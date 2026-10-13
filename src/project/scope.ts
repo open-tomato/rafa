@@ -128,7 +128,7 @@ import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
  * root or the home: `.rafa`. Taken from `CONFIG_FILE`, so the two
  * cannot name different directories.
  */
-export const SCOPE_DIR = dirname(CONFIG_FILE);
+export const SCOPE_DIR: string = dirname(CONFIG_FILE);
 
 /** The command the hint sends an operator to. */
 export const INIT_COMMAND = 'rafa init';

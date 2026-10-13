@@ -54,7 +54,7 @@ export interface FailedCaseFile {
  * as a group's title. The path is any run of non-space characters ending
  * in `.test` or `.spec` and a JavaScript or TypeScript extension.
  */
-export const TEST_FILE_HEADER = /^##\[group\](\S+\.(?:test|spec)\.[cm]?[jt]sx?):$/;
+export const TEST_FILE_HEADER: RegExp = /^##\[group\](\S+\.(?:test|spec)\.[cm]?[jt]sx?):$/;
 
 /** What closes a group. */
 const GROUP_END = '##[endgroup]';

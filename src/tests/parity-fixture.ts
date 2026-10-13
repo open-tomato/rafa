@@ -135,7 +135,7 @@ import { listSessionLogs, sessionLogDir } from '../effort/collect.js';
 export const LIVE_PARITY_ENV = 'RAFA_LIVE_PARITY';
 
 /** The skip reason while {@link LIVE_PARITY_ENV} is not `1`. */
-export const LIVE_PARITY_OFF_REASON = `live parity off: set ${LIVE_PARITY_ENV}=1 `
+export const LIVE_PARITY_OFF_REASON: string = `live parity off: set ${LIVE_PARITY_ENV}=1 `
   + 'to run against the sibling\'s live session logs and stored rows';
 
 /** The variable that points the parity tests at a session log directory. */

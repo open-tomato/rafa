@@ -196,4 +196,5 @@ const wrapped: RafaCommand = {
   ).run(context),
 };
 
-export default endingWith(Object.freeze(wrapped));
+const command: RafaCommand = endingWith(Object.freeze(wrapped));
+export default command;

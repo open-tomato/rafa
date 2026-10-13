@@ -85,13 +85,13 @@ export {
  * instinct the loop files from it, so the two drifting apart would
  * make the conversion lossy without anything failing.
  */
-export const INSTINCT_KINDS = FINDING_KINDS;
+export const INSTINCT_KINDS: readonly ['gotcha', 'pattern', 'location', 'skill-suggestion'] = FINDING_KINDS;
 
 /** One of {@link INSTINCT_KINDS}. */
 export type InstinctKind = FindingKind;
 
 /** Whether the failure the instinct is about announces itself. */
-export const INSTINCT_SIGNALS = FINDING_SIGNALS;
+export const INSTINCT_SIGNALS: readonly ['loud', 'silent'] = FINDING_SIGNALS;
 
 /** One of {@link INSTINCT_SIGNALS}. */
 export type InstinctSignal = FindingSignal;
@@ -101,7 +101,7 @@ export type InstinctSignal = FindingSignal;
  * `FINDING_DOMAINS` so a finding's `domain` is read against the same
  * set. See that list for where they were measured.
  */
-export const INSTINCT_DOMAINS = FINDING_DOMAINS;
+export const INSTINCT_DOMAINS: readonly ['code-style', 'testing', 'git', 'debugging', 'workflow', 'security', 'general-best-practices'] = FINDING_DOMAINS;
 
 /** One of {@link INSTINCT_DOMAINS}. */
 export type InstinctDomain = typeof INSTINCT_DOMAINS[number];
@@ -143,7 +143,7 @@ export const CAUSE_HEADING = '## Cause';
  * vocabularies are independent, and an instinct id that stopped
  * looking like a skill name would break nothing.
  */
-export const INSTINCT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const INSTINCT_ID_PATTERN: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * An ISO 8601 instant: a date, a `T`, a time, and either `Z` or an
@@ -151,7 +151,7 @@ export const INSTINCT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  * comparing these strings and a date sorts before every instant on the
  * same day.
  */
-export const TIMESTAMP_PATTERN
+export const TIMESTAMP_PATTERN: RegExp
   = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /** The fields a record cannot omit. */

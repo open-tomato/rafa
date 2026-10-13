@@ -145,7 +145,7 @@ import { hasPlanFor, readNativeBlockersColumn, readRoadmapRows } from './roadmap
 import { createRoadmapReadings, scanClaimBranches } from './roadmap.js';
 
 /** The three horizons, in the order their groups are printed. */
-export const HORIZONS = Object.freeze(['now', 'next', 'later'] as const);
+export const HORIZONS: readonly ['now', 'next', 'later'] = Object.freeze(['now', 'next', 'later'] as const);
 
 /** When an epic is planned. */
 export type Horizon = typeof HORIZONS[number];

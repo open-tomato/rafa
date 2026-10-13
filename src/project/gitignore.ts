@@ -148,7 +148,7 @@ const PRIVATE_TRIAGE = 'triage/private';
 const CACHE_DIR = 'cache';
 
 /** The digest of the flags the notice last saw, relative to the project root. */
-export const TRACKING_DIGEST_FILE = join(SCOPE_DIR, DIGEST_NAME);
+export const TRACKING_DIGEST_FILE: string = join(SCOPE_DIR, DIGEST_NAME);
 
 /** The line above the entry. */
 export const BLOCK_BEGIN = '# >>> rafa tracking: rafa rewrites the lines up to the end marker';

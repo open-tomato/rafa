@@ -711,4 +711,5 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
   return Object.freeze(command);
 }
 
-export default createPrTriageCommand();
+const command: RafaCommand = createPrTriageCommand();
+export default command;

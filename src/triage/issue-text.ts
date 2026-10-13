@@ -68,7 +68,7 @@ const TITLE_CUT = '...';
 const MIN_FENCE_LENGTH = 3;
 
 /** What opens a filed issue's body. */
-export const ISSUE_OPENING = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
+export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
   + ' dispatches no task for it: a plan that wants it fixed declares a task.';
 
 /** What opens a recurrence's comment. */

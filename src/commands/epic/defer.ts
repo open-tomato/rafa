@@ -71,4 +71,5 @@ export function createEpicDeferCommand(seams: EpicHorizonSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createEpicDeferCommand();
+const command: RafaCommand = createEpicDeferCommand();
+export default command;

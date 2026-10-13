@@ -87,7 +87,7 @@ import { isAgentName } from './declaration.js';
 export { readFrontmatter };
 
 /** Where definitions live under either root. */
-export const AGENT_DEFINITION_DIR = join('.claude', 'agents');
+export const AGENT_DEFINITION_DIR: string = join('.claude', 'agents');
 
 /** Which root a definition resolved under. */
 export type AgentDefinitionScope = 'project' | 'user';

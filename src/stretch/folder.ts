@@ -41,7 +41,7 @@ import { errorCode, isPidAlive } from '../core/loop/index.js';
 import { isPositiveWhole } from '../loop/session-record-parse.js';
 
 /** The folder every stretch writes under, relative to the project root. */
-export const STRETCH_DIR = join('.rafa', 'stretch');
+export const STRETCH_DIR: string = join('.rafa', 'stretch');
 
 /** The engineer's record in a stretch folder. */
 export const AGENT_FILE = 'agent.json';

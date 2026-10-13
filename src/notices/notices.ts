@@ -64,7 +64,7 @@ import { dirname, join } from 'node:path';
 import { CLAUDE_SETTING_SOURCES, messageOf } from '../core/config/sections.js';
 
 /** The notices rafa can owe a person, in the order they are printed. */
-export const NOTICE_IDS = Object.freeze(['alpha', 'danger'] as const);
+export const NOTICE_IDS: readonly ['alpha', 'danger'] = Object.freeze(['alpha', 'danger'] as const);
 
 /** One notice's id. */
 export type NoticeId = typeof NOTICE_IDS[number];

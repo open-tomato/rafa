@@ -54,10 +54,10 @@ import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { DISK_FILE_SYSTEM, SCOPE_DIR } from './scope.js';
 
 /** Where rafa's bin sits under the home: `.rafa/bin`. */
-export const RAFA_BIN_DIR = join(SCOPE_DIR, 'bin');
+export const RAFA_BIN_DIR: string = join(SCOPE_DIR, 'bin');
 
 /** Where bun's global bin sits under the home: `.bun/bin`. */
-export const BUN_BIN_DIR = join('.bun', 'bin');
+export const BUN_BIN_DIR: string = join('.bun', 'bin');
 
 /** Where `~/.rafa/bin` sits on the `PATH`; see the module note. */
 export type BinPathState = 'ahead' | 'missing' | 'behind';

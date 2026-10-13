@@ -136,4 +136,5 @@ export function createEffortDashboardCommand(seams: DashboardCommandSeams = {}):
   return Object.freeze(command);
 }
 
-export default createEffortDashboardCommand();
+const command: RafaCommand = createEffortDashboardCommand();
+export default command;

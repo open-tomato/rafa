@@ -91,7 +91,7 @@ import { FAILED_LOG_TAIL_LINES } from './evidence.js';
  * more than the evidence reader keeps would be showing lines no other
  * reader of the same triage ever saw.
  */
-export const FOLLOW_UP_EXCERPT_LINES = FAILED_LOG_TAIL_LINES;
+export const FOLLOW_UP_EXCERPT_LINES: number = FAILED_LOG_TAIL_LINES;
 
 /**
  * The commands whose answers are already in the prompt, named in the
@@ -106,18 +106,18 @@ export const REASSESS_COMMANDS: readonly string[] = Object.freeze([
 ] as const);
 
 /** What the "Conflicting files" section says when there are none. */
-export const NO_FILES
+export const NO_FILES: string
   = 'None were read. A `conflict-*` class with no files means the conflict was'
     + ' reported by GitHub but the head was not fetched locally, so treat the file'
     + ' list as unknown rather than empty.';
 
 /** What the "Failing step" section says when no log named one. */
-export const NO_STEP
+export const NO_STEP: string
   = 'No step was named. The run was cancelled, timed out, or GitHub no longer'
     + ' serves its log, so the class was not read from a step name.';
 
 /** What the "Log excerpt" section says when there is no evidence. */
-export const NO_EXCERPT
+export const NO_EXCERPT: string
   = 'No failing-job log was read. There was none to read: the pull request is not'
     + ' red on a check, or its run produced no log.';
 

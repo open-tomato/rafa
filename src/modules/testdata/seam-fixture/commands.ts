@@ -22,4 +22,6 @@ const pingCommand: RafaCommand = {
   },
 };
 
-export default [pingCommand];
+const commands: RafaCommand[] = [pingCommand];
+
+export default commands;

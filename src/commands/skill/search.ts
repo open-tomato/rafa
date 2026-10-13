@@ -380,4 +380,5 @@ export function createSkillSearchCommand(seams: SearchSeams = DEFAULT_SEARCH_SEA
   return createSearchCommand('skill', seams);
 }
 
-export default createSkillSearchCommand();
+const command: RafaCommand = createSkillSearchCommand();
+export default command;

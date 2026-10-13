@@ -325,7 +325,7 @@ export function noProvenanceRows(
 }
 
 /** The pin's row: none on a match, a warning on a difference, a note when unread. See "The pin". */
-export function cliVersionRows(installed: string | null, pinned = SERVE_CLI_VERSION): readonly TierDoctorRow[] {
+export function cliVersionRows(installed: string | null, pinned: string = SERVE_CLI_VERSION): readonly TierDoctorRow[] {
   if (installed === pinned) return [];
   const name = 'Claude Code';
   if (installed === null) {
@@ -349,7 +349,7 @@ export function cliVersionRows(installed: string | null, pinned = SERVE_CLI_VERS
  * The skill-use pin's row: a warning when `installed` is read and is not
  * `pinned`, nothing on a match or when unread. See "The skill-use pin".
  */
-export function skillUseVersionRows(installed: string | null, pinned = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
+export function skillUseVersionRows(installed: string | null, pinned: string = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
   if (installed === null || installed === pinned) return [];
   return [row(
     'skill-use-version',

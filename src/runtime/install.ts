@@ -176,7 +176,7 @@ export const EXIT_COULD_NOT_RUN = 2;
  * A tracker's file name, as `trackerPathFor` derives one from a plan's:
  * `PLAN_TRACKER.md` or `PLAN_TRACKER-<stub>.md`.
  */
-export const TRACKER_NAME = /^PLAN_TRACKER(-[^/]*)?\.md$/;
+export const TRACKER_NAME: RegExp = /^PLAN_TRACKER(-[^/]*)?\.md$/;
 
 /** Where a build's output lines go when the runner reads them rather than handing over its streams. */
 export interface BuildLines {

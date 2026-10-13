@@ -35,7 +35,7 @@ export const FRAGMENT_BATCH = 20;
 const PULL_FIELDS = 'number state baseRefName headRefOid';
 
 /** An issue's lists the facts read, each one GraphQL connection read page by page. */
-export const ISSUE_LISTS = Object.freeze(['labels', 'closedByPullRequestsReferences', 'timelineItems'] as const);
+export const ISSUE_LISTS: readonly ['labels', 'closedByPullRequestsReferences', 'timelineItems'] = Object.freeze(['labels', 'closedByPullRequestsReferences', 'timelineItems'] as const);
 
 /** One of {@link ISSUE_LISTS}. */
 export type IssueList = (typeof ISSUE_LISTS)[number];

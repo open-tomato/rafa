@@ -88,7 +88,7 @@ import { parseRoadmapBody } from './roadmap.js';
 export const HORIZON_LABEL_PREFIX = 'horizon:';
 
 /** Every kind of problem, in the order {@link readEpicProblems} answers them. */
-export const EPIC_PROBLEM_KINDS = Object.freeze([
+export const EPIC_PROBLEM_KINDS: readonly ['several-epic-labels', 'orphan-label', 'horizon', 'unlabelled-checklist', 'unlisted-member'] = Object.freeze([
   'several-epic-labels',
   'orphan-label',
   'horizon',

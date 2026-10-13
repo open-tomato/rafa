@@ -591,7 +591,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
  * tests plant pre-log stores with, brings a store to this
  * `user_version` and refuses one past it, as the pre-log releases do.
  */
-export const SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;
+export const SQLITE_SCHEMA_VERSION: number = SQLITE_MIGRATIONS.length;
 
 /**
  * The `user_version` a store is given when it holds `applied`. The

@@ -283,7 +283,7 @@ import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js'
 import { nearestOpenBugs } from './similarity.js';
 
 /** Where security bugs are filed, under a repository root. */
-export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
+export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
 
 /** The variables named as secrets whatever the config says, each when set. */
 export const SECRET_ENV_NAMES = ['GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'LINEAR_API_KEY'] as const;

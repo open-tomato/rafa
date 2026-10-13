@@ -131,7 +131,7 @@ export type FixSchemaStatus =
   | 'rebuilt';
 
 /** The `planSchema` refusals a rebuild at this rafa's migrations repairs, in the order they are tried. */
-export const REPAIRABLE_REASONS = [
+export const REPAIRABLE_REASONS: readonly ['pre-log-unreleased', 'gate-mismatch', 'edited', 'unknown-breaks-readers', 'unknown-breaks-writers'] = [
   'pre-log-unreleased',
   'gate-mismatch',
   'edited',

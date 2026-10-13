@@ -100,7 +100,7 @@ const COMMAND_NAME = 'rafa stretch item';
 export const CI_POLL_MS = 30_000;
 
 /** How long the item waits for the run on the merge commit to end. */
-export const CI_WAIT_MS = 90 * 60_000;
+export const CI_WAIT_MS: number = 90 * 60_000;
 
 /** How many reads of the run on the merge commit may fail in a row before the wait gives up. */
 export const CI_READ_TRIES = 3;

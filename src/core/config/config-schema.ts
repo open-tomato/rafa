@@ -230,7 +230,7 @@ import {
  * directory, so a path built here compares equal to one a caller built
  * with `join` of its own.
  */
-export const CONFIG_FILE = join('.rafa', 'config.yaml');
+export const CONFIG_FILE: string = join('.rafa', 'config.yaml');
 
 /**
  * Every setting, resolved. The module note maps each to its file key;

@@ -128,7 +128,7 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
 /** {@link TRIAGE_FRESH_HOURS} in milliseconds; the window is inclusive. */
-export const TRIAGE_FRESH_WINDOW_MS = TRIAGE_FRESH_HOURS * HOUR_MS;
+export const TRIAGE_FRESH_WINDOW_MS: number = TRIAGE_FRESH_HOURS * HOUR_MS;
 
 /** How many candidates a bare `rafa pr triage` assesses before it lists instead. */
 export const MAX_TRIAGE_CANDIDATES = 3;

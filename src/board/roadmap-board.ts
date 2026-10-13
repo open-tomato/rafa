@@ -112,7 +112,7 @@ export const BOARD_LIST_FIELDS = 'number,title,body,state,stateReason,labels';
  * {@link parseBoardListing} reads in that mode, in the order the module
  * note lists them.
  */
-export const nativeBoardListFields = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
+export const nativeBoardListFields: string = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
 
 /** The `--json` fields a listing read in `mode` asks for. */
 export function boardListFields(mode: BoardRelationshipMode): string {

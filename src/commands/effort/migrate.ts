@@ -200,4 +200,5 @@ export function createMigrateCommand(seams: MigrateCommandSeams = {}): RafaComma
   return Object.freeze(command);
 }
 
-export default createMigrateCommand();
+const command: RafaCommand = createMigrateCommand();
+export default command;

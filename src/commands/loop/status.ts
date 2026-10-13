@@ -191,4 +191,5 @@ export function createLoopStatusCommand(seams: LoopSessionSeams = {}): RafaComma
   return Object.freeze(command);
 }
 
-export default createLoopStatusCommand();
+const command: RafaCommand = createLoopStatusCommand();
+export default command;

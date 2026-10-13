@@ -222,4 +222,5 @@ export function createInstinctShowCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createInstinctShowCommand();
+const command: RafaCommand = createInstinctShowCommand();
+export default command;

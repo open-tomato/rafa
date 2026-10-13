@@ -391,7 +391,7 @@
  * dispatch nothing. `skill index` is in the command tree and is not
  * registered, because nothing dispatches it yet.
  */
-import type { SubjectSpec } from '../cli/registry.js';
+import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
 import type { RafaCommand } from '../core/command/index.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
@@ -620,4 +620,4 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
 ]);
 
 /** The registry `src/rafa.ts` dispatches through. */
-export const CORE_REGISTRY = createCommandRegistry({ subjects: CORE_SUBJECTS, commands: CORE_COMMANDS });
+export const CORE_REGISTRY: CommandRegistry = createCommandRegistry({ subjects: CORE_SUBJECTS, commands: CORE_COMMANDS });

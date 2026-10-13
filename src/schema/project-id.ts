@@ -50,7 +50,7 @@ import { createHash } from 'node:crypto';
 export const PROJECT_ID_LENGTH = 12;
 
 /** The shape {@link projectIdFromRemote} produces: lowercase hex. */
-export const PROJECT_ID_PATTERN = new RegExp(`^[0-9a-f]{${PROJECT_ID_LENGTH}}$`);
+export const PROJECT_ID_PATTERN: RegExp = new RegExp(`^[0-9a-f]{${PROJECT_ID_LENGTH}}$`);
 
 /**
  * The shell's `*@*:*` pattern: an `@` with a `:` somewhere after it,

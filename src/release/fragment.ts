@@ -71,7 +71,7 @@ export const FRAGMENT_EXTENSION = '.md';
  * What a plan id has to look like to name a fragment file and to be one
  * word of the receipt comment.
  */
-export const FRAGMENT_PLAN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const FRAGMENT_PLAN_ID_PATTERN: RegExp = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** The first suffix a second fragment of one plan takes: `-2`. */
 const FIRST_REPEAT_SUFFIX = 2;

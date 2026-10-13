@@ -732,4 +732,5 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
   return Object.freeze(command);
 }
 
-export default createNextCommand();
+const command: RafaCommand = createNextCommand();
+export default command;

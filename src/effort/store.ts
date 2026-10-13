@@ -75,7 +75,7 @@ import { dirname, join } from 'node:path';
  * literal so the separator is the platform's, which keeps a path built
  * here comparable to one a caller built with `join` of its own.
  */
-export const EFFORT_STORE_DIR = join('.rafa', 'effort');
+export const EFFORT_STORE_DIR: string = join('.rafa', 'effort');
 
 /** The row kinds the collector writes, one store file each. */
 export type EffortRowKind = 'sessions' | 'commits';

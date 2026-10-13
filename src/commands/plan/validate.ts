@@ -314,4 +314,5 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
   return Object.freeze(command);
 }
 
-export default createPlanValidateCommand();
+const command: RafaCommand = createPlanValidateCommand();
+export default command;

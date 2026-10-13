@@ -189,4 +189,5 @@ export function createSchemaCommand(seams: SchemaCommandSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createSchemaCommand();
+const command: RafaCommand = createSchemaCommand();
+export default command;

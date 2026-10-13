@@ -44,13 +44,13 @@ import { realEntry } from '../schema/tiers.js';
 import { STRETCH_DIR } from './folder.js';
 
 /** The project's own prompt, relative to its root. */
-export const PROJECT_PROMPT = join(STRETCH_DIR, 'engineer-prompt.md');
+export const PROJECT_PROMPT: string = join(STRETCH_DIR, 'engineer-prompt.md');
 
 /** Rafa's own prompt, relative to the rafa checkout's root. */
-export const RAFA_PROMPT = join('scripts', 'stretch', 'engineer-prompt.md');
+export const RAFA_PROMPT: string = join('scripts', 'stretch', 'engineer-prompt.md');
 
 /** The default prompt, relative to the folder of the running entry. */
-export const BUNDLED_PROMPT = join('bundled', 'stretch', 'engineer-prompt-default.md');
+export const BUNDLED_PROMPT: string = join('bundled', 'stretch', 'engineer-prompt-default.md');
 
 /** The placeholder for the stretch being started. */
 export const STRETCH_PLACEHOLDER = '{{STRETCH}}';

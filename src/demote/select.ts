@@ -82,10 +82,10 @@ export const CLAUDE_DIRECTORY = '.claude';
 export const AUTO_EXTRACTED_ORIGIN = 'auto-extracted';
 
 /** The directory under `<base>/.rafa/` the originals move into. */
-export const DEMOTED_PATH = join('.rafa', 'demoted');
+export const DEMOTED_PATH: string = join('.rafa', 'demoted');
 
 /** The directory under `<base>/.rafa/` the instincts are written into. */
-export const INSTINCTS_PATH = join('.rafa', 'instincts');
+export const INSTINCTS_PATH: string = join('.rafa', 'instincts');
 
 /** The report's name under {@link DEMOTED_PATH}. */
 export const REPORT_FILE = 'report.md';

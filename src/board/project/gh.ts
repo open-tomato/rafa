@@ -102,29 +102,29 @@ const PROJECT_SELECTION = 'id number title url closed public'
   + ` fields(first: ${String(PROJECT_PAGE_SIZE)}) { pageInfo { hasNextPage } nodes { ${FIELD_SELECTION} } }`;
 
 /** What the find asks; see the module note. */
-export const FIND_QUERY = 'query($owner: String!, $number: Int!) { repositoryOwner(login: $owner) { login ... on ProjectV2Owner'
+export const FIND_QUERY: string = 'query($owner: String!, $number: Int!) { repositoryOwner(login: $owner) { login ... on ProjectV2Owner'
   + ` { projectV2(number: $number) { ${PROJECT_SELECTION} } } } }`;
 
 /** The node id of an owner, read before the copy. */
 export const OWNER_QUERY = 'query($owner: String!) { repositoryOwner(login: $owner) { id login } }';
 
 /** The copy; see the module note. */
-export const COPY_MUTATION = 'mutation($template: ID!, $owner: ID!, $title: String!) { copyProjectV2(input:'
+export const COPY_MUTATION: string = 'mutation($template: ID!, $owner: ID!, $title: String!) { copyProjectV2(input:'
   + ` { projectId: $template, ownerId: $owner, title: $title, includeDraftIssues: false }) { projectV2 { ${PROJECT_SELECTION} } } }`;
 
 /** The node id of a repository, read before the link. */
 export const REPOSITORY_QUERY = 'query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }';
 
 /** The link; see the module note. */
-export const LINK_MUTATION = 'mutation($project: ID!, $repository: ID!) { linkProjectV2ToRepository(input:'
+export const LINK_MUTATION: string = 'mutation($project: ID!, $repository: ID!) { linkProjectV2ToRepository(input:'
   + ' { projectId: $project, repositoryId: $repository }) { repository { id } } }';
 
 /** The node id of an issue or a pull request, read before the add. */
-export const CONTENT_QUERY = 'query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name)'
+export const CONTENT_QUERY: string = 'query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name)'
   + ' { id issueOrPullRequest(number: $number) { ... on Issue { id } ... on PullRequest { id } } } }';
 
 /** The add; see the module note. */
-export const ADD_ITEM_MUTATION = 'mutation($project: ID!, $content: ID!) { addProjectV2ItemById(input:'
+export const ADD_ITEM_MUTATION: string = 'mutation($project: ID!, $content: ID!) { addProjectV2ItemById(input:'
   + ' { projectId: $project, contentId: $content }) { item { id } } }';
 
 /** A repository name GitHub accepts after its owner. */
@@ -142,7 +142,7 @@ const VALUE_SELECTION = `... on ProjectV2ItemFieldSingleSelectValue { optionId n
 const CONTENT_SELECTION = '... on Issue { number repository { nameWithOwner } } ... on PullRequest { number repository { nameWithOwner } }';
 
 /** What the items read asks, one page at a time; see the module note. */
-export const ITEMS_QUERY = 'query($project: ID!, $after: String) { node(id: $project) { ... on ProjectV2'
+export const ITEMS_QUERY: string = 'query($project: ID!, $after: String) { node(id: $project) { ... on ProjectV2'
   + ` { items(first: ${String(PROJECT_PAGE_SIZE)}, after: $after) { pageInfo { hasNextPage endCursor }`
   + ` nodes { id type isArchived content { ${CONTENT_SELECTION} }`
   + ` fieldValues(first: ${String(PROJECT_PAGE_SIZE)}) { pageInfo { hasNextPage } nodes { ${VALUE_SELECTION} } } } } } } }`;

@@ -131,4 +131,5 @@ export function createIssueShowCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
   return Object.freeze(command);
 }
 
-export default createIssueShowCommand();
+const command: RafaCommand = createIssueShowCommand();
+export default command;

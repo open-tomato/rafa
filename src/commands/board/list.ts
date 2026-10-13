@@ -252,4 +252,5 @@ export function createBoardListCommand(seams: BoardListSeams = {}): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createBoardListCommand();
+const command: RafaCommand = createBoardListCommand();
+export default command;
