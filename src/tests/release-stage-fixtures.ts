@@ -299,6 +299,7 @@ export function stubPulls(script: Script, calls: string[], bodies: string[]): Pu
     checks: () => unreached('checks'),
     browse: () => unreached('browse'),
     merge: () => unreached('merge'),
+    close: () => unreached('close'),
     create: () => unreached('create'),
     editTitle: () => unreached('editTitle'),
     editBase: () => unreached('editBase'),

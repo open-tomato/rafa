@@ -1,7 +1,8 @@
 /**
- * The removal steps of `rafa cleanup` as data: which worktrees, branches
- * and run records the ticked rows turn into, in which order, with which
- * delete flag, and the one runner that carries them out.
+ * The removal steps of `rafa cleanup` as data: which worktrees, local
+ * branches, branches on `origin` and run records the ticked rows turn
+ * into, in which order, with which delete flag, and the one runner that
+ * carries them out.
  *
  * `src/pr/worktree.ts` draws the line this module copies: a step is an
  * argv that can be read in a test without a repository, printed as the
@@ -26,7 +27,10 @@
  *      the question naming its commit count. A Not-pushed row that is
  *      withheld below is handed over unasked; see "Which Not-pushed
  *      rows are asked about".
- *   3. Last, every ticked run record (`./runs.ts`), `rm <record>
+ *   3. Then every ticked remote-only row (`./remote-only.ts`),
+ *      `git push origin --delete <name>`: one step per row, never a
+ *      force flag, waiting on nothing. See "The one remote write".
+ *   4. Last, every ticked run record (`./runs.ts`), `rm <record>
  *      [<events file>]`: one step per record, removing the record and,
  *      when the row names one, its events file. An unticked run row is no
  *      step. The runner does not spawn `rm`: it removes the step's paths
@@ -70,18 +74,51 @@
  * named rows alone and hands every other ticked row on unasked, to be
  * withheld with its reason.
  *
+ * ## The one remote write
+ *
+ * A `delete-remote-branch` step is the only step that reaches a remote,
+ * and its argv the only one built here whose git verb is `push`. The
+ * remote is always `origin`, the one `./remote-only.ts` reads.
+ *
+ * It is built from {@link CleanupSelection.remoteOnly} and from nothing
+ * else. A remote-only row never starts ticked (`RemoteOnlyRow.ticked` is
+ * the literal `false`), so a row is in that list only because the person
+ * ticked it: being handed over IS the tick, and a listed row that was
+ * not handed over is no step and no {@link WithheldRemoval}. No other
+ * group builds one. A Stale row still names
+ * `git push origin --delete <b>` for the person to run, and that line is
+ * the renderer's, not a step.
+ *
+ * The row has no local branch, so no worktree holds it and its step
+ * waits on nothing. The delete is not conditional on the tip the reading
+ * saw: a commit pushed to the branch between the fetch and the step goes
+ * with it (measured below). `--force-with-lease=<name>:<sha>` would make
+ * it conditional, and is a force flag this module never spells.
+ *
+ * A row whose name opens with `-` is a {@link WithheldRemoval}
+ * ({@link dashNameReason}), never a step: unlike a local branch, a
+ * branch on a remote can be named `-f` or `--force` (measured below),
+ * and git would read that word as an option of `push`. The reason names
+ * the line that does delete it, `--` before the name, for the person to
+ * run. A leading `+` is left alone: under `--delete` it forces nothing.
+ *
  * ## The force guard
  *
  * {@link forcedFlagRefusal} reads the argv about to be spawned, not the
  * rows it was built from, and the runner refuses a step it fires on
- * without spawning anything. `--force` with or without a value and any
- * short cluster holding `f` (`-f`, `-ff`, `-df`) are refused. `-D` is
- * not among them: it is the one forced delete the rules above allow,
- * and only this module's builder spells it.
+ * without spawning anything. `--force` with or without a value, every
+ * word opening `--force-` (`--force-with-lease`, `--force-if-includes`,
+ * both flags of `git push`) and any short cluster holding
+ * `f` (`-f`, `-ff`, `-df`) are refused. `-D` is not among them: it is
+ * the one forced delete the rules above allow, and only this module's
+ * builder spells it. The guard reads a `delete-remote-branch` step as it
+ * reads every other: it is about force flags, and an option that forces
+ * nothing passes it, which is why the builder withholds a dash name.
  *
- * A branch name cannot smuggle a flag in: `git branch -- -f` answered
- * `fatal: '-f' is not a valid branch name`, exit 128, and a worktree
- * path comes from `git worktree list`, which prints it absolute.
+ * A local branch name cannot smuggle a flag in: `git branch -- -f`
+ * answered `fatal: '-f' is not a valid branch name`, exit 128, and a
+ * worktree path comes from `git worktree list`, which prints it
+ * absolute. A name read off a remote can; see "The one remote write".
  *
  * ## Measured
  *
@@ -98,12 +135,29 @@
  *     use --force to delete it`. That refusal is reported, never
  *     answered with `--force`.
  *
- * Nothing here touches a remote: a Stale row names
- * `git push origin --delete <b>` for the person to run, and that line
- * is the renderer's, not a step.
+ * On git 2.53.0 under Linux, 2026-10-13, under `LC_ALL=C`, in a clone of
+ * a bare remote reached by its path, the remote's branches written
+ * there with `git update-ref`:
+ *
+ *   - `git push origin --delete <name>` exits 0, writes
+ *     ` - [deleted]         <name>` on standard error, and drops the
+ *     clone's `refs/remotes/origin/<name>` with the remote's branch.
+ *   - The same line again exits 1: `error: unable to delete '<name>':
+ *     remote ref does not exist`. The runner reports it as a step that
+ *     did not run clean.
+ *   - A branch whose tip was moved on the remote after the clone's last
+ *     fetch is deleted all the same, exit 0.
+ *   - The remote holds branches named `-f` and `--force`, and the clone
+ *     tracks them as `origin/-f` and `origin/--force`.
+ *     `git push origin --delete -f`, and the same with `--force`, exits
+ *     128 with `fatal: --delete doesn't make sense without any refs` and
+ *     deletes nothing; `git push origin --delete -- -f` deletes `-f`.
+ *   - With `+plus` and `plus` both on the remote,
+ *     `git push origin --delete +plus` deletes `+plus` and leaves `plus`.
  */
 import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.js';
 import type { PastHeadRead } from './past-head.js';
+import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '../core/git/index.js';
@@ -119,16 +173,22 @@ import { heldReason as checkedOutReason } from './groups.js';
 /** How many characters of a commit hash a withheld reason shows. */
 const SHORT_HASH_LENGTH = 7;
 
-/** The flag spellings that make a worktree removal or branch delete forced. */
-const FORCING_FLAG = /^(?:--force(?:=.*)?|-[^-]*f[^-]*)$/;
+/** The flag spellings that make a worktree removal, a branch delete or a push forced. */
+const FORCING_FLAG = /^(?:--force(?:[=-].*)?|-[^-]*f[^-]*)$/;
 
-/** Which of the three removals a step is. */
-export type CleanupStepKind = 'remove-worktree' | 'delete-branch' | 'remove-run';
+/** The remote a `delete-remote-branch` step writes to: the one `./remote-only.ts` reads its rows off. */
+const REMOTE = 'origin';
+
+/** What a word git reads as an option opens with. */
+const OPTION_MARK = '-';
+
+/** Which of the four removals a step is; `delete-remote-branch` is the only one that reaches a remote. */
+export type CleanupStepKind = 'remove-worktree' | 'delete-branch' | 'delete-remote-branch' | 'remove-run';
 
 /** One step: what it removes, and exactly what it runs. */
 export interface CleanupStep {
   readonly kind: CleanupStepKind;
-  /** The worktree path, the branch name or the run record's path it removes. */
+  /** The worktree path, the branch name (without `origin/` for a remote one) or the run record's path it removes. */
   readonly subject: string;
   /** The whole command, `git` or `rm` included, ready to print; see the module note for `rm`. */
   readonly argv: readonly string[];
@@ -154,13 +214,19 @@ export interface CleanupSelection {
   readonly stale: readonly StaleRow[];
   /** The Not-pushed rows the person ticked and confirmed by the second question, and the ticked ones {@link deletedNotPushed} leaves out, unasked. */
   readonly notPushed: readonly NotPushedRow[];
+  /**
+   * The remote-only rows the person ticked, each deleted on `origin`. A
+   * row's own `ticked` is always false, so only a row handed over here
+   * becomes a step; see "The one remote write". None when left out.
+   */
+  readonly remoteOnly?: readonly RemoteOnlyRow[];
   /** The run-record rows; only the ticked ones become steps. None when left out. */
   readonly runs?: readonly RunRow[];
 }
 
 /** What {@link cleanupSteps} answers. */
 export interface CleanupPlan {
-  /** Worktree removals first, then branch deletes, then run-record removals. */
+  /** Worktree removals first, then local branch deletes, then the deletes on `origin`, then run-record removals. */
   readonly steps: readonly CleanupStep[];
   readonly withheld: readonly WithheldRemoval[];
 }
@@ -170,7 +236,7 @@ export interface CleanupOutcome {
   readonly step: CleanupStep;
   /** True when git was spawned for it, or the run record's removal was tried. */
   readonly ran: boolean;
-  /** True when git exited 0 or every path was removed; false when it was not run at all. */
+  /** True when git exited 0 (for a delete on `origin`, the push did) or every path was removed; false when it was not run at all. */
   readonly ok: boolean;
   /** The step as one line the person can paste. */
   readonly command: string;
@@ -220,6 +286,39 @@ export function deleteBranchStep(branch: string, forced: boolean, after: string 
     argv: ['git', 'branch', flag, branch],
     after,
   });
+}
+
+/**
+ * The step deleting the branch `name` on `origin`:
+ * `git push origin --delete <name>`, never a force flag. The one step
+ * that writes to a remote; {@link cleanupSteps} builds it for a ticked
+ * remote-only row alone, and withholds a name that opens with `-`.
+ */
+export function deleteRemoteBranchStep(name: string): CleanupStep {
+  return frozenStep({
+    kind: 'delete-remote-branch',
+    subject: name,
+    argv: ['git', 'push', REMOTE, '--delete', name],
+    after: null,
+  });
+}
+
+/**
+ * Why a remote-only row whose name opens with `-` is not deleted, with
+ * the line that does delete it, `--` before the name, for the person to
+ * run; see "The one remote write" in the module note.
+ */
+export function dashNameReason(name: string): string {
+  const byHand = ['git', 'push', REMOTE, '--delete', '--', name].map((word) => shellQuote(word)).join(' ');
+  return `its name opens with \`${OPTION_MARK}\`, which git reads as an option, not as a branch; to delete it on ${REMOTE}: ${byHand}`;
+}
+
+/** The step for one ticked remote-only row, or why there is none. */
+function remoteBranchStep(row: RemoteOnlyRow): CleanupStep | WithheldRemoval {
+  if (row.name.startsWith(OPTION_MARK)) {
+    return { kind: 'delete-remote-branch', subject: row.name, reason: dashNameReason(row.name) };
+  }
+  return deleteRemoteBranchStep(row.name);
 }
 
 /**
@@ -378,24 +477,28 @@ export function deletedNotPushed(selection: CleanupSelection): readonly NotPushe
 
 /**
  * The steps the ticked rows turn into: worktree removals first, then
- * branch deletes, then the ticked run records, and every ticked row that
- * is not a step with why; see the module note for the order, the flags
- * and what is withheld.
+ * local branch deletes, then the deletes on `origin` of the ticked
+ * remote-only rows, then the ticked run records, and every ticked row
+ * that is not a step with why; see the module note for the order, the
+ * flags and what is withheld.
  */
 export function cleanupSteps(selection: CleanupSelection): CleanupPlan {
   const removable = selection.worktrees.filter((row) => row.tickable);
   const untickable = selection.worktrees.filter((row) => !row.tickable);
   const [removed, blocked] = heldBranches(selection);
   const branchEntries = branchPicks(selection).map((pick) => branchStep(pick, removed, blocked));
+  const remoteEntries = (selection.remoteOnly ?? []).map((row) => remoteBranchStep(row));
   return Object.freeze({
     steps: Object.freeze([
       ...removable.map((row) => removeWorktreeStep(row.path)),
       ...branchEntries.filter(isStep),
+      ...remoteEntries.filter(isStep),
       ...(selection.runs ?? []).filter((row) => row.ticked).map((row) => removeRunStep(row)),
     ]),
     withheld: Object.freeze([
       ...untickable.map((row): WithheldRemoval => ({ kind: 'remove-worktree', subject: row.path, reason: row.reason })),
       ...branchEntries.filter((entry): entry is WithheldRemoval => !isStep(entry)),
+      ...remoteEntries.filter((entry): entry is WithheldRemoval => !isStep(entry)),
     ]),
   });
 }
@@ -405,12 +508,16 @@ export function cleanupCommandLine(step: CleanupStep): string {
   return step.argv.map((word) => shellQuote(word)).join(' ');
 }
 
-/** What `--dry-run` prints: one command line per step, in run order. */
+/**
+ * What `--dry-run` prints: one command line per step, in run order, a
+ * `delete-remote-branch` step as the `git push origin --delete <name>`
+ * it would run.
+ */
 export function dryRunLines(plan: CleanupPlan): readonly string[] {
   return plan.steps.map((step) => cleanupCommandLine(step));
 }
 
-/** The words of `argv` that would force the removal, in order. */
+/** The words of `argv` that would force the removal or the push, in order. */
 function forcingWords(argv: readonly string[]): readonly string[] {
   return argv.filter((word) => FORCING_FLAG.test(word));
 }
@@ -449,7 +556,7 @@ function removeRun(files: CleanupFiles, step: CleanupStep): CleanupOutcome {
   return { step, ran: true, ok: true, command, said: '' };
 }
 
-/** Runs one step, unless the guard or its `after` worktree stops it. */
+/** Runs one step, a `delete-remote-branch` one as the push its argv spells, unless the guard or its `after` worktree stops it. */
 function runStep(git: GitRunner, files: CleanupFiles, step: CleanupStep, removed: ReadonlySet<string>): CleanupOutcome {
   const refusal = forcedFlagRefusal(step.argv);
   if (refusal !== null) return notRun(step, refusal);

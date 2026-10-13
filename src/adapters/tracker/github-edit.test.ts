@@ -23,6 +23,22 @@
  * with stdin ignored however one is given reddened the runner's stdin
  * case in `github.test.ts` alone, since every case here runs over the
  * fake or a scripted runner.
+ *
+ * The priority cases arrived on 2026-10-13: the reading held equal to
+ * `get`'s, and the swap held to its commands in order, the read, the
+ * label made and the one `gh issue edit`. Ten mutations of
+ * `github-edit.ts` were driven that day, one run each over
+ * `src/adapters/tracker/`, at 500 pass before and after, the module
+ * restored byte-identical (sha256) after each, and every one reddened a
+ * case here. The triage label never removed reddened 2 and no contract
+ * case, since `get` reads a priority past a triage label; a label added
+ * though held 2; an empty edit still sent, the comma refusal dropped and
+ * the label made without `--repo` 1 each; the priority check dropped its
+ * 2 refusal rows. Other priority labels never removed, the label never
+ * made, labels removed whether held or not and a null priority answered
+ * always reddened contract cases over the fake as well, which refuses a
+ * label the repository lacks, one the issue holds, and a removal of one
+ * it lacks.
  */
 import type { GhResult, GhRunner } from './github.js';
 import type { IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
@@ -102,7 +118,22 @@ describe('reading an issue to edit', () => {
       open: true,
       labels: ['module:auth', 'type:bug', 'priority:urgent'],
       author: 'rafa-fake',
+      priority: 'urgent',
     });
+  });
+
+  it.each([
+    ['the first of two priority labels', ['priority:low', 'priority:high'], 'low'],
+    ['null for a first priority label the port does not name', ['priority:p0', 'priority:high'], null],
+    ['null for an issue in triage', ['type:bug', 'needs-triage'], null],
+    ['null for an issue holding no label', [], null],
+    ['a priority beside the triage label', ['needs-triage', 'priority:medium'], 'medium'],
+  ] as const)('answers %s as the priority, as get answers it', async (_name, labels, priority) => {
+    const { tracker, fake } = await overOneIssue();
+    fake.update('1', (issue) => ({ ...issue, labels: [...labels] }));
+
+    expect((await pairOf(tracker).editable(githubRef('1'))).priority).toBe(priority);
+    expect((await tracker.get(githubRef('1'))).priority).toBe(priority);
   });
 
   it('answers the author login and labels the issue holds now, in the order gh wrote them', async () => {
@@ -207,7 +238,9 @@ describe('editing an issue', () => {
   });
 
   it.each([
-    ['naming neither a body nor a title', {}, 'the change names neither a body nor a title'],
+    ['naming no body, no title and no priority', {}, 'the change names no body, no title and no priority'],
+    ['holding a priority the port does not name', { priority: 'p0' }, 'priority is "p0", expected one of: urgent, high, medium, low'],
+    ['holding a null priority', { priority: null, title: 't' }, 'priority is null, expected one of: urgent, high, medium, low'],
     ['holding a body that is not a string', { body: 7 }, 'body is 7, expected a string'],
     ['holding a title that is not a string', { title: null, body: 'b' }, 'title is null, expected a string'],
     ['that is not a mapping', 'body', 'the change is "body", expected a mapping'],
@@ -276,5 +309,146 @@ describe('editing an issue', () => {
       'github tracker: gh issue edit 9 failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.',
     );
     expect(fake.issue('1')?.body).toBe('Codes stay valid.\n');
+  });
+});
+
+describe('editing an issue\'s priority', () => {
+  /** The view `edit` reads the held labels with, for issue 1. */
+  const VIEW = ['issue', 'view', '1', '--json', EDITABLE_FIELDS];
+
+  it('swaps a priority in one gh issue edit, after reading the labels and making the new one', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const before = fake.calls().length;
+
+    await pairOf(tracker).edit(githubRef('1'), { priority: 'low' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      VIEW,
+      ['label', 'create', 'priority:low', '--force'],
+      ['issue', 'edit', '1', '--add-label', 'priority:low', '--remove-label', 'priority:urgent'],
+    ]);
+    expect(fake.inputs().slice(before)).toEqual([undefined, undefined, undefined]);
+    expect(fake.issue('1')).toMatchObject({ title: 'Replay window', body: 'Codes stay valid.\n' });
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:low']);
+  });
+
+  it('takes an issue out of triage in the same edit, removing needs-triage', async () => {
+    const fake = createFakeGh();
+    const tracker = createGithubTracker({ gh: fake.run });
+    await tracker.create(draftFixture({ opt: 0, module: 'auth', priority: null }));
+    const before = fake.calls().length;
+
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'needs-triage']);
+    await pairOf(tracker).edit(githubRef('1'), { priority: 'high' });
+
+    const sent = fake.calls().slice(before);
+    expect(sent.at(-1)).toEqual(['issue', 'edit', '1', '--add-label', 'priority:high', '--remove-label', 'needs-triage']);
+    expect(sent.filter(([, verb]) => verb === 'edit')).toHaveLength(1);
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:high']);
+  });
+
+  it('removes every other priority label and needs-triage, of those held, adding no label held already', async () => {
+    const { tracker, fake } = await overOneIssue();
+    fake.update('1', (issue) => ({ ...issue, labels: ['priority:low', 'type:bug', 'needs-triage', 'priority:p0', 'priority:high'] }));
+    const before = fake.calls().length;
+
+    await pairOf(tracker).edit(githubRef('1'), { priority: 'high' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      VIEW,
+      ['issue', 'edit', '1', '--remove-label', 'priority:low', '--remove-label', 'needs-triage', '--remove-label', 'priority:p0'],
+    ]);
+    expect(fake.issue('1')?.labels).toEqual(['type:bug', 'priority:high']);
+  });
+
+  it('sends no gh issue edit for a priority held already, alone and out of triage, beside a title it still sends', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const { edit } = pairOf(tracker);
+    const before = fake.calls().length;
+
+    await edit(githubRef('1'), { priority: 'urgent' });
+
+    expect(fake.calls().slice(before)).toEqual([VIEW]);
+    await edit(githubRef('1'), { priority: 'urgent', title: 'Narrowed' });
+
+    expect(fake.calls().slice(before + 1)).toEqual([VIEW, ['issue', 'edit', '1', '--title', 'Narrowed']]);
+    expect(fake.issue('1')).toMatchObject({ title: 'Narrowed', labels: ['module:auth', 'type:bug', 'priority:urgent'] });
+  });
+
+  it('sends a priority beside a title and a body in one command, with --repo on the read, the label and the edit', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const before = fake.calls().length;
+    const repo = ['--repo', 'open-tomato/rafa'];
+
+    await pairOf(tracker).edit(githubRef('1', { repo: 'open-tomato/rafa' }), { title: 'Narrowed', body: BODY, priority: 'medium' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      ['issue', 'view', '1', ...repo, '--json', EDITABLE_FIELDS],
+      ['label', 'create', 'priority:medium', ...repo, '--force'],
+      [
+        'issue',
+        'edit',
+        '1',
+        ...repo,
+        '--title',
+        'Narrowed',
+        '--body-file',
+        '-',
+        '--add-label',
+        'priority:medium',
+        '--remove-label',
+        'priority:urgent',
+      ],
+    ]);
+    expect(fake.inputs().slice(before)).toEqual([undefined, undefined, BODY]);
+    expect(fake.issue('1')).toMatchObject({ title: 'Narrowed', body: BODY, labels: ['module:auth', 'type:bug', 'priority:medium'] });
+  });
+
+  it('refuses a swap naming a held label that holds a comma, sending nothing after the read, beside one it sends', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const { edit } = pairOf(tracker);
+    fake.update('1', (issue) => ({ ...issue, labels: ['priority:low,bug', 'bug'] }));
+    const before = fake.calls().length;
+
+    await expect(edit(githubRef('1'), { priority: 'high' })).rejects.toThrow(
+      'github tracker: refused an edit of issue #1: it holds the label "priority:low,bug",'
+      + ' and a label holding a comma cannot be named to gh issue edit',
+    );
+    expect(fake.calls().slice(before)).toEqual([VIEW]);
+    expect(fake.issue('1')?.labels).toEqual(['priority:low,bug', 'bug']);
+    fake.update('1', (issue) => ({ ...issue, labels: ['priority:low', 'bug'] }));
+    await edit(githubRef('1'), { priority: 'high' });
+
+    expect(fake.issue('1')?.labels).toEqual(['bug', 'priority:high']);
+  });
+
+  it('rejects with nothing edited when the label cannot be made, beside the edit sent once it can', async () => {
+    const { fake } = await overOneIssue();
+    let refusesLabels = true;
+    const gh: GhRunner = async (args, stdin) => (refusesLabels && args[0] === 'label'
+      ? { ok: false, stdout: '', stderr: 'HTTP 403: Resource not accessible by integration\n' }
+      : fake.run(args, stdin));
+    const { edit } = pairOf(createGithubTracker({ gh }));
+    const before = fake.calls().length;
+
+    await expect(edit(githubRef('1'), { priority: 'low' }))
+      .rejects.toThrow('github tracker: gh label create "priority:low" failed: HTTP 403: Resource not accessible by integration');
+    expect(fake.calls().slice(before)).toEqual([VIEW]);
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:urgent']);
+    refusesLabels = false;
+    await edit(githubRef('1'), { priority: 'low' });
+
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:low']);
+  });
+
+  it('rejects a priority edit of an issue the repository does not hold at its read, sending no edit', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const before = fake.calls().length;
+
+    await expect(pairOf(tracker).edit(githubRef('9'), { priority: 'low' })).rejects.toThrow(
+      'github tracker: gh issue view 9 failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.',
+    );
+    expect(fake.calls().slice(before)).toEqual([['issue', 'view', '9', '--json', EDITABLE_FIELDS]]);
+    expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:urgent']);
   });
 });

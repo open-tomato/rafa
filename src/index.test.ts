@@ -680,7 +680,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
     ['../../core/command/index.js', ['CommandExit']],
+    ['./edit-priority.js', ['PRIORITY_FLAG']],
     ['./edit-run.js', ['editIssue', 'renderEditReport']],
   ]],
   ['./commands/pr/current.js', [
@@ -708,6 +710,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/pr-retarget.js', ['retargetedLine']],
     ['../issue/issue-tracker.js', ['readRequiredFlag']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readPullArgument']],
+  ]],
+  ['./commands/pr/close.js', [
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../issue/issue-tracker.js', ['readRequiredFlag']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
   ]],
   ['./commands/pr/list.js', [
     ['../../core/config/sections.js', ['messageOf']],
@@ -1473,7 +1480,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/prompt/terminal.js', ['processTerminal']],
     ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
-    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
+    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
     ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
@@ -1678,6 +1685,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/view.js',
       './commands/pr/open.js',
       './commands/pr/retarget.js',
+      './commands/pr/close.js',
       './commands/pr/list.js',
       './commands/pr/wait.js',
       './commands/pr/merge.js',

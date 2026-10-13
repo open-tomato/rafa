@@ -10,7 +10,7 @@
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
  * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
- * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests |
+ * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
  *
  * Nothing here prints, and nothing spawns except through
  * {@link StatusSeams}, whose defaults are the system's own, so a unit

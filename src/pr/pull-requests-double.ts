@@ -165,6 +165,7 @@ export function createPullRequestsDouble(
     reviews: bind('reviews'),
     browse: bind('browse'),
     merge: bind('merge'),
+    close: bind('close'),
     create: bind('create'),
     editTitle: bind('editTitle'),
     editBase: bind('editBase'),

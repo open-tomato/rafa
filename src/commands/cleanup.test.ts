@@ -32,6 +32,14 @@
  *   worktree left unticked the question IS asked, and an unheld row
  *   ticked beside the held one is asked too, so the silence is the
  *   holder's and not a question that stopped being asked.
+ * - An Only on origin row left as it opens, unticked, runs no push and
+ *   is counted `0 branches on origin`; the same reading with the row
+ *   ticked runs `push origin --delete` once and counts 1, and answered
+ *   `n` runs nothing. So the push is proved to follow the tick AND the
+ *   answer, and the unticked case is read against runs that do push.
+ *   Both cases move the highlight onto the row first: the checklist
+ *   draws ten lines at a time and the default reading fills them, so
+ *   the last group is in no frame until the highlight reaches it.
  * - The listing cases hold the git runner uncalled, the keys never
  *   opened and the prompter never opened, beside the asking cases
  *   where all three are, so "nothing removed" is read against runs that
@@ -45,6 +53,7 @@ import type {
   LocalBranch,
   MergedRow,
   NotPushedRow,
+  RemoteOnlyRow,
   RunRow,
   StaleRow,
   WorktreeRow,
@@ -61,10 +70,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { forcedFlagRefusal, remoteOnlyReason } from '../cleanup/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
-import { cleanupData, renderCleanup, runRowLine } from './cleanup-render.js';
+import { cleanupData, remoteOnlyRowLine, renderCleanup, runRowLine } from './cleanup-render.js';
 import {
   CLEANUP_USAGE,
   cleanupGroups,
@@ -217,6 +227,31 @@ function plantedRun(): RunRow {
   return { ...RUN, path, eventsPath };
 }
 
+/** A branch only on `origin` holding three commits, two of them with no patch-equal copy on the base. */
+const REMOTE_ONLY: RemoteOnlyRow = {
+  group: 'remote-only',
+  name: 'fix/replaced',
+  lastCommit: WHEN,
+  commits: 3,
+  uncopied: 2,
+  ticked: false,
+  reason: remoteOnlyReason(2, 3, 'main'),
+};
+
+/** A branch only on `origin` whose every commit has a patch-equal copy on the base. */
+const REMOTE_COPIED: RemoteOnlyRow = {
+  group: 'remote-only',
+  name: 'fix/old',
+  lastCommit: WHEN,
+  commits: 2,
+  uncopied: 0,
+  ticked: false,
+  reason: remoteOnlyReason(0, 2, 'main'),
+};
+
+/** The push a ticked {@link REMOTE_ONLY} runs, as the recording git is handed it. */
+const REMOTE_PUSH = 'push origin --delete fix/replaced';
+
 function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
   return {
     ok: true,
@@ -226,6 +261,7 @@ function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
     stale: [STALE],
     notPushed: [NOT_PUSHED],
     worktrees: [WT_CLEAN, WT_DIRTY],
+    remoteOnly: [],
     runs: [],
     notes: [],
     ...overrides,
@@ -348,9 +384,15 @@ const DEFAULT_STEPS = [
 
 describe('cleanupQuestion and notPushedQuestion', () => {
   it('spells the final question with each count and its noun', () => {
-    expect(cleanupQuestion(2, 1, 0)).toBe('Delete 2 branches, remove 1 worktree and remove 0 run records? [y/N] ');
-    expect(cleanupQuestion(1, 0, 1)).toBe('Delete 1 branch, remove 0 worktrees and remove 1 run record? [y/N] ');
+    expect(cleanupQuestion(2, 1, 0)).toBe('Delete 2 local branches and 0 branches on origin, remove 1 worktree and remove 0 run records? [y/N] ');
+    expect(cleanupQuestion(1, 0, 1)).toBe('Delete 1 local branch and 0 branches on origin, remove 0 worktrees and remove 1 run record? [y/N] ');
     expect(cleanupQuestion(0, 0, 3)).toContain('remove 3 run records?');
+  });
+
+  it('counts the deletes on origin apart from the local ones', () => {
+    expect(cleanupQuestion(2, 1, 0, 1)).toBe('Delete 2 local branches and 1 branch on origin, remove 1 worktree and remove 0 run records? [y/N] ');
+    expect(cleanupQuestion(0, 0, 0, 3)).toBe('Delete 0 local branches and 3 branches on origin, remove 0 worktrees and remove 0 run records? [y/N] ');
+    expect(cleanupQuestion(2, 1, 0, 1)).not.toBe(cleanupQuestion(3, 1, 0, 0));
   });
 
   it('names the branch and the commits deleting it loses', () => {
@@ -360,10 +402,10 @@ describe('cleanupQuestion and notPushedQuestion', () => {
 });
 
 describe('cleanupGroups and selectionOf', () => {
-  it('gives the five groups in order, each row ticked as read, and an untickable worktree disabled with its reason', () => {
+  it('gives the six groups in order, each row ticked as read, and an untickable worktree disabled with its reason', () => {
     const groups = cleanupGroups(reading({ runs: [RUN] }));
-    expect(groups.map((group) => group.title)).toEqual(['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records']);
-    expect(groups.map((group) => group.choices.map((choice) => choice.checked))).toEqual([[true, true], [false], [false], [true, false], [true]]);
+    expect(groups.map((group) => group.title)).toEqual(['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records', 'Only on origin']);
+    expect(groups.map((group) => group.choices.map((choice) => choice.checked))).toEqual([[true, true], [false], [false], [true, false], [true], []]);
     const [clean, dirty] = groups[3]?.choices ?? [];
     expect(clean?.disabled).toBeUndefined();
     expect(clean?.label).toContain('clean; branch merged');
@@ -381,9 +423,42 @@ describe('cleanupGroups and selectionOf', () => {
     expect(run?.value).toBe(RUN);
   });
 
+  it('gives the branches only on origin as the last group, every row unticked and none disabled', () => {
+    const read = reading({ runs: [RUN], remoteOnly: [REMOTE_COPIED, REMOTE_ONLY] });
+    const group = cleanupGroups(read)[5];
+    expect(group?.title).toBe('Only on origin');
+    expect(group?.choices.map((choice) => choice.checked)).toEqual([false, false]);
+    expect(group?.choices.map((choice) => choice.disabled)).toEqual([undefined, undefined]);
+    expect(group?.choices.map((choice) => choice.value)).toEqual([REMOTE_COPIED, REMOTE_ONLY]);
+    expect(group?.choices.map((choice) => choice.label)).toEqual([
+      remoteOnlyRowLine(REMOTE_COPIED, REMOTE_ONLY.name.length),
+      remoteOnlyRowLine(REMOTE_ONLY, REMOTE_ONLY.name.length),
+    ]);
+    expect(group?.choices[1]?.label).toBe('fix/replaced  2026-09-20  2 of 3 commits with no patch-equal copy on origin/main');
+  });
+
   it('splits ticked rows back into their groups', () => {
     const selection = selectionOf([WT_CLEAN, MERGED, STALE, NOT_PUSHED, RUN]);
-    expect(selection).toEqual({ worktrees: [WT_CLEAN], merged: [MERGED], stale: [STALE], notPushed: [NOT_PUSHED], runs: [RUN] });
+    expect(selection).toEqual({
+      worktrees: [WT_CLEAN],
+      merged: [MERGED],
+      stale: [STALE],
+      notPushed: [NOT_PUSHED],
+      remoteOnly: [],
+      runs: [RUN],
+    });
+  });
+
+  it('hands a ticked branch only on origin over as remoteOnly, and as no local branch, worktree or run record', () => {
+    const selection = selectionOf([MERGED, REMOTE_ONLY, WT_CLEAN, REMOTE_COPIED]);
+    expect(selection).toEqual({
+      worktrees: [WT_CLEAN],
+      merged: [MERGED],
+      stale: [],
+      notPushed: [],
+      remoteOnly: [REMOTE_ONLY, REMOTE_COPIED],
+      runs: [],
+    });
   });
 });
 
@@ -604,6 +679,91 @@ describe('rafa cleanup with a terminal', () => {
     expect(outcome.stdout).toContain(NOTHING_REMOVED_TEXT);
   });
 
+  it('leaves an Only on origin row unticked on Enter: no push runs, and the question counts none on origin', async () => {
+    const outcome = await run([], { read: reading({ remoteOnly: [REMOTE_ONLY] }), keys: [UP, ENTER], answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0, 0)]);
+    expect(outcome.recorded.asked[0]).toContain('and 0 branches on origin');
+    expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
+    expect(outcome.written()).toContain(`  Only on origin\n❯ ◯ ${remoteOnlyRowLine(REMOTE_ONLY)}`);
+    expect(outcome.written()).not.toContain(`◉ ${remoteOnlyRowLine(REMOTE_ONLY)}`);
+  });
+
+  it('deletes a ticked Only on origin row on origin after the local branches, on the final yes alone (control)', async () => {
+    const outcome = await run([], { read: reading({ remoteOnly: [REMOTE_ONLY] }), keys: [UP, SPACE, ENTER], answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0, 1)]);
+    expect(outcome.recorded.asked[0]).toContain('Delete 2 local branches and 1 branch on origin,');
+    expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, REMOTE_PUSH]);
+    expect(outcome.stdout).toContain(`✓ git ${REMOTE_PUSH}`);
+    expect(outcome.written()).toContain(`❯ ◉ ${remoteOnlyRowLine(REMOTE_ONLY)}`);
+    expect(outcome.recorded.git.map((args) => forcedFlagRefusal(args))).toEqual([null, null, null, null]);
+  });
+
+  it('pushes nothing for the ticked row when the final question is answered n (control)', async () => {
+    const outcome = await run([], { read: reading({ remoteOnly: [REMOTE_ONLY] }), keys: [UP, SPACE, ENTER], answers: ['n'] });
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0, 1)]);
+    expect(outcome.recorded.git).toEqual([]);
+    expect(outcome.stdout).toContain(NOTHING_REMOVED_TEXT);
+  });
+
+  it('ticks the whole Only on origin group with a, and counts each row on origin', async () => {
+    const read = reading({ remoteOnly: [REMOTE_COPIED, REMOTE_ONLY] });
+    const outcome = await run([], { read, keys: [UP, GROUP, ENTER], answers: ['y'] });
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0, 2)]);
+    expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, 'push origin --delete fix/old', REMOTE_PUSH]);
+  });
+
+  it('asks over a reading whose only rows are branches only on origin, and counts nothing local', async () => {
+    const read = reading({ merged: [], stale: [], notPushed: [], worktrees: [], remoteOnly: [REMOTE_ONLY] });
+    const unticked = await run([], { read, keys: [ENTER] });
+    const ticked = await run([], { read, keys: [SPACE, ENTER], answers: ['y'] });
+    expect(unticked.recorded.keysOpened).toBe(1);
+    expect(unticked.recorded.promptersOpened).toBe(0);
+    expect(unticked.recorded.git).toEqual([]);
+    expect(unticked.stdout).not.toContain(NOTHING_LISTED_TEXT);
+    expect(unticked.stdout).toContain(NOTHING_REMOVED_TEXT);
+    expect(ticked.recorded.asked).toEqual([cleanupQuestion(0, 0, 0, 1)]);
+    expect(gitLines(ticked.recorded)).toEqual([REMOTE_PUSH]);
+  });
+
+  it('prints the push of a ticked Only on origin row under --dry-run, and no push for an unticked one', async () => {
+    const read = reading({ remoteOnly: [REMOTE_ONLY] });
+    const ticked = await run(['--dry-run'], { read, keys: [UP, SPACE, ENTER], answers: ['y'] });
+    const unticked = await run(['--dry-run'], { read, keys: [ENTER], answers: ['y'] });
+    expect(ticked.exitCode).toBe(0);
+    expect(ticked.recorded.asked).toEqual([]);
+    expect(ticked.stdout).toContain([...DEFAULT_STEPS, REMOTE_PUSH].map((line) => `git ${line}`).join('\n'));
+    expect(unticked.stdout).toContain(DEFAULT_STEPS.map((line) => `git ${line}`).join('\n'));
+    expect(unticked.stdout).not.toContain('git push');
+    expect([...ticked.recorded.git, ...unticked.recorded.git]).toEqual([]);
+  });
+
+  it('withholds a ticked Only on origin row whose name opens with a dash, naming the line to run by hand', async () => {
+    const dash: RemoteOnlyRow = { ...REMOTE_ONLY, name: '-f' };
+    const outcome = await run([], { read: reading({ remoteOnly: [dash] }), keys: [UP, SPACE, ENTER], answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0, 0)]);
+    expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
+    expect(outcome.stdout).toContain('not removed: -f: ');
+    expect(outcome.stdout).toContain('git push origin --delete -- -f');
+  });
+
+  it('exits 1 naming the push when origin refuses the delete, the local steps still run', async () => {
+    const outcome = await run([], {
+      read: reading({ remoteOnly: [REMOTE_ONLY] }),
+      keys: [UP, SPACE, ENTER],
+      answers: ['y'],
+      gitAnswer: (args) => (args[0] === 'push'
+        ? { ok: false, stdout: '', stderr: 'error: unable to delete \'fix/replaced\': remote ref does not exist' }
+        : undefined),
+    });
+    expect(outcome.exitCode).toBe(1);
+    expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, REMOTE_PUSH]);
+    expect(outcome.stdout).toContain(`✗ git ${REMOTE_PUSH}: error: unable to delete 'fix/replaced': remote ref does not exist`);
+    expect(outcome.stderr).toContain('1 step of 4 did not run clean');
+  });
+
   it('asks nothing over a reading with no row', async () => {
     const outcome = await run([], { read: reading({ merged: [], stale: [], notPushed: [], worktrees: [] }), keys: [ENTER] });
     expect(outcome.exitCode).toBe(0);
@@ -613,13 +773,16 @@ describe('rafa cleanup with a terminal', () => {
 });
 
 describe('rafa cleanup listing only', () => {
-  it('prints the five groups with no terminal, exiting 0 and removing nothing', async () => {
+  it('prints the six groups with no terminal, exiting 0 and removing nothing', async () => {
     const row = plantedRun();
-    const read = reading({ runs: [row] });
+    const read = reading({ runs: [row], remoteOnly: [REMOTE_ONLY, REMOTE_COPIED] });
     const outcome = await run([], { read, isTTY: false, keys: [ENTER], answers: ['y'] });
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toBe(`${renderCleanup(read).join('\n')}\n`);
     expect(outcome.stdout).toContain('Run records (1)');
+    expect(outcome.stdout).toContain('Only on origin (2)');
+    expect(outcome.stdout).toContain('  fix/replaced  2026-09-20  2 of 3 commits with no patch-equal copy on origin/main');
+    expect(outcome.stdout).toContain('  fix/old       2026-09-20  every commit has a patch-equal copy on origin/main (2 commits)');
     expect(existsSync(row.path)).toBe(true);
     expect(outcome.recorded.keysOpened).toBe(0);
     expect(outcome.recorded.promptersOpened).toBe(0);
@@ -627,15 +790,18 @@ describe('rafa cleanup listing only', () => {
   });
 
   it('prints the same listing under --dry-run with no terminal', async () => {
-    const plain = await run([], { isTTY: false });
-    const dry = await run(['--dry-run'], { isTTY: false });
+    const read = reading({ remoteOnly: [REMOTE_ONLY] });
+    const plain = await run([], { read, isTTY: false });
+    const dry = await run(['--dry-run'], { read, isTTY: false });
     expect(dry.exitCode).toBe(0);
     expect(dry.stdout).toBe(plain.stdout);
+    expect(dry.stdout).toContain('Only on origin (1)');
+    expect(dry.stdout).not.toContain('git push origin --delete fix/replaced');
     expect(dry.recorded.git).toEqual([]);
   });
 
   it('gives the groups as the result data under --output=json, asking nothing even with a terminal', async () => {
-    const read = reading({ runs: [RUN] });
+    const read = reading({ runs: [RUN], remoteOnly: [REMOTE_ONLY] });
     const outcome = await run(['--output=json'], { read, keys: [ENTER], answers: ['y'] });
     expect(outcome.exitCode).toBe(0);
     const events = eventsOf(outcome.stdout);
@@ -643,6 +809,7 @@ describe('rafa cleanup listing only', () => {
     expect(result?.type).toBe('result');
     expect(JSON.stringify(result)).toContain(JSON.stringify(cleanupData(read)));
     expect(JSON.stringify(result)).toContain('"runs":[{"sessionId":"a1b2c3d4"');
+    expect(JSON.stringify(result)).toContain('"remoteOnly":[{"name":"fix/replaced","lastCommit":"2026-09-20T08:30:00.000Z","commits":3,"uncopied":2,');
     expect(outcome.recorded.keysOpened).toBe(0);
     expect(outcome.recorded.promptersOpened).toBe(0);
     expect(outcome.recorded.git).toEqual([]);
@@ -694,5 +861,20 @@ describe('rafa cleanup reading', () => {
 
   it('declares no spends', () => {
     expect(createCleanupCommand().spends).toBeUndefined();
+  });
+
+  it('names the Only on origin group in its summary, its description and the --dry-run example', () => {
+    const command = createCleanupCommand();
+    expect(command.summary).toContain('unmerged branches only on origin');
+    expect(command.description).toContain('in six groups');
+    expect(command.description).toContain('Only on origin (a branch `origin` holds and this clone does not');
+    expect(command.description).toContain('an Only on origin row never');
+    expect(command.description).toContain('`Delete <n> local branches and <o> branches on origin, remove <m> worktrees and remove <r> run records? [y/N]`');
+    expect(command.description).toContain('`git push origin --delete <name>` for each ticked Only on origin branch');
+    expect(command.description).not.toContain('nothing remote is deleted');
+    expect(command.description).not.toContain('five groups');
+    const dryRun = command.examples.find((example) => example.cmd === 'rafa cleanup --dry-run');
+    expect(dryRun?.note).toContain('a ticked Only on origin branch as its `git push origin --delete <name>`');
+    expect(command.examples.map((example) => example.note).join(' ')).not.toContain('five groups');
   });
 });

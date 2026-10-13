@@ -179,6 +179,7 @@ runTrackerContract({
   readComments: async (ref) => contractFake.issue(ref.externalId)?.comments ?? [],
   transitionableStates: TRANSITIONABLE,
   editsIssues: true,
+  editsPriority: true,
 });
 
 describe('creating an issue', () => {

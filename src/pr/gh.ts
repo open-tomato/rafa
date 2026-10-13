@@ -183,6 +183,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { parseChecks, verdictOf } from './checks.js';
+import { closePullRequest } from './gh-close.js';
 import { CLOSING_ISSUES_FIELD, readClosingIssues } from './gh-closing-issues.js';
 import { MERGE_METHODS, isMergeMethod } from './types.js';
 
@@ -652,6 +653,9 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       const result = await gh(['pr', 'merge', target, `--${method}`]);
       return { merged: result.ok, detail: detailOf(result, command) };
     },
+
+    // One `gh pr close`, built and read in `./gh-close.ts`.
+    close: (number, comment, closing) => closePullRequest(gh, number, comment, closing),
 
     create: async (draft: PullRequestDraft): Promise<PullRequestSummary> => {
       const head = textArgument(draft.head, 'create', 'head', false);

@@ -295,7 +295,7 @@ describe('setUpProject, a first run', () => {
     expect(projectSetupChanged(report)).toBe(true);
 
     const held = await heldOn(router, COPY_NUMBER);
-    expect([...held.keys()]).toEqual(ADDED);
+    expect([...held.keys()]).toEqual([...ADDED]);
     expect(held.get(30)?.get('Rank')).toBe(2);
     expect(held.get(30)?.get('Stage')).toBe('Done');
     expect(held.get(50)?.get('Stage')).toBe('In review');
