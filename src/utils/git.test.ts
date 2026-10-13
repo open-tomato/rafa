@@ -104,6 +104,12 @@ describe('readCheckedOutBranch', () => {
   });
 
   it('reads the process\'s own directory when handed none', () => {
-    expect(readCheckedOutBranch()).toBe(getCurrentBranch());
+    // A detached checkout, as a pull request's runner has: no branch, where getCurrentBranch says HEAD.
+    const current = getCurrentBranch();
+    const expected = current === 'HEAD'
+      ? null
+      : current;
+
+    expect(readCheckedOutBranch()).toBe(expected);
   });
 });
