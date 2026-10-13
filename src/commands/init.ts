@@ -820,4 +820,5 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
   return Object.freeze(command);
 }
 
-export default createInitCommand();
+const command: RafaCommand = createInitCommand();
+export default command;

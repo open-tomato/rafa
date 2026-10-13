@@ -150,4 +150,5 @@ export function createStatusCommand(seams: StatusCommandSeams = DEFAULT_STATUS_S
   return Object.freeze(command);
 }
 
-export default createStatusCommand();
+const command: RafaCommand = createStatusCommand();
+export default command;

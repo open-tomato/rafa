@@ -495,4 +495,5 @@ export function createSwitchCommand(seams: SwitchSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createSwitchCommand();
+const command: RafaCommand = createSwitchCommand();
+export default command;

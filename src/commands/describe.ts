@@ -67,4 +67,5 @@ const describeCommand: RafaCommand = {
   },
 };
 
-export default Object.freeze(describeCommand);
+const command: RafaCommand = Object.freeze(describeCommand);
+export default command;

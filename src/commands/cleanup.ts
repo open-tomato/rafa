@@ -541,4 +541,5 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
   return Object.freeze(command);
 }
 
-export default createCleanupCommand();
+const command: RafaCommand = createCleanupCommand();
+export default command;
