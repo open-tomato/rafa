@@ -42,7 +42,7 @@ import { runSuite } from '../suite/run.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { OUTSIDE_CASE_REASON } from './suite-outside-case.js';
+import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from './suite-outside-case.js';
 import { addToLedger } from './suite-step.js';
 import { createRunSuiteSteps } from './suite-steps-run.js';
 
@@ -323,5 +323,61 @@ describe('a task step whose first run found no test file, beside a tests.alwaysR
     const repair = findNextTask(readFileSync(trackerPath, 'utf8'));
     expect(repair?.blocker).toContain('src/a.test.ts');
     expect(repair?.blocker).not.toContain(OUTSIDE_CASE_REASON);
+  });
+});
+
+describe('a stored baseline of a run that found no test file', () => {
+  /** A result of Bun's no-test-files run, marked or not, as the baseline file is written from it. */
+  const noTestFilesResult = (marked: boolean) => ({
+    command: ['bun', 'test'], exitCode: 1, summary: '', failures: [], errors: 0, junit: 'read' as const, unhandled: [], outputTail: [],
+    ...(marked
+      ? { noTestFiles: true }
+      : {}),
+  });
+
+  /** Stores that baseline, as an earlier run would have left it. */
+  function storeNoTestFilesBaseline(marked: boolean): string {
+    const path = baselinePathFor(trackerPath);
+    writeBaseline(path, baselineOf(noTestFilesResult(marked), new Date('2026-09-30T00:00:00Z'), BASE));
+    return path;
+  }
+
+  it('reuses a file carrying the mark with no warning, no suite run and the file left as it was', async () => {
+    const path = storeNoTestFilesBaseline(true);
+    const before = readFileSync(path, 'utf8');
+    expect(before).toContain('"noTestFiles": true');
+    const { steps, spawned } = stepsOver([]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    expect(spawned()).toBe(0);
+    expect(linesAt('warn')).toEqual([]);
+    expect(linesAt('info').join('\n')).toContain('Suite baseline reused from');
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+
+  it('warns once on a file of the same shape with no key, records it again with the mark, then reuses it quietly', async () => {
+    const path = storeNoTestFilesBaseline(false);
+    const before = readFileSync(path, 'utf8');
+    expect(before).not.toContain('noTestFiles');
+    const first = stepsOver([NO_TEST_FILES]);
+
+    expect(await first.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    const stored = readBaseline(path);
+    if (stored.state !== 'read') throw new Error('the baseline was not written again');
+    expect(first.spawned()).toBe(1);
+    expect(linesAt('warn')).toEqual([storedOutsideCaseLine('SUITE_BASELINE-fixture.json', { exitCode: 1 })]);
+    expect(stored.baseline.noTestFiles).toBe(true);
+    expect(readFileSync(path, 'utf8')).toContain('"noTestFiles": true');
+
+    lines = [];
+    const written = readFileSync(path, 'utf8');
+    const second = stepsOver([]);
+    expect(await second.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    expect(second.spawned()).toBe(0);
+    expect(linesAt('warn')).toEqual([]);
+    expect(readFileSync(path, 'utf8')).toBe(written);
   });
 });
