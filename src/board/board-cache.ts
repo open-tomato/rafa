@@ -115,7 +115,7 @@ import { nativeChangedArgs, nativeIssuesArgs, nativeRowFields } from './board-ca
 import { BOARD_LISTING_LIMIT, createGhBoardListing, parseBoardListing } from './roadmap-board.js';
 
 /** Where the cache is kept, relative to the project root. */
-export const BOARD_CACHE_FILE = join(SCOPE_DIR, 'cache', 'board.json');
+export const BOARD_CACHE_FILE: string = join(SCOPE_DIR, 'cache', 'board.json');
 
 /** The shape version the file is written with; a file of another version is read as no cache. */
 export const BOARD_CACHE_VERSION = 1;

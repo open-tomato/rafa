@@ -93,7 +93,7 @@ export function boardsListArgs(mode: BoardRelationshipMode): readonly string[] {
 export const BOARDS_LIST_ARGS: readonly string[] = boardsListArgs('labels');
 
 /** The command a refusal of the board lister names in the `labels` mode, the default. */
-export const BOARDS_LIST_COMMAND = `gh ${BOARDS_LIST_ARGS.join(' ')}`;
+export const BOARDS_LIST_COMMAND: string = `gh ${BOARDS_LIST_ARGS.join(' ')}`;
 
 /** What a failed `command` wrote, for a message. Never empty. */
 function detailOf(result: GhResult, command: string): string {

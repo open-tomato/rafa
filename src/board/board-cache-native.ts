@@ -74,7 +74,7 @@ const NATIVE_ISSUE_SELECTION = [
 ].join('');
 
 /** The GraphQL query the incremental read sends in the `native` mode; see the module note. */
-export const NATIVE_CHANGED_QUERY = [
+export const NATIVE_CHANGED_QUERY: string = [
   'query($owner: String!, $repo: String!, $since: DateTime!, $endCursor: String) {',
   ' repository(owner: $owner, name: $repo) {',
   ' issues(first: 100, after: $endCursor, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: ASC}) {',

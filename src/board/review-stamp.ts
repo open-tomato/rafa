@@ -108,13 +108,13 @@ export const REVIEW_MISSING = 'missing';
 export const REVIEW_ASSUMED = 'assumed';
 
 /** The line `--skip-review` leaves behind, indentation aside. */
-export const REVIEW_SKIPPED_LINE = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
+export const REVIEW_SKIPPED_LINE: string = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
 
 /** The line an unread review leaves behind, indentation aside. */
-export const REVIEW_MISSING_LINE = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
+export const REVIEW_MISSING_LINE: string = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
 
 /** The line a review of non-blocking gaps leaves behind, indentation aside. */
-export const REVIEW_ASSUMED_LINE = `${REVIEW_FIELD}: ${REVIEW_ASSUMED}`;
+export const REVIEW_ASSUMED_LINE: string = `${REVIEW_FIELD}: ${REVIEW_ASSUMED}`;
 
 /** What a stamp did, or what stopped it; `./plan-field.ts` spells the five. */
 export type ReviewStampAnswer = PlanFieldAnswer;
