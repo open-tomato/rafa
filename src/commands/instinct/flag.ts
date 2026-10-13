@@ -173,4 +173,5 @@ export function createInstinctFlagCommand(seams: InstinctFlagSeams = {}): RafaCo
   return Object.freeze(command);
 }
 
-export default createInstinctFlagCommand();
+const command: RafaCommand = createInstinctFlagCommand();
+export default command;

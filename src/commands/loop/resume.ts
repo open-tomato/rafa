@@ -117,4 +117,5 @@ export function createLoopResumeCommand(seams: LoopSessionSeams = {}): RafaComma
   return Object.freeze(command);
 }
 
-export default createLoopResumeCommand();
+const command: RafaCommand = createLoopResumeCommand();
+export default command;

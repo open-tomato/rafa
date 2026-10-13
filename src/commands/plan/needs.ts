@@ -515,4 +515,5 @@ export function createPlanNeedsCommand(seams: PlanNeedsSeams = DEFAULT_PLAN_NEED
   return Object.freeze(command);
 }
 
-export default createPlanNeedsCommand();
+const command: RafaCommand = createPlanNeedsCommand();
+export default command;

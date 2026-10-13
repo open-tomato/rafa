@@ -512,4 +512,5 @@ export function createLoopWaitCommand(seams: LoopWaitSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createLoopWaitCommand();
+const command: RafaCommand = createLoopWaitCommand();
+export default command;

@@ -395,4 +395,5 @@ export function createInstinctListCommand(seams: InstinctPromoteSeams = {}): Raf
   return Object.freeze(command);
 }
 
-export default createInstinctListCommand();
+const command: RafaCommand = createInstinctListCommand();
+export default command;

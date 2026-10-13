@@ -76,4 +76,5 @@ export function createInstinctCheckCommand(seams: CheckCommandSeams = DEFAULT_CH
   return Object.freeze(command);
 }
 
-export default createInstinctCheckCommand();
+const command: RafaCommand = createInstinctCheckCommand();
+export default command;

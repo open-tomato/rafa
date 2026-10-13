@@ -190,4 +190,5 @@ export function createInstinctPromoteCommand(seams: InstinctPromoteSeams = {}): 
   return Object.freeze(command);
 }
 
-export default createInstinctPromoteCommand();
+const command: RafaCommand = createInstinctPromoteCommand();
+export default command;

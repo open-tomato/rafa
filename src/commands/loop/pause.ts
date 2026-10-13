@@ -114,4 +114,5 @@ export function createLoopPauseCommand(seams: LoopSessionSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createLoopPauseCommand();
+const command: RafaCommand = createLoopPauseCommand();
+export default command;

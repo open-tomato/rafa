@@ -583,4 +583,5 @@ export function createSkillListCommand(seams: SkillListSeams = DEFAULT_SKILL_LIS
   return Object.freeze(command);
 }
 
-export default createSkillListCommand();
+const command: RafaCommand = createSkillListCommand();
+export default command;
