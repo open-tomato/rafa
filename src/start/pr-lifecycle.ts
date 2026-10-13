@@ -7,9 +7,9 @@
  * the defaults of `--ci-timeout` and `--ci-attempts` from the constants
  * exported here. Every effect it has goes through
  * {@link PrLifecycleSeams}: the pull request through the `PullRequests`
- * port (`pr/index.ts`), the branch through `utils/git.ts`, a repair
- * session through `runClaude`, and the poll's clock and wait through
- * `waitForChecks`. So a test drives each verdict with no network, no
+ * port (`pr/index.ts`), the branch through `readCheckedOutBranch`
+ * (`utils/git.ts`), a repair session through `runClaude`, and the
+ * poll's clock and wait through `waitForChecks`. So a test drives each verdict with no network, no
  * session and no 20-second wait. Every repair session loads settings
  * from the sources `start()` hands over, the run's
  * `loop.settingSources`.
@@ -25,11 +25,21 @@
  * the reading that decides whether to skip the gate at all, and the
  * repair prompt, which tells a session which commands to read logs with.
  *
+ * ## No branch checked out
+ *
+ * The branch is the first thing the gate reads, and it reads null on a
+ * detached HEAD, never the word `HEAD`: there is then no branch to push
+ * and none a pull request could be open for. The gate prints one
+ * warning and returns. Nothing is pushed, the provider is not read,
+ * `gh` is asked nothing and no phase is written, under either provider.
+ * A push of `HEAD` by name, or a pull request looked up under it, is
+ * what that reading rules out.
+ *
  * ## The `none` provider
  *
- * Before anything is asked of `gh`, the gate reads which provider the
- * repository gets ({@link PrLifecycleSeams.readProvider}, over
- * `pr/provider.ts`). A reading of `none` has no CLI to open a pull
+ * Once it has a branch, and before anything is asked of `gh`, the gate
+ * reads which provider the repository gets
+ * ({@link PrLifecycleSeams.readProvider}, over `pr/provider.ts`). A reading of `none` has no CLI to open a pull
  * request with and so nothing to poll, and it takes the whole of the
  * gate's other path: the branch is PUSHED, the compare URL printed, and
  * the CI wait skipped and said to be skipped (`pr/none.ts`). No PR is
@@ -92,8 +102,8 @@
  * written `pull-request` to it just before. The gate then writes `ci`
  * before each poll of the checks and `repair` before each repair
  * session, so a repaired PR reads `ci` again once its next poll starts.
- * A gate that skips itself, finds no PR or takes the `none` path writes
- * no phase, and the record keeps `pull-request`. Left out, the gate
+ * A gate that skips itself, has no branch, finds no PR or takes the
+ * `none` path writes no phase, and the record keeps `pull-request`. Left out, the gate
  * writes nothing ({@link NO_PHASES}).
  *
  * The repair prompt's first line is the `ci-repair` classifier key, and
@@ -134,7 +144,7 @@ import {
   resolvePrProvider,
   waitForChecks,
 } from '../pr/index.js';
-import { getCurrentBranch } from '../utils/git.js';
+import { readCheckedOutBranch } from '../utils/git.js';
 
 import { withStamp } from './stamp.js';
 
@@ -156,8 +166,11 @@ type MergeState = PullRequestDetail | null;
  * real ones.
  */
 export interface PrLifecycleSeams {
-  /** The branch whose PR is verified. */
-  readonly currentBranch: () => string;
+  /**
+   * The branch whose PR is verified, or null when none is checked out
+   * (a detached HEAD); see the module note.
+   */
+  readonly currentBranch: () => string | null;
   /**
    * Which provider the repository gets. A reading of `none` takes the
    * gate's other path; see the module note.
@@ -197,7 +210,7 @@ export interface PrLifecycleSeams {
  */
 export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClaude): PrLifecycleSeams {
   return {
-    currentBranch: () => getCurrentBranch(dir),
+    currentBranch: () => readCheckedOutBranch(dir),
     // `configured: null` leaves the answer to `origin`. `start()` passes a
     // reader carrying the run's own `pr.provider`; this default is what a
     // caller that names no seam gets.
@@ -248,7 +261,7 @@ export function refusedPushReaderIn(
  */
 export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   ...prLifecycleSeamsIn(process.cwd()),
-  currentBranch: getCurrentBranch,
+  currentBranch: readCheckedOutBranch,
   runClaude,
 };
 
@@ -326,8 +339,10 @@ async function repairPullRequest(
  * and reports rather than rethrows a provider that could not be asked
  * once the gate has started, for the same reason.
  *
- * Under a `none` provider it pushes the branch, prints the compare URL
- * and skips the wait instead, polling nothing; see the module note.
+ * With no branch checked out it prints one warning and returns before
+ * any push or provider reading. Under a `none` provider it pushes the
+ * branch, prints the compare URL and skips the wait instead, polling
+ * nothing. See the module note for both.
  *
  * Every repair session loads settings from `settingSources`, bound once
  * here so no attempt can spawn one under any other. `base` is the run's
@@ -358,6 +373,10 @@ export async function verifyPullRequest(
     phases,
   };
   const branch = io.currentBranch();
+  if (branch === null) {
+    activeOutput().warn('\n⚠️  No branch is checked out (detached HEAD) — nothing to push and no pull request to verify.');
+    return;
+  }
 
   const reading = io.readProvider();
   if (reading.provider === 'none') {

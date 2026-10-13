@@ -111,6 +111,7 @@ function testRun(exitCode = 0): SuiteResult {
       : null,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
   };
 }
 

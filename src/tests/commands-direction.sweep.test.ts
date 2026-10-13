@@ -36,12 +36,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
 import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
 import { listTrackedFiles } from '../../scripts/survey/files.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -97,6 +101,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
   { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'src/runtime/live-loops.ts' },
 ];
 
 /**

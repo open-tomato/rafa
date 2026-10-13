@@ -220,13 +220,14 @@ function plantRepo(project: PlantedProject, branch: string): void {
 }
 
 describe('the usage lines', () => {
-  it('names all nine actions, the five taking a number carrying an optional one, and is frozen', () => {
-    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait', 'open', 'retarget'] as const;
+  it('names all ten actions, the five a branch can answer carrying an optional number, and is frozen', () => {
+    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait', 'open', 'retarget', 'close'] as const;
 
     expect(Object.keys(PR_USAGE)).toEqual([...actions]);
     expect(actions.map((action) => PR_USAGE[action].startsWith(`rafa pr ${action}`))).toEqual(actions.map(() => true));
     expect(actions.filter((action) => PR_USAGE[action].includes('[<n>]')))
       .toEqual(['show', 'view', 'merge', 'triage', 'wait']);
+    expect(actions.filter((action) => PR_USAGE[action].includes(' <n>'))).toEqual(['retarget', 'close']);
     expect(Object.isFrozen(PR_USAGE)).toBe(true);
   });
 
@@ -234,6 +235,7 @@ describe('the usage lines', () => {
     expect(PR_USAGE.merge).toBe('rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]');
     expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]');
     expect(PR_USAGE.wait).toBe('rafa pr wait [<n>] [--timeout=<minutes>]');
+    expect(PR_USAGE.close).toBe('rafa pr close <n> --reason=<text> [--delete-branch] [--yes]');
   });
 });
 

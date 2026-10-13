@@ -284,6 +284,7 @@ function twoPulls(): ReturnType<typeof createPullRequestsDouble> {
       ...(pulls.find((each) => each.number === number) ?? summaryOf(number, 'gone')),
       body: bodies[number] ?? '',
       headRefOid: 'abc',
+      headCommittedAt: null,
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],

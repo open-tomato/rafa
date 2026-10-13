@@ -72,6 +72,7 @@ export type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
   PrerequisiteKind,
+  PrerequisiteScope,
 } from './config-items.js';
 export type {
   CommandLineSetting,

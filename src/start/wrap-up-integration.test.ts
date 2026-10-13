@@ -123,7 +123,7 @@ describe('wrap-up over a scratch repository', () => {
       promoteAfter: 3,
       promoteMinConfidence: 0.7,
     });
-    const prompt = buildWrapUpPrompt(BRANCH, 'main', '# Plan\n', null, null, lessons);
+    const prompt = buildWrapUpPrompt(BRANCH, 'main', '# Plan\n', 'gh', null, null, lessons);
 
     // Listed: the lesson at 0.7; the control, at 0.6, is not.
     expect(lessons.map((each) => each.id)).toEqual(['held-three']);
@@ -237,6 +237,7 @@ describe('wrap-up release fragment over a scratch repository', () => {
         updatedAt: '2026-09-20T12:00:00Z',
         body: BODY_BEFORE,
         headRefOid: 'deadbeef',
+        headCommittedAt: null,
         mergeable: 'mergeable',
         mergeStateStatus: 'CLEAN',
         labels: [],
@@ -422,7 +423,7 @@ describe('wrap-up under pr.base over a scratch repository and the recorded gh fa
     const pulls = createGhPullRequests({ gh: fake.run });
 
     // The prompt, built over the one base the run resolved.
-    const prompt = buildWrapUpPrompt(HEAD, base, '# Plan\n');
+    const prompt = buildWrapUpPrompt(HEAD, base, '# Plan\n', 'gh');
     expect(base).toBe(BASE);
     expect(prompt).toContain(`gh pr create --base ${BASE}`);
     expect(prompt).not.toContain('--base main');

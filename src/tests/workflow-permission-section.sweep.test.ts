@@ -1,7 +1,11 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { test, expect } from 'bun:test';
+import { test, expect, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 test('context/workflow.md holds What reaches a loop session section with permission rows', () => {
   const workflowPath = join(import.meta.dir, '..', '..', 'context', 'workflow.md');

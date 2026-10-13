@@ -443,3 +443,43 @@ describe('the bare line, over more than one candidate, including the 72-hour ski
     expect(fake.pull(502)?.comments).toHaveLength(1);
   });
 });
+
+describe('a green pull request that conflicts with its base', () => {
+  it('is assessed as a conflict class and is never answered as nothing to triage', async () => {
+    const fixture = loadFixture('green');
+    const seed = { ...seedOf(fixture), mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' } as FakePullRequestSeed;
+    const fake = createFakePrGh({ now: () => NOW });
+    fake.plant(seed);
+    const head = String(fixture.pr['headRefOid']);
+    const seams: TriageSeams = {
+      pullRequests: () => createGhPullRequests({ gh: fake.run }),
+      readBranch: () => 'main',
+      readRemote: () => GITHUB_ORIGIN,
+      git: () => conflictGit(new Map([[head, ['src/config.ts']]])),
+      now: () => NOW,
+      permissions: () => createGhPermissions({ gh: fake.run }),
+    };
+    const command = createPrTriageCommand(seams);
+
+    const json = await dispatchInProject(
+      ['pr', 'triage', String(seed.number), '--no-comment', '--output=json', NO_HINT],
+      SUBJECTS,
+      [command],
+      freshProject(),
+    );
+    const text = await dispatchInProject(
+      ['pr', 'triage', String(seed.number), '--no-comment', NO_HINT],
+      SUBJECTS,
+      [command],
+      freshProject(),
+    );
+
+    expect(json.exitCode).toBe(0);
+    const readings = dataOf(eventsOf(json.stdout))['readings'] as readonly Record<string, unknown>[];
+    expect(classOfReading(readings[0] as Record<string, unknown>)).toStartWith('conflict-');
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).not.toContain('nothing to triage');
+    expect(text.stdout).toContain('conflict-');
+    expect(fake.pull(seed.number)?.comments ?? []).toEqual([]);
+  });
+});

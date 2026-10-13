@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { failedOutsideAnyCase } from './suite-outside-case.js';
 import { FOLDED_COMMAND_JOINER, foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
 
 const STOP = 130;
@@ -19,6 +20,8 @@ const SWEEP = 'src/tests/one.sweep.test.ts';
 const TRACKED = ['src/a.ts', 'src/a.test.ts', SWEEP, 'packages/x/b.sweep.test.ts'];
 const FAILED: SuiteFailure = { file: 'src/a.test.ts', name: 'a > broke' };
 const SWEPT: SuiteFailure = { file: SWEEP, name: 'sweep > found a leak' };
+/** What a run Bun found no test file for holds beside its command: exit code 1, no summary line, the mark. */
+const MARKED: Partial<SuiteResult> = { exitCode: 1, summary: null, errors: null, junit: 'missing', noTestFiles: true };
 
 let warnings: string[];
 
@@ -56,6 +59,7 @@ function result(command: string, overrides: Partial<SuiteResult> = {}): SuiteRes
     errors: 0,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
     ...overrides,
   };
 }
@@ -116,6 +120,12 @@ describe('foldResults', () => {
     expect(folded.unhandled).toEqual([thrown, swept]);
   });
 
+  it('holds the output tail of both runs, the first run\'s first, and none when neither held one', () => {
+    const folded = foldResults(result('changed', { outputTail: ['error: boom', ' 1 fail'] }), result('sweep', { outputTail: [' 1 pass'] }), STOP);
+    expect(folded.outputTail).toEqual(['error: boom', ' 1 fail', ' 1 pass']);
+    expect(foldResults(result('changed'), result('sweep'), STOP).outputTail).toEqual([]);
+  });
+
   it('holds both commands, both summaries, and the failures and errors of both', () => {
     const folded = foldResults(
       result('changed', { exitCode: 1, failures: [FAILED], errors: 1 }),
@@ -159,9 +169,10 @@ describe('foldResults', () => {
   });
 
   it('keeps a summary beside a run that found no test file, which is no unreported run', () => {
-    const empty = result('changed', { exitCode: 1, summary: null, errors: null, junit: 'missing', noTestFiles: true });
+    const empty = result('changed', MARKED);
     const folded = foldResults(empty, result('sweep'), STOP);
     expect(folded.summary).toBe('Ran 1 test across 1 file. [sweep]');
+    expect(folded.exitCode).toBe(0);
     expect(folded.noTestFiles).toBeUndefined();
     expect(foldResults(empty, empty, STOP).noTestFiles).toBe(true);
   });
@@ -171,6 +182,82 @@ describe('foldResults', () => {
     expect(foldResults(missing, result('sweep'), STOP).junit).toBe('read');
     expect(foldResults(missing, missing, STOP).junit).toBe('missing');
     expect(foldResults(result('changed'), result('sweep', { junit: 'unreadable' }), STOP).junit).toBe('unreadable');
+  });
+
+  describe('a run marked noTestFiles', () => {
+    it('reads a marked run beside a passing one as no failure outside any test case (#1054)', () => {
+      const folded = foldResults(result('changed', { exitCode: 1, noTestFiles: true }), result('sweep'), STOP);
+      // Control: the marked run's exit code, were it the folded one with no mark, is what the reading is true for.
+      expect(failedOutsideAnyCase({ exitCode: 1, failures: folded.failures, noTestFiles: folded.noTestFiles })).toBe(true);
+      expect(failedOutsideAnyCase(folded)).toBe(false);
+    });
+
+    it('folds marked with passing to green: exit code 0, the second\'s summary, no mark', () => {
+      const folded = foldResults(result('changed', MARKED), result('sweep'), STOP);
+      expect(folded.exitCode).toBe(0);
+      expect(folded.summary).toBe('Ran 1 test across 1 file. [sweep]');
+      expect(folded.failures).toEqual([]);
+      expect(folded.noTestFiles).toBeUndefined();
+    });
+
+    it('folds passing with marked to green: exit code 0, the first\'s summary, no mark', () => {
+      const folded = foldResults(result('changed'), result('sweep', MARKED), STOP);
+      expect(folded.exitCode).toBe(0);
+      expect(folded.summary).toBe('Ran 1 test across 1 file. [changed]');
+      expect(folded.failures).toEqual([]);
+      expect(folded.noTestFiles).toBeUndefined();
+      expect(failedOutsideAnyCase(folded)).toBe(false);
+    });
+
+    it('folds marked with a run listing a failure to red on the second: its exit code and failures, no mark', () => {
+      const folded = foldResults(result('changed', MARKED), result('sweep', { exitCode: 3, failures: [SWEPT], errors: 1 }), STOP);
+      expect(folded.exitCode).toBe(3);
+      expect(folded.failures).toEqual([SWEPT]);
+      expect(folded.summary).toBe('Ran 1 test across 1 file. [sweep]');
+      expect(folded.noTestFiles).toBeUndefined();
+      expect(failedOutsideAnyCase(folded)).toBe(false);
+    });
+
+    it('folds marked with a run exiting nonzero with no failure to that run\'s exit code, read as outside any case', () => {
+      const folded = foldResults(result('changed', MARKED), result('sweep', { exitCode: 3, errors: 2 }), STOP);
+      expect(folded.exitCode).toBe(3);
+      expect(folded.failures).toEqual([]);
+      expect(folded.noTestFiles).toBeUndefined();
+      expect(failedOutsideAnyCase(folded)).toBe(true);
+    });
+
+    it('keeps the exit code of an unmarked run with no summary line beside a marked one, with the summary dropped', () => {
+      const silent = result('sweep', { exitCode: 2, summary: null, errors: null, junit: 'missing' });
+      const folded = foldResults(result('changed', MARKED), silent, STOP);
+      expect(folded.exitCode).toBe(2);
+      expect(folded.summary).toBeNull();
+      expect(folded.noTestFiles).toBeUndefined();
+    });
+
+    it('folds both marked to marked, on the first run\'s exit code as before', () => {
+      const folded = foldResults(result('changed', MARKED), result('sweep', { ...MARKED, exitCode: 4 }), STOP);
+      expect(folded.noTestFiles).toBe(true);
+      expect(folded.exitCode).toBe(1);
+      expect(folded.summary).toBeNull();
+      expect(failedOutsideAnyCase(folded)).toBe(false);
+    });
+
+    it('answers the stop code for a marked run beside a stop, on either side', () => {
+      const stopped = { exitCode: STOP, summary: null, errors: null };
+      // Control: beside a passing run the same marked run folds to 0, so the stop code is the stop's.
+      expect(foldResults(result('changed', MARKED), result('sweep'), STOP).exitCode).toBe(0);
+      expect(foldResults(result('changed', MARKED), result('sweep', stopped), STOP).exitCode).toBe(STOP);
+      expect(foldResults(result('changed', stopped), result('sweep', MARKED), STOP).exitCode).toBe(STOP);
+      expect(foldResults(result('changed', { ...MARKED, exitCode: STOP }), result('sweep'), STOP).exitCode).toBe(STOP);
+    });
+
+    it('keeps the marked run\'s place in the command, the output tail and the file order', () => {
+      const line = 'error: 0 test files matching **{.test,.spec}.ts';
+      const folded = foldResults(result('changed', { ...MARKED, outputTail: [line], fileOrder: [[]] }), result('sweep', { outputTail: [' 1 pass'], fileOrder: [[SWEEP]] }), STOP);
+      expect(folded.command).toEqual(['bun', 'test', 'changed', FOLDED_COMMAND_JOINER, 'bun', 'test', 'sweep']);
+      expect(folded.outputTail).toEqual([line, ' 1 pass']);
+      expect(folded.fileOrder).toEqual([[], [SWEEP]]);
+    });
   });
 
   it('answers null errors only when neither run printed a summary to read them from', () => {

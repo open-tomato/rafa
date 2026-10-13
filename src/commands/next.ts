@@ -719,7 +719,11 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       },
     ],
     outputs: ['text', 'json'],
-    spends: { when: 'through', what: 'when the step it runs is one of the above' },
+    spends: {
+      when: 'through',
+      what: 'when the step it runs starts a session: `plan` runs `rafa plan create` and its one planning session,'
+        + ' and `start` and `resume` run `rafa loop start` and the sessions of its loop',
+    },
     run: async (context) => {
       const report = await runNext(context, seams);
       if (context.outputMode === 'json') context.output.result(report);

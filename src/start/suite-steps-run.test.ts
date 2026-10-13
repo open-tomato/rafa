@@ -8,7 +8,11 @@
  * call, handed a red outcome or a due step, does not. The last cases
  * leave the steps as `suite-step.ts`'s own, over a scripted `bun test`
  * and git and a real tracker, so the default wiring is read writing a
- * real blocker, not assumed to.
+ * real blocker, not assumed to. Among them are the baseline's three
+ * (#945): one with listed failures is written and the run goes on, a
+ * stored one that exited nonzero and listed no failing case is recorded
+ * again, and a fresh one of that shape is not written and stops the run
+ * before a session, each next to the case it differs from by one field.
  *
  * Nothing here spawns `bun test`, git or `gh`.
  */
@@ -25,17 +29,19 @@ import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../core/output/index.js';
-import { baselineOf } from '../suite/baseline.js';
+import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
+import { baselineHaltLines, OUTSIDE_CASE_REASON } from './suite-outside-case.js';
+import { addToLedger, stageLedgerPathFor } from './suite-step.js';
 import { createRunSuiteSteps } from './suite-steps-run.js';
 
 const BASE = 'base0000';
@@ -58,7 +64,7 @@ const TRACKER = [
 ].join('\n');
 
 const BASELINE: SuiteBaseline = baselineOf(
-  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read', unhandled: [] },
+  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read', unhandled: [], outputTail: [] },
   new Date('2026-10-01T00:00:00Z'),
   BASE,
 );
@@ -120,7 +126,7 @@ function scripted(answers: Partial<SuiteStepCalls> = {}): { readonly calls: Suit
     ensureBaseline: (context) => {
       seen.names.push('ensureBaseline');
       seen.contexts.push(context);
-      return answers.ensureBaseline?.(context) ?? Promise.resolve<BaselineOutcome>({ baseline: BASELINE, step: null, interrupted: false });
+      return answers.ensureBaseline?.(context) ?? Promise.resolve<BaselineOutcome>({ baseline: BASELINE, step: null, interrupted: false, halted: false });
     },
     runDueStageSteps: (context, baseline) => {
       seen.names.push('runDueStageSteps');
@@ -410,7 +416,7 @@ describe('a step stopped by SIGINT', () => {
   });
 
   it('stops the run on an interrupted baseline, and runs no step at any later call', async () => {
-    const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true }) });
+    const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true, halted: false }) });
     const steps = stepsWith(calls);
 
     expect(await steps.beforeSession(taskAt('second task', 8))).toBe('stop');
@@ -446,11 +452,99 @@ describe('stoppedOnSignal', () => {
 
   it('answers true after an interrupted pre-wrap-up step and an interrupted baseline', async () => {
     const preWrapUp = stepsWith(scripted({ runPreWrapUpStep: () => Promise.resolve(stopped('pre-wrap-up')) }).calls);
-    const baseline = stepsWith(scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true }) }).calls);
+    const baseline = stepsWith(scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true, halted: false }) }).calls);
 
     expect(await preWrapUp.beforeSession(null)).toBe('stop');
     expect(await baseline.beforeSession(taskAt('second task', 8))).toBe('stop');
     expect([preWrapUp.stoppedOnSignal(), baseline.stoppedOnSignal()]).toEqual([true, true]);
+  });
+});
+
+/** What bun printed on stderr for one test file importing a package that is not installed. */
+const LOAD_TAIL = [
+  'src/a.test.ts:',
+  '# Unhandled error between tests',
+  'error: Cannot find package \'zod\' from \'/repo/src/a.test.ts\'',
+  ' 0 pass',
+  ' 1 fail',
+  ' 1 error',
+  'Ran 1 test across 1 file. [10.00ms]',
+];
+
+/** A run that exited 1 with a summary line and listed no failing case. */
+const OUTSIDE_CASE: SuiteResult = {
+  command: ['bun', 'test'],
+  exitCode: 1,
+  summary: 'Ran 1 test across 1 file. [10.00ms]',
+  failures: [],
+  errors: 1,
+  junit: 'missing',
+  unhandled: [],
+  outputTail: LOAD_TAIL,
+};
+
+/** The lines the run stops with on a baseline holding {@link OUTSIDE_CASE}. */
+const HALT_LINES = [
+  `⛔ The suite baseline exited 1 and listed no failing test: ${OUTSIDE_CASE_REASON}. Stopping before any session of this run is dispatched; the baseline was not written.`,
+  '   The likely cause is a test file that did not load: dependencies not installed in this checkout is the case seen.',
+  '   Once the suite loads, run again: that run records the baseline.',
+  '   The last 7 line(s) bun test printed on stderr:',
+  ...LOAD_TAIL.map((line) => `     ${line}`),
+];
+
+describe('a baseline that failed outside any test case', () => {
+  /** The baseline step such a run is recorded as. */
+  const step: SessionStep = {
+    kind: 'baseline',
+    scope: 'full',
+    command: ['bun', 'test'],
+    exitCode: 1,
+    summary: OUTSIDE_CASE.summary,
+    failures: [],
+    newFailures: [],
+    outsideCase: true,
+    outputTail: LOAD_TAIL,
+  };
+  const failed = baselineOf(OUTSIDE_CASE, new Date('2026-10-01T00:00:00Z'), BASE);
+
+  it('stops the run at the call that took it, with the reason, the likely cause and the tail, and runs no step at any later call', async () => {
+    const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: failed, step, interrupted: false, halted: true }) });
+    const steps = stepsWith(calls);
+
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe('stop');
+
+    expect(seen.names).toEqual(['ensureBaseline']);
+    expect(linesAt('error')).toEqual(HALT_LINES);
+    expect(linesAt('warn')).toEqual([]);
+  });
+
+  it('goes on over the same baseline when it is not answered as halted', async () => {
+    // The control for the case above: the same outcome, its `halted` false.
+    const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: failed, step, interrupted: false, halted: false }) });
+
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('go-on');
+    expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('is a stop no retry follows: stoppedOnSignal answers true, as it does not after a red step', async () => {
+    const halted = stepsWith(scripted({ ensureBaseline: () => Promise.resolve({ baseline: failed, step, interrupted: false, halted: true }) }).calls);
+    const red = stepsWith(scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage', true, 9)]) }).calls);
+
+    expect(await halted.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect(await red.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect([halted.stoppedOnSignal(), red.stoppedOnSignal()]).toEqual([true, false]);
+  });
+
+  it('says bun printed nothing when the recorded step holds no tail', async () => {
+    const bare: SessionStep = { ...step, outputTail: [] };
+    const { calls } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: failed, step: bare, interrupted: false, halted: true }) });
+
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect(linesAt('error')).toEqual(baselineHaltLines({ exitCode: 1, outputTail: [] }));
+    expect(linesAt('error').at(-1)).toBe('   bun test printed nothing on stderr.');
   });
 });
 
@@ -509,6 +603,7 @@ function suiteResult(failures: SuiteResult['failures'] = []): SuiteResult {
     errors: 0,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
   };
 }
 
@@ -605,5 +700,114 @@ describe('with suite-step.ts\'s own steps', () => {
     expect(findNextTask(after)?.status).toBe('blocked');
     expect(after.match(/Repair the red pre-wrap-up step/g)).toHaveLength(1);
     expect(recorded.map((step) => step.kind)).toEqual(['baseline', 'pre-wrap-up', 'pre-wrap-up']);
+  });
+
+  /** The baseline file beside the tracker, as it reads now, or null when it does not. */
+  const storedBaseline = (): SuiteBaseline | null => {
+    const reading = readBaseline(baselinePathFor(trackerPath));
+    return reading.state === 'read'
+      ? reading.baseline
+      : null;
+  };
+
+  /** Leaves `baseline` as the run that recorded it did: its file, and stage One entered in the ledger as covered by it. */
+  const storeBaseline = (baseline: SuiteBaseline): void => {
+    writeBaseline(baselinePathFor(trackerPath), baseline);
+    addToLedger(trackerPath, [{ stage: 0, name: 'One', commit: BASE, via: 'baseline' }]);
+  };
+
+  it('writes a baseline with listed failures as before, and goes on', async () => {
+    const known = { file: 'src/a.test.ts', name: 'a > broke' };
+    const { steps, recorded } = realSteps([suiteResult([known])]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    expect(storedBaseline()?.exitCode).toBe(1);
+    expect(storedBaseline()?.failures).toEqual([known]);
+    expect(existsSync(stageLedgerPathFor(trackerPath))).toBe(true);
+    expect(recorded.map((step) => [step.kind, step.outsideCase, step.outputTail])).toEqual([['baseline', undefined, undefined]]);
+    expect(linesAt('error')).toEqual([]);
+    expect(steps.stoppedOnSignal()).toBe(false);
+  });
+
+  it('halts on a fresh baseline that exited nonzero and listed no failing case: not written, and no step run after it', async () => {
+    // The case above with one field changed: the same exit code, no failure listed.
+    const { steps, runs, recorded } = realSteps([OUTSIDE_CASE]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('stop');
+    expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe('stop');
+
+    expect(runs).toHaveLength(1);
+    expect(existsSync(baselinePathFor(trackerPath))).toBe(false);
+    expect(existsSync(stageLedgerPathFor(trackerPath))).toBe(false);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    expect(recorded.map((step) => [step.kind, step.outsideCase, step.outputTail])).toEqual([['baseline', true, LOAD_TAIL]]);
+    expect(linesAt('error')).toEqual(HALT_LINES);
+    expect(linesAt('info')).toEqual(['🧪 suite baseline: bun test exited 1; Ran 1 test across 1 file. [10.00ms]']);
+    expect(steps.stoppedOnSignal()).toBe(true);
+  });
+
+  it('reuses a stored baseline with listed failures, running nothing', async () => {
+    const known = { file: 'src/a.test.ts', name: 'a > broke' };
+    const stored = baselineOf(suiteResult([known]), new Date('2026-09-30T00:00:00Z'), BASE);
+    storeBaseline(stored);
+    const { steps, runs } = realSteps([]);
+
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('go-on');
+
+    expect(runs).toHaveLength(0);
+    expect(storedBaseline()).toEqual(stored);
+    expect(linesAt('warn')).toEqual([]);
+  });
+
+  it('records a stored baseline that exited nonzero and listed no failing case again, saying why', async () => {
+    // The case above with one field changed: the stored run lists no failure.
+    storeBaseline(baselineOf(OUTSIDE_CASE, new Date('2026-09-30T00:00:00Z'), BASE));
+    const { steps, runs, recorded } = realSteps([suiteResult()]);
+
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('go-on');
+
+    expect(runs).toHaveLength(1);
+    expect(recorded.map((step) => step.kind)).toEqual(['baseline']);
+    expect(storedBaseline()?.exitCode).toBe(0);
+    expect(storedBaseline()?.recordedAt).toBe('2026-10-01T00:00:00.000Z');
+    expect(linesAt('warn')).toEqual([
+      `⚠️  SUITE_BASELINE-fixture.json holds a run that exited 1 and listed no failing test (${OUTSIDE_CASE_REASON}); recording the baseline again.`,
+    ]);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('writes the baseline of a project with no test file with its mark, and the next run reuses it quietly (#1053)', async () => {
+    // Bun exits 1 for it and lists nothing; the mark that tells it apart is kept in the file.
+    const none: SuiteResult = { ...suiteResult(), exitCode: 1, summary: null, errors: null, junit: 'missing', outputTail: ['error: 0 test files matching **{.test,.spec}.ts'], noTestFiles: true };
+    const first = realSteps([none]);
+
+    expect(await first.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+    expect(first.runs).toHaveLength(1);
+    expect(storedBaseline()?.exitCode).toBe(1);
+    expect(storedBaseline()?.noTestFiles).toBe(true);
+    expect(linesAt('error')).toEqual([]);
+    expect(linesAt('warn')).toEqual([]);
+    const written = readFileSync(baselinePathFor(trackerPath), 'utf8');
+
+    const second = realSteps([none]);
+    expect(await second.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+    expect(second.runs).toHaveLength(0);
+    expect(readFileSync(baselinePathFor(trackerPath), 'utf8')).toBe(written);
+    expect(linesAt('error')).toEqual([]);
+    expect(linesAt('warn')).toEqual([]);
+  });
+
+  it('halts when a stored baseline of that shape is recorded again and fails the same way, leaving the stored file', async () => {
+    const stored = baselineOf(OUTSIDE_CASE, new Date('2026-09-30T00:00:00Z'), BASE);
+    storeBaseline(stored);
+    const { steps, runs } = realSteps([OUTSIDE_CASE]);
+
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('stop');
+
+    expect(runs).toHaveLength(1);
+    expect(storedBaseline()).toEqual(stored);
+    expect(linesAt('error')).toEqual(HALT_LINES);
   });
 });

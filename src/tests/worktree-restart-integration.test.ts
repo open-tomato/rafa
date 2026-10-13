@@ -187,6 +187,8 @@ function plantRestartScratch(): ScratchRepo {
   const base = git(scratch, scratch.repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   git(scratch, scratch.repo, 'remote', 'add', 'origin', originPath);
   git(scratch, scratch.repo, 'push', '-q', '-u', 'origin', base);
+  // The run reads its base from origin/HEAD, which a bare clone-less remote add leaves unset.
+  git(scratch, scratch.repo, 'remote', 'set-head', 'origin', base);
 
   mkdirSync(join(scratch.repo, '.plans'));
   writeFileSync(join(scratch.repo, PLAN_REL), PLAN, 'utf8');

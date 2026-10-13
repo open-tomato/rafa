@@ -39,20 +39,21 @@
  * a command registered and not spelled goes red. Each of those modules
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, `board sync`, the five plan readers, `plan list`, `plan show`,
- * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
- * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
- * `issue` actions, and `module list` and `module exec` from the registry are held to be
- * the command modules wrapping none. `describe` runs the roster builder
- * of `src/cli/describe.ts`, which is no root export, and each of the first
- * three plan readers imports `parsePlan` from the `./plan` entry, which is
- * one, where `plan risk` and `plan needs` import their readings from
- * `src/plan/risk.ts` and `src/plan/needs.ts`, which are not. A binding a module
- * takes by name, as `loop start` takes the CI defaults its flags show,
- * is a value and not a command, and is not held. Every parsed import list
- * is also held to the spelled one, which is what keeps a parser that
- * matched nothing from passing vacuously.
+ * terminal runs and a service cannot import goes red. The command
+ * modules wrapping none are held too: the case that reaches the phase 0
+ * commands spells them path by path, every module of `COMMAND_MODULES`
+ * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths
+ * is the one to read, where a list kept in this note fell behind it.
+ * `describe` runs the roster builder of `src/cli/describe.ts`, which is
+ * no root export. `plan show` imports `parsePlan` from the `./plan`
+ * entry, which is one, where `plan list`, `plan validate`, `plan risk`
+ * and `plan needs` import their readings from `src/plan/list.ts`,
+ * `src/plan/validate.ts`, `src/plan/risk.ts` and `src/plan/needs.ts`,
+ * which are not. A binding a module takes by name, as `loop start`
+ * takes the CI defaults its flags show, is a value and not a command,
+ * and is not held. Every parsed import list is also held to the spelled
+ * one, which is what keeps a parser that matched nothing from passing
+ * vacuously.
  *
  * The import cases run a probe in a fresh process, from an empty
  * directory outside any repository: import one module by absolute path,
@@ -679,7 +680,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
     ['../../core/command/index.js', ['CommandExit']],
+    ['./edit-priority.js', ['PRIORITY_FLAG']],
     ['./edit-run.js', ['editIssue', 'renderEditReport']],
   ]],
   ['./commands/pr/current.js', [
@@ -707,6 +710,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/pr-retarget.js', ['retargetedLine']],
     ['../issue/issue-tracker.js', ['readRequiredFlag']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readPullArgument']],
+  ]],
+  ['./commands/pr/close.js', [
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../issue/issue-tracker.js', ['readRequiredFlag']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
   ]],
   ['./commands/pr/list.js', [
     ['../../core/config/sections.js', ['messageOf']],
@@ -1251,6 +1259,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../core/command/index.js', ['CommandExit']],
     ['../../core/config/index.js', ['configFilePath']],
     ['../../core/config/sections.js', ['messageOf']],
+    ['../../utils/agent-shell.js', ['AGENT_SHELL_ENV', 'isAgentShell']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
   ['./commands/ci/status.js', [
@@ -1315,7 +1324,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./item-merge.js', ['afterLoopWait', 'ghFiledAt', 'mergeDryRunLines']],
+    ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/stretch/end.js', [
@@ -1466,12 +1475,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
+    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],
     ['../cli/prompt/terminal.js', ['processTerminal']],
     ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
-    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
+    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
     ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
@@ -1480,9 +1489,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../core/config/index.js', ['SETTINGS']],
     ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
-    ['../core/loop/index.js', ['isPidAlive', 'readSessions']],
+    ['../core/loop/index.js', ['isPidAlive']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
+    ['../runtime/live-loops.js', ['liveLoopsOf']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
@@ -1675,6 +1685,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/view.js',
       './commands/pr/open.js',
       './commands/pr/retarget.js',
+      './commands/pr/close.js',
       './commands/pr/list.js',
       './commands/pr/wait.js',
       './commands/pr/merge.js',

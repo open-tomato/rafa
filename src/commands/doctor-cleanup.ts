@@ -1,7 +1,8 @@
 /**
  * The cleanup reading `rafa doctor` prints one row for: how many rows
- * four of the five groups `rafa cleanup` lists would hold — Merged,
- * Stale, Not pushed and Worktrees, never Run records — read by
+ * four of the groups `rafa cleanup` lists would hold — Merged, Stale,
+ * Not pushed and Worktrees, never Run records nor the branches only on
+ * `origin` — read by
  * `src/cleanup/`'s {@link readCleanup} and counted by
  * {@link cleanupCounts}. This is the command half of
  * `../cleanup/settings.ts`, which holds the settings the reading runs
@@ -14,9 +15,11 @@
  * `doctor` reads with `fetch: false`, so it runs no `git fetch --prune`
  * and sends nothing over the network for git: an upstream reads as gone
  * as of the last fetch that ran, which is `rafa cleanup`'s to refresh.
- * The only remote call is the pull request provider's merged listing,
- * and it goes through the `gh` runner `doctor` already opened for the
- * board rows (`DoctorCleanupInput.gh`), so a project whose
+ * The only remote calls are the pull request provider's: its merged
+ * listing, and its open one when an unmerged branch is on `origin`
+ * alone, which {@link readCleanup} reads for `rafa cleanup` and this
+ * row does not count. Both go through the `gh` runner `doctor` already
+ * opened for the board rows (`DoctorCleanupInput.gh`), so a project whose
  * provider is not `gh` reads no provider at all, exactly as
  * `rafa cleanup` does with `pr.provider: none`, and its Stale and
  * Not-pushed rows are still counted.

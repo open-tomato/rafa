@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Eight actions read and control pull requests:
+Ten actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -34,10 +34,23 @@ Eight actions read and control pull requests:
   `PullRequests.editBase`, printing the line `retargetedLine` builds; `<n>`
   is required here, never the branch's; one already on that base is a
   no-op, exit 0
+- `pr close <n> --reason=<text> [--delete-branch] [--yes]` — close one open
+  PR WITHOUT merging it, over `PullRequests.close`, the reason left as its
+  closing comment; `<n>` is on the line, never the branch's. It prints the
+  title, the head and the issues a merge would have closed, which stay
+  open, then asks `Close #<n> without merging? [y/N]`; `--yes` answers it,
+  and without a terminal and without `--yes` it refuses. The head branch
+  stays on the remote unless `--delete-branch` is on the line
 
-`<n>` defaults to the open PR of the current branch. Every action carries a
-summary, examples and `outputs: [text, json]`; each one in the core roster
-carries help snapshots too.
+One pull request made obsolete by another change is the case it is for:
+`rafa pr close 41 --reason="Replaced by #52 on the new base."` shows #41,
+its head and the issues it would have closed, asks, and on a yes closes
+it with that reason as its comment. Those issues stay open.
+
+`<n>` defaults to the open PR of the current branch, except for `pr close`
+and `pr retarget`, which act on the number they are given. Every action
+carries a summary, examples and `outputs: [text, json]`; each one in the
+core roster carries help snapshots too.
 
 `pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
 `checks` and is READ-ONLY: no repair session, no comment, no label, no
@@ -45,10 +58,21 @@ merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
 the deadline and the poll interval are that gate's own constants. The same
 `waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop
 agree about what green means and how often a pull request is asked. Green
-exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
-is answered at once rather than waited out, since a PR that does not merge
-cleanly schedules no run and no amount of waiting makes one; the deadline
-passing with checks still running exits 3. A green wait writes its report
+exits 0; red exits 1; a pull request with NO checks at all exits 1 too,
+with the head line `no check registered yet`. Zero checks are polled
+again at the poll interval while the head is younger than
+`FIRST_CHECK_GRACE_MS` (120 seconds, `src/pr/checks.ts`), since GitHub
+registers a push's runs some seconds after the push; past that grace the
+ending is `none` at once. The age is the head commit's committed date
+(`headCommittedAt` on the pull request's detail), not the push time, so an
+old commit pushed just now gets no grace, and a head whose date the
+provider does not answer gets none either. Only `pr wait` passes that
+date: the loop's CI gate and `pr triage --resolve` poll as they did. A
+`none` ending says the pull request does not merge cleanly, and that no
+run is scheduled for it, only when one more read of its detail says
+`conflicting`; any other reading gets `rafa pr wait <n>` to ask again and
+`rafa pr show <n>`, and says nothing about merging. The deadline passing
+with checks still running exits 3. A green wait writes its report
 through the output and then names the one step that follows, which for
 checks that have just passed is the merge (`src/next/ending.ts`,
 `--no-hint` to turn it off); every other ending carries the report as the
@@ -116,6 +140,22 @@ with `base` exactly, sends nothing when they match, prints one
 `↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line
 after an edit, and turns a refused edit into one warning naming the
 pull request, both bases and what `gh` said, never a throw.
+
+`close(number, comment, { deleteBranch })` is `gh pr close <n>
+--comment=<comment>`, with `--delete-branch` after it only when
+`deleteBranch` is true. It is built in `src/pr/gh-close.ts`, which
+`src/pr/gh.ts` hands its runner to, a split that keeps `gh.ts` under its
+size cap as `gh-closing-issues.ts` did for its read. A WRITE shaped like
+`editBase`: a bad number, a blank or
+non-string comment and a `deleteBranch` that is not a boolean are refused
+as TypeErrors before `gh` is sent anything, and a failed command throws
+naming `gh pr close <n>` and what it wrote, the comment left out of the
+name. It answers nothing and reads nothing back. Closing a pull request
+closes none of the issues it links. The port does not read the state
+first, so the caller does: `pr close` reads `get(n)` and refuses a pull
+request that is merged, closed or absent before the close is sent. The
+fake refuses a close of a pull request that is not open, and a close with
+no comment, the same way (`src/pr/gh-fake.ts`).
 
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
@@ -234,7 +274,12 @@ sentence replaces nothing.
    waiting on `origin/<base>` fold into a version, so settle is the
    merge's last line (`src/commands/pr/merge-followups.ts`). While a loop
    of the project is live, the update's line ends `run it after the loop
-   on <branch> finishes`, since `rafa self-update` refuses until then.
+   on <branch> finishes`, since `rafa self-update` refuses while that loop
+   is live. A tracker in `plan.dir` with an open or blocked task stops the
+   update only then: read while a loop is live, it exits 1 and names each
+   tracker, unless `--force` is on the line. With no loop live the update
+   goes on and warns once, naming each such tracker, so a tracker a parked
+   plan left behind does not hold it (`src/runtime/install.ts`).
    Both are only printed: `pr merge` never runs settle, and `rafa release
    tag` is no longer named here, since settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
@@ -367,6 +412,14 @@ Run again:
   when none is pending and the PR is still not green, assess again and EDIT
   the same comment (one triage comment per PR, history in its edits); when
   green, say green.
+- A conflicting head is never green, whatever its checks say: with
+  `mergeable: conflicting` (or `mergeStateStatus: DIRTY` while `mergeable`
+  is `unknown`) it is assessed and classed `conflict-*` whether its rows
+  are green, red or absent. Two stored-comment rules come first: a triage
+  already stored at the same head is shown, and a moved head with a check
+  still running shows the old triage as `pending`, conflict or not.
+  `unknown` with any other merge state and green checks still says green
+  (`src/pr/triage/rerun.ts`).
 - `--no-comment` reads an existing comment and writes none.
 
 Which PR, with no `<n>` and no PR on the current branch: list red PRs. One:
@@ -429,7 +482,10 @@ rejected.
 - Then the existing CI wait. A fresh assessment of class `green` OR
   `no-checks` counts as resolved (`endOfAttempt`,
   `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
-  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
+  repository that schedules no checks reads `no-checks`. Nothing counts as
+  resolved while the PR still conflicts (`stillConflicts`), green checks
+  included: they are what a green, conflicting PR brings into its run.
+  Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,
@@ -1081,8 +1137,9 @@ take commit on it.
 **Handover:** Ownership change is two-sided. The owner runs `rafa claim hand
 <n> --to=<store id>`, pushing a hand commit naming the receiver; the
 receiver runs `rafa claim accept <n>`, pushing an accept commit naming the
-giver. Until acceptance the owner stays the owner and may run `rafa claim
-withdraw <n>` to cancel the handover, pushing a withdraw commit.
+receiver's own store, so the receiver owns the claim from then on. Until
+acceptance the owner stays the owner and may run `rafa claim withdraw <n>`
+to cancel the handover, pushing a withdraw commit.
 
 **Takeover:** `rafa claim take <n> [--stale]` takes a claim held too long.
 Without `--stale` it refuses unless the claim reads stale by `claims.staleAfter`

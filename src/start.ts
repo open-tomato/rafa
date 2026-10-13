@@ -55,20 +55,20 @@
  * either way. Everywhere else it is the project root. Both are settled
  * in `start/run-checkout.ts`.
  *
- * Ahead of the branch guard, a run started on `main` or `master` is
- * offered the plan's own branch (`resolveRunBranch` in
- * `start/run-setup.ts`, the offer itself in `start/branch.ts`): with a
- * terminal it is asked whether to create
+ * Ahead of the branch guard, a run started on `main` or `master`, or on
+ * a detached HEAD, is offered the plan's own branch (`resolveRunBranch`
+ * in `start/run-setup.ts`, the offer itself in `start/branch.ts`): with
+ * a terminal it is asked whether to create
  * `feat/<plan-stub>` from the latest `origin/<base>` and run there, or
  * whether to switch to that branch when it already exists, and
  * `--create-branch` answers yes without asking. A run that moved carries
  * the new branch into the guard and into the session record below, so
  * neither reads the base the run started on. Nothing is offered under
- * `--any-branch`, for a plan whose file names no stub, or with no
- * terminal and no flag, and the guard then has the last word as it
- * always did. Every refusal along the way — a modified tracked file, a
- * fetch that failed, a base that has diverged — is thrown from there as
- * exit code 1, and leaves the run on its base.
+ * `--any-branch` on a branch, for a plan whose file names no stub, or
+ * with no terminal and no flag, and the guard then has the last word: a
+ * run left on no branch it refuses under every line. Every refusal on
+ * the way — a modified tracked file, a fetch that failed, a base that has
+ * diverged — is thrown as exit code 1, and leaves the run where it was.
  *
  * `--as-worktree` takes the place of that offer: no question is asked,
  * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
@@ -218,17 +218,17 @@
  * --runtime     the installed rafa the run goes on in: a version under
  *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
  *               (`start/runtime.ts`).
- * --create-branch on `main` or `master`, create `feat/<plan-stub>` from the
- *               latest `origin/<base>` and run there without asking, or
- *               switch to that branch when it is already there
- *               (`start/branch.ts`). Read by `start/run-setup.ts` alone.
+ * --create-branch on `main`, `master` or a detached HEAD, create
+ *               `feat/<plan-stub>` from the latest `origin/<base>` and run
+ *               there without asking, or switch to that branch when it is
+ *               there (`start/branch.ts`). Read by `start/run-setup.ts` alone.
  * --as-worktree run in a linked worktree of `feat/<plan-stub>` at
  *               `loop.worktreeDir/<stub>`, created from the latest
  *               `origin/<base>` when the branch is not there yet, and leave
  *               the main checkout as it is (`start/run-checkout.ts`).
  * --any-branch  run where the loop stands, whatever branch that is: no
- *               offer is made and the guard (`start/run-setup.ts`)
- *               checks nothing.
+ *               offer is made and the guard (`start/run-setup.ts`) checks
+ *               nothing. On a detached HEAD, no branch, it waives nothing.
  * --roadmap     stamp the hop record, when a hop is away, on the run's
  *               session record as its `hop` (`start/session.ts`). What
  *               `rafa next --roadmap` passes to the loop it starts.
@@ -397,6 +397,7 @@ import {
 import {
   bindEventsFile,
   emitLoopEvent,
+  injectionPlace,
   taskPosition,
   taskTokens,
   unbindEventsFile,
@@ -501,14 +502,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const planStub = planStubFromPath(planPath);
   // Where git runs and every session is spawned, and the branch there
   // (`start/run-checkout.ts`): the working tree the run was started in,
-  // on `main` or `master` offered `feat/<stub>` first, or under
+  // on `main`, `master` or no branch offered `feat/<stub>` first, or under
   // `--as-worktree` the worktree added for that branch. The branch is the
-  // one the guard reads and the session record below names, so a run
-  // that moved is never guarded on, and never records, the base it
-  // started from.
+  // one the guard reads and the session record below names, so a run that
+  // moved never records the base it started from. Null, for no branch, is
+  // refused by the guard, which asserts a name for every reading below.
   const { checkout, branch } = await settleRunCheckout({
     projectRoot: repoRoot,
     worktreeDir: runConfig.config.loopWorktreeDir,
+    prBase: runConfig.config.prBase,
     planStub,
     args,
   });
@@ -778,6 +780,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         taskInfo,
         promptContent,
         planContent,
+        place: injectionPlace(trackerContent, taskInfo),
         inject: injectMode,
         repoRoot,
         checkout,

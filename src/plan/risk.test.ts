@@ -344,6 +344,36 @@ describe('assessPlanRisk: commands', () => {
   });
 });
 
+describe('assessPlanRisk: long runs', () => {
+  it('notes an open task line asking for the full suite, with the plan, the line and the fix', async () => {
+    const plan = planOf([
+      '- [x] Run the full suite  {tools=Read}',
+      '- [ ] Check `bun test src/plan/` is green  {tools=Read}',
+      '- [ ] Run the full suite, `tsc` and `eslint`  {tools=Read}',
+    ]);
+
+    const report = await assessPlanRisk(plan, seams());
+
+    expect(ofKind(report, 'long-run')).toEqual([{
+      level: 'note',
+      kind: 'long-run',
+      text: '"full suite" — a whole-suite run can outlast one Bash call: declare tests=full on the task and take the run out of its text',
+      task: 'Run the full suite, `tsc` and `eslint`',
+      file: 'PLAN.md',
+      line: lineOf(plan.text, '- [ ] Run the full suite'),
+    }]);
+  });
+
+  it('reads a bare bun test span after the command findings and ahead of the account ones', async () => {
+    const report = await assessPlanRisk(planOf(['- [ ] Run `sudo bun test`  {tools=Read}']), seams());
+
+    expect(report.findings.map((finding) => finding.kind)).toEqual([
+      'destructive', 'long-run', 'account', 'account', 'account', 'account',
+    ]);
+    expect(report.total).toEqual({ high: 1, note: 5 });
+  });
+});
+
 describe('assessPlanRisk: accounts and secrets', () => {
   it('always carries the four account notes', async () => {
     const report = await assessPlanRisk(planOf([]), seams());

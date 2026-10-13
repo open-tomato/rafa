@@ -45,6 +45,7 @@ export type {
 } from './checks.js';
 export type {
   ChecksReading,
+  ClosePullRequestOptions,
   ClosingIssue,
   Mergeability,
   MergeMethod,
@@ -81,6 +82,7 @@ export type {
 export {
   classifyState,
   failingRows,
+  FIRST_CHECK_GRACE_MS,
   formatRows,
   parseChecks,
   verdictOf,

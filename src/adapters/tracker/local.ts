@@ -84,18 +84,29 @@
  *   - `openIssues`, rafa's own reading, which the source lacks. It
  *     reads the issue files as `find` does, keeps those of the type whose
  *     state is not one of {@link CLOSED_STATES}, and answers each with
- *     its title and body, lowest number first. An issue file it cannot
- *     read is skipped and reported through `warn`, as `find` skips one,
- *     the report naming `openIssues`.
+ *     its title and body, lowest number first, and with the `capturedAt`
+ *     its file holds as the time it was created: the record's own time,
+ *     which a copy or a checkout of the file keeps where the file's time
+ *     on disk does not. A `capturedAt` is checked for being a string and
+ *     no more when a file is read, so one that does not read as a time,
+ *     in a file edited by hand, answers a null `createdAt` and the issue
+ *     is still listed. An issue file it cannot read is skipped and
+ *     reported through `warn`, as `find` skips one, the report naming
+ *     `openIssues`.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks.
  *     `editable` reads the file the ref names, as `get` does, and
- *     answers its title and body, open unless its state is one of
- *     {@link CLOSED_STATES}, with no labels and an empty author, since
- *     an issue file holds neither. `edit` rewrites that file with the
- *     body, the title or both the change names, keeping every other
- *     field, so a later read answers the written text byte for byte. A
- *     change naming neither is refused with nothing written, as is a
- *     body or title no read would accept.
+ *     answers its title, body and `priority` field, open unless its
+ *     state is one of {@link CLOSED_STATES}, with no labels and an empty
+ *     author, since an issue file holds neither. `edit` rewrites that
+ *     file with the body, the title and the priority the change names,
+ *     keeping every other field, so a later read answers the written
+ *     text byte for byte. A priority is the file's `priority` field, and
+ *     a null there is the whole of triage's mark, so writing one swaps
+ *     the old priority and takes the issue out of triage at once. A
+ *     change naming none of the three is refused with nothing written,
+ *     as is a body or title no read would accept, and a priority that
+ *     is not one of the port's: a null too, which a file may hold and an
+ *     edit may not write.
  *
  * Kept as the source has them: `preflight` always answers ok, since the
  * file system is the last resort; the capabilities are all false; `find`
@@ -145,6 +156,12 @@ export const CLOSED_STATES: ReadonlySet<IssueState> = new Set(['done', 'released
 
 /** What an issue file's name ends with. */
 const ISSUE_EXTENSION = '.md';
+
+/**
+ * An ISO 8601 date and time with its offset, as `github-open-issues.ts`
+ * spells the one it reads `createdAt` by.
+ */
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /** An issue as its file holds it. */
 export interface LocalIssueRecord {
@@ -461,6 +478,20 @@ function matchesQuery(record: LocalIssueRecord, query: IssueQuery): boolean {
   return `${draft.title}\n${draft.body}`.toLowerCase().includes(query.text.toLowerCase());
 }
 
+/**
+ * The `createdAt` `openIssues` answers for a record: its `capturedAt`
+ * as written when that is an ISO 8601 date and time with its offset
+ * naming a real instant, else null. The shape is checked beside the
+ * instant because `Date.parse` alone reads `1` as the first day of 2001,
+ * as the note on `createdAtOf` in `github-open-issues.ts` records.
+ */
+function createdAtOf(record: LocalIssueRecord): string | null {
+  const { capturedAt } = record;
+  return ISO_DATE_TIME.test(capturedAt) && !Number.isNaN(Date.parse(capturedAt))
+    ? capturedAt
+    : null;
+}
+
 /** The ref of issue `number`, carrying the `opt` its draft held. */
 function refFor(number: number, opt: number): IssueRef {
   return { opt, kind: 'local', externalId: String(number), url: null };
@@ -565,6 +596,7 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         ref: refFor(number, record.draft.opt),
         title: record.draft.title,
         body: record.draft.body,
+        createdAt: createdAtOf(record),
       }));
     },
 
@@ -588,12 +620,20 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         open: !CLOSED_STATES.has(record.state),
         labels: [],
         author: '',
+        priority: record.draft.priority,
       };
     },
 
     edit: async (ref: IssueRef, change: IssueEdit): Promise<void> => {
-      if (change.body === undefined && change.title === undefined) {
-        throw new TypeError(`${PREFIX}: refused an edit naming neither a body nor a title`);
+      const { priority } = change;
+      if (change.body === undefined && change.title === undefined && priority === undefined) {
+        throw new TypeError(`${PREFIX}: refused an edit naming no body, no title and no priority`);
+      }
+      if (priority !== undefined && !oneOf(ISSUE_PRIORITIES)(priority)) {
+        throw new TypeError(
+          `${PREFIX}: refused to write an invalid issue: priority is ${describeValue(priority)},`
+            + ` expected one of: ${ISSUE_PRIORITIES.join(', ')}`,
+        );
       }
       const { number, record } = await read(ref);
       const draft = {
@@ -604,6 +644,9 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         ...(change.title === undefined
           ? {}
           : { title: change.title }),
+        ...(priority === undefined
+          ? {}
+          : { priority }),
       };
       await rewrite(number, { ...record, draft });
     },

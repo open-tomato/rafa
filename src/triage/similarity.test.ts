@@ -34,6 +34,7 @@ function openBug(id: number, what: string, artifact: string | null): OpenIssue {
     ref: { opt: id, kind: 'github', externalId: String(id), url: `https://github.com/o/r/issues/${id}` },
     title: what,
     body,
+    createdAt: null,
   };
 }
 

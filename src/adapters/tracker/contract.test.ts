@@ -38,6 +38,14 @@
  * green: the closed case moves its issues to `done` and `cancelled`
  * whatever the narrowing, and rejects for a tracker that never moves.
  *
+ * The fourth `openIssues` case, the `createdAt` one, arrived on
+ * 2026-10-12, held by five breaks of its own below: a null time, no
+ * time, a time that is no time, a tracker dating its first issue alone,
+ * which is what holds the case to every issue rather than to one, and a
+ * tracker answering no open issue, which is what holds it to having read
+ * an issue at all. It creates its two issues with `opt: 0` and compares
+ * no count, so the break keying issues by opt leaves it green.
+ *
  * The five `editable` and `edit` cases arrived on 2026-10-06, each held
  * by the breaks below. The in-memory tracker is run with
  * `editsIssues: true`, and three earlier breaks redden one of them as
@@ -47,9 +55,20 @@
  * closed case, narrowed or not. A body written with its trailing newline
  * trimmed reddens the body case alone, which is what holds it to byte
  * for byte.
+ *
+ * The four priority cases arrived on 2026-10-13, each held by the breaks
+ * below. The in-memory tracker is run with `editsPriority: true`, and
+ * nine earlier breaks redden one or more of them as well: a missing
+ * pair, a missing `edit` and a throwing preflight all four, keying
+ * issues by opt the two that create two issues, a fixed priority from
+ * `get` the two that read `get`, an empty body from `editable` the two
+ * that read the body, every edit dropped the three that edit, and an
+ * edit written onto every issue or clearing the title the first edit
+ * case. A tracker run without `editsPriority` that still answers a
+ * priority reddens the one case standing in for the four.
  */
 import type { TrackerContractOptions } from './contract.js';
-import type { IssueDraft, IssueRef, IssueState, Tracker } from '../../ports/index.js';
+import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '../../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -76,26 +95,43 @@ const CASES = {
   openOfType: 'openIssues answers each open issue of the type with its title and body',
   openClosed: 'openIssues leaves out an issue moved to done or to cancelled',
   openNone: 'openIssues answers nothing for a type with no open issue',
+  openCreatedAt: 'openIssues answers each open issue with a createdAt that parses as a time',
   editable: 'editable answers the title, body and open state of a created issue',
   editableClosed: 'editable answers an issue moved to done or to cancelled as closed',
   editBody: 'edit writes a body read back byte for byte, leaving the title and every other issue',
   editTitle: 'edit writes a title alone, leaving the body',
   editUnknown: 'editable and edit reject for an unknown ref',
+  editablePriority: 'editable answers the priority of a created issue, and null before triage sets one',
+  editPriority: 'edit writes a priority read back by editable and get, leaving the title, the body and every other issue',
+  editPrioritySwap: 'edit swaps one priority for another',
+  editPriorityTitle: 'edit writes a priority beside a title, leaving the body',
 } as const;
 
-/** The case an adapter run with `readsOpenIssues: false` gets in place of the three `openIssues` cases. */
+/** The case an adapter run with `readsOpenIssues: false` gets in place of the four `openIssues` cases. */
 const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
 
-/** The case an adapter run without `editsIssues` gets in place of the five `editable` and `edit` cases. */
+/** The case an adapter run without `editsIssues` gets in place of the nine `editable` and `edit` cases. */
 const EDIT_LEFT_OUT_CASE = 'leaves out the editable and edit pair it is run without';
 
-/** The names of the five `editable` and `edit` cases, in contract order. */
+/** The case an adapter with the pair, run without `editsPriority`, gets in place of the four priority cases. */
+const PRIORITY_LEFT_OUT_CASE = 'answers no priority from editable, run without the priority edit';
+
+/** The names of the four priority cases, in contract order. */
+const PRIORITY_CASES: readonly string[] = [
+  CASES.editablePriority,
+  CASES.editPriority,
+  CASES.editPrioritySwap,
+  CASES.editPriorityTitle,
+];
+
+/** The names of the nine `editable` and `edit` cases, the four priority ones last, in contract order. */
 const EDIT_CASES: readonly string[] = [
   CASES.editable,
   CASES.editableClosed,
   CASES.editBody,
   CASES.editTitle,
   CASES.editUnknown,
+  ...PRIORITY_CASES,
 ];
 
 /** Faults the in-memory tracker can be made with, each breaking what it names. */
@@ -110,10 +146,14 @@ interface Faults {
   readonly closedAsOpen?: boolean;
   /** `openIssues` answers open issues of every type. */
   readonly anyType?: boolean;
+  /** `openIssues` answers the first issue created with its time, and every later one with none. */
+  readonly datesFirstOnly?: boolean;
   /** `edit` writes its change onto every issue held, not the one its ref names. */
   readonly editsEveryIssue?: boolean;
-  /** `edit` given a body alone clears the title. */
+  /** `edit` given no title clears the one held. */
   readonly bodyEditClearsTitle?: boolean;
+  /** `edit` writes a priority onto an issue triage has set none for, and never over one already set. */
+  readonly neverSwapsPriority?: boolean;
 }
 
 /** The states the in-memory tracker holds closed, as the port's `openIssues` note names them. */
@@ -124,6 +164,8 @@ interface HeldIssue {
   readonly draft: IssueDraft;
   readonly state: IssueState;
   readonly comments: readonly string[];
+  /** When `create` made it, or null for one the tracker holds no time for. */
+  readonly createdAt: string | null;
 }
 
 /** An in-memory tracker, and a reader of the comments it holds. */
@@ -157,7 +199,10 @@ function memoryTracker(faults: Faults = {}): {
       const externalId = faults.idFromOpt === true
         ? String(draft.opt)
         : String(issued);
-      issues.set(externalId, { draft, state: 'todo', comments: [] });
+      const createdAt = faults.datesFirstOnly === true && issued > 1
+        ? null
+        : new Date().toISOString();
+      issues.set(externalId, { draft, state: 'todo', comments: [], createdAt });
       return { opt: draft.opt, kind: 'memory', externalId, url: null };
     },
     get: async (ref) => {
@@ -190,6 +235,7 @@ function memoryTracker(faults: Faults = {}): {
         ref: { opt: issue.draft.opt, kind: 'memory', externalId, url: null },
         title: issue.draft.title,
         body: issue.draft.body,
+        createdAt: issue.createdAt,
       })),
     editable: async (ref) => {
       const issue = held(ref);
@@ -200,6 +246,7 @@ function memoryTracker(faults: Faults = {}): {
         open: !CLOSED.has(issue.state),
         labels: [],
         author: '',
+        priority: issue.draft.priority,
       };
     },
     edit: async (ref, change) => {
@@ -212,7 +259,10 @@ function memoryTracker(faults: Faults = {}): {
         const title = faults.bodyEditClearsTitle === true && change.title === undefined
           ? ''
           : change.title ?? issue.draft.title;
-        const draft = { ...issue.draft, title, body: change.body ?? issue.draft.body };
+        const priority = faults.neverSwapsPriority === true && issue.draft.priority !== null
+          ? issue.draft.priority
+          : change.priority ?? issue.draft.priority;
+        const draft = { ...issue.draft, title, body: change.body ?? issue.draft.body, priority };
         issues.set(externalId, { ...issue, draft });
       }
     },
@@ -235,6 +285,7 @@ function contractOptions(
     expectsProjects: false,
     expectedKind: 'memory',
     editsIssues: true,
+    editsPriority: true,
     create: async () => {
       const made = memoryTracker(faults);
       comments = made.comments;
@@ -254,6 +305,20 @@ function editableOf(tracker: Tracker): NonNullable<Tracker['editable']> {
 function editOf(tracker: Tracker): NonNullable<Tracker['edit']> {
   if (tracker.edit === undefined) throw new Error('memory tracker: no edit member');
   return tracker.edit;
+}
+
+/** `issue` as a tracker whose pair reads no priority answers it. */
+function withoutPriority(issue: EditableIssue): EditableIssue {
+  return Object.fromEntries(Object.entries(issue).filter(([key]) => key !== 'priority')) as unknown as EditableIssue;
+}
+
+/**
+ * `change` with its priority left out. Cast: a change naming a priority
+ * alone becomes one naming nothing, which the port's type rules out and
+ * the in-memory tracker writes as no change.
+ */
+function withoutChangedPriority(change: IssueEdit): IssueEdit {
+  return Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'priority')) as unknown as IssueEdit;
 }
 
 /** The names of the cases that reject when run with `options`, in contract order. */
@@ -305,10 +370,12 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.openOfType,
       CASES.openClosed,
       CASES.openNone,
+      CASES.openCreatedAt,
       CASES.editable,
       CASES.editableClosed,
       CASES.editBody,
       CASES.editTitle,
+      ...PRIORITY_CASES,
     ],
   ],
   [
@@ -319,7 +386,16 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'keys issues by their opt',
     contractOptions({ idFromOpt: true }),
-    [CASES.sharedOpt, CASES.limit, CASES.titleText, CASES.openOfType, CASES.openClosed, CASES.editBody],
+    [
+      CASES.sharedOpt,
+      CASES.limit,
+      CASES.titleText,
+      CASES.openOfType,
+      CASES.openClosed,
+      CASES.editBody,
+      CASES.editablePriority,
+      CASES.editPriority,
+    ],
   ],
   [
     'answers a fixed module',
@@ -329,7 +405,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'answers a fixed priority',
     contractOptions({}, (base) => ({ get: async (ref) => ({ ...(await base.get(ref)), priority: 'urgent' }) })),
-    [CASES.priority],
+    [CASES.priority, CASES.editPriority, CASES.editPrioritySwap],
   ],
   [
     'ignores the module in find',
@@ -365,7 +441,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'has no openIssues reading',
     contractOptions({}, () => ({ openIssues: undefined })),
-    [CASES.openOfType, CASES.openClosed, CASES.openNone],
+    [CASES.openOfType, CASES.openClosed, CASES.openNone, CASES.openCreatedAt],
   ],
   ['answers closed issues from openIssues', contractOptions({ closedAsOpen: true }), [CASES.openClosed]],
   ['ignores the type in openIssues', contractOptions({ anyType: true }), [CASES.openOfType, CASES.openNone]],
@@ -383,6 +459,34 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
         .map((issue) => ({ ...issue, ref: { ...issue.ref, kind: 'github' } })),
     })),
     [CASES.openOfType],
+  ],
+  [
+    'answers open issues with a null createdAt',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? []).map((issue) => ({ ...issue, createdAt: null })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  [
+    'answers open issues with no createdAt',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? [])
+        .map((issue) => ({ ...issue, createdAt: undefined as unknown as string })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  [
+    'answers open issues with a createdAt that is no time',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? []).map((issue) => ({ ...issue, createdAt: 'yesterday' })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  ['dates the first open issue alone', contractOptions({ datesFirstOnly: true }), [CASES.openCreatedAt]],
+  [
+    'answers no open issue at all',
+    contractOptions({}, () => ({ openIssues: async () => [] })),
+    [CASES.openOfType, CASES.openClosed, CASES.openCreatedAt],
   ],
   ['has no editable and edit pair', contractOptions({}, () => ({ editable: undefined, edit: undefined })), EDIT_CASES],
   ['has editable without edit', contractOptions({}, () => ({ edit: undefined })), EDIT_CASES],
@@ -408,7 +512,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'answers editable with an empty body',
     contractOptions({}, (base) => ({ editable: async (ref) => ({ ...(await editableOf(base)(ref)), body: '' }) })),
-    [CASES.editable, CASES.editBody, CASES.editTitle],
+    [CASES.editable, CASES.editBody, CASES.editTitle, CASES.editPriority, CASES.editPriorityTitle],
   ],
   [
     'answers an unknown ref from editable',
@@ -424,7 +528,11 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     })),
     [CASES.editUnknown],
   ],
-  ['drops every edit', contractOptions({}, () => ({ edit: async () => {} })), [CASES.editBody, CASES.editTitle, CASES.editUnknown]],
+  [
+    'drops every edit',
+    contractOptions({}, () => ({ edit: async () => {} })),
+    [CASES.editBody, CASES.editTitle, CASES.editUnknown, CASES.editPriority, CASES.editPrioritySwap, CASES.editPriorityTitle],
+  ],
   [
     'writes the body with its trailing newline trimmed',
     contractOptions({}, (base) => ({
@@ -434,8 +542,38 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     })),
     [CASES.editBody],
   ],
-  ['writes the edit onto every issue', contractOptions({ editsEveryIssue: true }), [CASES.editBody]],
-  ['clears the title on a body edit', contractOptions({ bodyEditClearsTitle: true }), [CASES.editBody]],
+  ['writes the edit onto every issue', contractOptions({ editsEveryIssue: true }), [CASES.editBody, CASES.editPriority]],
+  ['clears the title on an edit naming none', contractOptions({ bodyEditClearsTitle: true }), [CASES.editBody, CASES.editPriority]],
+  [
+    'answers editable without a priority',
+    contractOptions({}, (base) => ({ editable: async (ref) => withoutPriority(await editableOf(base)(ref)) })),
+    PRIORITY_CASES,
+  ],
+  [
+    'answers a priority from editable for an issue triage has set none for',
+    contractOptions({}, (base) => ({
+      editable: async (ref) => {
+        const issue = await editableOf(base)(ref);
+        return { ...issue, priority: issue.priority ?? 'low' };
+      },
+    })),
+    [CASES.editablePriority],
+  ],
+  [
+    'drops the priority of an edit',
+    contractOptions({}, (base) => ({ edit: async (ref, change) => editOf(base)(ref, withoutChangedPriority(change)) })),
+    [CASES.editPriority, CASES.editPrioritySwap, CASES.editPriorityTitle],
+  ],
+  [
+    'drops the priority of an edit that names a title',
+    contractOptions({}, (base) => ({
+      edit: async (ref, change) => editOf(base)(ref, change.title === undefined
+        ? change
+        : withoutChangedPriority(change)),
+    })),
+    [CASES.editPriorityTitle],
+  ],
+  ['never writes a priority over one already set', contractOptions({ neverSwapsPriority: true }), [CASES.editPrioritySwap]],
 ];
 
 runTrackerContract(contractOptions());
@@ -482,7 +620,7 @@ describe('the Tracker contract cases', () => {
     expect(await rejectedCases({ ...answers999, unknownExternalId: 'missing' })).toEqual([]);
   });
 
-  it('swaps the three openIssues cases for one holding the reading left out, when run without it', () => {
+  it('swaps the four openIssues cases for one holding the reading left out, when run without it', () => {
     const without = { ...contractOptions(), readsOpenIssues: false };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
@@ -502,7 +640,7 @@ describe('the Tracker contract cases', () => {
 });
 
 describe('the Tracker contract cases run without editsIssues', () => {
-  it('swaps the five editable and edit cases for one holding the pair left out', () => {
+  it('swaps the nine editable and edit cases for one holding the pair left out', () => {
     const without = { ...contractOptions(), editsIssues: undefined };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
@@ -522,6 +660,37 @@ describe('the Tracker contract cases run without editsIssues', () => {
     expect(await rejectedCases(withPair)).toEqual([EDIT_LEFT_OUT_CASE]);
     expect(await rejectedCases(withEditOnly)).toEqual([EDIT_LEFT_OUT_CASE]);
     expect(await rejectedCases(withoutPair)).toEqual([]);
+  });
+});
+
+describe('the Tracker contract cases run without editsPriority', () => {
+  it('swaps the four priority cases for one holding editable to answering none', () => {
+    const without = { ...contractOptions(), editsPriority: undefined };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !PRIORITY_CASES.includes(name)),
+      PRIORITY_LEFT_OUT_CASE,
+    ]);
+  });
+
+  it('holds a tracker run without editsPriority to answering no priority, beside one that answers none', async () => {
+    const answersOne = { ...contractOptions(), editsPriority: false };
+    const answersNone = {
+      ...contractOptions({}, (base) => ({ editable: async (ref) => withoutPriority(await editableOf(base)(ref)) })),
+      editsPriority: false,
+    };
+
+    expect(await rejectedCases(answersOne)).toEqual([PRIORITY_LEFT_OUT_CASE]);
+    expect(await rejectedCases(answersNone)).toEqual([]);
+  });
+
+  it('reads editsPriority beside editsIssues alone, adding no priority case to a tracker run without the pair', () => {
+    const without = { ...contractOptions(), editsIssues: false, editsPriority: true };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !EDIT_CASES.includes(name)),
+      EDIT_LEFT_OUT_CASE,
+    ]);
   });
 });
 

@@ -49,6 +49,22 @@
  *     longer than the cap, whose earlier lines must be gone and counted;
  *     and an attempt that leaves a DIFFERENT failing step, whose plan
  *     must quote the new log and not the old one.
+ *   - **A green, conflicting pull request is handed its plan, and is
+ *     not called green while it conflicts (#889).** Passing rows are
+ *     what both wrong readings rest on: the assessment that says
+ *     "nothing to triage" and runs nothing, and the CI wait whose green
+ *     verdict ends an attempt as resolved. So the seed is the lockfile
+ *     conflict with a passing check on it, driven three ways: an
+ *     attempt that fixes it (the plan was run, exit 0), one that pushes
+ *     nothing, and one that moves the head and leaves the conflict
+ *     (both exit 3, neither printing the green line). The first is the
+ *     control of the other two, since it prints that line over the same
+ *     seed. Two mutations of `endOfAttempt` were driven on 2026-10-12,
+ *     the module restored from a scratch copy and verified with
+ *     `shasum -c` after each: green taken from the CI wait and the class
+ *     alone fails both of those two, and `stillConflicts` reading only
+ *     a fresh assessment fails the one that pushed nothing, whose
+ *     re-assessment classifies nothing.
  *
  * `'what --resolve does not run'` below also carries the trust check's
  * remaining legs from `.specs/rafa-20-pr-commands.md`'s "write-holder
@@ -171,6 +187,18 @@ const CONFLICTED_41: FakePullRequestSeed = {
   mergeable: 'CONFLICTING',
   mergeStateStatus: 'DIRTY',
 };
+
+/** How a headline abbreviates the head pull request 41 is planted at: its number, zero-padded. */
+const SEEDED_HEAD = '0'.repeat(7);
+
+/** The head {@link fixesIt} moves the pull request to, abbreviated the same way. */
+const FIXED_HEAD = '1'.repeat(7);
+
+/**
+ * The same lockfile conflict under a check that passed: rows from before
+ * the base moved, which say nothing about a head that no longer merges.
+ */
+const GREEN_CONFLICTED_41: FakePullRequestSeed = { ...CONFLICTED_41, checks: [PASSING_GATES] };
 
 /** A dependabot pull request whose lint step failed, which is `ci-lint` and simple on a bump. */
 const BUMPED_41: FakePullRequestSeed = {
@@ -375,6 +403,51 @@ describe('a resolve run that fixed the pull request', () => {
     expect(commentBody(outcome.fake)).toContain('resolved');
     expect(commentBody(outcome.fake)).toContain('attempts: 1');
     expect(gitLines(outcome.git, 'worktree').some((line) => line.includes('--force'))).toBe(false);
+  });
+});
+
+describe('a pull request that conflicts though its checks are green', () => {
+  it('is handed the plan for its conflict class, rather than read as nothing to triage', async () => {
+    const outcome = await resolved({ seeds: [GREEN_CONFLICTED_41], attempt: fixesIt });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.loops).toHaveLength(1);
+    expect(outcome.loops[0]?.planPath.endsWith('resolve-conflict-lockfile.md')).toBe(true);
+    expect(planText(outcome)).toContain('# Plan: Resolve lockfile conflict');
+    expect(outcome.stdout).toContain('Resolving #41 as `conflict-lockfile`');
+    expect(outcome.stdout).not.toContain(`the head ${SEEDED_HEAD} is green`);
+    expect(outcome.stdout).toContain(`the head ${FIXED_HEAD} is green`);
+    expect(outcome.stdout).not.toContain('so --resolve ran nothing');
+    expect(outcome.stdout).toContain('is green after 1 of 2 resolve attempts');
+    expect(commentBody(outcome.fake)).toContain('simple, resolved');
+  });
+
+  it('is not called green by an attempt that pushed nothing, its checks green throughout', async () => {
+    const outcome = await resolved({ seeds: [GREEN_CONFLICTED_41] });
+
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.loops).toHaveLength(2);
+    expect(outcome.stdout).not.toContain('is green after');
+    expect(outcome.stdout).toContain('the same reading as the run before it');
+    expect(commentBody(outcome.fake)).toContain('simple, not resolved');
+    expect(commentBody(outcome.fake)).toContain('attempts: 2');
+  });
+
+  it('is not called green by an attempt that moved the head and left the conflict', async () => {
+    let head = 1;
+    const outcome = await resolved({
+      seeds: [GREEN_CONFLICTED_41],
+      attempt: (fake) => {
+        head += 1;
+        fake.update(41, (pull) => ({ ...pull, headRefOid: String(head).repeat(40) }));
+      },
+    });
+
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.loops).toHaveLength(2);
+    expect(outcome.stdout).not.toContain('is green after');
+    expect(outcome.stdout).not.toContain('nothing to triage');
+    expect(commentBody(outcome.fake)).toContain('simple, not resolved');
   });
 });
 

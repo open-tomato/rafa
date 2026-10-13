@@ -106,21 +106,17 @@
  *     `preflight` would have thrown.
  *   - Every port function is a property, and the tracker answered is
  *     frozen, as the `local` adapter's is.
- *   - `openIssues`, rafa's own reading, which the source lacks. It is
- *     one `gh issue list --state open` narrowed by the `type:` label,
- *     asking for each row's title and body beside what `find` asks for,
- *     so no issue is read with a `get` of its own. It lists up to
- *     {@link OPEN_ISSUES_LIMIT} issues, newest first as `gh` lists them,
- *     where `find` stops at 30 unless told otherwise. An issue with no
- *     `type:` label, which `get` reads as `code`, is not listed for
- *     `code`, as `find` by type does not find it either. A type the
- *     port does not name is refused before anything is sent.
+ *   - `openIssues`, rafa's own reading, which the source lacks: one
+ *     `gh issue list --state open` narrowed by the `type:` label, asking
+ *     for each row's title, body and `createdAt` beside what `find` asks
+ *     for. `github-open-issues.ts` holds the reading and its note, and
+ *     is handed the readers `find` checks a row with.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks:
  *     one `gh issue view --json title,body,state,labels,author`, and one
  *     `gh issue edit` with the body handed to `gh` on stdin through
- *     `--body-file -`. `github-edit.ts` holds the pair and its note; the
- *     runner hands `gh` a `stdin` when one is given, and keeps stdin
- *     closed otherwise.
+ *     `--body-file -` and a priority swapped as labels. `github-edit.ts`
+ *     holds the pair and its note; the runner hands `gh` a `stdin` when
+ *     one is given, and keeps stdin closed otherwise.
  *
  * Kept as the source has them: `create` makes every label it sends with
  * `gh label create --force` before `gh issue create`, because the source
@@ -150,7 +146,6 @@ import type {
   IssueRef,
   IssueState,
   IssueType,
-  OpenIssue,
   PreflightResult,
   Tracker,
   TrackerCapabilities,
@@ -160,6 +155,7 @@ import type {
 import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 
 import { createGithubEditMembers } from './github-edit.js';
+import { createGithubOpenIssues } from './github-open-issues.js';
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 
 /** What every refusal opens with. */
@@ -234,17 +230,6 @@ const LIST_COMMAND = 'gh issue list';
 
 /** The fields `find` asks `gh issue list` for. */
 const LIST_FIELDS = 'number,url,labels';
-
-/** The fields `openIssues` asks `gh issue list` for: `find`'s, and the text. */
-const OPEN_LIST_FIELDS = 'number,url,labels,title,body';
-
-/**
- * How many open issues `openIssues` lists: past it the oldest are left
- * out. `gh issue list` honours a limit above 100: read off `gh` 2.101.0
- * on 2026-10-02, `gh issue list --repo cli/cli --state open --limit 150
- * --json number` answered 150 rows.
- */
-export const OPEN_ISSUES_LIMIT = 1000;
 
 /** How many issues `find` lists when the query sets no limit: `gh issue list`'s default. */
 const DEFAULT_FIND_LIMIT = 30;
@@ -556,12 +541,6 @@ interface ListedIssue {
   readonly labels: readonly string[];
 }
 
-/** One row `gh issue list` wrote for `openIssues`, checked. */
-interface ListedOpenIssue extends ListedIssue {
-  readonly title: string;
-  readonly body: string;
-}
-
 /** What `gh issue list` wrote, as a list. Throws when it is not JSON or not a list. */
 function listedRows(stdout: string): unknown[] {
   const payload = parseJson(stdout, LIST_COMMAND);
@@ -592,18 +571,6 @@ function listedRow(row: unknown, index: number): ListedIssue {
 /** The rows `gh issue list` wrote. Throws, naming the first row refused, when they are not issues. */
 function listedIssues(stdout: string): ListedIssue[] {
   return listedRows(stdout).map(listedRow);
-}
-
-/** The rows `gh issue list` wrote for `openIssues`, each also checked for its title and body. */
-function listedOpenIssues(stdout: string): ListedOpenIssue[] {
-  return listedRows(stdout).map((row, index): ListedOpenIssue => {
-    const listed = listedRow(row, index);
-    // `listedRow` refused any row that is not a mapping.
-    const { title, body } = row as Record<string, unknown>;
-    if (typeof title !== 'string') throw rowRefusal(index, `with title ${describeValue(title)}, expected a string`);
-    if (typeof body !== 'string') throw rowRefusal(index, `with body ${describeValue(body)}, expected a string`);
-    return { ...listed, title, body };
-  });
 }
 
 /** The ref `find` and `openIssues` answer for a listed row: opt 0, and the module label when it has one. */
@@ -808,27 +775,12 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
       return listedIssues(stdout).map(refOfRow);
     },
 
-    openIssues: async (type: IssueType): Promise<OpenIssue[]> => {
-      if (!isOneOf(ISSUE_TYPES, type)) {
-        throw new TypeError(
-          `${PREFIX}: openIssues refused type ${describeValue(type)}, expected one of: ${ISSUE_TYPES.join(', ')}`,
-        );
-      }
-      const stdout = await run([
-        'issue',
-        'list',
-        '--state',
-        'open',
-        '--json',
-        OPEN_LIST_FIELDS,
-        '--limit',
-        String(OPEN_ISSUES_LIMIT),
-        '--label',
-        `${GITHUB_LABELS.typePrefix}${type}`,
-      ], LIST_COMMAND);
-
-      return listedOpenIssues(stdout).map((row): OpenIssue => ({ ref: refOfRow(row), title: row.title, body: row.body }));
-    },
+    openIssues: createGithubOpenIssues({
+      run,
+      listedRows,
+      refOfRow: (row, index) => refOfRow(listedRow(row, index)),
+      typeLabel: (type) => `${GITHUB_LABELS.typePrefix}${type}`,
+    }),
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {
       const number = issueNumberOfRef(ref);
@@ -870,7 +822,7 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
       };
     },
 
-    ...createGithubEditMembers({ run, issueNumberOf: issueNumberOfRef, parseJson, labelNames }),
+    ...createGithubEditMembers({ run, issueNumberOf: issueNumberOfRef, parseJson, labelNames, labels: GITHUB_LABELS }),
   };
   return Object.freeze(tracker);
 }

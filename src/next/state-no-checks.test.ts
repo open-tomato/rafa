@@ -93,6 +93,7 @@ function detail(mergeable: Mergeability): PullRequestDetail {
     ...summary(),
     body: 'Closes #86',
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],

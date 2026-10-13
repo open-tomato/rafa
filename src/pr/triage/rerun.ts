@@ -1,7 +1,7 @@
 /**
  * The re-run readings: what a second `rafa pr triage` over the same
  * pull request does, decided from the comment already stored on it and
- * the pull request's head and checks as they stand now.
+ * the pull request's head, mergeability and checks as they stand now.
  *
  * Assessing is not free — a conflict read, a run listing and a log tail
  * per failing job — and it is also not idempotent to the reader: every
@@ -17,9 +17,10 @@
  *      and show the old triage; a partial reading of a run in flight is
  *      not something to re-classify against.
  *   3. `assess` — the head moved, nothing is pending and the pull
- *      request is still not green. Assess again and EDIT the same
- *      comment.
- *   4. `green` — nothing to triage.
+ *      request is still not green, or its checks are green and the head
+ *      conflicts with its base. Assess again and EDIT the same comment.
+ *   4. `green` — nothing to triage: every check passed on a head that
+ *      is not read as conflicting.
  *
  * Pure and total, like `./classify.ts`: no clock, no process, no await,
  * no throw. Every input reaches exactly one of
@@ -42,6 +43,37 @@
  * rather than quietly fixed, because the fix (letting green outrank a
  * stored head) would also re-read every green pull request that already
  * carries a triage.
+ *
+ * ## Green rows on a conflicting head are not `green`
+ *
+ * A check row says what ran against a merge GitHub could build at the
+ * time, and a head that conflicts has no such merge now: its rows are
+ * from before the base moved, and they go on reading as passed for as
+ * long as nothing is pushed (`./classify.ts`, "why a conflict outranks
+ * a red check"). Answering `green` on those rows told a person there
+ * was nothing to triage on a pull request that cannot be merged, and
+ * stopped the run before `classifyTriage`, which ranks the conflict
+ * first, was ever reached (#889). So {@link RerunInput.pr} carries the
+ * pull request's mergeability, and `green` is answered only where it
+ * does not read as a conflict.
+ *
+ * The conflict question is `readsAsConflicting` (`./classify.ts`) over
+ * an EMPTY file list, so that the two modules cannot disagree about
+ * the words: GitHub's `conflicting`, or its `DIRTY` merge state while
+ * `mergeable` is still `unknown`. The file list is the one reading the
+ * classifier has that this module does not, and it is left out on
+ * purpose: reading it is the `git merge-tree` this reading exists to
+ * come before. The cost is one case, and it is the old behaviour: a
+ * head GitHub answers `unknown` for, with a merge state that is not
+ * `DIRTY`, and green rows, is `green` here even where a local merge
+ * would have named a conflicting file. GitHub settles `unknown` within
+ * seconds of a push, and the next run reads its answer.
+ *
+ * Only the `green` question reads the conflict. The two stored-comment
+ * readings stay ahead of it and are unchanged: a conflicting head at
+ * its stored head is `already-assessed`, since the stored triage is
+ * the triage of that head, conflict included; and one behind a run in
+ * flight is `pending`.
  *
  * ## Why three of the four readings need a stored comment and `green`
  * does not
@@ -90,12 +122,14 @@
  * a false `already-assessed` is a pull request that is never assessed
  * again.
  */
+import type { MergeReading } from './classify.js';
 import type { TriageBlock } from './comment.js';
 import type { CheckRow, ChecksVerdict } from '../checks.js';
 import type { PullRequestComment } from '../types.js';
 
 import { verdictOf } from '../checks.js';
 
+import { readsAsConflicting } from './classify.js';
 import { readTriageBlock } from './comment.js';
 
 /**
@@ -144,6 +178,12 @@ export const SHORT_HEAD_LENGTH = 7;
 /** How many characters of a head a headline prints. */
 const HEADLINE_HEAD_LENGTH = 7;
 
+/**
+ * The conflicting file list this module hands `readsAsConflicting`:
+ * none, because no `git merge-tree` has run yet; see the module note.
+ */
+const NO_FILES_READ: readonly string[] = Object.freeze([]);
+
 /** What one re-run reading is made from. */
 export interface RerunInput {
   /**
@@ -153,6 +193,14 @@ export interface RerunInput {
   readonly comment: PullRequestComment | null;
   /** The pull request's head commit now, as the port answered it. */
   readonly head: string;
+  /**
+   * Its mergeability now, as the port answered it: the two fields the
+   * conflict reading is made from, so a detail straight off the port is
+   * passed in whole. Required, because a caller that left it out would
+   * read every conflicting head with green rows as `green`; see the
+   * module note.
+   */
+  readonly pr: MergeReading;
   /** Its check rows now, as `parseChecks` read them. */
   readonly rows: readonly CheckRow[];
   /**
@@ -179,6 +227,13 @@ export interface RerunReading {
   readonly problems: readonly string[];
   /** The verdict over the rows, kept so a report can show `none`. */
   readonly verdict: ChecksVerdict;
+  /**
+   * Whether the pull request's mergeability reads as a conflict, with
+   * no file list read; see the module note. Answered on every reading,
+   * so a caller holding one that assessed nothing still knows the head
+   * does not merge.
+   */
+  readonly conflicting: boolean;
   /** Whether the stored head is the pull request's; false when none was readable. */
   readonly sameHead: boolean;
   /**
@@ -243,18 +298,32 @@ function pendingHeadline(head: string, rows: readonly CheckRow[], at: string | n
     + `still running, so the triage from ${when} stands`;
 }
 
-/** The headline of the reading that assesses. */
-function assessHeadline(head: string, verdict: ChecksVerdict, write: RerunWrite): string {
+/** What the assessing headline says the comment write will be. */
+function postingWord(write: RerunWrite): string {
+  if (write === 'none') return 'writing no comment';
+  return write === 'edit'
+    ? 'editing the triage comment'
+    : 'commenting';
+}
+
+/**
+ * The headline of the reading that assesses.
+ *
+ * Green rows reach it only on a conflicting head, and that one is worded
+ * on its own: "is not green" would be false of its checks, and calling
+ * it green would be the reading #889 removed.
+ */
+function assessHeadline(input: RerunInput, verdict: ChecksVerdict, write: RerunWrite): string {
+  const head = shortHead(input.head);
+  const posting = postingWord(write);
+  if (verdict === 'green') {
+    return `the head ${head} conflicts with its base though all ${checkCount(input.rows.length)} passed, `
+      + `so assessing again and ${posting}`;
+  }
   const state = verdict === 'none'
     ? 'reports no checks at all'
     : 'is not green';
-  const comment = write === 'edit'
-    ? 'editing the triage comment'
-    : 'commenting';
-  const posting = write === 'none'
-    ? 'writing no comment'
-    : comment;
-  return `the head ${shortHead(head)} ${state} and nothing is pending, so assessing again and ${posting}`;
+  return `the head ${head} ${state} and nothing is pending, so assessing again and ${posting}`;
 }
 
 /** The headline of the reading with nothing to triage. */
@@ -263,15 +332,20 @@ function greenHeadline(head: string, rows: readonly CheckRow[]): string {
     + 'so there is nothing to triage';
 }
 
-/** The precedence itself, kept apart so the four branches are one readable list. */
+/**
+ * The precedence itself, kept apart so the four branches are one
+ * readable list. Only the `green` question reads the conflict; see the
+ * module note.
+ */
 function decide(
   comment: PullRequestComment | null,
   sameHead: boolean,
   verdict: ChecksVerdict,
+  conflicting: boolean,
 ): RerunDecision {
   if (comment !== null && sameHead) return 'already-assessed';
   if (comment !== null && verdict === 'pending') return 'pending';
-  if (verdict === 'green') return 'green';
+  if (verdict === 'green' && !conflicting) return 'green';
   return 'assess';
 }
 
@@ -296,12 +370,12 @@ function headlineFor(
   if (decision === 'already-assessed') return alreadyHeadline(reading.at, reading.block);
   if (decision === 'pending') return pendingHeadline(input.head, input.rows, reading.at);
   if (decision === 'green') return greenHeadline(input.head, input.rows);
-  return assessHeadline(input.head, reading.verdict, reading.write);
+  return assessHeadline(input, reading.verdict, reading.write);
 }
 
 /**
  * The re-run reading over one stored comment and one pull request's
- * head and checks.
+ * head, mergeability and checks.
  *
  * Total and pure: every input reaches exactly one of
  * {@link RERUN_DECISIONS}, nothing is spawned, nothing is awaited and
@@ -317,7 +391,8 @@ export function readTriageRerun(input: RerunInput): RerunReading {
   const problems = stored?.problems ?? [];
   const sameHead = isSameHead(block?.head ?? null, input.head);
   const verdict = verdictOf(input.rows);
-  const decision = decide(comment, sameHead, verdict);
+  const conflicting = readsAsConflicting(input.pr, NO_FILES_READ);
+  const decision = decide(comment, sameHead, verdict, conflicting);
   const write = writeFor(decision, comment, input.noComment === true);
   const storedAt = storedTime(comment, block);
 
@@ -329,6 +404,7 @@ export function readTriageRerun(input: RerunInput): RerunReading {
     block,
     problems,
     verdict,
+    conflicting,
     sameHead,
     storedAt,
     headline: headlineFor(decision, input, { at: storedAt, block, verdict, write }),

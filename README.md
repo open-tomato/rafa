@@ -182,9 +182,11 @@ the next one, so you rarely have to remember it.
    stored, one commit. A task that reports `blocked` is marked and the
    run stops with the reason; fix what it names and start again, and the
    blocked task goes first. After the last task a wrap-up session syncs
-   with the base, commits a release fragment when the project has them
-   (the plan's level and notes), pushes, opens the pull request and waits
-   for CI, spending repair sessions on a red one.
+   with the base and rewrites the release fragment's notes into changelog
+   lines, when the project has fragments. The loop writes the fragment
+   (the plan's level and notes) and commits it, pushes, opens the pull
+   request and waits for CI, spending repair sessions on a red one. The
+   version and the changelog are left to `rafa release settle`.
 
    From another terminal: `rafa loop status`, `rafa loop pause` (after the
    running task), `rafa loop stop` (now).
@@ -205,12 +207,12 @@ the next one, so you rarely have to remember it.
 
 ### Release fragments and settling
 
-A branch no longer owns a version number. Instead, the wrap-up commits a
-release fragment (a small markdown file naming the plan, level and notes),
-and `rafa release settle` assigns the version on the base branch after
-merges. This lets several branches merge in any order without a version
-collision: whichever machine settles first releases all waiting fragments
-under one version.
+A branch no longer owns a version number. Instead, the loop's wrap-up
+writes and commits a release fragment (a small markdown file naming the
+plan, level and notes), and `rafa release settle` assigns the version and
+folds the changelog on the base branch after merges. This lets several
+branches merge in any order without a version collision: whichever
+machine settles first releases all waiting fragments under one version.
 
 The pull request shows a forecast of what version the branch would get if
 merged now. The fragment is stored under `release.fragments` (default
@@ -819,16 +821,20 @@ install the same way (`src/runtime/install.ts`). The bin is not in
 `~/.bun/bin`, where `bun link` in this checkout re-points `rafa` at the
 checkout's `dist/` with no message, so put `~/.rafa/bin` on `PATH` ahead
 of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.
-Both exit 1 before building anything while a plan tracker in `plan.dir`
-(`.rafa/plans` unless `.rafa/config.yaml` names another) still holds an
-open or blocked task, and name every such tracker. `rafa self-update`
-runs only inside a project, so `rafa init` the checkout first, and it
-also exits 1 while a loop of the project is live, naming each loop's
-branch and pid, unless `dangerous.selfUpdateDuringLoop` is true in the
-config; `--force` does not override that wait. They exit
-2 when they could not run: a `package.json` that is not rafa's or cannot
-be read, a config or tracker they could not read, a loop record
-`rafa self-update` could not read, or a build, copy or link that failed.
+A plan tracker in `plan.dir` (`.rafa/plans` unless `.rafa/config.yaml`
+names another) that still holds an open or blocked task holds an install
+back only while a loop of the checkout is live: both then exit 1 before
+building anything and name every such tracker, unless `--force` is on
+the line. With no loop live they install, one warning naming each such
+tracker, so a plan stopped halfway no longer blocks an update.
+`rafa self-update` runs only inside a project, so `rafa init` the
+checkout first, and it also exits 1 while a loop of the project is live,
+naming each loop's branch and pid, unless
+`dangerous.selfUpdateDuringLoop` is true in the config; `--force` does
+not override that wait. They exit 2 when they could not run: a
+`package.json` that is not rafa's or cannot be read, a config, tracker
+or loop record they could not read, or a build, copy or link that
+failed.
 
 A version is installed once. Both also exit 1, before building, when
 `~/.rafa/runtime/<version>/` is already there, naming that directory and

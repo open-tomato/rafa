@@ -60,6 +60,24 @@
  *     that shows the old triage's own time.
  *   - the green headline reused for `assess`: 3 fail, all three assess
  *     cases.
+ *
+ * ## The conflict reading (#889)
+ *
+ * Green rows are "nothing to triage" only on a head that merges, so the
+ * three mergeability words each have a case over the SAME green rows:
+ * `conflicting` assesses, `unknown` and `mergeable` stay green. The two
+ * that stay green are the controls of the one that does not: a reading
+ * that assessed every green pull request would pass the first and fail
+ * both. The stored-comment rules are held with the conflict in place: a
+ * conflicting head still reads `already-assessed` at its stored head
+ * and `pending` behind a run in flight.
+ *
+ * One mutation of `rerun.ts` was driven on 2026-10-12 over this file,
+ * restored from a scratch copy and verified with `shasum -c`: `decide`
+ * answering `green` for green rows whatever the conflict reading, which
+ * is the module as it stood before #889. 4 fail and 23 pass: the
+ * `conflicting` case, its edit-the-stored-comment twin, the `DIRTY`
+ * tie-break and the `mergeable` word taken as it stands.
  */
 import type { RerunDecision, RerunInput } from './rerun.js';
 import type { CheckRow } from '../checks.js';
@@ -98,6 +116,15 @@ const COMMENT_AT = '2026-09-17T09:30:04Z';
 function row(name: string, state: string, outcome: CheckRow['outcome']): CheckRow {
   return { name, state, link: `https://ci.example/${name}`, outcome };
 }
+
+/** A head GitHub says merges, which is what every case reads unless it says otherwise. */
+const MERGES: RerunInput['pr'] = { mergeable: 'mergeable', mergeStateStatus: 'CLEAN' };
+
+/** A head GitHub says does not merge. */
+const CONFLICTS: RerunInput['pr'] = { mergeable: 'conflicting', mergeStateStatus: 'DIRTY' };
+
+/** A head GitHub is still computing an answer for. */
+const NOT_KNOWN: RerunInput['pr'] = { mergeable: 'unknown', mergeStateStatus: 'UNKNOWN' };
 
 /** Rows that have all passed. */
 const GREEN_ROWS: readonly CheckRow[] = [row('gates', 'SUCCESS', 'pass')];
@@ -151,11 +178,12 @@ function storedAt(head: string): PullRequestComment {
   return comment(storedBody(head));
 }
 
-/** One re-run input: a stored triage at the stored head, red, unless a case says otherwise. */
+/** One re-run input: a stored triage at the stored head, red and merging, unless a case says otherwise. */
 function input(overrides: Partial<RerunInput> = {}): RerunInput {
   return {
     comment: storedAt(STORED_HEAD),
     head: STORED_HEAD,
+    pr: MERGES,
     rows: RED_ROWS,
     ...overrides,
   };
@@ -304,6 +332,80 @@ describe('a green pull request', () => {
     expect(read.block).toBeNull();
     expect(read.headline).toContain('is green');
     expect(read.headline).toContain('1 check');
+  });
+});
+
+describe('green rows and the conflict reading', () => {
+  it('assesses green rows on a conflicting head, which is never nothing to triage', () => {
+    const read = readTriageRerun(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: CONFLICTS }));
+
+    expect(read.decision).toBe('assess');
+    expect(read.assesses).toBe(true);
+    expect(read.write).toBe('post');
+    expect(read.verdict).toBe('green');
+    expect(read.conflicting).toBe(true);
+    expect(read.headline).toContain('conflicts with its base though all 1 check passed');
+    expect(read.headline).not.toContain('is green');
+    expect(read.headline).not.toContain('nothing to triage');
+  });
+
+  it('edits the stored comment for the same reading once the head has moved', () => {
+    const read = readTriageRerun(input({ head: MOVED_HEAD, rows: GREEN_ROWS, pr: CONFLICTS }));
+
+    expect(read.decision).toBe('assess');
+    expect(read.write).toBe('edit');
+    expect(read.headline).toContain('editing the triage comment');
+  });
+
+  it('leaves green rows on a head whose mergeability is unknown as nothing to triage', () => {
+    const read = readTriageRerun(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: NOT_KNOWN }));
+
+    expect(read.decision).toBe('green');
+    expect(read.assesses).toBe(false);
+    expect(read.conflicting).toBe(false);
+    expect(read.headline).toContain('so there is nothing to triage');
+  });
+
+  it('leaves green rows on a head that merges as nothing to triage', () => {
+    const read = readTriageRerun(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: MERGES }));
+
+    expect(read.decision).toBe('green');
+    expect(read.assesses).toBe(false);
+    expect(read.conflicting).toBe(false);
+    expect(read.write).toBe('none');
+  });
+
+  it('takes the DIRTY merge state for an unknown head, as the classifier does', () => {
+    const dirty: RerunInput['pr'] = { mergeable: 'unknown', mergeStateStatus: 'DIRTY' };
+    const read = readTriageRerun(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: dirty }));
+
+    expect(read.decision).toBe('assess');
+    expect(read.conflicting).toBe(true);
+  });
+
+  it('takes the mergeable word as it stands, whatever the merge state beside it says', () => {
+    const blocked: RerunInput['pr'] = { mergeable: 'conflicting', mergeStateStatus: 'BLOCKED' };
+    const stale: RerunInput['pr'] = { mergeable: 'mergeable', mergeStateStatus: 'DIRTY' };
+
+    expect(decisionOf(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: blocked }))).toBe('assess');
+    expect(decisionOf(input({ comment: null, head: MOVED_HEAD, rows: GREEN_ROWS, pr: stale }))).toBe('green');
+  });
+
+  it('keeps the stored-comment rules over a conflicting head: the same head, then a run in flight', () => {
+    const same = readTriageRerun(input({ rows: GREEN_ROWS, pr: CONFLICTS }));
+    const running = readTriageRerun(input({ head: MOVED_HEAD, rows: PENDING_ROWS, pr: CONFLICTS }));
+
+    expect(same.decision).toBe('already-assessed');
+    expect(same.conflicting).toBe(true);
+    expect(running.decision).toBe('pending');
+  });
+
+  it('words every other assessment as it was, the conflict reading aside', () => {
+    const red = readTriageRerun(input({ head: MOVED_HEAD, pr: CONFLICTS }));
+    const none = readTriageRerun(input({ head: MOVED_HEAD, rows: [], pr: CONFLICTS }));
+
+    expect(red.headline).toContain('is not green and nothing is pending');
+    expect(none.headline).toContain('reports no checks at all and nothing is pending');
   });
 });
 

@@ -42,14 +42,43 @@
  * blocker on its repair task. The folded result holds both commands,
  * joined by `;`, the failures of both with each test file and name pair
  * once (a changed sweep can run in both), the errors of both summed, the
- * errors outside any test of both in run order, both summary lines, and
+ * errors outside any test of both in run order, the output tail of both
+ * in run order (so up to twice `OUTPUT_TAIL_LINES` lines, neither run's
+ * cut for the other's), both summary lines, and
  * each run's file order as its own list (`SuiteResult.fileOrder`), the
  * first run's first, since each run is its own `bun test` process and a
  * file's place is read within the process it ran in. Its exit code is the stop code when either run
  * ended on it, so a SIGINT during either run still reads as a stop; else
  * the exit code of a run that exited nonzero with no summary line and
  * held test files, with the summary dropped, so the step reads that run
- * as unreported; else the first nonzero exit code; else 0.
+ * as unreported; else the first nonzero exit code; else 0. Those last
+ * three are read over the runs that count, below.
+ *
+ * ## A run that found no test file
+ *
+ * A run marked `noTestFiles` (`suite/run.ts`) is neutral: Bun exits 1 on
+ * it with nothing to fail, so its exit code is no reading of the tree
+ * and the fold leaves it out. Folded with any other run, the result
+ * reads as that other run (#1054). Before that the fold answered the
+ * marked run's exit code and dropped its mark, and the step read a task
+ * with no test file of its own as failed outside any test case
+ * (`suite-outside-case.ts`) beside always-run tests that passed.
+ *
+ * | First | Second | Folded reads |
+ * |---|---|---|
+ * | marked | passing | green: exit code 0, the second's summary, no mark |
+ * | passing | marked | green: exit code 0, the first's summary, no mark |
+ * | marked | failing | red on the second: its exit code and failures, no mark |
+ * | marked | marked | marked: `noTestFiles: true`, the first nonzero exit code |
+ *
+ * Only the mark makes a run neutral. A run that exited nonzero for any
+ * other reason keeps its exit code, one with no summary line and no mark
+ * included. A stop code is read before the mark, so a marked run beside
+ * a stop folds to the stop. The neutral run keeps its place in
+ * `command`, `outputTail` and `fileOrder`, so the recorded step still
+ * shows both runs. Its summary, failures and errors are joined as any
+ * run's are; `runSuite` marks a run on Bun's own line for no test file,
+ * which comes with no summary line.
  *
  * A list that resolves to no file, `[]` or a glob matching nothing, adds
  * nothing to either scope and says nothing. When `git ls-files` does not
@@ -94,14 +123,23 @@ function unreported(result: SuiteResult): boolean {
   return result.exitCode !== 0 && result.summary === null && result.noTestFiles !== true;
 }
 
+/**
+ * The runs whose exit code the fold reads: each one not marked
+ * `noTestFiles`, or both when both are. See the module note.
+ */
+function countedRuns(first: SuiteResult, second: SuiteResult): readonly SuiteResult[] {
+  const held = [first, second].filter((run) => run.noTestFiles !== true);
+  return held.length === 0
+    ? [first, second]
+    : held;
+}
+
 /** The folded exit code; see the module note. */
 function foldedExit(first: SuiteResult, second: SuiteResult, stopCode: number): number {
   if (first.exitCode === stopCode || second.exitCode === stopCode) return stopCode;
-  const silent = [first, second].find(unreported);
-  if (silent !== undefined) return silent.exitCode;
-  return first.exitCode !== 0
-    ? first.exitCode
-    : second.exitCode;
+  const counted = countedRuns(first, second);
+  const read = counted.find(unreported) ?? counted.find((run) => run.exitCode !== 0);
+  return read?.exitCode ?? 0;
 }
 
 /** The failures of both runs, each file and name pair once, in the order first read. */
@@ -153,6 +191,7 @@ export function foldResults(first: SuiteResult, second: SuiteResult, stopCode: n
     errors: foldedErrors(first, second),
     junit: foldedJunit(first, second),
     unhandled: [...first.unhandled, ...second.unhandled],
+    outputTail: [...first.outputTail, ...second.outputTail],
     fileOrder: foldedFileOrder(first, second),
   };
   return first.noTestFiles === true && second.noTestFiles === true

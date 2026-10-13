@@ -31,6 +31,13 @@
  *     `{"id":"MDQ6VXNlcjk4NDgy","is_bot":false,"login":"vilmibm","name":"Nate Smith"}`.
  *     A bot-authored issue was not read; the fake plants people only.
  *   - `gh issue list` answered its rows newest first.
+ *   - An issue's `createdAt` is ISO 8601 to the second, in UTC, in a
+ *     listing and in a view alike. Read on 2026-10-12 with `gh` 2.102.0,
+ *     `gh issue list --repo cli/cli --state open --limit 2 --json
+ *     number,createdAt` answered
+ *     `[{"createdAt":"2026-10-12T05:50:18Z","number":14647},{"createdAt":"2026-10-08T19:15:57Z","number":14627}]`,
+ *     and `gh issue view 14647 --repo cli/cli --json createdAt,number`
+ *     answered `{"createdAt":"2026-10-12T05:50:18Z","number":14647}`.
  *   - `--label "needs-triage,enhancement"` answered what two `--label`
  *     flags did, so a label value is split on commas.
  *   - A value flag takes the argument after it even when that argument
@@ -45,6 +52,11 @@
  *   - `gh repo view --json nameWithOwner` wrote
  *     `{"nameWithOwner":"open-tomato/rafa"}` in this repository.
  *   - `gh issue create --help` says the new issue URL is printed to stdout.
+ *   - `gh issue edit --help`, read on 2026-10-13 with `gh` 2.102.0, names
+ *     `--add-label name  Add labels by name` and `--remove-label name
+ *     Remove labels by name`, and shows `gh issue edit 23 --add-label
+ *     "bug,help wanted" --remove-label "core"`, so both values are split
+ *     on commas as `--label` is.
  *
  * Not recorded, since reading them would write to a repository: what
  * `gh issue create`, `gh issue comment`, `gh issue reopen`,
@@ -57,6 +69,13 @@
  * `gh issue create` fails whole on a label that does not exist and that a
  * reopen clears the close reason, are the source's, and every message
  * this module makes up opens with `fake gh:`.
+ *
+ * Not recorded either, for the same reason: what `gh issue edit` does
+ * with an `--add-label` naming a label the repository lacks or the
+ * issue holds already, or a `--remove-label` naming one the issue
+ * lacks. The fake refuses all three, a rule of its own and not the
+ * source's, so an adapter that leaned on any of them fails the case
+ * that sent it. A label an edit adds lands after those the issue keeps.
  *
  * ## Strict
  *
@@ -71,7 +90,7 @@
  * modelled to read it: a stdin handed to any other command is refused,
  * and so is that edit handed none, which `gh` would read as an empty
  * body. `--body-file` naming a file, `--body` beside `--body-file`, and
- * an edit naming neither a title nor a body are refused too.
+ * an edit naming no title, no body and no label are refused too.
  *
  * ## Recording
  *
@@ -79,7 +98,8 @@
  * included, in order, each copied and frozen, and {@link FakeGh.inputs}
  * the stdin each was handed, in the same order. {@link FakeGh.update}
  * replaces one issue, so a case can plant what a person could have
- * edited on GitHub.
+ * edited on GitHub, and a `createdAt` no command writes: an issue is
+ * stamped once, by `gh issue create`, from {@link FakeGhOptions.now}.
  */
 import type { GhResult, GhRunner } from './github.js';
 
@@ -94,6 +114,8 @@ export interface FakeGhIssue {
   readonly stateReason: string;
   /** The login that opened it; every issue the fake plants carries the fake's own account. */
   readonly author: string;
+  /** When it was opened, as `gh` writes a time: ISO 8601 to the second, in UTC, as recorded. */
+  readonly createdAt: string;
   readonly comments: readonly string[];
 }
 
@@ -109,6 +131,12 @@ export interface FakeGhOptions {
   readonly repo?: string | null;
   /** Whether `gh label create` succeeds. True when left out. */
   readonly labelCreateOk?: boolean;
+  /**
+   * Stamps the `createdAt` of each issue `gh issue create` files,
+   * written out as answered. The system clock, to the second in UTC as
+   * recorded, when left out.
+   */
+  readonly now?: () => string;
 }
 
 /** The fake: its runner, and what it holds and was handed. */
@@ -158,7 +186,17 @@ const NO_REMOTES = 'no git remotes found\n';
 const LABEL_CREATE_ERROR = 'HTTP 403: Resource not accessible by integration (label create)\n';
 
 /** The fields each viewing command can be asked for. */
-const VIEW_FIELDS: ReadonlySet<string> = new Set(['author', 'body', 'labels', 'number', 'state', 'stateReason', 'title', 'url']);
+const VIEW_FIELDS: ReadonlySet<string> = new Set([
+  'author',
+  'body',
+  'createdAt',
+  'labels',
+  'number',
+  'state',
+  'stateReason',
+  'title',
+  'url',
+]);
 
 /** The flags a modelled command takes, and how many arguments it takes besides. */
 interface CommandShape {
@@ -179,7 +217,10 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['issue list', { values: ['--state', '--json', '--limit', '--label', '--search', '--repo'], switches: [], positionals: 0 }],
   ['issue comment', { values: ['--body', '--repo'], switches: [], positionals: 1 }],
   ['issue reopen', { values: ['--repo'], switches: [], positionals: 1 }],
-  ['issue edit', { values: ['--title', '--body', '--body-file', '--repo'], switches: [], positionals: 1 }],
+  [
+    'issue edit',
+    { values: ['--title', '--body', '--body-file', '--add-label', '--remove-label', '--repo'], switches: [], positionals: 1 },
+  ],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
 ]);
 
@@ -188,6 +229,12 @@ interface ParsedCommand {
   readonly positionals: readonly string[];
   /** Each flag's values, in order; a switch holds one empty value per use. */
   readonly flags: ReadonlyMap<string, readonly string[]>;
+}
+
+/** The system clock as `gh` writes a time: ISO 8601 to the second, in UTC. */
+function systemTime(): string {
+  return new Date().toISOString()
+    .replace(/\.\d{3}Z$/, 'Z');
 }
 
 /** A successful answer. */
@@ -237,9 +284,9 @@ function flagValue(parsed: ParsedCommand, name: string): string | undefined {
   return parsed.flags.get(name)?.at(-1);
 }
 
-/** Every label a command's `--label` flags name, each split on commas as recorded. */
-function labelValues(parsed: ParsedCommand): string[] {
-  return (parsed.flags.get('--label') ?? []).flatMap((value) => value.split(','));
+/** Every label a command's `flag` flags name, `--label` when left out, each split on commas as recorded. */
+function labelValues(parsed: ParsedCommand, flag = '--label'): string[] {
+  return (parsed.flags.get(flag) ?? []).flatMap((value) => value.split(','));
 }
 
 /** Makes a fake `gh` over an empty repository; see the module note. */
@@ -249,6 +296,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
     ? DEFAULT_REPO
     : options.repo;
   const labelCreateOk = options.labelCreateOk ?? true;
+  const now = options.now ?? systemTime;
 
   let issues: ReadonlyMap<string, FakeGhIssue> = new Map();
   let labels: ReadonlySet<string> = new Set(DEFAULT_LABELS);
@@ -288,6 +336,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
     const values: Record<string, unknown> = {
       author: { id: `MDQ6VXNlcmZha2U${issue.author}`, is_bot: false, login: issue.author, name: issue.author },
       body: issue.body,
+      createdAt: issue.createdAt,
       labels: issue.labels.map((name, index) => ({ id: `LA_fake${index}`, name, description: '', color: 'ededed' })),
       number: issue.number,
       state: issue.state,
@@ -331,7 +380,17 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       if (missing !== undefined) return failed(`could not add label: '${missing}' not found\n`);
 
       const number = Math.max(0, ...[...issues.values()].map((issue) => issue.number)) + 1;
-      store({ number, title, body, labels: wanted, state: 'OPEN', stateReason: '', author: FAKE_LOGIN, comments: [] });
+      store({
+        number,
+        title,
+        body,
+        labels: wanted,
+        state: 'OPEN',
+        stateReason: '',
+        author: FAKE_LOGIN,
+        createdAt: now(),
+        comments: [],
+      });
       return ok(`${urlOf(number)}\n`);
     }],
 
@@ -395,10 +454,29 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       const body = bodyFile === undefined
         ? flagValue(parsed, '--body')
         : stdin;
-      if (title === undefined && body === undefined) return failed('fake gh: issue edit models --title or a body, and was handed neither\n');
+      const added = labelValues(parsed, '--add-label');
+      const removed = labelValues(parsed, '--remove-label');
+      if (title === undefined && body === undefined && added.length + removed.length === 0) {
+        return failed('fake gh: issue edit models --title, a body or a label, and was handed none\n');
+      }
       const issue = namedIssue(parsed.positionals[0] ?? '');
       if ('ok' in issue) return issue;
-      store({ ...issue, title: title ?? issue.title, body: body ?? issue.body });
+      const unmade = added.find((label) => !labels.has(label));
+      if (unmade !== undefined) {
+        return failed(`fake gh: issue edit --add-label models a label the repository holds, and was handed ${unmade}\n`);
+      }
+      const held = added.find((label) => issue.labels.includes(label));
+      if (held !== undefined) return failed(`fake gh: issue edit --add-label models a label the issue lacks, and was handed ${held}\n`);
+      const lacked = removed.find((label) => !issue.labels.includes(label));
+      if (lacked !== undefined) {
+        return failed(`fake gh: issue edit --remove-label models a label the issue holds, and was handed ${lacked}\n`);
+      }
+      store({
+        ...issue,
+        title: title ?? issue.title,
+        body: body ?? issue.body,
+        labels: [...issue.labels.filter((label) => !removed.includes(label)), ...added],
+      });
       return ok(`${urlOf(issue.number)}\n`);
     }],
 

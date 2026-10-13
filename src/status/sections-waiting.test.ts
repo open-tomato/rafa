@@ -136,6 +136,7 @@ function pull(state: PullRequestState): PullRequestDetail {
     updatedAt: '2026-09-29T10:00:00Z',
     body: '',
     headRefOid: 'abc123',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'BLOCKED',
     labels: [],

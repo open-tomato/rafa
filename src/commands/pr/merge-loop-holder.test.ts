@@ -65,6 +65,7 @@ function detail(): PullRequestDetail {
     updatedAt: '2026-09-30T11:00:00Z',
     body: 'Refactors the sign-in form.',
     headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

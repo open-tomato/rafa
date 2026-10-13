@@ -106,16 +106,17 @@ never on position.
 ### Task session scope and test configuration
 
 **A task line declares `tests=affected` (the default), `tests=module`, or
-`tests=full` to control what its session checks.** Alongside `agent=` and
-other declaration keys, a task line can end with `{tests=<scope>}` to set
-the scope of verification the session will run. The three scopes cover
-both the task session's gates and the runner's stage step that follows
-the stage's last task.
+`tests=full` to control what the runner checks after its session.** Alongside
+`agent=` and other declaration keys, a task line can end with
+`{tests=<scope>}` to set the scope of the runner's task step, which runs once
+the task's session has committed. The session itself never runs the whole
+suite. The three scopes size that step; the stage step after a stage's last
+task follows its own rule, below.
 
 **Task session gates** run in every task, reading one exit code from each:
-- `bun test --changed=<base>` scoped to the changed tests (default, or when
-  `tests=affected` is declared or the changed files do not trigger a
-  module or full-suite rerun)
+- `bun test --changed=<base>` scoped to the changed tests, whatever the task's
+  `tests=` declares, since that key sizes the runner's task step and not the
+  session's run
 - `bunx tsc --noEmit` to type-check changed files (TypeScript only, test
   files excluded by `tsconfig.json`)
 - `bunx eslint <changed files>` to lint changed files
@@ -129,7 +130,8 @@ gate later anyway.
 **Runner recorded steps** run at fixed points in the loop to establish
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
-- `task` — Full suite after each task's session ends and commits
+- `task` — the scope `taskStepScope` answers over the task's diff, after each
+  task's session ends and commits (`tests=`, below)
 - `stage` — After a stage's last task: the tests under `Owns:` folders
   changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
   files when the plan has no `Owns:` folder (reason `fallback`)
@@ -148,20 +150,33 @@ pair against the baseline's captured set: a match means the failure was
 already present, a mismatch means it is new. Only new failures block the
 next task.
 
-**Declaration key `tests=` on a task line** sets what the task's session
-will run; the stage step scope after that stage completes follows from the
-plan's `Owns:` folders (scope `full`) or falls back to `bun test
---changed=<since>` (scope `affected`, reason `fallback`):
-- `tests=affected` (default): task session runs `bun test --changed=<base>`
-  plus types and lint on the changed files; stage step is determined by
-  the `Owns:` rule above
-- `tests=module`: task session skips to `bun test <module-files>` when the
-  task touches files whose enclosing module is listed in
-  `tests.integration`, otherwise same as `tests=affected`; stage step is
-  determined by the `Owns:` rule above
-- `tests=full`: task session runs full suite when the task changes a config
-  file or a globally-used module; stage step always runs full suite, not
-  a fallback
+**Declaration key `tests=` on a task line** sets the scope of the runner's
+task step, which runs after the task's session commits; the session runs only
+what its change reaches. The stage step after a stage's last task follows the
+plan's `Owns:` folders instead, or falls back to `bun test --changed=<since>`
+(scope `affected`, reason `fallback`):
+- `tests=affected` (default): the task step runs `bun test --changed=<base>`
+  plus types and lint on the changed files
+- `tests=module`: the task step runs the test files under each `Owns:` folder
+  the task's diff touches; when no touched folder holds a test file, it runs
+  as `tests=affected` (reason `no-module-tests`, or `fallback` with no `Owns:`
+  folder)
+- `tests=full`: the task step runs the full suite after the commit, whatever
+  the diff touches; the session never runs it
+
+A diff touching a `tests.fullSuiteTriggers` path escalates an `affected` or
+`module` step to the full suite, reason `trigger`.
+
+**`rafa plan risk` notes a task whose sentence asks for the whole suite.**
+An open task gets a `long-run` note when its sentence says "full suite" or
+"whole suite", in any case, or when a code span in it runs `bun test` with
+no path. `--changed=<base>` narrows the run, so it is not flagged. The note
+names the line and the fix, which is to declare `tests=full` on the task and
+take the run out of its text (`src/plan/risk/long-runs.ts`). It is level
+`note`, so `--strict` still exits 0 on it. A task session's Bash call stops
+at 10 minutes, and a whole-suite run can outlast that, which is why the
+runner runs the suite after the task commits when the task declares
+`tests=full`.
 
 **Config keys determine when a task triggers `tests=module` or `tests=full`
 automatically, and which tests always run:**
@@ -175,33 +190,43 @@ automatically, and which tests always run:**
   file matching these globs, the task scope escalates to `tests=full`
 - `tests.integration` (glob list; defaults to `**/*-integration.test.ts`,
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
-  — when a task touches files in any module matching these globs (files in
-  the same directory or a sibling at a known depth), the scope escalates
-  to `tests=module`
+  — the test files a stage step with `Owns:` folders runs beside the
+  folders it changed; a task step does not read this key
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
   blocks nothing, unless a test file the step's own change touches ran
   before it (`context/verification.md`)
 
-**A stage-end step with new failures blocks the next task.** After a
-stage's last task, the stage step runs the tests under the `Owns:`
-folders the stage changed (scope `full`), or, with no `Owns:` folder,
-`bun test --changed=<since>` with the `tests.alwaysRun` files (scope
-`affected`, reason `fallback`), joining the always-run files so they still
-pass the slow-sweep share guard. The step captures failures. If any
-failure is new against the baseline and still red when its file is run
-alone, or green alone after a test file the stage changed, the runner
-inserts a `[BLOCKED]`
-repair task above the first open task (`src/start/suite-blocker.ts`), its
-blocker the failures, which the repair session receives through
-`BLOCKER_PROMPT_PREFIX` in its prompt, and the run stops. A restarted run
-dispatches that repair first and runs no stage step before it, or before
-any `[BLOCKED]` task, because a due step run there would meet the same
-failures and stop the run again before the repair got its session. The
-stage steps still due run before the first open task after it. The blocked
-task holds until its session completes or a human unblocks it by removing
-the `[BLOCKED]` mark on its line in the tracker.
+**A stage-end step with new failures blocks the next task.** After a stage's
+last task, the stage step runs the tests under the `Owns:` folders the stage
+changed, plus the `tests.integration` tier, or, with no `Owns:` folder, `bun
+test --changed=<since>` with the `tests.alwaysRun` files (scope `affected`,
+reason `fallback`), joining the always-run files so they still pass the
+slow-sweep share guard. The step captures failures. If any failure is new
+against the baseline and still red when its file is run alone, or green alone
+after a test file the stage changed, the runner inserts a `[BLOCKED]` repair
+task above the first open task (`src/start/suite-blocker.ts`), its blocker the
+failures, which the repair session receives through `BLOCKER_PROMPT_PREFIX` in
+its prompt, and the run stops. A restarted run dispatches that repair first
+and runs no stage step before it, or before any `[BLOCKED]` task, because a
+due step run there would meet the same failures and stop the run again before
+the repair got its session. The stage steps still due run before the first
+open task after it. The blocked task holds until its session completes or a
+human unblocks it by removing the `[BLOCKED]` mark on its line in the tracker.
+
+**A repair line names the task it repairs, and the repair is handed that
+task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
+after its declaration and before its blocker comment, and `TaskInfo.repairs`
+reads the text back (`src/utils/tracker.ts`). A task-step repair names the
+task whose step was red, and a stage-step repair names the last task of that
+stage. A pre-wrap-up repair names nothing and has no comment, since the whole
+suite is what it repairs. Under `plan.inject: stage` a repair that names a
+task is rendered as that task's stage, with the repair's line open directly
+below the named task, and under `plan.inject: task` as the repair's line alone
+within that stage's context. A repair that names nothing is handed the whole
+plan with no warning. One that names a task the plan no longer holds is handed
+the whole plan too, with a warning that says the repair was looking for it.
 
 ### What reaches a loop session
 
@@ -323,32 +348,80 @@ project root owns `.rafa/` and the config; the checkout is where
 (or in a directory you configure); without it, the checkout IS the project
 root, and you run the loop where you already are.
 
+**The base is read one way, by the start and by the wrap-up.** It is
+`pr.base` when the config sets it (`rafa config set pr.base=<branch>`), else
+the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
+(`src/cleanup/branches.ts`) reads it: the start reads it in the project root
+for the branch it cuts and the worktree it adds, the wrap-up reads it in the
+run's own checkout (`src/start/wrap-up-run.ts`) for the pull request. A
+repository with no `origin/HEAD` and no `pr.base` gets `main`. To name another
+base, set `pr.base`, or run `git remote set-head origin -a` so that
+`origin/HEAD` names the remote's default branch. The base is an address written
+on the plan. The branch checked out where the run was started is never the
+base, and where the person stands when they start the run is no part of it.
+
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
 The branch is created as `feat/<stub>` from the latest `origin/<base>`,
-where `<base>` is the tracking branch of the default branch. This feature
+where `<base>` is the branch checked out, `main` or `master`. This feature
 requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**On a detached HEAD, `--create-branch` cuts the branch from the base, and the
+refusal without it names the flag.** Without `--create-branch` the run is
+refused before its first task: the refusal says no branch is checked out,
+names `--create-branch`, and, for a plan whose file names a stub,
+`--as-worktree`. With it, or with a yes to the question a terminal asks, the
+run fetches `origin/<base>` and creates `feat/<stub>` from the fetched ref
+with `--no-track`, so the new branch takes no upstream. A failed fetch refuses
+first, so the branch is never cut from a stale base. `HEAD` is never handed on
+as a branch name. `--any-branch` does not let a detached HEAD through: it
+waives which branch the run is on, not that it is on one. Under
+`--as-worktree` the run makes no offer and needs no flag: its worktree is cut
+from the same base, and the detached checkout is left as it was.
+
+**`--as-worktree` adds a plan's worktree in two steps, and retries only the
+upstream.** For a plan whose branch already exists on `origin`, the add is
+`git worktree add --no-track`, and the upstream is a second step:
+`git branch --set-upstream-to=origin/<branch> <branch>`. Git keeps one
+`.git/config` for every worktree of a clone and refuses a second writer while
+its lock is held rather than waiting, so two plans started at once in one
+clone could lose one upstream (issue #960). The second step is tried up to
+`UPSTREAM_TRIES` (5) times, with `UPSTREAM_PAUSE_MS` (200) between tries, and
+only while git reports the config as locked (`src/start/worktree-upstream.ts`).
+A run that gives up removes the worktree it added, keeps the local branch, and
+names the branch and that line. A run started again finds the branch and
+leaves its upstream as it was found, so the line is run by hand first. Any
+other failure leaves the worktree in place and says so. A rafa lock file
+around each add was rejected: git already locks the file, and a lock of
+rafa's own would outlive a run killed while holding it.
+
+**A run started from a scratch branch still compares its plan with the
+base.** Started from a session worktree on `scratch/notes`, `--as-worktree`
+cuts the plan's branch from `pr.base` or `origin/HEAD`, as above, and prints
+one line naming that base, where it was read from, and the branch the run was
+started on: `The worktree's base is main, read from origin/HEAD (the default
+when it names none), not scratch/notes`. A run started on the base prints
+nothing, and a run started on a detached HEAD says `not a detached HEAD`.
+
 **An existing branch under `--as-worktree` catches up with its base when it
-holds only claims.** `rafa plan create` claims a plan by pushing
-`feat/<stub>` at the base's tip, so a run started later finds a branch cut
-from a base that has moved since. When `--as-worktree` takes a branch that
-already exists (local, remote-only, or held by the worktree an earlier
-start left), it fetches `origin/<base>` (the base, never the branch) and
-reads the branch's commits past it (`src/start/claim-catch-up.ts`). A
-branch holding only `claim(rafa-<n>): …` commits is merged with
-`git merge origin/<base>` in the run's worktree before the first task, a
-merge and never a rewrite of the pushed branch, and one line names the
-commits taken and their range. A branch holding any other commit is never
-merged: one warning says how many commits behind `origin/<base>` it is, and
-the run goes on. A branch at or ahead of `origin/<base>` prints nothing
-new. A failed fetch is a warning, the branch then read against
-`origin/<base>` as it stood; a failed merge is aborted and refuses the run.
-`--create-branch` without `--as-worktree` switches to an existing branch as
-it is, with no catch-up.
+holds only claims.** `rafa plan create` claims a plan by pushing `feat/<stub>`
+at the base's tip, so a run started later finds a branch cut from a base that
+has moved since. When `--as-worktree` takes a branch that already exists
+(local, remote-only, or held by the worktree an earlier start left), it
+fetches `origin/<base>` (the base, read as above, never the branch) and reads
+the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding
+only `claim(rafa-<n>): …` commits is merged with `git merge origin/<base>` in
+the run's worktree before the first task, a merge and never a rewrite of the
+pushed branch, and one line names the commits taken and their range. A branch
+holding any other commit is never merged: one warning says how many commits
+behind `origin/<base>` it is, and the run goes on. A branch at or ahead of
+`origin/<base>` prints nothing new. A failed fetch is a warning, the branch
+then read against `origin/<base>` as it stood; a failed merge is aborted and
+refuses the run. `--create-branch` without `--as-worktree` switches to an
+existing branch as it is, with no catch-up.
 
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
@@ -364,6 +437,26 @@ not the plan.** Once the tracker exists, a task line appended to the plan
 file is never dispatched: the loop prints `All tasks completed!`. Append
 the open line to the tracker as well before running again. This replaces
 nothing.
+
+**A run that dispatches only its wrap-up skips the `[auto]` items scoped
+`tasks`.** A PREREQUISITES file marks an `[auto]` item `[tasks]` or
+`[wrap-up]` after its box and beside its inline tag, as in
+`- [ ] [auto] [tasks] Bun is installed: ...`, or on a heading above it,
+which the items under that heading inherit unless their own marker says
+otherwise. An item with no marker counts as `both`, so a file written before
+the marker existed is probed exactly as it was. When the tracker beside the
+plan holds no open and no blocked task, the run dispatches its wrap-up alone,
+and the preflight passes over each item scoped `tasks` rather than probing it.
+Each one is named in a line of its own, such as `⏭ tasks-only item tool "the
+compiler is installed" was not checked: only the tasks need it, and
+PLAN_TRACKER-demo.md holds no open and no blocked task`. A skipped item is not
+checked, counted, stored or able to halt. Items scoped `wrap-up` or `both` are
+probed as before, and so is every item when a task is open or blocked, or when
+no tracker can be read, as on a first dispatch. `rafa doctor --plan=` does not
+run this preflight and probes every item. The skip serves a rerun whose
+wrap-up session died before it pushed: starting the loop again goes straight
+to the wrap-up, even when the plan's scratch variables are no longer exported,
+instead of halting on a check only the tasks needed.
 
 **The order of all work lives in ONE place: the pinned "Roadmap" issue**
 on the `open-tomato/rafa` board. The word "phase" and its letters are
@@ -516,6 +609,9 @@ tooling promise (the hook's denial) to tooling completion (the rafa
 command) to closure (the verification sweep), and leaves no gap report
 buried in a list of general bugs.
 
+A stale line found during other work is corrected in that work, in the same
+commit, and is not filed as a bug.
+
 ### Files beside the tree
 
 **`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the
@@ -558,26 +654,38 @@ plan's declared level is below its notes. Details at `context/release.md`; confi
 
 ### The wrap-up and pull request
 
-**A run never ends `done` without its pull request.** The wrap-up session is
-responsible for opening a pull request with the release notes, but the runner
-verifies that a pull request exists before marking the run complete. After the
-wrap-up session ends, the runner reads the branch's open pull request. With
-one found, the run advances to the pull-request phase and waits for CI. With
-none, the runner runs `loop.wrapUp.retries` more wrap-up sessions, each told
-that the pull request is missing and given the previous session's final message
-so it can fix any issue that stopped the PR creation. If retries are exhausted
-and still no pull request exists, the runner opens one itself with the title
-`rafa-<n>: <plan title>` and a body opening with `Closes #<n>`, the release
-fragment's notes, and a line saying the wrap-up did not finish. If opening
-fails (for instance, if the branch has not been merged into the base yet or
-was pushed while the working tree had conflicts), the run ends `blocked` with
-the step and branch named. A pull request a retry or the runner opened is
-then given the release forecast or failure sentence the release step found
+**A run never ends `done` without its pull request, unless `pr.provider` is
+`none`.** The wrap-up session is responsible for opening a pull request with
+the release notes, but the runner verifies that a pull request exists before
+marking the run complete. After the wrap-up session ends, the runner reads the
+branch's open pull request. With one found, the run advances to the
+pull-request phase and waits for CI. With none, the runner runs
+`loop.wrapUp.retries` more wrap-up sessions, each told that the pull request
+is missing and given the previous session's final message so it can fix any
+issue that stopped the PR creation. If retries are exhausted and still no pull
+request exists, the runner opens one itself with the title `rafa-<n>: <plan
+title>` and a body opening with `Closes #<n>`, the release fragment's notes,
+and a line saying the wrap-up did not finish. If opening fails (for instance,
+if the branch has not been merged into the base yet or was pushed while the
+working tree had conflicts), the run ends `stopped` with exit code 1, the
+report naming the step and branch. A pull request a retry or the runner opened
+is then given the release forecast or failure sentence the release step found
 no pull request to write to (`carryReleaseIntoPullRequest`,
 `src/start/release-body.ts`), before the retarget and the CI wait; one the
 release step already wrote to is not written again, and a blocked delivery
-writes nothing. With `pr.provider: none`, the pull-request check
-and creation are both skipped and the run advances directly to CI or closes.
+writes nothing. With `pr.provider: none`, no pull request is read or opened:
+the CI gate's `none` path (`src/start/pr-lifecycle.ts`) pushes the branch,
+prints the compare URL when origin names a web host, skips the CI wait, and the
+run ends `done` with the branch pushed and no pull request.
+
+**The wrap-up prompt is written for `pr.provider: none` too.**
+`buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
+resolved, and under `none` it leaves out the four bullets that find the
+plan's issue number, title the pull request and describe it. It writes one
+bullet where the create and edit step would go instead: the run ends with the
+branch pushed and no pull request is opened, so the session is told not to
+open, edit or look for one. The rest of the prompt reads as it does under any
+provider, and under every other provider the prompt is unchanged.
 
 **The wrap-up emits `pr` or `no-pr` once, in every output mode.**
 `emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to
@@ -629,13 +737,6 @@ starts), and `🍅 #<n> <phase>` when in any other phase, preventing display of
 counts past the total. Commands like `rafa loop status` and `rafa loop list`
 print the phase name beside the done/total count. A run record from an older
 rafa without a `phase` field reads as `task` for backwards compatibility.
-
-**A detached HEAD is refused at `loop start`.** The branch check that runs
-before the first task rejects any `loop start` attempt when the working tree
-is on a detached HEAD, whether or not `--create-branch` is passed. The refusal
-message names two alternatives: switch to a branch with `git switch <base>`
-or use `--as-worktree` to create a separate working tree. No route accepts
-`HEAD` as a valid branch name, preventing silent errors from later operations.
 
 **SIGINT during a suite step is a stop, not a suite failure.** When the runner
 is recording a suite step (baseline, task, stage, or pre-wrap-up) and receives

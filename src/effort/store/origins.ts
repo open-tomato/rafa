@@ -1,7 +1,9 @@
 /**
- * The origin pair every production insert stamps on the row it writes:
+ * The origin pair a production insert stamps on a new row it writes:
  * `origin_store`, the store id `store_meta` records, and `origin_seq`,
- * the row's own `seq`.
+ * the row's own `seq`. An insert that carries a row over from another
+ * store or file keeps the pair that row holds; {@link ORIGIN_TABLES}
+ * names the three.
  *
  * ## One counter, not two
  *
@@ -60,11 +62,18 @@
  */
 
 /**
- * The twelve tables a merge unions, each carrying `origin_store` and
- * `origin_seq` since migration `row-origins`. Every production insert
- * into one of them is stamped; `schema_migrations`, `store_meta`,
- * `store_replaced`, `merges` and `merge_conflicts` are the store's own
- * bookkeeping and carry no origin.
+ * The tables a merge unions, each carrying `origin_store` and
+ * `origin_seq` since migration `row-origins`. A production insert that
+ * writes a new row into one of them is stamped. Three inserts carry
+ * rows that exist already and leave the pair as the row holds it:
+ * the copy in `fix-schema.ts`, column for column from the live store;
+ * the union in `merge-union.ts`, which gives another store's row a new
+ * local `seq` and keeps its origin; and the restore in
+ * `fixture-extract.ts`, which builds a store from an extract's rows.
+ * `origins.test.ts` reads every insert from source and spells both
+ * lists. `schema_migrations`, `store_meta`, `store_replaced`, `merges`
+ * and `merge_conflicts` are the store's own bookkeeping and carry no
+ * origin.
  */
 export const ORIGIN_TABLES = [
   'sessions',

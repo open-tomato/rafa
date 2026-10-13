@@ -135,6 +135,7 @@ export type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
   PrerequisiteKind,
+  PrerequisiteScope,
   RafaConfig,
   ResolvedConfig,
 } from './core/config/index.js';

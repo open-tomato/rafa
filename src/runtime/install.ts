@@ -15,24 +15,27 @@
  *      not rafa's or whose `version` could not name one directory;
  *   2. reads the config as `loop start` resolves it (`config-load.ts`),
  *      for `plan.dir`;
- *   3. refuses while a tracker in `plan.dir` has a task left, before
- *      building;
+ *   3. reads the trackers in `plan.dir`, and when one has a task left
+ *      and it was not forced, the live loops of the checkout: it refuses
+ *      while a loop is live, before building;
  *   4. refuses while `~/.rafa/runtime/<version>/` is already there,
  *      unless it was forced, before building;
- *   5. runs the build;
- *   6. copies `dist/` into a staging directory beside
+ *   5. warns, in one line, of every tracker with a task left it is
+ *      installing beside;
+ *   6. runs the build;
+ *   7. copies `dist/` into a staging directory beside
  *      `~/.rafa/runtime/<version>/` and renames it into place;
- *   7. links `~/.rafa/bin/rafa` at the copied `cli.js`, making the bin
+ *   8. links `~/.rafa/bin/rafa` at the copied `cli.js`, making the bin
  *      directory when it is missing;
- *   8. logs the path the link resolves to.
+ *   9. logs the path the link resolves to.
  *
  * What was refused or could not run is answered, never written:
  * {@link outcomeProblem} words it, so the script writes it to stderr and
  * the command carries it as its `CommandExit` message. Exit codes, for
  * both: 0 done, 1 refused, 2 could not run. 2 is its own code on purpose:
- * a manifest, config or tracker that could not be read, or a build, copy
- * or link that failed, is never read as a refusal, and a refusal is never
- * read as something broken.
+ * a manifest, config, tracker or loop record that could not be read, or a
+ * build, copy or link that failed, is never read as a refusal, and a
+ * refusal is never read as something broken.
  *
  * ## The bin sits in `~/.rafa/bin`, not in bun's
  *
@@ -53,19 +56,42 @@
  * is not this package's is answered as could-not-run at the `manifest`
  * step, before anything else is read.
  *
- * ## A tracker with a task left refuses
+ * ## A tracker with a task left refuses only under a live loop
  *
- * A plan with a task left is a run that may still be going, from the
- * very runtime this would replace, and its remaining tasks would meet a
- * runner and a prompt it never started with. A tracker has a task left
- * when `findNextTask` answers one over its text, an open or a blocked
- * task, so a task line inside a closed `rafa:*` block is skipped exactly
- * as the loop skips it. Trackers sit beside their plans (`trackerPathFor`)
- * in `plan.dir`, `.rafa/plans` unless a config names another, and are
- * looked for there alone: not in its subdirectories and not at the
- * project root, where a hand-written `PLAN.md` falls back to. A `plan.dir`
- * that does not exist holds none. The refusal names every tracker with a
- * task left.
+ * The guard exists so an install never replaces the runtime under a
+ * running loop, whose remaining tasks would meet a runner and a prompt it
+ * never started with. A tracker with a task left is not that loop: a plan
+ * stopped halfway, or one no loop will ever pick up again, leaves the
+ * same tracker behind, and no loop can clear it. So the tracker is the
+ * question and the live loops are the answer. When a tracker has a task
+ * left:
+ *
+ *   - forced ({@link InstallOptions.force}), the install goes on, and
+ *     the loops are not read: no answer would change what it does;
+ *   - otherwise it reads the loops of the checkout
+ *     ({@link InstallSeams.liveLoops}, `liveLoopsOf` over the repo root
+ *     when left out, `live-loops.ts`), goes on when none is live, and
+ *     with one live refuses at the `trackers` reason, before the build,
+ *     naming every tracker with a task left, its line and its task.
+ *
+ * An install that goes on beside such a tracker says so once: one line
+ * through `warn` naming every one of them with its line, written after
+ * the runtime check below has passed, so an install that then refuses for
+ * the runtime warns of nothing. With no tracker holding a task the loops
+ * are never read and nothing is warned of.
+ *
+ * A loop record that cannot be read is answered as could-not-run at the
+ * `loops` step: a loop the install cannot rule out is never read as none.
+ * The records are the ones under the repo root handed in, and the note
+ * of `live-loops.ts` says what that leaves out.
+ *
+ * A tracker has a task left when `findNextTask` answers one over its
+ * text, an open or a blocked task, so a task line inside a closed
+ * `rafa:*` block is skipped exactly as the loop skips it. Trackers sit
+ * beside their plans (`trackerPathFor`) in `plan.dir`, `.rafa/plans`
+ * unless a config names another, and are looked for there alone: not in
+ * its subdirectories and not at the project root, where a hand-written
+ * `PLAN.md` falls back to. A `plan.dir` that does not exist holds none.
  *
  * ## A runtime already there refuses, and `--force` replaces it whole
  *
@@ -102,10 +128,12 @@
  *
  * ## Seams
  *
- * The checkout, the home, the build runner and where lines go are passed
- * in ({@link InstallSeams}), so a test points every path under a temporary
- * directory of its own and never runs the real build.
+ * The checkout, the home, the build runner, the reading of the live loops
+ * and where lines go are passed in ({@link InstallSeams}), so a test
+ * points every path under a temporary directory of its own, never runs
+ * the real build, and answers a live loop without a process of its own.
  */
+import type { SessionRecord } from '../core/loop/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import {
@@ -129,6 +157,8 @@ import { messageOf } from '../core/config/sections.js';
 import { RAFA_BIN_DIR } from '../project/bin-path.js';
 import { RUNTIME_ENTRY, RUNTIME_SUBDIR, VERSION_SHAPE } from '../start/runtime.js';
 import { findNextTask } from '../utils/tracker.js';
+
+import { liveLoopsOf } from './live-loops.js';
 
 export { RAFA_PACKAGE_NAME };
 
@@ -166,15 +196,24 @@ export interface InstallSeams {
   readonly build: (repoRoot: string) => number;
   /** Where progress and the resolved path go. */
   readonly log: (line: string) => void;
-  /** Where a config warning goes. */
+  /** Where a config warning goes, and the one line naming the trackers an install goes on beside. */
   readonly warn: (line: string) => void;
+  /**
+   * The live loops of `repoRoot`, read only when a tracker has a task
+   * left and the install was not forced; see the module note.
+   * `liveLoopsOf` over the repo root when left out, so neither caller has
+   * to name it.
+   */
+  readonly liveLoops?: (repoRoot: string) => readonly SessionRecord[];
 }
 
 /** What one install is told to do beyond where it reads and writes. */
 export interface InstallOptions {
   /**
    * Replace a `~/.rafa/runtime/<version>/` already there, whole, instead
-   * of refusing it; see the module note. False unless it is set.
+   * of refusing it, and install beside a tracker with a task left while a
+   * loop is live instead of refusing that; see the module note. False
+   * unless it is set.
    */
   readonly force?: boolean;
 }
@@ -188,11 +227,12 @@ export interface OpenTracker {
 }
 
 /** The step an install that could not run stopped at. */
-export type InstallStage = 'manifest' | 'config' | 'trackers' | 'build' | 'copy' | 'link';
+export type InstallStage = 'manifest' | 'config' | 'trackers' | 'loops' | 'build' | 'copy' | 'link';
 
 /**
  * What one install did. A refusal carries the `reason` it refused for: a
- * tracker with a task left, or a runtime already installed.
+ * tracker with a task left while a loop is live, or a runtime already
+ * installed.
  */
 export type InstallOutcome =
   | {
@@ -233,6 +273,7 @@ const AFTERMATH: Readonly<Record<InstallStage, string>> = {
   manifest: NOTHING_DONE,
   config: NOTHING_DONE,
   trackers: NOTHING_DONE,
+  loops: NOTHING_DONE,
   build: 'nothing was copied or linked',
   copy: 'the runtime directory holds the build it held or this one, never a mix, and the link was not changed',
   link: 'the runtime directory holds this build, and the link may not point at it',
@@ -278,17 +319,32 @@ export function outcomeProblem(outcome: InstallOutcome, repoRoot: string): strin
   }
 }
 
+/** The refusal's lines for trackers with a task left while a loop is live; see the module note. */
 function trackerRefusalLines(open: readonly OpenTracker[], planDir: string): string[] {
   return [
-    `REFUSED — ${open.length} plan tracker(s) in ${planDir} still hold a task, and a loop may be running from the runtime this would replace:`,
+    `REFUSED — ${open.length} plan tracker(s) in ${planDir} still hold a task while a loop of this project is live,`
+      + ' and a live loop runs from the runtime this would replace:',
     ...open.map(({ path, task }) => {
       const box = task.status === 'blocked'
         ? '[BLOCKED]'
         : '[ ]';
       return `  ${path}:${task.lineNum + 1}  ${box} ${task.task}`;
     }),
-    `${NOTHING_DONE}. Finish those plans, then run it again.`,
+    `${NOTHING_DONE}. Wait for every live loop to finish, or run it again with ${FORCE_FLAG} to install under them.`,
   ];
+}
+
+/**
+ * The one warning an install going on beside trackers with a task left
+ * writes, each tracker named with the line its task is on.
+ *
+ * @param open - The trackers with a task left, at least one.
+ * @param planDir - The `plan.dir` they sit in, as the line names it.
+ * @returns The line, with no prefix: the `warn` seam adds its own.
+ */
+export function trackerWarningLine(open: readonly OpenTracker[], planDir: string): string {
+  const named = open.map(({ path, task }) => `${path}:${task.lineNum + 1}`);
+  return `installing with ${open.length} plan tracker(s) in ${planDir} still holding a task: ${named.join(', ')}`;
 }
 
 function runtimeRefusalLines(runtimeDir: string, version: string): string[] {
@@ -482,7 +538,8 @@ function textLines(bytes: Uint8Array | undefined): string[] {
  * Installs one checkout, answering what it did. A step that throws is
  * answered as `failed` at that step; see the module note for the order.
  * `options.force` replaces a runtime directory already there rather than
- * refusing it.
+ * refusing it, and installs beside a tracker with a task left under a
+ * live loop rather than refusing that.
  */
 export function installRuntime(seams: InstallSeams, options: InstallOptions = {}): InstallOutcome {
   try {
@@ -506,7 +563,9 @@ function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcom
   log(`plan dir: ${planDir}`);
 
   const open = inStage('trackers', () => openTrackers(repoRoot, planDir));
-  if (open.length > 0) return { kind: 'refused', reason: 'trackers', planDir, trackers: open };
+  if (open.length > 0 && options.force !== true && loopIsLive(seams)) {
+    return { kind: 'refused', reason: 'trackers', planDir, trackers: open };
+  }
 
   const distDir = join(repoRoot, 'dist');
   const runtimeDir = join(runtimeRoot, version);
@@ -515,6 +574,7 @@ function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcom
     return { kind: 'refused', reason: 'runtime-exists', version, runtimeDir };
   }
 
+  if (open.length > 0) seams.warn(trackerWarningLine(open, relative(repoRoot, planDir) || '.'));
   log(`building ${repoRoot}`);
   const code = inStage('build', () => seams.build(repoRoot));
   if (code !== 0) throw new StageFailure('build', `the build exited ${code}`);
@@ -531,6 +591,12 @@ function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcom
   const resolved = inStage('link', () => relink(linkPath, join(runtimeDir, RUNTIME_ENTRY)));
   log(`${linkPath} resolves to ${resolved}`);
   return { kind: 'done', version, runtimeDir, linkPath, resolved, copied };
+}
+
+/** Whether a loop of the checkout is live, a record that cannot be read a failure at the `loops` step. */
+function loopIsLive(seams: InstallSeams): boolean {
+  const read = seams.liveLoops ?? liveLoopsOf;
+  return inStage('loops', () => read(seams.repoRoot)).length > 0;
 }
 
 /** Runs one step, answering any throw from it as a failure at that step. */

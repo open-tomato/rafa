@@ -33,11 +33,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
 import { deepImportLine, isCodeFile, readCoreImports } from '../../scripts/survey/core-barrels.js';
 import { CORE_FOLDER } from '../../scripts/survey/core-moves.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 

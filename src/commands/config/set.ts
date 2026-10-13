@@ -27,15 +27,29 @@
  * alone. A file already reading the value is left byte-identical, and
  * the line says so.
  *
+ * ## The `dangerous` section under an agent
+ *
+ * A `dangerous.*` key is a person's consent to step off a check, so an
+ * agent must not be the one to give it (#919). When `isAgentShell`
+ * (`src/utils/agent-shell.ts`) holds for `context.env`, the key
+ * `dangerous` and every key opening with `dangerous.` is refused,
+ * whether or not the config reader knows it. The refusal comes once the
+ * argument is split and before the project is looked for, so the file is
+ * neither read nor written. It names the variable read, and prints the
+ * line for the person to run in a terminal of their own. No flag and no
+ * config key passes it. Every other key is written under an agent as it
+ * is anywhere, and a shell without the variable is not gated.
+ *
  * ## Exit codes
  *
  * 0 for a value written and for a file already reading it. 1 for every
  * refusal, each naming why and that nothing was written: a malformed
- * argument, a file that cannot be read or written, and each
- * `ConfigSetRefusal` (an unknown key, a value its reader refuses, a key
- * written twice or in flow style, an edit that does not read back).
- * With `--output=json` the {@link ConfigSetResult} is the data of the
- * terminal result event.
+ * argument, a key of the `dangerous` section under an agent, a file that
+ * cannot be read or written, and each `ConfigSetRefusal` (an unknown
+ * key, a value its reader refuses, a key written twice or in flow style,
+ * an edit that does not read back). With `--output=json` the
+ * {@link ConfigSetResult} is the data of the terminal result event, and
+ * a refusal is the `CommandExit` it is in text mode.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
@@ -45,6 +59,7 @@ import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
 import { CommandExit } from '../../core/command/index.js';
 import { configFilePath } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { AGENT_SHELL_ENV, isAgentShell } from '../../utils/agent-shell.js';
 import { expectOneArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -55,6 +70,9 @@ export const CONFIG_SET_USAGE = 'rafa config set <key>=<value>';
 
 /** The exit code of every refusal. */
 const REFUSED_EXIT = 1;
+
+/** The config section whose keys are a person's consent to step off a check. */
+const DANGEROUS_SECTION = 'dangerous';
 
 /** How a value the project file does not set is printed. */
 export const NOT_SET = '(not set)';
@@ -87,6 +105,25 @@ export function splitAssignment(word: string): { key: string; value: string } {
   return { key, value: word.slice(at + 1) };
 }
 
+/** True for the `dangerous` section's own key and for every key under it, known to the reader or not. */
+export function isDangerousKey(key: string): boolean {
+  return key === DANGEROUS_SECTION || key.startsWith(`${DANGEROUS_SECTION}.`);
+}
+
+/**
+ * The refusal of a `dangerous` key under an agent: the variable read,
+ * that nothing was written, and the line for the person to run. See "The
+ * `dangerous` section under an agent".
+ */
+function agentRefusal(key: string, value: string): CommandExit {
+  return new CommandExit(
+    REFUSED_EXIT,
+    `❌ ${COMMAND_NAME}: ${key} is a key of the ${DANGEROUS_SECTION} section, which only a person sets, and`
+    + ` ${AGENT_SHELL_ENV} is set, so an agent is running this shell. Nothing was written.\n`
+    + `Run it in your own terminal:\n  ${COMMAND_NAME} ${key}=${value}`,
+  );
+}
+
 /** A value as one line prints it: a string as written, `(not set)` for null, anything else as JSON. */
 export function formatValue(value: unknown): string {
   if (value === null || value === undefined) return NOT_SET;
@@ -108,6 +145,7 @@ function readText(path: string): string {
 export function setConfig(context: RafaContext): ConfigSetResult {
   const word = expectOneArgument(context.args, CONFIG_SET_USAGE);
   const { key, value } = splitAssignment(word);
+  if (isDangerousKey(key) && isAgentShell(context.env)) throw agentRefusal(key, value);
   const project = requireProject(context, COMMAND_NAME);
   const path = configFilePath(project.root);
   const text = readText(path);
@@ -155,7 +193,10 @@ export function createConfigSetCommand(): RafaCommand {
       + ' section is appended. The edited text is read back through the config reader before it is'
       + ' written, and a file already reading the value is left as it was. Exit code 1, with nothing'
       + ' written, for an argument that is not `<key>=<value>`, a key the config schema does not know, a'
-      + ' value the key\'s reader refuses, and a key written twice or in flow style. With `--output=json`'
+      + ' value the key\'s reader refuses, and a key written twice or in flow style. A key of the'
+      + ' `dangerous` section is a person\'s consent, so it is refused the same way, before the file is'
+      + ' read, in a shell an agent runs (`CLAUDECODE` set): the refusal prints the line to run in a'
+      + ' terminal of your own, and no flag passes it. With `--output=json`'
       + ' the key, the file, the old and new values and whether it changed are the data of the terminal'
       + ' result event. Starts no session.',
     args: [

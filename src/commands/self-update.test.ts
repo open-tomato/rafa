@@ -2,8 +2,10 @@
  * Tests for `rafa self-update` (`self-update.ts`): the install it runs in
  * the project root, the build lines it forwards, the `PATH` warning, json
  * mode, `--force` reaching the install, the wait for a live loop and
- * `dangerous.selfUpdateDuringLoop`, and its refusals with their exit
- * codes. The install itself is held in `src/runtime/install.test.ts`.
+ * `dangerous.selfUpdateDuringLoop`, a tracker with a task left with and
+ * without a live loop, and its refusals with their exit codes. The
+ * install itself is held in `src/runtime/install.test.ts`, and the
+ * reading of the live loops in `src/runtime/live-loops.test.ts`.
  *
  * Each case dispatches a command made over a build seam of its own, in a
  * project planted under this file's temporary directory beside a home of
@@ -32,7 +34,6 @@ import selfUpdateCommand, {
   createSelfUpdateCommand,
   DEFAULT_SELF_UPDATE_SEAMS,
   DURING_LOOP_KEY,
-  liveLoopsOf,
 } from './self-update.js';
 
 /** A temporary directory of this file's own, its real path. */
@@ -189,20 +190,6 @@ describe('rafa self-update refuses', () => {
     expect(existsSync(join(rafaBinOf(project), 'rafa'))).toBe(false);
   });
 
-  it('exits 1 while a tracker in plan.dir holds a task, naming it and building nothing', async () => {
-    const project = plantCheckout();
-    writeFile(join(project.root, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [x] done\n- [BLOCKED] stuck\n');
-    const builds: string[] = [];
-
-    const run = await selfUpdate(project, recordingBuild(builds));
-
-    expect(run.exitCode).toBe(1);
-    expect(run.stderr).toContain('REFUSED — 1 plan tracker(s) in .rafa/plans still hold a task');
-    expect(run.stderr).toContain(`${join('.rafa', 'plans', 'PLAN_TRACKER-a.md')}:2  [BLOCKED] stuck`);
-    expect(builds).toEqual([]);
-    expect(existsSync(join(project.home, '.rafa'))).toBe(false);
-  });
-
   it('exits 2 in a project that is no rafa checkout, building nothing', async () => {
     const project = plantCheckout('@someone/else');
     const builds: string[] = [];
@@ -343,6 +330,50 @@ describe('rafa self-update beside a live loop', () => {
     expect(readlinkSync(join(rafaBinOf(project), 'rafa'))).toBe(join(project.home, '.rafa', 'runtime', VERSION, 'cli.js'));
   });
 
+  it('installs beside a tracker with a task left when no loop is live, warning once with the tracker named', async () => {
+    const project = plantCheckout();
+    writeFile(join(project.root, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [x] done\n- [BLOCKED] stuck\n');
+    plantLoop(project, 'killed', 'feature/gone', GONE_PID);
+    const builds: string[] = [];
+
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(builds).toEqual([project.root]);
+    const warned = run.stdout.split('\n').filter((line) => line.includes('plan tracker(s)'));
+    expect(warned).toEqual([
+      `warn: installing with 1 plan tracker(s) in .rafa/plans still holding a task: ${join('.rafa', 'plans', 'PLAN_TRACKER-a.md')}:2`,
+    ]);
+    expect(readlinkSync(join(rafaBinOf(project), 'rafa'))).toBe(join(project.home, '.rafa', 'runtime', VERSION, 'cli.js'));
+  });
+
+  it('refuses on a tracker with a task left under a live loop it was let past, unless --force is on the line', async () => {
+    const project = plantCheckout();
+    writeFile(join(project.root, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [x] done\n- [BLOCKED] stuck\n');
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    setDuringLoop(project, true);
+    const builds: string[] = [];
+
+    const refused = await selfUpdate(project, probedBuild(builds));
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain('REFUSED — 1 plan tracker(s) in .rafa/plans still hold a task while a loop of this project is live');
+    expect(refused.stderr).toContain(`${join('.rafa', 'plans', 'PLAN_TRACKER-a.md')}:2  [BLOCKED] stuck`);
+    expect(refused.stderr).toContain('run it again with --force');
+    expect(refused.stdout).not.toContain('installing with');
+    expect(builds).toEqual([]);
+    expect(existsSync(join(project.home, '.rafa'))).toBe(false);
+
+    const forced = await selfUpdate(project, probedBuild(builds), ['--force']);
+
+    expect(forced.exitCode).toBe(0);
+    expect(builds).toEqual([project.root]);
+    expect(forced.stdout.split('\n').filter((line) => line.includes('plan tracker(s)'))).toEqual([
+      `warn: installing with 1 plan tracker(s) in .rafa/plans still holding a task: ${join('.rafa', 'plans', 'PLAN_TRACKER-a.md')}:2`,
+    ]);
+  });
+
   it('installs once every recorded pid is gone, the records left as they are', async () => {
     const project = plantCheckout();
     plantLoop(project, 'killed', 'feature/a', GONE_PID);
@@ -390,14 +421,6 @@ describe('rafa self-update beside a live loop', () => {
     expect(run.stderr).toContain('FAIL — loops:');
     expect(run.stderr).toContain('broken.json');
     expect(builds).toEqual([]);
-  });
-});
-
-describe('liveLoopsOf', () => {
-  it('answers no loop for a project with no runs directory', () => {
-    const project = plantCheckout();
-
-    expect(liveLoopsOf(project.root, probe)).toEqual([]);
   });
 });
 

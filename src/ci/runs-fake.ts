@@ -18,12 +18,41 @@
  * on stderr. A `--json` field `gh` does not know exits 1 with
  * `Unknown JSON field: "<name>"` followed by the list of fields.
  *
+ * `--commit` was read off `gh` 2.102.0 on 2026-10-12 against
+ * `open-tomato/rafa`, read-only, with `--repo`, on `stretch/5` while its
+ * newest runs were of `fb9abe9c` and an older one of `7ade9b90`:
+ *
+ *   - `gh` takes `--commit` beside `--branch`, and both filter. With
+ *     `--branch stretch/5 --commit 7ade9b90... --limit 1` it answered
+ *     that commit's run, not the branch's newest. With `--branch
+ *     stretch/4` and the same commit it answered `[]`; with no
+ *     `--branch`, that run and one of the same commit on `stretch/101`.
+ *   - A full sha with no run answers `[]` and exit 0, beside `--branch`,
+ *     beside `--branch` and `--workflow`, and alone.
+ *   - A sha that is not 40 characters matches nothing: the abbreviated
+ *     `7ade9b9` answered `[]` and exit 0, as did `nothex`. The match is
+ *     on the whole sha, in either case: the 40 characters in upper case
+ *     answered the run, its `headSha` in lower case.
+ *   - `--workflow` beside `--commit` filters as it does without it, and
+ *     a workflow the repository does not have still exits 1 with `could
+ *     not find any workflows named <name>`.
+ *   - Without `--limit`, every run of the commit on the branch comes
+ *     back, newest first: two for `fb9abe9c` (a `push` and a
+ *     `pull_request` run of `verify`), one for `7ade9b90`. So `--limit 1`
+ *     beside `--commit` answers the newest run of that commit.
+ *   - An empty `--commit ""` is no filter: `gh` answered the branch's
+ *     newest run. `--commit` as the last argument exits 1 with `flag
+ *     needs an argument: --commit` and the usage text.
+ *
  * ## Strict
  *
- * Only `run list` with `--branch`, `--workflow`, `--limit` and `--json`
- * is modelled. Any other command, flag, or a flag with no value is
- * refused with `ok` false and a message opening `fake gh:`, rather than
- * ignored, so a reader sending a flag nobody checked fails its case.
+ * Only `run list` with `--branch`, `--commit`, `--workflow`, `--limit`
+ * and `--json` is modelled. Any other command, flag, or a flag with no
+ * value is refused with `ok` false and a message opening `fake gh:`,
+ * rather than ignored, so a reader sending a flag nobody checked fails
+ * its case. An empty `--commit` is refused the same way, although `gh`
+ * takes it: there it silently reads the branch's newest run, which is
+ * the answer a reader asking by commit must never get.
  */
 import type { RunState } from './runs.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -69,7 +98,7 @@ export interface FakeRunsGh {
 }
 
 /** The flags `run list` is modelled with, each taking one value. */
-const FLAGS = new Set(['--branch', '--workflow', '--limit', '--json']);
+const FLAGS = new Set(['--branch', '--commit', '--workflow', '--limit', '--json']);
 
 /**
  * A fake holding `runs`, and every workflow named by one of them plus
@@ -106,9 +135,13 @@ function answer(args: readonly string[], runs: readonly FakeRun[], workflows: Re
   const limit = Number(flags.get('--limit') ?? '20');
   if (!Number.isSafeInteger(limit) || limit < 1) return refused(`--limit ${flags.get('--limit')} is not a positive integer`);
 
+  const commit = flags.get('--commit')?.toLowerCase();
+  if (commit === '') return refused('--commit "" is empty, which gh reads as no filter');
+
   const branch = flags.get('--branch');
   const rows = [...runs]
     .filter((run) => (branch === undefined || run.headBranch === branch) && (workflow === undefined || run.workflowName === workflow))
+    .filter((run) => commit === undefined || run.headSha.toLowerCase() === commit)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit)
     .map((run) => pick(run, fields));

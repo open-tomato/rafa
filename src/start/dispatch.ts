@@ -99,7 +99,7 @@ import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
-import type { PlanInjection } from '../plan/index.js';
+import type { InjectionRequest, PlanInjection } from '../plan/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskReportRecord } from '../report/record.js';
 import type { SuiteFailure } from '../suite/run.js';
@@ -213,6 +213,12 @@ export interface TaskDispatchOptions {
    * share of it {@link TaskDispatchOptions.inject} names.
    */
   planContent: string;
+  /**
+   * Where the task sits in the plan, and what it names when it is a
+   * repair: `injectionPlace` of `start/loop-events.ts` reads both off
+   * the tracker. Left out, the task is located by its text alone.
+   */
+  place?: Pick<InjectionRequest, 'position' | 'repairs'>;
   /**
    * How much of the plan the session is handed. Required rather than
    * defaulted: a default here would be a second one beside
@@ -607,6 +613,7 @@ export async function dispatchTask(
     mode: options.inject,
     plan: options.planContent,
     task: taskInfo,
+    ...options.place,
   });
   if (injection.fallback !== null) {
     activeOutput().warn(`   Injection: \`${injection.requested}\` not rendered: ${injection.fallback.text}.`);

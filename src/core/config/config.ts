@@ -236,6 +236,7 @@ export type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
   PrerequisiteKind,
+  PrerequisiteScope,
 } from './config-items.js';
 export { MODULE_SOURCE_KINDS, PREREQUISITE_KINDS } from './config-items.js';
 

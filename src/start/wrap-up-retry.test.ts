@@ -11,6 +11,12 @@
  * `pr.base: integration` resolves it, and the cases read that the
  * session `retryWrapUp` spawns is handed the same base.
  *
+ * Every case builds under `gh`, the provider a retry is spawned under:
+ * `runWrapUp` delivers nothing, so retries nothing, under `none`. One
+ * case reads that the provider is handed on all the same, a prompt
+ * built under `none` holding no `gh pr` (#977), with the `gh` prompt as
+ * its control.
+ *
  * `retryWrapUp` is driven through a stand-in spawner with no learning
  * and no serving, so no session, git or `gh` is reached: the cases read
  * the prompt it spawned, the directory it spawned in, and the message it
@@ -28,7 +34,7 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import { withStamp } from './stamp.js';
 import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';
 import { buildWrapUpRetryPrompt, missingPullRequestBullet, retryWrapUp } from './wrap-up-retry.js';
-import { buildWrapUpPrompt } from './wrap-up.js';
+import { buildWrapUpPrompt, NO_PULL_REQUEST_BULLET } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
 const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
@@ -54,6 +60,7 @@ function retryPrompt(previousMessage: string = MESSAGE): string {
     branch: BRANCH,
     base: BASE,
     planContent: PLAN,
+    provider: 'gh',
     release: null,
     lessons: [],
     previousMessage,
@@ -69,7 +76,7 @@ describe('the retry wrap-up prompt', () => {
   });
 
   test('says the pull request is missing, naming the branch, where the first prompt does not', () => {
-    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
+    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, 'gh', null);
 
     expect(retryPrompt()).toContain(`The pull request is MISSING. An earlier wrap-up session on this run ended, and no open pull request exists for ${BRANCH}.`);
     expect(first).not.toContain('MISSING');
@@ -139,11 +146,32 @@ describe('the retry wrap-up prompt', () => {
     expect(prompt).not.toContain('is already open for');
   });
 
+  test('hands the provider on, so a prompt built under none holds no `gh pr`', () => {
+    const underNone = buildWrapUpRetryPrompt({
+      branch: BRANCH,
+      base: BASE,
+      planContent: PLAN,
+      provider: 'none',
+      release: null,
+      lessons: [],
+      previousMessage: 'Pushed the branch.',
+    });
+
+    expect(underNone).not.toContain('gh pr');
+    expect(underNone).toContain(NO_PULL_REQUEST_BULLET);
+
+    // The control: the same retry under `gh` holds the create bullet,
+    // so the absence above is the provider's.
+    expect(retryPrompt('Pushed the branch.')).toContain('gh pr create');
+    expect(retryPrompt('Pushed the branch.')).not.toContain(NO_PULL_REQUEST_BULLET);
+  });
+
   test('names the base it is handed, not a default', () => {
     const onMain = buildWrapUpRetryPrompt({
       branch: BRANCH,
       base: 'main',
       planContent: PLAN,
+      provider: 'gh',
       release: null,
       lessons: [],
       previousMessage: MESSAGE,
@@ -165,11 +193,12 @@ describe('the retry wrap-up prompt', () => {
       notesLevel: null,
       problems: [],
     };
-    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, skipped, []);
+    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, 'gh', null, skipped, []);
     const retry = buildWrapUpRetryPrompt({
       branch: BRANCH,
       base: BASE,
       planContent: PLAN,
+      provider: 'gh',
       release: skipped,
       lessons: [],
       previousMessage: MESSAGE,
@@ -196,10 +225,10 @@ describe('the retry wrap-up prompt\'s files red only in a suite step', () => {
   }]);
 
   test('carries the section the first wrap-up prompt carries, since the retry is the session that opens the pull request', () => {
-    const retry = buildWrapUpRetryPrompt({ branch: BRANCH, base: BASE, planContent: PLAN, release: null, lessons: [], previousMessage: MESSAGE, stepOnly: items });
+    const retry = buildWrapUpRetryPrompt({ branch: BRANCH, base: BASE, planContent: PLAN, provider: 'gh', release: null, lessons: [], previousMessage: MESSAGE, stepOnly: items });
 
     expect(retry).toContain(stepOnlySection(items).join('\n'));
-    expect(retry.split('\n')[0]).toBe(buildWrapUpPrompt(BRANCH, BASE, PLAN).split('\n')[0] ?? '');
+    expect(retry.split('\n')[0]).toBe(buildWrapUpPrompt(BRANCH, BASE, PLAN, 'gh').split('\n')[0] ?? '');
   });
 
   test('carries none when the run holds no such file', () => {
@@ -235,6 +264,7 @@ describe('retryWrapUp', () => {
       branch: BRANCH,
       base: BASE,
       planContent: PLAN,
+      provider: 'gh',
       settingSources: ['project'],
       serving: null,
       learning: null,

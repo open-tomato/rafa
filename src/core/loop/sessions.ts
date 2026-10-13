@@ -119,6 +119,17 @@
  *     written right after `newFailures`. Every other step carries no
  *     `stepOnly` key, and an entry outside that shape is left out on
  *     read, never refused, as an unknown `reason` is.
+ *   - `outsideCase`: only on a step whose run exited nonzero and listed
+ *     no failing case (`start/suite-outside-case.ts`), `true`, with
+ *     `outputTail` right after it: the last non-blank lines of that
+ *     run's stderr (`SuiteResult.outputTail`, `suite/run.ts`), which is
+ *     the evidence of a run the JUnit report says nothing about; the
+ *     list is empty when the run printed none. The pair is written
+ *     after `stepOnly`. Every other step carries neither key, so it is
+ *     written byte for byte as it was before them. On read an
+ *     `outsideCase` that is not `true` is left out with the tail, never
+ *     refused, as an unknown `reason` is, and a tail that is no list of
+ *     strings reads as empty.
  *   - `interrupted`: only on a step the runner read as a stop rather than
  *     a suite's answer, `true`: its `bun test` ended on SIGINT, or the
  *     runner received SIGINT while it ran (`start/suite-step.ts`). Its
@@ -299,6 +310,10 @@ export interface SessionStep {
   readonly newFailures: readonly SuiteFailure[];
   /** The files red in the step and green alone; left out of a step with none. See the module note. */
   readonly stepOnly?: readonly SessionStepOnly[];
+  /** `true` on a step whose run exited nonzero and listed no failing case; left out of every other. See the module note. */
+  readonly outsideCase?: true;
+  /** The last lines of that run's stderr; only beside {@link SessionStep.outsideCase}. */
+  readonly outputTail?: readonly string[];
   /** `true` on a step read as a stop on SIGINT; left out of every other. See the module note. */
   readonly interrupted?: true;
 }

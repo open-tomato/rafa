@@ -120,6 +120,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'PrerequisiteItem',
     'PrerequisiteKind',
     'PrerequisiteReminder',
+    'PrerequisiteScope',
     'PrerequisiteSettings',
     'PrerequisiteTag',
     'ProbeOptions',

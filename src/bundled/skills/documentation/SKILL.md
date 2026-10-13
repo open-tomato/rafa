@@ -30,7 +30,7 @@ Two kinds of documentation are maintained:
 | **API (Swagger)** | `@asteasolutions/zod-to-openapi` + `swagger-ui-express` | `openapi.json` + served behind `ctx.requireAuth` at `GET /docs/` | `bun run docs:openapi` |
 
 > Both rows are INSTALLED in `@ar/service` — the OpenAPI half is no longer a
-> convention to adopt on some later day, and [`rules/openapi.md`](rules/openapi.md)
+> convention to adopt on some later day, and this skill
 > records what is there rather than a setup to perform. The two scripts are
 > SIBLINGS sharing no output tree, which is worth stating because the pair of
 > names suggests they do: `docs:openapi` writes the gitignored `.docs/swagger/`,
@@ -43,16 +43,6 @@ Two kinds of documentation are maintained:
 
 Manual documentation (ADRs, design notes) lives in `docs/` and is never gitignored.
 Auto-generated outputs go in `.docs/` (dotfolder) and are always gitignored.
-
----
-
-## Rules index
-
-| Rule file | When to use |
-| --- | --- |
-| [`rules/tsdoc.md`](rules/tsdoc.md) | Writing TSDoc comments on any TypeScript symbol |
-| [`rules/openapi.md`](rules/openapi.md) | Documenting Express routes with OpenAPI/Swagger |
-| [`rules/typedoc-setup.md`](rules/typedoc-setup.md) | Adding TypeDoc infra to the repo (or a project derived from it) |
 
 ---
 
@@ -72,7 +62,7 @@ Before marking a documentation task done:
 - [ ] Every exported function, class, and interface has a TSDoc block with `@param` and `@returns`.
 - [ ] Every file has a `@packageDocumentation` comment (or is covered by a module-level JSDoc).
 - [ ] Every Express router factory is documented with `@remarks` listing its HTTP endpoints.
-- [ ] `typedoc.json`, `tsconfig.docs.json`, and a `docs:generate` script exist (see [`rules/typedoc-setup.md`](rules/typedoc-setup.md)).
+- [ ] `typedoc.json`, `tsconfig.docs.json`, and a `docs:generate` script exist.
 - [ ] `openapi.ts` exists and every route is registered in it — `openapi-coverage.test.ts` is the gate that says so, and a route added without a binding-table entry reddens it.
 - [ ] `.docs/` is already gitignored twice over and needs no new entry: once at the repo root (`.gitignore`) and again at the package (`packages/service/.gitignore`), both files tracked. Running `git check-ignore -v` on the generated `openapi.json` names the PACKAGE rule, the nearer file winning — take the source off that output rather than predicting it.
 - [ ] `docs/` (manual ADRs) is **not** gitignored.

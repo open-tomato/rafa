@@ -1,8 +1,8 @@
 /**
- * `./cleanup-render.ts` over hand-built readings — the five groups'
+ * `./cleanup-render.ts` over hand-built readings — the six groups'
  * lines, the empty groups, the notes, the column padding, the Stale
- * row's remote delete line, the run records' rows and the JSON data —
- * and once over the
+ * row's remote delete line, the run records' rows, the rows of the
+ * branches only on `origin` and the JSON data — and once over the
  * scratch repository, where the line a Stale row names is run against
  * the bare remote.
  *
@@ -14,12 +14,19 @@
  * remote is read BEFORE the line runs and does list it, so a line that
  * deleted nothing, or a remote that never held the branch, would
  * redden the case.
+ *
+ * The Only on origin cases read against each other: a row with commits
+ * the base holds no copy of and a row whose every commit has one are
+ * rendered by the same function and must differ in the count they show,
+ * and the scratch reading lists that group empty, so a renderer that
+ * printed a remote-only row for every reading would redden it.
  */
 import type {
   CleanupRead,
   LocalBranch,
   MergedRow,
   NotPushedRow,
+  RemoteOnlyRow,
   RunRow,
   StaleRow,
   WorktreeRow,
@@ -28,7 +35,7 @@ import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
+import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
@@ -42,6 +49,7 @@ import {
   cleanupDate,
   cleanupNameWidth,
   remoteDeleteLine,
+  remoteOnlyRowLine,
   renderCleanup,
   runRowLine,
   worktreeRowLine,
@@ -99,6 +107,28 @@ const RUN: RunRow = {
   ticked: true,
 };
 
+/** A branch only on `origin` holding three commits, two of them with no patch-equal copy on the base. */
+const REMOTE_ONLY: RemoteOnlyRow = {
+  group: 'remote-only',
+  name: 'fix/replaced',
+  lastCommit: OLD,
+  commits: 3,
+  uncopied: 2,
+  ticked: false,
+  reason: remoteOnlyReason(2, 3, 'main'),
+};
+
+/** A branch only on `origin` whose every commit has a patch-equal copy on the base. */
+const REMOTE_COPIED: RemoteOnlyRow = {
+  group: 'remote-only',
+  name: 'fix/old',
+  lastCommit: WHEN,
+  commits: 2,
+  uncopied: 0,
+  ticked: false,
+  reason: remoteOnlyReason(0, 2, 'main'),
+};
+
 function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
   return {
     ok: true,
@@ -108,6 +138,7 @@ function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
     stale: [STALE],
     notPushed: [NOT_PUSHED],
     worktrees: [WORKTREE],
+    remoteOnly: [],
     runs: [],
     notes: [],
     ...overrides,
@@ -177,10 +208,24 @@ describe('row lines', () => {
   it('pads the name to the width it is given', () => {
     expect(branchRowLine(NOT_PUSHED, 6)).toBe('wip     2026-09-20  no upstream; 2 commits not on any remote');
   });
+
+  it('shows a branch only on origin as its name, its tip\'s date and how many commits have no copy on the base', () => {
+    expect(remoteOnlyRowLine(REMOTE_ONLY)).toBe('fix/replaced  2026-06-26  2 of 3 commits with no patch-equal copy on origin/main');
+  });
+
+  it('says every commit has a copy for a branch only on origin whose count is zero', () => {
+    expect(remoteOnlyRowLine(REMOTE_COPIED)).toBe('fix/old  2026-09-20  every commit has a patch-equal copy on origin/main (2 commits)');
+    expect(remoteOnlyRowLine(REMOTE_COPIED)).not.toContain('with no patch-equal copy');
+  });
+
+  it('names no command on the row of a branch only on origin, and pads its name to the width given', () => {
+    expect(remoteOnlyRowLine(REMOTE_ONLY)).not.toContain('git push');
+    expect(remoteOnlyRowLine(REMOTE_COPIED, 12)).toStartWith('fix/old       2026-09-20  ');
+  });
 });
 
 describe('renderCleanup', () => {
-  it('lists the five groups in order, each heading with its count and one line per row', () => {
+  it('lists the six groups in order, each heading with its count and one line per row', () => {
     const read = reading({ worktrees: [] });
     const width = cleanupNameWidth(read, 'branches');
     expect(width).toBe('old-idea'.length);
@@ -195,28 +240,51 @@ describe('renderCleanup', () => {
       `  ${NO_ROWS_TEXT}`,
       'Run records (0)',
       `  ${NO_ROWS_TEXT}`,
+      'Only on origin (0)',
+      `  ${NO_ROWS_TEXT}`,
     ]);
   });
 
-  it('lists the run records last, one line per record, under a heading counting them', () => {
+  it('lists the run records after the worktrees, one line per record, under a heading counting them', () => {
     const second: RunRow = { ...RUN, sessionId: 'e5f6a7b8', path: '/repo/.rafa/runs/e5f6a7b8.json', eventsPath: null };
     const read = reading({ worktrees: [], runs: [RUN, second] });
     const width = cleanupNameWidth(read, 'runs');
     expect(width).toBe(RUN.plan.length);
-    expect(renderCleanup(read).slice(-3)).toEqual([
+    expect(renderCleanup(read).slice(-5, -2)).toEqual([
       `${CLEANUP_GROUP_TITLES.runs} (2)`,
       `  ${runRowLine(RUN, width)}`,
       `  ${runRowLine(second, width)}`,
     ]);
   });
 
+  it('lists the branches only on origin last, one line per branch, each with its copy count', () => {
+    const read = reading({ runs: [RUN], remoteOnly: [REMOTE_COPIED, REMOTE_ONLY] });
+    const width = cleanupNameWidth(read, 'remoteOnly');
+    expect(width).toBe(REMOTE_ONLY.name.length);
+    expect(renderCleanup(read).slice(-3)).toEqual([
+      `${CLEANUP_GROUP_TITLES.remoteOnly} (2)`,
+      `  fix/old       2026-09-20  ${remoteOnlyReason(0, 2, 'main')}`,
+      `  fix/replaced  2026-06-26  ${remoteOnlyReason(2, 3, 'main')}`,
+    ]);
+  });
+
+  it('pads the branches only on origin to their own column, which no local branch row shares', () => {
+    const long: RemoteOnlyRow = { ...REMOTE_ONLY, name: `fix/${'r'.repeat(40)}` };
+    const without = renderCleanup(reading());
+    const withLong = renderCleanup(reading({ remoteOnly: [long] }));
+    expect(cleanupNameWidth(reading({ remoteOnly: [long] }), 'branches')).toBe('old-idea'.length);
+    expect(withLong.slice(0, -2)).toEqual(without.slice(0, -2));
+    expect(withLong.at(-1)).toBe(`  ${remoteOnlyRowLine(long)}`);
+  });
+
   it('pads each kind of row, branches, worktree paths and plans, to its own column', () => {
-    const lines = renderCleanup(reading({ runs: [RUN] })).filter((line) => line.startsWith('  '));
-    expect(lines).toHaveLength(5);
+    const lines = renderCleanup(reading({ runs: [RUN], remoteOnly: [REMOTE_ONLY] })).filter((line) => line.startsWith('  '));
+    expect(lines).toHaveLength(6);
     const dateColumn = (line: string): number => line.search(/\d{4}-\d{2}-\d{2}/);
     expect(lines.slice(0, 3).map(dateColumn)).toEqual([2 + 'old-idea'.length + 2, 2 + 'old-idea'.length + 2, 2 + 'old-idea'.length + 2]);
     expect(dateColumn(lines[3] ?? '')).toBe(2 + WORKTREE.path.length + 2);
     expect(dateColumn(lines[4] ?? '')).toBe(2 + RUN.plan.length + 2);
+    expect(dateColumn(lines[5] ?? '')).toBe(2 + REMOTE_ONLY.name.length + 2);
   });
 
   it('keeps a 100-character worktree path from widening a branch row past its name, date and reason', () => {
@@ -242,9 +310,10 @@ describe('renderCleanup', () => {
 
   it('measures 0 for a kind with no rows', () => {
     expect(cleanupNameWidth(reading(), 'runs')).toBe(0);
+    expect(cleanupNameWidth(reading(), 'remoteOnly')).toBe(0);
   });
 
-  it('names all five groups when every one is empty', () => {
+  it('names all six groups when every one is empty', () => {
     const lines = renderCleanup(reading({ merged: [], stale: [], notPushed: [], worktrees: [] }));
     expect(lines).toEqual([
       `${CLEANUP_GROUP_TITLES.merged} (0)`,
@@ -257,8 +326,12 @@ describe('renderCleanup', () => {
       `  ${NO_ROWS_TEXT}`,
       `${CLEANUP_GROUP_TITLES.runs} (0)`,
       `  ${NO_ROWS_TEXT}`,
+      `${CLEANUP_GROUP_TITLES.remoteOnly} (0)`,
+      `  ${NO_ROWS_TEXT}`,
     ]);
     expect(CLEANUP_GROUP_TITLES.runs).toBe('Run records');
+    expect(CLEANUP_GROUP_TITLES.remoteOnly).toBe('Only on origin');
+    expect(Object.keys(CLEANUP_GROUP_TITLES)).toEqual(['merged', 'stale', 'notPushed', 'worktrees', 'runs', 'remoteOnly']);
   });
 
   it('puts the notes first, one line each', () => {
@@ -269,7 +342,7 @@ describe('renderCleanup', () => {
 
 describe('cleanupData', () => {
   it('carries every row with its dates as ISO strings, its reason and its default tick', () => {
-    expect(cleanupData(reading({ notes: ['a note'], runs: [RUN] }))).toEqual({
+    expect(cleanupData(reading({ notes: ['a note'], runs: [RUN], remoteOnly: [REMOTE_ONLY] }))).toEqual({
       base: 'main',
       fetched: true,
       counts: { merged: 1, stale: 1, notPushed: 1, worktrees: 1 },
@@ -317,8 +390,29 @@ describe('cleanupData', () => {
         startedAt: '2026-08-01T23:30:00.000Z',
         ticked: true,
       }],
+      remoteOnly: [{
+        name: 'fix/replaced',
+        lastCommit: '2026-06-26T23:59:59.000Z',
+        commits: 3,
+        uncopied: 2,
+        reason: '2 of 3 commits with no patch-equal copy on origin/main',
+        ticked: false,
+      }],
       notes: ['a note'],
     });
+  });
+
+  it('carries an empty remoteOnly for a reading that lists no branch only on origin', () => {
+    expect(cleanupData(reading()).remoteOnly).toEqual([]);
+  });
+
+  it('carries every branch only on origin unticked, and leaves them out of the counts', () => {
+    const data = cleanupData(reading({ remoteOnly: [REMOTE_ONLY, REMOTE_COPIED] }));
+    expect(data.remoteOnly.map((row) => [row.name, row.uncopied, row.commits, row.ticked])).toEqual([
+      ['fix/replaced', 2, 3, false],
+      ['fix/old', 0, 2, false],
+    ]);
+    expect(data.counts).toEqual({ merged: 1, stale: 1, notPushed: 1, worktrees: 1 });
   });
 
   it('answers null for a pull request and a modification time that are absent', () => {
@@ -337,7 +431,7 @@ describe('cleanupData', () => {
   });
 
   it('survives a JSON round trip unchanged', () => {
-    const data = cleanupData(reading({ runs: [{ ...RUN, eventsPath: null }] }));
+    const data = cleanupData(reading({ runs: [{ ...RUN, eventsPath: null }], remoteOnly: [REMOTE_COPIED] }));
     expect(JSON.parse(JSON.stringify(data))).toEqual(data);
   });
 });
@@ -384,7 +478,9 @@ describe('the scratch repository', () => {
       'Not pushed (1)',
       `Worktrees (${String(read.worktrees.length)})`,
       'Run records (0)',
+      'Only on origin (0)',
     ]);
+    expect(lines.slice(-2)).toEqual(['Only on origin (0)', `  ${NO_ROWS_TEXT}`]);
     expect(lines).toContain(`  ${branchRowLine(read.stale[0] as StaleRow, cleanupNameWidth(read, 'branches'))}`);
   });
 

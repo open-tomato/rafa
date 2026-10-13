@@ -185,6 +185,9 @@ being asked to read `progress.txt` and decide.
      carries it.
 
 5. A missing answer is reported in the PR body, but does not block the PR.
+   Under `pr.provider: none` no pull request is looked up: the line is
+   printed with the provider as the reason, and the lessons stay in the
+   library.
 
 6. With nothing promotable, the `## Lessons to promote` section is
    absent, and neither is `rafa:promoted`.

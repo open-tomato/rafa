@@ -1,4 +1,5 @@
 import type { InstallOutcome, InstallSeams } from './install.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import {
   chmodSync,
@@ -50,6 +51,13 @@ import {
  * Where a case asserts nothing was left beside the version's directory,
  * it reads the runtime root, which the staging and outgoing directories
  * would be in.
+ *
+ * Whether a loop of the checkout is live is the case's own answer: the
+ * harness hands the install a `liveLoops` seam answering the records it
+ * was given, none unless the case names some, and records each root the
+ * seam was read with. The two cases reading the default seam plant a
+ * session record under the checkout's `.rafa/runs/` instead, the live one
+ * naming this test process's own pid.
  */
 
 const FENCE = '```';
@@ -61,6 +69,18 @@ const BUILT: Readonly<Record<string, string>> = {
   'PROMPT.md': 'the new prompt\n',
   'index-new1234.js': 'export const chunk = 1;\n',
   'plan/index.js': 'export const plan = 1;\n',
+};
+
+/** A loop of the planted checkout that reads as live, as the `liveLoops` seam answers one. */
+const LIVE_LOOP: SessionRecord = {
+  sessionId: 'live',
+  planStub: 'running',
+  plan: '.rafa/plans/PLAN-running.md',
+  branch: 'feat/running',
+  pid: 4242,
+  startedAt: '2026-10-12T10:00:00.000Z',
+  state: 'running',
+  task: null,
 };
 
 let base = '';
@@ -147,14 +167,21 @@ interface Harness {
   builds: string[];
   out: string[];
   warnings: string[];
+  /** The root of every reading of the live loops the run made. */
+  loopReads: string[];
 }
 
-/** Seams over `world`, recording builds and output, after asserting every path is under the case's own directory. */
-function harness(world: World, build: (root: string) => number): Harness {
+/**
+ * Seams over `world`, recording builds, output and each reading of the
+ * live loops, which answers `loops`, after asserting every path is under
+ * the case's own directory.
+ */
+function harness(world: World, build: (root: string) => number, loops: readonly SessionRecord[] = []): Harness {
   expectUnderBase(world.repoRoot, world.home, world.binDir, world.linkPath);
   const builds: string[] = [];
   const out: string[] = [];
   const warnings: string[] = [];
+  const loopReads: string[] = [];
   return {
     seams: {
       repoRoot: world.repoRoot,
@@ -165,11 +192,27 @@ function harness(world: World, build: (root: string) => number): Harness {
       },
       log: (line) => out.push(line),
       warn: (line) => warnings.push(line),
+      liveLoops: (root) => {
+        loopReads.push(root);
+        return loops;
+      },
     },
     builds,
     out,
     warnings,
+    loopReads,
   };
+}
+
+/** The seams of `run` with no `liveLoops`, so the install reads the default: the records under the checkout. */
+function withDefaultLoops(run: Harness): InstallSeams {
+  const { repoRoot, home, build, log, warn } = run.seams;
+  return { repoRoot, home, build, log, warn };
+}
+
+/** Writes a session record under the checkout's `.rafa/runs/`, as `loop start` would. */
+function plantRecord(world: World, record: SessionRecord): void {
+  writeFile(world.repoRoot, join('.rafa', 'runs', `${record.sessionId}.json`), [JSON.stringify(record, null, 2)]);
 }
 
 /**
@@ -211,13 +254,13 @@ function plantRuntime(world: World): void {
   writeFileSync(join(world.runtimeDir, 'plan', 'marker.txt'), 'planted\n');
 }
 
-describe('installRuntime refuses while a tracker in plan.dir has a task left', () => {
+describe('installRuntime refuses while a tracker in plan.dir has a task left and a loop is live', () => {
   it('refuses on an open task, building, copying and linking nothing', () => {
     const world = plantWorld();
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-running.md', ['# Tracker', '- [x] a finished task', '- [ ] a task left']);
     // A dist an earlier build left, which a run that did not refuse could copy.
     writeDist(world.repoRoot);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
     const before = fingerprint(base);
 
     const outcome = installRuntime(run.seams);
@@ -236,10 +279,14 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
     expect(fingerprint(base)).toEqual(before);
     expect(existsSync(world.linkPath)).toBe(false);
     expect(existsSync(world.runtimeDir)).toBe(false);
+    expect(run.loopReads).toEqual([world.repoRoot]);
+    expect(run.warnings).toEqual([]);
     expect(outcomeProblem(outcome, world.repoRoot)).toEqual([
-      'REFUSED — 1 plan tracker(s) in .rafa/plans still hold a task, and a loop may be running from the runtime this would replace:',
+      'REFUSED — 1 plan tracker(s) in .rafa/plans still hold a task while a loop of this project is live,'
+        + ' and a live loop runs from the runtime this would replace:',
       `  ${join('.rafa', 'plans', 'PLAN_TRACKER-running.md')}:3  [ ] a task left`,
-      'nothing was built, copied or linked. Finish those plans, then run it again.',
+      'nothing was built, copied or linked. Wait for every live loop to finish,'
+        + ' or run it again with --force to install under them.',
     ]);
   });
 
@@ -247,7 +294,7 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
     const world = plantWorld();
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER.md', ['- [x] a finished task', '- [BLOCKED] a blocked task']);
     writeDist(world.repoRoot);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
     const before = fingerprint(base);
 
     const outcome = installRuntime(run.seams);
@@ -269,7 +316,7 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-blocked.md', ['- [BLOCKED] a blocked task']);
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-finished.md', ['- [x] a finished task']);
     writeFile(world.repoRoot, '.rafa/plans/PLAN-open.md', ['- [ ] a plan line, which is no tracker']);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
 
     const outcome = installRuntime(run.seams);
 
@@ -289,16 +336,157 @@ describe('installRuntime refuses while a tracker in plan.dir has a task left', (
 
     // The control: the same line outside a block is a task left.
     writeFile(world.repoRoot, tracker, ['- [x] a finished task', '', '- [ ] a body line']);
-    const outside = harness(world, cleanBuild);
+    const outside = harness(world, cleanBuild, [LIVE_LOOP]);
     expect(installRuntime(outside.seams).kind).toBe('refused');
     expect(outside.builds).toEqual([]);
 
     writeFile(world.repoRoot, tracker, ['- [x] a finished task', '', `${FENCE}rafa:context`, '- [ ] a body line', FENCE]);
-    const inside = harness(world, cleanBuild);
+    const inside = harness(world, cleanBuild, [LIVE_LOOP]);
     const outcome = installRuntime(inside.seams);
 
     expect(outcome.kind).toBe('done');
     expect(inside.builds).toEqual([world.repoRoot]);
+    expect(inside.warnings).toEqual([]);
+  });
+});
+
+describe('installRuntime beside a tracker with a task left', () => {
+  /** Two trackers with a task left, one open and one blocked, beside a finished one. */
+  function plantOpenTrackers(world: World): void {
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-open.md', ['# Tracker', '- [x] a finished task', '- [ ] an open task']);
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-blocked.md', ['- [BLOCKED] a blocked task']);
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-finished.md', ['- [x] a finished task']);
+  }
+
+  /** The one warning an install that goes on writes over {@link plantOpenTrackers}. */
+  const WARNING = 'installing with 2 plan tracker(s) in .rafa/plans still holding a task: '
+    + `${join('.rafa', 'plans', 'PLAN_TRACKER-blocked.md')}:1, ${join('.rafa', 'plans', 'PLAN_TRACKER-open.md')}:3`;
+
+  it('installs with no live loop, warning once with every open tracker named', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    const run = harness(world, cleanBuild);
+
+    const outcome = expectDone(installRuntime(run.seams));
+
+    expect(exitCodeFor(outcome)).toBe(EXIT_DONE);
+    expect(run.builds).toEqual([world.repoRoot]);
+    expect(run.loopReads).toEqual([world.repoRoot]);
+    expect(run.warnings).toEqual([WARNING]);
+    expect(realpathSync(world.linkPath)).toBe(join(world.runtimeDir, 'cli.js'));
+    expect(outcomeProblem(outcome, world.repoRoot)).toBeNull();
+  });
+
+  it('refuses under a live loop without force, building nothing and warning of nothing', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
+    const before = fingerprint(base);
+
+    const outcome = installRuntime(run.seams);
+
+    expect(refusedPaths(outcome)).toEqual([
+      join('.rafa', 'plans', 'PLAN_TRACKER-blocked.md'),
+      join('.rafa', 'plans', 'PLAN_TRACKER-open.md'),
+    ]);
+    expect(exitCodeFor(outcome)).toBe(EXIT_REFUSED);
+    expect(run.builds).toEqual([]);
+    expect(run.warnings).toEqual([]);
+    expect(fingerprint(base)).toEqual(before);
+    const lines = outcomeProblem(outcome, world.repoRoot) ?? [];
+    expect(lines[0]).toContain('while a loop of this project is live');
+    expect(lines.join('\n')).not.toContain('may be running');
+    expect(lines.at(-1)).toContain('run it again with --force');
+  });
+
+  it('installs under a live loop when forced, with the same one warning', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
+
+    // The control: the same world, unforced, refuses and builds nothing.
+    expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'trackers' });
+    expect(run.builds).toEqual([]);
+    expect(run.warnings).toEqual([]);
+
+    const outcome = expectDone(installRuntime(run.seams, { force: true }));
+
+    expect(exitCodeFor(outcome)).toBe(EXIT_DONE);
+    expect(run.builds).toEqual([world.repoRoot]);
+    expect(run.warnings).toEqual([WARNING]);
+    expect(realpathSync(world.linkPath)).toBe(join(world.runtimeDir, 'cli.js'));
+    // Forced, no answer would change what it does, so the control's reading is the only one.
+    expect(run.loopReads).toEqual([world.repoRoot]);
+  });
+
+  it('warns of nothing with no open tracker, and never reads the live loops', () => {
+    const world = plantWorld();
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-finished.md', ['- [x] a finished task']);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
+
+    expect(installRuntime(run.seams).kind).toBe('done');
+    expect(run.warnings).toEqual([]);
+    expect(run.loopReads).toEqual([]);
+
+    // The control: one open task in the same tracker, and the same seams read the loops and refuse.
+    writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-finished.md', ['- [ ] a task left']);
+    expect(installRuntime(run.seams, { force: false })).toMatchObject({ kind: 'refused', reason: 'trackers' });
+    expect(run.loopReads).toEqual([world.repoRoot]);
+  });
+
+  it('warns of nothing when the install then refuses for the runtime already there', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    plantRuntime(world);
+    const run = harness(world, cleanBuild);
+
+    expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
+    expect(run.warnings).toEqual([]);
+    expect(run.builds).toEqual([]);
+
+    // The control: forced past the runtime, the same world installs and warns.
+    expect(installRuntime(run.seams, { force: true }).kind).toBe('done');
+    expect(run.warnings).toEqual([WARNING]);
+  });
+
+  it('reads the records under the checkout when the seams name no reading, this process reading as live', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    const run = harness(world, cleanBuild);
+
+    // The control: a record that is done names no live loop, whatever its pid.
+    plantRecord(world, { ...LIVE_LOOP, pid: process.pid, state: 'done' });
+    expect(installRuntime(withDefaultLoops(run)).kind).toBe('done');
+    expect(run.warnings).toEqual([WARNING]);
+    rmSync(world.runtimeDir, { recursive: true, force: true });
+
+    plantRecord(world, { ...LIVE_LOOP, pid: process.pid });
+    const outcome = installRuntime(withDefaultLoops(run));
+
+    expect(outcome).toMatchObject({ kind: 'refused', reason: 'trackers' });
+    expect(run.builds).toEqual([world.repoRoot]);
+    expect(run.loopReads).toEqual([]);
+  });
+
+  it('exits 2 when a loop record cannot be read, touching nothing', () => {
+    const world = plantWorld();
+    plantOpenTrackers(world);
+    writeFile(world.repoRoot, '.rafa/runs/broken.json', ['not json']);
+    writeDist(world.repoRoot);
+    const run = harness(world, cleanBuild);
+    const before = fingerprint(base);
+
+    const outcome = installRuntime(withDefaultLoops(run));
+
+    expect(outcome).toMatchObject({ kind: 'failed', stage: 'loops' });
+    expect(exitCodeFor(outcome)).toBe(EXIT_COULD_NOT_RUN);
+    expect(run.builds).toEqual([]);
+    expect(run.warnings).toEqual([]);
+    expect(fingerprint(base)).toEqual(before);
+    const lines = outcomeProblem(outcome, world.repoRoot) ?? [];
+    expect(lines[0]).toStartWith('FAIL — loops: ');
+    expect(lines[0]).toContain('broken.json');
+    expect(lines[1]).toBe('nothing was built, copied or linked.');
   });
 });
 
@@ -338,17 +526,17 @@ describe('installRuntime refuses a version already installed', () => {
     expect(run.builds).toEqual([]);
   });
 
-  it('names the trackers first when a tracker also has a task left', () => {
+  it('names the trackers first when a tracker also has a task left under a live loop', () => {
     const world = plantWorld();
     plantRuntime(world);
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-running.md', ['- [ ] a task left']);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
 
     expect(installRuntime(run.seams)).toMatchObject({ kind: 'refused', reason: 'trackers' });
 
     // The control: with the tracker finished, the same world refuses for the runtime.
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-running.md', ['- [x] a task done']);
-    expect(installRuntime(harness(world, cleanBuild).seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
+    expect(installRuntime(harness(world, cleanBuild, [LIVE_LOOP]).seams)).toMatchObject({ kind: 'refused', reason: 'runtime-exists' });
   });
 });
 
@@ -420,12 +608,13 @@ describe('where installRuntime looks for trackers', () => {
     writeFile(world.repoRoot, '.plans/PLAN_TRACKER-a.md', ['- [ ] an open task in .plans']);
 
     // The control: with no config, plan.dir is .rafa/plans, and a tracker in .plans is not looked at.
-    const unconfigured = harness(world, cleanBuild);
+    const unconfigured = harness(world, cleanBuild, [LIVE_LOOP]);
     expect(installRuntime(unconfigured.seams).kind).toBe('done');
+    expect(unconfigured.warnings).toEqual([]);
 
     writeFile(world.repoRoot, '.rafa/config.yaml', ['plan:', '  dir: .plans']);
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-b.md', ['- [ ] an open task in the default']);
-    const configured = harness(world, cleanBuild);
+    const configured = harness(world, cleanBuild, [LIVE_LOOP]);
     const outcome = installRuntime(configured.seams);
 
     expect(outcome).toMatchObject({ kind: 'refused', planDir: join(world.repoRoot, '.plans') });
@@ -438,7 +627,7 @@ describe('where installRuntime looks for trackers', () => {
     const world = plantWorld();
     writeFile(world.home, '.rafa/config.yaml', ['plan:', '  dir: user-plans']);
     writeFile(world.repoRoot, 'user-plans/PLAN_TRACKER-u.md', ['- [ ] an open task']);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
 
     const outcome = installRuntime(run.seams);
 
@@ -449,13 +638,15 @@ describe('where installRuntime looks for trackers', () => {
     const world = plantWorld();
     writeFile(world.repoRoot, 'PLAN_TRACKER.md', ['- [ ] an open task at the root']);
     writeFile(world.repoRoot, '.rafa/plans/archive/PLAN_TRACKER-old.md', ['- [ ] an open task below plan.dir']);
-    const run = harness(world, cleanBuild);
+    const run = harness(world, cleanBuild, [LIVE_LOOP]);
 
     expect(installRuntime(run.seams).kind).toBe('done');
+    expect(run.warnings).toEqual([]);
 
     // The control: the same tracker directly in plan.dir refuses.
     writeFile(world.repoRoot, '.rafa/plans/PLAN_TRACKER-old.md', ['- [ ] an open task below plan.dir']);
-    expect(refusedPaths(installRuntime(harness(world, cleanBuild).seams))).toEqual([join('.rafa', 'plans', 'PLAN_TRACKER-old.md')]);
+    expect(refusedPaths(installRuntime(harness(world, cleanBuild, [LIVE_LOOP]).seams)))
+      .toEqual([join('.rafa', 'plans', 'PLAN_TRACKER-old.md')]);
   });
 });
 

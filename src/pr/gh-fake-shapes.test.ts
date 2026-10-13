@@ -88,6 +88,30 @@ describe('the pull request a --json read answers', () => {
     expect(renderPull(pull(), ['mergedAt'], REPO)).toEqual({ mergedAt: null });
   });
 
+  it('writes the head as the one commit of the list, in the recorded key order, under its own oid', () => {
+    const rendered = renderPull(pull({ headCommittedAt: '2026-09-26T04:46:04Z' }), ['commits', 'headRefOid'], REPO);
+    const commits = rendered['commits'] as Record<string, unknown>[];
+
+    expect(commits).toHaveLength(1);
+    expect(Object.keys(commits[0] ?? {})).toEqual([
+      'authoredDate',
+      'authors',
+      'committedDate',
+      'messageBody',
+      'messageHeadline',
+      'oid',
+    ]);
+    expect(commits[0]).toMatchObject({
+      committedDate: '2026-09-26T04:46:04Z',
+      oid: rendered['headRefOid'],
+      authors: [{ email: 'octo@users.noreply.github.com', login: 'octo', name: 'Octo Cat' }],
+    });
+  });
+
+  it('writes no commit for a head whose date is null', () => {
+    expect(renderPull(pull({ headCommittedAt: null }), ['commits'], REPO)).toEqual({ commits: [] });
+  });
+
   it('writes a person as id, is_bot, login and name, and a bot as is_bot and login alone', () => {
     const person = renderPull(pull(), ['author'], REPO)['author'];
     const bot = renderPull(
@@ -386,6 +410,7 @@ describe('the pull request a seed fills out', () => {
       author: { login: 'octo', isBot: false, name: 'Octo Cat' },
       headRefName: 'feat/pr-21',
       headRefOid: '0000000000000000000000000000000000000021',
+      headCommittedAt: '2026-09-18T11:00:00Z',
       baseRefName: 'main',
       isCrossRepository: false,
       state: 'MERGED',
@@ -405,6 +430,12 @@ describe('the pull request a seed fills out', () => {
       .toBe('2026-09-20T08:00:00Z');
     expect(fillSeed({ number: 3 }).mergedAt).toBeNull();
     expect(fillSeed({ number: 3, state: 'CLOSED' }).mergedAt).toBeNull();
+  });
+
+  it('commits the head at the seed\'s updatedAt, and at the instant a seed names instead', () => {
+    expect(fillSeed({ number: 3, updatedAt: '2026-09-20T09:00:00Z' }).headCommittedAt).toBe('2026-09-20T09:00:00Z');
+    expect(fillSeed({ number: 3, headCommittedAt: '2026-10-12T11:59:59Z' }).headCommittedAt).toBe('2026-10-12T11:59:59Z');
+    expect(fillSeed({ number: 3, headCommittedAt: null }).headCommittedAt).toBeNull();
   });
 
   it('keeps a mergedAt the seed names over the one its state would give', () => {

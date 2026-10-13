@@ -12,9 +12,11 @@
  * {@link fakeClock}: a counter `clock` reads and `sleep` advances by the
  * milliseconds it was asked to wait. So a poll that takes three rounds
  * and a deadline that passes are measured in microseconds, and the
- * sleeps are a reading of their own — a `none` verdict is held to ONE
- * poll and NO sleep, which is what "it answers at once rather than
- * waiting out the deadline" means.
+ * sleeps are a reading of their own — a `none` verdict on a head with
+ * no committed time, or one past the grace, is held to ONE poll and NO
+ * sleep, which is what "it answers at once rather than waiting out the
+ * deadline" means, and the same pull request on a head committed a
+ * second ago is held to the polls the grace asks for.
  *
  * The cases that dispatch the command run it from a project of its own
  * beside a home of its own under this file's temporary directory
@@ -42,11 +44,26 @@
  * records the refusal, so a `comment` or a `merge` would show; and the
  * `<n>` case asserts the log holds NO `findOpen`, so "the number on the
  * line is used instead of the branch" is measured too.
+ *
+ * The same log holds the two `get` reads apart: one ahead of the poll,
+ * for the head's committed time, on every run; and one at a `none`
+ * ending alone, for whether the head conflicts. The conflict line is
+ * asserted PRESENT on a detail reading `conflicting` and ABSENT on each
+ * of the other two readings, so neither assertion can pass on a report
+ * that always or never prints it; and one case plants a first detail
+ * that does not conflict and a second that does, so the line is shown
+ * to come from the read at the ending.
  */
 import type { PrWaitReading, PrWaitSeams } from './wait.js';
 import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
-import type { CheckRow, ChecksReading, PullRequests, PullRequestSummary } from '../../pr/index.js';
+import type {
+  CheckRow,
+  ChecksReading,
+  PullRequestDetail,
+  PullRequests,
+  PullRequestSummary,
+} from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -55,7 +72,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { PR_NEEDS_GH } from '../../pr/index.js';
+import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
@@ -112,6 +129,7 @@ function reading(over: Partial<PrWaitReading> = {}): PrWaitReading {
     elapsedMs: 20_000,
     polls: 2,
     timeoutMs: 20 * 60_000,
+    conflicting: false,
     ...over,
   };
 }
@@ -136,6 +154,40 @@ function summary(): PullRequestSummary {
   };
 }
 
+/**
+ * The pull request as `get` answers it: no committed time for its head,
+ * so no grace, and a head that merges, unless `over` says otherwise.
+ */
+function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
+  return {
+    ...summary(),
+    body: '',
+    headRefOid: '5f2c1d9a7b3e4c6d8f0a1b2c3d4e5f6a7b8c9d0e',
+    headCommittedAt: null,
+    mergeable: 'mergeable',
+    mergeStateStatus: 'CLEAN',
+    labels: [],
+    closes: [],
+    ...over,
+  };
+}
+
+/** The instant the grace cases start their clock at: 2026-10-12T12:00:00Z. */
+const NOON = Date.UTC(2026, 9, 12, 12);
+
+/** The ISO 8601 instant `ms` milliseconds before {@link NOON}, as a provider writes a committed date. */
+function committed(msBeforeNoon: number): string {
+  return new Date(NOON - msBeforeNoon).toISOString();
+}
+
+/** The line a `none` ending prints under the rows when the head conflicts. */
+const CONFLICT_LINE = '#41 does not merge cleanly, so no run is scheduled for it;'
+  + ' run rafa pr show 41 to see its merge state.';
+
+/** The line a `none` ending prints under the rows when it does not. */
+const ASK_AGAIN_LINE = 'No check has registered on #41; run rafa pr wait 41 to ask again,'
+  + ' or rafa pr show 41 to see the pull request.';
+
 /** A checks reading over `rows`, with the verdict a case wants read. */
 function checksOf(rows: readonly CheckRow[], verdict: ChecksReading['verdict']): ChecksReading {
   return { rows, verdict };
@@ -151,9 +203,9 @@ interface FakeClock {
   readonly sleeps: () => readonly number[];
 }
 
-/** A clock starting at zero that only the sleeps move. */
-function fakeClock(): FakeClock {
-  let ms = 0;
+/** A clock starting at `start`, zero when left out, that only the sleeps move. */
+function fakeClock(start = 0): FakeClock {
+  let ms = start;
   let waits: readonly number[] = [];
   return {
     clock: () => ms,
@@ -173,11 +225,34 @@ interface CaseProvider {
   readonly sent: () => readonly string[];
 }
 
-/** A provider answering `findOpen` and `checks`, one reading per poll, refusing every other member. */
-function pollingPulls(polls: readonly ChecksReading[], found: PullRequestSummary | null = summary()): CaseProvider {
+/** What a case plants beyond the polls. */
+interface Planted {
+  /** What `findOpen` answers. The open pull request of the branch when left out. */
+  readonly found?: PullRequestSummary | null;
+  /** What `get` answers, one per read and the last one again after that. {@link detail} when left out. */
+  readonly details?: readonly (PullRequestDetail | null)[];
+}
+
+/**
+ * A provider answering `findOpen`, `get` and `checks`, one reading per
+ * poll, refusing every other member.
+ */
+function pollingPulls(polls: readonly ChecksReading[], planted: Planted = {}): CaseProvider {
   let asked = 0;
+  let read = 0;
+  const found = planted.found === undefined
+    ? summary()
+    : planted.found;
+  const details = planted.details ?? [detail()];
   const double = createPullRequestsDouble({
     findOpen: () => Promise.resolve(found),
+    get: () => {
+      const answer = details[Math.min(read, details.length - 1)];
+      read += 1;
+      return answer === undefined
+        ? Promise.reject(new Error('the case planted no detail'))
+        : Promise.resolve(answer);
+    },
     checks: () => {
       const answer = polls[Math.min(asked, polls.length - 1)];
       asked += 1;
@@ -279,15 +354,36 @@ describe('the report', () => {
     expect(lines.at(-1)).toBe('Failing: gates — run rafa pr triage 41 to assess it.');
   });
 
-  it('says a pull request with no checks at all may be one that does not merge', () => {
+  it('words a pull request with no checks as no check registered yet, and names how to ask again', () => {
     const none = reading({ verdict: 'none', rows: [], polls: 1, elapsedMs: 0 });
 
     expect(linesOf(renderWait(none))).toEqual([
-      'checks none on #41 — nothing reported — 1 poll in 0s',
+      'checks none on #41 — no check registered yet — 1 poll in 0s',
       '   (no checks reported)',
-      'A pull request that does not merge cleanly schedules no run at all;'
-        + ' run rafa pr show 41 to see whether it merges.',
+      ASK_AGAIN_LINE,
     ]);
+    expect(renderWait(none)).not.toContain('merge cleanly');
+    expect(renderWait(none)).not.toContain('nothing reported');
+  });
+
+  it('says a pull request with no checks does not merge cleanly only when it conflicts', () => {
+    const conflicting = reading({ verdict: 'none', rows: [], polls: 1, elapsedMs: 0, conflicting: true });
+
+    expect(linesOf(renderWait(conflicting))).toEqual([
+      'checks none on #41 — no check registered yet — 1 poll in 0s',
+      '   (no checks reported)',
+      CONFLICT_LINE,
+    ]);
+    expect(CONFLICT_LINE).toContain('merge cleanly');
+    expect(ASK_AGAIN_LINE).not.toContain('merge cleanly');
+  });
+
+  it('calls a deadline that passed with no check at all checks that have not started', () => {
+    const late = reading({ verdict: 'timeout', rows: [], polls: 3, elapsedMs: 40_000, timeoutMs: 60_000 });
+    const lines = linesOf(renderWait(late));
+
+    expect(lines[0]).toBe('checks not started on #41 — no check registered yet — 3 polls in 40s');
+    expect(lines.at(-1)).toBe('Waited the 1 min this run was given; run rafa pr wait 41 again to keep waiting.');
   });
 
   it('calls a deadline that passed checks still running, and names the minutes it waited', () => {
@@ -363,18 +459,123 @@ describe('the poll, over an injected clock', () => {
       `   pass    gates — SUCCESS (${RUN_URL})`,
     ]);
     expect(clock.sleeps()).toEqual([CI_POLL_INTERVAL_MS]);
-    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'checks 41', 'checks 41']);
+    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'get 41', 'checks 41', 'checks 41']);
   });
 
-  it('answers a pull request with no checks at once, asking once and sleeping never', async () => {
+  it('answers a pull request with no checks at once when its head carries no time, sleeping never', async () => {
     const clock = fakeClock();
     const provider = pollingPulls([checksOf([], 'none')]);
     const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject());
 
     expect(run.exitCode).toBe(1);
-    expect(run.stderr).toContain('checks none on #41 — nothing reported — 1 poll in 0s');
+    expect(run.stderr).toContain('checks none on #41 — no check registered yet — 1 poll in 0s');
+    expect(run.stderr).toContain(ASK_AGAIN_LINE);
+    expect(run.stderr).not.toContain('merge cleanly');
     expect(clock.sleeps()).toEqual([]);
-    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'checks 41']);
+    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'get 41', 'checks 41', 'get 41']);
+  });
+
+  it('answers at once for a head committed the whole grace ago', async () => {
+    const clock = fakeClock(NOON);
+    const provider = pollingPulls(
+      [checksOf([], 'none')],
+      { details: [detail({ headCommittedAt: committed(FIRST_CHECK_GRACE_MS) })] },
+    );
+    const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('checks none on #41 — no check registered yet — 1 poll in 0s');
+    expect(clock.sleeps()).toEqual([]);
+  });
+
+  it('polls a head committed a second ago until its first check registers, then reports green', async () => {
+    const clock = fakeClock(NOON);
+    const provider = pollingPulls(
+      [checksOf([], 'none'), checksOf([], 'none'), checksOf([row()], 'green')],
+      { details: [detail({ headCommittedAt: committed(1_000) })] },
+    );
+    const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject());
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(linesOf(run.stdout.trimEnd())).toEqual([
+      'Waiting for the checks of #41, up to 20 min.',
+      '   [0s] pending — 0 check(s)',
+      '   [20s] pending — 0 check(s)',
+      '   [40s] green — 1 check(s)',
+      'checks green on #41 — 1 check — 3 polls in 40s',
+      `   pass    gates — SUCCESS (${RUN_URL})`,
+    ]);
+    expect(clock.sleeps()).toEqual([CI_POLL_INTERVAL_MS, CI_POLL_INTERVAL_MS]);
+    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'get 41', 'checks 41', 'checks 41', 'checks 41']);
+  });
+
+  it('waits out the grace on a young head that never gets a check, then exits 1 with no conflict line', async () => {
+    const clock = fakeClock(NOON);
+    const provider = pollingPulls(
+      [checksOf([], 'none')],
+      { details: [detail({ headCommittedAt: committed(1_000), mergeable: 'unknown' })] },
+    );
+    const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('checks none on #41 — no check registered yet — 7 polls in 120s');
+    expect(run.stderr).toContain(ASK_AGAIN_LINE);
+    expect(run.stderr).not.toContain('merge cleanly');
+    expect(clock.sleeps()).toEqual(Array.from({ length: 6 }, () => CI_POLL_INTERVAL_MS));
+  });
+
+  it('prints the does-not-merge-cleanly line when the detail read at the ending says conflicting', async () => {
+    const clock = fakeClock();
+    const provider = pollingPulls(
+      [checksOf([], 'none')],
+      { details: [detail({ mergeable: 'unknown' }), detail({ mergeable: 'conflicting', mergeStateStatus: 'DIRTY' })] },
+    );
+    const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(CONFLICT_LINE);
+    expect(run.stderr).not.toContain(ASK_AGAIN_LINE);
+    expect(provider.sent()).toEqual(['get 41', 'checks 41', 'get 41']);
+  });
+
+  it.each(['mergeable', 'unknown'] as const)(
+    'prints no does-not-merge-cleanly line for a detail reading %s',
+    async (mergeable) => {
+      const provider = pollingPulls([checksOf([], 'none')], { details: [detail({ mergeable })] });
+      const { run } = await ran(caseSeams(provider.pulls, fakeClock()).seams, freshProject(), ['41']);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain(ASK_AGAIN_LINE);
+      expect(run.stderr).not.toContain('merge cleanly');
+    },
+  );
+
+  it('reads the detail once more only at a none ending, never on a red or a green one', async () => {
+    const red = pollingPulls([checksOf([row({ state: 'FAILURE', outcome: 'fail' })], 'red')]);
+    const green = pollingPulls([checksOf([row()], 'green')]);
+
+    await ran(caseSeams(red.pulls, fakeClock()).seams, freshProject(), ['41']);
+    await ran(caseSeams(green.pulls, fakeClock()).seams, freshProject(), ['41']);
+
+    expect([red.sent(), green.sent()]).toEqual([['get 41', 'checks 41'], ['get 41', 'checks 41']]);
+  });
+
+  it('waits with no grace on a number the provider holds no pull request under, leaving the refusal to the checks read', async () => {
+    const provider = pollingPulls([checksOf([], 'none')], { details: [null] });
+    const { run } = await ran(caseSeams(provider.pulls, fakeClock(NOON)).seams, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('checks none on #41 — no check registered yet — 1 poll in 0s');
+    expect(run.stderr).not.toContain('merge cleanly');
+  });
+
+  it('reads a committed date that is no time as no head time', async () => {
+    const clock = fakeClock(NOON);
+    const provider = pollingPulls([checksOf([], 'none')], { details: [detail({ headCommittedAt: 'yesterday' })] });
+    const { run } = await ran(caseSeams(provider.pulls, clock).seams, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(clock.sleeps()).toEqual([]);
   });
 
   it('reports a red pull request on stderr and exits 1, having asked once', async () => {
@@ -387,7 +588,7 @@ describe('the poll, over an injected clock', () => {
     expect(run.stderr).toContain('checks red on #41 — 1 check — 1 poll in 0s');
     expect(run.stderr).toContain('Failing: gates — run rafa pr triage 41 to assess it.');
     expect(run.stdout).not.toContain('checks red');
-    expect(provider.sent()).toEqual(['checks 41']);
+    expect(provider.sent()).toEqual(['get 41', 'checks 41']);
   });
 
   it('gives up at the deadline the line asked for, exits 3, and says how long it waited', async () => {
@@ -416,6 +617,7 @@ describe('the poll, over an injected clock', () => {
       elapsedMs: 0,
       polls: 1,
       timeoutMs: DEFAULT_WAIT_TIMEOUT_MIN * 60_000,
+      conflicting: false,
       exitCode: 0,
     });
     expect((dataOf(events) as { text: string }).text).toContain('checks green on #41');
@@ -461,7 +663,7 @@ describe('the refusals', () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain('Waiting for the checks of #41, up to 7 min.');
-    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'checks 41']);
+    expect(provider.sent()).toEqual([`findOpen ${BRANCH}`, 'get 41', 'checks 41']);
   });
 
   it('refuses a project whose provider is not gh with exit code 2 and the shared message', async () => {
@@ -474,7 +676,7 @@ describe('the refusals', () => {
   });
 
   it('refuses a branch with no open pull request, naming the branch and pointing at pr list', async () => {
-    const provider = pollingPulls([checksOf([], 'none')], null);
+    const provider = pollingPulls([checksOf([], 'none')], { found: null });
     const { run } = await ran(caseSeams(provider.pulls, fakeClock()).seams, freshProject());
 
     expect(run.exitCode).toBe(1);
@@ -485,6 +687,7 @@ describe('the refusals', () => {
 
   it('refuses with what the provider said when the checks could not be read', async () => {
     const double = createPullRequestsDouble({
+      get: () => Promise.resolve(detail()),
       checks: () => Promise.reject(new Error('gh pull requests: gh pr checks 41 failed: could not connect')),
     });
     const { run } = await ran(caseSeams(double.pulls, fakeClock()).seams, freshProject(), ['41']);
@@ -494,6 +697,19 @@ describe('the refusals', () => {
       '❌ Could not read the checks of pull request #41:'
         + ' gh pull requests: gh pr checks 41 failed: could not connect',
     );
+  });
+
+  it('refuses with what the provider said when the pull request could not be read, asking for no check', async () => {
+    const double = createPullRequestsDouble({
+      get: () => Promise.reject(new Error('gh pull requests: gh pr view 41 failed: could not connect')),
+    });
+    const { run } = await ran(caseSeams(double.pulls, fakeClock()).seams, freshProject(), ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(
+      '❌ Could not read pull request #41: gh pull requests: gh pr view 41 failed: could not connect',
+    );
+    expect(double.sent()).toEqual(['get 41']);
   });
 });
 

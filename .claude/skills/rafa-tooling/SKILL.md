@@ -48,6 +48,9 @@ goes one of three ways, and the first that matches wins.
 3. **You ask first.** A write nobody asked for, such as moving an issue or
    posting a comment: ask once, then run it as in 2.
 
+`rafa pr close` asks before it closes, so pass `--yes` only for a close the
+user asked for in this conversation. Any other close is case 3.
+
 A user message that is only a rafa line (`rafa next --roadmap`) means "run
 this". Run it when it fits case 2. When it needs a terminal, run its
 `--dry-run` form if it has one, show what it would do, and hand the line
@@ -197,6 +200,9 @@ Each row pairs the verbose command with the rafa line that replaces it.
 | `gh issue comment 12 --body …` | `rafa issue comment 12 --body=…` |
 | `gh issue close 12`, label edits for state | `rafa issue move 12 done` |
 | `gh issue edit 12 --body-file …` | `rafa issue edit 12 --append-file=<file> --reason=<text>` |
+| `gh issue edit 12 --add-label priority:… --remove-label needs-triage` | `rafa issue edit 12 --priority=<priority>` |
+| `gh pr close 41 --comment …` | `rafa pr close 41 --reason=<text>` |
+| `git cherry` + `git push origin --delete <branch>` | `rafa cleanup` (the remote-only group) |
 | `gh issue edit 12 --add-label epic:… --remove-label epic:…` | `rafa epic move 12 --to=<epic>` |
 | `gh pr view --json … \| jq …` for the current branch | `rafa pr current` |
 | `gh pr view 41 --json closingIssuesReferences`, `gh pr checks 41` | `rafa pr show 41` |

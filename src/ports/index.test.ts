@@ -123,6 +123,13 @@
  * is refused either way. `OpenIssue` left unexported reddened the name
  * list and the unknown-type call, which names it.
  *
+ * `createdAt` arrived on `OpenIssue` on 2026-10-12 with one refusal, of
+ * a tracker whose open issues carry none, and a null one in the
+ * conforming probe's reader. One mutation of the entry was driven that
+ * day against this file, at 40 pass unmutated, restored from a scratch
+ * copy and verified with `sha256sum -c`: `createdAt` made optional
+ * reddened that refusal alone.
+ *
  * The optional `editable` and `edit` pair arrived on 2026-10-06 with
  * the names `EditableIssue` and `IssueEdit`, a third tracker in the
  * conforming probe that implements the pair, a call writing a body, a
@@ -134,6 +141,13 @@
  * `editable` made required reddened the clean probe and the refusal of
  * a tracker with no `transition`, whose readings it changed.
  * `EditableIssue` left unexported reddened the name list alone.
+ *
+ * A priority arrived on the pair on 2026-10-13: an optional `priority`
+ * on `EditableIssue` and a third member of the `IssueEdit` union. The
+ * conforming probe gained a fourth tracker, whose `editable` answers a
+ * priority, and a call writing a priority alone, beside a title and
+ * beside both, and two refusals arrived: an edit naming a priority the
+ * port does not hold, and an `editable` answering one.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -275,7 +289,7 @@ function trackerLiteral(kind: string, transition: string | null, openIssues: str
 }
 
 /** An `openIssues` answering one open issue of the type it is handed. */
-const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b" }]';
+const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b", createdAt: null }]';
 
 /**
  * A tracker literal as {@link trackerLiteral} writes it, under `name`,
@@ -292,6 +306,9 @@ function editingTrackerLiteral(editable: string, edit: string, name = 'tracker')
 
 /** An `editable` answering every field the port names. */
 const EDITABLE = 'async (ref) => ({ ref, title: "t", body: "b", open: true, labels: ["spec:ready"], author: "" })';
+
+/** An `editable` answering a priority beside every field the port names. */
+const EDITABLE_WITH_PRIORITY = 'async (ref) => ({ ref, title: "t", body: "b", open: true, labels: [], author: "", priority: null })';
 
 /** An `edit` that writes nothing. */
 const EDIT = 'async () => {}';
@@ -315,10 +332,16 @@ const CONFORMING_PROBE = probeSource(
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
   ...trackerLiteral('"local"', 'async () => ({})', OPEN_ISSUES, 'reader'),
   ...editingTrackerLiteral(EDITABLE, EDIT, 'editor'),
+  ...editingTrackerLiteral(EDITABLE_WITH_PRIORITY, EDIT, 'prioritiser'),
   'export async function rewrite(tracker: P.Tracker, ref: P.IssueRef): Promise<void> {',
   '  await tracker.edit?.(ref, { body: "b" });',
   '  await tracker.edit?.(ref, { title: "t" });',
   '  await tracker.edit?.(ref, { body: "b", title: "t" });',
+  '  await tracker.edit?.(ref, { priority: "high" });',
+  '  await tracker.edit?.(ref, { title: "t", priority: "low" });',
+  '  await tracker.edit?.(ref, { body: "b", title: "t", priority: "urgent" });',
+  '  const held: P.IssuePriority | null | undefined = (await tracker.editable?.(ref))?.priority;',
+  '  void held;',
   '}',
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
@@ -444,10 +467,21 @@ const REFUSALS: readonly Refusal[] = [
     source: probeSource(...trackerLiteral(
       '"local"',
       'async () => ({})',
-      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t" }]',
+      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t", createdAt: null }]',
     )),
     code: 2322,
     names: 'Property \'body\' is missing',
+  },
+  {
+    title: 'a tracker whose open issues carry no createdAt',
+    file: 'tracker-open-issues-no-created-at.ts',
+    source: probeSource(...trackerLiteral(
+      '"local"',
+      'async () => ({})',
+      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t", body: "b" }]',
+    )),
+    code: 2322,
+    names: 'Property \'createdAt\' is missing',
   },
   {
     title: 'a tracker whose openIssues accepts less than the port hands it',
@@ -501,6 +535,27 @@ const REFUSALS: readonly Refusal[] = [
     ),
     code: 2345,
     names: 'IssueEdit',
+  },
+  {
+    title: 'an edit naming a priority the port does not hold',
+    file: 'tracker-unknown-priority-edit.ts',
+    source: probeSource(
+      'export async function escalate(tracker: P.Tracker, ref: P.IssueRef): Promise<void> {',
+      '  await tracker.edit?.(ref, { priority: "p0" });',
+      '}',
+    ),
+    code: 2322,
+    names: '"p0"',
+  },
+  {
+    title: 'a tracker whose editable answers a priority the port does not hold',
+    file: 'tracker-editable-unknown-priority.ts',
+    source: probeSource(...editingTrackerLiteral(
+      'async (ref) => ({ ref, title: "t", body: "b", open: true, labels: [], author: "", priority: "p0" })',
+      EDIT,
+    )),
+    code: 2322,
+    names: 'Types of property \'priority\' are incompatible',
   },
   {
     title: 'a tracker kind that is not a string',

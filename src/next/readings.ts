@@ -18,18 +18,38 @@
  * {@link openWorld} answers a {@link NextWorld} of functions, every one
  * of them memoised ({@link once}). The table is ordered, so a state an
  * early row settles never spends what a later one would have: a loop
- * that is running is answered out of `.rafa/runs/` alone, with no git,
- * no provider and no board asked at all. The provider is reached from
- * row 5 on, and the board from row 10 on.
+ * that is running in the main checkout is answered out of `.rafa/runs/`
+ * alone, with no git, no provider and no board asked at all. The
+ * provider is reached from row 5 on, and the board from row 10 on.
  *
  * {@link NextWorld.tracked} and {@link NextWorld.checkout} are the two
- * readings the table does not own: `./preconditions.ts` makes them once
- * row 1 has found no live run and ahead of every other row, for the
- * pre-condition that stops the table on a working tree with changes to
- * tracked files. The first is one `git status --porcelain` at the
- * project root, and the second, `git rev-parse --show-toplevel` there,
- * is asked only once the first has found a change, to name the checkout
- * the changes were read in. Neither asks anything of the network.
+ * readings the table does not own: `./preconditions.ts` makes them for
+ * the pre-condition that stops the table on a working tree with changes
+ * to tracked files, ahead of every row but row 1, and ahead of row 1 too
+ * unless {@link NextWorld.liveRunHoldsTree} says a live run works in
+ * that tree. The first is one `git status --porcelain` at the project
+ * root, and the second, `git rev-parse --show-toplevel` there, names the
+ * checkout the changes were read in. Neither asks anything of the
+ * network.
+ *
+ * ## Which live run holds the tree
+ *
+ * A run's edits land in its checkout, and its record says which that is
+ * (`src/loop/sessions.ts`, `src/start/session.ts`): a record with no
+ * `worktree` key ran with the project root as its checkout, and one
+ * carrying the key names the working tree it ran in, as git spelled its
+ * top level. {@link NextWorld.liveRunHoldsTree} reads that over every
+ * live record ({@link holdsTree}): true for a record with no `worktree`,
+ * with no git asked, since the project root is where the tree is read;
+ * and true for a record whose `worktree` is the checkout
+ * {@link NextWorld.checkout} names, which is how a project root that
+ * sits below its repository's top level reads its own loop. A record
+ * naming any other working tree holds a tree nobody read here.
+ *
+ * So the checkout is named at most once per answer, and from one of two
+ * places: by this reading, when live runs all carry a `worktree`, or by
+ * the tree line once the tree has shown a change. With no live run and a
+ * clean tree it is never asked.
  *
  * The board is asked from the BASE BRANCH alone, because every row that
  * reads it names the base. So `rafa next` on a plan branch spends no
@@ -270,6 +290,13 @@ export interface NextWorld {
   readonly branch: () => string;
   /** The session record whose run has not ended, or null when no record has one. */
   readonly liveRun: () => SessionRecord | null;
+  /**
+   * True when a live run works in the checkout {@link NextWorld.tracked}
+   * is read in, so the changes there are a loop's and not the person's.
+   * False with no live run, and when every live run works in a worktree
+   * of its own. See the module note.
+   */
+  readonly liveRunHoldsTree: () => boolean;
   /** How the base stands against its remote, or null when that could not be read. */
   readonly standing: () => BaseStanding | null;
   /** The tracked paths the working tree has changes to, in git's order. */
@@ -395,6 +422,22 @@ export function readCheckout(sources: NextSources, note: Note): string | null {
     : gitSaid(result);
   note(`the checkout the working tree was read in could not be named: ${why}`);
   return null;
+}
+
+/**
+ * True when one of the `live` runs works in the checkout the tree is
+ * read in: a record with no `worktree`, whose checkout is the project
+ * root, or one whose `worktree` is the top level `checkout` names.
+ *
+ * `checkout` is asked only when every live record carries a `worktree`,
+ * so a run in the main checkout, and no live run at all, cost no git.
+ * The two paths are compared as written: both are git's own spelling of
+ * a top level (`src/start/checkout.ts`, `src/start/worktree.ts`). A
+ * checkout that could not be named matches no record.
+ */
+export function holdsTree(live: readonly SessionRecord[], checkout: () => string | null): boolean {
+  return live.some((record) => record.worktree === undefined)
+    || live.some((record) => record.worktree === checkout());
 }
 
 /** Every branch ref this clone and the remote hold, each half that failed noted. */
@@ -550,15 +593,17 @@ export function openWorld(sources: NextSources): NextWorld {
     reading.problems.forEach((problem) => note(problem));
     return reading;
   });
+  const checkout = once(() => readCheckout(sources, note));
 
   return {
     sources,
     remote,
     branch,
     liveRun: once(() => runs().find((record) => isLive(record)) ?? null),
+    liveRunHoldsTree: once(() => holdsTree(runs().filter((record) => isLive(record)), checkout)),
     standing: once(() => readStanding(sources, remote, note)),
     tracked: once(() => readTracked(sources, note)),
-    checkout: once(() => readCheckout(sources, note)),
+    checkout,
     branchPlan: once(() => readBranchPlan(branch(), plans())),
     unstartedPlan: once(() => plans()
       .find((plan) => !hasRun(runs(), plan.stub) && !hasStartedBranch(sources, remote, refs(), plan.stub, note)) ?? null),

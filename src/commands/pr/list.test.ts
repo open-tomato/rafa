@@ -137,6 +137,7 @@ function stubPulls(answers: StubAnswers = {}): PullRequests {
       ...summary({ number }),
       body: '',
       headRefOid: 'abc',
+      headCommittedAt: null,
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],

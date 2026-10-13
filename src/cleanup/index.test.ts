@@ -4,12 +4,18 @@
  * `cleanupCounts` over its reading; then once over a real clone of a
  * bare remote, where the same branch is and is not `[gone]` depending
  * on whether the fetch was asked for, so the fetch is shown to change
- * the reading rather than assumed to.
+ * the reading rather than assumed to; and once over the scratch
+ * repository's remote-only set, so the rows `readCleanup` hands on are
+ * read from git itself.
+ *
+ * The scripted git throws on a call no case scripted, and by default it
+ * answers no branch under `refs/remotes/origin`: a case that scripts
+ * none of the remote-only calls past that listing proves none ran.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
 import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { SessionRecord } from '../core/loop/index.js';
-import type { MergedPullRequest } from '../pr/types.js';
+import type { MergedPullRequest, PullRequestSummary } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,6 +24,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '../claims/record.js';
 import { runsDir, sessionFilePath } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
@@ -25,6 +32,8 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { BRANCH_FORMAT } from './branches.js';
 import { unreachableNote } from './groups.js';
+import { openUnknownNote, openUnreadNote, REMOTE_BRANCH_FORMAT, remoteOnlyReason } from './remote-only.js';
+import { createScratchRepository, REMOTE_ONLY_BRANCHES, REMOTE_ONLY_COMMITS, SCRATCH_NOW } from './scratch-repository.js';
 import { GIT_DIR, WORKTREE_LIST, WORKTREE_STATUS } from './worktrees.js';
 
 import {
@@ -50,6 +59,14 @@ const FOR_EACH_REF = `for-each-ref --format=${BRANCH_FORMAT} refs/heads`;
 const MERGED_CALL = 'branch --merged refs/heads/main --format=%(refname:lstrip=2)';
 const COUNT_WIP = 'rev-list --count refs/heads/wip --not --remotes refs/heads/main --';
 const TIPS_CALL = 'for-each-ref --format=%(refname:lstrip=2)%09%(objectname) refs/heads';
+const REMOTES_CALL = `for-each-ref --format=${REMOTE_BRANCH_FORMAT} refs/remotes/origin`;
+const HEADS_CALL = 'for-each-ref --format=%(refname:lstrip=2) refs/heads';
+const REMOTE_MERGED_CALL = 'for-each-ref --merged=refs/remotes/origin/main --format=%(refname:lstrip=3) refs/remotes/origin';
+const WORKTREES_CALL = WORKTREE_LIST.join(' ');
+
+/** A branch on `origin` alone, and the `git cherry` call that counts its commits. */
+const ORPHAN = 'orphan';
+const CHERRY_ORPHAN = `cherry refs/remotes/origin/main refs/remotes/origin/${ORPHAN}`;
 
 /** One line of {@link BRANCH_FORMAT} output. */
 function ref(name: string, upstream: string, track: string, unix: number, head = ' '): string {
@@ -88,8 +105,62 @@ const ANSWERS: Readonly<Record<string, GitResult>> = {
   [FOR_EACH_REF]: said(BRANCHES),
   [MERGED_CALL]: said('done\n'),
   [COUNT_WIP]: said('2\n'),
-  [WORKTREE_LIST.join(' ')]: said(WORKTREES),
+  [WORKTREES_CALL]: said(WORKTREES),
+  [REMOTES_CALL]: said(''),
 };
+
+/** One line of {@link REMOTE_BRANCH_FORMAT} output for a branch, no symbolic ref. */
+function remoteRef(name: string, unix: number): string {
+  return `${name}\t${String(unix)}\t`;
+}
+
+/**
+ * The answers of a clone whose `origin` holds `names` beside `main` and
+ * the local branches, none of them merged into `origin/main`, and
+ * {@link ORPHAN} holding two commits, one with a copy on the base.
+ */
+function withRemoteOnly(...names: string[]): Record<string, GitResult> {
+  const remote = ['done', 'here', 'main', 'old', ...names].map((name) => remoteRef(name, OLD));
+  return {
+    [REMOTES_CALL]: said(`${remote.join('\n')}\n`),
+    [HEADS_CALL]: said('done\nhere\nmain\nold\nwip\n'),
+    [REMOTE_MERGED_CALL]: said('done\nmain\n'),
+    [CHERRY_ORPHAN]: said('- a1\n+ b2\n'),
+  };
+}
+
+/** The three calls `readClaimBranch` makes for `branch`, answering `message` as its one claim commit. */
+function claimCalls(branch: string, message: string): Record<string, GitResult> {
+  const tip = 'c'.repeat(40);
+  return {
+    [`rev-parse --verify --quiet refs/remotes/origin/${branch}^{commit}`]: said(`${tip}\n`),
+    [`log -1 --format=%ct ${tip}`]: said(`${String(OLD)}\n`),
+    [`log -z --reverse --regexp-ignore-case --fixed-strings --grep=rafa-claim --format=%H%n%B ${tip}`]:
+      said(`${'0'.repeat(40)}\n${message}`),
+  };
+}
+
+function openPull(number: number, headRefName: string): PullRequestSummary {
+  return {
+    number,
+    title: `pull request ${String(number)}`,
+    url: `https://example.test/pull/${String(number)}`,
+    state: 'open',
+    headRefName,
+    baseRefName: 'main',
+    author: { login: 'someone', isBot: false },
+    isCrossRepository: false,
+    updatedAt: '2026-09-01T10:00:00Z',
+  };
+}
+
+/** A provider with no merged pull request whose `list` answers `open`. */
+function provider(...open: PullRequestSummary[]): ReturnType<typeof createPullRequestsDouble> {
+  return createPullRequestsDouble({
+    listMerged: () => Promise.resolve([]),
+    list: () => Promise.resolve(open),
+  });
+}
 
 /** Seams answering `answers` in the command's directory, every call written to `log`. */
 function scripted(
@@ -182,12 +253,13 @@ describe('readCleanup over scripted seams', () => {
     const reading = await readCleanup(seams, settings());
     if (!reading.ok) throw new Error(reading.detail);
 
-    expect(log).toEqual([FETCH, SYMBOLIC_REF, FOR_EACH_REF, MERGED_CALL, COUNT_WIP, WORKTREE_LIST.join(' ')]);
+    expect(log).toEqual([FETCH, SYMBOLIC_REF, FOR_EACH_REF, MERGED_CALL, COUNT_WIP, WORKTREES_CALL, REMOTES_CALL]);
     expect(reading.fetched).toBe(true);
     expect(reading.base).toBe('main');
     expect(reading.merged.map((row) => [row.branch.name, row.reason])).toEqual([['done', 'merged into main']]);
     expect(reading.stale.map((row) => [row.branch.name, row.reason])).toEqual([['old', 'no commit in 90 days; merged state unknown']]);
     expect(reading.notPushed.map((row) => [row.branch.name, row.commits])).toEqual([['wip', 2]]);
+    expect(reading.remoteOnly).toEqual([]);
     expect(reading.notes).toEqual([]);
   });
 
@@ -306,6 +378,133 @@ describe('readCleanup over scripted seams', () => {
   });
 });
 
+describe('readCleanup remote-only branches', () => {
+  it('asks no provider and says nothing when origin holds no branch of its own', async () => {
+    const pulls = provider();
+    const { seams, log } = scripted({ [TIPS_CALL]: said('') }, pulls.pulls);
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toEqual([]);
+    expect(reading.notes).toEqual([]);
+    expect(pulls.sent()).toEqual(['listMerged']);
+    expect(log.at(-1)).toBe(REMOTES_CALL);
+  });
+
+  it('lists the unmerged branch only on origin, unticked, with its counts against the groups\' base', async () => {
+    const pulls = provider();
+    const { seams, log } = scripted({ [TIPS_CALL]: said(''), ...withRemoteOnly(ORPHAN) }, pulls.pulls);
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toEqual([{
+      group: 'remote-only',
+      name: ORPHAN,
+      lastCommit: new Date(OLD * 1000),
+      commits: 2,
+      uncopied: 1,
+      ticked: false,
+      reason: remoteOnlyReason(1, 2, 'main'),
+    }]);
+    expect(reading.notes).toEqual([]);
+    expect(pulls.sent()).toEqual(['listMerged', 'list']);
+    expect(log.slice(log.indexOf(WORKTREES_CALL) + 1))
+      .toEqual([REMOTES_CALL, HEADS_CALL, SYMBOLIC_REF, REMOTE_MERGED_CALL, CHERRY_ORPHAN]);
+  });
+
+  it('leaves the three branch groups and the worktrees as they read without it', async () => {
+    const without = await readCleanup(scripted({}, provider().pulls).seams, settings());
+    const withIt = await readCleanup(scripted(withRemoteOnly(ORPHAN), provider().pulls).seams, settings());
+    if (!without.ok) throw new Error(without.detail);
+    if (!withIt.ok) throw new Error(withIt.detail);
+
+    expect(withIt.remoteOnly.map((row) => row.name)).toEqual([ORPHAN]);
+    expect(withIt.merged).toEqual(without.merged);
+    expect(withIt.stale).toEqual(without.stale);
+    expect(withIt.notPushed).toEqual(without.notPushed);
+    expect(withIt.worktrees).toEqual(without.worktrees);
+  });
+
+  it('leaves out the head of an open pull request', async () => {
+    // Control: the same script lists the branch with no open pull request, two cases up.
+    const { seams, log } = scripted(withRemoteOnly(ORPHAN), provider(openPull(7, ORPHAN)).pulls);
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toEqual([]);
+    expect(reading.notes).toEqual([]);
+    expect(log).not.toContain(CHERRY_ORPHAN);
+  });
+
+  it('hands cleanup.keep on, so a kept branch only on origin is not listed', async () => {
+    const { seams } = scripted(withRemoteOnly(ORPHAN, 'release/1'), provider().pulls);
+    const reading = await readCleanup(seams, settings({ keep: ['release/*'] }));
+    if (!reading.ok) throw new Error(reading.detail);
+
+    // Unkept, `release/1` would reach a `git cherry` this script holds no answer for, and throw.
+    expect(reading.remoteOnly.map((row) => row.name)).toEqual([ORPHAN]);
+  });
+
+  it('lists nothing with no provider, and says in one note how many it withheld', async () => {
+    const { seams, log } = scripted(withRemoteOnly(ORPHAN, 'other'));
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toEqual([]);
+    expect(reading.notes).toEqual([openUnknownNote(2)]);
+    expect(log).not.toContain(CHERRY_ORPHAN);
+  });
+
+  it('puts its note after the fetch\'s and the groups\' and ahead of the run records\'', async () => {
+    const root = plantedRuns();
+    const broken = join(root, '.rafa', 'runs', 'broken.json');
+    writeFileSync(broken, 'not json');
+    const pulls = createPullRequestsDouble({
+      listMerged: () => Promise.reject(new Error('HTTP 502')),
+      list: () => Promise.reject(new Error('HTTP 503\nmore')),
+    });
+    const { seams } = scripted({ [FETCH]: refused('fatal: no route\n'), ...withRemoteOnly(ORPHAN) }, pulls.pulls);
+    const reading = await readCleanup(seams, settings({ projectRoot: root }));
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.notes.slice(0, 3)).toEqual([
+      fetchFailedNote('fatal: no route'),
+      unreachableNote('HTTP 502'),
+      openUnreadNote(1, 'HTTP 503'),
+    ]);
+    expect(reading.notes).toHaveLength(4);
+    expect(reading.notes[3]).toStartWith(`run records: skipped ${broken}: `);
+    expect(reading.remoteOnly).toEqual([]);
+  });
+
+  it('lists a claim branch this device holds only when the settings name the device', async () => {
+    const claimed = 'feat/rafa-12-thing';
+    const answers = {
+      ...withRemoteOnly(claimed),
+      ...claimCalls(claimed, formatClaimMessage({ action: 'claim', issue: 12, store: 'store-here' })),
+      [`cherry refs/remotes/origin/main refs/remotes/origin/${claimed}`]: said('+ a1\n'),
+    };
+    const device = { storeId: 'store-here', replacedIds: [] };
+
+    const named = await readCleanup(scripted(answers, provider().pulls).seams, settings({ device }));
+    const unnamed = await readCleanup(scripted(answers, provider().pulls).seams, settings());
+    if (!named.ok) throw new Error(named.detail);
+    if (!unnamed.ok) throw new Error(unnamed.detail);
+
+    expect(named.remoteOnly.map((row) => row.name)).toEqual([claimed]);
+    expect(unnamed.remoteOnly).toEqual([]);
+    expect(unnamed.notes).toEqual([]);
+  });
+
+  it('passes on a remote listing git refuses, after the worktrees were read', async () => {
+    const { seams, log } = scripted({ [REMOTES_CALL]: refused('fatal: bad ref\n') });
+
+    expect(await readCleanup(seams, settings()))
+      .toEqual({ ok: false, detail: 'git for-each-ref refs/remotes/origin failed: fatal: bad ref' });
+    expect(log).toContain(WORKTREES_CALL);
+  });
+});
+
 describe('readCleanup run records', () => {
   it('lists the older finished record of a plan, with its events file, and keeps the newest', async () => {
     const root = plantedRuns();
@@ -360,9 +559,19 @@ describe('cleanupCounts', () => {
       stale: [],
       notPushed: [],
       worktrees: [],
+      remoteOnly: [],
       runs: [],
       notes: [],
     })).toEqual({ merged: 0, stale: 0, notPushed: 0, worktrees: 0 });
+  });
+
+  it('leaves the remote-only branches out, as rafa doctor and rafa status print', async () => {
+    const { seams } = scripted(withRemoteOnly(ORPHAN), provider().pulls);
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toHaveLength(1);
+    expect(cleanupCounts(reading)).toEqual({ merged: 1, stale: 1, notPushed: 1, worktrees: 2 });
   });
 
   it('leaves the run records out, as rafa doctor and rafa status print', async () => {
@@ -435,5 +644,43 @@ describe('readCleanup over a real clone', () => {
     expect(fetched.merged.map((row) => [row.branch.name, row.reason, row.ticked]))
       .toEqual([['gone', 'upstream origin/gone is gone; main does not reach its tip', false]]);
     expect(fetched.notes).toEqual([]);
+  });
+});
+
+describe('readCleanup over the scratch repository\'s remote-only set', () => {
+  const scratch = createScratchRepository({ remoteOnly: true });
+
+  afterAll(() => {
+    scratch.dispose();
+  });
+
+  function scratchSettings(): CleanupSettings {
+    return settings({
+      fetch: false,
+      base: null,
+      now: SCRATCH_NOW,
+      home: scratch.home,
+      cwd: scratch.clone,
+      projectRoot: scratch.clone,
+    });
+  }
+
+  it('lists the unmerged and the copied branch with their counts, never stretch/9', async () => {
+    const reading = await readCleanup(defaultCleanupSeams(scratch.clone, provider().pulls), scratchSettings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly.map((row) => [row.name, row.commits, row.uncopied, row.ticked])).toEqual([
+      [REMOTE_ONLY_BRANCHES.copied, REMOTE_ONLY_COMMITS, 0, false],
+      [REMOTE_ONLY_BRANCHES.unmerged, REMOTE_ONLY_COMMITS, REMOTE_ONLY_COMMITS, false],
+    ]);
+    expect(reading.notes).toEqual([]);
+  });
+
+  it('control: the same clone with no provider lists none and counts the two it withheld', async () => {
+    const reading = await readCleanup(defaultCleanupSeams(scratch.clone, null), scratchSettings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.remoteOnly).toEqual([]);
+    expect(reading.notes).toContain(openUnknownNote(2));
   });
 });

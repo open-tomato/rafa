@@ -29,6 +29,7 @@
  * | `pr view <n> --web [--repo]` | `browse` |
  * | `pr checks <n> --json <fields> [--repo]` | `checks` |
  * | `pr merge <n> --squash or --merge or --rebase [--repo]` | `merge` |
+ * | `pr close <n> --comment=<text> [--delete-branch --repo]` | `close` |
  * | `pr edit <n> --body <text>, --title <text> or --base <branch> [--repo]` | `editBody`, `editTitle`, `editBase` |
  * | `pr create --head --base --title --body [--repo]` | `create` |
  * | `run view <id> --log-failed [--repo]` | `failedLog` |
@@ -48,10 +49,13 @@
  *
  * A command, a flag, a `--json` field, a method or an `api` path the fake
  * does not model is refused, with `ok` false and a message naming it,
- * rather than ignored. An adapter that sent `--auto`, `--admin` or
+ * rather than ignored. A merge that sent `--auto`, `--admin` or
  * `--delete-branch` fails the case that sent it, where a fake ignoring
  * the flag would let the case pass on a `gh` invocation nobody had
- * checked. A `--repo` naming another repository than the fake's own is
+ * checked; `--delete-branch` is modelled for `pr close` alone. A flag
+ * taking a value is read in both spellings `gh` takes, `--flag value`
+ * and `--flag=value`, the second being how a close sends its comment. A
+ * `--repo` naming another repository than the fake's own is
  * refused the same way, and so is an `api` path naming one. Every message
  * the fake invents opens with `fake gh:`; everything else it writes was
  * recorded.
@@ -72,12 +76,29 @@
  * the same write to the base, which every later read then answers as
  * `baseRefName`.
  *
+ * A pull request's head is committed at its `updatedAt` unless the seed
+ * names a `headCommittedAt`, and `pr view --json commits` writes that one
+ * commit. So a planted pull request has an OLD head, the fake's instants
+ * being fixed ones in the past, and a case about a head pushed a moment
+ * ago plants the instant it means, or null for a head `gh` does not list.
+ *
  * `gh pr create` is modelled from its help text alone, which says the
  * new pull request's URL is printed: the fake opens the pull request
  * under the next free number, by `rafa-fake`, and writes that URL and
  * nothing else. A second open pull request from one head into one base
  * is refused, in words the fake invents, since what `gh` writes then
  * was not recorded.
+ *
+ * `gh pr close` is modelled from its help text alone as well
+ * (`./gh-close.ts` quotes it): the pull request becomes `CLOSED`, the
+ * comment joins its comments by `rafa-fake` at the fake's clock, and
+ * nothing is written to either stream. A close with no `--comment`, or
+ * a blank one, is refused, the port sending none such. So is a close of
+ * a pull request that is not open, in words the fake invents: what `gh`
+ * answers for one already closed or merged was not recorded, and a
+ * caller reads the state first. `--delete-branch` records the head in
+ * {@link FakePrGh.deletedBranches} and changes nothing else, a pull
+ * request answering its `headRefName` after the branch is gone.
  *
  * The repository holds no workflow until {@link FakePrGh.plantWorkflows}
  * gives it some, as `open-tomato/rafa` has none, and the workflows path
@@ -162,6 +183,8 @@ export interface FakePrGh {
   readonly update: (number: number, change: (pull: FakePullRequest) => FakePullRequest) => void;
   /** Makes `gh pr merge` on this pull request fail, writing `stderr`. */
   readonly refuseMerge: (number: number, stderr: string) => void;
+  /** The head of every pull request closed with `--delete-branch`, in order. */
+  readonly deletedBranches: () => readonly string[];
   /** Puts the `--log-failed` output of one run in the repository. */
   readonly plantRun: (id: string, log: string) => void;
   /** Makes one run answer that its log has been dropped. */
@@ -213,6 +236,7 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['pr view', { values: ['--json', '--repo'], switches: ['--web'], positionals: 1 }],
   ['pr checks', { values: ['--json', '--repo'], switches: [], positionals: 1 }],
   ['pr merge', { values: ['--repo'], switches: MERGE_SWITCHES, positionals: 1 }],
+  ['pr close', { values: ['--comment', '--repo'], switches: ['--delete-branch'], positionals: 1 }],
   ['pr edit', { values: ['--body', '--title', '--base', '--repo'], switches: [], positionals: 1 }],
   ['pr create', { values: ['--head', '--base', '--title', '--body', '--repo'], switches: [], positionals: 0 }],
   ['run view', { values: ['--repo'], switches: ['--log-failed'], positionals: 1 }],
@@ -233,13 +257,25 @@ function commandKey(args: readonly string[]): string {
     : args.slice(0, 2).join(' ');
 }
 
+/** A value flag written `--flag=value`, split; null for every other argument. */
+function joinedFlag(shape: CommandShape, arg: string): { readonly name: string; readonly value: string } | null {
+  const at = arg.indexOf('=');
+  const name = arg.slice(0, Math.max(at, 0));
+  return name.startsWith('--') && shape.values.includes(name)
+    ? { name, value: arg.slice(at + 1) }
+    : null;
+}
+
 /** Reads `rest` against `shape`, or answers what the fake refuses in it. */
 function parseCommand(key: string, shape: CommandShape, rest: readonly string[]): ParsedCommand | string {
   const positionals: string[] = [];
   const flags = new Map<string, readonly string[]>();
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index] ?? '';
-    if (shape.switches.includes(arg)) {
+    const joined = joinedFlag(shape, arg);
+    if (joined !== null) {
+      flags.set(joined.name, [...(flags.get(joined.name) ?? []), joined.value]);
+    } else if (shape.switches.includes(arg)) {
       flags.set(arg, [...(flags.get(arg) ?? []), '']);
     } else if (shape.values.includes(arg)) {
       const value = rest[index + 1];
@@ -287,6 +323,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
 
   let pulls: ReadonlyMap<number, FakePullRequest> = new Map();
   let mergeRefusals: ReadonlyMap<number, string> = new Map();
+  let deletedBranches: readonly string[] = [];
   let runLogs: ReadonlyMap<string, string | null> = new Map();
   let permissions: ReadonlyMap<string, string> = new Map();
   let workflows: readonly FakeWorkflow[] = [];
@@ -395,6 +432,27 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     // A merged pull request answers UNKNOWN for both merge fields, as recorded,
     // and is merged at the fake's clock, which a comment is stamped with too.
     store({ ...pull, state: 'MERGED', mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN', mergedAt: now() });
+    return ok();
+  };
+
+  const handlePrClose = (parsed: ParsedCommand): GhResult => {
+    const refused = repoProblem(parsed);
+    if (refused !== null) return refused;
+    const body = flagValue(parsed, '--comment');
+    if (body === undefined || body.trim() === '') {
+      return failed('fake gh: pr close models --comment=<text> with text that is not blank, and was handed none\n');
+    }
+    const pull = namedPull(parsed.positionals[0] ?? '');
+    if (isResult(pull)) return pull;
+    if (pull.state !== 'OPEN') {
+      return failed(`fake gh: pull request ${pull.number} is ${pull.state}, and a close is modelled for an open one alone\n`);
+    }
+    // The comment, then the close, and nothing written: see the module note.
+    const at = now();
+    const comment: FakePrComment = { id: nextCommentId, author: COMMENT_AUTHOR, body, createdAt: at, updatedAt: at };
+    nextCommentId += 1;
+    store({ ...pull, state: 'CLOSED', comments: [...pull.comments, comment] });
+    if (hasSwitch(parsed, '--delete-branch')) deletedBranches = [...deletedBranches, pull.headRefName];
     return ok();
   };
 
@@ -534,6 +592,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     ['pr view', handlePrView],
     ['pr checks', handlePrChecks],
     ['pr merge', handlePrMerge],
+    ['pr close', handlePrClose],
     ['pr edit', handlePrEdit],
     ['pr create', handlePrCreate],
     ['run view', handleRunView],
@@ -567,6 +626,7 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     refuseMerge: (number, stderr) => {
       mergeRefusals = new Map([...mergeRefusals, [number, stderr]]);
     },
+    deletedBranches: () => deletedBranches,
     plantRun: (id, log) => {
       runLogs = new Map([...runLogs, [id, log]]);
     },

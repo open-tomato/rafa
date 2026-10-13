@@ -38,11 +38,27 @@
  *
  * One JSON object, pretty-printed with a trailing newline, holding
  * {@link BASELINE_VERSION}, when it was recorded, the commit it was
- * recorded at, and the {@link SuiteResult} fields but `unhandled`, the
- * errors outside any test, which it holds as the `errors` count only. A
+ * recorded at, and the {@link SuiteResult} fields but two: `unhandled`,
+ * the errors outside any test, which it holds as the `errors` count only,
+ * and `outputTail`, the last lines of the run's stderr, which it does not
+ * hold at all. A
  * file that does not parse, carries another version, or lacks a field
  * reads as `unreadable` with the reason, never as a throw: the caller
  * decides whether to record the baseline again.
+ *
+ * `noTestFiles`, the mark of a run Bun found no test file for, is
+ * optional within version 1 too: {@link baselineOf} writes
+ * `noTestFiles: true` for a result that carries it and no key for any
+ * other, so the baseline of a project with tests is the file it was
+ * before the mark was kept. A file with no key reads as before, and one
+ * holding a boolean reads; any other value makes the file `unreadable`.
+ * The mark is what tells the baseline of a project with no test file
+ * (exit code 1, nothing listed) from a run that failed outside any test
+ * case (`start/suite-outside-case.ts`), which is recorded again.
+ *
+ * The reader checks the fields it names and refuses no other key, which
+ * is why the mark needed no new version: a rafa from before it reads a
+ * file that carries it.
  *
  * A failure's `message` is optional within version 1: it is written when
  * the result holds one, and a failure without it reads as before, so a
@@ -68,9 +84,10 @@ const JUNIT_READINGS: readonly JunitReading[] = ['read', 'missing', 'unreadable'
 
 /**
  * A suite result as the baseline file holds it: every field but
- * `unhandled`, whose errors the file keeps as the `errors` count only.
+ * `unhandled`, whose errors the file keeps as the `errors` count only,
+ * and `outputTail`, which the file does not keep.
  */
-export interface SuiteBaseline extends Omit<SuiteResult, 'unhandled'> {
+export interface SuiteBaseline extends Omit<SuiteResult, 'unhandled' | 'outputTail'> {
   readonly version: typeof BASELINE_VERSION;
   /** When the run finished, as an ISO 8601 string. */
   readonly recordedAt: string;
@@ -112,7 +129,11 @@ function copyFailure(failure: SuiteFailure): SuiteFailure {
     : { file: failure.file, name: failure.name, message: failure.message };
 }
 
-/** A baseline of `result`, recorded at `recordedAt` on `commit`, as a new object. */
+/**
+ * A baseline of `result`, recorded at `recordedAt` on `commit`, as a new
+ * object. It holds `noTestFiles` only for a result marked so; see the
+ * module note.
+ */
 export function baselineOf(result: SuiteResult, recordedAt: Date, commit: string | null): SuiteBaseline {
   return {
     version: BASELINE_VERSION,
@@ -124,6 +145,9 @@ export function baselineOf(result: SuiteResult, recordedAt: Date, commit: string
     failures: result.failures.map(copyFailure),
     errors: result.errors,
     junit: result.junit,
+    ...(result.noTestFiles === true
+      ? { noTestFiles: true }
+      : {}),
   };
 }
 
@@ -164,6 +188,7 @@ function badField(record: Readonly<Record<string, unknown>>): string | null {
     ['failures', (value) => Array.isArray(value) && value.every(isFailure)],
     ['errors', (value) => value === null || Number.isInteger(value)],
     ['junit', (value) => JUNIT_READINGS.includes(value as JunitReading)],
+    ['noTestFiles', (value) => value === undefined || typeof value === 'boolean'],
   ];
   const failed = checks.find(([key, check]) => !check(record[key]));
   return failed?.[0] ?? null;

@@ -260,6 +260,7 @@ function detail(pull: PlantedPull): PullRequestDetail {
     ...summary(),
     body: `Closes #${String(C)}`,
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable: pull.mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],

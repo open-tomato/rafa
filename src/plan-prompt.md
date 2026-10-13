@@ -34,7 +34,10 @@ on the `open-tomato/rafa` board.
   test that imports none of its files: test preloads, `bunfig.toml`,
   `tsconfig*.json`, `package.json` or the lockfile, global state or
   environment every test inherits, and a stage's closing cross-module
-  test task.
+  test task. Keep the whole suite and any command outliving one Bash call
+  out of a task's text: `tests=full` is how the runner runs the suite, and
+  a task that needs a long run's output reads the `.output.txt` a `[start]`
+  prerequisite or the runner wrote beside its JUnit file.
 
 * Before planning, review the spec as written, and report that review at the
   END of your final message as a `rafa:spec-review` block carrying
@@ -87,6 +90,10 @@ criteria — **do not execute the plan**.
   it from the plan. An `[auto]` item holds exactly one backticked span, and
   that span is its command, ending the item after `: ` and run as written:
   prove a tool with `<tool> --version`, `<tool> --help` or `which <tool>`.
+  An `[auto]` item only the tasks need carries `[tasks]` after its box and
+  tag, and one only the wrap-up needs carries `[wrap-up]`
+  (`- [ ] [auto] [tasks] ...`); an unmarked item is needed by both. The
+  marker is written bare, never in backticks and never after the command.
 * Do not create or touch any tracker file — the loop derives it from the plan.
 
 ## The effort-store rule for plans that carry migrations
