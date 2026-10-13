@@ -84,6 +84,8 @@ The Claude sessions are named `<project> stretch <n> <role>`.
 device drives it from claude.ai; `--dry-run` prints what would run. `start`
 warns about operators still linked into `~/.claude` by the launcher before
 the copies, since no new stretch reads them and one started with them may.
+Whether the tmux session stays is open: #598 rejected a tmux session on
+the host, read with capture-pane.
 
 `rafa stretch item <issue> [--wait] [--dry-run]` handles one item from
 loop start to its pit-stop readings. It takes the integration branch from
