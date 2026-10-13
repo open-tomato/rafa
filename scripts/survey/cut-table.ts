@@ -211,7 +211,7 @@ export interface RuleProblem {
 }
 
 /** The graph the table reads, relative to the repository root. */
-export const GRAPH_PATH = `${OUTPUT_DIR}/import-graph.json`;
+export const GRAPH_PATH: string = `${OUTPUT_DIR}/import-graph.json`;
 
 /** The issue that makes each package own its config section. */
 export const SECTIONS_ISSUE = 118;
@@ -220,7 +220,7 @@ export const SECTIONS_ISSUE = 118;
 export const SECTION_IMPORTER_FOLDER = 'src/core/config/';
 
 /** A config section file: `src/config-schema-<section>.ts`, at the top of `src/`. */
-export const SECTION_FILE = /^src\/config-schema-[^/]+\.ts$/;
+export const SECTION_FILE: RegExp = /^src\/config-schema-[^/]+\.ts$/;
 
 /** How many files the summary lists by the upward edges that end on them. */
 export const TOP_TARGETS = 20;
