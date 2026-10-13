@@ -56,6 +56,7 @@ function result(command: string, overrides: Partial<SuiteResult> = {}): SuiteRes
     errors: 0,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
     ...overrides,
   };
 }
@@ -114,6 +115,12 @@ describe('foldResults', () => {
     const swept = { file: 'src/x.sweep.test.ts', firstLine: null };
     const folded = foldResults(result('changed', { unhandled: [thrown] }), result('sweep', { unhandled: [swept] }), STOP);
     expect(folded.unhandled).toEqual([thrown, swept]);
+  });
+
+  it('holds the output tail of both runs, the first run\'s first, and none when neither held one', () => {
+    const folded = foldResults(result('changed', { outputTail: ['error: boom', ' 1 fail'] }), result('sweep', { outputTail: [' 1 pass'] }), STOP);
+    expect(folded.outputTail).toEqual(['error: boom', ' 1 fail', ' 1 pass']);
+    expect(foldResults(result('changed'), result('sweep'), STOP).outputTail).toEqual([]);
   });
 
   it('holds both commands, both summaries, and the failures and errors of both', () => {

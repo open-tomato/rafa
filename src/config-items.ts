@@ -114,6 +114,13 @@ export const PREREQUISITE_KINDS = ['tool', 'env', 'service', 'lsp'] as const;
 /** One of the four prerequisite kinds. */
 export type PrerequisiteKind = (typeof PREREQUISITE_KINDS)[number];
 
+/**
+ * Which of a run's dispatches need a plan's item: its tasks, its wrap-up,
+ * or both. Read from the `[tasks]` or `[wrap-up]` marker of a
+ * PREREQUISITES file (`src/preflight/prerequisites-md.ts`).
+ */
+export type PrerequisiteScope = 'tasks' | 'wrap-up' | 'both';
+
 /** One item of `prerequisites.required`. */
 export interface PrerequisiteItem {
   /** Which of the four keys named it. */
@@ -122,6 +129,11 @@ export interface PrerequisiteItem {
   name: string;
   /** The command that proves it, or null to check presence alone. */
   probe: string | null;
+  /**
+   * The scope a plan's PREREQUISITES file gave the item. Left out of an
+   * item the config names, which has no spelling for one.
+   */
+  scope?: PrerequisiteScope;
 }
 
 /** One item of `prerequisites.optional`. */

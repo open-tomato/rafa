@@ -59,6 +59,11 @@
  * position that is a whole number from 1 or null, and a list of files
  * before it), right after its `newFailures`, and leaves out any other
  * entry, and the key itself when no entry is left.
+ *
+ * A step's `outsideCase` and `outputTail`, likewise. The frozen step
+ * keeps the pair, after `stepOnly`, when `outsideCase` is `true`, with
+ * the tail as its list of strings or as an empty list when it is
+ * anything else, and leaves out both keys for any other `outsideCase`.
  */
 import type {
   SessionDecision,
@@ -459,6 +464,15 @@ function stepOnlyEntry(stepOnly: unknown): { readonly stepOnly?: readonly Sessio
   }))) };
 }
 
+/** The `outsideCase` and `outputTail` entries of a frozen step: both when the mark is `true`, neither otherwise. See the module note. */
+function outsideCaseEntry(outsideCase: unknown, outputTail: unknown): Pick<SessionStep, 'outsideCase' | 'outputTail'> {
+  if (outsideCase !== true) return {};
+  const tail = isStringList(outputTail)
+    ? outputTail
+    : [];
+  return { outsideCase: true, outputTail: Object.freeze([...tail]) };
+}
+
 /** True for one of {@link SESSION_STEP_REASONS}. */
 function isSessionStepReason(value: unknown): value is SessionStepReason {
   return (SESSION_STEP_REASONS as readonly unknown[]).includes(value);
@@ -475,8 +489,9 @@ function reasonEntry(reason: unknown): { readonly reason?: SessionStepReason } {
  * A frozen step already checked, its fields in the order they are
  * written: `reason` right after `scope`, only when it is one of
  * {@link SESSION_STEP_REASONS}, `stepOnly` right after `newFailures`,
- * only when it holds a whole entry, and `interrupted` last, only when
- * there.
+ * only when it holds a whole entry, `outsideCase` with `outputTail`
+ * after it, only when the mark is `true`, and `interrupted` last, only
+ * when there.
  */
 function freezeStep(step: SessionStep): SessionStep {
   return Object.freeze({
@@ -491,6 +506,7 @@ function freezeStep(step: SessionStep): SessionStep {
     failures: freezeFailures(step.failures),
     newFailures: freezeFailures(step.newFailures),
     ...stepOnlyEntry(field(step, 'stepOnly')),
+    ...outsideCaseEntry(field(step, 'outsideCase'), field(step, 'outputTail')),
     ...(step.interrupted === true
       ? { interrupted: true as const }
       : {}),

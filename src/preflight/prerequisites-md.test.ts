@@ -17,6 +17,11 @@
  * `[auto]`, and a heading naming a start without brackets beside one
  * carrying them.
  *
+ * "the scope marker" holds `[tasks]` and `[wrap-up]` (#892): each case
+ * reads a marked item beside the same item unmarked, or beside the same
+ * marker written where it is not one, so none passes on a reader that
+ * answers `both` for everything or drops every bracketed word.
+ *
  * The copy reads a probe from the span ENDING the item after its final
  * `: `, where the source took the first span, so every probed fixture
  * here, the ported cases included, is written `<description>:
@@ -410,11 +415,249 @@ describe('parsePrerequisites: what the copy changes', () => {
   });
 });
 
+describe('parsePrerequisites: the scope marker', () => {
+  /** What each item of `content` reads as: its text, tag, scope and probe. */
+  function readings(content: string): readonly (readonly [string, string, string, string | null])[] {
+    return parsePrerequisites(content).map((item) => [item.description, item.tag, item.scope, item.probe] as const);
+  }
+
+  it('reads an item with no marker as both, whatever its tag', () => {
+    const content = [
+      '- [ ] [auto] Bun: `bun --version`',
+      '- [ ] [start] Sibling clean: `git status`',
+      '- [ ] [human] Lead approves',
+      '- [ ] Backup confirmed',
+    ].join('\n');
+
+    expect(parsePrerequisites(content).map((item) => item.scope)).toEqual(['both', 'both', 'both', 'both']);
+  });
+
+  it('reads a marker written after the inline tag, and drops it from the description', () => {
+    const content = [
+      '- [ ] [auto] [tasks] Bun: `bun --version`',
+      '- [ ] [auto] [wrap-up] gh logged in: `gh auth status`',
+      '- [ ] [auto] Docker running: `docker info`',
+    ].join('\n');
+
+    expect(readings(content)).toEqual([
+      ['Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+      ['gh logged in: `gh auth status`', 'auto', 'wrap-up', 'gh auth status'],
+      ['Docker running: `docker info`', 'auto', 'both', 'docker info'],
+    ]);
+  });
+
+  it('reads a marker written right after the box, the tag coming from the heading', () => {
+    const content = '## Checks [auto]\n\n- [ ] [tasks] Bun: `bun --version`\n- [ ] gh logged in: `gh auth status`\n';
+    expect(readings(content)).toEqual([
+      ['Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+      ['gh logged in: `gh auth status`', 'auto', 'both', 'gh auth status'],
+    ]);
+  });
+
+  it('reads a marker in either case, as a tag is', () => {
+    const content = '- [ ] [AUTO] [Tasks] Bun: `bun --version`\n- [ ] [auto] [WRAP-UP] gh: `gh auth status`\n';
+    expect(parsePrerequisites(content).map((item) => [item.tag, item.scope])).toEqual([
+      ['auto', 'tasks'],
+      ['auto', 'wrap-up'],
+    ]);
+  });
+
+  it('gives the items under a marked heading its scope, and leaves its tag alone', () => {
+    const content = [
+      '## Toolchain [auto] [tasks]',
+      '',
+      '- [ ] Bun: `bun --version`',
+      '',
+      '## Publishing [wrap-up] [auto]',
+      '',
+      '- [ ] gh logged in: `gh auth status`',
+      '',
+      '## Services [auto]',
+      '',
+      '- [ ] Docker running: `docker info`',
+    ].join('\n');
+
+    expect(parsePrerequisites(content).map((item) => [item.tag, item.scope, item.probe])).toEqual([
+      ['auto', 'tasks', 'bun --version'],
+      ['auto', 'wrap-up', 'gh auth status'],
+      ['auto', 'both', 'docker info'],
+    ]);
+  });
+
+  it('lets an item marker outrank its heading, where the unmarked item beside it takes the heading scope', () => {
+    const content = [
+      '## Toolchain [auto] [tasks]',
+      '',
+      '- [ ] [wrap-up] gh logged in: `gh auth status`',
+      '- [ ] Bun: `bun --version`',
+      '',
+      '## Publishing [auto] [wrap-up]',
+      '',
+      '- [ ] [auto] [tasks] Fixtures built: `test -d fixtures`',
+      '- [ ] Registry reachable: `npm ping`',
+    ].join('\n');
+
+    expect(parsePrerequisites(content).map((item) => [item.scope, item.probe])).toEqual([
+      ['wrap-up', 'gh auth status'],
+      ['tasks', 'bun --version'],
+      ['tasks', 'test -d fixtures'],
+      ['wrap-up', 'npm ping'],
+    ]);
+  });
+
+  it('keeps a heading scope over a deeper unmarked heading and ends it at a sibling', () => {
+    const content = [
+      '## Toolchain [auto] [tasks]',
+      '',
+      '### Bun',
+      '',
+      '- [ ] Bun: `bun --version`',
+      '',
+      '### Publishing [wrap-up]',
+      '',
+      '- [ ] gh logged in: `gh auth status`',
+      '',
+      '## Services [auto]',
+      '',
+      '- [ ] Docker running: `docker info`',
+    ].join('\n');
+
+    expect(parsePrerequisites(content).map((item) => [item.tag, item.scope])).toEqual([
+      ['auto', 'tasks'],
+      ['auto', 'wrap-up'],
+      ['auto', 'both'],
+    ]);
+  });
+
+  it('reads both markers together as both, on a heading and on an item under a marked one', () => {
+    const content = [
+      '## Toolchain [auto] [tasks]',
+      '',
+      '### Shared [tasks] [wrap-up]',
+      '',
+      '- [ ] Bun: `bun --version`',
+      '',
+      '### Fixtures',
+      '',
+      '- [ ] [wrap-up] [tasks] gh logged in: `gh auth status`',
+      '- [ ] Fixtures built: `test -d fixtures`',
+    ].join('\n');
+
+    expect(readings(content)).toEqual([
+      ['Bun: `bun --version`', 'auto', 'both', 'bun --version'],
+      ['gh logged in: `gh auth status`', 'auto', 'both', 'gh auth status'],
+      ['Fixtures built: `test -d fixtures`', 'auto', 'tasks', 'test -d fixtures'],
+    ]);
+  });
+
+  it('never reads a marker as the probe: a marked item with no span is malformed', () => {
+    const marked = parsePrerequisites('- [ ] [auto] [tasks] The service is reachable\n');
+    expect(marked.map((item) => [item.description, item.scope, item.probe])).toEqual([
+      ['The service is reachable', 'tasks', null],
+    ]);
+
+    const plan = planPrerequisites('- [ ] [auto] [tasks] The service is reachable\n');
+    expect(plan.required).toEqual([]);
+    expect(plan.malformed).toEqual([{ description: 'The service is reachable', tag: 'auto', line: 1 }]);
+  });
+
+  it('reads a marker nowhere but at the opening: one after the span leaves the item malformed and both', () => {
+    const content = '- [ ] [auto] Bun: `bun --version` [tasks]\n- [ ] [auto] [tasks] Bun: `bun --version`\n';
+    expect(readings(content)).toEqual([
+      ['Bun: `bun --version` [tasks]', 'auto', 'both', null],
+      ['Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+    ]);
+  });
+
+  it('reads a marker written ahead of the tag as it reads one after, the tag still read', () => {
+    const content = '## Manual steps\n\n- [ ] [tasks] [auto] Bun: `bun --version`\n- [ ] [auto] [tasks] Bun: `bun --version`\n';
+    expect(readings(content)).toEqual([
+      ['Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+      ['Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+    ]);
+  });
+
+  it('reads one tag at the opening and leaves a second in the description, marked or not', () => {
+    const content = '- [ ] [auto] [tasks] [start] Bun: `bun --version`\n- [ ] [auto] [start] Bun: `bun --version`\n';
+    expect(readings(content)).toEqual([
+      ['[start] Bun: `bun --version`', 'auto', 'tasks', 'bun --version'],
+      ['[start] Bun: `bun --version`', 'auto', 'both', 'bun --version'],
+    ]);
+  });
+
+  it('reads the marker of a [start] item and of a [human] item, each keeping its tag and probe', () => {
+    const content = [
+      '- [ ] [start] [tasks] Sibling clean: `git status`',
+      '- [ ] [human] [wrap-up] Lead approves: `echo approved`',
+    ].join('\n');
+
+    expect(readings(content)).toEqual([
+      ['Sibling clean: `git status`', 'start', 'tasks', 'git status'],
+      ['Lead approves: `echo approved`', 'human', 'wrap-up', null],
+    ]);
+  });
+
+  it('does not read a heading naming tasks or a wrap-up without brackets as marked', () => {
+    const content = '## Checks the tasks need before the wrap-up [auto]\n\n- [ ] Bun: `bun --version`\n';
+    expect(parsePrerequisites(content).map((item) => [item.tag, item.scope])).toEqual([['auto', 'both']]);
+  });
+});
+
+describe('planPrerequisites: the scope of a required item', () => {
+  it('carries each auto item scope onto its required item, both when none is written', () => {
+    const content = [
+      '## Checks [auto]',
+      '',
+      '- [ ] [tasks] Bun: `bun --version`',
+      '- [ ] [wrap-up] gh logged in: `gh auth status`',
+      '- [ ] Docker running: `docker info`',
+    ].join('\n');
+
+    expect(planPrerequisites(content).required).toEqual([
+      { kind: 'tool', name: 'Bun: `bun --version`', probe: 'bun --version', scope: 'tasks' },
+      { kind: 'tool', name: 'gh logged in: `gh auth status`', probe: 'gh auth status', scope: 'wrap-up' },
+      { kind: 'tool', name: 'Docker running: `docker info`', probe: 'docker info', scope: 'both' },
+    ]);
+  });
+
+  it('carries a heading scope onto the required items under it', () => {
+    const plan = planPrerequisites('## Toolchain [auto] [tasks]\n\n- [ ] Bun: `bun --version`\n');
+    expect(plan.required.map((item) => [item.probe, item.scope])).toEqual([['bun --version', 'tasks']]);
+  });
+
+  it('keeps a marked [human] item a reminder, in no tier', () => {
+    const plan = planPrerequisites('- [ ] [human] [tasks] Token minted: `gh auth token`\n- [ ] [human] Lead approves\n');
+    expect(plan.required).toEqual([]);
+    expect(plan.startRequired).toEqual([]);
+    expect(plan.malformed).toEqual([]);
+    expect(plan.reminders).toEqual([
+      { description: 'Token minted: `gh auth token`', tag: 'human', line: 1 },
+      { description: 'Lead approves', tag: 'human', line: 2 },
+    ]);
+  });
+
+  it('keeps a marked [start] item on the start tier, its marker read and moving it nowhere', () => {
+    const plan = planPrerequisites('- [ ] [start] [tasks] Sibling clean: `git status`\n');
+    expect(plan.required).toEqual([]);
+    expect(plan.startRequired).toEqual([
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status', scope: 'tasks' },
+    ]);
+  });
+
+  it('leaves the config required items with no scope when a plan merges after them', () => {
+    const merged = mergePlanPrerequisites(configuredSettings(), '- [ ] [auto] [tasks] Docker running: `docker info`\n');
+    expect(merged.required.map((item) => [item.probe, item.scope])).toEqual([
+      ['bun --version', undefined],
+      ['docker info', 'tasks'],
+    ]);
+  });
+});
+
 describe('planPrerequisites', () => {
   it('maps an auto item with a probe to a required tool item named by its description', () => {
     const plan = planPrerequisites('## Toolchain [auto]\n\n- [ ] Bun installed: `bun --version`\n');
     expect(plan.required).toEqual([
-      { kind: 'tool', name: 'Bun installed: `bun --version`', probe: 'bun --version' },
+      { kind: 'tool', name: 'Bun installed: `bun --version`', probe: 'bun --version', scope: 'both' },
     ]);
     expect(plan.reminders).toEqual([]);
   });
@@ -464,7 +707,7 @@ describe('planPrerequisites', () => {
     const plan = planPrerequisites('- [ ] [start] Sibling clean: `git status`\n');
     expect(plan.required).toEqual([]);
     expect(plan.startRequired).toEqual([
-      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status', scope: 'both' },
     ]);
     expect(plan.reminders).toEqual([]);
   });
@@ -472,7 +715,7 @@ describe('planPrerequisites', () => {
   it('maps the same item tagged [auto] to a required item and leaves the start tier empty', () => {
     const plan = planPrerequisites('- [ ] [auto] Sibling clean: `git status`\n');
     expect(plan.required).toEqual([
-      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status', scope: 'both' },
     ]);
     expect(plan.startRequired).toEqual([]);
   });
@@ -583,7 +826,7 @@ describe('mergePlanPrerequisites', () => {
     const merged = mergePlanPrerequisites(configuredSettings(), PLAN_A);
     expect(merged.required).toEqual([
       { kind: 'tool', name: 'bun', probe: 'bun --version' },
-      { kind: 'tool', name: 'Docker running: `docker info`', probe: 'docker info' },
+      { kind: 'tool', name: 'Docker running: `docker info`', probe: 'docker info', scope: 'both' },
     ]);
     expect(merged.optional).toEqual([
       { kind: 'tool', name: 'mgrep', probe: 'mgrep --version', reason: 'faster search; grep is the fallback' },
@@ -621,7 +864,7 @@ describe('mergePlanPrerequisites', () => {
     const merged = mergePlanPrerequisites(settings, `${PLAN_B}- [ ] [start] Sibling clean: \`git status\`\n`);
     expect(merged.required.map((item) => item.probe)).toEqual(['bun --version', 'npm ping']);
     expect(merged.startRequired).toEqual([
-      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status' },
+      { kind: 'tool', name: 'Sibling clean: `git status`', probe: 'git status', scope: 'both' },
     ]);
   });
 

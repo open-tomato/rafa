@@ -39,6 +39,13 @@
  * code span in them is read as a command. How a command line is found
  * and what it is read for is `risk/commands.ts`'s.
  *
+ * Each open task's sentence, declaration taken off, is read once more
+ * for a whole-suite run its session is told to make (`risk/long-runs.ts`):
+ * the phrase "full suite" or "whole suite", or a code span running
+ * `bun test` with no path. Such a line is a `long-run` `note` naming the
+ * fix, `tests=full` on the task, since the Bash tool stops a command at
+ * 10 minutes. Nothing but a task's sentence is read for it.
+ *
  * Then the four account findings (`risk/accounts.ts`) and one finding
  * per credential-bearing variable NAME (`risk/secrets.ts`): a value is
  * never read, so none can reach a finding or a report.
@@ -66,12 +73,13 @@ import { findAgentDefinition } from '../utils/agent-definition.js';
 import { parsePlan } from './parse.js';
 import { readAccounts } from './risk/accounts.js';
 import { readBodyCommands, readTaskLineCommands } from './risk/commands.js';
+import { readLongRuns } from './risk/long-runs.js';
 import { scanSecretNames } from './risk/secrets.js';
 
 export type { RiskLevel } from './risk/commands.js';
 
-/** The five kinds of finding, in the order a report reads them. */
-export const RISK_KINDS = ['tools', 'destructive', 'outside-path', 'account', 'secret'] as const;
+/** The six kinds of finding, in the order a report reads them. */
+export const RISK_KINDS = ['tools', 'destructive', 'outside-path', 'long-run', 'account', 'secret'] as const;
 
 /** One of {@link RISK_KINDS}. */
 export type RiskKind = (typeof RISK_KINDS)[number];
@@ -93,7 +101,7 @@ const TASK_EXCERPT = 72;
 export interface RiskFinding {
   /** `high` is what `--strict` refuses on. */
   readonly level: RiskLevel;
-  /** Which of the five readings found it. */
+  /** Which of the six readings found it. */
   readonly kind: RiskKind;
   /** The line a report prints. */
   readonly text: string;
@@ -116,7 +124,7 @@ export interface RiskReport {
   /** The plan, displayed as {@link RiskFinding.file} is. */
   readonly plan: string;
   readonly total: RiskTotal;
-  /** Tools, destructive, outside-path, account, secret, each in reading order. */
+  /** Tools, destructive and outside-path, long-run, account, secret, each in reading order. */
   readonly findings: readonly RiskFinding[];
 }
 
@@ -361,12 +369,14 @@ export async function assessPlanRisk(plan: RiskPlan, seams: RiskSeams): Promise<
 
   const tools = tasks.flatMap((task) => toolsFinding(task, display, seams) ?? []);
   const commands = commandFindings(plan, display, tasks, seams);
+  const longRuns = readLongRuns(tasks)
+    .map(({ level, kind, text, task, line }): RiskFinding => ({ level, kind, text, task, file: display, line }));
   const accounts = (await readAccounts(seams.accounts, seams.runners))
     .map(({ level, kind, text }): RiskFinding => ({ level, kind, text }));
   const secrets = scanSecretNames(seams.environment)
     .map(({ level, kind, text }): RiskFinding => ({ level, kind, text }));
 
-  const findings = [...tools, ...commands, ...accounts, ...secrets];
+  const findings = [...tools, ...commands, ...longRuns, ...accounts, ...secrets];
   return { plan: display, total: riskTotal(findings), findings };
 }
 

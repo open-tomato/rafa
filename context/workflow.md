@@ -163,6 +163,17 @@ plan's `Owns:` folders (scope `full`) or falls back to `bun test
   file or a globally-used module; stage step always runs full suite, not
   a fallback
 
+**`rafa plan risk` notes a task whose sentence asks for the whole suite.**
+An open task gets a `long-run` note when its sentence says "full suite" or
+"whole suite", in any case, or when a code span in it runs `bun test` with
+no path. `--changed=<base>` narrows the run, so it is not flagged. The note
+names the line and the fix, which is to declare `tests=full` on the task and
+take the run out of its text (`src/plan/risk/long-runs.ts`). It is level
+`note`, so `--strict` still exits 0 on it. A task session's Bash call stops
+at 10 minutes, and a whole-suite run can outlast that, which is why the
+runner runs the suite after the task commits when the task declares
+`tests=full`.
+
 **Config keys determine when a task triggers `tests=module` or `tests=full`
 automatically, and which tests always run:**
 - `tests.alwaysRun` (glob list; defaults to `src/**/*.sweep.test.ts`) —
@@ -202,6 +213,19 @@ failures and stop the run again before the repair got its session. The
 stage steps still due run before the first open task after it. The blocked
 task holds until its session completes or a human unblocks it by removing
 the `[BLOCKED]` mark on its line in the tracker.
+
+**A repair line names the task it repairs, and the repair is handed that
+task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
+after its declaration and before its blocker comment, and `TaskInfo.repairs`
+reads the text back (`src/utils/tracker.ts`). A task-step repair names the
+task whose step was red, and a stage-step repair names the last task of that
+stage. A pre-wrap-up repair names nothing and has no comment, since the whole
+suite is what it repairs. Under `plan.inject: stage` a repair that names a
+task is rendered as that task's stage, with the repair's line open directly
+below the named task, and under `plan.inject: task` as the repair's line alone
+within that stage's context. A repair that names nothing is handed the whole
+plan with no warning. One that names a task the plan no longer holds is handed
+the whole plan too, with a warning that says the repair was looking for it.
 
 ### What reaches a loop session
 
@@ -409,6 +433,26 @@ not the plan.** Once the tracker exists, a task line appended to the plan
 file is never dispatched: the loop prints `All tasks completed!`. Append
 the open line to the tracker as well before running again. This replaces
 nothing.
+
+**A run that dispatches only its wrap-up skips the `[auto]` items scoped
+`tasks`.** A PREREQUISITES file marks an `[auto]` item `[tasks]` or
+`[wrap-up]` after its box and beside its inline tag, as in
+`- [ ] [auto] [tasks] Bun is installed: ...`, or on a heading above it,
+which the items under that heading inherit unless their own marker says
+otherwise. An item with no marker counts as `both`, so a file written before
+the marker existed is probed exactly as it was. When the tracker beside the
+plan holds no open and no blocked task, the run dispatches its wrap-up alone,
+and the preflight passes over each item scoped `tasks` rather than probing it.
+Each one is named in a line of its own, such as `⏭ tasks-only item tool "the
+compiler is installed" was not checked: only the tasks need it, and
+PLAN_TRACKER-demo.md holds no open and no blocked task`. A skipped item is not
+checked, counted, stored or able to halt. Items scoped `wrap-up` or `both` are
+probed as before, and so is every item when a task is open or blocked, or when
+no tracker can be read, as on a first dispatch. `rafa doctor --plan=` does not
+run this preflight and probes every item. The skip serves a rerun whose
+wrap-up session died before it pushed: starting the loop again goes straight
+to the wrap-up, even when the plan's scratch variables are no longer exported,
+instead of halting on a check only the tasks needed.
 
 **The order of all work lives in ONE place: the pinned "Roadmap" issue**
 on the `open-tomato/rafa` board. The word "phase" and its letters are
@@ -623,6 +667,15 @@ no pull request to write to (`carryReleaseIntoPullRequest`,
 release step already wrote to is not written again, and a blocked delivery
 writes nothing. With `pr.provider: none`, the pull-request check
 and creation are both skipped and the run advances directly to CI or closes.
+
+**The wrap-up prompt is written for `pr.provider: none` too.**
+`buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
+resolved, and under `none` it leaves out the four bullets that find the
+plan's issue number, title the pull request and describe it. It writes one
+bullet where the create and edit step would go instead: the run ends with the
+branch pushed and no pull request is opened, so the session is told not to
+open, edit or look for one. The rest of the prompt reads as it does under any
+provider, and under every other provider the prompt is unchanged.
 
 **The wrap-up emits `pr` or `no-pr` once, in every output mode.**
 `emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to

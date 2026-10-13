@@ -23,6 +23,10 @@
  * the invocation's, `RafaContext.env`, and only its keys are read, by
  * `scanSecretNames`: no value can reach a line this command writes.
  *
+ * The plan's open task lines are read as well for a whole-suite run
+ * their session is told to make (`src/plan/risk/long-runs.ts`): each is
+ * a `long-run` `note`, so `--strict` does not refuse on it.
+ *
  * ## What it writes
  *
  * Text mode writes `renderRiskText`'s report a line at a time: the `high`

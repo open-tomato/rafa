@@ -84,17 +84,74 @@
  *
  * ## Locating the task
  *
- * The task is found by its `lineNum`, counting from zero as
- * `TaskInfo.lineNum` does, and must hold the same `task` there. A
- * tracker is the plan copied once, so a plan edited afterwards can put
- * a different task, or no task, where the tracker's task sits; and a
- * task line after the fence of a `rafa:*` block never closed is one
- * `findNextTask` still dispatches and the model reads as that block's
- * body. None of the three is a
- * reason to stop a plan. The rendering falls back to `full`, which
- * hands the session everything it had before modes existed, and says
- * why in {@link PlanInjection.fallback}. `full` locates nothing, so it
+ * The loop hands over the PLAN's text and the task its TRACKER
+ * answered. A tracker is the plan copied once, and the two stop sharing
+ * line numbers the first time a red step inserts a repair line into the
+ * tracker (`insertTrackerTask`): every task below it sits one line
+ * lower than the plan holds it. The task was once found by its
+ * `lineNum`, so each task after a repair fell back to `full` (#865).
+ * The tracker's line number is therefore never read, and
+ * {@link InjectionTask} does not carry it. The task is found by what
+ * the two documents share, in this order:
+ *
+ *   1. The one plan task whose `task` equals the dispatched one.
+ *   2. When SEVERAL hold that text, the one of them at
+ *      {@link InjectionRequest.position}.
+ *   3. When NONE holds it, the task at that position: a plan whose
+ *      task was reworded after the copy still holds it in its place.
+ *
+ * A position counts from zero over the model's tasks, and one that is
+ * absent, negative or no integer names no task. A text held once is
+ * taken whatever the position says.
+ *
+ * What is left falls back to `full`, which hands the session everything
+ * it had before modes existed, and {@link PlanInjection.fallback} says
+ * what was looked for:
+ *
+ *   - `no-task-with-text`: no task holds the text and none sits at the
+ *     position. The plan lost the task after the copy; or the line
+ *     follows the fence of a `rafa:*` block never closed, which
+ *     `findNextTask` still dispatches and the model reads as that
+ *     block's body. The model holds no task after such a fence, so the
+ *     position of one reaches past its last task.
+ *   - `several-tasks-with-text`: several tasks hold the text and the
+ *     position names none of them, so nothing says which was
+ *     dispatched.
+ *
+ * Neither is a reason to stop a plan. `full` locates nothing, so it
  * never falls back.
+ *
+ * ## A repair
+ *
+ * A repair line (`writeRepairTask`, `start/suite-blocker.ts`) exists in
+ * the tracker alone, so the plan holds no task with its text and none
+ * in its place. It is rendered by the plan task it names instead, which
+ * the loop hands over as {@link InjectionRequest.repairs}:
+ *
+ *   - A repair that NAMES a task renders that task's stage. The named
+ *     task is found as above, by its sentence in place of the dispatched
+ *     text, with one difference: the position only settles between
+ *     several tasks holding that sentence, and never stands in for a
+ *     sentence no task holds. A repair's position is the place of the
+ *     plan task above it, which says where it was inserted and not what
+ *     it repairs. `stage` shows the repair's line open, directly below
+ *     the task it names, in place of no other line: the named task and
+ *     each one above it are shown done, each one below as the document
+ *     wrote it. `task` shows the repair's line alone. Either way the
+ *     line is the repair's sentence, its declaration off.
+ *   - A repair that names a task the plan does not hold falls back to
+ *     `full` with `no-task-with-text`, or `several-tasks-with-text`,
+ *     and a sentence that says a repair was looking.
+ *   - A repair that names NOTHING is handed the whole plan with a null
+ *     fallback, whatever mode was asked for: a pre-wrap-up repair, since
+ *     the whole suite is what it repairs, and every repair a tracker
+ *     held before the comment was written. That is no fallback, so
+ *     nothing warns.
+ *
+ * The plan handed over for a repair is the plan file. A tracker holds
+ * its repair lines as tasks of their own, so it renders them among the
+ * stage's lines and counts them in a position; the two documents render
+ * the same only while the tracker holds no repair.
  *
  * Nothing here throws.
  */
@@ -102,10 +159,15 @@ import type { PlanModel, PlanTask, PlanTaskStatus } from './parse.js';
 import type { InjectMode } from '../config.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import { parseTaskDeclaration } from '../utils/declaration.js';
+
 import { parsePlan } from './parse.js';
 
-/** The dispatched task, by the two fields of `TaskInfo` it is located by. */
-export type InjectionTask = Pick<TaskInfo, 'task' | 'lineNum'>;
+/**
+ * The dispatched task, by the one field of `TaskInfo` it is located by.
+ * Its `lineNum` is a line of the tracker and is left out on purpose.
+ */
+export type InjectionTask = Pick<TaskInfo, 'task'>;
 
 /** What {@link renderInjection} renders. */
 export interface InjectionRequest {
@@ -118,22 +180,33 @@ export interface InjectionRequest {
   readonly plan: string;
   /** The task being dispatched, as `findNextTask` answered it. */
   readonly task: InjectionTask;
+  /**
+   * The dispatched task's ordinal among the tracker's tasks, repair
+   * lines not counted, from zero: its place among the plan's tasks.
+   * Read only when the text does not settle the task. Absent, the text
+   * alone locates it. For a repair, the place of the plan task above it.
+   */
+  readonly position?: number;
+  /**
+   * What a dispatched repair names, as `TaskInfo.repairs` holds it: the
+   * sentence of a plan task, or null for a repair that names nothing.
+   * Absent when the dispatched task is no repair. See the module note.
+   */
+  readonly repairs?: string | null;
 }
 
-/** Why a rendering fell back to `full`. */
+/** Why a rendering fell back to `full`, by what was looked for. */
 export type InjectionFallbackReason =
-  /** The model reads no task at the line: prose, a blank, or block body. */
-  | 'no-task-at-line'
-  /** The model reads a different task at the line. */
-  | 'task-text-differs';
+  /** No plan task holds the dispatched text, and none sits at its position. */
+  | 'no-task-with-text'
+  /** Several plan tasks hold the dispatched text, and its position names none of them. */
+  | 'several-tasks-with-text';
 
 /** Why the requested mode was not rendered. */
 export interface InjectionFallback {
-  /** What the lookup found at the task's line. */
+  /** What the lookup did not find. */
   readonly reason: InjectionFallbackReason;
-  /** The task's line, counting from one, as an editor numbers it. */
-  readonly line: number;
-  /** One sentence for an operator to read. */
+  /** One sentence for an operator to read. It names no line of the plan. */
   readonly text: string;
 }
 
@@ -141,11 +214,17 @@ export interface InjectionFallback {
 export interface PlanInjection {
   /** The mode the caller asked for. */
   readonly requested: InjectMode;
-  /** The mode rendered: `requested`, or `full` after a fallback. */
+  /**
+   * The mode rendered: `requested`, or `full` after a fallback and for
+   * a repair that names nothing.
+   */
   readonly mode: InjectMode;
   /** What the session is handed in place of the whole plan. */
   readonly text: string;
-  /** Why `mode` is not `requested`, or null when it is. */
+  /**
+   * Why a lookup did not render `requested`, or null: when it did, and
+   * for a repair that names nothing, which looks nothing up.
+   */
   readonly fallback: InjectionFallback | null;
 }
 
@@ -154,8 +233,18 @@ type Location =
   | { readonly found: true; readonly task: PlanTask }
   | { readonly found: false; readonly fallback: InjectionFallback };
 
+/**
+ * What a rendering is built around: the plan task located, and the
+ * sentence of the repair dispatched for it, or null when that task is
+ * itself the one dispatched.
+ */
+interface Dispatched {
+  readonly task: PlanTask;
+  readonly repair: string | null;
+}
+
 /** Renders a located task's view of its model. */
-type Renderer = (model: PlanModel, dispatched: PlanTask) => string;
+type Renderer = (model: PlanModel, dispatched: Dispatched) => string;
 
 /** The heading over the plan-wide context. */
 const PLAN_CONTEXT_HEADING = '## Plan context';
@@ -179,23 +268,84 @@ const CHECKBOXES: Readonly<Record<PlanTaskStatus, string>> = {
   done: '- [x]',
 };
 
-/** The fallback for a task the model does not hold as dispatched. */
-function fallbackFor(reason: InjectionFallbackReason, lineNum: number): Location {
-  const line = lineNum + 1;
-  const found = reason === 'no-task-at-line'
-    ? 'no task the plan model reads'
-    : 'a different task than the one dispatched';
-  const text = `line ${line} of the plan holds ${found}, so the whole plan is handed over; `
-    + 'the plan may have changed since its tracker was copied, or the line sits inside a rafa:* block';
-  return { found: false, fallback: { reason, line, text } };
+/** How every fallback sentence ends. */
+const HANDED_OVER = ', so the whole plan is handed over';
+
+/** `position` as an index into the model's tasks, or null when it names none. */
+function placeOf(position: number | undefined): number | null {
+  return position !== undefined && Number.isInteger(position) && position >= 0
+    ? position
+    : null;
+}
+
+/** The text a fallback sentence says was looked for. */
+const DISPATCHED_TEXT = 'the dispatched text';
+
+/** {@link DISPATCHED_TEXT} when a repair was dispatched. */
+const REPAIRED_TEXT = 'the text the dispatched repair names';
+
+/** The fallback when no task holds the text and none sits at `place`. */
+function noTaskWithText(place: number | null): Location {
+  const beyond = place === null
+    ? ''
+    : ` and no task number ${place + 1}`;
+  const text = `the plan holds no task with ${DISPATCHED_TEXT}${beyond}${HANDED_OVER}; `
+    + 'the plan may have changed since its tracker was copied, or the task line sits inside a rafa:* block';
+  return { found: false, fallback: { reason: 'no-task-with-text', text } };
+}
+
+/** The fallback when `count` tasks hold `sought` and `place` names none of them. */
+function severalTasksWithText(count: number, place: number | null, sought: string): Location {
+  const which = place === null
+    ? 'the dispatch gives no position among its tasks'
+    : `task number ${place + 1} is none of them`;
+  const text = `the plan holds ${count} tasks with ${sought} and ${which}${HANDED_OVER}`;
+  return { found: false, fallback: { reason: 'several-tasks-with-text', text } };
+}
+
+/** The fallback when no task holds the sentence a repair names. */
+function noRepairedTask(): Location {
+  const text = `the plan holds no task with ${REPAIRED_TEXT}${HANDED_OVER}; `
+    + 'the plan may have changed since the repair was written';
+  return { found: false, fallback: { reason: 'no-task-with-text', text } };
 }
 
 /** Finds the dispatched task in the model. See the module note. */
-function locate(model: PlanModel, wanted: InjectionTask): Location {
-  const task = model.tasks.find((candidate) => candidate.lineNum === wanted.lineNum);
-  if (task === undefined) return fallbackFor('no-task-at-line', wanted.lineNum);
-  if (task.task !== wanted.task) return fallbackFor('task-text-differs', wanted.lineNum);
-  return { found: true, task };
+function locate(model: PlanModel, wanted: InjectionTask, position: number | undefined): Location {
+  const place = placeOf(position);
+  const atPlace = place === null
+    ? undefined
+    : model.tasks[place];
+  const holders = model.tasks.filter((candidate) => candidate.task === wanted.task);
+  const [first] = holders;
+
+  if (first === undefined) {
+    return atPlace === undefined
+      ? noTaskWithText(place)
+      : { found: true, task: atPlace };
+  }
+  if (holders.length === 1) return { found: true, task: first };
+  return atPlace !== undefined && holders.includes(atPlace)
+    ? { found: true, task: atPlace }
+    : severalTasksWithText(holders.length, place, DISPATCHED_TEXT);
+}
+
+/** Finds the task whose sentence a repair names. See the module note. */
+function locateRepaired(model: PlanModel, named: string, position: number | undefined): Location {
+  const sentence = named.trim();
+  const holders = model.tasks.filter((candidate) => candidate.text.trim() === sentence);
+  const [first] = holders;
+
+  if (first === undefined) return noRepairedTask();
+  if (holders.length === 1) return { found: true, task: first };
+
+  const place = placeOf(position);
+  const atPlace = place === null
+    ? undefined
+    : model.tasks[place];
+  return atPlace !== undefined && holders.includes(atPlace)
+    ? { found: true, task: atPlace }
+    : severalTasksWithText(holders.length, place, REPAIRED_TEXT);
 }
 
 /** A context body less its outer blank lines, or null when it says nothing. */
@@ -218,15 +368,30 @@ function renderDocument(sections: readonly (string | null)[]): string {
 }
 
 /** The checkbox a task is shown with. See the module note. */
-function shownStatus(task: PlanTask, dispatched: PlanTask): PlanTaskStatus {
-  if (task.lineNum < dispatched.lineNum) return 'done';
-  if (task.lineNum === dispatched.lineNum) return 'unchecked';
-  return task.status;
+function shownStatus(task: PlanTask, dispatched: Dispatched): PlanTaskStatus {
+  if (task.lineNum < dispatched.task.lineNum) return 'done';
+  if (task.lineNum > dispatched.task.lineNum) return task.status;
+  return dispatched.repair === null
+    ? 'unchecked'
+    : 'done';
 }
 
 /** One task line: its checkbox and its text, the declaration off. */
-function taskLine(status: PlanTaskStatus, task: PlanTask): string {
+function taskLine(status: PlanTaskStatus, task: Pick<PlanTask, 'text'>): string {
   return `${CHECKBOXES[status]} ${task.text}`;
+}
+
+/** The dispatched line, shown open: the located task's, or its repair's. */
+function openLine(dispatched: Dispatched): string {
+  return taskLine('unchecked', { text: dispatched.repair ?? dispatched.task.text });
+}
+
+/** `task`'s line in a stage's checklist, the repair's open line below the task it names. */
+function checklistLines(task: PlanTask, dispatched: Dispatched): string[] {
+  const line = taskLine(shownStatus(task, dispatched), task);
+  return task === dispatched.task && dispatched.repair !== null
+    ? [line, openLine(dispatched)]
+    : [line];
 }
 
 /** The plan-wide context's section, or null without a context. */
@@ -259,22 +424,22 @@ function stageListSection(model: PlanModel, dispatched: PlanTask): string | null
 }
 
 /** `stage`: the contexts, the stage's checklist and the stage list. */
-function renderStage(model: PlanModel, dispatched: PlanTask): string {
+function renderStage(model: PlanModel, dispatched: Dispatched): string {
   const checklist = model.tasks
-    .filter((task) => task.stage === dispatched.stage)
-    .map((task) => taskLine(shownStatus(task, dispatched), task));
+    .filter((task) => task.stage === dispatched.task.stage)
+    .flatMap((task) => checklistLines(task, dispatched));
   return renderDocument([
     planContextSection(model),
-    stageSection(model, dispatched, checklist),
-    stageListSection(model, dispatched),
+    stageSection(model, dispatched.task, checklist),
+    stageListSection(model, dispatched.task),
   ]);
 }
 
-/** `task`: the contexts and the dispatched task's line alone. */
-function renderTask(model: PlanModel, dispatched: PlanTask): string {
+/** `task`: the contexts and the dispatched line alone. */
+function renderTask(model: PlanModel, dispatched: Dispatched): string {
   return renderDocument([
     planContextSection(model),
-    stageSection(model, dispatched, [taskLine('unchecked', dispatched)]),
+    stageSection(model, dispatched.task, [openLine(dispatched)]),
   ]);
 }
 
@@ -290,17 +455,25 @@ const RENDERERS: Readonly<Record<Exclude<InjectMode, 'full'>, Renderer>> = {
  * Takes any plan text and any task, answers a new value and never
  * throws. `full` answers the plan text unchanged. `stage` and `task`
  * answer a document built from {@link parsePlan}'s model, or fall back
- * to `full` when the model does not hold the task at its line, and
- * report why. See the module note for what each mode renders.
+ * to `full` when neither the task's text nor its position finds it in
+ * the model, and report why. A repair is rendered by the task
+ * {@link InjectionRequest.repairs} names, and one that names nothing
+ * answers `full` with no fallback. See the module note for what each
+ * mode renders.
  */
 export function renderInjection(request: InjectionRequest): PlanInjection {
-  const { mode, plan, task } = request;
-  if (mode === 'full') return { requested: mode, mode, text: plan, fallback: null };
+  const { mode, plan, task, position, repairs } = request;
+  if (mode === 'full' || repairs === null) return { requested: mode, mode: 'full', text: plan, fallback: null };
 
   const model = parsePlan(plan);
-  const location = locate(model, task);
+  const location = repairs === undefined
+    ? locate(model, task, position)
+    : locateRepaired(model, repairs, position);
   if (!location.found) {
     return { requested: mode, mode: 'full', text: plan, fallback: location.fallback };
   }
-  return { requested: mode, mode, text: RENDERERS[mode](model, location.task), fallback: null };
+  const repair = repairs === undefined
+    ? null
+    : parseTaskDeclaration(task.task).text.trim();
+  return { requested: mode, mode, text: RENDERERS[mode](model, { task: location.task, repair }), fallback: null };
 }

@@ -395,6 +395,7 @@ import {
 import {
   bindEventsFile,
   emitLoopEvent,
+  injectionPlace,
   taskPosition,
   taskTokens,
   unbindEventsFile,
@@ -778,6 +779,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         taskInfo,
         promptContent,
         planContent,
+        place: injectionPlace(trackerContent, taskInfo),
         inject: injectMode,
         repoRoot,
         checkout,

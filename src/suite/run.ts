@@ -87,6 +87,19 @@
  * when stderr held none of the three, so the file on disk is always this
  * run's.
  *
+ * ## The output tail
+ *
+ * A result carries {@link SuiteResult.outputTail} too: the last
+ * {@link OUTPUT_TAIL_LINES} non-blank lines of stderr, trailing spaces
+ * removed, in the order Bun printed them, and none when stderr held no
+ * such line ({@link readOutputTail}). It is the evidence of a run that
+ * exits nonzero and names no failing case, where the JUnit file is silent
+ * and no `# Unhandled error between tests` block need have been printed.
+ * It is cut by position alone: no line is chosen or dropped for what it
+ * says, a blank one aside, so it decides nothing and a caller reads the
+ * exit code for that. The baseline file does not hold it, as it does not
+ * hold `unhandled` (`./baseline.ts`).
+ *
  * ## How a test is named
  *
  * A `<testsuite>` directly under `<testsuites>` is a test file; each one
@@ -218,6 +231,12 @@ export interface SuiteResult {
    */
   readonly unhandled: readonly UnhandledError[];
   /**
+   * The last {@link OUTPUT_TAIL_LINES} non-blank lines of stderr, in the
+   * order Bun printed them; none when stderr held no such line. See the
+   * module note.
+   */
+  readonly outputTail: readonly string[];
+  /**
    * True when Bun found no test file to run at all (a project with none,
    * which it reports as an error and exit code 1); absent otherwise.
    */
@@ -288,6 +307,22 @@ const NO_TEST_FILES_LINE = /^(?:error: 0 test files matching |No tests found!)/m
 /** True when `stderr` is Bun saying the project holds no test file at all. */
 export function readNoTestFiles(stderr: string): boolean {
   return NO_TEST_FILES_LINE.test(stderr);
+}
+
+/** How many lines of stderr {@link SuiteResult.outputTail} holds at most. */
+export const OUTPUT_TAIL_LINES = 20;
+
+/**
+ * The last {@link OUTPUT_TAIL_LINES} non-blank lines of `stderr`, their
+ * trailing spaces removed, in the order they were printed; none when it
+ * holds no such line. See the module note, "The output tail".
+ */
+export function readOutputTail(stderr: string): readonly string[] {
+  return stderr
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line !== '')
+    .slice(-OUTPUT_TAIL_LINES);
 }
 
 /** `path` as `bun test` reads it as a path rather than a filter; see the module note. */
@@ -552,7 +587,8 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const { summary, errors } = readSummary(stderr);
   const failures = withErrorLines(named, cases);
   const unhandled = parseUnhandled(stderr);
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, fileOrder: [files] };
+  const outputTail = readOutputTail(stderr);
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files] };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

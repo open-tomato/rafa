@@ -4,8 +4,9 @@
  *
  * {@link blockerText} names each new failing test file with its count,
  * the command running them (`bun test <files>`), what Bun printed for
- * them, and the errors or the missing summary when those made the step
- * red. What Bun printed is the first error line of each new failure
+ * them, and the errors, the missing summary or the run that failed
+ * outside any test case when those made the step red. What Bun printed
+ * is the first error line of each new failure
  * (`suite/failure-lines.ts`), which the JUnit report does not hold:
  * quoted by file, each distinct line once with how many of the file's
  * tests printed it. The blocker is one tracker line, the repair task's
@@ -45,7 +46,14 @@
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
- * named, the inherited ones included. Each path in a `bun test` command
+ * named, the inherited ones included. A run that exited nonzero and
+ * listed no failing case ({@link StepVerdict.outsideCase}) has that said
+ * in `outsideCaseText`'s sentence (`suite-outside-case.ts`): its exit
+ * code, `OUTSIDE_CASE_REASON`, and the end of the run's output tail,
+ * kept to a few hundred characters as the error lines are, by that
+ * module's own two caps. It follows the sentences on the errors and on
+ * the missing summary, which the same run can also be red on. Each path
+ * in a `bun test` command
  * is written as {@link runnablePath} spells it, `./` before a relative
  * one: bun reads an argument without `./` or `/` as a substring filter,
  * so a bare `x.test.ts` would also run `a/x.test.ts`.
@@ -63,14 +71,31 @@
  * the repair before anything else, handed the blocker. With no open task
  * left the line goes after the checklist's last task.
  *
+ * A repair exists in the tracker alone, so its line also says which
+ * plan task it repairs, in a `<!-- repairs: <text> -->` comment between
+ * its declaration and its blocker (`insertTrackerTask` writes it,
+ * escaped as the blocker is, and `findNextTask` answers it as
+ * `TaskInfo.repairs`). A task step's repair names the task whose step
+ * was red ({@link RepairSite.task}). A stage step's repair names the
+ * last task of that stage ({@link RepairSite.stage}), a repair line
+ * that closes the stage passed over, since a name is a plan task's
+ * text. A pre-wrap-up step's repair names nothing and its line holds
+ * no such comment: the whole suite is what it repairs. Nothing is
+ * named either by a stage step told no stage, or by a repair inserted
+ * for a repair whose own line the tracker no longer holds, below.
+ *
  * A red task step that follows a repair task, its task text one
  * {@link isRepairTask} reads, writes its blocker on that repair's own line
  * instead and inserts nothing: the line, ticked by the repair's commit,
  * is opened and marked `[BLOCKED]` again through `writeTrackerBlocker`,
- * its text and the commit it names kept. So a repair that leaves the
+ * its text and the commit it names kept, and with them the repairs
+ * comment, which the tick left on the line: the repair still names the
+ * task it named when it was inserted. So a repair that leaves the
  * suite red is retried on its own line, and the tracker never holds two
  * repairs for one red step. Should no line carry that text, a repair is
- * inserted as for any task.
+ * inserted as for any task, naming nothing. A repair a tracker held
+ * before the comment was written has none, and blocked again it still
+ * names nothing.
  *
  * A red pre-wrap-up step runs with no open task left, so its repair,
  * `Repair the red pre-wrap-up step at commit <sha>`, goes after the
@@ -83,13 +108,17 @@
  * caller halts on.
  */
 import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
+import type { PlanTask } from '../plan/parse.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
+import type { InsertedTask } from '../utils/tracker.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { parsePlan } from '../plan/parse.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
+
+import { outsideCaseText } from './suite-outside-case.js';
 
 /** A step's failures split against the baseline, and what else can make it red. */
 export interface StepVerdict {
@@ -98,6 +127,8 @@ export interface StepVerdict {
   readonly newErrors: number;
   /** True when Bun exited nonzero and printed no summary. */
   readonly unreported: boolean;
+  /** True when the run failed outside any test case (`failedOutsideAnyCase`, `suite-outside-case.ts`). */
+  readonly outsideCase: boolean;
 }
 
 /** Each file among `failures` and how many of its tests failed, in first-seen order. */
@@ -311,12 +342,13 @@ const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
 /**
  * The blocker a red step writes: the new failing files with their
  * counts, the command running them and what Bun printed for them, then
- * the errors outside any test by file and first line, or the missing
- * summary, when those made it red. `label` names the step. `alone` is
+ * the errors outside any test by file and first line, the missing
+ * summary, or the run that failed outside any test case with the end of
+ * its output, when those made it red. `label` names the step. `alone` is
  * what the step's newly red files read when run alone, when they were:
  * see the module note.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: AloneSaid): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled' | 'outputTail'>, verdict: StepVerdict, alone?: AloneSaid): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   const afterTouched = (alone?.afterTouched ?? []).filter((entry) => files.some(([file]) => file === entry.file));
@@ -338,6 +370,7 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' 
   if (afterTouched.length > 0) parts.push(afterTouchedText(afterTouched));
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
+  if (verdict.outsideCase) parts.push(outsideCaseText(result));
   const stepOnly = alone?.stepOnly ?? [];
   if (stepOnly.length > 0) parts.push(`${STEP_ONLY_LEAD}: ${stepOnly.map((entry) => `${entry.file} (${testCount(entry.tests.length)})`).join(', ')}.`);
   return parts.join(' ');
@@ -368,6 +401,11 @@ export interface RepairSite {
   readonly commit: string | null;
   /** The task step's task text, its declaration taken off; absent for a stage step. */
   readonly task?: string;
+  /**
+   * The stage step's stage, as the index of its heading among the
+   * tracker's (`PlanTask.stage`); absent for the other steps.
+   */
+  readonly stage?: number;
 }
 
 /** What {@link writeRepairTask} wrote. */
@@ -392,23 +430,45 @@ export function isRepairTask(text: string): boolean {
 }
 
 /** The line of the last task whose sentence is `text`, or null. */
-function lineOfTask(content: string, text: string): number | null {
-  const found = parsePlan(content).tasks.filter((task) => task.text === text.trim());
+function lineOfTask(tasks: readonly PlanTask[], text: string): number | null {
+  const found = tasks.filter((task) => task.text === text.trim());
   return found.at(-1)?.lineNum ?? null;
 }
 
 /** The line of the last ticked pre-wrap-up repair task, or null. */
-function lineOfTickedPreWrapUpRepair(content: string): number | null {
-  const found = parsePlan(content).tasks.filter((task) => task.status === 'done' && PRE_WRAP_UP_REPAIR.test(task.text.trim()));
+function lineOfTickedPreWrapUpRepair(tasks: readonly PlanTask[]): number | null {
+  const found = tasks.filter((task) => task.status === 'done' && PRE_WRAP_UP_REPAIR.test(task.text.trim()));
   return found.at(-1)?.lineNum ?? null;
 }
 
 /** The existing repair `site` writes its blocker on, or null when it inserts one; see the module note. */
-function existingRepairOf(content: string, site: RepairSite): number | null {
-  if (site.kind === 'pre-wrap-up') return lineOfTickedPreWrapUpRepair(content);
+function existingRepairOf(tasks: readonly PlanTask[], site: RepairSite): number | null {
+  if (site.kind === 'pre-wrap-up') return lineOfTickedPreWrapUpRepair(tasks);
   return site.task !== undefined && isRepairTask(site.task)
-    ? lineOfTask(content, site.task)
+    ? lineOfTask(tasks, site.task)
     : null;
+}
+
+/** The sentence of the last task of stage `stage` that is no repair's, or null. */
+function lastTaskOfStage(tasks: readonly PlanTask[], stage: number): string | null {
+  const held = tasks.filter((task) => task.stage === stage && !isRepairTask(task.text));
+  return held.at(-1)?.text.trim() ?? null;
+}
+
+/**
+ * The plan task a repair inserted for `site` names in its repairs
+ * comment, or null when it names none; see the module note.
+ */
+function repairedBy(tasks: readonly PlanTask[], site: RepairSite): string | null {
+  if (site.kind === 'pre-wrap-up') return null;
+  if (site.kind === 'stage') {
+    return site.stage === undefined
+      ? null
+      : lastTaskOfStage(tasks, site.stage);
+  }
+  return site.task === undefined || isRepairTask(site.task)
+    ? null
+    : site.task.trim();
 }
 
 /** Writes `blocker` on the repair task at `line`, opening it first when ticked. */
@@ -428,15 +488,25 @@ function blockRepairAgain(trackerPath: string, content: string, line: number, bl
  * Writes `blocker` on a repair task: the repair `site.task` names when
  * the step follows one, or for a pre-wrap-up step the ticked pre-wrap-up
  * repair the tracker holds, else one inserted above the first open plan
- * task. Answers the line written, or null when an existing repair's line
+ * task, its line naming the plan task it repairs when `site` has one.
+ * Answers the line written, or null when an existing repair's line
  * would not take it. See the module note.
  */
 export function writeRepairTask(trackerPath: string, blocker: string, site: RepairSite): RepairWritten | null {
   const content = readFileSync(trackerPath, 'utf8');
-  const repaired = existingRepairOf(content, site);
-  if (repaired !== null) return blockRepairAgain(trackerPath, content, repaired, blocker);
+  const { tasks } = parsePlan(content);
+  const existing = existingRepairOf(tasks, site);
+  if (existing !== null) return blockRepairAgain(trackerPath, content, existing, blocker);
 
-  const firstOpen = parsePlan(content).tasks.find((task) => task.status !== 'done')?.lineNum ?? null;
-  const entry = { task: repairTaskText(site.kind, site.commit), declaration: `agent=${REPAIR_AGENT}`, blocker };
+  const firstOpen = tasks.find((task) => task.status !== 'done')?.lineNum ?? null;
+  const repairs = repairedBy(tasks, site);
+  const entry: InsertedTask = {
+    task: repairTaskText(site.kind, site.commit),
+    declaration: `agent=${REPAIR_AGENT}`,
+    blocker,
+    ...(repairs === null
+      ? {}
+      : { repairs }),
+  };
   return { line: insertTrackerTask(trackerPath, entry, firstOpen), inserted: true };
 }

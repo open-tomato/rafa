@@ -11,7 +11,8 @@
  * promote the listed lessons, commit, push and open the pull request,
  * and the earlier session may have done any part of that or none. So
  * the prompt is {@link buildWrapUpPrompt}'s, built with no open pull
- * request, which gives it the `gh pr create --base <base>` bullet over
+ * request and the provider the caller resolved, which under `gh` gives
+ * it the `gh pr create --base <base>` bullet over
  * the run's base as `runWrapUp` resolved it once, with the list of the
  * test files red only in a suite step the first one carried
  * (`start/step-only-report.ts`), since the retry is the session whose
@@ -34,6 +35,13 @@
  * whitespace — a session that crashed before answering — is named as
  * such instead of being quoted as an empty block.
  *
+ * The provider is handed through and never defaulted (#977), as the
+ * first wrap-up's is. `runWrapUp` (`start/wrap-up-run.ts`) delivers no
+ * pull request under `pr.provider: none`, so it spawns no retry there;
+ * a prompt built under `none` all the same carries no `gh pr create`
+ * bullet, only the missing-pull-request bullet above the first
+ * prompt's.
+ *
  * ## Spawning one
  *
  * {@link retryWrapUp} spawns the session through `runWrapUpSession`
@@ -49,7 +57,7 @@
  * verifies or commits, and would leave the dirty tree the runner then
  * refuses to open a pull request over (`start/runner-pr.ts`).
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource, PrProvider } from '../config.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
@@ -67,6 +75,8 @@ export interface WrapUpRetryPrompt {
   readonly base: string;
   /** The plan the run executed, appended whole as the wrap-up's is. */
   readonly planContent: string;
+  /** The run's `pr.provider`, as the first wrap-up was given it. */
+  readonly provider: PrProvider;
   /** Step 1's release record, as the first wrap-up was given it, or null. */
   readonly release: ReleasePreparation | null;
   /** The lessons to promote, as the first wrap-up was given them. */
@@ -106,7 +116,7 @@ export function missingPullRequestBullet(branch: string, previousMessage: string
  * line. The caller stamps it (`start/stamp.ts`), as it does the first.
  */
 export function buildWrapUpRetryPrompt(retry: WrapUpRetryPrompt): string {
-  const first = buildWrapUpPrompt(retry.branch, retry.base, retry.planContent, null, retry.release, retry.lessons, retry.stepOnly);
+  const first = buildWrapUpPrompt(retry.branch, retry.base, retry.planContent, retry.provider, null, retry.release, retry.lessons, retry.stepOnly);
   const [classifierKey, ...rest] = first.split('\n');
   return [
     classifierKey,
@@ -125,6 +135,8 @@ export interface WrapUpRetryRun {
   readonly base: string;
   /** The plan the run executed. */
   readonly planContent: string;
+  /** The run's `pr.provider`, as the caller resolved it; required, with no default. */
+  readonly provider: PrProvider;
   /** The setting sources every session the run spawns loads. */
   readonly settingSources: readonly ClaudeSettingSource[];
   /** What the session is served against, or null to serve nothing. */
@@ -145,10 +157,10 @@ export interface WrapUpRetryRun {
  * note.
  */
 export function retryWrapUp(run: WrapUpRetryRun): Promise<string> {
-  const { branch, base, planContent, previousMessage } = run;
+  const { branch, base, planContent, provider, previousMessage } = run;
   const stepOnly = run.stepOnly ?? [];
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, base, planContent, release: null, lessons, previousMessage, stepOnly }),
+    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, base, planContent, provider, release: null, lessons, previousMessage, stepOnly }),
     settingSources: run.settingSources,
     serving: run.serving,
     learning: run.learning,

@@ -13,7 +13,9 @@
  * `errorLines` cases read a new failure's error lines back, and a value
  * that is no list of lines as no lines at all. The `stepOnly` cases read
  * the files red only in the step back, and leave out an entry outside
- * its shape without refusing the record.
+ * its shape without refusing the record. The `outsideCase` cases read
+ * the mark and its output tail back as a pair, and a mark that is not
+ * `true` as neither key.
  */
 import type { SessionDraft, SessionRecord, SessionStep, SessionStepOnly } from './sessions.js';
 
@@ -392,6 +394,67 @@ describe('parseSessionRecord and the steps field', () => {
     const [step] = sessionSteps(parseSessionRecord(stepText({ stepOnly: [{ ...STEP_ONLY, position: 'second' }, STEP_ONLY] }), FILE));
 
     expect(step?.stepOnly).toEqual([STEP_ONLY]);
+  });
+
+  it('writes outsideCase with its output tail after the new failures, reads the pair back frozen, and adds neither key to a step without', () => {
+    const root = freshRoot();
+    beginSession(root, draft(), { isAlive: ALIVE });
+    const tail = ['error: Cannot find package \'zod\' from \'/repo/src/a.test.ts\'', ' 1 error'];
+    const step: SessionStep = { ...TASK_STEP, failures: [], newFailures: [], outsideCase: true, outputTail: tail };
+
+    updateSession(root, ID, { appendStep: BASELINE });
+    const record = updateSession(root, ID, { appendStep: step });
+    const stored = JSON.parse(readFileSync(sessionFilePath(root, ID), 'utf8')) as { steps: object[] };
+    const [first, read] = sessionSteps(readSession(root, ID, { isAlive: ALIVE }));
+
+    expect(sessionSteps(record)).toEqual([BASELINE, step]);
+    expect(Object.keys(stored.steps[0] ?? {})).toEqual(Object.keys(BASELINE));
+    expect(Object.keys(stored.steps[1] ?? {}).slice(-3)).toEqual(['newFailures', 'outsideCase', 'outputTail']);
+    expect(Object.keys(first ?? {})).toEqual(Object.keys(BASELINE));
+    expect(read?.outsideCase).toBe(true);
+    expect(read?.outputTail).toEqual(tail);
+    expect(Object.isFrozen(read?.outputTail)).toBe(true);
+    // The pair sits after stepOnly and before the interrupted mark on a stored step holding all of them.
+    const all = parseSessionRecord(stepText({ stepOnly: [STEP_ONLY], outsideCase: true, outputTail: tail, interrupted: true }), FILE);
+    expect(Object.keys(sessionSteps(all)[0] ?? {}).slice(-4)).toEqual(['stepOnly', 'outsideCase', 'outputTail', 'interrupted']);
+  });
+
+  it('reads an outsideCase step whose run printed nothing with an empty tail', () => {
+    const [step] = sessionSteps(parseSessionRecord(stepText({ outsideCase: true, outputTail: [] }), FILE));
+
+    expect(step).toEqual({ ...BASELINE, outsideCase: true, outputTail: [] });
+  });
+
+  it.each([
+    ['false', false],
+    ['null', null],
+    ['a string', 'true'],
+    ['a number', 1],
+  ])('reads outsideCase set to %s as neither key, its tail left out with it, refusing nothing', (_label, outsideCase) => {
+    const [step] = sessionSteps(parseSessionRecord(stepText({ outsideCase, outputTail: [' 1 error'] }), FILE));
+
+    expect(Object.keys(step ?? {})).toEqual(Object.keys(BASELINE));
+    expect(step).toEqual(BASELINE);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a string', ' 1 error'],
+    ['a list holding a number', [' 1 error', 3]],
+  ])('reads the tail of an outsideCase step as empty when it is %s, keeping the mark', (_label, outputTail) => {
+    const [step] = sessionSteps(parseSessionRecord(stepText({ outsideCase: true, outputTail }), FILE));
+
+    expect(step).toEqual({ ...BASELINE, outsideCase: true, outputTail: [] });
+    // Control: a tail that is a list of strings is read as it is.
+    const [whole] = sessionSteps(parseSessionRecord(stepText({ outsideCase: true, outputTail: [' 1 error'] }), FILE));
+    expect(whole?.outputTail).toEqual([' 1 error']);
+  });
+
+  it('leaves out an output tail on a step that carries no outsideCase mark', () => {
+    const [step] = sessionSteps(parseSessionRecord(stepText({ outputTail: [' 1 error'] }), FILE));
+
+    expect(Object.keys(step ?? {})).toEqual(Object.keys(BASELINE));
   });
 
   it('names the place of a bad step after good ones', () => {
