@@ -680,7 +680,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
     ['../../core/command/index.js', ['CommandExit']],
+    ['./edit-priority.js', ['PRIORITY_FLAG']],
     ['./edit-run.js', ['editIssue', 'renderEditReport']],
   ]],
   ['./commands/pr/current.js', [
