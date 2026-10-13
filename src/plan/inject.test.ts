@@ -866,4 +866,51 @@ describe('a tracker walked through the loop', () => {
     // Control: the tracker the walk compared against did change.
     expect(readFileSync(trackerPath, 'utf8')).not.toBe(PLAN);
   });
+
+  it('renders a repair inserted after a red task step as the stage it closed, and each later task as its own', () => {
+    const trackerPath = join(dir, 'PLAN_TRACKER-walk-repair.md');
+    writeFileSync(trackerPath, PLAN);
+    const read = () => readFileSync(trackerPath, 'utf8');
+    const REPAIR_LINE = /^Repair the red /;
+
+    // The stage's three tasks are done, and the last one's step was red.
+    for (let ticked = 0; ticked < 3; ticked += 1) {
+      updateTrackerLine(trackerPath, findNextTask(read())!.lineNum, 'done');
+    }
+    insertTrackerTask(
+      trackerPath,
+      { task: 'Repair the red task step at commit 6666666', declaration: 'agent=build-error-resolver', blocker: 'the suite went red', repairs: 'Add the fixtures' },
+      findNextTask(read())!.lineNum,
+    );
+
+    const seen: string[] = [];
+    let info = findNextTask(read());
+    while (info !== null && seen.length < 10) {
+      const tracker = read();
+      const isRepair = REPAIR_LINE.test(info.task);
+      const above = listTrackerTasks(tracker).filter((held) => held.lineNum < info!.lineNum && !REPAIR_LINE.test(held.task)).length;
+      const position = isRepair
+        ? above - 1
+        : above;
+      const rendered = renderInjection({ mode: 'stage', plan: PLAN, task: info, position, ...(info.repairs === undefined
+        ? {}
+        : { repairs: info.repairs }) });
+
+      expect(rendered.fallback).toBeNull();
+      expect(rendered.mode).toBe('stage');
+      const [stage, current] = isRepair || position < 3
+        ? ['## Stage: schema', '1. schema (current stage)']
+        : ['## Stage: api', '2. api (current stage)'];
+      expect(rendered.text).toContain(stage);
+      expect(rendered.text).toContain(current);
+      expect(rendered.text).toContain(`- [ ] ${info.task.replace(/\s+\{.*\}$/, '')}`);
+
+      seen.push(info.task.replace(/\s+\{.*\}$/, ''));
+      updateTrackerLine(trackerPath, info.lineNum, 'done');
+      info = findNextTask(read());
+    }
+
+    // Control: the repair came first, and every later task was dispatched.
+    expect(seen).toEqual(['Repair the red task step at commit 6666666', 'Add the route', 'Add the handler']);
+  });
 });
