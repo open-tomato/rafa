@@ -74,10 +74,11 @@
  * freely as the canonical one, so the dispatcher writes no deprecation
  * line for it (`dispatch.ts`).
  */
-import type { RafaCommand } from './command.js';
 import type { CommandAlias, CommandRegistry, ModuleMount, SubjectSpec } from './registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
-import { commandSpelling } from './command.js';
+import { commandSpelling } from '../core/command/index.js';
+
 import { HELP_WORD, mountKey } from './registry.js';
 
 /** The refusals a line routes to. */

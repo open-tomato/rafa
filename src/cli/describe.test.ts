@@ -45,15 +45,15 @@
  * `outputs` and a blank `description` each reddened the completeness case
  * over the core registry and nothing else.
  */
-import type { RafaCommand } from './command.js';
 import type { DescribedAction, DescribeDocument } from './describe.js';
 import type { CommandRegistry } from './registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CORE_REGISTRY } from '../commands/index.js';
+import { commandSpelling, isTopLevel } from '../core/command/index.js';
 
-import { commandSpelling, isTopLevel } from './command.js';
 import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from './describe.js';
 import { createCommandRegistry, mountKey } from './registry.js';
 import { routeLine } from './route.js';

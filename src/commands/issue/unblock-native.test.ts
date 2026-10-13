@@ -23,7 +23,7 @@
 import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectRefresh } from '../../board/project/refresh.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

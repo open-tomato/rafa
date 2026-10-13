@@ -46,7 +46,7 @@
 import type { TypeCheckRecipe } from './type-step.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { gitSaid } from '../pr/index.js';
 
 import { scratchTsconfigFields, TEST_FILE_SUFFIX, tscArgv } from './type-step.js';

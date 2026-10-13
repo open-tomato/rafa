@@ -69,8 +69,8 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
+import { CONFIG_DEFAULTS, configFilePath } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,

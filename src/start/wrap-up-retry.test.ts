@@ -16,12 +16,12 @@
  * the prompt it spawned, the directory it spawned in, and the message it
  * answered.
  */
+import type { CapturedSpawnOptions } from '../core/loop/index.js';
 import type { ReleaseSkipped } from '../release/prepare.js';
-import type { CapturedSpawnOptions } from '../utils/claude.js';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

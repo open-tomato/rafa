@@ -102,11 +102,11 @@
  * whether the loop ran it or a person typed it.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { CheckRow, ChecksVerdict } from '../../pr/index.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';

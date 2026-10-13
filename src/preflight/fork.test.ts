@@ -30,7 +30,7 @@
  */
 import type { ForkOptions } from './fork.js';
 import type { PreflightTiers } from './run.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 
 import {
   chmodSync,

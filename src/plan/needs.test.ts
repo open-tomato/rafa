@@ -30,7 +30,7 @@
  * part of `readPlanNeeds` over each, so the two cannot drift apart.
  */
 import type { Need, NeedsReading, NeedsSeams } from './needs.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

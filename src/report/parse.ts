@@ -71,7 +71,7 @@
  *
  * A readable block answers a {@link TaskReport}, plus
  * {@link ReportPresent.issues} for whatever it did not read as written.
- * The rules are the ones `plan/parse.ts` applies to a plan header.
+ * The rules are the ones `core/plan/parse.ts` applies to a plan header.
  *
  *   - An UNKNOWN key, at the top level or inside an entry, is retained in
  *     that level's `extras` and acts on nothing. This is the rule
@@ -156,9 +156,9 @@
  *     Keys are matched against a list of names, never looked up by
  *     object index, so such a key lands in `extras`.
  */
-import type { RafaBlock } from '../plan/blocks.js';
+import type { RafaBlock } from '../core/plan/block-reader.js';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 /** What a session says of its own task. The loop's outcome is separate. */
 export const REPORT_STATUSES = ['done', 'blocked'] as const;

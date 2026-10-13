@@ -12,8 +12,8 @@
  */
 import type { PlantedProject } from './cli-capture.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { LoopSessionSeams } from '../loop/session-readings.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
+import type { LoopSessionSeams } from '../core/loop/readings.js';
 
 import {
   mkdirSync,
@@ -24,7 +24,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { runsDir, sessionFilePath } from '../loop/sessions.js';
+import { runsDir, sessionFilePath } from '../core/loop/index.js';
 
 import { eventsOf, plantProject } from './cli-capture.js';
 

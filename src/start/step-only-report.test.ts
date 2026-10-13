@@ -8,7 +8,7 @@
  * steps holding no such file, where nothing is: no section, no heading
  * and no line printed.
  */
-import type { SessionStep, SessionStepOnly } from '../loop/sessions.js';
+import type { SessionStep, SessionStepOnly } from '../core/loop/index.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,8 +16,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { beginSession, sessionFilePath, updateSession } from '../loop/sessions.js';
+import { beginSession, sessionFilePath, updateSession } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

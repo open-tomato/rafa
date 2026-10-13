@@ -19,7 +19,7 @@ import type { Script } from '../tests/release-stage-fixtures.js';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { RELEASE_BLOCK_CLOSE } from '../release/branch-forecast.js';
 import {
   BRANCH,

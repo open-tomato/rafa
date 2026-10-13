@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../board/epic-template.js';
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 import {
   buildVerifyPrompt,

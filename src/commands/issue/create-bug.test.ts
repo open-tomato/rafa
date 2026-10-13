@@ -7,7 +7,7 @@
  * seam answering a fixed commit, so no case reads this checkout.
  */
 import type { IssueSeams } from './issue-tracker.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
-import { RAFA_VERSION } from '../../cli/version.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
 import { dispatchInProject, plantProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createIssueCreateCommand } from './create.js';

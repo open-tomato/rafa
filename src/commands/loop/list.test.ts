@@ -18,7 +18,7 @@
  * other cases plant hold none, as an older rafa writes them, and read
  * `task`.
  */
-import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,7 +26,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SESSION_PHASES } from '../../loop/sessions.js';
+import { SESSION_PHASES } from '../../core/loop/index.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER_PATH,

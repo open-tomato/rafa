@@ -48,7 +48,7 @@ import type { EffortRowKind } from '../store.js';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { EFFORT_STORE_DIR, effortStoreFileName } from '../store.js';
 
 import { SQLITE_STORE_FILE_NAME } from './sqlite.js';

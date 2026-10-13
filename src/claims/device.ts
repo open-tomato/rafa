@@ -65,7 +65,7 @@
  * why `absent` does not name the move: it would not help, and the store
  * is made, and its id minted, by its first write that adds a row.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { existsSync } from 'node:fs';
 

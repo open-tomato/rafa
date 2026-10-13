@@ -19,8 +19,8 @@
  * session's. Both are asked, so no pass comes from an answer that ignores
  * the environment. No case reads the real `PATH`, home or `origin`.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
 import type { DeepSection } from './doctor-deep-row.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

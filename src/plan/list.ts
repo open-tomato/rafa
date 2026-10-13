@@ -27,12 +27,12 @@
  * The directory is the {@link PlansDir} the caller hands over, already
  * resolved; reading `plan.dir` off a config is the caller's.
  */
-import type { PlansDir, TaskCounts } from './plan-files.js';
+import type { PlansDir, TaskCounts } from '../core/plan/index.js';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { countTasks, isFile, planFileName, stubOfPlanFile } from './plan-files.js';
+import { countTasks, isFile, planFileName, stubOfPlanFile } from '../core/plan/index.js';
 
 import { parsePlan } from './index.js';
 

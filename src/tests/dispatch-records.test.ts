@@ -9,7 +9,7 @@
  * bundle is pulled through a registered stub adapter, and the row is read
  * back from the SQLite store with a raw query.
  */
-import type { TierPin } from '../config-sections.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
@@ -23,8 +23,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
 

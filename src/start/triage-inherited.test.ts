@@ -39,8 +39,8 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';

@@ -55,7 +55,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { PullRequestComment } from '../pr/index.js';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -69,8 +69,8 @@ import { specPath } from '../board/naming.js';
 import { inspectRoadmapIssue, resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ghBoardTrust } from '../board/trust.js';
-import { CommandExit } from '../cli/command.js';
 import { requireTrustedResolveAuthor, readTrustedTriageComment } from '../commands/pr/triage-trust.js';
+import { CommandExit } from '../core/command/index.js';
 import { TRIAGE_MARKER } from '../pr/triage/comment.js';
 
 import { sinkOutput } from './output-sinks.js';

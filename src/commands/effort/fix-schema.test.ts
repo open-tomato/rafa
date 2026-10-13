@@ -18,10 +18,10 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { beginSession } from '../../core/loop/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../../effort/store/sqlite.js';
-import { beginSession } from '../../loop/sessions.js';
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createFixSchemaCommand } from './fix-schema.js';

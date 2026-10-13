@@ -52,8 +52,8 @@
  * reads empty there holds two entries here.
  */
 import type { WrapUpLearning } from './wrap-up.js';
-import type { AdapterContext } from '../adapters/registry.js';
-import type { PrProvider } from '../config.js';
+import type { AdapterContext } from '../core/adapters/index.js';
+import type { PrProvider } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';
@@ -61,9 +61,9 @@ import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { actionHash } from '../learning/index.js';
 import { serializeFragment } from '../release/fragment.js';

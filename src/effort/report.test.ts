@@ -127,8 +127,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../config-load.js';
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 import { expectExit } from '../tests/cli-capture.js';
 

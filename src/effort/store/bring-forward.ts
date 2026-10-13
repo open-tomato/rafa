@@ -82,7 +82,7 @@ import type {
 } from './schema-plan.js';
 import type { Database } from 'bun:sqlite';
 
-import { RAFA_VERSION } from '../../cli/version.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
 
 import { ADOPTION_NAME, refuseUnownedDevelopmentWrite } from './development-build.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';

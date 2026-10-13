@@ -70,8 +70,8 @@
  * roster order case and the refusal listing the actions of `effort`.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand } from '../cli/command.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -80,9 +80,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { commandProblem, commandSpelling } from '../cli/command.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { commandProblem, commandSpelling } from '../core/command/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';

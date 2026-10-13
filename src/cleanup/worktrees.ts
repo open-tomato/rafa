@@ -46,7 +46,7 @@
  *   - **current**: the command's working directory is the worktree or a
  *     directory inside it.
  *   - **session**: a loop session record reads `running` or `paused`
- *     (`readState`, `src/loop/sessions.ts`: a pid that is gone reads
+ *     (`readState`, `src/core/loop/sessions.ts`: a pid that is gone reads
  *     `stopped`) and is either kept under the worktree's own
  *     `.rafa/runs/`, or kept under the project root's and names the
  *     worktree's branch. The second is the common case: `.rafa/` is
@@ -89,15 +89,15 @@
  * {@link WorktreesUnread}; a failure reading one worktree is that
  * worktree's `unreadable` blocker.
  */
-import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import { realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
-import { readSessions, runsDir } from '../loop/sessions.js';
-import { createGitRunner, gitSaid } from '../pr/git.js';
+import { messageOf } from '../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
+import { readSessions, runsDir } from '../core/loop/index.js';
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { worktreeDirAt } from '../start/worktree-dir.js';

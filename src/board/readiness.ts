@@ -149,7 +149,7 @@
  * inside it. A section holding nothing but the template's comment is one
  * fault, and naming it twice sends the author looking for a second one.
  */
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 /** The label a person puts on an issue that is ready to plan from. */
 export const SPEC_READY_LABEL = 'spec:ready';

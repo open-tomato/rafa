@@ -15,26 +15,129 @@ spells out, and the shapes the lint config forces.
   `index.test.ts` measures it.
 - **A cross-subject helper import is the convention, not a smell.**
   Shared refusals and readers live in the subject that first needed them
-  rather than in a neutral module: eighteen command modules import
-  `../plan/plan-files.js`, and `src/commands/release/tag.ts` takes
-  `versionTag` from `../../release/version-tag.js` so two writers cannot
-  spell one tag differently. Reach for the existing helper — a second
-  spelling of a refusal is the real smell, as `release status`'s
-  hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared
-  `expectNoArgument`, which says `Expected no argument`.
+  rather than in a neutral module: command modules take the plan readers
+  from the plan barrel, `../../core/plan/index.js`, and
+  `src/commands/release/tag.ts` takes `versionTag` from
+  `../../release/version-tag.js` so two writers cannot spell one tag
+  differently. Reach for the existing helper — a second spelling of a
+  refusal is the real smell, as `release status`'s hand-rolled
+  `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
+  shared `expectNoArgument`, which says `Expected no argument`.
 - **Every `import type` line forms one `import/order` group**
   (`sharedRules.mjs`), and no short rule predicts its order: neither plain
   name order, "every sibling before every parent", nor path depth first,
-  as this bullet read until 2026-09-24. `src/plan/risk.ts` spells
-  `./parse.js`, `../config.js`, `./risk/accounts.js`,
-  `../utils/declaration.js`, while `src/inventory/search/index.ts` puts
-  `../record.js` after `../../utils/claude.js`. Take the order from
+  as this bullet read until 2026-09-24. `src/plan/risk.ts` puts its two
+  `./risk/` lines first and its `../core/` and `../utils/` lines after,
+  while `src/board/project/rules.ts` puts `./options.js` last, after its
+  `../` lines. Both pass eslint. Take the order from
   `bunx eslint --fix-dry-run --format json <file>`, not from this page.
   Value imports differ: the `parent` group (`../`) comes before the
   `sibling` group (`./`), a blank line between them.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
+
+### Core and its barrels
+
+**Core is `src/core/`, the code every part of rafa reads.** The nineteen
+files that #905 moves there are the connective tissue of the codebase:
+graph analysis calls such files high-betweenness nodes, since many paths
+between the rest of the tree run through them. They sit in seven subject
+folders. `config/` holds the config readers, schema, sections and loader;
+`command/` the command contract (`RafaCommand`, `RafaContext`,
+`CommandExit`), the version and the confirm prompt; `output/` the active
+output; `adapters/` the adapter registry; `git/` the git runner and the
+commit helpers; `plan/` the block reader, the plan parser and the
+plan-file readers; `loop/` the loop's session helpers, its session
+readings and the Claude spawner. A file keeps its base name when it moves.
+
+Two edge cases show why a file is core. `src/pr/git.ts` sat under the
+pull-request code, but release code imports the git runner too, so it
+moved to `src/core/git/`. `src/report/parse.ts` reads like the run's
+report code, but the effort store reads it, so it is core. Core is also
+`src/ports/`, the effort store under `src/effort/store/` and
+`src/report/record.ts`: core by assignment, kept where they are.
+
+**A subject's barrel is the only file under `src/core/` that a file
+outside it may import.** There are eleven, all listed in `CORE_BARRELS` of
+`scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
+four more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts` and
+`plan/block-reader.ts`. A barrel re-exports the names of the files behind
+it and no more. The barrels are the declared exports until the cut names
+real subpaths (#808).
+
+**Outside `src/core/`, a file imports a barrel by relative path and
+nothing deeper.** In a file outside `src/core/`, no static import,
+`import type`, `export … from` or dynamic `import()` names a file behind a
+barrel.
+Inside `src/core/`, a file imports the files it needs by path, siblings
+and other subjects' files alike, and never a barrel. A grep at this
+commit found no barrel imported from inside, but no sweep measures that
+half.
+
+**The deep-import sweep holds the outside half.**
+`src/tests/core-barrels.sweep.test.ts` reads every code file a commit
+would hold, tracked or untracked and not ignored, under `src/`, `scripts/`
+and `packages/` and at the root, test files included. It fails on any
+import from outside `src/core/` that reaches a file inside it other than a
+listed barrel. The reading is `readCoreImports` in
+`scripts/survey/core-barrels.ts`, over the specifiers `textImports` finds,
+so an `import type`, an `export … from`, a dynamic `import()` and a
+`require()` count as much as a static import. It takes no allow-list: a
+path is allowed only by listing it as a barrel in `core-moves.ts`, and
+`core-moves.test.ts` checks that list's shape. An `index.ts` under a
+subject folder is a deep import like any other file. Three things are not
+seen: an `import()` or `require()` whose argument is not a string literal,
+a `mock.module()` call, and a path built for a spawned process or a file
+read. The sweep prints the files it read at load, so an empty read cannot
+pass.
+
+**A barrel is split, never widened, when it closes a runtime cycle.** A
+barrel that groups a file with one outside `src/core/` that imports the
+barrel back by value closes a cycle. The cycle fails with a
+`ReferenceError` at load, in one import order only, so a green `tsc`
+proves nothing about it. The four barrels beyond the subject indexes are
+the splits made so far. `config/sections.ts` holds the leaf pair
+`config-sections.ts` and `config-readers.ts`, because `config-schema.ts`
+imports section files that import the pair back. `config/load.ts` stands
+alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
+which imports the config barrels back. `loop/readings.ts` stands alone,
+because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
+from which `development-build.ts` imports `loop/index.ts` back.
+`plan/block-reader.ts` stands alone, because `parse.ts` imports
+`src/utils/tracker.ts`, which imports `blocks.ts` back.
+
+### The cut table
+
+**The cut table ranks where the package lines could fall.**
+`docs/survey/cut-table.json` and `docs/survey/cut-table.md` list the ten
+packages of epic #801, lowest first: `@open-tomato/rafa` (core),
+`rafa-inventory`, `rafa-board`, `rafa-pr`, `rafa-run`, `rafa-release`,
+`rafa-effort`, `rafa-hub`, `rafa-sync-service` and
+`@open-tomato/rafa-cli`. For each it gives the folders and named files it
+holds, and its count of upward edges: imports of kind `value` or `type`
+between two non-test files, from a package lower in the order into a
+higher one. `scripts/survey/cut-table.ts` writes both files from
+`docs/survey/import-graph.json`, never from a fresh build of the graph, so
+the table and the graph cannot disagree.
+
+**Where a file goes is a rule, and a file no rule holds counts toward the
+CLI.** A file a package names goes there, and a test follows the file it
+tests. Otherwise the longest folder that holds the file decides, among the
+package folders and the unassigned ones. A file no rule holds is left to
+place and counts as a file of `@open-tomato/rafa-cli`, which takes every
+file no line holds. An edge with an end in an unassigned folder
+(`src/stretch/`, `src/commands/stretch/` or `src/ci/`) has no rank on that
+end, so it is never upward. Inside `src/schema/` the placement is per file,
+as the Packages section below lists.
+
+**The counts rank options and do not certify a cut.** An upward edge from
+`src/core/config/` into a `src/config-schema-<section>.ts` file is marked
+as cleared by #118, which makes each package own its config section. It
+still counts as upward: the table's `remaining` column is the count less
+the cleared edges. A count is only as current as the graph it was read
+from. `tsc --build` with project references (#807) is the gate that
+certifies a cut.
 
 ### Packages under `packages/`
 
@@ -58,8 +161,9 @@ spells out, and the shapes the lint config forces.
   not a member of its own workspace.
 - **Every other route into core stays unresolved.** A deep path or an
   unmapped subpath fails with `Cannot find package '@open-tomato/rafa'`
-  under bun and `TS2307` under tsc. Each package's
-  `src/core-subpaths.test.ts` holds this, holds the map to the two
+  under bun and `TS2307` under tsc. Each package's own
+  `core-subpaths.test.ts`, under `packages/<name>/src/`, holds this,
+  holds the map to the two
   subpaths as a closed list, and holds each entry equal to the root
   `exports`. A new subpath goes into both files and that list.
 - **Which gates reach a package.** `bun run test` runs its tests.
@@ -75,6 +179,28 @@ spells out, and the shapes the lint config forces.
   errors (measured on ESLint 9.39.5). Two globs make several projects,
   so the resolver also sets `noWarnOnMultipleProjects`, or every run
   prints `Multiple projects found` to stderr.
+- **A content schema is imported through its owner's `schemas` export.**
+  A content schema is a frontmatter or record schema describing a file
+  rafa reads (a skill, an agent, an instinct), not config and not a step.
+  Across a package line it comes through the owning package's `schemas`
+  export, a fifth export beside the four the package contract lists
+  (commands, steps with guards, config section, flows through
+  `run(ctx, options)`), never through a deep path. Core's schemas are
+  exported from `@open-tomato/rafa/ports` as `schemas`, so the closed list
+  of two core subpaths stays at two. No schema has moved yet: this is the
+  placement the cut takes.
+- **Each schema under `src/schema/` lands in one package**, the one
+  `docs/survey/content-schema-importers.md` names for it:
+  - `tiers.ts`, `project-id.ts`: `@open-tomato/rafa` (core)
+  - `frontmatter.ts`: `rafa-effort`
+  - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
+    `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
+  - `agent.ts`: `@open-tomato/rafa-cli`
+- **One upward edge survives the placement.** `src/effort/report-skills.ts`
+  (rafa-effort) reads `readScopes` from `src/schema/scope-records.ts`,
+  which lands in rafa-inventory. No placement clears it, because
+  `scope-records.ts` imports inventory's `instinct.ts` and
+  `check/layout.ts`. The survey page records it under its upward edges.
 
 ### References
 
@@ -122,11 +248,12 @@ a thing to split.
 
 **A new key in `SETTINGS` reaches six files beyond the schema, sections
 and `init` scaffold.** `RafaConfig` literals have to be complete, so the
-layer literal in `src/config.ts` needs it. `src/config-schema.test.ts`
-pins the key set as closed lists (`KEYS`, `TOP`, `SECTIONS`,
-`knownKeysAbove`). Both config suites also check
-that every setting appears exactly once: `src/config.test.ts` (`SETTINGS`,
-`DEFAULTS`, `FULL`, `FULL_VALUES`, its cases and `KNOWN`) and
+layer literal in `src/core/config/config.ts` needs it.
+`src/core/config/config-schema.test.ts` pins the key set as closed
+lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`). Both config suites
+also check that every setting appears exactly once:
+`src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
+`FULL_VALUES`, its cases and `KNOWN`) and
 `src/tests/config-layers.test.ts` (the PROJECT and USER text and values,
 and `SECTION_CASES`). `check-types` never reads the two suites, so only
 `bun run test` shows what is missing. A section appended after the last
@@ -172,10 +299,15 @@ is the gate for those.
 **Files are mapped to clusters via `docs/survey/cluster-map.json`,**
 the file-to-cluster assignment from the eight-cluster import graph survey
 run. A file with no mapping takes the cluster most of its folder's mapped
-files hold. If a file's folder holds no mapped file, the sweep fails,
-naming the file and that you must extend the map with a new survey run.
-The sweep prints the file coverage line and a count of files placed by
-folder majority.
+files hold. If a file's folder holds no mapped file, the file stays
+unplaced and the sweep does not fail on it: a cycle through it is still
+found, and the file counts toward no cluster. The sweep prints the file
+coverage line, a count of files placed by folder majority, and a count
+of the unplaced ones; a new survey run that extends the map places them.
+The move of #905 renamed the map's keys to the `src/core/` paths and kept
+each keyed file's cluster. Two moved files were never keyed,
+`plan-files.ts` and `session-readings.ts`, so the sweep places them by
+their folder.
 
 **The map traces the 68-file cycle that crossed package lines before
 rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:
@@ -188,8 +320,20 @@ and `BOARD_REFUSAL_EXIT` (board/refs-gate.ts from board/plan-spec.ts
 in c6). The fix moves those three symbols first to new homes in c1, then
 replaces the dynamic import's roster with a parameter; order matters,
 because a seam landing before the three moves leaves the 13-file c1/c6
-cycle in place. Once `#905`'s shared-contract move cuts the code into
-packages, the sweep reads packages instead of clusters.
+cycle in place. The sweep still reads clusters. The cut table names each
+file's package, but this sweep does not read it: its own note names the
+table as the input it is meant to take later. Until then, a cycle that
+crosses two packages but sits in one cluster passes it.
+
+**A cycle through a barrel can stay inside one cluster.**
+`src/core/adapters/index.ts` is one: `registry.ts` imports
+`src/effort/sync/select.ts` by value, and `select.ts` imports the registry
+back through the barrel. Both sit in cluster c7, so the sweep passes them,
+and a barrel over one file cannot be split to step round the cycle. A
+barrel's cycles are counted by `stronglyConnected` in
+`scripts/survey/graph-algorithms.ts`, a full read whatever the cluster.
+Its load order is checked by `src/tests/core-barrel-load-spawned.test.ts`,
+which loads each barrel first in a fresh `bun` process and expects exit 0.
 
 ### The library boundary
 
@@ -199,7 +343,9 @@ code the rest of the codebase reads goes into the subject folders at
 target is inside it — not static `import`, not `import type`, not
 `export … from`, and not dynamic `import()`. This rule forces every
 feature that more than one command might want into the library half
-first, before a second command is even written.
+first, before a second command is even written. Library code every part
+of rafa reads goes into `src/core/`, behind its barrels (Core and its
+barrels, above).
 
 **Two files are exempt by name:** `src/rafa.ts` (the bin entry, which
 loads the command registry and dispatches on `process.argv`) and
@@ -209,18 +355,21 @@ names every non-test import edge and fails when a library file brings in
 the command half.
 
 **Edge case: a reader so widely used that it lives in the commands
-folder.** `src/commands/plan/plan-files.ts` has 71 importers, because
-the first command that needed it (`rafa plan create`) wrote it there.
-When a second command wants it, the symbol moves to `src/plan/plan-files.ts`
-and the command file imports from there. The sweep reads the move with
-the list: a command file that exports its own library half is a failure
-until the re-export is gone. Symbols imported from inside `src/commands/`
-by test files are never swept; `classifyFile` of `scripts/survey/files.ts`
-decides what a test is.
+folder.** `src/commands/plan/plan-files.ts` is the command half of the
+plan readers: the first command that needed them (`rafa plan create`)
+wrote them there, and ten non-test files import it at this commit. Its
+library half, the readings that take no command context, is
+`src/core/plan/plan-files.ts`, which command modules reach through the
+plan barrel. When a second command wants a reader, the reader moves to
+the library half and the command file imports it from there. The sweep
+reads the move with the list: a command file that exports its own library
+half is a failure until the re-export is gone. Symbols imported from inside
+`src/commands/` by test files are never swept; `classifyFile` of
+`scripts/survey/files.ts` decides what a test is.
 
 **Symbols take their subject folder from the import graph survey.** The
 eight-cluster map in `docs/survey/cluster-map.json` decides the folder;
-the acceptance criteria's cut table in `#905` confirms the place before
-a task moves a symbol. A file with no mapping takes the cluster most of
-its folder's mapped files hold; if a file's folder holds no mapped file,
-the task extends the map with a new survey run.
+`docs/survey/cut-table.md` names each file's package, which confirms the
+place before a task moves a symbol. A file with no mapping takes the
+cluster most of its folder's mapped files hold; if a file's folder holds
+no mapped file, the task extends the map with a new survey run.

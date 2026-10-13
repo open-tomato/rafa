@@ -63,9 +63,9 @@
  * `0` reddened that snapshot's case alone and left the file stale, and a
  * run with it set to `1` passed and wrote the original bytes back.
  */
-import type { RafaCommand } from './command.js';
 import type { CommandRegistry } from './registry.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -75,10 +75,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
+import { commandSpelling } from '../core/command/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
-import { commandSpelling } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { dispatch } from './dispatch.js';
 import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';

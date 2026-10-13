@@ -85,10 +85,10 @@ import type { BoardIssue } from './roadmap-board.js';
 import type { Horizon } from './roadmap-epic-rows.js';
 import type { PlanNames } from './roadmap-rows.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from './roadmap.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { HORIZON_LABEL_PREFIX } from './epic-problems.js';
 import { renderHorizonComment } from './epic-trail.js';

@@ -164,7 +164,6 @@
  * `file` are not contacted. {@link collectEffort} makes no contact, so
  * a caller handing it a store syncs nothing.
  */
-import type { ResolvedConfig } from '../config.js';
 import type { SkillCollectSummary, SkillLog, SkillScope } from './collect-skills.js';
 import type {
   CommitLogOptions,
@@ -177,15 +176,16 @@ import type {
   SessionEffortRow,
   SessionMode,
 } from './store/types.js';
+import type { ResolvedConfig } from '../core/config/index.js';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
+import { activeOutput } from '../core/output/index.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -697,7 +697,7 @@ function refuse(problems: readonly string[]): never {
  * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
  * Writes the summary through the active output
- * (`adapters/output/active.ts`), one `info` line each, as the run's
+ * (`core/output/active.ts`), one `info` line each, as the run's
  * progress and config warnings are written ({@link collectEffort}),
  * then pushes and pulls the store's rows (see the module note's `Sync`).
  *

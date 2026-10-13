@@ -74,7 +74,7 @@ of a claim branch the remote refuses because another store now owns the
 claim halts the run instead, exit 1 with the "claim lost" report, its
 commits kept on `lost/<stub>` and no compare URL printed
 (`src/start/pr-lifecycle.ts` over `src/claims/lost.ts`). No other
-provider is built; the functions in `src/utils/pr.ts` move behind one
+provider is built; the functions in `src/pr/gh.ts` move behind one
 `PullRequests` interface in `src/pr/` so a second provider is an adapter
 later.
 
@@ -84,7 +84,7 @@ The port carries `comment`, `editComment` and `editBody`. `editBody` is
 rafa-21's: the release stage writes its failure sentence into a pull
 request body the wrap-up session already wrote, when the provider that
 stage resolves is `gh`. The port is NOT in
-`PORT_VERSIONS` (`src/adapters/registry.ts` versions tracker, store,
+`PORT_VERSIONS` (`src/core/adapters/registry.ts` versions tracker, store,
 learning, output, planner, sync and logger only), so adding a method to it bumps
 no version.
 

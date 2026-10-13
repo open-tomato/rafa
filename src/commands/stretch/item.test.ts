@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../loop/sessions.js';
+import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

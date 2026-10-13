@@ -76,7 +76,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import {
   RELEASE_HEADING_FIELDS,

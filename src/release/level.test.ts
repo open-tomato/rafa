@@ -39,7 +39,7 @@ import type { PlanChange } from '../effort/store/changes.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { PLAN_RELEASE_LEVELS } from '../plan/parse.js';
+import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
 
 import { RELEASE_LEVEL_RANK, highestChangeLevel, releaseLevelReport, resolveReleaseLevel } from './level.js';
 

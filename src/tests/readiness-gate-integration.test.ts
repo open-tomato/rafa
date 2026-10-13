@@ -38,7 +38,7 @@ import type { IssueBoard } from '../board/issue-board.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { ReadinessGap } from '../board/readiness.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -71,8 +71,8 @@ import {
   stampReviewSkipped,
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
-import { CommandExit } from '../cli/command.js';
-import { rejectedPath } from '../plan/plan-files.js';
+import { CommandExit } from '../core/command/index.js';
+import { rejectedPath } from '../core/plan/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

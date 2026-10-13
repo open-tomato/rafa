@@ -51,12 +51,12 @@
  */
 import type { AfterMergeRequest, BoardRelations } from './port.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks } from '../roadmap-board.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { BOARD_RELATIONSHIP_MODES } from '../../config-sections.js';
+import { BOARD_RELATIONSHIP_MODES } from '../../core/config/sections.js';
 import { boardListFields } from '../roadmap-board.js';
 
 /** The fixture board's own repository. */

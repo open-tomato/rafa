@@ -12,12 +12,12 @@
  * the path every command's config takes, with the project and user
  * files each naming one half.
  */
-import type { ValueAt } from './config-sections.js';
+import type { ValueAt } from './core/config/sections.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { hubContextOf, hubTimeout, hubTimeoutMs, hubUrl } from './config-schema-hub.js';
-import { ConfigError, parseConfigText, resolveConfig } from './config.js';
+import { ConfigError, parseConfigText, resolveConfig } from './core/config/index.js';
 
 /** Where every reader case reads its value. */
 const AT: ValueAt = { label: 'F: hub.x', key: 'hub.x' };

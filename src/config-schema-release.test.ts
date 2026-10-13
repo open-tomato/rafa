@@ -17,7 +17,7 @@
  * value is reported with a `ConfigError` naming it, as every other
  * unusable value is.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -26,13 +26,13 @@ import {
   PR_DEFAULTS,
   RELEASE_DEFAULTS,
 } from './config-schema-release.js';
-import { SETTINGS } from './config-schema.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
-} from './config.js';
+  SETTINGS,
+} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

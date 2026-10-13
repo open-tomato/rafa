@@ -6,7 +6,7 @@
  * modification-time rule is read from the file system itself.
  */
 import type { LoopWorktreeReading, LoopWorktreeSeams } from './merge-loop-worktree.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../../pr/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';

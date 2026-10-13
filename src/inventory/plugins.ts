@@ -108,7 +108,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from '../modules/manifest.js';
 
 import { byName, skillItem, sourceItem } from './trees.js';

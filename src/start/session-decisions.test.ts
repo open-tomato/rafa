@@ -11,7 +11,7 @@
  * branch's, a running one, an older one behind a newer run with no list.
  */
 import type { RunSessionOptions } from './session.js';
-import type { SessionDecision, SessionRecord } from '../loop/sessions.js';
+import type { SessionDecision, SessionRecord } from '../core/loop/index.js';
 
 import {
   mkdirSync,
@@ -24,9 +24,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { readSession, runsDir, sessionFilePath } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { eventsFileOf } from '../loop/events-file.js';
-import { readSession, runsDir, sessionFilePath } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './session.js';

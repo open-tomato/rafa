@@ -40,14 +40,14 @@
  * The directory is refused unless it is absolute, since running git in
  * a relative one would read the process's working directory. Git is
  * reached through a {@link GitRunner} opened for the directory,
- * `createGitRunner` from `src/pr/git.ts` when left out, which already
+ * `createGitRunner` from `src/core/git/git.ts` when left out, which already
  * sets `LC_ALL=C` so the refusal line matched is git's untranslated one.
  */
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { isAbsolute } from 'node:path';
 
-import { createGitRunner, gitSaid } from '../pr/git.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
 
 /**
  * The start of the line git prints when no directory at or above holds

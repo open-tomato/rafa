@@ -49,7 +49,7 @@
  */
 import type { EditableIssue, IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
 
-import { describeValue, isMapping } from '../../config-sections.js';
+import { describeValue, isMapping } from '../../core/config/sections.js';
 
 /** What every refusal opens with, as `github.ts` spells it. */
 const PREFIX = 'github tracker';

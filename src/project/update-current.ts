@@ -38,7 +38,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { listBoardLabels, missingBoardLabels, setUpLabels } from '../board/setup.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { writeProjectLock } from './lock.js';
 import { PROJECT_TREE, writeProjectScope } from './scaffold.js';

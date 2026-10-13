@@ -46,13 +46,13 @@
  * sentence a model folded over several lines is collapsed onto its item
  * rather than ending the list.
  *
- * Nothing here is a heading the plan model reads. `src/plan/parse.ts`
+ * Nothing here is a heading the plan model reads. `src/core/plan/parse.ts`
  * reads `# Stage: <name>` and the checklist grammar reads `- [ ] `;
  * this section is neither, so a plan opened with it parses exactly as
  * it did before, which `./review-stamp.test.ts` holds through
  * `parsePlan` over a stamped plan.
  *
- * `review` is not one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), so
+ * `review` is not one of `PLAN_HEADER_FIELDS` (`src/core/plan/parse.ts`), so
  * the plan reader keeps it as a `PlanHeaderExtra`: retained, acting on
  * nothing, and listed by `plan show`. That is the shape an unrecognised
  * key is supposed to have, and it is why this needs no change to the

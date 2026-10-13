@@ -22,7 +22,7 @@
  *   - a plan with nothing unmet is one `ok` row.
  */
 import type { DeepNeedsSeams } from './doctor-deep-needs.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { NeedsReading } from '../plan/needs.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

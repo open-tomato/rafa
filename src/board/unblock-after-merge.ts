@@ -78,7 +78,7 @@
 import type { UnblockAsk, UnblockReport } from './unblock.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { closedIssuesIn } from './roadmap.js';
 import { isUnblockFailure, runUnblock } from './unblock.js';

@@ -19,9 +19,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { PORT_VERSIONS } from '../../adapters/registry.js';
 import { dispatch } from '../../cli/dispatch.js';
 import { createCommandRegistry } from '../../cli/registry.js';
+import { PORT_VERSIONS } from '../../core/adapters/index.js';
 import { loadInvocationModules } from '../../modules/load.js';
 import { eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { CORE_COMMANDS, CORE_SUBJECTS } from '../index.js';

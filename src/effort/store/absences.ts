@@ -62,7 +62,7 @@
  * The surrogate rules never refuse a session's own output. Measured on
  * bun 1.3.14, `TextDecoder` decodes the bytes a lone surrogate would be
  * (`ed a0 80`) as three U+FFFD, and a captured session's stdout is
- * decoded by one (`utils/claude.ts`).
+ * decoded by one (`core/loop/claude.ts`).
  *
  * `reason` and `outcome` have no CHECK. `outcome` stays open for the
  * reason `findings.ts` gives. `reason` is the parser's set, which can

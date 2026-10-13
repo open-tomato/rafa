@@ -9,7 +9,7 @@
  * that shows the same probe seeing the worktree while it exists, so an
  * empty list after the call cannot be a probe that never saw anything.
  */
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { SETTLE_SCRATCH_PREFIX, withSettleWorktree } from './settle-worktree.js';

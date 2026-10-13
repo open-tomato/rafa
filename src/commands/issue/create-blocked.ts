@@ -68,7 +68,7 @@ import type { BlockedReading } from '../../board/blocked.js';
 import type { IssueDraft, Tracker } from '../../ports/index.js';
 
 import { BLOCKED_BY_FIELD, readBlockedBy } from '../../board/blocked.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { onTracker } from './issue-tracker.js';
 

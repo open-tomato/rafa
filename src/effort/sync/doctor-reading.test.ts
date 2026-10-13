@@ -17,7 +17,7 @@
  * Every root is a path under this file's temporary directory that is
  * never made.
  */
-import type { ResolvedConfig } from '../../config.js';
+import type { ResolvedConfig } from '../../core/config/index.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
-import { messageOf } from '../../config-sections.js';
-import { parseConfigText, resolveConfig } from '../../config.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
+import { parseConfigText, resolveConfig } from '../../core/config/index.js';
+import { messageOf } from '../../core/config/sections.js';
 
 import { EFFORT_SYNC_ROW, readDoctorEffortSync } from './doctor-reading.js';
 import { selectSync } from './select.js';

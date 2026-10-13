@@ -11,7 +11,7 @@
  * `run` seam names another runner.
  *
  * What the operator is told goes through the active output
- * (`adapters/output/active.ts`): the task, its routing and what was
+ * (`core/output/active.ts`): the task, its routing and what was
  * stored through `info`; a declaration token dropped, a plan injection
  * that fell back, an overfull `progress.txt` and a stored report's
  * warnings through `warn`; and a store that could not be rendered or
@@ -19,7 +19,7 @@
  * `step` event named by the task sentence, ahead of the line announcing
  * the task. Text mode emits none, since the `text` adapter would render
  * it as a `step: ` line beside that announcement. The session's own
- * stdout reaches the operator through `utils/claude.ts`, as `log` events
+ * stdout reaches the operator through `core/loop/claude.ts`, as `log` events
  * in json mode.
  *
  * The task prompt's first line carries the `task` classifier key, and
@@ -90,13 +90,13 @@
  * text, prints the halt, and the dispatch answers
  * {@link TaskDispatch.halted} with no session spawned.
  */
-import type { SkillResolverName } from '../config-sections.js';
-import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { AdapterRegistry } from '../adapters/registry.js';
+import type { AdapterRegistry } from '../core/adapters/index.js';
+import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core/config/sections.js';
+import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { PlanInjection } from '../plan/index.js';
@@ -105,20 +105,19 @@ import type { TaskReportRecord } from '../report/record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { randomUUID } from 'crypto';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { runClaudeCaptured } from '../core/loop/index.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
 import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
-import { runClaudeCaptured } from '../utils/claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
@@ -158,7 +157,7 @@ export type TaskSessionRunner = (
  * The id goes AHEAD of the declaration's flags, and `runClaudeCaptured`
  * puts the setting sources, then the `served` flags, ahead of both.
  * `--tools` is variadic and is the last flag a declaration resolves to
- * (`utils/claude.ts`), so a `--session-id` placed after it would be read
+ * (`core/loop/claude.ts`), so a `--session-id` placed after it would be read
  * as a tool name. `--add-dir`, which the served flags may carry, is
  * variadic too, and stops at the dash of the `--session-id` after it.
  *

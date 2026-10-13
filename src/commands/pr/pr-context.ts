@@ -36,7 +36,7 @@
  * `<n>` when the line names one, and otherwise the open pull request of
  * the branch checked out AT THE PROJECT ROOT — not at the process's
  * working directory, which is a subdirectory of it as often as not, and
- * may be another checkout entirely. `loop/session-readings.ts` reads a
+ * may be another checkout entirely. `core/loop/session-readings.ts` reads a
  * branch at a root for the same reason, and `utils/git.ts`'s reader,
  * which reads the process's own directory, is why neither imports it.
  *
@@ -90,19 +90,19 @@
  * request, and a provider call that rejected.
  */
 import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { RafaContext } from '../../cli/command.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaContext } from '../../core/command/index.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
 import { execFileSync } from 'node:child_process';
 
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { messageOf } from '../../config-sections.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { messageOf } from '../../core/config/sections.js';
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { mergeGuardSettings } from '../../release/guard-merge.js';
 

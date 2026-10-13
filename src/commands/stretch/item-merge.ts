@@ -67,7 +67,7 @@
  * `rafa`, reaches GitHub or sleeps.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaContext } from '../../cli/command.js';
+import type { RafaContext } from '../../core/command/index.js';
 import type { Tracker } from '../../ports/index.js';
 import type { FiledAtReader } from '../../stretch/pit-readings.js';
 
@@ -75,8 +75,8 @@ import { readFileSync } from 'node:fs';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
-import { CommandExit } from '../../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';

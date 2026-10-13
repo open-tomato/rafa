@@ -40,7 +40,7 @@
  *    here, each of the three a case that reads the setting back out of
  *    a config the step had written.
  */
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { ReleaseFileSettings } from '../release/enabled.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -49,7 +49,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,

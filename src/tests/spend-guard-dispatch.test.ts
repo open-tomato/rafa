@@ -3,7 +3,7 @@
  * registry, through the REAL dispatcher (`cli/dispatch.ts`), which
  * records the running command in `cli/running.ts`, whose record a
  * planted command's `run` reads by calling the REAL `spawnClaude`
- * (`utils/claude.ts`) against a stand-in `claude` on PATH.
+ * (`core/loop/claude.ts`) against a stand-in `claude` on PATH.
  *
  * `claude.test.ts` drives the guard directly: it calls `setRunningCommand`
  * itself and then a door, so it proves the guard reads the record
@@ -69,15 +69,15 @@
  *
  * The session's `warn` lines are read off an output set at module
  * level, which is the one a caller outside every dispatch writes
- * through (`adapters/output/active.ts`). Its control was run on
+ * through (`core/output/active.ts`). Its control was run on
  * 2026-10-12: with `runAsRunningCommand` also leaving its record at
  * module level, this case alone of the four was red, its list holding
  * one line that named `rafa plan waits`, and `cli/running.ts` was
  * restored sha256-identical.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
 import type { CommandSpend } from '../cli/spends.js';
+import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,10 +85,10 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { claudeArgs, spawnClaude } from '../utils/claude.js';
+import { claudeArgs, spawnClaude } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

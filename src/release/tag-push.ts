@@ -34,7 +34,7 @@
  * declines makes the push exit 1 with the hook's words on stderr and a
  * `[remote rejected] (pre-receive hook declined)` status line.
  */
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { pushSaid } from './settle-push.js';
 import { RELEASE_REMOTE } from './version.js';

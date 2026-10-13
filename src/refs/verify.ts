@@ -167,19 +167,19 @@
  * ## Keys
  *
  * A key is `present` when some entry of `SETTINGS` in
- * `src/config-schema.ts` has it as its `key`.
+ * `src/core/config/config-schema.ts` has it as its `key`.
  */
 import type { Ref } from './extract.js';
 import type { IssueState, LiveReading } from './stamp.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument } from '../cli/describe.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { GLOBAL_FLAGS } from '../cli/help.js';
 import { pluralOf } from '../cli/registry.js';
-import { SETTINGS } from '../config-schema.js';
-import { gitSaid } from '../pr/git.js';
+import { SETTINGS } from '../core/config/index.js';
+import { gitSaid } from '../core/git/index.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 

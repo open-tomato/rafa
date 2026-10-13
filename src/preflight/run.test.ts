@@ -23,7 +23,7 @@
  *   - presence: each kind beside the same check failing, the environment
  *     read being the one handed in and not this process's.
  */
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,7 @@ import { delimiter, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 

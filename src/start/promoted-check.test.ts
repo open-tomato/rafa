@@ -30,7 +30,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/index.js';

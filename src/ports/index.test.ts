@@ -96,7 +96,8 @@
  *
  * The `Sync` port arrived on 2026-09-29 with its four refusals. Six
  * mutations of the entry were driven that day against this file,
- * `src/adapters/registry.test.ts`, `src/tests/adapter-registry.test.ts`
+ * `src/core/adapters/registry.test.ts`,
+ * `src/tests/adapter-registry.test.ts`
  * and `src/modules/`, each restored from a scratch copy and verified
  * with `sha256sum -c`, and every one reddened a case. `kind` widened
  * to `string`, `push` allowed to answer synchronously, and the pulled

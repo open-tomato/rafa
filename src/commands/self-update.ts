@@ -28,7 +28,7 @@
  * ## A live loop refuses
  *
  * Before the install reads anything, it reads the session records under
- * the project root's `.rafa/runs/` (`readSessions`, `loop/sessions.ts`),
+ * the project root's `.rafa/runs/` (`readSessions`, `core/loop/sessions.ts`),
  * the project root being the main checkout even when the command runs
  * in a linked worktree (`project/scope.ts`). Each record reading
  * `running` or `paused`, which `readState` answers only while its pid is
@@ -88,17 +88,17 @@
  * Whether a record's pid is alive is its `isAlive`, `isPidAlive` when left
  * out, so a case plants a live loop without a process of its own.
  */
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { PidProbe, SessionRecord } from '../loop/sessions.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { BuildLines } from '../runtime/install.js';
 
-import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
-import { SETTINGS } from '../config-schema.js';
-import { messageOf } from '../config-sections.js';
-import { isPidAlive, readSessions } from '../loop/sessions.js';
+import { CommandExit } from '../core/command/index.js';
+import { SETTINGS } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
+import { messageOf } from '../core/config/sections.js';
+import { isPidAlive, readSessions } from '../core/loop/index.js';
 import { readBinPath } from '../project/bin-path.js';
 import { exitCodeFor, installRuntime, outcomeProblem, runBuild } from '../runtime/install.js';
 

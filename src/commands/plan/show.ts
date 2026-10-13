@@ -31,7 +31,7 @@
  * value left out, the plan `context`, the `stages` and `tasks` as
  * `parsePlan` answers them, the task `counts`, and the `issues`. An
  * extra's value is `unknown` to the parser, which never serialises one
- * (`plan/parse.ts`), so only its key is given.
+ * (`core/plan/parse.ts`), so only its key is given.
  *
  * In text mode it writes the stub, the file under the plans directory as
  * `plan.dir` spells it, the issue and spec the header names when it
@@ -42,15 +42,14 @@
  * shown and never refused: `rafa plan validate` is the check that exits
  * nonzero on one.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
+import type { PlansDir, TaskCounts } from '../../core/plan/index.js';
 import type { PlanIssue, PlanStage, PlanTask } from '../../plan/index.js';
-import type { PlansDir, TaskCounts } from '../../plan/plan-files.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { parsePlan } from '../../plan/index.js';
+import { CommandExit } from '../../core/command/index.js';
 import {
   checkbox,
   countTasks,
@@ -58,7 +57,8 @@ import {
   isFile,
   issueLine,
   planFileName,
-} from '../../plan/plan-files.js';
+} from '../../core/plan/index.js';
+import { parsePlan } from '../../plan/index.js';
 import { isStampableStub } from '../../utils/plan-stamp.js';
 
 import { expectOneArgument, requireProject, resolvePlansDir } from './plan-files.js';

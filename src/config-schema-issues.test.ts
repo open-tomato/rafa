@@ -8,14 +8,13 @@
  * refusal sits beside an accepting control, and every key and message is
  * SPELLED, never read off the module.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { templateProblem } from './bugs/title.js';
 import { bugRulesOf } from './config-schema-issues.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './config-schema.js';
-import { parseConfigText, resolveConfig } from './config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig, SETTINGS } from './core/config/index.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 import { projectConfigText } from './project/scaffold.js';
 

@@ -20,9 +20,9 @@
  * rows of one session stamped the same time, which is what the origin
  * pair would order.
  */
-import type { SkillResolverName } from '../config-sections.js';
 import type { FindingsDispatch } from './store/findings.js';
 import type { PlanCiRow } from './store/plan-ci.js';
+import type { SkillResolverName } from '../core/config/sections.js';
 import type { ReportBlocker, ReportBug, ReportFinding } from '../report/parse.js';
 import type { Device, MergedBothWays } from '../tests/merged-stores.js';
 

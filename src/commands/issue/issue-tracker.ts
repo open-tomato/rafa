@@ -83,22 +83,22 @@
  * `gh` runner reads the Roadmap, the board and the issues a saved copy
  * names.
  */
-import type { AdapterRegistry } from '../../adapters/registry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { AdapterRegistry } from '../../core/adapters/index.js';
+import type { RafaContext } from '../../core/command/index.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DoctorRefsSeams } from '../doctor-refs.js';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { messageOf } from '../../config-sections.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { messageOf } from '../../core/config/sections.js';
 
 /** How the chain is resolved; see the module note. Each left out is the chain's own. */
 export interface IssueSeams {

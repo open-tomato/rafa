@@ -24,8 +24,8 @@
  *
  * ## The refusals
  *
- * Each throws `CommandExit` (`cli/command.ts`) with exit code 1 and the
- * whole refusal as its message, ending with
+ * Each throws `CommandExit` (`core/command/command.ts`) with exit code 1
+ * and the whole refusal as its message, ending with
  * `Nothing was checked and nothing was dispatched.`:
  *
  *   - `--runtime` with no value, bare or empty.
@@ -75,18 +75,18 @@
  * `rafa loop stop` signals the pid the child's own session record names.
  * Ending here instead would leave the child running with no one waiting.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
-import type { OutputMode } from '../config-sections.js';
+import type { OutputMode } from '../core/config/sections.js';
 import type { CliEvent, CliEventResult, Output } from '../ports/index.js';
 
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 
 import { argValue } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';

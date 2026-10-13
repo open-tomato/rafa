@@ -10,7 +10,7 @@ import type { SuiteFailure } from '../suite/run.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
+import { activeOutput, setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS } from './dispatch.js';

@@ -41,7 +41,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { attributesOf, suitePathArgument } from '../suite/run.js';
 
 /** The time, in seconds, past which an always-run file is named as slow. */

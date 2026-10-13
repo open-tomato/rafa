@@ -63,7 +63,7 @@
 import type { ChangelogNote } from './changelog.js';
 import type { ReleasePrepared, ReleaseSettings } from './prepare.js';
 import type { ReleaseVerificationContext } from './verify.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -72,7 +72,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RELEASE_AUTO } from '../config-sections.js';
+import { RELEASE_AUTO } from '../core/config/sections.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

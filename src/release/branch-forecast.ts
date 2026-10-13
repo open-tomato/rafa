@@ -47,12 +47,12 @@
  * append-if-absent, as the release stage always wrote it: it is a record
  * of what happened, not a reading that goes stale.
  */
-import type { ReleaseStrategy } from '../config-readers.js';
 import type { Forecast } from './forecast.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { FoldFragment } from './strategy.js';
 import type { ReleaseVerified } from './verify.js';
-import type { GitRunner } from '../pr/git.js';
+import type { ReleaseStrategy } from '../core/config/sections.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { posix } from 'node:path';
 

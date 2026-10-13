@@ -19,7 +19,7 @@
  * degrades to `local`, so the case cannot pass on the core registry.
  */
 import type { IssueSeams, LineFlags } from './issue-tracker.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent, Tracker } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
@@ -29,10 +29,10 @@ import { join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
-import { CommandExit } from '../../cli/command.js';
-import { configFilePath } from '../../config.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
+import { CommandExit } from '../../core/command/index.js';
+import { configFilePath } from '../../core/config/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

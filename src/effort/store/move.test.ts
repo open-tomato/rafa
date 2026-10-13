@@ -17,7 +17,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { plantProject } from '../../tests/cli-capture.js';
 

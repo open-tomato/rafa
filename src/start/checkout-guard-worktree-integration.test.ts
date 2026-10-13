@@ -38,8 +38,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
-import { readSessions } from '../loop/sessions.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { readSessions } from '../core/loop/index.js';
 import { expectExit, plantScratchRepo } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

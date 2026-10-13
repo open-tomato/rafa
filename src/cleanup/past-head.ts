@@ -60,12 +60,12 @@
  * and answered {@link PastHeadNotDescended}, like a head that is there
  * and not an ancestor. Any other failure is {@link PastHeadUnread}.
  */
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { posix } from 'node:path';
 
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 import { directoryPrefix, fragmentIdOf } from '../release/fragment-tree.js';
 import { changelogSections } from '../release/receipt.js';
 

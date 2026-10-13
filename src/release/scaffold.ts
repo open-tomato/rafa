@@ -2,7 +2,8 @@
  * The commented lines the config `rafa init` writes carries for the six
  * settings the release-settle plan adds: four under `release`, then
  * `pr.versionCollision` and `dangerous.acceptVersionCollision`, each
- * spelled at its schema default (`CONFIG_DEFAULTS` of `src/config.ts`).
+ * spelled at its schema default (`CONFIG_DEFAULTS` of
+ * `src/core/config/config.ts`).
  * `src/project/scaffold.ts` places them, each under its own section.
  *
  * This is the library half of the release step of `rafa init`; its
@@ -14,7 +15,7 @@
  * Nothing here reads the disk, the clock or the environment: the three
  * exports are constants built once from the defaults.
  */
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 /**
  * The commented lines the config `rafa init` writes carries for the

@@ -88,7 +88,7 @@ import type { UnhandledError } from '../suite/unhandled.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 
 /** A step's failures split against the baseline, and what else can make it red. */

@@ -124,8 +124,8 @@ import {
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
 
 import { name as RAFA_PACKAGE_NAME } from '../../package.json';
-import { loadConfig } from '../config-load.js';
-import { messageOf } from '../config-sections.js';
+import { loadConfig } from '../core/config/load.js';
+import { messageOf } from '../core/config/sections.js';
 import { RAFA_BIN_DIR } from '../project/bin-path.js';
 import { RUNTIME_ENTRY, RUNTIME_SUBDIR, VERSION_SHAPE } from '../start/runtime.js';
 import { findNextTask } from '../utils/tracker.js';

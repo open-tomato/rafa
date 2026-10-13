@@ -43,7 +43,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { noSourceMessage, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { findSpec, resolveCreateSpec, specCandidates, usageRefusal } from './spec-route.js';
 

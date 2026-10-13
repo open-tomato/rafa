@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 export interface TaskInfo {
   task: string;
@@ -264,11 +264,11 @@ const NO_LINES: ReadonlySet<number> = new Set();
  * line is its body. Without this rule a `- [ ] ` at column 0 in a
  * `rafa:context` body was dispatched as a task, and its text reached all
  * four sites, the git history among them. So an open or blocked task
- * line inside a block is that block's body, as `plan/parse.ts` reads it,
+ * line inside a block is that block's body, as `core/plan/parse.ts` reads it,
  * whatever the block's kind: a `rafa:report`, or a kind a later phase
  * names, included.
  *
- * Blocks are found by `plan/blocks.ts`, which tracks fences the way a
+ * Blocks are found by `core/plan/blocks.ts`, which tracks fences the way a
  * renderer shows them. Every other fence stays transparent: a `- [ ] `
  * at column 0 inside a `text` illustration fence is dispatched as it
  * always was, and so is one inside a `rafa:` fence nested in such an
@@ -432,7 +432,7 @@ export function writeTrackerBlocker(
   return true;
 }
 
-/** Any task line's checkbox, ticked included, as `plan/parse.ts` reads the checklist. */
+/** Any task line's checkbox, ticked included, as `core/plan/parse.ts` reads the checklist. */
 const ANY_TASK_PREFIX = /^- \[(?: |x|BLOCKED)\] /;
 
 /** A character that ends a line for a tracker reader or for JavaScript's `.`. */

@@ -40,7 +40,7 @@ import { readEpics } from '../board/epics.js';
 import { samePlace } from '../board/place.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
 import { parseRoadmapBody, pickNextRoadmapLine } from '../board/roadmap.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readPositionFile } from '../project/position.js';
 
 import { decideHop, takenBy } from './hop-chain.js';

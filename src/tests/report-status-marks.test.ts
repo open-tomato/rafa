@@ -31,7 +31,7 @@
  * is stored `done` beside `blocked` — which is exactly the row the third
  * case below reads back.
  */
-import type { CapturedSession } from '../utils/claude.js';
+import type { CapturedSession } from '../core/loop/index.js';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -54,7 +54,7 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { finishCleanExit } from '../start/commit.js';
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';

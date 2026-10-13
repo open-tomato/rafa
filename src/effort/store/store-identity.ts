@@ -92,14 +92,14 @@
  * alone, so a read spawns no `ioreg`, stats nothing and writes nothing.
  */
 import type { StoreAccess } from './schema-plan.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { hostname, platform as currentPlatform } from 'node:os';
 
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { normalizeRemote } from '../../schema/project-id.js';
 
 import { readStoreGeneration } from './store-generation.js';

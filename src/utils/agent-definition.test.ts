@@ -51,7 +51,7 @@ import type {
   AgentDefinitionCandidate,
   AgentDefinitionRoots,
 } from './agent-definition.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import {
   mkdirSync,

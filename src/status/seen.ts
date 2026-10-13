@@ -43,18 +43,18 @@
  * `.rafa/` is gitignored whole, so the file is never tracked.
  */
 import type { WorktreeSeams } from '../cleanup/index.js';
-import type { RafaConfig } from '../config.js';
-import type { PidProbe, SessionState } from '../loop/sessions.js';
+import type { RafaConfig } from '../core/config/index.js';
+import type { PidProbe, SessionState } from '../core/loop/index.js';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { readSessions, SESSION_STATES } from '../core/loop/index.js';
+import { readSessionChecklist } from '../core/loop/readings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { readSessionChecklist } from '../loop/session-readings.js';
-import { readSessions, SESSION_STATES } from '../loop/sessions.js';
 import { scopeAt } from '../project/scope.js';
 
 import { isIdleWorktree } from './sections.js';

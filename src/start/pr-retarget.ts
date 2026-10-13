@@ -32,7 +32,7 @@
 import type { Output } from '../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** The effects {@link retargetPullRequest} reaches through. */
 export interface PrRetargetSeams {

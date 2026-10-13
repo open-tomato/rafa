@@ -92,10 +92,10 @@
  * space there, so the line stays one line.
  */
 import type { PreflightItems } from './prerequisites-md.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;

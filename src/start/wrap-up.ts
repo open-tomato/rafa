@@ -14,7 +14,7 @@
  * {@link runWrapUpSession}, handed this one's final message, and then by
  * the PR the runner opens itself (`start/wrap-up-run.ts`). The line naming
  * whether the session succeeded goes
- * through the active output (`adapters/output/active.ts`): `info` on
+ * through the active output (`core/output/active.ts`): `info` on
  * success, and `error` on a failure, which does not stop `start()`.
  * So does a warning for each rafa-tier winner the session is not
  * served, at `warn`.
@@ -42,23 +42,23 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
  */
-import type { ClaudeSettingSource, PrProvider } from '../config.js';
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
+import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js';
+import type { CapturingSpawner } from '../core/loop/index.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
-import type { CapturingSpawner } from '../utils/claude.js';
 
 import { posix } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
+import { runClaudeCaptured } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';
-import { runClaudeCaptured } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';

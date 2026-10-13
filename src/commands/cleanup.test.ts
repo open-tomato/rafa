@@ -44,9 +44,9 @@ import type {
   StaleRow,
   WorktreeRow,
 } from '../cleanup/index.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { GitResult } from '../pr/git.js';
+import type { Prompter } from '../core/command/index.js';
+import type { GitResult } from '../core/git/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 

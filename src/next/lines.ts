@@ -24,9 +24,9 @@
 import type { NextInvocation } from './actions.js';
 import type { NextCeiling } from './ceiling.js';
 import type { NextActionId, NextState } from './state.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { ALWAYS_ASKED, BARE_YES_ACTIONS, ROADMAP_ACTIONS, YES_FLAG } from './ceiling.js';
 import { commandWords } from './hint.js';

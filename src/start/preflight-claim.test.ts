@@ -57,7 +57,7 @@ import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -66,13 +66,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';

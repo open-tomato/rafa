@@ -15,7 +15,7 @@ import type { IssueDraft, IssueQuery, IssueRef, Tracker } from '../../ports/inde
 import { describe, expect, it } from 'bun:test';
 
 import { readBlockedBy } from '../../board/blocked.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import {
   KNOWN_LIST_LIMIT,

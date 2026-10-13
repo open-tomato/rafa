@@ -38,7 +38,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { name as RAFA_PACKAGE_NAME } from '../../package.json';
-import { errorCode } from '../loop/sessions.js';
+import { errorCode } from '../core/loop/index.js';
 import { realEntry } from '../schema/tiers.js';
 
 import { STRETCH_DIR } from './folder.js';

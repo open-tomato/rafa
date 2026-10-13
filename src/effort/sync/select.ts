@@ -8,8 +8,9 @@
  * that wrote it. {@link createLocalSync} answers a `Sync` whose push and
  * pull both answer `nothing-to-sync` and read nothing of their request,
  * so neither opens the store nor touches the disk. Core registers it as
- * `sync/local` in `CORE_ADAPTER_REGISTRY` (`src/adapters/registry.ts`),
- * which calls {@link createLocalSync} from the entry's `create`.
+ * `sync/local` in `CORE_ADAPTER_REGISTRY`
+ * (`src/core/adapters/registry.ts`), which calls {@link createLocalSync}
+ * from the entry's `create`.
  *
  * ## Selecting
  *
@@ -53,21 +54,24 @@
  * ## The import cycle
  *
  * `registry.ts` imports {@link createLocalSync} from here, and this
- * module imports `CORE_ADAPTER_REGISTRY` from there. Neither reads the
- * other's binding while it evaluates: the registry calls
+ * module imports `CORE_ADAPTER_REGISTRY` back through the barrel over
+ * it, `src/core/adapters/index.ts`. Neither reads the other's binding
+ * while it evaluates: the registry calls
  * {@link createLocalSync} only inside the entry's `create`, and this
  * module reads the registry only inside {@link selectSync}. So either
- * module can be imported first. `select.test.ts` imports each first in a
- * child `bun` and resolves `sync/local` there.
+ * module can be imported first. `select.test.ts` imports this module and
+ * the barrel each first in a child `bun` and resolves `sync/local`
+ * there, and `src/core/adapters/index.test.ts` does the same with
+ * `registry.ts` first.
  */
-import type { AdapterContext, AdapterRegistry } from '../../adapters/registry.js';
-import type { RafaConfig, SyncStrategy } from '../../config.js';
+import type { AdapterContext, AdapterRegistry } from '../../core/adapters/index.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { SyncStrategy } from '../../core/config/sections.js';
 import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { hubContextOf } from '../../config-schema-hub.js';
-import { describeValue } from '../../config-sections.js';
-import { SYNC_STRATEGIES } from '../../config.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
+import { describeValue, SYNC_STRATEGIES } from '../../core/config/sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync';

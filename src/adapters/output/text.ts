@@ -75,8 +75,8 @@ function resultLine(event: CliEventResult): string {
  * Makes a `text` Output writing each line to `stream`.
  *
  * The output answered is frozen, so no caller replaces one of its
- * functions on an output `active.ts` may be handing every module of the
- * process.
+ * functions on an output `src/core/output/active.ts` may be handing
+ * every module of the process.
  */
 export function createTextOutput({ verbosity, stream }: CreateTextOutputOptions): Output {
   const writeLine = (line: string): void => {

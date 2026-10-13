@@ -31,14 +31,14 @@
  * `src/commands/stretch/` and `src/commands/doctor-stretch.ts` imports
  * this module, so the stretch logic can move into its own package.
  */
-import type { PidProbe } from '../loop/sessions.js';
+import type { PidProbe } from '../core/loop/index.js';
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { errorCode, isPidAlive } from '../core/loop/index.js';
 import { isPositiveWhole } from '../loop/session-record-parse.js';
-import { errorCode, isPidAlive } from '../loop/sessions.js';
 
 /** The folder every stretch writes under, relative to the project root. */
 export const STRETCH_DIR = join('.rafa', 'stretch');

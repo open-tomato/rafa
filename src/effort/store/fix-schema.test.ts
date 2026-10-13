@@ -30,7 +30,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RAFA_VERSION } from '../../cli/version.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
 
 import { bringForward, MIGRATION_LOG_TABLE } from './bring-forward.js';
 import { fixStoreSchema, SchemaFixRefusal } from './fix-schema.js';

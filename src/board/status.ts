@@ -57,7 +57,7 @@ import type { Stats } from 'node:fs';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { createGhRoadmapSearch, ROADMAP_SETTING, ROADMAP_TITLE, severalRoadmapsMessage } from './roadmap.js';
 import { readRoadmapSetting } from './setup-config.js';

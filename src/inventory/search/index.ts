@@ -15,7 +15,7 @@
  * ## The session
  *
  * The session is spawned through the capturing door
- * (`src/utils/claude.ts`), under the run's `loop.settingSources`, with
+ * (`src/core/loop/claude.ts`), under the run's `loop.settingSources`, with
  * the argument list {@link searchFlags} builds: `--session-id` with an
  * id the runner picks, `--model` {@link SEARCH_MODEL}, and `--tools`
  * naming {@link SEARCH_TOOLS} and nothing else. `--tools` is variadic,
@@ -86,18 +86,18 @@
 import type { SearchBlockIssue, SearchMatch } from './block.js';
 import type { RankedCandidate } from './rank.js';
 import type { ScratchCopy } from './scratch.js';
-import type { ClaudeSettingSource } from '../../config.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
+import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore, SessionEffortRow } from '../../effort/store/types.js';
-import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
 import type { InventoryKind, InventoryRecord } from '../record.js';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
 import { collectSessionRow, sessionLogDir } from '../../effort/collect.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
-import { claudeArgs, spawnClaudeCaptured } from '../../utils/claude.js';
 
 import { parseSearchBlock } from './block.js';
 import { renderSearchPrompt } from './prompt.js';

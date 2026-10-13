@@ -24,9 +24,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '../../core/git/index.js';
 import { parseFragment, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
-import { createGitRunner } from '../git.js';
 
 import {
   conversionCommitSubject,
