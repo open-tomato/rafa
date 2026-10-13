@@ -153,8 +153,9 @@ refresh's warning lines after their own output.
 The `IssueBoard` wrapper at `src/board/project/issue-board-refresh.ts`
 wraps the GitHub issue board's label writes (`swapLabels`, `addLabel`,
 `removeLabel`), so every label write through the board is followed by a
-refresh. This covers the claim stages, the readiness gate, `issue move` and
-labels-mode `issue unblock` without editing each caller.
+refresh. This covers the claim stages, the readiness gate and labels-mode
+`issue unblock` without editing each caller. `rafa issue move` is not
+covered: it goes through the Tracker port and writes no label.
 
 Native-mode blocker writes do not go through `IssueBoard`, so
 `src/commands/issue/unblock-native.ts` calls the refresh itself.
@@ -209,7 +210,10 @@ Commands that call the refresh outside the label wrapper:
   <reason>` when the refresh did not fill it
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
-  issues they were blocking
+  issues they were blocking; an epic whose member it closes is not
+  refreshed, so its Progress stays stale until `rafa board sync`
+- `rafa issue move` — refresh the moved issue after the Tracker port's move,
+  since the move writes no label (`src/commands/issue/move-project.ts`)
 - `rafa start` (runner PR step) — refresh the issues the pull request closes
 - `rafa release settle` — refresh the issues closed by the pull requests
   whose fragments were folded (a push delivery only; PR delivery sends no
