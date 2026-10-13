@@ -1108,8 +1108,9 @@ take commit on it.
 **Handover:** Ownership change is two-sided. The owner runs `rafa claim hand
 <n> --to=<store id>`, pushing a hand commit naming the receiver; the
 receiver runs `rafa claim accept <n>`, pushing an accept commit naming the
-giver. Until acceptance the owner stays the owner and may run `rafa claim
-withdraw <n>` to cancel the handover, pushing a withdraw commit.
+receiver's own store, so the receiver owns the claim from then on. Until
+acceptance the owner stays the owner and may run `rafa claim withdraw <n>`
+to cancel the handover, pushing a withdraw commit.
 
 **Takeover:** `rafa claim take <n> [--stale]` takes a claim held too long.
 Without `--stale` it refuses unless the claim reads stale by `claims.staleAfter`
