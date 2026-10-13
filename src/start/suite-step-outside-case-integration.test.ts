@@ -42,7 +42,7 @@ import { runSuite } from '../suite/run.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { OUTSIDE_CASE_REASON } from './suite-outside-case.js';
+import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from './suite-outside-case.js';
 import { addToLedger } from './suite-step.js';
 import { createRunSuiteSteps } from './suite-steps-run.js';
 
@@ -98,6 +98,11 @@ interface Planted {
 const OUTSIDE: Planted = { exitCode: 1, stderr: LOAD_STDERR, junit: EMPTY_JUNIT };
 const LISTED: Planted = { exitCode: 1, stderr: FAILED_STDERR, junit: FAILED_JUNIT };
 const GREEN: Planted = { exitCode: 0, stderr: GREEN_STDERR, junit: EMPTY_JUNIT };
+/** Bun's answer to a run that selects no test file: exit code 1, its own line and no summary. */
+const NO_TEST_FILES: Planted = { exitCode: 1, stderr: 'error: 0 test files matching **{.test,.spec,_test_,_spec_}.{js,ts,jsx,tsx}\n', junit: EMPTY_JUNIT };
+
+/** The one `tests.alwaysRun` file the always-run cases name, tracked in the checkout. */
+const ALWAYS_RUN_FILE = 'src/x.sweep.test.ts';
 
 let dir: string;
 let trackerPath: string;
@@ -127,17 +132,18 @@ function linesAt(level: string): readonly string[] {
 }
 
 /** A git at {@link HEAD} whose diff from {@link BASE} is `src/a.ts`. */
-function gitAtHead(): GitRunner {
+function gitAtHead(tracked: readonly string[] = []): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
     [`diff --name-only -z --no-renames ${BASE} HEAD`]: { ok: true, stdout: 'src/a.ts\0', stderr: '' },
     [`diff --name-only -z --no-renames ${HEAD} HEAD`]: { ok: true, stdout: '', stderr: '' },
+    'ls-files -z': { ok: true, stdout: tracked.map((path) => `${path}\0`).join(''), stderr: '' },
   };
   return (args) => answers[args.join(' ')] ?? { ok: false, stdout: '', stderr: `unscripted: ${args.join(' ')}` };
 }
 
 /** The loop's steps over `runs`, answered in turn by a planted spawn under the real `runSuite`. */
-function stepsOver(runs: readonly Planted[]): { readonly steps: ReturnType<typeof createRunSuiteSteps>; readonly recorded: SessionStep[]; readonly spawned: () => number } {
+function stepsOver(runs: readonly Planted[], alwaysRun: readonly string[] = []): { readonly steps: ReturnType<typeof createRunSuiteSteps>; readonly recorded: SessionStep[]; readonly spawned: () => number } {
   const queue = [...runs];
   let spawnedCount = 0;
   const recorded: SessionStep[] = [];
@@ -155,7 +161,7 @@ function stepsOver(runs: readonly Planted[]): { readonly steps: ReturnType<typeo
     checkout: dir,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: false },
+    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: alwaysRun, testsRetakeRedAlone: false },
     planContent: TRACKER,
     gh: () => Promise.reject(new Error('gh is not read by these cases')),
     seams: {
@@ -163,7 +169,7 @@ function stepsOver(runs: readonly Planted[]): { readonly steps: ReturnType<typeo
       appendStep: (step) => {
         recorded.push(step);
       },
-      git: gitAtHead(),
+      git: gitAtHead(alwaysRun),
       listTestFiles: () => ['src/a.test.ts'],
       readPreloadFiles: () => ({ state: 'read', files: [] }),
       now: () => new Date('2026-10-01T00:00:00Z'),
@@ -284,5 +290,94 @@ describe('the control: a run that exits 1 listing one failing case', () => {
     tickTask();
     expect(await steps.afterTask({ task: 'only task', lineNum: 4, status: 'unchecked' }, BASE)).toBe(true);
     expect(repairLines()).toEqual([]);
+  });
+});
+
+describe('a task step whose first run found no test file, beside a tests.alwaysRun run', () => {
+  it('settles green with no outside-case mark and no repair task when the always-run run passes', async () => {
+    storeGreenBaseline();
+    const { steps, recorded, spawned } = stepsOver([NO_TEST_FILES, GREEN], [ALWAYS_RUN_FILE]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+    tickTask();
+    expect(await steps.afterTask({ task: 'only task', lineNum: 4, status: 'unchecked' }, BASE)).toBe(true);
+
+    expect(spawned()).toBe(2);
+    expect(recorded.map((step) => [step.kind, step.exitCode, step.outsideCase])).toEqual([['task', 0, undefined]]);
+    expect(recorded[0]?.newFailures).toEqual([]);
+    expect(repairLines()).toEqual([]);
+  });
+
+  it('settles red on the failure the always-run run lists, with one repair task', async () => {
+    storeGreenBaseline();
+    const { steps, recorded, spawned } = stepsOver([NO_TEST_FILES, LISTED], [ALWAYS_RUN_FILE]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+    tickTask();
+    expect(await steps.afterTask({ task: 'only task', lineNum: 4, status: 'unchecked' }, BASE)).toBe(false);
+
+    expect(spawned()).toBe(2);
+    expect(recorded.map((step) => [step.kind, step.exitCode, step.outsideCase])).toEqual([['task', 1, undefined]]);
+    expect(recorded[0]?.newFailures.map((failure) => failure.file)).toEqual(['src/a.test.ts']);
+    expect(repairLines()).toHaveLength(1);
+    const repair = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(repair?.blocker).toContain('src/a.test.ts');
+    expect(repair?.blocker).not.toContain(OUTSIDE_CASE_REASON);
+  });
+});
+
+describe('a stored baseline of a run that found no test file', () => {
+  /** A result of Bun's no-test-files run, marked or not, as the baseline file is written from it. */
+  const noTestFilesResult = (marked: boolean) => ({
+    command: ['bun', 'test'], exitCode: 1, summary: '', failures: [], errors: 0, junit: 'read' as const, unhandled: [], outputTail: [],
+    ...(marked
+      ? { noTestFiles: true }
+      : {}),
+  });
+
+  /** Stores that baseline, as an earlier run would have left it. */
+  function storeNoTestFilesBaseline(marked: boolean): string {
+    const path = baselinePathFor(trackerPath);
+    writeBaseline(path, baselineOf(noTestFilesResult(marked), new Date('2026-09-30T00:00:00Z'), BASE));
+    return path;
+  }
+
+  it('reuses a file carrying the mark with no warning, no suite run and the file left as it was', async () => {
+    const path = storeNoTestFilesBaseline(true);
+    const before = readFileSync(path, 'utf8');
+    expect(before).toContain('"noTestFiles": true');
+    const { steps, spawned } = stepsOver([]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    expect(spawned()).toBe(0);
+    expect(linesAt('warn')).toEqual([]);
+    expect(linesAt('info').join('\n')).toContain('Suite baseline reused from');
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+
+  it('warns once on a file of the same shape with no key, records it again with the mark, then reuses it quietly', async () => {
+    const path = storeNoTestFilesBaseline(false);
+    const before = readFileSync(path, 'utf8');
+    expect(before).not.toContain('noTestFiles');
+    const first = stepsOver([NO_TEST_FILES]);
+
+    expect(await first.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    const stored = readBaseline(path);
+    if (stored.state !== 'read') throw new Error('the baseline was not written again');
+    expect(first.spawned()).toBe(1);
+    expect(linesAt('warn')).toEqual([storedOutsideCaseLine('SUITE_BASELINE-fixture.json', { exitCode: 1 })]);
+    expect(stored.baseline.noTestFiles).toBe(true);
+    expect(readFileSync(path, 'utf8')).toContain('"noTestFiles": true');
+
+    lines = [];
+    const written = readFileSync(path, 'utf8');
+    const second = stepsOver([]);
+    expect(await second.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+
+    expect(second.spawned()).toBe(0);
+    expect(linesAt('warn')).toEqual([]);
+    expect(readFileSync(path, 'utf8')).toBe(written);
   });
 });

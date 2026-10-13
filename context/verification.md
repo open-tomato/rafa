@@ -198,13 +198,52 @@ the baseline holds.** The exit code is the reading
 (`failedOutsideAnyCase`, `src/start/suite-outside-case.ts`), and no
 wording of Bun's stderr decides it. A task, stage or pre-wrap-up step is
 red on it even when the baseline counted as many errors. The baseline is
-not red on it: it halts the run, as the next paragraph says. Left as they
-were: a run Bun found no test file for, a SIGINT stop, and a run listing
-failures, which are split against the baseline as above. The blocker
-names the reason, `the run failed outside any test case`, and quotes the
-end of the run's stderr within a few hundred characters; the recorded
-step carries `outsideCase: true` and that tail whole as `outputTail`. A
-step red on this alone is not retaken.
+not red on it: it halts the run, as the next paragraph says. Left as
+they were: a run Bun found no test file for (below), a SIGINT stop, and
+a run listing failures, which are split against the baseline as above.
+The blocker names the reason, `the run failed outside any test case`,
+and quotes the end of the run's stderr within a few hundred characters;
+the recorded step carries `outsideCase: true` and that tail whole as
+`outputTail`. A step red on this alone is not retaken.
+
+**A run Bun found no test file for is green alone and neutral folded.**
+A project holding no test file makes Bun print `error: 0 test files
+matching` or `No tests found!` and exit 1, and `runSuite`
+(`src/suite/run.ts`) marks that run `noTestFiles`.
+`failedOutsideAnyCase` leaves a marked run as it is, and `verdictOf`
+(`src/start/suite-step.ts`) reads it as no failure and no unreported
+exit, so a step holding only that run reads green, and its record
+carries no `outsideCase` key. Bun's `--changed` line for an empty scope,
+`--changed: 1 changed file, but no test files are affected`, is not this
+mark: that run exits 0, is not marked, and reads as passing with `Ran 0
+tests across 0 files.`
+
+When a task step folds the marked run with its always-run run,
+`foldResults` (`src/start/task-always-run.ts`) reads the other run and
+drops the mark. A stop code is read before the mark, so a marked run
+beside a SIGINT stop folds to the stop. The four pairings:
+
+| First run | Second run | Folded reads |
+|---|---|---|
+| marked | passing | green: exit 0, the second run's summary, no mark |
+| passing | marked | green: exit 0, the first run's summary, no mark |
+| marked | failing | red on the second run: its exit code and failures, no mark |
+| marked | marked | marked: `noTestFiles: true`, the first run's exit code |
+
+"Failing" is a second run that lists a failing case or exits nonzero: a
+run that exits nonzero with no failing case still reads as outside any
+test case, with its exit code. Three cases read off these rules. A task
+that edits one context page has an empty own scope: `bun test
+--changed=<base>` reaches no test file and exits 0, unmarked, so its
+first run is passing and the always-run sweeps pass beside it. The fold
+is green and so is the step. A new project with no test file yet has no
+sweep to fold with, so its task steps read the marked run alone, green,
+and its baseline is recorded once (below). An empty own scope whose
+always-run tests fail folds as passing then failing, not as a marked
+run: a `--changed` run in a tree holding test files prints the line
+above, not the mark. The second run's exit code and failures are read,
+and the step is red on those failures when the baseline does not hold
+them, as before this fix.
 
 **A baseline that failed outside any test case halts the run.** Such a
 run is not written as the baseline (`ensureBaseline`,
@@ -223,6 +262,19 @@ and says the run failed outside any test case. Install the dependencies,
 then run again. A baseline file written before this rule can hold such a
 run: `ensureBaseline` records it again with a warning that says so, and a
 baseline with listed failures is inherited as before.
+
+**A baseline with no test file is stored with its mark, and reused.**
+`baselineOf` (`src/suite/baseline.ts`) writes `noTestFiles: true` into
+the baseline file for a marked result and no key for any other result;
+the version stays 1, and `readBaseline` takes the key as absent or a
+boolean, any other value making the file unreadable. `ensureBaseline`
+(`src/start/suite-step.ts`) reuses a stored baseline that
+`failedOutsideAnyCase` does not read as outside a case, with an info
+line and no `bun test` run. So a new project with no test file records
+its baseline once and reads it quietly after: the mark is what tells it
+from a run that failed outside any test case. A file written before the
+mark was kept has no key, reads as that failure, and is recorded again
+once with the warning; the file written then carries the mark.
 
 **A failed case's error is read from stderr, and the step keeps its
 first lines.** Bun 1.3.14, the pinned version, writes every thrown

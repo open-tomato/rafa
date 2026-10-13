@@ -12,6 +12,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { failedOutsideAnyCase } from '../start/suite-outside-case.js';
+
 import {
   BASELINE_VERSION,
   baselineOf,
@@ -40,7 +42,20 @@ const RESULT: SuiteResult = {
   outputTail: ['error: boom', 'Ran 3 tests across 2 files. [12.00ms]'],
 };
 
-const RECORDED_AT = new Date('2026-09-30T10:00:00.000Z');
+/** A run Bun found no test file for: exit code 1, no summary line, nothing listed, and the mark. */
+const NO_TEST_FILES: SuiteResult = {
+  command: ['bun', 'test'],
+  exitCode: 1,
+  summary: null,
+  failures: [],
+  errors: null,
+  junit: 'missing',
+  unhandled: [],
+  outputTail: ['No tests found!'],
+  noTestFiles: true,
+};
+
+const RECORDED_AT =new Date('2026-09-30T10:00:00.000Z');
 
 let dir: string;
 
@@ -188,6 +203,86 @@ describe('writeBaseline and readBaseline', () => {
       writeFileSync(path, JSON.stringify({ ...whole, failures: [{ file: 'a.test.ts', name: 'n', message }] }), 'utf8');
       expect(readBaseline(path)).toEqual({ state: 'unreadable', reason: 'field failures is missing or malformed' });
     }
+  });
+
+  it('reads a marked result back as one that did not fail outside any case (#1053)', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+
+    writeBaseline(path, baselineOf(NO_TEST_FILES, RECORDED_AT, null));
+
+    const reading = readBaseline(path);
+    if (reading.state !== 'read') throw new Error(`the baseline read as ${reading.state}`);
+    expect(failedOutsideAnyCase(reading.baseline)).toBe(false);
+    // Control: the same shape without the mark is the reading the mark excuses.
+    expect(failedOutsideAnyCase({ exitCode: reading.baseline.exitCode, failures: reading.baseline.failures })).toBe(true);
+  });
+
+  it('writes no noTestFiles key for an unmarked result', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const baseline = baselineOf(RESULT, RECORDED_AT, null);
+
+    writeBaseline(path, baseline);
+
+    expect('noTestFiles' in baseline).toBe(false);
+    expect(readFileSync(path, 'utf8')).not.toContain('noTestFiles');
+    // A mark that is present and false is no mark either: only `true` is written.
+    expect('noTestFiles' in baselineOf({ ...RESULT, noTestFiles: false }, RECORDED_AT, null)).toBe(false);
+    // Control: the same check finds the key in a marked result's file.
+    writeBaseline(path, baselineOf(NO_TEST_FILES, RECORDED_AT, null));
+    expect(readFileSync(path, 'utf8')).toContain('"noTestFiles": true');
+  });
+
+  it('round-trips a marked result', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const baseline = baselineOf(NO_TEST_FILES, RECORDED_AT, 'abc123');
+
+    writeBaseline(path, baseline);
+
+    expect(baseline.noTestFiles).toBe(true);
+    expect(readBaseline(path)).toEqual({ state: 'read', baseline });
+    const reading = readBaseline(path);
+    expect(reading.state === 'read' && reading.baseline.noTestFiles).toBe(true);
+  });
+
+  it('reads a file with no noTestFiles key as read', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const { noTestFiles: mark, ...before } = baselineOf(NO_TEST_FILES, RECORDED_AT, null);
+    writeFileSync(path, JSON.stringify(before), 'utf8');
+
+    // Control: the baseline held the mark, so the file without it is the older shape.
+    expect(mark).toBe(true);
+    expect('noTestFiles' in before).toBe(false);
+    expect(readBaseline(path)).toEqual({ state: 'read', baseline: before });
+  });
+
+  it('reads a boolean noTestFiles of either value as read', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const whole = baselineOf(RESULT, RECORDED_AT, null);
+
+    for (const noTestFiles of [true, false]) {
+      writeFileSync(path, JSON.stringify({ ...whole, noTestFiles }), 'utf8');
+      expect(readBaseline(path)).toEqual({ state: 'read', baseline: { ...whole, noTestFiles } });
+    }
+  });
+
+  it('reads a noTestFiles that is not a boolean as unreadable', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const whole = baselineOf(NO_TEST_FILES, RECORDED_AT, null);
+
+    for (const noTestFiles of ['true', 1, null, [true]]) {
+      writeFileSync(path, JSON.stringify({ ...whole, noTestFiles }), 'utf8');
+      expect(readBaseline(path)).toEqual({ state: 'unreadable', reason: 'field noTestFiles is missing or malformed' });
+    }
+  });
+
+  it('reads a file carrying an unknown key under version 1', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const withUnknown = { ...baselineOf(RESULT, RECORDED_AT, null), notAField: { any: ['thing'] } };
+    writeFileSync(path, JSON.stringify(withUnknown), 'utf8');
+
+    expect(BASELINE_VERSION).toBe(1);
+    expect(withUnknown.version).toBe(1);
+    expect(readBaseline(path)).toEqual({ state: 'read', baseline: withUnknown });
   });
 
   it('reads a baseline written without failures field as unreadable', () => {

@@ -16,6 +16,12 @@
  * one, an answered lesson beside an unanswered one, a body written
  * beside a body left alone. Without it, a check that reported every
  * lesson, or none, would pass.
+ *
+ * The last group hands the check a null `pulls`, as the wrap-up does
+ * under `pr.provider: none` (#1051): a line to report is printed behind
+ * the reason, and no line to report prints nothing. The two are each
+ * other's control, and the same answer over a `gh` provider is the
+ * control for the reason, which is absent there.
  */
 import type { PromotedCheck } from './promoted-check.js';
 import type { InstinctRecord } from '../learning/index.js';
@@ -41,6 +47,7 @@ import {
   changedSince,
   checkPromoted,
   checkWrapUpAnswer,
+  NO_PROVIDER_REASON,
   readHead,
   recordPromotions,
   repoPath,
@@ -524,5 +531,85 @@ describe('checkWrapUpAnswer', () => {
 
     expect(warnings.some((each) => each.includes('the learning adapter could not be made: no `learning` adapter has the kind `absent`'))).toBe(true);
     expect(warnings.some((each) => each.includes(`no open pull request was found for ${BRANCH}`) && each.includes('`lesson-b` (no answer'))).toBe(true);
+  });
+});
+
+describe('checkWrapUpAnswer with no pull request provider', () => {
+  let infos: string[] = [];
+  let warnings: string[] = [];
+
+  beforeEach(() => {
+    infos = [];
+    warnings = [];
+    setActiveOutput(sinkOutput({
+      info: (message) => {
+        infos.push(message);
+      },
+      warn: (message) => {
+        warnings.push(message);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** The check over `output` for two lessons, `context/source.md` changed, and a null `pulls`. */
+  async function runWithout(output: string) {
+    const { learning, pushes } = stubLearning();
+    const check = await checkWrapUpAnswer({
+      lessons: [lesson('lesson-a'), lesson('lesson-b')],
+      output,
+      head: HEAD,
+      repoRoot: ROOT,
+      branch: BRANCH,
+      git: stubGit(diffOf('context/source.md')).git,
+      pulls: null,
+      learning: () => learning,
+    });
+    return { check, pushes };
+  }
+
+  test('prints the line behind the reason when a lesson is left unanswered', async () => {
+    const { check, pushes } = await runWithout(answered('lesson-a → context/source.md'));
+
+    const line = unpromotedLine(check, HEAD);
+    expect(line).toBe('Lessons listed for promotion that this pull request does not carry: `lesson-b` (no answer in the `rafa:promoted` block).');
+    expect(warnings).toEqual([`   ${NO_PROVIDER_REASON}: ${String(line)}`]);
+    expect(warnings[0]).toContain('`pr.provider` is `none`');
+    expect(warnings[0]).toContain('the lessons stay in the library');
+    // The confirmed promotion is recorded as under any provider.
+    expect(pushes.map((each) => each.instincts[0]?.promoted_to)).toEqual(['context/source.md']);
+    expect(infos).toEqual(['   Lesson `lesson-a` promoted to context/source.md.']);
+  });
+
+  test('prints nothing about a pull request when there is no line to report', async () => {
+    // The control for the case above: the same lessons, both answered.
+    const { check } = await runWithout(answered('lesson-a → context/source.md', 'lesson-b → skipped: covered by a skill'));
+
+    expect(check.unpromoted).toEqual([]);
+    expect(warnings).toEqual([]);
+    expect(infos).toEqual(['   Lesson `lesson-a` promoted to context/source.md.']);
+  });
+
+  test('names no provider as the reason when a provider is handed over', async () => {
+    // The control for the reason: the same answer over `gh`, no pull request open.
+    const fakeGh = createFakePrGh();
+    await checkWrapUpAnswer({
+      lessons: [lesson('lesson-a'), lesson('lesson-b')],
+      output: answered('lesson-a → context/source.md'),
+      head: HEAD,
+      repoRoot: ROOT,
+      branch: BRANCH,
+      git: stubGit(diffOf('context/source.md')).git,
+      pulls: createGhPullRequests({ gh: fakeGh.run }),
+      learning: () => stubLearning().learning,
+    });
+
+    expect(fakeGh.calls().length).toBeGreaterThan(0);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toStartWith(`   This line is not in the pull request body, as no open pull request was found for ${BRANCH}: `);
+    expect(warnings[0]).not.toContain(NO_PROVIDER_REASON);
   });
 });
