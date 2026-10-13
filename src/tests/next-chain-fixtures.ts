@@ -32,7 +32,7 @@ import { completeSpecBody } from './spec-bodies.js';
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));
 
 /** `src/`, where every module a probe imports lives. */
-export const SRC_DIR = join(TESTS_DIR, '..');
+export const SRC_DIR: string = join(TESTS_DIR, '..');
 
 /** The base branch of the scratch repository. */
 export const BASE = 'main';
@@ -56,7 +56,7 @@ export const AUTHOR_LOGIN = 'octocat';
 export const NEXT_TITLE = 'Ship next feature';
 
 /** The project config: a GitHub provider so no origin remote needs probing, and the roadmap issue. */
-export const CONFIG_TEXT = [
+export const CONFIG_TEXT: string = [
   'pr:',
   '  provider: gh',
   `  base: ${BASE}`,
