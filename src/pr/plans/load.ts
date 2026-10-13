@@ -281,13 +281,13 @@ export const FAILING_LOG_SLOT = 'FAILING_LOG';
  * same cap `../triage/follow-up.ts` shows a prompt with, so no reader of
  * one triage sees lines another was denied. See the module note.
  */
-export const FAILING_LOG_EXCERPT_LINES = FOLLOW_UP_EXCERPT_LINES;
+export const FAILING_LOG_EXCERPT_LINES: number = FOLLOW_UP_EXCERPT_LINES;
 
 /**
  * What stands in for the excerpt when the fill carried none; see the
  * module note on the failing log.
  */
-export const NO_FAILING_LOG
+export const NO_FAILING_LOG: string
   = 'No failing-job log was carried into this plan. Read it yourself with'
     + ' `gh run view <run-id> --log-failed` before changing anything, and say that'
     + ' the excerpt was missing rather than guessing what failed.';

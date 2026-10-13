@@ -116,7 +116,7 @@ import { parseWorktrees } from './merge.js';
 import { shellQuote } from './preflight-items.js';
 
 /** Where under a home directory the resolve worktrees are made. */
-export const WORKTREES_SUBDIR = join('.rafa', 'worktrees');
+export const WORKTREES_SUBDIR: string = join('.rafa', 'worktrees');
 
 /** What a resolve worktree directory is named before its PR number. */
 const WORKTREE_PREFIX = 'pr-';

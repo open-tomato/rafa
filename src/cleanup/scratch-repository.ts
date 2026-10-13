@@ -103,7 +103,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { ADMIN_FILES, GIT_DIR } from './worktrees.js';
 
 /** The moment every commit is dated, except `stale`'s. */
-export const SCRATCH_NOW = new Date('2026-09-24T12:00:00Z');
+export const SCRATCH_NOW: Date = new Date('2026-09-24T12:00:00Z');
 
 /** How many days before {@link SCRATCH_NOW} the `stale` branch was last committed. */
 export const STALE_AGE_DAYS = 90;
@@ -120,7 +120,7 @@ const LATER_DAYS = 30;
  * The clock a past-head reading runs with: the worktree `wt-held` is
  * dated to it, so it is no idle at all and reads `recent`.
  */
-export const SCRATCH_LATER = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
+export const SCRATCH_LATER: Date = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
 
 /** The id of the release fragment `main` holds and `fragment` commits past its head. */
 export const FRAGMENT_ID = 'rafa-901';

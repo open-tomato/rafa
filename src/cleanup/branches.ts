@@ -75,7 +75,7 @@ import { gitSaid } from '../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 
 /** The `for-each-ref` format every branch is read with; see the module note. */
-export const BRANCH_FORMAT = [
+export const BRANCH_FORMAT: string = [
   '%(refname:lstrip=2)',
   '%(upstream:short)',
   '%(upstream:track,nobracket)',

@@ -56,7 +56,7 @@ import { renderFrontmatter } from '../schema/frontmatter.js';
 import { SKILL_SIGNALS } from '../schema/skill.js';
 
 /** The directory under `<base>/.rafa/` the proposal files are written into. */
-export const BACKFILL_PATH = join('.rafa', 'backfill');
+export const BACKFILL_PATH: string = join('.rafa', 'backfill');
 
 /** What a proposal file is named, before its two-digit batch number. */
 export const PROPOSAL_FILE_PREFIX = 'proposals-';
@@ -65,7 +65,7 @@ export const PROPOSAL_FILE_PREFIX = 'proposals-';
 export const PROPOSAL_FILE_EXTENSION = '.yaml';
 
 /** The shape a row's hash takes: sha256 in lower-case hex. */
-export const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+export const SHA256_PATTERN: RegExp = /^[0-9a-f]{64}$/;
 
 /** Whether a proposal file has been through the review. */
 export type ProposalStatus = 'draft' | 'reviewed';
@@ -152,7 +152,7 @@ export interface ReadProposal {
 }
 
 /** The comment block every proposal file opens with, for the reviewer. */
-export const PROPOSAL_FILE_HEADER = [
+export const PROPOSAL_FILE_HEADER: string = [
   '# Backfill proposals: one row per skill, written by one session.',
   '#',
   '# Review each row against the skill description and its When to Use',
