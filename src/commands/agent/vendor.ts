@@ -364,4 +364,5 @@ export function createAgentVendorCommand(
   return Object.freeze(command);
 }
 
-export default createAgentVendorCommand();
+const command: RafaCommand = createAgentVendorCommand();
+export default command;

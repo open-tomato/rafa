@@ -22,4 +22,5 @@ export function createAgentSearchCommand(seams: SearchSeams = DEFAULT_SEARCH_SEA
   return createSearchCommand('agent', seams);
 }
 
-export default createAgentSearchCommand();
+const command: RafaCommand = createAgentSearchCommand();
+export default command;

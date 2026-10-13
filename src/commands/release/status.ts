@@ -526,4 +526,5 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
   return Object.freeze(command);
 }
 
-export default createReleaseStatusCommand();
+const command: RafaCommand = createReleaseStatusCommand();
+export default command;

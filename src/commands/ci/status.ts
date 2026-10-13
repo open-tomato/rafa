@@ -183,4 +183,5 @@ export function createCiStatusCommand(seams: CiStatusSeams = DEFAULT_CI_STATUS_S
   return Object.freeze(command);
 }
 
-export default createCiStatusCommand();
+const command: RafaCommand = createCiStatusCommand();
+export default command;

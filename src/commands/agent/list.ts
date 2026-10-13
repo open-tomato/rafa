@@ -399,4 +399,5 @@ export function createAgentListCommand(seams: AgentListSeams = DEFAULT_AGENT_LIS
   return Object.freeze(command);
 }
 
-export default createAgentListCommand();
+const command: RafaCommand = createAgentListCommand();
+export default command;

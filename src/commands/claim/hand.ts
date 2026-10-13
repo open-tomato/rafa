@@ -284,4 +284,5 @@ export function createClaimHandCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SE
   return Object.freeze(command);
 }
 
-export default createClaimHandCommand();
+const command: RafaCommand = createClaimHandCommand();
+export default command;
