@@ -84,16 +84,41 @@
  *
  * ## Locating the task
  *
- * The task is found by its `lineNum`, counting from zero as
- * `TaskInfo.lineNum` does, and must hold the same `task` there. A
- * tracker is the plan copied once, so a plan edited afterwards can put
- * a different task, or no task, where the tracker's task sits; and a
- * task line after the fence of a `rafa:*` block never closed is one
- * `findNextTask` still dispatches and the model reads as that block's
- * body. None of the three is a
- * reason to stop a plan. The rendering falls back to `full`, which
- * hands the session everything it had before modes existed, and says
- * why in {@link PlanInjection.fallback}. `full` locates nothing, so it
+ * The loop hands over the PLAN's text and the task its TRACKER
+ * answered. A tracker is the plan copied once, and the two stop sharing
+ * line numbers the first time a red step inserts a repair line into the
+ * tracker (`insertTrackerTask`): every task below it sits one line
+ * lower than the plan holds it. The task was once found by its
+ * `lineNum`, so each task after a repair fell back to `full` (#865).
+ * The tracker's line number is therefore never read, and
+ * {@link InjectionTask} does not carry it. The task is found by what
+ * the two documents share, in this order:
+ *
+ *   1. The one plan task whose `task` equals the dispatched one.
+ *   2. When SEVERAL hold that text, the one of them at
+ *      {@link InjectionRequest.position}.
+ *   3. When NONE holds it, the task at that position: a plan whose
+ *      task was reworded after the copy still holds it in its place.
+ *
+ * A position counts from zero over the model's tasks, and one that is
+ * absent, negative or no integer names no task. A text held once is
+ * taken whatever the position says.
+ *
+ * What is left falls back to `full`, which hands the session everything
+ * it had before modes existed, and {@link PlanInjection.fallback} says
+ * what was looked for:
+ *
+ *   - `no-task-with-text`: no task holds the text and none sits at the
+ *     position. The plan lost the task after the copy; or the line
+ *     follows the fence of a `rafa:*` block never closed, which
+ *     `findNextTask` still dispatches and the model reads as that
+ *     block's body. The model holds no task after such a fence, so the
+ *     position of one reaches past its last task.
+ *   - `several-tasks-with-text`: several tasks hold the text and the
+ *     position names none of them, so nothing says which was
+ *     dispatched.
+ *
+ * Neither is a reason to stop a plan. `full` locates nothing, so it
  * never falls back.
  *
  * Nothing here throws.
@@ -104,8 +129,11 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { parsePlan } from './parse.js';
 
-/** The dispatched task, by the two fields of `TaskInfo` it is located by. */
-export type InjectionTask = Pick<TaskInfo, 'task' | 'lineNum'>;
+/**
+ * The dispatched task, by the one field of `TaskInfo` it is located by.
+ * Its `lineNum` is a line of the tracker and is left out on purpose.
+ */
+export type InjectionTask = Pick<TaskInfo, 'task'>;
 
 /** What {@link renderInjection} renders. */
 export interface InjectionRequest {
@@ -118,22 +146,27 @@ export interface InjectionRequest {
   readonly plan: string;
   /** The task being dispatched, as `findNextTask` answered it. */
   readonly task: InjectionTask;
+  /**
+   * The dispatched task's ordinal among the tracker's tasks, repair
+   * lines not counted, from zero: its place among the plan's tasks.
+   * Read only when the text does not settle the task. Absent, the text
+   * alone locates it.
+   */
+  readonly position?: number;
 }
 
-/** Why a rendering fell back to `full`. */
+/** Why a rendering fell back to `full`, by what was looked for. */
 export type InjectionFallbackReason =
-  /** The model reads no task at the line: prose, a blank, or block body. */
-  | 'no-task-at-line'
-  /** The model reads a different task at the line. */
-  | 'task-text-differs';
+  /** No plan task holds the dispatched text, and none sits at its position. */
+  | 'no-task-with-text'
+  /** Several plan tasks hold the dispatched text, and its position names none of them. */
+  | 'several-tasks-with-text';
 
 /** Why the requested mode was not rendered. */
 export interface InjectionFallback {
-  /** What the lookup found at the task's line. */
+  /** What the lookup did not find. */
   readonly reason: InjectionFallbackReason;
-  /** The task's line, counting from one, as an editor numbers it. */
-  readonly line: number;
-  /** One sentence for an operator to read. */
+  /** One sentence for an operator to read. It names no line of the plan. */
   readonly text: string;
 }
 
@@ -179,23 +212,53 @@ const CHECKBOXES: Readonly<Record<PlanTaskStatus, string>> = {
   done: '- [x]',
 };
 
-/** The fallback for a task the model does not hold as dispatched. */
-function fallbackFor(reason: InjectionFallbackReason, lineNum: number): Location {
-  const line = lineNum + 1;
-  const found = reason === 'no-task-at-line'
-    ? 'no task the plan model reads'
-    : 'a different task than the one dispatched';
-  const text = `line ${line} of the plan holds ${found}, so the whole plan is handed over; `
-    + 'the plan may have changed since its tracker was copied, or the line sits inside a rafa:* block';
-  return { found: false, fallback: { reason, line, text } };
+/** How every fallback sentence ends. */
+const HANDED_OVER = ', so the whole plan is handed over';
+
+/** `position` as an index into the model's tasks, or null when it names none. */
+function placeOf(position: number | undefined): number | null {
+  return position !== undefined && Number.isInteger(position) && position >= 0
+    ? position
+    : null;
+}
+
+/** The fallback when no task holds the text and none sits at `place`. */
+function noTaskWithText(place: number | null): Location {
+  const beyond = place === null
+    ? ''
+    : ` and no task number ${place + 1}`;
+  const text = `the plan holds no task with the dispatched text${beyond}${HANDED_OVER}; `
+    + 'the plan may have changed since its tracker was copied, or the task line sits inside a rafa:* block';
+  return { found: false, fallback: { reason: 'no-task-with-text', text } };
+}
+
+/** The fallback when `count` tasks hold the text and `place` names none of them. */
+function severalTasksWithText(count: number, place: number | null): Location {
+  const which = place === null
+    ? 'the dispatch gives no position among its tasks'
+    : `task number ${place + 1} is none of them`;
+  const text = `the plan holds ${count} tasks with the dispatched text and ${which}${HANDED_OVER}`;
+  return { found: false, fallback: { reason: 'several-tasks-with-text', text } };
 }
 
 /** Finds the dispatched task in the model. See the module note. */
-function locate(model: PlanModel, wanted: InjectionTask): Location {
-  const task = model.tasks.find((candidate) => candidate.lineNum === wanted.lineNum);
-  if (task === undefined) return fallbackFor('no-task-at-line', wanted.lineNum);
-  if (task.task !== wanted.task) return fallbackFor('task-text-differs', wanted.lineNum);
-  return { found: true, task };
+function locate(model: PlanModel, wanted: InjectionTask, position: number | undefined): Location {
+  const place = placeOf(position);
+  const atPlace = place === null
+    ? undefined
+    : model.tasks[place];
+  const holders = model.tasks.filter((candidate) => candidate.task === wanted.task);
+  const [first] = holders;
+
+  if (first === undefined) {
+    return atPlace === undefined
+      ? noTaskWithText(place)
+      : { found: true, task: atPlace };
+  }
+  if (holders.length === 1) return { found: true, task: first };
+  return atPlace !== undefined && holders.includes(atPlace)
+    ? { found: true, task: atPlace }
+    : severalTasksWithText(holders.length, place);
 }
 
 /** A context body less its outer blank lines, or null when it says nothing. */
@@ -290,15 +353,16 @@ const RENDERERS: Readonly<Record<Exclude<InjectMode, 'full'>, Renderer>> = {
  * Takes any plan text and any task, answers a new value and never
  * throws. `full` answers the plan text unchanged. `stage` and `task`
  * answer a document built from {@link parsePlan}'s model, or fall back
- * to `full` when the model does not hold the task at its line, and
- * report why. See the module note for what each mode renders.
+ * to `full` when neither the task's text nor its position finds it in
+ * the model, and report why. See the module note for what each mode
+ * renders.
  */
 export function renderInjection(request: InjectionRequest): PlanInjection {
-  const { mode, plan, task } = request;
+  const { mode, plan, task, position } = request;
   if (mode === 'full') return { requested: mode, mode, text: plan, fallback: null };
 
   const model = parsePlan(plan);
-  const location = locate(model, task);
+  const location = locate(model, task, position);
   if (!location.found) {
     return { requested: mode, mode: 'full', text: plan, fallback: location.fallback };
   }

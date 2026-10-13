@@ -125,6 +125,9 @@ const PROMPT_CONTENT = 'The loop stages and commits on your behalf.';
 /** The line the loop writes above every task prompt. */
 const DISPATCHED_HEAD = `Your scoped task is: ${DISPATCHED_TASK}`;
 
+/** A task text the plan holds on no line. */
+const UNHELD_TASK = 'Add a route the plan never names';
+
 /** The branch a wrap-up is told to push to. */
 const BRANCH = 'feat/an-injection-fixture';
 
@@ -426,29 +429,40 @@ describe('a task dispatched under each mode', () => {
     }
   });
 
-  it('hands over the whole plan, and says why, when the task has moved', async () => {
+  it('hands over the whole plan, and says why, when the plan holds no task with the text', async () => {
     const task = nextTaskAfter(1);
-    const moved = { ...task, lineNum: task.lineNum + 1 };
-    const { result } = await dispatchIn('stage', moved);
+    const { result } = await dispatchIn('stage', { ...task, task: UNHELD_TASK });
 
     expect(result.injection.requested).toBe('stage');
     expect(result.injection.mode).toBe('full');
-    expect(result.injection.fallback?.reason).toBe('no-task-at-line');
+    expect(result.injection.fallback?.reason).toBe('no-task-with-text');
     expect(result.prompt.endsWith(`\n${PLAN}`)).toBe(true);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('`stage` not rendered');
-    expect(warnings[0]).toContain(`line ${moved.lineNum + 1} of the plan`);
+    expect(warnings[0]).toContain('the plan holds no task with the dispatched text');
 
-    // The same dispatch at the task's own line renders and says nothing.
+    // The same dispatch with the task's own text renders and says nothing.
     warnings = [];
     const inPlace = await dispatchIn('stage', task);
     expect(inPlace.result.injection.mode).toBe('stage');
     expect(warnings).toEqual([]);
   });
 
+  it('renders the stage of a task its tracker holds on a lower line than the plan does', async () => {
+    // #865: a repair line inserted above the task moves it down in the
+    // tracker alone, and the plan holds no task where it now sits.
+    const task = nextTaskAfter(1);
+    const moved = await dispatchIn('stage', { ...task, lineNum: task.lineNum + 1 });
+    const inPlace = await dispatchIn('stage', task);
+
+    expect(moved.result.injection).toEqual(inPlace.result.injection);
+    expect(moved.result.injection.mode).toBe('stage');
+    expect(warnings).toEqual([]);
+  });
+
   it('warns about nothing under `full`, which locates no task', async () => {
     const task = nextTaskAfter(1);
-    const { result } = await dispatchIn('full', { ...task, lineNum: task.lineNum + 1 });
+    const { result } = await dispatchIn('full', { ...task, task: UNHELD_TASK });
 
     expect(result.injection.fallback).toBeNull();
     expect(warnings).toEqual([]);
