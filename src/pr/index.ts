@@ -45,6 +45,7 @@ export type {
 } from './checks.js';
 export type {
   ChecksReading,
+  ClosePullRequestOptions,
   ClosingIssue,
   Mergeability,
   MergeMethod,

@@ -8,7 +8,7 @@
  * commands exist, what each one accepts, what the repository does when
  * one arrives, and that every call is recorded. No case spawns anything.
  *
- * The strictness is the point: an adapter that sends `--delete-branch`,
+ * The strictness is the point: a merge that sends `--delete-branch`,
  * an unmodelled `--json` field or a `gh api` path nobody recorded fails
  * the case that sent it, where a lenient fake would answer as if the
  * invocation had been checked against `gh`.
@@ -74,7 +74,7 @@ async function json(fake: FakePrGh, args: readonly string[]): Promise<unknown> {
 
 describe('what the fake refuses', () => {
   it.each([
-    [['pr', 'close', '7'], 'fake gh: unhandled command pr close 7\n'],
+    [['pr', 'reopen', '7'], 'fake gh: unhandled command pr reopen 7\n'],
     [['pr', 'comment', '7', '--body', 'hi'], 'fake gh: unhandled command pr comment 7 --body hi\n'],
     [['pr', 'ready', '7'], 'fake gh: unhandled command pr ready 7\n'],
     [['run', 'list'], 'fake gh: unhandled command run list\n'],
@@ -113,10 +113,10 @@ describe('what the fake refuses', () => {
   it('records every call it was handed, refused ones included, frozen', async () => {
     const fake = withOnePull();
 
-    await fake.run(['pr', 'close', '7']);
+    await fake.run(['pr', 'reopen', '7']);
     await fake.run(VIEW);
 
-    expect(fake.calls()).toEqual([['pr', 'close', '7'], VIEW]);
+    expect(fake.calls()).toEqual([['pr', 'reopen', '7'], VIEW]);
     expect(Object.isFrozen(fake.calls()[0])).toBe(true);
   });
 });

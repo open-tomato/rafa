@@ -118,6 +118,10 @@ const MEMBERS: readonly Member[] = [
       '  }),',
     ],
   },
+  {
+    name: 'close',
+    lines: ['  close: async (_n: number, _comment: string, _options: T.ClosePullRequestOptions) => {},'],
+  },
   { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => summary,'] },
   { name: 'editTitle', lines: ['  editTitle: async (_n: number, _title: string) => {},'] },
   { name: 'editBase', lines: ['  editBase: async (_n: number, _base: string) => {},'] },
