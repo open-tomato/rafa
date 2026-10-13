@@ -146,7 +146,7 @@ export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
 ]);
 
 /** The root help's closing line, saying what the spend mark means. */
-export const SPENDS_LEGEND = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;
+export const SPENDS_LEGEND: string = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;
 
 /** The indent of a block's lines under its heading. */
 const INDENT = '  ';

@@ -290,7 +290,7 @@ export function formatProgressSection(progressContent: string | undefined): stri
 }
 
 /** The dev-planner skill in the rafa tier, relative to the directory holding the entry. */
-export const PLAN_FORMAT_SKILL = path.join(BUNDLED_SKILLS_DIR, 'dev-planner', 'SKILL.md');
+export const PLAN_FORMAT_SKILL: string = path.join(BUNDLED_SKILLS_DIR, 'dev-planner', 'SKILL.md');
 
 /**
  * Where {@link readPlanFormat} reads the skill: {@link PLAN_FORMAT_SKILL}

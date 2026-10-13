@@ -310,7 +310,7 @@ export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
 export const STAGE_LEDGER_VERSION = 1;
 
 /** The exit code `Bun.spawn` answers for a child ended by SIGINT: 128 plus its number. See the module note. */
-export const SIGINT_EXIT_CODE = 128 + constants.signals.SIGINT;
+export const SIGINT_EXIT_CODE: number = 128 + constants.signals.SIGINT;
 
 /** How many known failures a step lists by name before it counts the rest. */
 const KNOWN_LISTED = 10;

@@ -242,7 +242,7 @@ export function formatFinding(finding: ProgressFinding): string {
  */
 export function renderProgressText(
   findings: readonly ProgressFinding[],
-  capBytes = PROGRESS_CAP_BYTES,
+  capBytes: number = PROGRESS_CAP_BYTES,
 ): ProgressText {
   if (!Number.isSafeInteger(capBytes) || capBytes < 0) {
     throw new RangeError(`progress: a cap of ${capBytes} bytes is not a non-negative integer`);

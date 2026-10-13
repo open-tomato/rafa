@@ -60,7 +60,7 @@ const PREFIX = 'claim labels';
 const CLAIM_STANDS = 'the claim stands in git';
 
 /** The stage labels a release or a merge takes off, in the order they are sent. */
-export const STAGE_LABELS = Object.freeze([IN_DEVELOPMENT_LABEL, CLAIMED_LABEL] as const);
+export const STAGE_LABELS: readonly ['rafa:in-development', 'rafa:claimed'] = Object.freeze([IN_DEVELOPMENT_LABEL, CLAIMED_LABEL] as const);
 
 /** What a transition answered: the board took it, or why it did not. */
 export type LabelOutcome =
