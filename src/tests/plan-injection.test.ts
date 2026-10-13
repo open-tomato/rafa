@@ -518,7 +518,7 @@ describe('a task dispatched under each mode', () => {
 
 describe('the wrap-up session', () => {
   it('is handed the whole plan, which a stage rendering is not', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, 'main', PLAN);
+    const prompt = buildWrapUpPrompt(BRANCH, 'main', PLAN, 'gh');
     const stage = renderInjection({ mode: 'stage', plan: PLAN, task: nextTaskAfter(1) });
 
     expect(prompt.endsWith(`\n${PLAN}`)).toBe(true);
@@ -532,13 +532,13 @@ describe('the wrap-up session', () => {
 
   it('keeps its classifier key first, the plan and the stamp after it', () => {
     const stub = 'an-injection-fixture';
-    const stamped = stampPrompt(stub, buildWrapUpPrompt(BRANCH, 'main', PLAN));
+    const stamped = stampPrompt(stub, buildWrapUpPrompt(BRANCH, 'main', PLAN, 'gh'));
 
     expect(classifyPromptContent(stamped)).toBe('wrap-up');
     expect(planStubFromPrompt(stamped)).toBe(stub);
 
     // The plan written ABOVE the instructions buckets as nothing.
-    const prepended = `${PLAN}\n${buildWrapUpPrompt(BRANCH, 'main', '')}`;
+    const prepended = `${PLAN}\n${buildWrapUpPrompt(BRANCH, 'main', '', 'gh')}`;
     expect(classifyPromptContent(prepended)).toBe('other');
   });
 
@@ -552,7 +552,7 @@ describe('the wrap-up session', () => {
     expect(start).toContain('await runWrapUp({');
     expect(start).toContain('          planContent,\n');
     expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider, { stepOnly });');
-    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons, extras.stepOnly)');
+    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, provider, openPullRequest, release, lessons, extras.stepOnly)');
     expect(start).toContain('inject: injectMode,');
     // The place of the task in the plan, and what a repair names, are
     // read off the tracker the task came from.

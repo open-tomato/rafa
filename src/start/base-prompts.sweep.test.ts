@@ -5,7 +5,9 @@
  *
  * Two readings of the same rule. The built wrap-up prompt, over a run
  * whose base is `integration` with `origin/HEAD` naming `main`, holds no
- * `origin/main` whether or not a pull request is open. And the source of
+ * `origin/main` whether or not a pull request is open, and none under
+ * `pr.provider: none` either, where it names no `gh pr` at all (#977).
+ * And the source of
  * every module that writes a wrap-up, CI-repair or conflict-repair prompt
  * (`wrap-up.ts`, `pr-lifecycle.ts`, `wrap-up-run.ts`, `runner-pr.ts`)
  * carries no `origin/main` in its code, comments aside: a prompt line
@@ -49,10 +51,21 @@ describe('the base a prompt names under pr.base: integration', () => {
   });
 
   test('the wrap-up prompt names no origin/main with no pull request open', () => {
-    const prompt = buildWrapUpPrompt('feat/sweep', base, plan, null);
+    const prompt = buildWrapUpPrompt('feat/sweep', base, plan, 'gh', null);
 
     expect(prompt).toContain('origin/integration');
     expect(prompt).not.toContain(LITERAL);
+  });
+
+  test('the wrap-up prompt under a none provider names no origin/main and no gh pr', () => {
+    const prompt = buildWrapUpPrompt('feat/sweep', base, plan, 'none', null);
+
+    expect(prompt).toContain('origin/integration');
+    expect(prompt).not.toContain(LITERAL);
+    expect(prompt).not.toContain('gh pr');
+
+    // The control: the same call under `gh` does name a `gh pr` command.
+    expect(buildWrapUpPrompt('feat/sweep', base, plan, 'gh', null)).toContain('gh pr create --base integration');
   });
 
   test.each(PROMPT_MODULES)('%s writes no origin/main literal in code', (name) => {

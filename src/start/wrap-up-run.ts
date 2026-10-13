@@ -103,7 +103,7 @@
  * (`adapters/output/active.ts`), as the rest of `loop start` does.
  */
 import type { CheckoutExpectation } from './checkout-guard.js';
-import type { ClaudeSettingSource, RafaConfig } from '../config.js';
+import type { ClaudeSettingSource, PrProvider, RafaConfig } from '../config.js';
 import type { PassedOverTask } from './loop-events.js';
 import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { SessionServing } from './serving.js';
@@ -219,8 +219,8 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
   // The run's `pr.provider`, read off this config and the checkout's
   // `origin` by every reader below. The wrap-up session is handed it so
-  // that under `none` it looks up no pull request and its closing line
-  // promises no retry (`start/wrap-up.ts`).
+  // that under `none` it looks up no pull request, its prompt asks for
+  // none, and its closing line promises no retry (`start/wrap-up.ts`).
   const readProvider = () => resolvePrProvider({
     configured: settings.prProvider ?? null,
     dir: checkout,
@@ -269,7 +269,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   if (readProvider().provider !== 'none') {
     const delivery = await deliverPullRequest(
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
-      deliverySeamsIn({ ...input, base, fragment: finish.fragment, stepOnly }),
+      deliverySeamsIn({ ...input, base, provider: readProvider().provider, fragment: finish.fragment, stepOnly }),
     );
     // A forced wrap-up's pull request becomes a draft listing the tasks
     // it passed over BEFORE its `pr` event, so no reader of the events
@@ -544,6 +544,8 @@ export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
 export interface DeliveryContext extends WrapUpRunInput {
   /** The run's base branch, as `runWrapUp` resolved it once; never resolved again here. */
   readonly base: string;
+  /** The run's `pr.provider`, as `runWrapUp` read it; each retry's prompt is built under it. */
+  readonly provider: PrProvider;
   /** The fragment `finishRelease` committed, relative to the checkout, or null. */
   readonly fragment: string | null;
   /** The test files red only in a suite step, as `runWrapUp` read them once; each retry lists them. */
@@ -569,6 +571,7 @@ export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySe
       branch: expected.branch,
       base: context.base,
       planContent: context.planContent,
+      provider: context.provider,
       settingSources: context.settingSources,
       serving: context.serving,
       learning: context.wrapUpLearning,

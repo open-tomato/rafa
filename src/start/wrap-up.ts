@@ -31,11 +31,14 @@
  * the project root, which holds the store; the two are one directory
  * unless the loop runs in a linked worktree.
  *
- * Under `pr.provider: none` there is no pull request to read (#847):
- * {@link preserveProgress} is handed the provider the caller resolved
- * and then makes neither lookup, the session's prompt is built as for a
- * branch with no open pull request, and the line a session that exits 0
- * ends with names the provider as `none` and promises no retry, since
+ * Under `pr.provider: none` there is no pull request to read (#847)
+ * and none to ask for (#977): {@link preserveProgress} is handed the
+ * provider the caller resolved, makes neither lookup, and hands the
+ * provider on to {@link buildWrapUpPrompt}. The prompt then carries no
+ * bullet that opens, edits, titles or describes a pull request, and
+ * {@link NO_PULL_REQUEST_BULLET} in their place, saying the run ends
+ * with the branch pushed. The line a session that exits 0 ends with
+ * names the provider as `none` and promises no retry, since
  * `start/wrap-up-run.ts` delivers nothing under it.
  *
  * The prompt's first line is the `wrap-up` classifier key, and
@@ -106,6 +109,19 @@ import { stepOnlySection } from './step-only-report.js';
  * asks for a push and a `gh pr edit` of the body, and this session is
  * not asked to move a pull request it did not open.
  *
+ * `provider` is the run's `pr.provider` as the caller resolved it. It
+ * is required, as `base` is: a default of `gh` would let a caller
+ * forget it and ask a `none` run for a pull request (#977). Under
+ * `none` the prompt leaves out the four bullets that only find the
+ * issue number for, title or describe a pull request
+ * ({@link pullRequestNamingBullets}), and writes
+ * {@link NO_PULL_REQUEST_BULLET} where the create or edit bullet goes,
+ * whatever `openPullRequest` holds. The merge with the base, the frozen
+ * install check, the release bullets, the commit and push, and the
+ * sections below the bullets are written as under any provider. Under
+ * every other provider the prompt is what it was before the argument
+ * existed.
+ *
  * `openPullRequest` is the branch's open PR as the loop read it before
  * the session, or null when it found none. The session is told which
  * rather than asked to look, so whether to create or to edit is decided
@@ -142,6 +158,7 @@ export function buildWrapUpPrompt(
   branch: string,
   base: string,
   planContent: string,
+  provider: PrProvider,
   openPullRequest: number | null = null,
   release: ReleasePreparation | null = null,
   lessons: readonly InstinctRecord[] = [],
@@ -150,16 +167,13 @@ export function buildWrapUpPrompt(
   return [
     '* Read `@progress.txt` in full.',
     '* `@progress.txt` above names the file `progress.txt` at the repo root; the `@` is a reference marker, never part of a path. Do not create or write a file whose name starts with `@`.',
-    '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
-    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
-    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
-    '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
+    ...pullRequestNamingBullets(branch, provider),
     `* BEFORE pushing, bring the branch up to date with the base: \`git fetch origin ${base}\` then \`git merge origin/${base}\`. A branch that conflicts with ${base} gets NO CI run at all — GitHub cannot build \`refs/pull/<n>/merge\` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan's context is still loaded, is the cheapest place it will ever be.`,
     mechanicalConflictBullet(),
     `* If the merge touched \`bun.lock\` or any \`package.json\`, run \`bun install --frozen-lockfile\` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base's copy (\`git checkout origin/${base} -- bun.lock\`), run a plain \`bun install\` so this branch's own dependencies are re-added, and confirm the frozen run then passes.`,
     ...releaseBullets(release),
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
-    pullRequestStep(branch, base, openPullRequest),
+    pullRequestStep(branch, base, provider, openPullRequest),
     '* Do not include Claude attribution in the commit or PR message.',
     ...stepOnlySection(stepOnly),
     ...lessonsSection(lessons),
@@ -169,6 +183,30 @@ export function buildWrapUpPrompt(
     planContent,
   ].join('\n');
 }
+
+/**
+ * The four bullets that only serve a pull request: the two that find
+ * the plan's issue number, the title with its `Closes #<n>` line, and
+ * the description. None under `pr.provider: none`, where no pull
+ * request is opened to carry any of them.
+ */
+function pullRequestNamingBullets(branch: string, provider: PrProvider): readonly string[] {
+  if (provider === 'none') return [];
+  return [
+    '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
+    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
+    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
+    '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
+  ];
+}
+
+/**
+ * The bullet a prompt under `pr.provider: none` carries where the
+ * create or edit bullet goes (#977): the run ends with the branch
+ * pushed. It names no `gh` command, so a session cannot read one off
+ * it.
+ */
+export const NO_PULL_REQUEST_BULLET = '* `pr.provider` is `none` for this project, so this run ends with the branch pushed and no pull request is opened: do not open, edit or look for one.';
 
 /** A lesson's field as one line: trimmed, every whitespace run one space. */
 function oneLine(text: string): string {
@@ -233,8 +271,13 @@ function lessonsSection(lessons: readonly InstinctRecord[]): readonly string[] {
  * create branch keeps the one reading of a refusal that must not turn
  * into a second PR. The create names the run's `base`; the already-open
  * PR's bullet does not.
+ *
+ * Under `pr.provider: none` it is {@link NO_PULL_REQUEST_BULLET},
+ * whatever `openPullRequest` holds: there is no provider to open or
+ * edit one through.
  */
-function pullRequestStep(branch: string, base: string, openPullRequest: number | null): string {
+function pullRequestStep(branch: string, base: string, provider: PrProvider, openPullRequest: number | null): string {
+  if (provider === 'none') return NO_PULL_REQUEST_BULLET;
   return openPullRequest === null
     ? `* No open PR was found for ${branch}: open one with \`gh pr create --base ${base}\`. If it answers that a PR already exists, push to that PR and update its body with \`gh pr edit\`; never open a second PR from a new branch.`
     : `* PR #${openPullRequest} is already open for ${branch}, likely opened by the plan's close-out: push to it and update its body with \`gh pr edit ${openPullRequest}\` so the description covers the promotions this session committed.`;
@@ -457,8 +500,9 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  *
  * `provider` is the run's `pr.provider` as the caller resolved it
  * (`resolvePrProvider`, `pr/provider.ts`). Under `none` neither lookup
- * is made, whatever `extras` holds: the prompt is built with no open
- * pull request, and the line printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
+ * is made, whatever `extras` holds: the prompt, handed the provider,
+ * asks for no pull request ({@link buildWrapUpPrompt}), and the line
+ * printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
  * which promises no retry because the caller delivers no pull request
  * under that provider. It is required, as `checkout` is: a default of
  * `gh` would ask `gh` in a repository that has none to ask.
@@ -494,7 +538,7 @@ export async function preserveProgress(
     ? await lookup(checkout, branch)
     : null;
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons, extras.stepOnly),
+    buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, provider, openPullRequest, release, lessons, extras.stepOnly),
     settingSources,
     serving,
     learning,
