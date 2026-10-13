@@ -412,6 +412,8 @@ The second example above has no `skills=` and is still a valid task declaration.
   - [ ] Move the test preload into `bunfig.toml`  {tests=full}
 ```
 
+A task's text never asks its session for a whole-suite run, or for any command that can outlast one Bash call, since the Bash tool stops a command at 10 minutes. The runner runs the suite through `tests=full` on the task. A task that needs a long run's output reads a file that a `[start]` prerequisite or the runner wrote, such as the `.output.txt` beside a suite run's JUnit file.
+
 ---
 
 ## Task sizing (session economics)
@@ -445,6 +447,11 @@ The second example above has no `skills=` and is still a valid task declaration.
   --write-tree origin/<base> HEAD`) and assemble the body material — the gate
   captures, the test plan, the recorded debt — into the plan's close-out
   notes for that wrap-up session to use.
+* A task's text never asks its session for the whole suite, or for any
+  command that can outlast one Bash call. Declare `tests=full` on the task
+  and the runner runs the suite after the commit; a task that needs a long
+  run's output reads it from the file a `[start]` prerequisite or the
+  runner wrote.
 
 ---
 
