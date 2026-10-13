@@ -37,6 +37,53 @@ spells out, and the shapes the lint config forces.
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
 
+### Explicit types on exports
+
+**`tsconfig.base.json` sets `isolatedDeclarations` and
+`erasableSyntaxOnly`**, so the root config and both workspace packages
+are held to them by `bun run check-types`, with no flag on the command
+line. `declaration` sits beside them because `tsc` refuses
+`isolatedDeclarations` without it; under the base's `noEmit` it writes no
+file. The root `tsconfig.json` excludes `**/*.test.ts`, so
+`check-types` does not hold a test file under `src/` or `scripts/`. The
+runner's type step does, for the test files a task adds or edits: its
+scratch config extends `tsconfig.json` and takes the flags with it. A
+package's `tsconfig.json` includes its test files, so `check-types`
+holds one under `packages/`.
+
+- **An export carries its type.** An exported `const`, a function's
+  return, and a parameter or property whose default is not a plain
+  literal each need an annotation the compiler can read from the file
+  alone; a missing one is a TS90xx error (`a = [1].length` is refused,
+  `b = 2` is not). Write the type the compiler infers, then read it
+  against what the export is for. A frozen literal array or object that a
+  `typeof X[number]` or `keyof typeof X` reads keeps its literal type
+  (`readonly ['a', 'b']`, not `readonly string[]`). A path, a message or
+  a query string is `string`, and a pattern is `RegExp`. Where a named
+  type already says it, write the name instead of the expanded shape.
+- **A command's default export takes the `const command: RafaCommand`
+  form**: `const command: RafaCommand = createNextCommand();` and then
+  `export default command;`, as `src/commands/next.ts` does. `RafaCommand`
+  comes from the command barrel, `src/core/command/index.ts`. Where the
+  expression is not assignable to `RafaCommand`, fix the factory's
+  declared return type rather than the annotation.
+- **An annotation adds `import type` only, never a value import.** A
+  value import of a barrel from a file the barrel imports back closes a
+  runtime cycle (A barrel is split, never widened, below). No `any`, no
+  `import('…')` type and no `as` cast is added to make an annotation fit.
+- **A constructor declares its fields instead of using parameter
+  properties.** `constructor(readonly step: UpdateStep)` is refused with
+  TS1294; declare the field on the class and assign it in the body, as
+  `UpdateStepError` in `src/project/update-current.ts` does. An `enum`
+  and a `namespace` holding values are refused the same way.
+- **One TS1294 or ordinary type error hides every TS90xx error.** `tsc`
+  computes the TS90xx errors only for a program with no other error, so
+  fix the others first and run it again before reading a file as clean.
+- **`scripts/codemod/explicit-exports.ts` writes the annotations.** Run
+  `bun scripts/codemod/explicit-exports.ts <folder>…`, with `--dry-run`
+  to print the changes and write nothing. It lists each export it
+  refuses, and those are annotated by hand.
+
 ### Core and its barrels
 
 **Core is `src/core/`, the code every part of rafa reads.** The nineteen
