@@ -9,9 +9,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
+import { expectExit } from '../tests/cli-capture.js';
+import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
+
 import { CORE_COMMANDS } from './index.js';
 
-setDefaultTimeout(60_000);
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
@@ -155,7 +158,7 @@ describe('the commands roster', () => {
     const names = readNames(JSON.parse(spawned.stdout.toString()) as DescribeDocument);
 
     // Assert
-    expect(spawned.exitCode).toBe(0);
+    expectExit({ exitCode: spawned.exitCode, stdout: spawned.stdout.toString(), stderr: spawned.stderr.toString() }, 0);
     expect(names).toEqual([...BASE_NAMES]);
   });
 });
