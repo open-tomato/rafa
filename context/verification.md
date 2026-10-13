@@ -6,9 +6,9 @@ A change made through an agent, a loop task or a session by hand, is
 tested at its scope first: `changed` (`bun test --changed=<base>`, the
 `tests=affected` scope below) for an isolated change, `related` (the
 touched module's test files by path, the `tests=module` scope) when it
-reaches further. The full suite runs about 20 minutes a pass, so it is
-the warranty before a merge, run once every scoped run is green, and
-never the quick check between edits.
+reaches further. The full suite runs 6.4 minutes a pass as measured in
+stretch 4, so it is the warranty before a merge, run once every scoped
+run is green, and never the quick check between edits.
 
 A change still asks for the full suite before the merge-time run when:
 
@@ -76,25 +76,26 @@ belongs in the scoped `bunx eslint <changed files>` run too.
 Each recorded step names its scope (affected, module, full, or a
 file/folder list it ran on) and its reason where it has one (`declared`
 for a task step whose line declares `tests=module` or `tests=full`;
-`trigger` when changed files match `tests.fullSuiteTriggers` or
-`tests.integration` and escalate the scope; `fallback` for a stage step
-with no `Owns:` folder running `bun test --changed=<since>`;
-`no-module-tests` when a task names `tests=module` but the module has no
-test files; `stage` for a stage step's `Owns:` path list). The baseline
-and the pre-wrap-up step carry no reason, as they always run the full
-suite. Each also records the command, exit code, Bun's summary line,
-every failing test (file + full test name pairs), and which failures are
-new against the baseline (not present in `baseline`'s captured failures).
+`trigger` when changed files match `tests.fullSuiteTriggers` and
+escalate the scope; `fallback` for a stage step with no `Owns:` folder
+running `bun test --changed=<since>`; `no-module-tests` when a task
+names `tests=module` but the module has no test files; `stage` for a
+stage step's `Owns:` path list). The baseline and the pre-wrap-up step
+carry no reason, as they always run the full suite. Each also records
+the command, exit code, Bun's summary line, every failing test (file +
+full test name pairs), and which failures are new against the baseline
+(not present in `baseline`'s captured failures).
 
-**Declaration key `tests=` on a task line** sets what the task's session
-will run:
+**Declaration key `tests=` on a task line** sets what the runner's task
+step runs after the task's session commits; the session runs only what
+its change reaches:
 - `tests=affected` (default): `bun test --changed=<base>` plus types and
   lint on the changed files
-- `tests=module`: One full-suite module (e.g., `bun test
-  src/effort/**/*.test.ts`) when the task touches files that trigger a
-  module re-run
-- `tests=full`: Entire suite when the task changes a config file or a
-  globally-used module
+- `tests=module`: the test files under each `Owns:` folder the task's
+  diff touches, or `tests=affected` when no touched folder holds a test
+  file
+- `tests=full`: the full suite after the commit, whatever the diff
+  touches; the session never runs it
 
 **Config keys for test selection and running:**
 - `tests.alwaysRun` (glob list, defaults to `src/**/*.sweep.test.ts`) —

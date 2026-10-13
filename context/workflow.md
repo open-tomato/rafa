@@ -106,16 +106,17 @@ never on position.
 ### Task session scope and test configuration
 
 **A task line declares `tests=affected` (the default), `tests=module`, or
-`tests=full` to control what its session checks.** Alongside `agent=` and
-other declaration keys, a task line can end with `{tests=<scope>}` to set
-the scope of verification the session will run. The three scopes cover
-both the task session's gates and the runner's stage step that follows
-the stage's last task.
+`tests=full` to control what the runner checks after its session.** Alongside
+`agent=` and other declaration keys, a task line can end with
+`{tests=<scope>}` to set the scope of the runner's task step, which runs once
+the task's session has committed. The session itself never runs the whole
+suite. The three scopes size that step; the stage step after a stage's last
+task follows its own rule, below.
 
 **Task session gates** run in every task, reading one exit code from each:
-- `bun test --changed=<base>` scoped to the changed tests (default, or when
-  `tests=affected` is declared or the changed files do not trigger a
-  module or full-suite rerun)
+- `bun test --changed=<base>` scoped to the changed tests, whatever the task's
+  `tests=` declares, since that key sizes the runner's task step and not the
+  session's run
 - `bunx tsc --noEmit` to type-check changed files (TypeScript only, test
   files excluded by `tsconfig.json`)
 - `bunx eslint <changed files>` to lint changed files
@@ -129,7 +130,8 @@ gate later anyway.
 **Runner recorded steps** run at fixed points in the loop to establish
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
-- `task` — Full suite after each task's session ends and commits
+- `task` — the scope `taskStepScope` answers over the task's diff, after each
+  task's session ends and commits (`tests=`, below)
 - `stage` — After a stage's last task: the tests under `Owns:` folders
   changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
   files when the plan has no `Owns:` folder (reason `fallback`)
@@ -148,20 +150,22 @@ pair against the baseline's captured set: a match means the failure was
 already present, a mismatch means it is new. Only new failures block the
 next task.
 
-**Declaration key `tests=` on a task line** sets what the task's session
-will run; the stage step scope after that stage completes follows from the
-plan's `Owns:` folders (scope `full`) or falls back to `bun test
---changed=<since>` (scope `affected`, reason `fallback`):
-- `tests=affected` (default): task session runs `bun test --changed=<base>`
-  plus types and lint on the changed files; stage step is determined by
-  the `Owns:` rule above
-- `tests=module`: task session skips to `bun test <module-files>` when the
-  task touches files whose enclosing module is listed in
-  `tests.integration`, otherwise same as `tests=affected`; stage step is
-  determined by the `Owns:` rule above
-- `tests=full`: task session runs full suite when the task changes a config
-  file or a globally-used module; stage step always runs full suite, not
-  a fallback
+**Declaration key `tests=` on a task line** sets the scope of the runner's
+task step, which runs after the task's session commits; the session runs only
+what its change reaches. The stage step after a stage's last task follows the
+plan's `Owns:` folders instead, or falls back to `bun test --changed=<since>`
+(scope `affected`, reason `fallback`):
+- `tests=affected` (default): the task step runs `bun test --changed=<base>`
+  plus types and lint on the changed files
+- `tests=module`: the task step runs the test files under each `Owns:` folder
+  the task's diff touches; when no touched folder holds a test file, it runs
+  as `tests=affected` (reason `no-module-tests`, or `fallback` with no `Owns:`
+  folder)
+- `tests=full`: the task step runs the full suite after the commit, whatever
+  the diff touches; the session never runs it
+
+A diff touching a `tests.fullSuiteTriggers` path escalates an `affected` or
+`module` step to the full suite, reason `trigger`.
 
 **`rafa plan risk` notes a task whose sentence asks for the whole suite.**
 An open task gets a `long-run` note when its sentence says "full suite" or
@@ -186,33 +190,30 @@ automatically, and which tests always run:**
   file matching these globs, the task scope escalates to `tests=full`
 - `tests.integration` (glob list; defaults to `**/*-integration.test.ts`,
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
-  — when a task touches files in any module matching these globs (files in
-  the same directory or a sibling at a known depth), the scope escalates
-  to `tests=module`
+  — the test files a stage step with `Owns:` folders runs beside the
+  folders it changed; a task step does not read this key
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
   blocks nothing, unless a test file the step's own change touches ran
   before it (`context/verification.md`)
 
-**A stage-end step with new failures blocks the next task.** After a
-stage's last task, the stage step runs the tests under the `Owns:`
-folders the stage changed (scope `full`), or, with no `Owns:` folder,
-`bun test --changed=<since>` with the `tests.alwaysRun` files (scope
-`affected`, reason `fallback`), joining the always-run files so they still
-pass the slow-sweep share guard. The step captures failures. If any
-failure is new against the baseline and still red when its file is run
-alone, or green alone after a test file the stage changed, the runner
-inserts a `[BLOCKED]`
-repair task above the first open task (`src/start/suite-blocker.ts`), its
-blocker the failures, which the repair session receives through
-`BLOCKER_PROMPT_PREFIX` in its prompt, and the run stops. A restarted run
-dispatches that repair first and runs no stage step before it, or before
-any `[BLOCKED]` task, because a due step run there would meet the same
-failures and stop the run again before the repair got its session. The
-stage steps still due run before the first open task after it. The blocked
-task holds until its session completes or a human unblocks it by removing
-the `[BLOCKED]` mark on its line in the tracker.
+**A stage-end step with new failures blocks the next task.** After a stage's
+last task, the stage step runs the tests under the `Owns:` folders the stage
+changed, plus the `tests.integration` tier, or, with no `Owns:` folder, `bun
+test --changed=<since>` with the `tests.alwaysRun` files (scope `affected`,
+reason `fallback`), joining the always-run files so they still pass the
+slow-sweep share guard. The step captures failures. If any failure is new
+against the baseline and still red when its file is run alone, or green alone
+after a test file the stage changed, the runner inserts a `[BLOCKED]` repair
+task above the first open task (`src/start/suite-blocker.ts`), its blocker the
+failures, which the repair session receives through `BLOCKER_PROMPT_PREFIX` in
+its prompt, and the run stops. A restarted run dispatches that repair first
+and runs no stage step before it, or before any `[BLOCKED]` task, because a
+due step run there would meet the same failures and stop the run again before
+the repair got its session. The stage steps still due run before the first
+open task after it. The blocked task holds until its session completes or a
+human unblocks it by removing the `[BLOCKED]` mark on its line in the tracker.
 
 **A repair line names the task it repairs, and the repair is handed that
 task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
@@ -647,26 +648,29 @@ plan's declared level is below its notes. Details at `context/release.md`; confi
 
 ### The wrap-up and pull request
 
-**A run never ends `done` without its pull request.** The wrap-up session is
-responsible for opening a pull request with the release notes, but the runner
-verifies that a pull request exists before marking the run complete. After the
-wrap-up session ends, the runner reads the branch's open pull request. With
-one found, the run advances to the pull-request phase and waits for CI. With
-none, the runner runs `loop.wrapUp.retries` more wrap-up sessions, each told
-that the pull request is missing and given the previous session's final message
-so it can fix any issue that stopped the PR creation. If retries are exhausted
-and still no pull request exists, the runner opens one itself with the title
-`rafa-<n>: <plan title>` and a body opening with `Closes #<n>`, the release
-fragment's notes, and a line saying the wrap-up did not finish. If opening
-fails (for instance, if the branch has not been merged into the base yet or
-was pushed while the working tree had conflicts), the run ends `blocked` with
-the step and branch named. A pull request a retry or the runner opened is
-then given the release forecast or failure sentence the release step found
-no pull request to write to (`carryReleaseIntoPullRequest`,
-`src/start/release-body.ts`), before the retarget and the CI wait; one the
-release step already wrote to is not written again, and a blocked delivery
-writes nothing. With `pr.provider: none`, the pull-request check
-and creation are both skipped and the run advances directly to CI or closes.
+**A run never ends `done` without its pull request, unless `pr.provider` is
+`none`.** The wrap-up session is responsible for opening a pull request with
+the release notes, but the runner verifies that a pull request exists before
+marking the run complete. After the wrap-up session ends, the runner reads the
+branch's open pull request. With one found, the run advances to the
+pull-request phase and waits for CI. With none, the runner runs
+`loop.wrapUp.retries` more wrap-up sessions, each told that the pull request
+is missing and given the previous session's final message so it can fix any
+issue that stopped the PR creation. If retries are exhausted and still no pull
+request exists, the runner opens one itself with the title `rafa-<n>: <plan
+title>` and a body opening with `Closes #<n>`, the release fragment's notes,
+and a line saying the wrap-up did not finish. If opening fails (for instance,
+if the branch has not been merged into the base yet or was pushed while the
+working tree had conflicts), the run ends `blocked` with the step and branch
+named. A pull request a retry or the runner opened is then given the release
+forecast or failure sentence the release step found no pull request to write
+to (`carryReleaseIntoPullRequest`, `src/start/release-body.ts`), before the
+retarget and the CI wait; one the release step already wrote to is not written
+again, and a blocked delivery writes nothing. With `pr.provider: none`, no
+pull request is read or opened: the CI gate's `none` path
+(`src/start/pr-lifecycle.ts`) pushes the branch, prints the compare URL when
+origin names a web host, skips the CI wait, and the run ends `done` with the
+branch pushed and no pull request.
 
 **The wrap-up prompt is written for `pr.provider: none` too.**
 `buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
