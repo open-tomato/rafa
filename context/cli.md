@@ -558,7 +558,8 @@ New; it replaces no earlier text. What a row or an action added to
   by `readRunArgs` (`start/run-setup.ts`), before the deferral and the
   session record. Four stops are retried: a red suite step before a session
   and a red task step after one (never one `stoppedOnSignal` reads as
-  stopped by SIGINT, `start/suite-steps-run.ts`), a task session that exited
+  stopped by SIGINT or by a baseline that failed outside any test case,
+  `start/suite-steps-run.ts`), a task session that exited
   nonzero (the budget exit and the interrupt end before it is asked), and a
   clean exit held only on its absences (`heldOnNothingLeftBehind`,
   `start/commit.ts`: every hold a no-report, background-wait or no-commit

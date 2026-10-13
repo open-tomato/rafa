@@ -57,7 +57,8 @@
  * a clean exit held only on what it left behind. The two readings that
  * tell such a stop apart are
  * `stoppedOnSignal` in `start/suite-steps-run.ts`, true for a suite
- * stop SIGINT made and false for a red step, and
+ * stop SIGINT made, and for one a baseline that failed outside any test
+ * case made, and false for a red step, and
  * `heldOnNothingLeftBehind` in `start/commit.ts`, true for a clean exit
  * held only because its session left neither a report nor a commit.
  * A report that blocks its own task, a refused commit, a moved

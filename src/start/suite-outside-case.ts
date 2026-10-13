@@ -1,8 +1,9 @@
 /**
  * The reading of a suite run that failed outside any test case, for the
  * runner's suite steps (`suite-step.ts`): the reading itself, its
- * reason, the sentence a blocker quotes the run's output in, and what
- * the recorded step keeps of it.
+ * reason, the sentence a blocker quotes the run's output in, what the
+ * recorded step keeps of it, and what is said of a baseline that reads
+ * so.
  *
  * ## The reading
  *
@@ -69,6 +70,35 @@
  * the run record (`SessionStep`, `loop/sessions.ts`): `outsideCase: true`
  * and `outputTail`, every line of it. Every other step carries neither.
  *
+ * ## A baseline of that shape
+ *
+ * A step red this way is split against a baseline, and a baseline that
+ * failed the same way is none to split against: it names no failure, and
+ * the errors it counts are the ones every later step would inherit. So
+ * `ensureBaseline` (`suite-step.ts`) does not write such a run to the
+ * baseline file, and answers it as halted; the loop
+ * (`suite-steps-run.ts`) then stops before any session of the run is
+ * dispatched, with {@link baselineHaltLines}: the exit code and
+ * {@link OUTSIDE_CASE_REASON}, the likely cause
+ * ({@link OUTSIDE_CASE_LIKELY_CAUSE}, with dependencies not installed in
+ * the checkout as the case seen), that the next run records the
+ * baseline, and the run's output tail. The tail is printed whole, one
+ * line of output for each of its lines with the spaces it opened with:
+ * the caps above are for a tracker line, and these go to the terminal.
+ * The cause is said as likely and never read off the output, as the
+ * reading itself is not.
+ *
+ * A baseline file written before this rule can hold such a run. The
+ * file keeps no `noTestFiles` mark (`baselineOf`, `suite/baseline.ts`)
+ * and no SIGINT stop is ever written, so the stored shape is a nonzero
+ * `exitCode` beside an empty `failures`, which is what
+ * {@link failedOutsideAnyCase} reads of it. `ensureBaseline` records
+ * such a file again and says why with {@link storedOutsideCaseLine},
+ * which states what the file holds. That takes in the baseline of a
+ * project Bun finds no test file in, which also exits 1 and lists
+ * nothing: it is written as before, and recorded again by every run
+ * after it, each a `bun test` with no file to run.
+ *
  * ## The SIGINT exit code
  *
  * {@link SIGINT_STOP_CODE} is `SIGINT_EXIT_CODE` of `suite-step.ts`,
@@ -85,6 +115,9 @@ import { constants } from 'node:os';
 
 /** Why a step red on {@link failedOutsideAnyCase} is red, as its blocker and the lines about it say it. */
 export const OUTSIDE_CASE_REASON = 'the run failed outside any test case';
+
+/** What {@link baselineHaltLines} names as the likely cause of a baseline that failed outside any test case. */
+export const OUTSIDE_CASE_LIKELY_CAUSE = 'a test file that did not load';
 
 /** The exit code of a run ended by SIGINT: 128 plus its number. See the module note. */
 const SIGINT_STOP_CODE = 128 + constants.signals.SIGINT;
@@ -161,4 +194,39 @@ export function outsideCaseRecord(verdict: Pick<StepVerdict, 'outsideCase'>, res
   return verdict.outsideCase
     ? { outsideCase: true, outputTail: [...result.outputTail] }
     : {};
+}
+
+/** What opens each line after the first of {@link baselineHaltLines}. */
+const HALT_INDENT = '   ';
+
+/** What opens each line of the output tail {@link baselineHaltLines} prints, under the line that counts them. */
+const HALT_TAIL_INDENT = '     ';
+
+/**
+ * The lines a run stops with on a baseline that failed outside any test
+ * case: its exit code and {@link OUTSIDE_CASE_REASON}, the likely cause,
+ * what to do, and every line of its output tail. See the module note.
+ */
+export function baselineHaltLines(result: Pick<SuiteResult, 'exitCode' | 'outputTail'>): readonly string[] {
+  const tail = result.outputTail.length === 0
+    ? [`${HALT_INDENT}bun test printed nothing on stderr.`]
+    : [
+      `${HALT_INDENT}The last ${result.outputTail.length} line(s) bun test printed on stderr:`,
+      ...result.outputTail.map((line) => `${HALT_TAIL_INDENT}${line}`),
+    ];
+  return [
+    `⛔ The suite baseline exited ${result.exitCode} and listed no failing test: ${OUTSIDE_CASE_REASON}. Stopping before any session of this run is dispatched; the baseline was not written.`,
+    `${HALT_INDENT}The likely cause is ${OUTSIDE_CASE_LIKELY_CAUSE}: dependencies not installed in this checkout is the case seen.`,
+    `${HALT_INDENT}Once the suite loads, run again: that run records the baseline.`,
+    ...tail,
+  ];
+}
+
+/**
+ * The warning for the stored baseline in `file` that
+ * {@link failedOutsideAnyCase} reads as failed: what it holds, and that
+ * the baseline is recorded again. See the module note.
+ */
+export function storedOutsideCaseLine(file: string, baseline: Pick<SuiteResult, 'exitCode'>): string {
+  return `⚠️  ${file} holds a run that exited ${baseline.exitCode} and listed no failing test (${OUTSIDE_CASE_REASON}); recording the baseline again.`;
 }

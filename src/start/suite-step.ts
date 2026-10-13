@@ -17,7 +17,7 @@
  *
  * | Step | Runs | Blocks |
  * |---|---|---|
- * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing |
+ * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
  * | task ({@link runTaskStep}) | `taskStepScope` (`suite/scope.ts`) over the task's diff | a repair task it inserts, or the repair it followed |
  * | stage ({@link runStageStep}) | `stageStepScope` over the stage's diff | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
@@ -28,6 +28,13 @@
  * full suite runs at HEAD and is written there. Its failures are the
  * KNOWN ones every later step is split against, and a red baseline
  * blocks nothing: that is what lets a run starting on a red `main` go on.
+ * One baseline is not written: a run that exited nonzero and listed no
+ * failing case (`failedOutsideAnyCase`, below). Its step is recorded
+ * with its tail, no stage enters the ledger, and it answers
+ * {@link BaselineOutcome.halted}, on which the caller
+ * (`suite-steps-run.ts`) stops the run before a session and says why. A
+ * stored baseline of that shape is recorded again, with a line saying
+ * so (`suite-outside-case.ts` holds the lines and their account).
  *
  * **A task step** runs the scope `taskStepScope` answers from the task
  * line's `tests=` value and the diff from the task's base commit to
@@ -285,7 +292,7 @@ import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
 import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
-import { failedOutsideAnyCase, outsideCaseRecord } from './suite-outside-case.js';
+import { failedOutsideAnyCase, outsideCaseRecord, storedOutsideCaseLine } from './suite-outside-case.js';
 import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
@@ -371,6 +378,8 @@ export interface BaselineOutcome {
   readonly step: SessionStep | null;
   /** True when the run was read as a stop on SIGINT: the baseline was not written. */
   readonly interrupted: boolean;
+  /** True when the run failed outside any test case: the baseline was not written, and the run stops. See the module note. */
+  readonly halted: boolean;
 }
 
 /** One stage whose step was taken, or that the baseline covered. */
@@ -738,24 +747,32 @@ export function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams
 /**
  * The baseline the run's steps are split against: the stored one, or a
  * full run recorded now, with its step, and the stages already complete
- * entered in the ledger. See the module note.
+ * entered in the ledger; or, for a run that failed outside any test
+ * case, that run unwritten and answered as halted. See the module note.
  */
 export async function ensureBaseline(context: SuiteStepContext): Promise<BaselineOutcome> {
   const seams = seamsOf(context);
   const path = baselinePathFor(context.trackerPath);
   const reading = readBaseline(path);
-  if (reading.state === 'read') {
+  if (reading.state === 'read' && !failedOutsideAnyCase(reading.baseline)) {
     const known = reading.baseline.failures.length;
     activeOutput().info(`📏 Suite baseline reused from ${basename(path)} (${reading.baseline.recordedAt}): ${known} known failure(s).`);
-    return { baseline: reading.baseline, step: null, interrupted: false };
+    return { baseline: reading.baseline, step: null, interrupted: false, halted: false };
   }
   if (reading.state === 'unreadable') activeOutput().warn(`⚠️  ${basename(path)} does not read (${reading.reason}); recording the baseline again.`);
+  if (reading.state === 'read') activeOutput().warn(storedOutsideCaseLine(basename(path), reading.baseline));
 
   const commit = readHead(seams.git);
   const result = await runOne(context, seams, 'baseline', {});
   const baseline = baselineOf(result, seams.now(), commit);
   const settling: Settling = { kind: 'baseline', scope: 'full', label: 'suite baseline', result, baseline, repair: null };
-  if (isStepInterrupted(context, result)) return { baseline, step: settleInterrupted(seams, settling).step, interrupted: true };
+  if (isStepInterrupted(context, result)) return { baseline, step: settleInterrupted(seams, settling).step, interrupted: true, halted: false };
+  if (failedOutsideAnyCase(result)) {
+    const step = stepOf(settling, result, verdictOf(result, baseline));
+    recordStep(seams, step);
+    announce(settling.label, result, []);
+    return { baseline, step, interrupted: false, halted: true };
+  }
   try {
     writeBaseline(path, baseline);
   } catch (error) {
@@ -764,7 +781,7 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   const outcome = settleStep(context, seams, settling);
   const covered = completeStages(readFileSync(context.trackerPath, 'utf8'));
   addToLedger(context.trackerPath, covered.map((stage) => ({ ...stage, commit, via: 'baseline' as const })));
-  return { baseline, step: outcome.step, interrupted: false };
+  return { baseline, step: outcome.step, interrupted: false, halted: false };
 }
 
 /** The runs a task step or a stage step's fallback makes: its own, and the paths of a second run over the always-run files, or none. */

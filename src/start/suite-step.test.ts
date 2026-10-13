@@ -237,7 +237,7 @@ describe('ensureBaseline', () => {
     writeBaseline(baselinePathFor(trackerPath), baselineWith());
     const { context, seen } = contextWith([]);
     const outcome = await ensureBaseline(context);
-    expect(outcome).toEqual({ baseline: baselineWith(), step: null, interrupted: false });
+    expect(outcome).toEqual({ baseline: baselineWith(), step: null, interrupted: false, halted: false });
     expect(seen.runs).toHaveLength(0);
     expect(seen.steps).toHaveLength(0);
   });
