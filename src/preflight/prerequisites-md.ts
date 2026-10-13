@@ -88,6 +88,49 @@
  *     first, so a heading carrying both reads `auto`, the tier probed
  *     every time.
  *
+ * ## The scope marker
+ *
+ * A run whose tasks are all ticked dispatches its wrap-up alone, and a
+ * check only the tasks needed has nothing left to guard (#892). An item
+ * may therefore say which dispatches need it, and every item read
+ * carries the answer as its {@link PrerequisiteScope}:
+ *
+ *   - `[tasks]` or `[wrap-up]` at an item's opening, after its box and
+ *     beside its inline tag when it has one
+ *     (`- [ ] [auto] [tasks] Bun is installed: ...`), gives it the scope
+ *     `tasks` or `wrap-up`. The marker is dropped from the description as
+ *     the tag is. It is written after the tag; one written ahead of it is
+ *     read the same way, since reading `- [ ] [tasks] [auto] ...` as an
+ *     untagged item would quietly turn a check into a reminder.
+ *   - A heading carrying a marker gives it to the items under it the way
+ *     a tag reaches them: over the deeper headings that carry none, ending
+ *     at the next heading of its own level or shallower. A heading's tag
+ *     and its marker are read apart, so `## Toolchain [auto] [tasks]`
+ *     gives both, and a deeper `### Publishing [wrap-up]` changes the
+ *     scope and keeps the tag.
+ *   - An item's own marker outranks its heading's.
+ *   - No marker anywhere reads as `both`, so a file written before the
+ *     marker existed is probed exactly as it was. Both markers written
+ *     together read as `both` too, the one spelling that undoes a marked
+ *     heading for a section or an item under it.
+ *   - Only the bracketed word, in either case, is a marker, and only at
+ *     an item's opening or on a heading. A heading that merely names
+ *     tasks or a wrap-up is unmarked, for the reason `[start]` is not
+ *     matched loosely: a fuzzy match would quietly narrow a check.
+ *   - **A marker is never the probe, and not a second span.** The probe
+ *     is still the backticked span ending the item. A marker written
+ *     after that span is text after it, so the item is malformed, as any
+ *     other trailing text makes it.
+ *
+ * The scope travels onto the required item a probed `auto` or `start`
+ * item becomes, and this module does nothing more with it: which items a
+ * dispatch skips is the caller's to decide, as the start tier is. The
+ * marker is read on every item and means something on an `auto` one
+ * alone. A `start` item is already probed on a first dispatch only, and
+ * a `human` item is never probed, so on either the marker is read, kept
+ * on the parsed item and has NO EFFECT: a marked `[human]` item stays a
+ * reminder and a marked `[start]` item stays on the start tier.
+ *
  * ## What an item becomes
  *
  * {@link planPrerequisites} maps the file onto the config's shapes
@@ -96,7 +139,9 @@
  *   - An `auto` item with a probe is a REQUIRED item, the tier whose
  *     failure halts a run. Its `name` is the item's description and its
  *     `kind` is `tool`, the kind whose probe is a command. Every such item
- *     carries its probe, so its kind names nothing a check needs.
+ *     carries its probe, so its kind names nothing a check needs. Its
+ *     `scope` is the item's, `both` included, where a config item has
+ *     none.
  *   - A `start` item with a probe is a REQUIRED item too, held on
  *     {@link PlanPrerequisites.startRequired} instead, the tier a caller
  *     probes on a first dispatch and skips on a resume.
@@ -133,6 +178,7 @@
 import type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
+  PrerequisiteScope,
   RafaConfig,
 } from '../config.js';
 
@@ -146,6 +192,8 @@ import { messageOf } from '../config-sections.js';
  */
 export type PrerequisiteTag = 'auto' | 'human' | 'start';
 
+export type { PrerequisiteScope };
+
 /** One unticked item of a PREREQUISITES file; see the module note. */
 export interface MarkdownPrerequisite {
   /** The item's first line, as written. */
@@ -154,6 +202,12 @@ export interface MarkdownPrerequisite {
   description: string;
   /** Its own tag, else its section's, else `human`. */
   tag: PrerequisiteTag;
+  /**
+   * Which dispatches need it: its own marker, else its nearest marked
+   * heading's, else `both`. Read on every item; see the module note for
+   * the tags it changes nothing for.
+   */
+  scope: PrerequisiteScope;
   /** Where its first line sits, counted from 0. */
   lineIndex: number;
   /**
@@ -211,17 +265,32 @@ export type PrerequisiteSettings = Pick<
   'prerequisitesRequired' | 'prerequisitesOptional'
 >;
 
-/** The tags of the headings a line sits under, one per level from 1. */
-type HeadingScope = readonly (PrerequisiteTag | null)[];
+/** What one heading gives its section: a tag, a scope, both or neither. */
+interface HeadingMarks {
+  readonly tag: PrerequisiteTag | null;
+  readonly scope: PrerequisiteScope | null;
+}
+
+/** The marks of the headings a line sits under, one per level from 1. */
+type HeadingScope = readonly (HeadingMarks | null)[];
+
+/** What an item's opening says of it, and the text left once it is dropped. */
+interface ItemOpening extends HeadingMarks {
+  readonly rest: string;
+}
 
 const SECTION_AUTO_RE = /\[auto\]/i;
 const SECTION_START_RE = /\[start\]/i;
 const SECTION_HUMAN_RE = /\[human\]|manual|human|sign.?off|team/i;
+const TASKS_MARKER_RE = /\[tasks\]/i;
+const WRAP_UP_MARKER_RE = /\[wrap-up\]/i;
 
 const ITEM_RE = /^-\s+\[\s*\]\s+/;
-const INLINE_AUTO_RE = /^-\s+\[\s*\]\s+\[auto\]\s+/i;
-const INLINE_HUMAN_RE = /^-\s+\[\s*\]\s+\[human\]\s+/i;
-const INLINE_START_RE = /^-\s+\[\s*\]\s+\[start\]\s+/i;
+const SCOPE_MARKERS = String.raw`((?:\[(?:tasks|wrap-up)\]\s+)*)`;
+const ITEM_OPENING_RE = new RegExp(
+  String.raw`^-\s+\[\s*\]\s+${SCOPE_MARKERS}(?:\[(auto|human|start)\]\s+)?${SCOPE_MARKERS}`,
+  'i',
+);
 const PROBE_RE = /:\s+`([^`]+)`\s*$/;
 
 const HEADING_MARKS_RE = /^#+/;
@@ -238,22 +307,38 @@ function inferSectionTag(header: string): PrerequisiteTag | null {
 }
 
 /**
+ * The scope the markers in `text` name: `tasks` or `wrap-up` for one of
+ * them, `both` for the two together, null when it carries neither.
+ */
+function markedScope(text: string): PrerequisiteScope | null {
+  const isForTasks = TASKS_MARKER_RE.test(text);
+  const isForWrapUp = WRAP_UP_MARKER_RE.test(text);
+  if (isForTasks && isForWrapUp) return 'both';
+  if (isForTasks) return 'tasks';
+  if (isForWrapUp) return 'wrap-up';
+  return null;
+}
+
+/**
  * The scope below `header`: the headings at shallower levels kept, its
- * own level set to its tag, every deeper level ended.
+ * own level set to its tag and its marker, every deeper level ended.
  */
 function enterHeading(scope: HeadingScope, header: string): HeadingScope {
   const level = HEADING_MARKS_RE.exec(header)?.[0].length ?? 1;
   const above = Array.from({ length: level - 1 }, (_, index) => scope[index] ?? null);
-  return [...above, inferSectionTag(header)];
+  return [...above, { tag: inferSectionTag(header), scope: markedScope(header) }];
 }
 
-/** The tag of the deepest heading in `scope` that names one, else `human`. */
-function sectionDefault(scope: HeadingScope): PrerequisiteTag {
+/**
+ * What the deepest heading in `scope` that names `mark` gives it, or null
+ * when no heading above the line names one.
+ */
+function sectionMark<Mark extends keyof HeadingMarks>(scope: HeadingScope, mark: Mark): HeadingMarks[Mark] | null {
   for (let index = scope.length - 1; index >= 0; index -= 1) {
-    const tag = scope[index];
-    if (tag) return tag;
+    const named = scope[index]?.[mark];
+    if (named) return named;
   }
-  return 'human';
+  return null;
 }
 
 /** The run of backticks or tildes a line opens a fence with, or null. */
@@ -285,22 +370,27 @@ function continuationOf(lines: readonly string[], start: number): string[] {
   return following;
 }
 
-/** The tag written right after an item's box, or null when there is none. */
-function inlineTag(line: string): PrerequisiteTag | null {
-  if (INLINE_AUTO_RE.test(line)) return 'auto';
-  if (INLINE_START_RE.test(line)) return 'start';
-  if (INLINE_HUMAN_RE.test(line)) return 'human';
-  return null;
+/** The tag an item's opening spells, in either case, or null for none. */
+function tagNamed(word: string | undefined): PrerequisiteTag | null {
+  const tag = word?.toLowerCase();
+  return tag === 'auto' || tag === 'human' || tag === 'start'
+    ? tag
+    : null;
 }
 
-/** An item line with its `- [ ] [auto] ` or `- [ ] ` opening dropped. */
-function stripItemPrefix(line: string): string {
-  return line
-    .replace(INLINE_AUTO_RE, '')
-    .replace(INLINE_HUMAN_RE, '')
-    .replace(INLINE_START_RE, '')
-    .replace(ITEM_RE, '')
-    .trim();
+/**
+ * An item line's opening, read once: the tag and the scope marker written
+ * after its box, each null when it is not written, and the line with its
+ * `- [ ] [auto] [tasks] ` or `- [ ] ` opening dropped.
+ */
+function readOpening(line: string): ItemOpening {
+  const opening = ITEM_OPENING_RE.exec(line);
+  const [matched = '', before = '', tag, after = ''] = opening ?? [];
+  return {
+    tag: tagNamed(tag),
+    scope: markedScope(`${before}${after}`),
+    rest: line.slice(matched.length).trim(),
+  };
 }
 
 /** True when a tag's item carries a probe; a `human` item never does. */
@@ -321,15 +411,17 @@ function extractProbe(description: string): string | null {
 function readItem(
   lines: readonly string[],
   lineIndex: number,
-  inherited: PrerequisiteTag,
+  headings: HeadingScope,
 ): MarkdownPrerequisite {
   const raw = lines[lineIndex] ?? '';
-  const tag = inlineTag(raw) ?? inherited;
-  const description = [stripItemPrefix(raw), ...continuationOf(lines, lineIndex + 1)].join(' ');
+  const opening = readOpening(raw);
+  const tag = opening.tag ?? sectionMark(headings, 'tag') ?? 'human';
+  const scope = opening.scope ?? sectionMark(headings, 'scope') ?? 'both';
+  const description = [opening.rest, ...continuationOf(lines, lineIndex + 1)].join(' ');
   const probe = isProbedTag(tag)
     ? extractProbe(description)
     : null;
-  return Object.freeze({ raw, description, tag, lineIndex, probe });
+  return Object.freeze({ raw, description, tag, scope, lineIndex, probe });
 }
 
 /**
@@ -357,7 +449,7 @@ export function parsePrerequisites(content: string): readonly MarkdownPrerequisi
       scope = enterHeading(scope, line);
       continue;
     }
-    if (ITEM_RE.test(line)) items.push(readItem(lines, index, sectionDefault(scope)));
+    if (ITEM_RE.test(line)) items.push(readItem(lines, index, scope));
   }
 
   return Object.freeze(items);
@@ -370,7 +462,7 @@ function isProbed(item: MarkdownPrerequisite): item is MarkdownPrerequisite & { 
 
 /** A probed item as a required item; see the module note. */
 function requiredItem(item: MarkdownPrerequisite & { probe: string }): PrerequisiteItem {
-  return Object.freeze({ kind: 'tool', name: item.description, probe: item.probe });
+  return Object.freeze({ kind: 'tool', name: item.description, probe: item.probe, scope: item.scope });
 }
 
 /** The probed items of `items` tagged `tag`, frozen, in file order. */
@@ -396,7 +488,9 @@ function isMalformed(item: MarkdownPrerequisite): boolean {
  * What a PREREQUISITES file adds to a run: its probed `auto` items as
  * required items, its probed `start` items as start-only required items,
  * its `human` items as reminders, and its `auto` and `start` items with
- * no probe as malformed, each list in file order and frozen.
+ * no probe as malformed, each list in file order and frozen. A required
+ * item of either tier carries the scope its item read, `both` when no
+ * marker is written; see the module note.
  */
 export function planPrerequisites(content: string): PlanPrerequisites {
   const items = parsePrerequisites(content);

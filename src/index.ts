@@ -140,6 +140,7 @@ export type {
   OutputMode,
   PrerequisiteItem,
   PrerequisiteKind,
+  PrerequisiteScope,
   PrProvider,
   RafaConfig,
   ReleaseEnabled,

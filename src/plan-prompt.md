@@ -87,6 +87,10 @@ criteria — **do not execute the plan**.
   it from the plan. An `[auto]` item holds exactly one backticked span, and
   that span is its command, ending the item after `: ` and run as written:
   prove a tool with `<tool> --version`, `<tool> --help` or `which <tool>`.
+  An `[auto]` item only the tasks need carries `[tasks]` after its box and
+  tag, and one only the wrap-up needs carries `[wrap-up]`
+  (`- [ ] [auto] [tasks] ...`); an unmarked item is needed by both. The
+  marker is written bare, never in backticks and never after the command.
 * Do not create or touch any tracker file — the loop derives it from the plan.
 
 ## The effort-store rule for plans that carry migrations

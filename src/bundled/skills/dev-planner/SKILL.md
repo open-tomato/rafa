@@ -472,6 +472,8 @@ The wrap-up session always receives `full` regardless of the configured mode.
   - [ ] {Tool} installed: `{tool} --version`
   - [ ] {Service name} answering on port {n}: `curl -sf http://localhost:{n}/health`
   - [ ] {VAR_NAME} set, obtained from {where}: `test -n "${VAR_NAME}"`
+  - [ ] [tasks] {Something only the tasks need}: `{command to verify}`
+  - [ ] [wrap-up] {Something only the wrap-up needs}: `{command to verify}`
 
   ## Credentials [human]
   - [ ] {Credential description}
@@ -488,6 +490,8 @@ How the file is read:
 - An item's tag is the `[auto]`, `[human]`, or `[start]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`, and one carrying `[start]` tags it `start`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
 - An `auto` item's probe is the backticked span that ends it, after its final `: `. The item merges as a required prerequisite, the tier whose failure halts a run.
 - A `start` item's probe is read the same way. The item is probed on first dispatch only (skipped on resume), and failure halts a run on first dispatch.
+- An item's scope is the `[tasks]` or `[wrap-up]` marker written at its opening, after its box and after its tag when it has one (`- [ ] [auto] [tasks] ...`). Without one it takes the marker of the nearest heading above it that carries one, which reaches the deeper headings under it and ends at the next heading of its own level or shallower, as a tag does; an item's own marker outranks its heading's. With no marker anywhere the scope is `both`, and the two markers written together read as `both` too. The marker is dropped from the item's text and is never read as its probe.
+- The scope says which dispatches need an `auto` item: `tasks` the task sessions, `wrap-up` the wrap-up session, `both` every one. A marker on a `start` or `human` item is read and changes nothing: the `start` item is still probed on first dispatch only, and the `human` item is still a reminder.
 - A `human` item is a reminder: named to the operator, never probed, and never halting a run.
 - An `auto` or `start` item that does not end with `: ` and its command — the command first, text after it, or no span at all — is malformed: `rafa loop start` and `rafa doctor` refuse the plan, naming its line, and run nothing.
 
@@ -496,6 +500,7 @@ Rules:
 - An `[auto]` item holds exactly one backticked span, and that span is its command. The preflight runs it as written, so put no package name, path or other command in backticks anywhere in the item.
 - Tag an item `auto` only when a shell command proves it, and end the item with `: ` and that command. The command asks for no input and changes nothing.
 - Tag an item `start` only when a shell command proves it and it should only be checked on the first dispatch of a plan (not on resume). End it with `: ` and the command, one span, as for `auto`.
+- Mark an `auto` item `[tasks]` when only the plan's tasks need it and `[wrap-up]` when only the wrap-up does (pushing, opening the pull request, releasing); leave it unmarked when both do or when unsure, since an unmarked item is always probed. Write the marker bare, at the item's opening or on its heading, never in backticks and never after the command: text after the span makes the item malformed.
 - Make the command complete: it exits 0 when the prerequisite holds. To prove a tool is installed, probe `<tool> --version`, `<tool> --help` or `which <tool>` — never a bare subcommand such as `uvx check-jsonschema`, which exits non-zero for want of arguments.
 - Tag every step for after the plan merges `human`, as the heading above does, so no run ever executes one as a probe.
 - Do not duplicate steps already documented in the repo's contributor docs (README, CONTRIBUTING, and the like).
