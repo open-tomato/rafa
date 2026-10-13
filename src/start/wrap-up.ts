@@ -41,6 +41,14 @@
  * names the provider as `none` and promises no retry, since
  * `start/wrap-up-run.ts` delivers nothing under it.
  *
+ * The promotion check is the third such reading (#1051).
+ * {@link runWrapUpSession} takes the provider as
+ * {@link WrapUpSessionRun.provider}, from {@link preserveProgress} and
+ * from `retryWrapUp` (`start/wrap-up-retry.ts`), and under `none` makes
+ * no pull request reader: it hands `checkWrapUpAnswer` a null `pulls`,
+ * and the line naming the lessons left unanswered or unchanged is
+ * printed with the provider as the reason, in place of a `gh` lookup.
+ *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
@@ -52,6 +60,7 @@ import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js
 import type { CapturingSpawner } from '../core/loop/index.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
+import type { PullRequests } from '../pr/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
 
 import { posix } from 'node:path';
@@ -477,7 +486,9 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * succeeded its `rafa:promoted` answer is checked against the changes
  * since that HEAD (`start/promoted-check.ts`): each confirmed lesson
  * gets `promoted_to` through the same adapter, and one line naming each
- * unanswered or unchanged id goes into the PR body with `gh pr edit`. A
+ * unanswered or unchanged id goes into the PR body with `gh pr edit`,
+ * or, under `pr.provider: none`, to the operator with the provider as
+ * the reason and no `gh` call (#1051). A
  * session that FAILED is not checked. Its commit, push and PR may never
  * have happened, and the rerun this module then asks for lists the same
  * lessons again, which a `promoted_to` set now would take off that list.
@@ -504,7 +515,9 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * asks for no pull request ({@link buildWrapUpPrompt}), and the line
  * printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
  * which promises no retry because the caller delivers no pull request
- * under that provider. It is required, as `checkout` is: a default of
+ * under that provider. It is handed on to {@link runWrapUpSession}, so
+ * the promotion check asks `gh` for no pull request either (#1051). It
+ * is required, as `checkout` is: a default of
  * `gh` would ask `gh` in a repository that has none to ask.
  *
  * `extras` holds `stepOnly`, the test files the run's suite steps read
@@ -544,6 +557,7 @@ export async function preserveProgress(
     learning,
     checkout,
     branch,
+    provider,
     succeeded: hasProvider
       ? async () => progressPreservedLine(await lookup(checkout, branch))
       : PROGRESS_PRESERVED_NO_PROVIDER,
@@ -601,12 +615,25 @@ export interface WrapUpSessionRun {
   /** The run's branch, whose PR body the promotion check writes to. */
   readonly branch: string;
   /**
+   * The run's `pr.provider`, as the caller resolved it. Required, with
+   * no default, as `WrapUpRetryRun.provider` is: a default of `gh` would
+   * let a caller forget it and ask `gh` for a pull request under `none`
+   * (#1051).
+   */
+  readonly provider: PrProvider;
+  /**
    * The line printed when the session exits 0, or a reading that
    * answers it, made only then and only after the session has ended.
    */
   readonly succeeded: string | (() => Promise<string>);
   /** The spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
+  /**
+   * What the tests answer in place of `gh`: the pull request reader of
+   * a checkout, which the promotion check writes its line through.
+   * `ghPullRequestsIn` when left out. Never called under `none`.
+   */
+  readonly pullRequests?: (checkout: string) => PullRequests;
 }
 
 /**
@@ -616,6 +643,12 @@ export interface WrapUpSessionRun {
  * served and spawned in the checkout, the outcome line printed, and the
  * `rafa:promoted` answer checked once it succeeded. Never throws for a
  * session that failed; the caller reads whether a pull request is open.
+ *
+ * Under `pr.provider: none` no pull request reader is made, and
+ * `checkWrapUpAnswer` is handed a null `pulls` (#1051): a line to
+ * report is printed with the provider as the reason, and `gh` is not
+ * asked. Under every other provider the reader is the checkout's, as it
+ * was before `provider` existed.
  */
 export async function runWrapUpSession(run: WrapUpSessionRun): Promise<string> {
   const { learning, checkout } = run;
@@ -654,7 +687,9 @@ export async function runWrapUpSession(run: WrapUpSessionRun): Promise<string> {
     repoRoot: checkout,
     branch: run.branch,
     git,
-    pulls: ghPullRequestsIn(checkout),
+    pulls: run.provider === 'none'
+      ? null
+      : (run.pullRequests ?? ghPullRequestsIn)(checkout),
     learning: () => wrapUpAdapter(learning),
   });
   return session.stdout;

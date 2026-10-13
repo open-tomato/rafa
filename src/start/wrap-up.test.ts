@@ -60,6 +60,23 @@
  * The
  * `gh` cases are the control for the `none` ones: the recorder that
  * reads empty there holds two entries here.
+ *
+ * A group of its own covers `runWrapUpSession` with one listed lesson
+ * the session leaves unanswered (#1051), which is what brings the
+ * promotion check to its pull request line. The session's pull request
+ * reader is answered through the `pullRequests` seam: the real `gh`
+ * provider over a runner that records each argument list and refuses
+ * the call. Under `none` the seam is never called, no `gh` argument list
+ * is recorded and the line is printed with the provider as the reason;
+ * under `gh` the same run records the `gh pr list` lookup, which is the
+ * control showing the recorder is where a lookup lands.
+ *
+ * A stand-in `gh` first on the PATH is not what these cases read,
+ * because it would read empty under any provider: `Bun.spawn` handed a
+ * bare `gh` and no `env`, as `createGhRunner` hands it, resolves the
+ * command against the PATH the process started with, and a
+ * `process.env.PATH` set by a test does not move it (measured on bun
+ * 1.3.14, 2026-10-13).
  */
 import type { WrapUpLearning } from './wrap-up.js';
 import type { AdapterContext } from '../core/adapters/index.js';
@@ -78,13 +95,15 @@ import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js'
 import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { actionHash } from '../learning/index.js';
+import { createGhPullRequests } from '../pr/index.js';
 import { serializeFragment } from '../release/fragment.js';
 import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { NO_PROVIDER_REASON } from './promoted-check.js';
 import { parsePromoted } from './promoted.js';
 import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';
-import { buildWrapUpPrompt, lessonsToPromote, NO_PULL_REQUEST_BULLET, preserveProgress, PROGRESS_PRESERVED_NO_PROVIDER } from './wrap-up.js';
+import { buildWrapUpPrompt, lessonsToPromote, NO_PULL_REQUEST_BULLET, preserveProgress, PROGRESS_PRESERVED_NO_PROVIDER, runWrapUpSession } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
 const BRANCH = 'feat/rafa-20-pr-commands';
@@ -819,5 +838,123 @@ describe('preserveProgress under the run\'s pull request provider', () => {
     expect(none.infos).toEqual([NO_PR_YET]);
     expect(late.lookups).toEqual([`before:${ON_BRANCH}`, `after:${ON_BRANCH}`]);
     expect(late.infos).toEqual(['\n✅ Progress preserved; pull request #612 is open on this branch.']);
+  });
+});
+
+describe('runWrapUpSession under the run\'s pull request provider', () => {
+  const planter = scratchPlanter('rafa-wrap-up-session-provider-');
+  afterAll(planter.remove);
+
+  /** The branch every case's scratch checkout is on. */
+  const ON_BRANCH = `feat/${STUB}`;
+
+  /** The one lesson listed, which the stand-in session never answers. */
+  const UNANSWERED = lesson('left-unanswered-1a2b3c4d', 3, 0.7);
+
+  /** The line the check writes for that lesson, under any provider. */
+  const LINE = 'Lessons listed for promotion that this pull request does not carry: `left-unanswered-1a2b3c4d` (no answer in the `rafa:promoted` block).';
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** A registry whose one learning adapter answers {@link UNANSWERED} as blessed. */
+  const registry = createAdapterRegistry([{
+    port: 'learning',
+    kind: 'stub',
+    portVersion: PORT_VERSIONS.learning,
+    create: (): Learning => ({
+      push: () => Promise.reject(new Error('no lesson is promoted here')),
+      pullBlessed: () => Promise.resolve({ version: 'stub', instincts: [UNANSWERED] }),
+      flag: () => Promise.reject(new Error('the wrap-up flags nothing')),
+    }),
+  }]);
+
+  /** What one {@link sessionUnder} run recorded. */
+  interface SessionRun {
+    /** The checkout of each pull request reader made, in order. */
+    readonly readers: readonly string[];
+    /** Every `gh` call made, as its arguments joined with spaces. */
+    readonly ghCalls: readonly string[];
+    /** Every `warn` line written. */
+    readonly warnings: readonly string[];
+    /** The prompt the session was handed. */
+    readonly prompt: string;
+    /** The scratch checkout the session ran in. */
+    readonly checkout: string;
+  }
+
+  /**
+   * One `runWrapUpSession` under `provider` over a scratch checkout, its
+   * session exiting 0 with no `rafa:promoted` block, and its pull
+   * request reader the real `gh` provider over a runner that records
+   * each call and refuses it.
+   */
+  async function sessionUnder(provider: PrProvider): Promise<SessionRun> {
+    const readers: string[] = [];
+    const ghCalls: string[] = [];
+    const warnings: string[] = [];
+    const prompts: string[] = [];
+    setActiveOutput(sinkOutput({
+      warn: (line) => {
+        warnings.push(line);
+      },
+    }));
+    const scratch = planter.plant({ branch: ON_BRANCH, plan: PLAN_DONE });
+    await runWrapUpSession({
+      buildPrompt: (lessons) => buildWrapUpPrompt(ON_BRANCH, 'main', PLAN_DONE, provider, null, null, lessons),
+      settingSources: ['project'],
+      serving: null,
+      learning: { kind: 'stub', home: scratch.home, blessMinConfidence: 0.5, registry, repoRoot: scratch.repo, promoteAfter: 3, promoteMinConfidence: 0.7 },
+      checkout: scratch.repo,
+      branch: ON_BRANCH,
+      provider,
+      succeeded: 'the session ended',
+      spawn: (_args, prompt) => {
+        prompts.push(prompt);
+        return Promise.resolve({ exitCode: 0, stdout: 'Committed and pushed.' });
+      },
+      pullRequests: (checkout) => {
+        readers.push(checkout);
+        return createGhPullRequests({
+          gh: (args) => {
+            ghCalls.push(args.join(' '));
+            return Promise.resolve({ ok: false, stdout: '', stderr: 'the recorder refuses every call' });
+          },
+        });
+      },
+    });
+    return { readers, ghCalls, warnings, prompt: prompts[0] ?? '', checkout: scratch.repo };
+  }
+
+  test('makes no gh call under none for a lesson left unanswered, and prints its line with the provider as the reason (#1051)', async () => {
+    const none = await sessionUnder('none');
+
+    // The lesson was listed and left unanswered, so the check reached its line.
+    expect(none.prompt).toContain('- `left-unanswered-1a2b3c4d`');
+    expect(none.readers).toEqual([]);
+    expect(none.ghCalls).toEqual([]);
+    expect(none.warnings).toEqual([
+      '   The wrap-up session wrote no `rafa:promoted` block.',
+      `   ${NO_PROVIDER_REASON}: ${LINE}`,
+    ]);
+    expect(NO_PROVIDER_REASON).toContain('`pr.provider` is `none`');
+    expect(NO_PROVIDER_REASON).toContain('no pull request carries it');
+    expect(NO_PROVIDER_REASON).toContain('the lessons stay in the library');
+  });
+
+  test('looks the pull request up through gh for the same lesson under gh, as before', async () => {
+    // The control: the same run under `gh` reaches the recorder, so the
+    // empty recorder under `none` is the provider's doing.
+    const gh = await sessionUnder('gh');
+
+    expect(gh.prompt).toContain('- `left-unanswered-1a2b3c4d`');
+    expect(gh.readers).toEqual([gh.checkout]);
+    expect(gh.ghCalls).toHaveLength(1);
+    expect(gh.ghCalls[0]).toStartWith(`pr list --state open --head ${ON_BRANCH} `);
+    expect(gh.warnings).toHaveLength(2);
+    expect(gh.warnings[1]).toStartWith('   This line is not in the pull request body, as the pull request body could not be written: ');
+    expect(gh.warnings[1]).toEndWith(`the recorder refuses every call: ${LINE}`);
+    expect(gh.warnings.some((line) => line.includes(NO_PROVIDER_REASON))).toBe(false);
   });
 });

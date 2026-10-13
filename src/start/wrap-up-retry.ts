@@ -40,7 +40,10 @@
  * pull request under `pr.provider: none`, so it spawns no retry there;
  * a prompt built under `none` all the same carries no `gh pr create`
  * bullet, only the missing-pull-request bullet above the first
- * prompt's.
+ * prompt's. {@link retryWrapUp} hands the same provider to
+ * `runWrapUpSession` as `WrapUpSessionRun.provider`, so a retry spawned
+ * under `none` would ask `gh` for no pull request in its promotion
+ * check either (#1051).
  *
  * ## Spawning one
  *
@@ -154,7 +157,8 @@ export interface WrapUpRetryRun {
 /**
  * Spawns one retry wrap-up session over {@link buildWrapUpRetryPrompt},
  * with no release record, and answers its final message; see the module
- * note.
+ * note. The run's provider goes to the prompt and to the session's
+ * promotion check alike, never a default.
  */
 export function retryWrapUp(run: WrapUpRetryRun): Promise<string> {
   const { branch, base, planContent, provider, previousMessage } = run;
@@ -166,6 +170,7 @@ export function retryWrapUp(run: WrapUpRetryRun): Promise<string> {
     learning: run.learning,
     checkout: run.checkout,
     branch,
+    provider,
     succeeded: '\n✅ Retry wrap-up session ended; the loop checks for the pull request again.',
     ...(run.spawn === undefined
       ? {}
