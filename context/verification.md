@@ -18,14 +18,21 @@ A change still asks for the full suite before the merge-time run when:
 - a scoped run is green and the failure it chases is still unexplained,
   so the full run is the capture that names it.
 
-The runner's recorded steps below are full runs at fixed points of a
-loop; a session never adds its own between them.
+The runner's recorded steps below run at fixed points of a loop. The
+baseline and the pre-wrap-up step are always full runs, a task step is
+full when its line declares `tests=full` or a trigger escalates it, and a
+session never adds its own between them. A whole-suite run is the
+runner's to take: a session that runs `bun test` with no path in one Bash
+call can outlast that call's 10-minute limit, so `rafa plan risk` flags a
+task text that asks for one (the `long-run` note, `context/workflow.md`).
 
 ### Gate tiers and task declaration
 
 **A task session runs a targeted subset of checks; the runner runs the full
 suite at defined stages.** A task line declares `tests=affected` (the
-default), `tests=module`, or `tests=full` to control what its session checks.
+default), `tests=module`, or `tests=full`: the runner's task step runs that
+scope after the session commits, and the session itself checks only what
+its change reaches.
 
 **Task session gates** (read one exit code from each):
 - `bun test --changed=<base>` (affected tests), then `bun test
@@ -56,8 +63,9 @@ types: `check-types` runs `tsc` over the root, then each
 code from the root config as it lints `src/`, so a changed package file
 belongs in the scoped `bunx eslint <changed files>` run too.
 
-**Runner recorded steps** (full suite, recorded at fixed points):
-- `baseline` — Full suite once at plan start (first dispatch)
+**Runner recorded steps** (recorded at fixed points, each with its scope):
+- `baseline` — Full suite once at plan start (first dispatch); a run that
+  failed outside any test case halts the run and is not written
 - `task` — Scope from `taskStepScope` over the task's diff after
   each task's session ends and commits
 - `stage` — After a stage's last task: the tests under the `Owns:`
@@ -66,16 +74,17 @@ belongs in the scoped `bunx eslint <changed files>` run too.
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope (affected, module, full, or a
-file/folder list it ran on), its reason (`declared` for a task or stage
-step whose session declared `tests=module` or `tests=full`; `trigger` when
-changed files match `tests.fullSuiteTriggers` or `tests.integration` and
-escalate the scope; `fallback` for a stage step with no `Owns:` folder
-running `bun test --changed=<since>`; `no-module-tests` when a task
-names `tests=module` but the module has no test files; `stage` for a
-pre-wrap-up step, which is always full suite), the command, exit code,
-Bun's summary line, every failing test (file + full test name pairs), and
-which failures are new against the baseline (not present in `baseline`'s
-captured failures).
+file/folder list it ran on) and its reason where it has one (`declared`
+for a task step whose line declares `tests=module` or `tests=full`;
+`trigger` when changed files match `tests.fullSuiteTriggers` or
+`tests.integration` and escalate the scope; `fallback` for a stage step
+with no `Owns:` folder running `bun test --changed=<since>`;
+`no-module-tests` when a task names `tests=module` but the module has no
+test files; `stage` for a stage step's `Owns:` path list). The baseline
+and the pre-wrap-up step carry no reason, as they always run the full
+suite. Each also records the command, exit code, Bun's summary line,
+every failing test (file + full test name pairs), and which failures are
+new against the baseline (not present in `baseline`'s captured failures).
 
 **Declaration key `tests=` on a task line** sets what the task's session
 will run:
@@ -109,9 +118,10 @@ is identified by its test file path and full test name (the pair the
 JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
-means it is new. Only new failures make a step red, and of those only
-the ones still red when their file is run alone, or green alone after a
-test file the step's own change touches (below). A red task or stage
+means it is new. Only new failures, and a run that failed outside any
+test case (below), make a step red; of the new failures, only the ones
+still red when their file is run alone, or green alone after a test
+file the step's own change touches (below). A red task or stage
 step inserts a `[BLOCKED]` repair task above the first open plan task,
 which it leaves as it was: the repair's text names the commit the step
 ran at (`Repair the red task step at commit <sha>`), its declaration is
@@ -150,7 +160,9 @@ is a full-suite run that establishes what the tree held at that moment.
 Later steps compare their failures against this baseline to separate
 inherited failures from new ones. A baseline failure (one present in the
 baseline step) does not block work; a new failure (one that first appears
-in a later step) does.
+in a later step) does. A baseline that failed outside any test case is
+the one exception: it is not written, and the run halts before its first
+session (below).
 
 **A failure is a test file plus a full test name.** The JUnit reporter
 (run with `--reporter=junit --reporter-outfile=<file>`) identifies each
@@ -184,15 +196,33 @@ step's run is retaken once at most.
 **A run that exits nonzero and lists no failing case is red, whatever
 the baseline holds.** The exit code is the reading
 (`failedOutsideAnyCase`, `src/start/suite-outside-case.ts`), and no
-wording of Bun's stderr decides it. A task, stage or pre-wrap-up step
-is red on it even when the baseline counted as many errors, which is
-how a checkout whose test files never loaded reads on every run. Left
-as they were: a run Bun found no test file for, a SIGINT stop, and a
-run listing failures, which are split against the baseline as above.
-The blocker names the reason, `the run failed outside any test case`,
-and quotes the end of the run's stderr within a few hundred characters;
-the recorded step carries `outsideCase: true` and that tail whole as
-`outputTail`. A step red on this alone is not retaken.
+wording of Bun's stderr decides it. A task, stage or pre-wrap-up step is
+red on it even when the baseline counted as many errors. The baseline is
+not red on it: it halts the run, as the next paragraph says. Left as they
+were: a run Bun found no test file for, a SIGINT stop, and a run listing
+failures, which are split against the baseline as above. The blocker
+names the reason, `the run failed outside any test case`, and quotes the
+end of the run's stderr within a few hundred characters; the recorded
+step carries `outsideCase: true` and that tail whole as `outputTail`. A
+step red on this alone is not retaken.
+
+**A baseline that failed outside any test case halts the run.** Such a
+run is not written as the baseline (`ensureBaseline`,
+`src/start/suite-step.ts`): it names no failure to split a later step
+against, and its errors would be inherited by every step after it. The
+run stops before its first session is dispatched, with `baselineHaltLines`
+(`src/start/suite-outside-case.ts`) printed: the exit code and the reason,
+the likely cause (a test file that did not load, with dependencies not
+installed in the checkout as the case seen), that the next run records
+the baseline, and the output tail whole. Nothing is marked on the
+tracker. The run record keeps that baseline step with `outsideCase: true`
+and its tail, and no stage enters the ledger. The case this halt is for:
+a loop started in a worktree with no installed dependencies used to reach
+the wrap-up with every test file unloaded; now it halts at the baseline
+and says the run failed outside any test case. Install the dependencies,
+then run again. A baseline file written before this rule can hold such a
+run: `ensureBaseline` records it again with a warning that says so, and a
+baseline with listed failures is inherited as before.
 
 **A failed case's error is read from stderr, and the step keeps its
 first lines.** Bun 1.3.14, the pinned version, writes every thrown
@@ -321,8 +351,12 @@ The `newFailures` array in each step lists only the failures not present
 in the baseline, each with the `errorLines` Bun printed for it when it
 printed any. A step that found files red only in the step lists them
 under `stepOnly`, and their tests are in `failures` and not in
-`newFailures`. The runner writes these arrays as each step completes,
-and the loop reads them to decide what to report to the next task.
+`newFailures`. A step red outside any test case carries `outsideCase: true`
+and `outputTail`: the last 20 non-blank stderr lines of its run, or of each
+of its two runs when it ran its always-run files as a second one, in order.
+Every other step carries neither key. The runner writes these arrays as
+each step completes, and the loop reads them to decide what to report to
+the next task.
 
 **Known baseline failures are documented on this page.** Some tests fail
 on every run because the tree itself is in that state or the test reads
