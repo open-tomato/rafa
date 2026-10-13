@@ -108,6 +108,7 @@ function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
     stale: [STALE],
     notPushed: [NOT_PUSHED],
     worktrees: [WORKTREE],
+    remoteOnly: [],
     runs: [],
     notes: [],
     ...overrides,

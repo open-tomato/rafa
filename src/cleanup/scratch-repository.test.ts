@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
+import { openUnknownNote } from './remote-only.js';
 import {
   createScratchRepository,
   LOCK_REASON,
@@ -179,8 +180,19 @@ function cherryMarks(repo: ScratchRepository, name: string): string[] {
     .map((line) => line.slice(0, 1));
 }
 
-/** The five groups of a reading, as the names in each and the ticks. */
-async function groupsOf(options: ScratchOptions): Promise<{ repo: ScratchRepository; groups: unknown }> {
+/** A scratch repository, the five groups it reads as, and the reading's notes. */
+interface ScratchGroups {
+  readonly repo: ScratchRepository;
+  readonly groups: unknown;
+  readonly notes: readonly string[];
+}
+
+/**
+ * The five groups of a reading, as the names in each and the ticks, and
+ * its notes apart: read with no provider, the remote-only set leaves a
+ * note of its own, which is no part of what the five groups read.
+ */
+async function groupsOf(options: ScratchOptions): Promise<ScratchGroups> {
   const repo = createScratchRepository(options);
   try {
     const reading = await readCleanup(defaultCleanupSeams(repo.clone, null), {
@@ -198,14 +210,13 @@ async function groupsOf(options: ScratchOptions): Promise<{ repo: ScratchReposit
     if (!reading.ok) throw new Error(reading.detail);
     const groups = {
       base: reading.base,
-      notes: reading.notes,
       merged: reading.merged.map((row) => [row.branch, row.ticked, row.reason]),
       stale: reading.stale.map((row) => [row.branch, row.ticked, row.reason]),
       notPushed: reading.notPushed.map((row) => [row.branch, row.ticked, row.commits]),
       worktrees: reading.worktrees.map((row) => [row.branch, row.tickable, row.ticked]),
       counts: cleanupCounts(reading),
     };
-    return { repo, groups };
+    return { repo, groups, notes: reading.notes };
   } catch (error) {
     repo.dispose();
     throw error;
@@ -213,8 +224,8 @@ async function groupsOf(options: ScratchOptions): Promise<{ repo: ScratchReposit
 }
 
 describe('the scratch repository with its remote-only option', () => {
-  let plain: { repo: ScratchRepository; groups: unknown };
-  let withSet: { repo: ScratchRepository; groups: unknown };
+  let plain: ScratchGroups;
+  let withSet: ScratchGroups;
   const added = Object.values(REMOTE_ONLY_BRANCHES);
 
   beforeAll(async () => {
@@ -283,6 +294,9 @@ describe('the scratch repository with its remote-only option', () => {
   it('leaves the five groups of the default build as they read without it', () => {
     expect(withSet.groups).toEqual(plain.groups);
     expect(withSet.repo.pastHead).toBeNull();
+    // The one note is the remote-only reading's: with no provider it withholds the two branches it would list.
+    expect(plain.notes).toEqual([]);
+    expect(withSet.notes).toEqual([openUnknownNote(added.length - 1)]);
   });
 
   it('leaves every local branch but main on the commit the default build puts it on', () => {

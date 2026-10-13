@@ -226,6 +226,7 @@ function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
     stale: [STALE],
     notPushed: [NOT_PUSHED],
     worktrees: [WT_CLEAN, WT_DIRTY],
+    remoteOnly: [],
     runs: [],
     notes: [],
     ...overrides,
