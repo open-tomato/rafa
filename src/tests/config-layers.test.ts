@@ -49,7 +49,7 @@ import type {
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -1415,5 +1415,122 @@ describe('a second section redefining dangerous.acceptStaleRefs', () => {
     // The refused registration left the registry as it was.
     const loaded = await loadConfig(scopes(null, null), {}, quiet);
     expect(loaded.config.dangerousAcceptStaleRefs).toBe(false);
+  });
+});
+
+/** Writes `text` at `path`, creating its directory, and answers `path`. */
+function writeAt(path: string, text: string): string {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+  return path;
+}
+
+/** A module file's text: `export default` of `entries` as JSON, typed by `satisfies Config`. */
+function typedModuleText(entries: unknown): string {
+  return 'import type { Config } from \'@open-tomato/rafa/config\';\n'
+    + `export default ${JSON.stringify(entries)} satisfies Config;\n`;
+}
+
+/**
+ * Runs `run` with the working directory at `dir` and puts it back after.
+ * `dir` sits under the temporary root, so no `node_modules` stands above it
+ * and nothing named `@open-tomato/rafa` can be found from it.
+ */
+async function withCwd<T>(dir: string, run: () => Promise<T>): Promise<T> {
+  const before = process.cwd();
+  process.chdir(dir);
+  try {
+    return await run();
+  } finally {
+    process.chdir(before);
+  }
+}
+
+describe('loadConfig over a project whose rafa.config.ts holds only types', () => {
+  it('reads naming.branch from the TS file over pr.base from a user YAML file', async () => {
+    const roots = scopes(null, 'pr:\n  base: develop\n');
+    const path = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      typedModuleText([{ naming: { branch: 'work/{stub}' } }]),
+    );
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', roots.root)).toThrow();
+    const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, quiet));
+
+    expect(resolved.config.namingBranch).toBe('work/{stub}');
+    expect(resolved.sources.namingBranch).toBe('file');
+    expect(resolved.provenance.namingBranch).toEqual({ file: path, entry: 0 });
+    expect(resolved.config.prBase).toBe('develop');
+    expect(resolved.sources.prBase).toBe('user');
+  });
+
+  it('reads the TS file over a YAML file of the same scope, warning about the shadow once', async () => {
+    const roots = scopes('naming:\n  branch: yaml/{stub}\npr:\n  base: yaml-base\n', null);
+    const ts = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      typedModuleText([{ naming: { branch: 'ts/{stub}' } }]),
+    );
+    const { lines, warn } = sink();
+    const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, warn));
+
+    expect(resolved.config.namingBranch).toBe('ts/{stub}');
+    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual([CONFIG_DEFAULTS.prBase, 'default']);
+    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
+    expect(lines.filter((line) => line.includes(literalPath(roots.root)))).toHaveLength(1);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('warns about two entries of one TS file setting pr.base at warn, and refuses at error', async () => {
+    const entries = [{ pr: { base: 'first' } }, { pr: { base: 'second' } }];
+    const warned = scopes(null, null);
+    const warnedPath = writeAt(join(warned.root, 'rafa.config.ts'), typedModuleText(entries));
+    const { lines, warn } = sink();
+    const resolved = await withCwd(warned.root, () => loadConfig(warned, {}, warn));
+
+    expect(resolved.config.prBase).toBe('second');
+    expect(lines).toEqual([
+      `rafa config: ${warnedPath}: pr.base is set more than once within one layer: layer "project" (entries 0, 1)`,
+    ]);
+
+    const refused = scopes(null, null);
+    const refusedPath = writeAt(
+      join(refused.root, 'rafa.config.ts'),
+      typedModuleText([{ merge: { duplicates: 'error' } }, ...entries]),
+    );
+    const error = await withCwd(refused.root, () => refusal(() => loadConfig(refused, {}, quiet)));
+
+    expect(error.problems).toEqual([
+      `${refusedPath}: pr.base is set more than once within one layer: layer "project" (entries 1, 2)`,
+    ]);
+  });
+
+  it('refuses a user-scope TS file holding flows, naming the layer and the file', async () => {
+    const roots = scopes(null, null);
+    const path = writeAt(
+      join(roots.home, '.rafa', 'rafa.config.ts'),
+      typedModuleText([{ flows: { next: {} } }]),
+    );
+    const error = await withCwd(roots.root, () => refusal(() => loadConfig(roots, {}, quiet)));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toContain(path);
+    expect(error.problems[0]).toContain('flows is refused in the user layer');
+  });
+
+  it('refuses a project file with a value import of @open-tomato/rafa/config, naming the module and the install', async () => {
+    const roots = scopes(null, null);
+    const path = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      'import { defineConfig } from \'@open-tomato/rafa/config\';\n'
+        + 'export default defineConfig([{ pr: { base: \'trunk\' } }]);\n',
+    );
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', roots.root)).toThrow();
+    const error = await withCwd(roots.root, () => refusal(() => loadConfig(roots, {}, quiet)));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toContain(path);
+    expect(error.problems[0]).toContain('@open-tomato/rafa/config');
+    expect(error.problems[0]).toContain('bun add -d @open-tomato/rafa');
   });
 });
