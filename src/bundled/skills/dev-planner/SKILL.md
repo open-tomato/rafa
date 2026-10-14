@@ -369,6 +369,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 | `tools` | tool names, comma-separated with no spaces | `--tools` | never passed: the definition names its tool set |
 | `skills` | skill names, comma-separated with no spaces | nothing: no flag carries a skill | kept on the record beside the agent |
 | `tests` | `affected`, `module` or `full`; `affected` when absent | nothing: the loop's runner reads it | kept on the record beside the agent |
+| `docs` | `repair`, its one value; any other is recorded as an issue and read as absent | nothing: the loop reads it | kept on the record beside the agent |
 
 * `agent=<name>` outranks `model` and `tools`, and `effort` only when its
   definition declares one, as the last column says. The outranked keys
@@ -393,7 +394,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list and whose `readTestScope` reads a test scope; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
