@@ -76,12 +76,12 @@ import { TRUSTED_PERMISSIONS } from '../../board/trust.js';
 import { resolveConfig } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { STORE_BACKENDS } from '../../core/config/sections.js';
-import * as wire from '../sync/wire.js';
 
 import { mergeStore } from './merge-store.js';
 import { openNdjsonStore } from './ndjson.js';
 import { openSqliteStore } from './sqlite.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
+import * as wire from './wire.js';
 
 import * as entry from './index.js';
 

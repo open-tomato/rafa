@@ -67,7 +67,7 @@
  * `./ports`, and `./ports` exports no runtime value
  * (`context/source.md`):
  *
- *   - the sync wire codec, `src/effort/sync/wire.ts`: the export of a
+ *   - the sync wire codec, `src/effort/store/wire.ts`: the export of a
  *     store's rows past a cursor as JSON, the text's encoder and
  *     checking decoder, the materialiser that builds a payload into the
  *     store file a merge reads, and its two errors;
@@ -107,7 +107,7 @@ export type {
   WirePayload,
   WireRow,
   WireValue,
-} from '../sync/wire.js';
+} from './wire.js';
 export type { MergeOptions, MergeResult as StoreMergeResult } from './merge-store.js';
 export type {
   NdjsonAppendResult,
@@ -138,7 +138,7 @@ export {
   WIRE_VERSION,
   WireExportRefusal,
   WireFormatError,
-} from '../sync/wire.js';
+} from './wire.js';
 export { mergeStore } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';

@@ -2335,7 +2335,7 @@
     {
       "kind": "source",
       "path": "src/runtime/identity.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -3983,13 +3983,6 @@
           "toPackage": "rafa-board"
         },
         {
-          "from": "src/effort/store/index.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/sync/wire.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/effort/store/plan-ci.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -4033,8 +4026,8 @@
         }
       ],
       "fileCounts": {
-        "source": 83,
-        "test": 96,
+        "source": 84,
+        "test": 97,
         "testSupport": 2
       },
       "files": [
@@ -4209,6 +4202,8 @@
         "src/effort/store/triage.ts",
         "src/effort/store/types.test.ts",
         "src/effort/store/types.ts",
+        "src/effort/store/wire.test.ts",
+        "src/effort/store/wire.ts",
         "src/ports/index.test.ts",
         "src/ports/index.ts",
         "src/report/parse.test.ts",
@@ -4222,7 +4217,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 103,
+        "src/effort/store/": 105,
         "src/ports/": 2
       },
       "folders": [
@@ -4238,8 +4233,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 44,
-      "upwardEdges": 57
+      "remaining": 43,
+      "upwardEdges": 56
     },
     {
       "clearedByIssue118": 0,
@@ -6998,18 +6993,11 @@
           "kind": "value",
           "to": "src/config-schema-hub.ts",
           "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/effort/sync/wire.ts",
-          "fromPackage": "rafa-effort",
-          "kind": "value",
-          "to": "src/runtime/identity.ts",
-          "toPackage": "@open-tomato/rafa-cli"
         }
       ],
       "fileCounts": {
-        "source": 37,
-        "test": 35,
+        "source": 36,
+        "test": 34,
         "testSupport": 0
       },
       "files": [
@@ -7079,15 +7067,13 @@
         "src/effort/sync/file.ts",
         "src/effort/sync/select.test.ts",
         "src/effort/sync/select.ts",
-        "src/effort/sync/wire.test.ts",
-        "src/effort/sync/wire.ts",
         "src/effort/trend-stats.test.ts",
         "src/effort/trend-stats.ts",
         "src/schema/frontmatter.test.ts",
         "src/schema/frontmatter.ts"
       ],
       "filesByFolder": {
-        "src/effort/": 70
+        "src/effort/": 68
       },
       "folders": [
         "src/effort/"
@@ -7097,8 +7083,8 @@
         "src/schema/frontmatter.ts"
       ],
       "rank": 7,
-      "remaining": 5,
-      "upwardEdges": 5
+      "remaining": 4,
+      "upwardEdges": 4
     },
     {
       "clearedByIssue118": 0,
@@ -7960,7 +7946,7 @@
     "nonTestEdges": 4325,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 301
+    "upwardEdges": 299
   },
   "unassigned": [
     {

@@ -172,7 +172,7 @@ import {
   WIRE_VERSION,
   WireExportRefusal,
   WireFormatError,
-} from './effort/sync/wire.js';
+} from './effort/store/wire.js';
 import {
   FEATURE_TYPES,
   MANIFEST_VERSION,

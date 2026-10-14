@@ -295,7 +295,7 @@ database file matters. Importing each other's files in a loop is safe
 and idempotent: a repeat of the same file merges nothing new.
 
 **The `service` strategy syncs rows through a wire format over HTTP, defined
-in `src/effort/sync/wire.ts`, and merged only by `mergeStore`.** Push
+in `src/effort/store/wire.ts`, and merged only by `mergeStore`.** Push
 exports rows the local store wrote (identified by its origin pair) past a
 per-table, per-device cursor, building a JSON payload of every `merged`
 table's rows that have a `seq` higher than the cursor's value for that
