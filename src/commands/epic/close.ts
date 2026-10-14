@@ -87,11 +87,12 @@
  * Each failed check is one report of its own, holding one bug and no
  * blocker, handed to `triageReport` with the check session's id, since
  * that session is where the evidence came from, and `failed` as the
- * outcome. The bug is `security: false`: a criterion that does not hold is
- * a product bug, so it goes to the public tracker the chain resolves,
- * resolved once and only when a check failed (`resolveTracker`, with
- * `unresolvedTracker` from `src/start/triage.ts` standing in for a chain
- * that landed nowhere, so each bug then fails with its refusal). Its
+ * outcome. The bug is `security: false` and `kind: bug`: a criterion that
+ * does not hold is a product bug, so it goes to the public tracker the
+ * chain resolves, resolved once and only when a check failed
+ * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
+ * standing in for a chain that landed nowhere, so each bug then fails
+ * with its refusal). Its
  * `what` names the epic and the criterion, and its `artifact` is
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
@@ -455,6 +456,7 @@ export function failedCheckReport(epic: number, failure: CheckAnswered, commit: 
       what: `Epic ${ref(epic)} acceptance criterion ${String(criterion.number)} fails against main: ${oneLine(criterion.text)}`,
       artifact: failedCheckArtifact(epic, criterion),
       security: false,
+      kind: 'bug',
       extras: [],
     })],
     changes: [],

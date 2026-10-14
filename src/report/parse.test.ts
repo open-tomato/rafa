@@ -54,6 +54,12 @@
  * `stale_docs` key reported as missing (73, the seven-field case among
  * them). The module was green before and after, and restored
  * byte-identical (sha256).
+ *
+ * The `kind` of an `out_of_scope_bugs` entry is pinned by its own
+ * describe block, by the spec-example case, and by the older-prompt
+ * fixture `testdata/no-kind-report.txt`, a report shaped as the task
+ * prompt asked for one before the key existed (built by hand, not
+ * captured from a session).
  */
 import type { ReportAbsent, ReportFinding, ReportPresent, ReportReading } from './parse.js';
 
@@ -64,6 +70,7 @@ import { describe, expect, it } from 'bun:test';
 import { INSTINCT_DOMAINS } from '../schema/instinct.js';
 
 import {
+  BUG_KINDS,
   CHANGE_LEVELS,
   FINDING_DOMAINS,
   FINDING_KINDS,
@@ -147,7 +154,9 @@ const SEVEN_FIELD_BODY = [
 
 /** The spec's own example body, which exercises every field once. */
 const SPEC_BODY = [
-  ...SEVEN_FIELD_BODY,
+  ...SEVEN_FIELD_BODY.flatMap((line) => line === '    security: false'
+    ? [line, '    kind: bug']
+    : [line]),
   'stale_docs:',
   '  - where: "context/triage.md:12"',
   '    what: "says triage has three channels"',
@@ -212,7 +221,7 @@ describe('the report a session output ends with', () => {
       ],
       skillsUsed: ['progress-hygiene'],
       blockers: [{ what: 'LINEAR_API_KEY unset', artifact: '401 Unauthorized', extras: [] }],
-      outOfScopeBugs: [{ what: '...', artifact: '...', security: false, extras: [] }],
+      outOfScopeBugs: [{ what: '...', artifact: '...', security: false, kind: 'bug', extras: [] }],
       changes: [{
         level: 'minor',
         area: 'loop',
@@ -241,6 +250,7 @@ describe('the report a session output ends with', () => {
     expect([...FINDING_KINDS]).toEqual(['gotcha', 'pattern', 'location', 'skill-suggestion']);
     expect([...FINDING_SIGNALS]).toEqual(['loud', 'silent']);
     expect([...CHANGE_LEVELS]).toEqual(['patch', 'minor', 'major', 'none']);
+    expect([...BUG_KINDS]).toEqual(['bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine']);
   });
 });
 
@@ -666,7 +676,9 @@ describe('the blockers and out_of_scope_bugs lists', () => {
   it('reports a missing security flag instead of defaulting it to false', () => {
     const reading = reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"');
 
-    expect(reading.report.outOfScopeBugs).toEqual([{ what: 'bug', artifact: null, security: null, extras: [] }]);
+    expect(reading.report.outOfScopeBugs).toEqual([
+      { what: 'bug', artifact: null, security: null, kind: 'bug', extras: [] },
+    ]);
     expect(issuePairs(reading)).toEqual(['missing-field out_of_scope_bugs[0].security']);
   });
 
@@ -675,6 +687,109 @@ describe('the blockers and out_of_scope_bugs lists', () => {
 
     expect(reading.report).toMatchObject({ blockers: [], outOfScopeBugs: [] });
     expect(issuePairs(reading)).toEqual(['unusable-field blockers[0]', 'unusable-field out_of_scope_bugs[0]']);
+  });
+});
+
+describe('an out_of_scope_bugs entry\'s kind', () => {
+  /** One bug entry with every required field, and `kindLines` after them. */
+  function bugReport(...kindLines: string[]): ReportPresent {
+    return reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"', '    security: false', ...kindLines);
+  }
+
+  it.each([...BUG_KINDS])('reads kind %s as written, with no issue', (kind) => {
+    const reading = bugReport(`    kind: ${kind}`);
+
+    expect(reading.report.outOfScopeBugs).toEqual([
+      { what: 'bug', artifact: null, security: false, kind, extras: [] },
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['an absent key', []],
+    ['a null value', ['    kind: null']],
+    ['an empty value', ['    kind:']],
+  ])('reads %s as bug, with no issue', (_label, kindLines) => {
+    const reading = bugReport(...kindLines);
+
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['gotcha', '"gotcha"'],
+    ['Bug', '"Bug"'],
+    ['own_gap', '"own_gap"'],
+    ['"  "', '"  "'],
+    ['3', 'the number 3'],
+    ['[bug]', 'a list'],
+  ])('reads kind %s as bug and reports it as unusable', (written, described) => {
+    const reading = bugReport(`    kind: ${written}`);
+
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'out_of_scope_bugs[0].kind',
+      text: `out_of_scope_bugs[0].kind is ${described}, not one of ${BUG_KINDS.join(', ')}`,
+    }]);
+  });
+
+  it('answers a kind issue after the security issue of the same entry', () => {
+    const reading = reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"', '    kind: other');
+
+    expect(issuePairs(reading)).toEqual([
+      'missing-field out_of_scope_bugs[0].security',
+      'unusable-field out_of_scope_bugs[0].kind',
+    ]);
+  });
+
+  it('leaves a finding\'s kind to its own list', () => {
+    const reading = reportOf(
+      'status: done',
+      'findings:',
+      ...findingLines('t', 'w').map((line) => line.replace('gotcha', 'own-gap')),
+      'out_of_scope_bugs:',
+      '  - what: "bug"',
+      '    security: false',
+      '    kind: gotcha',
+    );
+
+    expect(reading.report.findings[0]?.kind).toBeNull();
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(issuePairs(reading)).toEqual([
+      'unusable-field findings[0].kind',
+      'unusable-field out_of_scope_bugs[0].kind',
+    ]);
+  });
+
+  describe('in a report written on the prompt before the key existed', () => {
+    const output = readFileSync(new URL('./testdata/no-kind-report.txt', import.meta.url), 'utf8');
+    const reading = presentOf(parseReport(output));
+
+    it('holds bug entries and no kind key, read off the raw text', () => {
+      expect(output.match(/^ {2}- what:/gm)).toHaveLength(2);
+      expect(output).not.toMatch(/^ +kind:/m);
+    });
+
+    it('reads every entry as bug, with no issue', () => {
+      expect(reading.report.outOfScopeBugs).toEqual([
+        {
+          what: 'the stage step reads the retry count before the config is loaded',
+          artifact: 'retries is undefined',
+          security: false,
+          kind: 'bug',
+          extras: [],
+        },
+        {
+          what: 'a plan path with a space is passed unquoted to the shell',
+          artifact: 'No such file or directory',
+          security: true,
+          kind: 'bug',
+          extras: [],
+        },
+      ]);
+      expect(reading.issues).toEqual([]);
+    });
   });
 });
 
@@ -1151,6 +1266,7 @@ describe('the final message a real session ended with', () => {
         what: 'Early break from a `Statement.iterate()` loop in an existing query helper poisons its cached statement',
         artifact: 'bad parameter or other API misuse',
         security: false,
+        kind: 'bug',
         extras: [],
       },
     ]);
