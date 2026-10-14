@@ -139,6 +139,7 @@ function reportOf(bug: ReportBug): TaskReport {
     blockers: [],
     outOfScopeBugs: [bug],
     changes: [],
+    staleDocs: [],
     extras: [],
   };
 }

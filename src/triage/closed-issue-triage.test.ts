@@ -51,6 +51,7 @@ function report(): TaskReport {
     skillsUsed: [],
     blockers: [],
     changes: [],
+    staleDocs: [],
     outOfScopeBugs: [BUG],
     extras: [],
   };

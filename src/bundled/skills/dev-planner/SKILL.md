@@ -257,6 +257,13 @@ out_of_scope_bugs:
   - what: "bun:sqlite connection pooling"
     artifact: "SQLITE_MISUSE"
     security: false
+changes:
+  - level: minor
+    area: "store"
+    summary: "the store reads and writes through one interface"
+stale_docs:
+  - where: "context/effort-store.md:41"
+    what: "says the store has one backend"
 ```
 ````
 
@@ -271,6 +278,7 @@ Report fields:
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
 | `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
 | `changes` | list of objects | Release notes for this task's own diff (contributing to the release fragment), one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none`. The wrap-up collects these from all tasks and writes them to the fragment that `rafa release settle` processes after the branch merges. |
+| `stale_docs` | list of objects | Documentation lines the task saw that no longer match the code and that its own change did not falsify (see below). An absent list is empty with no issue |
 
 Finding entry fields:
 
@@ -292,6 +300,13 @@ Change note entry fields:
 | `level` | string | yes | How much of a release the diff is worth: `patch`, `minor`, `major` or `none` |
 | `area` | string | no | The changelog section the line groups under (e.g., `cli`, `store`) |
 | `summary` | string | yes | One line a user of the project would understand, quoted |
+
+Stale doc entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `where` | string | no | The file, with the line when known, as one string (e.g., `context/triage.md:12`). An entry without one is kept |
+| `what` | string | yes | What no longer matches. An entry without one is reported as an issue and dropped |
 
 Blocker/bug entry fields:
 

@@ -445,6 +445,7 @@ export function failedCheckReport(epic: number, failure: CheckAnswered, commit: 
       extras: [],
     })],
     changes: [],
+    staleDocs: [],
     extras: [],
   });
 }
