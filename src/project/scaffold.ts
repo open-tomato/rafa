@@ -149,6 +149,8 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '#   base:                        # the branch a PR opens into; unset is the remote default',
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
   PR_VERSION_COLLISION_LINE,
+  '# merge:',
+  `#   duplicates: ${CONFIG_DEFAULTS.mergeDuplicates}               # warn | error | allow, two entries of one file setting one key`,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,

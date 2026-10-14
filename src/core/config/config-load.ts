@@ -142,7 +142,7 @@
  * `existsSync`: `Bun.file(path).exists()` answers false for a directory.
  */
 import type { ConfigScopeName, ShadowedFile } from './config-origins.js';
-import type { Mapping } from './config-sections.js';
+import type { DuplicatesLevel, Mapping } from './config-sections.js';
 import type { ConfigFile, ConfigOverrides, ConfigSetting, ResolvedConfig } from './config.js';
 import type { Diagnostic, LoadResult, Provenance } from '@open-tomato/define-config';
 
@@ -154,7 +154,7 @@ import { createLoader } from '@open-tomato/define-config';
 import { setActiveStoreSettings } from '../../effort/store/settings.js';
 import { activeOutput } from '../output/active.js';
 
-import { describeValue, isMapping, messageOf } from './config-sections.js';
+import { describeValue, DUPLICATE_LEVELS, isMapping, messageOf } from './config-sections.js';
 import {
   CONFIG_FILE,
   ConfigError,
@@ -183,12 +183,6 @@ const RAFA_PACKAGE = '@open-tomato/rafa';
 
 /** The keys only a project's file may hold; see the module note. */
 const PROJECT_ONLY_KEYS: readonly string[] = ['flows', 'steps'];
-
-/** The levels `merge.duplicates` takes. */
-const DUPLICATE_LEVELS = ['warn', 'error', 'allow'] as const;
-
-/** How a key two entries of one file set is reported. */
-type DuplicatesLevel = typeof DUPLICATE_LEVELS[number];
 
 /** One scope to read: its layer, its directory and its lookup names, the YAML file last. */
 interface ScopePlace {

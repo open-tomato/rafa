@@ -105,6 +105,7 @@ import {
   confidence,
   CONFIG_VERSIONS,
   dayCount,
+  duplicatesLevel,
   flag,
   githubLogin,
   INJECT_MODES,
@@ -185,7 +186,8 @@ export type CoreSetting =
   | 'tiersAgents'
   | 'routing'
   | 'taskSkills'
-  | 'taskLessons';
+  | 'taskLessons'
+  | 'mergeDuplicates';
 
 /** Core's section: its package, the spec and the default of each of its settings, and no check. */
 export interface CoreSection extends ConfigSection {
@@ -294,6 +296,7 @@ const CORE_SPECS: CoreSection['settings'] = {
   routing: { key: 'routing', read: routeTable, cli: false },
   taskSkills: { key: 'task.skills', read: skillResolverName, cli: true },
   taskLessons: { key: 'task.lessons', read: lessonSwitch, cli: false },
+  mergeDuplicates: { key: 'merge.duplicates', read: duplicatesLevel, cli: false },
 };
 
 /** What each of core's settings resolves to when no layer names it; see "Defaults" above. */
@@ -340,6 +343,7 @@ const CORE_DEFAULTS: CoreSection['defaults'] = Object.freeze({
   routing: DEFAULT_ROUTING,
   taskSkills: 'planner',
   taskLessons: 'on',
+  mergeDuplicates: 'warn',
 });
 
 /**

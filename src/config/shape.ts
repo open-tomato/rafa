@@ -52,6 +52,7 @@ import type {
   ClaimsAhead,
   ClaimsStaleAfter,
   ConfigVersion,
+  DuplicatesLevel,
   InjectMode,
   LessonSwitch,
   OutputMode,
@@ -226,6 +227,11 @@ export interface ConfigShape {
   readonly task: {
     readonly skills: SkillResolverName;
     readonly lessons: LessonSwitch;
+  };
+  /** The `merge` keys. */
+  readonly merge: {
+    /** `merge.duplicates`: how two entries of one file setting one key are reported. */
+    readonly duplicates: DuplicatesLevel;
   };
   /** The `naming` keys. */
   readonly naming: {

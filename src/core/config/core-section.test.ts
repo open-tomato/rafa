@@ -75,6 +75,7 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['routing', 'routing'],
   ['taskSkills', 'task.skills'],
   ['taskLessons', 'task.lessons'],
+  ['mergeDuplicates', 'merge.duplicates'],
 ];
 
 /** The settings a flag may name, each of them core's. */
@@ -131,6 +132,7 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   tiersRafa: 'on',
   taskSkills: 'planner',
   taskLessons: 'on',
+  mergeDuplicates: 'warn',
 };
 
 /** The three map settings, whose defaults are compared by identity or by entries. */
@@ -258,5 +260,24 @@ describe('core through the section contract', () => {
     expect(refusal).toThrow(
       'dangerous.acceptStaleRefs is defined by package "core" and again by package "intruder"',
     );
+  });
+});
+
+describe('merge.duplicates', () => {
+  const spec = CORE_SECTION.settings.mergeDuplicates;
+  const at = { label: spec.key, key: spec.key };
+
+  it.each(['warn', 'error', 'allow'])('accepts %s as itself', (level) => {
+    expect(spec.read(level, at)).toEqual({ value: level, problems: [], extras: [] });
+  });
+
+  it('refuses a level outside the three, naming them', () => {
+    const reading = spec.read('fail', at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual(['merge.duplicates is "fail", expected one of: warn, error, allow']);
+  });
+
+  it('defaults to warn', () => {
+    expect(CORE_SECTION.defaults.mergeDuplicates).toBe('warn');
   });
 });

@@ -32,6 +32,7 @@ import type {
   ClaimsStaleAfter,
   ClaudeSettingSource,
   ConfigVersion,
+  DuplicatesLevel,
   InjectMode,
   LessonSwitch,
   OutputMode,
@@ -188,6 +189,11 @@ export interface RafaConfig {
   taskSkills: SkillResolverName;
   /** Whether blessed lessons join each task's prompt. `task.lessons`. */
   taskLessons: LessonSwitch;
+  /**
+   * How two entries of one config file setting one key are reported:
+   * `warn`, `error` or `allow`. `merge.duplicates`.
+   */
+  mergeDuplicates: DuplicatesLevel;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */

@@ -109,7 +109,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, tests)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -198,6 +198,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'routing',
   'taskSkills',
   'taskLessons',
+  'mergeDuplicates',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsAlwaysRun',
@@ -297,6 +298,7 @@ const DEFAULTS: RafaConfig = {
   ]),
   taskSkills: 'planner',
   taskLessons: 'on',
+  mergeDuplicates: 'warn',
   testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
   testsIntegration: [
     '**/*-integration.test.ts',
@@ -446,6 +448,8 @@ const FULL = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'merge:',
+  '  duplicates: allow',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
@@ -558,6 +562,7 @@ const FULL_VALUES: RafaConfig = {
   routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  mergeDuplicates: 'allow',
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
@@ -1220,6 +1225,11 @@ describe('parseConfigText', () => {
         'task.lessons', 'task:\n  lessons: false',
         'task.lessons is false, expected one of: on, off',
         'task:\n  lessons: off', 'taskLessons', 'off',
+      ],
+      [
+        'merge.duplicates', 'merge:\n  duplicates: fail',
+        'merge.duplicates is "fail", expected one of: warn, error, allow',
+        'merge:\n  duplicates: error', 'mergeDuplicates', 'error',
       ],
       [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
