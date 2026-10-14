@@ -514,6 +514,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     prBase: runConfig.config.prBase,
     planStub,
     args,
+    branchTemplate: runConfig.config.namingBranch,
   });
   guardRunBranch(planStub, branch, args);
   // What the loop guard holds the checkout to: its branch at the HEAD it

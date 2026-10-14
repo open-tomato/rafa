@@ -434,8 +434,9 @@ base, and where the person stands when they start the run is no part of it.
 
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
-The branch is created as `feat/<stub>` from the latest `origin/<base>`,
-where `<base>` is the branch checked out, `main` or `master`. This feature
+The branch is created as `naming.branch` names it, `feat/{stub}` by default
+with the plan's stub for `{stub}`, from the latest `origin/<base>`, where
+`<base>` is the branch checked out, `main` or `master`. This feature
 requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being

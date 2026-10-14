@@ -35,9 +35,7 @@
  * own, declared there, since an interface core left empty for them
  * would be refused by `@typescript-eslint/no-empty-object-type`.
  *
- * `naming.branch` is declared ahead of its setting: no section reads it
- * yet, and `shape.test.ts` names it as the one leaf no setting holds.
- * That test reads every other leaf back as a setting's key and every
+ * `shape.test.ts` reads every leaf back as a setting's key and every
  * setting's key as a leaf, so a key added to a section without its leaf
  * here, or the other way round, fails there.
  *
@@ -235,7 +233,7 @@ export interface ConfigShape {
   };
   /** The `naming` keys. */
   readonly naming: {
-    /** `naming.branch`: a branch name template holding `{stub}`, declared ahead of its setting. */
+    /** `naming.branch`: the template the branch `loop start` creates is named from, holding `{stub}` once. */
     readonly branch: string;
   };
 }

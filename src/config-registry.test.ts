@@ -168,6 +168,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['taskSkills', 'task.skills'],
   ['taskLessons', 'task.lessons'],
   ['mergeDuplicates', 'merge.duplicates'],
+  ['namingBranch', 'naming.branch'],
   ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
   ['testsIntegration', 'tests.integration'],
   ['testsAlwaysRun', 'tests.alwaysRun'],
@@ -206,6 +207,7 @@ const TOP = [
   'routing',
   'task',
   'merge',
+  'naming',
   'tests',
 ];
 
@@ -449,6 +451,7 @@ describe('SECTIONS', () => {
       'loop.forceWrapUp',
       'loop.wrapUp',
       'merge',
+      'naming',
       'output',
       'plan',
       'pr',

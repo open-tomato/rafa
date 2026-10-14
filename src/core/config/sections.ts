@@ -68,8 +68,13 @@ export type {
 } from './config-sections.js';
 
 export {
+  BRANCH_STUB,
+  branchFromTemplate,
+  branchTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
   directory,
   fragmentsDirectory,
+  isBranchTemplate,
   mapOf,
   RELEASE_SETTLE_MODES,
   RELEASE_STRATEGIES,

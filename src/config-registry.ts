@@ -197,6 +197,7 @@ const CORE_TAIL = [
   'taskSkills',
   'taskLessons',
   'mergeDuplicates',
+  'namingBranch',
 ] as const;
 
 /**

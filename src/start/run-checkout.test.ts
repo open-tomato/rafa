@@ -557,3 +557,24 @@ describe('settleRunCheckout against a real repository', () => {
     expect(settled.projectRoot).toBe(project);
   });
 });
+
+describe('settleRunCheckout and naming.branch', () => {
+  /** A template other than the default, so a dropped one reads as missing. */
+  const TEMPLATE = 'work/{stub}';
+
+  it('hands the template to the branch offer without --as-worktree', async () => {
+    const { seams, calls } = stubbed(ROOT, 'main');
+    await settleRunCheckout({ ...request([]), branchTemplate: TEMPLATE }, seams);
+
+    expect(calls.offers.map((offered) => offered.branchTemplate)).toEqual([TEMPLATE]);
+    expect(calls.worktrees).toEqual([]);
+  });
+
+  it('hands the template to the worktree under --as-worktree', async () => {
+    const { seams, calls } = stubbed(ROOT, 'main');
+    await settleRunCheckout({ ...request(['--as-worktree']), branchTemplate: TEMPLATE }, seams);
+
+    expect(calls.worktrees.map((added) => added.branchTemplate)).toEqual([TEMPLATE]);
+    expect(calls.offers).toEqual([]);
+  });
+});

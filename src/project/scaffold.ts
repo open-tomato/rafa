@@ -151,6 +151,8 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   PR_VERSION_COLLISION_LINE,
   '# merge:',
   `#   duplicates: ${CONFIG_DEFAULTS.mergeDuplicates}               # warn | error | allow, two entries of one file setting one key`,
+  '# naming:',
+  `#   branch: ${CONFIG_DEFAULTS.namingBranch}          # the branch loop start creates, {stub} once for the plan's stub`,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,

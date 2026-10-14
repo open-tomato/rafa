@@ -194,6 +194,11 @@ export interface RafaConfig {
    * `warn`, `error` or `allow`. `merge.duplicates`.
    */
   mergeDuplicates: DuplicatesLevel;
+  /**
+   * The template a plan's branch is named from, holding `{stub}` exactly
+   * once; `loop start` creates the branch it names. `naming.branch`.
+   */
+  namingBranch: string;
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */

@@ -90,6 +90,8 @@ import {
   requiredPrerequisite,
 } from './config-items.js';
 import {
+  branchTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
   directory,
   routeTable,
   tierPins,
@@ -187,7 +189,8 @@ export type CoreSetting =
   | 'routing'
   | 'taskSkills'
   | 'taskLessons'
-  | 'mergeDuplicates';
+  | 'mergeDuplicates'
+  | 'namingBranch';
 
 /** Core's section: its package, the spec and the default of each of its settings, and no check. */
 export interface CoreSection extends ConfigSection {
@@ -297,6 +300,7 @@ const CORE_SPECS: CoreSection['settings'] = {
   taskSkills: { key: 'task.skills', read: skillResolverName, cli: true },
   taskLessons: { key: 'task.lessons', read: lessonSwitch, cli: false },
   mergeDuplicates: { key: 'merge.duplicates', read: duplicatesLevel, cli: false },
+  namingBranch: { key: 'naming.branch', read: branchTemplate, cli: false },
 };
 
 /** What each of core's settings resolves to when no layer names it; see "Defaults" above. */
@@ -344,6 +348,7 @@ const CORE_DEFAULTS: CoreSection['defaults'] = Object.freeze({
   taskSkills: 'planner',
   taskLessons: 'on',
   mergeDuplicates: 'warn',
+  namingBranch: DEFAULT_BRANCH_TEMPLATE,
 });
 
 /**

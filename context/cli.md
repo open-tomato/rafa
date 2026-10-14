@@ -443,7 +443,10 @@ New; it replaces no earlier text. What a row or an action added to
   `main`, `master` or a detached HEAD** (`start/run-setup.ts`): when the
   working directory is checked out on `main` or `master`, or on no branch
   at all, the flag creates `feat/<stub>` from the latest `origin/<base>`,
-  where `<base>` is `pr.base` when set, else `origin/HEAD`. Without the
+  where `<base>` is `pr.base` when set, else `origin/HEAD`. The branch's
+  name is the `naming.branch` template, `feat/{stub}` by default, with the
+  plan's stub for `{stub}`; it names the worktree's branch under
+  `--as-worktree` too (`start/branch-decision.ts`). Without the
   flag a terminal asks the same question, and any other run is refused,
   naming the flag. The flag is read from the parsed line and handed into
   `start`, which resolves the plan from `.rafa/plans/` unless `plan.dir`

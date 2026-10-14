@@ -76,6 +76,7 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['taskSkills', 'task.skills'],
   ['taskLessons', 'task.lessons'],
   ['mergeDuplicates', 'merge.duplicates'],
+  ['namingBranch', 'naming.branch'],
 ];
 
 /** The settings a flag may name, each of them core's. */
@@ -133,6 +134,7 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   taskSkills: 'planner',
   taskLessons: 'on',
   mergeDuplicates: 'warn',
+  namingBranch: 'feat/{stub}',
 };
 
 /** The three map settings, whose defaults are compared by identity or by entries. */
@@ -279,5 +281,27 @@ describe('merge.duplicates', () => {
 
   it('defaults to warn', () => {
     expect(CORE_SECTION.defaults.mergeDuplicates).toBe('warn');
+  });
+});
+
+describe('naming.branch', () => {
+  const spec = CORE_SECTION.settings.namingBranch;
+  const at = { label: spec.key, key: spec.key };
+
+  it('accepts a template holding {stub} once', () => {
+    expect(spec.read('work/{stub}', at)).toEqual({ value: 'work/{stub}', problems: [], extras: [] });
+  });
+
+  it('refuses a template without {stub}, naming the rule', () => {
+    const reading = spec.read('work/main', at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual([
+      'naming.branch is "work/main", expected a branch name template holding {stub} exactly once',
+    ]);
+  });
+
+  it('defaults to feat/{stub}, and takes no flag', () => {
+    expect(CORE_SECTION.defaults.namingBranch).toBe('feat/{stub}');
+    expect(spec.cli).toBe(false);
   });
 });

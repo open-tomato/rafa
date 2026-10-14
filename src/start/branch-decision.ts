@@ -160,12 +160,18 @@
  */
 import type { GitResult, WorkingTreeStatus } from '../pr/index.js';
 
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '../core/config/sections.js';
 import { gitSaid } from '../pr/index.js';
 
 /** The remote a plan's branch is created from and tracked on. */
 export const REMOTE = 'origin';
 
-/** What every plan branch is called: this, and the plan's stub. */
+/**
+ * What a plan branch is called under the default `naming.branch`,
+ * `feat/{stub}`: this, and the plan's stub. `loop start` names the
+ * branch it creates from the template ({@link branchNameFor}); the
+ * readers of claim and plan branches still match this prefix.
+ */
 export const BRANCH_PREFIX = 'feat/';
 
 /** The indent a refusal's listed lines carry, as `src/pr/merge.ts` indents its own. */
@@ -226,9 +232,13 @@ function hasNoBranch(standing: RunStanding | undefined): boolean {
   return (standing ?? DEFAULT_STANDING) === 'no-branch';
 }
 
-/** The branch a plan with this stub runs on. */
-export function branchNameFor(planStub: string): string {
-  return `${BRANCH_PREFIX}${planStub}`;
+/**
+ * The branch a plan with this stub runs on: `template`, the
+ * `naming.branch` setting, with its `{stub}` replaced by the stub.
+ * `feat/{stub}`, the setting's default, when left out.
+ */
+export function branchNameFor(planStub: string, template: string = DEFAULT_BRANCH_TEMPLATE): string {
+  return branchFromTemplate(template, planStub);
 }
 
 /** The ref `branch` is read at locally. */
@@ -290,6 +300,11 @@ export interface BranchSituation {
   readonly createBranch: boolean;
   /** True when a terminal can answer the question. */
   readonly canAsk: boolean;
+  /**
+   * `naming.branch`, the template the plan's branch is named from
+   * ({@link branchNameFor}); `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
   /** True when `feat/<stub>` is a local branch ({@link localRef}). */
   readonly localBranch: boolean;
   /** True when `feat/<stub>` is a remote-tracking ref ({@link remoteTrackingRef}). */
@@ -363,7 +378,7 @@ export function readBranchOffer(situation: BranchSituation): BranchOffer {
   const stub = situation.planStub?.trim() ?? '';
   if (stub === '') return standAside('no-plan-stub');
 
-  const branch = branchNameFor(stub);
+  const branch = branchNameFor(stub, situation.branchTemplate);
   const route = routeFor(situation);
   if (situation.createBranch) return Object.freeze({ kind: 'take', branch, route });
   if (!situation.canAsk) return standAside('no-terminal');

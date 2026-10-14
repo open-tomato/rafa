@@ -13,7 +13,12 @@ import type { Reader, ValueAt } from './config-sections.js';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  BRANCH_STUB,
+  branchFromTemplate,
+  branchTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
   directory,
+  isBranchTemplate,
   mapOf,
   releaseFile,
   routeTable,
@@ -180,5 +185,52 @@ describe('routeTable', () => {
     expect(routeTable('x', at).problems).toEqual([
       'F: routing is "x", expected a mapping of names to false or an agent name',
     ]);
+  });
+});
+
+describe('branchTemplate', () => {
+  /** Where every template case reads its value. */
+  const at: ValueAt = { label: 'F: naming.branch', key: 'naming.branch' };
+
+  /** The refusal's tail, spelled. */
+  const EXPECTED = 'expected a branch name template holding {stub} exactly once';
+
+  it('accepts a template holding {stub} once, kept as written', () => {
+    for (const template of ['feat/{stub}', '{stub}', 'work/{stub}-wip', ' team/{stub}']) {
+      expect(branchTemplate(template, at)).toEqual({ value: template, problems: [], extras: [] });
+    }
+  });
+
+  it('refuses a template with no {stub}, naming the value', () => {
+    expect(branchTemplate('feat/main', at).problems).toEqual([`F: naming.branch is "feat/main", ${EXPECTED}`]);
+    expect(branchTemplate('', at).problems).toEqual([`F: naming.branch is "", ${EXPECTED}`]);
+    expect(branchTemplate('feat/{Stub}', at).value).toBeUndefined();
+  });
+
+  it('refuses a template holding {stub} twice', () => {
+    expect(branchTemplate('{stub}/{stub}', at).problems).toEqual([`F: naming.branch is "{stub}/{stub}", ${EXPECTED}`]);
+  });
+
+  it('refuses a value that is no string', () => {
+    expect(branchTemplate(['feat/{stub}'], at).problems).toEqual([`F: naming.branch is a list, ${EXPECTED}`]);
+    expect(branchTemplate(null, at).value).toBeUndefined();
+    expect(isBranchTemplate(7)).toBe(false);
+  });
+
+  it('defaults to feat/{stub}, which the reader accepts', () => {
+    expect(BRANCH_STUB).toBe('{stub}');
+    expect(DEFAULT_BRANCH_TEMPLATE).toBe('feat/{stub}');
+    expect(isBranchTemplate(DEFAULT_BRANCH_TEMPLATE)).toBe(true);
+  });
+});
+
+describe('branchFromTemplate', () => {
+  it('puts the stub where {stub} stands', () => {
+    expect(branchFromTemplate('feat/{stub}', 'rafa-118')).toBe('feat/rafa-118');
+    expect(branchFromTemplate('work/{stub}-wip', 'x')).toBe('work/x-wip');
+  });
+
+  it('takes the stub literally, a replacement pattern in it included', () => {
+    expect(branchFromTemplate('feat/{stub}', 'a$&b')).toBe('feat/a$&b');
   });
 });

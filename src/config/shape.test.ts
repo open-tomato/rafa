@@ -25,14 +25,6 @@ const ROOT = resolve(import.meta.dir, '../..');
 
 const INDEX = resolve(ROOT, 'src/config/index.ts');
 
-/**
- * Leaves the shape declares ahead of their setting. `naming.branch`
- * joins core's section later in plan rafa-118; when it does, the test
- * below that keeps this list off the registry fails, and the key leaves
- * this list and the note in `shape.ts` with it.
- */
-const AHEAD_OF_SETTING: readonly string[] = ['naming.branch'];
-
 /** A value its reader accepts, for each setting whose default is null and so absent from `defaults`. */
 const SAMPLES: Readonly<Record<string, unknown>> = {
   'hub.url': 'https://hub.example.org',
@@ -228,11 +220,8 @@ describe('the nested file shape against the registry', () => {
     const leaves = shapeLeaves(program);
     expect(leaves).toContain('board.project.writePauseMs');
     expect(leaves).toContain('routing');
-    expect(leaves).toEqual([...settingKeys, ...AHEAD_OF_SETTING].sort());
-  });
-
-  test('a key the shape holds ahead of its setting is no setting\'s key yet', () => {
-    expect(settingKeys.filter((key) => AHEAD_OF_SETTING.includes(key))).toEqual([]);
+    expect(leaves).toContain('naming.branch');
+    expect(leaves).toEqual([...settingKeys].sort());
   });
 
   test('each setting whose default is null has a sample, and its reader accepts it', () => {

@@ -109,7 +109,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -199,6 +199,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'taskSkills',
   'taskLessons',
   'mergeDuplicates',
+  'namingBranch',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsAlwaysRun',
@@ -299,6 +300,7 @@ const DEFAULTS: RafaConfig = {
   taskSkills: 'planner',
   taskLessons: 'on',
   mergeDuplicates: 'warn',
+  namingBranch: 'feat/{stub}',
   testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
   testsIntegration: [
     '**/*-integration.test.ts',
@@ -450,6 +452,8 @@ const FULL = [
   '  lessons: off',
   'merge:',
   '  duplicates: allow',
+  'naming:',
+  '  branch: "work/{stub}"',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
@@ -563,6 +567,7 @@ const FULL_VALUES: RafaConfig = {
   taskSkills: 'tag',
   taskLessons: 'off',
   mergeDuplicates: 'allow',
+  namingBranch: 'work/{stub}',
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
@@ -1230,6 +1235,11 @@ describe('parseConfigText', () => {
         'merge.duplicates', 'merge:\n  duplicates: fail',
         'merge.duplicates is "fail", expected one of: warn, error, allow',
         'merge:\n  duplicates: error', 'mergeDuplicates', 'error',
+      ],
+      [
+        'naming.branch', 'naming:\n  branch: feat/{stub}-{stub}',
+        'naming.branch is "feat/{stub}-{stub}", expected a branch name template holding {stub} exactly once',
+        'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
       ],
       [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
