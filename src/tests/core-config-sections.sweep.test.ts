@@ -12,8 +12,8 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 
 import '../config-registry.js';
 import { textImports } from '../../scripts/survey/import-graph.js';
-import { loadConfig } from '../core/config/config-load.js';
-import { activeSettings, EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '../core/config/section.js';
+import { activeSettings, EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 
 import { SWEEP_TIMEOUT } from './sweep-timeout.js';
 

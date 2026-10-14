@@ -57,7 +57,7 @@ function readAs(setting: ConfigSetting, raw: unknown) {
 
 /** Holds `setting` to accepting `raw` as itself, with nothing to report. */
 function expectAccepted(setting: ConfigSetting, raw: unknown): void {
-  expect(readAs(setting, raw)).toEqual({ value: raw, problems: [], extras: [] });
+  expect(readAs(setting, raw)).toEqual({ value: raw as never, problems: [], extras: [] });
 }
 
 /** Holds `setting` to refusing `raw` with exactly `problem`, and no value. */
@@ -83,8 +83,8 @@ describe('the six keys', () => {
   });
 
   it.each(SIX)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
-    expect(CONFIG_DEFAULTS[setting]).toEqual(value);
-    expect(resolveConfig().config[setting]).toEqual(value);
+    expect(CONFIG_DEFAULTS[setting]).toEqual(value as never);
+    expect(resolveConfig().config[setting]).toEqual(value as never);
     expect(resolveConfig().sources[setting]).toBe('default');
   });
 
