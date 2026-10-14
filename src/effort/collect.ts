@@ -182,8 +182,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { activeOutput } from '../core/output/index.js';
 

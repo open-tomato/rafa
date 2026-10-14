@@ -112,8 +112,8 @@ import type { BinPathReading } from '../project/bin-path.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { BuildLines } from '../runtime/install.js';
 
+import { SETTINGS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { SETTINGS } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { messageOf } from '../core/config/sections.js';
 import { isPidAlive } from '../core/loop/index.js';

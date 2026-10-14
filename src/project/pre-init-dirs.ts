@@ -46,7 +46,8 @@ import type { RafaConfig } from '../core/config/index.js';
 
 import { normalize, sep } from 'node:path';
 
-import { CONFIG_DEFAULTS, CONFIG_FILE } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { CONFIG_FILE } from '../core/config/index.js';
 
 /** The two settings this reading judges. */
 export type PreInitSetting = 'planDir' | 'specsDir';

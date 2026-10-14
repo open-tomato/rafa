@@ -1526,8 +1526,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
+    ['../config-registry.js', ['SETTINGS']],
     ['../core/command/index.js', ['CommandExit']],
-    ['../core/config/index.js', ['SETTINGS']],
     ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
     ['../core/loop/index.js', ['isPidAlive']],

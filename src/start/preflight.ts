@@ -360,8 +360,8 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
 import { effortStoreDir } from '../effort/store/location.js';

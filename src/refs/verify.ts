@@ -178,7 +178,7 @@ import type { GitRunner } from '../core/git/index.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { GLOBAL_FLAGS } from '../cli/help.js';
 import { pluralOf } from '../cli/registry.js';
-import { SETTINGS } from '../core/config/index.js';
+import { SETTINGS } from '../config-registry.js';
 import { gitSaid } from '../core/git/index.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
