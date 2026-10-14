@@ -17,7 +17,7 @@
  * as silence, leaves the setting at its default.
  */
 import type { ConfigSetting } from './config-schema.js';
-import type { ConfigOverrides } from './config.js';
+import type { ConfigLayer, ConfigOverrides } from './config.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -122,7 +122,7 @@ describe('board.relationships validation', () => {
 
   it('leaves the setting at its default when the file value is refused and read as silence', () => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, boardRelationships: readAs('sub-issues').value }, extras: [], path: PATH };
+    const file = { values: { ...values, boardRelationships: readAs('sub-issues').value ?? undefined } as ConfigLayer, extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.boardRelationships).toBe('labels');

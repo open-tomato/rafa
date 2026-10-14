@@ -122,7 +122,7 @@ export const CORE_MOVES: readonly CoreMove[] = [
   {
     from: 'src/config-schema.ts',
     subject: 'config',
-    tests: ['src/config-schema-board.test.ts', 'src/config-schema.test.ts'],
+    tests: ['src/config-schema-board.test.ts'],
     to: 'src/core/config/config-schema.ts',
   },
   {
