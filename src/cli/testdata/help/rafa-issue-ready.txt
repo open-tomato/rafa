@@ -2,7 +2,7 @@ rafa issue ready — mark an issue spec:ready once its author and its body check
   out
 
 Usage:
-  rafa issue ready <n> [--yes] [--no-hint]
+  rafa issue ready <n> [--yes] [--dry-run] [--no-hint]
 
 Description:
   Reads the issue on the GitHub board, refuses one opened by an account without
@@ -15,19 +15,24 @@ Description:
   checks refuse without it; without a terminal and without `--yes` it prints
   both readings and adds no label. A run that marks the issue, or finds it
   marked already, ends by naming the one step that follows, which `--no-hint`
-  turns off. With `--output=json` the report is the data of the terminal result
-  event.
+  turns off. `--dry-run` makes every check and prints both readings, asking
+  nothing and writing nothing whatever the terminal, exits 2 on a check that
+  refuses, and is refused beside `--yes`. With `--output=json` the report is the
+  data of the terminal result event.
 
 Arguments:
   n   string, required
       The issue number on the GitHub board.
 
 Flags:
-  --yes    boolean
+  --yes       boolean
       Marks the issue spec:ready without asking, once its author and its body
       check out; a check that refuses still refuses. Needed where standard input
       is no terminal.
-  --hint   boolean, default true
+  --dry-run   boolean
+      Prints both readings and writes nothing, asking no question whatever the
+      terminal; a check that refuses still exits 2. Not with --yes.
+  --hint      boolean, default true
       Ends by naming the one step that follows, asking it where there is a
       terminal to answer on; `--no-hint` reads nothing and prints nothing.
 
@@ -37,6 +42,9 @@ Examples:
   rafa issue ready 57 --yes
       Checks #57 and marks it spec:ready with no question, from a script or an
       agent.
+  rafa issue ready 57 --dry-run
+      Checks #57 and reads its status in one line, from a script, an agent or
+      CI, marking nothing.
 
 Outputs:
   text, json
