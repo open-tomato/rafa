@@ -5,6 +5,8 @@
  * one `ConfigSection`, package `release`, and the `declare module` below
  * adds {@link PrSettings}, {@link ReleaseSettings} and
  * {@link DangerousReleaseSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below at the places the two sections always sat,
  * and the `dangerous` key right after `dangerous.acceptStaleRefs`, so
@@ -164,6 +166,35 @@ import {
 declare module './core/config/config-schema.js' {
   /** The `release` section's fields, added to core's. */
   interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `pr` and `release` keys a file writes, both namespaces this section's alone. */
+  interface ConfigShape {
+    readonly pr: {
+      readonly provider: PrProvider;
+      readonly mergeMethod: MergeMethod;
+      readonly base: string;
+      readonly resolveBudget: number;
+      readonly versionCollision: VersionCollisionMode;
+    };
+    readonly release: {
+      readonly enabled: ReleaseEnabled;
+      readonly versionFile: string;
+      readonly changelog: string;
+      readonly heading: string;
+      readonly fragments: string;
+      readonly strategy: ReleaseStrategy;
+      readonly settle: ReleaseSettleMode;
+      readonly tag: ReleaseTagMode;
+      readonly publishCommand: string;
+    };
+  }
+
+  /** `dangerous.acceptVersionCollision`, added to core's consents. */
+  interface DangerousShape {
+    readonly acceptVersionCollision: boolean;
+  }
 }
 
 /** The `pr` section's settings, resolved. */

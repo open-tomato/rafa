@@ -5,6 +5,8 @@
  * {@link WRAP_UP_SECTION} hands it to core as one `ConfigSection`,
  * package `wrap-up`, and the `declare module` below adds
  * {@link WrapUpSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `loop.worktreeDir`, so the order
  * settings are reported in holds the `loop` section together.
@@ -53,6 +55,15 @@ import { refused } from './core/config/sections.js';
 declare module './core/config/config-schema.js' {
   /** The `wrap-up` section's fields, added to core's. */
   interface RafaConfig extends WrapUpSettings {}
+}
+
+declare module './config/shape.js' {
+  /** `loop.wrapUp.retries`, added to the shared namespace. */
+  interface LoopShape {
+    readonly wrapUp: {
+      readonly retries: WrapUpRetries;
+    };
+  }
 }
 
 /** The fewest retry sessions `loop.wrapUp.retries` accepts as a number. */

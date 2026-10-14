@@ -4,6 +4,8 @@
  * spec and its reader. {@link ISSUES_SECTION} hands them to core as one
  * `ConfigSection`, package `issues`, and the `declare module` below adds
  * {@link IssuesConfigSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `logger` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
@@ -53,6 +55,23 @@ import { listedCodes } from './errors/rafa-codes.js';
 declare module './core/config/config-schema.js' {
   /** The `issues` section's fields, added to core's. */
   interface RafaConfig extends IssuesConfigSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `issues` keys a file writes. */
+  interface ConfigShape {
+    readonly issues: {
+      readonly titles: {
+        readonly bug: string;
+        readonly summaryMax: number;
+      };
+      readonly environments: readonly string[];
+      readonly vocabulary: {
+        readonly modules: readonly string[];
+        readonly actions: readonly string[];
+      };
+    };
+  }
 }
 
 /** The `issues` settings. */

@@ -6,6 +6,8 @@
  * handed. {@link HUB_SECTION} hands them to core as one `ConfigSection`,
  * package `hub`, with {@link hubUrlProblems} as its check, and the
  * `declare module` below adds {@link HubSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread {@link HUB_DEFAULTS} and {@link HUB_SETTINGS} right after
  * `effort.sync`, the setting they serve, as `config-schema-release.ts`'s
@@ -83,6 +85,17 @@ import { describeValue, refused, text } from './core/config/sections.js';
 declare module './core/config/config-schema.js' {
   /** The `hub` section's fields, added to core's. */
   interface RafaConfig extends HubSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `hub` keys a file writes. */
+  interface ConfigShape {
+    readonly hub: {
+      readonly url: string;
+      readonly tokenSecret: string;
+      readonly timeout: HubTimeout;
+    };
+  }
 }
 
 /** The shortest `hub.timeout` accepted, in seconds. */

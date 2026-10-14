@@ -6,6 +6,8 @@
  * {@link BOARD_PROJECT_SECTION} hands them to core as one
  * `ConfigSection`, package `board-project`, and the `declare module`
  * below adds {@link BoardProjectLimitSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `board.project.number`, so the
  * order settings are reported in holds the `board.project` section
@@ -74,6 +76,17 @@ import { refused } from './core/config/sections.js';
 declare module './core/config/config-schema.js' {
   /** The `board-project` section's fields, added to core's. */
   interface RafaConfig extends BoardProjectLimitSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `board.project` limits a file writes, added to core's two keys. */
+  interface BoardProjectShape {
+    readonly retries: BoardProjectRetries;
+    readonly retryWaitSeconds: number;
+    readonly progressSeconds: BoardProjectProgressSeconds;
+    readonly writeBatchSize: number;
+    readonly writePauseMs: number;
+  }
 }
 
 /** The fewest tries after a failure `board.project.retries` accepts as a number. */
