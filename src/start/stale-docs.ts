@@ -57,6 +57,20 @@
  * then of local paths under the project root, the checkout and the home
  * directory. The rows are stored as reported, as every report's are.
  *
+ * ## Ticking a doc-update plan's line
+ *
+ * A plan `rafa docs plan` wrote, titled `chore(doc-update)`, holds one
+ * task per open line of the release's stale-docs issues. When such a
+ * task ends `done`, its line is ticked in the issue the plan's
+ * `rafa:plan` block names, through `tickStaleDocLine`, over the same
+ * once-resolved tracker; a task that ended blocked, failed or
+ * interrupted leaves its line open. The plan is read from `planPath`
+ * once, on the first task ended `done`; a run handed no `planPath`, a
+ * plan of any other title, or a task whose text names no line ticks
+ * nothing. A doc-update plan naming no issue, an issue no longer open
+ * and a failed call are each one warning; a line the issue no longer
+ * holds unticked is one note, since a person may have settled it.
+ *
  * ## The print after the last task
  *
  * A line answered `kept` is collected, once per text, and
@@ -79,7 +93,12 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RafaConfig } from '../core/config/index.js';
-import type { StaleDocEntry, StaleDocLineResult, StaleDocsTracker } from '../docs/release-issue.js';
+import type {
+  StaleDocEntry,
+  StaleDocLineResult,
+  StaleDocsTracker,
+  StaleDocTickResult,
+} from '../docs/release-issue.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
 import type { StaleDocsWriteResult } from '../effort/store/stale-docs.js';
 import type { IssueRef } from '../ports/index.js';
@@ -96,10 +115,14 @@ import { resolve as resolvePath } from 'node:path';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import {
   addStaleDocLine,
+  DOC_UPDATE_TITLE,
+  docUpdateLineText,
   staleDocLineText,
   staleDocsVersion,
+  tickStaleDocLine,
 } from '../docs/release-issue.js';
 import { writeStaleDocs } from '../effort/store/stale-docs.js';
 import { createGitRunner } from '../pr/index.js';
@@ -146,6 +169,8 @@ export interface StartStaleDocsOptions {
   readonly repoRoot: string;
   /** The run's checkout, where git reads the forecast and the version file is read. */
   readonly checkout: string;
+  /** The plan the run executes, read for a doc-update plan's issue. No line is ticked when left out. */
+  readonly planPath?: string;
   /** The run's resolved config. */
   readonly config: StartStaleDocsConfig;
   /** The home directory lines are redacted of. `homedir()` when left out. */
@@ -170,19 +195,22 @@ export interface StaleDocsTaskInput {
   readonly outcome: FindingOutcome;
 }
 
-/** What the handler did with one doc task's report. */
+/** What the handler did with one task: the doc task's report, a doc-update task's line, or both. */
 export interface StaleDocsHandling {
-  /** What the `unsettled` write did, or null when the store threw. */
+  /** What the `unsettled` write did, or null when the store threw or the task is no doc task. */
   readonly stored: StaleDocsWriteResult | null;
   /** What became of each entry's line, in the report's order. */
   readonly lines: readonly StaleDocLineResult[];
+  /** What ticking a doc-update task's line did, or null when the task is none. */
+  readonly ticked: StaleDocTickResult | null;
 }
 
 /** The loop's handler of the doc task's report, one per run. */
 export interface StartStaleDocs {
   /**
-   * Handles one task's report: null for any task but a `docs=repair`
-   * task ended `done` with an entry. Never rejects; see the module note.
+   * Handles one task: null for any task but a `docs=repair` task ended
+   * `done` with an entry, or a doc-update plan's task ended `done`.
+   * Never rejects; see the module note.
    */
   readonly afterTask: (input: StaleDocsTaskInput) => Promise<StaleDocsHandling | null>;
   /** Prints the kept lines once, under one heading, and answers what it printed. */
@@ -277,6 +305,38 @@ function resultLine(result: StaleDocLineResult, text: string): { readonly warn: 
   }
 }
 
+/** What a doc-update plan names, or null for a plan of any other title. */
+interface DocUpdatePlan {
+  /** The issue its `rafa:plan` block names, or null when it names none. */
+  readonly issue: string | null;
+}
+
+/** A Markdown heading naming a plan's title. */
+const PLAN_TITLE = /^# Plan:[ \t]*(.*?)[ \t]*\r?$/m;
+
+/** The doc-update plan at `planPath`, or null for any other plan; throws for a plan that cannot be read. */
+function readDocUpdatePlan(planPath: string): DocUpdatePlan | null {
+  const markdown = readFileSync(planPath, 'utf8');
+  if (PLAN_TITLE.exec(markdown)?.[1] !== DOC_UPDATE_TITLE) return null;
+  return { issue: parsePlan(markdown).header.issue };
+}
+
+/** The line one tick tells the operator, and whether it is a warning. */
+function tickLine(result: StaleDocTickResult, text: string): { readonly warn: boolean; readonly line: string } {
+  switch (result.action) {
+    case 'ticked':
+      return { warn: false, line: `ticked in ${refName(result.ref)}: ${text}` };
+    case 'absent':
+      return { warn: false, line: `${refName(result.ref)} no longer holds the line unticked: ${text}` };
+    case 'no-issue':
+      return { warn: true, line: `not ticked, no open stale-docs issue ${result.issue}: ${text}` };
+    case 'untracked':
+      return { warn: false, line: `not ticked (${result.reason}): ${text}` };
+    case 'failed':
+      return { warn: true, line: `not ticked: ${result.problem}` };
+  }
+}
+
 /** How a line names an issue: its URL, or its kind and id when it has none. */
 function refName(ref: IssueRef): string {
   return ref.url ?? `${ref.kind} issue ${ref.externalId}`;
@@ -290,6 +350,7 @@ export function createStartStaleDocs(options: StartStaleDocsOptions): StartStale
   const kept = new Map<string, string>();
   let version: string | null = null;
   let tracker: Promise<StaleDocsTracker | null> | null = null;
+  let docUpdatePlan: DocUpdatePlan | null | undefined;
 
   const versionOnce = (): string => {
     version ??= (options.readVersion ?? (() => readStaleDocsVersion(options)))();
@@ -336,7 +397,35 @@ export function createStartStaleDocs(options: StartStaleDocsOptions): StartStale
     return result;
   };
 
-  const handle = async (input: StaleDocsTaskInput): Promise<StaleDocsHandling | null> => {
+  const docUpdatePlanOnce = (): DocUpdatePlan | null => {
+    if (docUpdatePlan !== undefined) return docUpdatePlan;
+    try {
+      docUpdatePlan = options.planPath === undefined
+        ? null
+        : readDocUpdatePlan(options.planPath);
+    } catch (error) {
+      activeOutput().warn(`${INDENT}${LINE_PREFIX}the plan was not read for its stale-docs issue: ${redact(messageOf(error))}`);
+      docUpdatePlan = null;
+    }
+    if (docUpdatePlan?.issue === null) {
+      activeOutput().warn(`${INDENT}${LINE_PREFIX}the ${DOC_UPDATE_TITLE} plan names no issue, so no line is ticked`);
+    }
+    return docUpdatePlan;
+  };
+
+  const tick = async (input: StaleDocsTaskInput): Promise<StaleDocTickResult | null> => {
+    if (input.outcome !== 'done') return null;
+    const issue = docUpdatePlanOnce()?.issue ?? null;
+    const text = docUpdateLineText(input.dispatch.taskText);
+    if (issue === null || text === null) return null;
+    const result = await tickStaleDocLine({ tracker: await resolveOnce(), issue, text });
+    const { warn, line } = tickLine(result, text);
+    if (warn) activeOutput().warn(`${INDENT}${LINE_PREFIX}${line}`);
+    else activeOutput().info(`${INDENT}${LINE_PREFIX}${line}`);
+    return result;
+  };
+
+  const repair = async (input: StaleDocsTaskInput): Promise<Omit<StaleDocsHandling, 'ticked'> | null> => {
     if (!isDocTaskDone(input)) return null;
     const reading = parseReport(input.dispatch.output);
     if (!reading.present || reading.report.staleDocs.length === 0) return null;
@@ -351,6 +440,13 @@ export function createStartStaleDocs(options: StartStaleDocsOptions): StartStale
       lines.push(await addLine({ where, what: redact(each.what) }));
     }
     return { stored, lines };
+  };
+
+  const handle = async (input: StaleDocsTaskInput): Promise<StaleDocsHandling | null> => {
+    const ticked = await tick(input);
+    const repaired = await repair(input);
+    if (ticked === null && repaired === null) return null;
+    return { stored: repaired?.stored ?? null, lines: repaired?.lines ?? [], ticked };
   };
 
   return {

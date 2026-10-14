@@ -1361,6 +1361,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../core/config/sections.js', ['messageOf']],
     ['../../core/plan/index.js', ['plansDirAt']],
     ['../../docs/open-lines.js', ['readOpenStaleDocLines']],
+    ['../../docs/release-issue.js', ['DOC_UPDATE_TASK_PREFIX', 'DOC_UPDATE_TITLE']],
     ['../../utils/plan-stamp.js', ['isStampableStub', 'planStampLine']],
     ['../../utils/tracker.js', ['escapeBlockerText']],
     ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],

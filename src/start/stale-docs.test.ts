@@ -37,8 +37,16 @@ import {
 } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { renderDocUpdatePlan } from '../commands/docs/plan.js';
 import { setActiveOutput } from '../core/output/index.js';
-import { NEXT_VERSION, NO_EDITABLE_TRACKER, STALE_DOCS_MARKER, staleDocsTitle } from '../docs/release-issue.js';
+import { parsePlan } from '../core/plan/index.js';
+import {
+  addStaleDocLine,
+  NEXT_VERSION,
+  NO_EDITABLE_TRACKER,
+  STALE_DOCS_MARKER,
+  staleDocsTitle,
+} from '../docs/release-issue.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
@@ -456,6 +464,97 @@ describe('a failure never stops the run', () => {
     expect(lines.warn).toEqual([
       '   Stale docs: nothing more was done with the doc task\'s report: the version file is a directory',
     ]);
+  });
+});
+
+describe('ticking a doc-update plan\'s line', () => {
+  const PAGE_LINE = `${PAGE[0]}: ${PAGE[1]}`;
+  const README_LINE = `${README[0]}: ${README[1]}`;
+
+  /** A root whose issue holds both lines, its doc-update plan written from them, and the plan's tasks. */
+  async function docUpdateRun(extra: Partial<StartStaleDocsOptions> = {}): Promise<{
+    readonly root: string;
+    readonly options: StartStaleDocsOptions;
+    readonly tasks: readonly StaleDocsTaskInput['dispatch'][];
+  }> {
+    const { root, options: base } = fixture();
+    const tracker = createLocalTracker({ issuesDir: localIssuesDir(root), fallbackReason: null, now: CLOCK });
+    const created = await addStaleDocLine({ tracker, version: VERSION, entry: { where: PAGE[0], what: PAGE[1] } });
+    await addStaleDocLine({ tracker, version: VERSION, entry: { where: README[0], what: README[1] } });
+    if (created.action !== 'created') throw new Error(`seeding answered ${created.action}`);
+    const markdown = renderDocUpdatePlan({ issue: created.ref.externalId, lines: [PAGE_LINE, README_LINE] });
+    const planPath = join(root, 'PLAN-doc-update.md');
+    writeFileSync(planPath, markdown, 'utf8');
+    const tasks = parsePlan(markdown).tasks.map((task, index) => ({
+      sessionId: `doc-update-${index}`,
+      taskText: task.text,
+      output: sessionOutput(undefined),
+      declaration: task.declaration,
+    }));
+    return { root, options: { ...base, planPath, ...extra }, tasks };
+  }
+
+  /** The one marked issue's body. */
+  async function bodyOf(root: string): Promise<string> {
+    const issues = await markedIssues(root);
+    expect(issues).toHaveLength(1);
+    return issues[0]?.body ?? '';
+  }
+
+  it('ticks a done task\'s line in the issue the plan names, the other line left open', async () => {
+    const lines = captureLines();
+    const { root, options, tasks } = await docUpdateRun();
+
+    const handled = await createStartStaleDocs(options).afterTask({ planStub: 'rafa-1-doc-update', dispatch: tasks[0]!, outcome: 'done' });
+
+    expect(handled?.ticked?.action).toBe('ticked');
+    expect(handled?.lines).toEqual([]);
+    const body = await bodyOf(root);
+    expect(body).toContain(`- [x] ${PAGE_LINE}`);
+    expect(body).toContain(`- [ ] ${README_LINE}`);
+    expect(lines.info.some((line) => line.includes('ticked in local issue') && line.endsWith(PAGE_LINE))).toBe(true);
+    expect(lines.warn).toEqual([]);
+  });
+
+  it.each(['blocked', 'failed'] as const)('leaves the line of a task that ended %s open', async (outcome) => {
+    const { root, options, tasks } = await docUpdateRun();
+    const before = await bodyOf(root);
+
+    expect(await createStartStaleDocs(options).afterTask({ planStub: 'rafa-1-doc-update', dispatch: tasks[0]!, outcome })).toBeNull();
+
+    expect(await bodyOf(root)).toBe(before);
+    expect(before).toContain(`- [ ] ${PAGE_LINE}`);
+  });
+
+  it('answers absent and writes nothing for a line no longer in the body', async () => {
+    const lines = captureLines();
+    const { root, options, tasks } = await docUpdateRun();
+    const issuesDir = localIssuesDir(root);
+    const tracker = createLocalTracker({ issuesDir, fallbackReason: null, now: CLOCK });
+    const [issue] = await markedIssues(root);
+    if (issue === undefined) throw new Error('no issue was seeded');
+    await tracker.edit?.(issue.ref, { body: issue.body.replace(`- [ ] ${PAGE_LINE}\n`, '') });
+    const before = await bodyOf(root);
+
+    const handled = await createStartStaleDocs(options).afterTask({ planStub: 'rafa-1-doc-update', dispatch: tasks[0]!, outcome: 'done' });
+
+    expect(handled?.ticked?.action).toBe('absent');
+    expect(await bodyOf(root)).toBe(before);
+    expect(before).not.toContain(PAGE_LINE);
+    expect(lines.warn).toEqual([]);
+    expect(lines.info.some((line) => line.includes('no longer holds the line unticked'))).toBe(true);
+  });
+
+  it('ticks nothing for a plan of any other title, the same task done', async () => {
+    const { root, options, tasks } = await docUpdateRun();
+    const other = join(root, 'PLAN-other.md');
+    writeFileSync(other, '# Plan: feat(other)\n\n```rafa:plan\nissue: "1"\n```\n\n- [ ] Wire it\n', 'utf8');
+    const before = await bodyOf(root);
+
+    const handler = createStartStaleDocs({ ...options, planPath: other });
+
+    expect(await handler.afterTask({ planStub: 'rafa-1-other', dispatch: tasks[0]!, outcome: 'done' })).toBeNull();
+    expect(await bodyOf(root)).toBe(before);
   });
 });
 

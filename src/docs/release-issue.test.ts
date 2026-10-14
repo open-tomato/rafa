@@ -20,10 +20,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
+import { escapeBlockerText } from '../utils/tracker.js';
 
 import {
   addStaleDocLine,
   bodyHoldsLine,
+  DOC_UPDATE_TASK_PREFIX,
+  docUpdateLineText,
   NEXT_VERSION,
   NO_EDITABLE_TRACKER,
   STALE_DOCS_MARKER,
@@ -32,6 +35,7 @@ import {
   staleDocsBody,
   staleDocsTitle,
   staleDocsVersion,
+  tickStaleDocLine,
 } from './release-issue.js';
 
 const scratch: string[] = [];
@@ -324,5 +328,126 @@ describe('addStaleDocLine when a call rejects', () => {
 
     expect(created.action === 'failed' && created.problem).toBe('creating the stale-docs issue failed: refused');
     expect(edited.action === 'failed' && edited.problem).toBe('editing the stale-docs issue failed: refused');
+  });
+});
+
+describe('docUpdateLineText', () => {
+  it('reads the escaped line back off a doc-update task, as its issue holds it', () => {
+    const line = 'a.md:3: says <!-- old --> and\nmore';
+    expect(docUpdateLineText(`${DOC_UPDATE_TASK_PREFIX}${escapeBlockerText(line)}`)).toBe(line);
+  });
+
+  it('reads no line off a task of any other shape, or one naming none', () => {
+    expect(docUpdateLineText('Wire the loop')).toBeNull();
+    expect(docUpdateLineText(`${DOC_UPDATE_TASK_PREFIX}  `)).toBeNull();
+  });
+});
+
+describe('tickStaleDocLine over a local tracker', () => {
+  /** A tracker holding one issue with the page and the other line, and that issue's id. */
+  async function seeded(): Promise<{ tracker: Tracker; issue: string }> {
+    const tracker = localTracker();
+    const first = await addStaleDocLine({ tracker, version: '1.4.0', entry: PAGE });
+    await addStaleDocLine({ tracker, version: '1.4.0', entry: OTHER });
+    if (first.action !== 'created') throw new Error(`seeding answered ${first.action}`);
+    return { tracker, issue: first.ref.externalId };
+  }
+
+  it('ticks the done task\'s line, leaving the other line open', async () => {
+    const { tracker, issue } = await seeded();
+
+    const result = await tickStaleDocLine({ tracker, issue, text: staleDocLineText(PAGE) });
+
+    expect(result.action).toBe('ticked');
+    const [held] = await markedIssues(tracker);
+    expect(held?.body).toContain(`- [x] ${staleDocLineText(PAGE)}`);
+    expect(held?.body).toContain(staleDocLine(OTHER));
+    expect(held?.body).not.toContain(staleDocLine(PAGE));
+  });
+
+  it('answers absent and writes nothing for a line no longer in the body', async () => {
+    const { tracker, issue } = await seeded();
+    const [before] = await markedIssues(tracker);
+
+    const result = await tickStaleDocLine({ tracker, issue, text: 'gone.md: was removed by hand' });
+
+    expect(result.action).toBe('absent');
+    const [after] = await markedIssues(tracker);
+    expect(after?.body).toBe(before?.body ?? '');
+  });
+
+  it('answers absent for a line already ticked, so a second tick writes nothing', async () => {
+    const { tracker, issue } = await seeded();
+    await tickStaleDocLine({ tracker, issue, text: staleDocLineText(PAGE) });
+
+    const again = await tickStaleDocLine({ tracker, issue, text: staleDocLineText(PAGE) });
+
+    expect(again.action).toBe('absent');
+  });
+
+  it('answers no-issue for an id no open marked issue has', async () => {
+    const { tracker } = await seeded();
+
+    const result = await tickStaleDocLine({ tracker, issue: '999', text: staleDocLineText(PAGE) });
+
+    expect(result).toEqual({ action: 'no-issue', issue: '999' });
+  });
+});
+
+describe('tickStaleDocLine over a counting fake', () => {
+  const body = `${STALE_DOCS_MARKER}\r\n\r\n- [ ] a.md: one\r\n  - [ ] b.md: two\r\n`;
+  const open: OpenIssue = { ref: REF, title: staleDocsTitle('1.4.0'), body, createdAt: null };
+
+  it('ticks only the box, the indent and line endings as they were', async () => {
+    const { tracker, edits } = countingTracker([open]);
+
+    const result = await tickStaleDocLine({ tracker, issue: '7', text: 'b.md: two' });
+
+    expect(result).toEqual({ action: 'ticked', ref: REF });
+    expect(edits).toEqual([{ body: `${STALE_DOCS_MARKER}\r\n\r\n- [ ] a.md: one\r\n  - [x] b.md: two\r\n` }]);
+  });
+
+  it('takes no issue of the id without the marker', async () => {
+    const { tracker, edits } = countingTracker([{ ...open, body: '- [ ] b.md: two\n' }]);
+
+    const result = await tickStaleDocLine({ tracker, issue: '7', text: 'b.md: two' });
+
+    expect(result.action).toBe('no-issue');
+    expect(edits).toEqual([]);
+  });
+
+  it('calls nothing on a tracker with no edit, or when none resolved', async () => {
+    const calls: string[] = [];
+    const tracker: StaleDocsTracker = {
+      openIssues: async () => {
+        calls.push('openIssues');
+        return [open];
+      },
+      create: async () => {
+        calls.push('create');
+        return REF;
+      },
+    };
+
+    expect(await tickStaleDocLine({ tracker, issue: '7', text: 'b.md: two' }))
+      .toEqual({ action: 'untracked', reason: NO_EDITABLE_TRACKER });
+    expect(await tickStaleDocLine({ tracker: null, issue: '7', text: 'b.md: two' }))
+      .toEqual({ action: 'untracked', reason: NO_EDITABLE_TRACKER });
+    expect(calls).toEqual([]);
+  });
+
+  it('answers a failed listing or edit on one line rather than throwing', async () => {
+    const listing: StaleDocsTracker = {
+      openIssues: () => Promise.reject(new Error('gh: rate\nlimited')),
+      create: async () => REF,
+      edit: async () => undefined,
+    };
+    const editing: StaleDocsTracker = { ...listing, openIssues: async () => [open], edit: () => Promise.reject(new Error('denied')) };
+
+    const listed = await tickStaleDocLine({ tracker: listing, issue: '7', text: 'b.md: two' });
+    const edited = await tickStaleDocLine({ tracker: editing, issue: '7', text: 'b.md: two' });
+
+    expect(listed).toEqual({ action: 'failed', problem: 'listing the open chore issues failed: gh: rate limited' });
+    expect(edited).toEqual({ action: 'failed', problem: 'editing the stale-docs issue failed: denied' });
   });
 });

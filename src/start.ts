@@ -548,7 +548,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   bindEventsFile(repoRoot, session.id);
   // The doc task's unsettled lines: an issue line each, or the print at the end (`start/stale-docs.ts`).
-  const staleDocs = createStartStaleDocs({ repoRoot, checkout, config: runConfig.config });
+  const staleDocs = createStartStaleDocs({ repoRoot, checkout, planPath, config: runConfig.config });
   // Set once the run's `--continue` decisions are made, and asked at its
   // end however it ends: a `--decide` no decision point used is named.
   let decisionsAtEnd = (): void => undefined;

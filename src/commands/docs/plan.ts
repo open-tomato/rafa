@@ -87,6 +87,7 @@ import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { plansDirAt } from '../../core/plan/index.js';
 import { readOpenStaleDocLines } from '../../docs/open-lines.js';
+import { DOC_UPDATE_TASK_PREFIX, DOC_UPDATE_TITLE } from '../../docs/release-issue.js';
 import { isStampableStub, planStampLine } from '../../utils/plan-stamp.js';
 import { escapeBlockerText } from '../../utils/tracker.js';
 import { DEFAULT_ISSUE_SEAMS } from '../issue/issue-tracker.js';
@@ -95,17 +96,14 @@ import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa docs plan';
 
+// The title and task prefix live beside the tick that reads them back (`docs/release-issue.ts`).
+export { DOC_UPDATE_TASK_PREFIX, DOC_UPDATE_TITLE };
+
 /** The usage line a refusal names. */
 export const DOCS_PLAN_USAGE = 'rafa docs plan';
 
-/** The title a doc-update plan carries. */
-export const DOC_UPDATE_TITLE = 'chore(doc-update)';
-
 /** The name of the one stage a doc-update plan holds. */
 export const DOC_UPDATE_STAGE = 'Stale doc lines';
-
-/** What every task's text opens with, before the escaped line. */
-export const DOC_UPDATE_TASK_PREFIX = 'Repair the stale doc line at ';
 
 /** The declaration every task line ends on. */
 export const DOC_UPDATE_DECLARATION = '{agent=doc-updater}';
