@@ -23,8 +23,8 @@ Ten actions read and control pull requests:
   no fetch, no fold, no extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
-- `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
-  it or resolve it when simple
+- `pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
+  [--max-attempts=2]` — assess it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
 - `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`
   — open one from a pushed head over `PullRequests.create`, or print the one
@@ -561,7 +561,15 @@ permission lookup is a refusal, never a pass. Applied on every repository,
 public or not.
 
 For `pr triage --resolve`, a PR whose author is untrusted is refused unless
-it is `dependabot[bot]` or listed. For marker comments, one from an untrusted
+it is `dependabot[bot]` or listed. Its head's config module is trusted
+apart from its author (`src/commands/pr/triage-config-trust.ts`), after the
+cross-repository refusal and before the worktree is added: a
+`rafa.config.ts` or `rafa.config.mjs` on the head (the local branch, else
+`origin/<branch>`, as `git worktree add` takes it) whose blob
+`origin/<base>` as last fetched does not hold, by `git rev-parse`, is
+refused with exit 1 naming the file, the base and `--allow-local-config`.
+That flag lets it through with one warning line. A config module is code
+the resolve loop imports when it starts in the worktree. For marker comments, one from an untrusted
 author is ignored and reported, so a planted triage comment cannot supply the
 follow-up prompt.
 

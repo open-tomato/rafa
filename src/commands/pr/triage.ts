@@ -1,5 +1,6 @@
 /**
- * `rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]`:
+ * `rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
+ * [--max-attempts=<count>]`:
  * one pull request assessed IN CODE — its class, the evidence the class
  * was read from, and a follow-up prompt a session can be handed as it
  * stands — and, under `--resolve`, handed to the ordinary loop over the
@@ -156,8 +157,10 @@
  * `--resolve`, three more from elsewhere: exit 2 for more than one red
  * candidate (`select.ts`), for a cross-repository pull request
  * (`src/pr/worktree.ts`) and for a pull request whose author is
- * trusted with nothing (`src/board/trust.ts`), and exit 3 when the
- * attempt guard gives up.
+ * trusted with nothing (`src/board/trust.ts`), exit 1 for a head whose
+ * config module `origin/<base>` does not hold, unless
+ * `--allow-local-config` (`./triage-config-trust.ts`), and exit 3 when
+ * the attempt guard gives up.
  */
 import type { PrSeams } from './pr-context.js';
 import type { ResolveLoopRunner } from './resolve-loop.js';
@@ -190,6 +193,7 @@ import {
   readBooleanFlag,
   readPullArgument,
 } from './pr-context.js';
+import { ALLOW_LOCAL_CONFIG_FLAG } from './triage-config-trust.js';
 import { readTriageGuard, triageVerdict } from './triage-guard.js';
 import { readConflictFiles, readFailedLogs, readWorkflowCount } from './triage-read.js';
 import { evidenceOf, renderTriages, workflowCountOf } from './triage-report.js';
@@ -530,6 +534,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
   const wantsComment = readBooleanFlag(context.flags, 'comment', USAGE, true);
   const wantsResolve = readBooleanFlag(context.flags, 'resolve', USAGE, false);
   const maxAttempts = readMaxAttempts(context.flags, USAGE);
+  const allowLocalConfig = readBooleanFlag(context.flags, ALLOW_LOCAL_CONFIG_FLAG, USAGE, false);
   refuseResolveWithoutComment(wantsResolve, wantsComment);
   const asked = readPullArgument(context.args, USAGE);
   const pr = await openPrContext(context, seams);
@@ -582,6 +587,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
       release: pr.versionGuard,
       number,
       reading,
+      allowLocalConfig,
       maxAttempts,
       budgetUsd: pr.resolveBudget,
       now,
@@ -643,7 +649,9 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       + ' It reads the triage comment only from an author holding write'
       + ' access to the repository or listed in `board.trustedAuthors`, and ignores and reports one written by'
       + ' anybody else. A cross-repository pull request, more than one candidate, and under `--resolve` a pull'
-      + ' request whose author is neither trusted nor a known dependency-bump bot, are refused with exit code 2. With `--output=json` the selection, every'
+      + ' request whose author is neither trusted nor a known dependency-bump bot, are refused with exit code 2;'
+      + ' under `--resolve` a head carrying a `rafa.config.ts` or `rafa.config.mjs` that `origin/<base>` does not hold'
+      + ' as the same file is refused with exit code 1 unless `--allow-local-config` is passed. With `--output=json` the selection, every'
       + ' reading, what `--resolve` came to and the rendered text are the data of the terminal result event.'
       + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
     args: [
@@ -665,6 +673,12 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
         description: 'Run the pinned plan for a simple class in a worktree of its own, waiting on CI after each'
           + ' attempt, or convert a `conflict-version` stamp into a release fragment with no session. Exits 3 when'
           + ' the attempt guard gives up or the conversion is refused.',
+        type: 'boolean',
+      },
+      {
+        name: ALLOW_LOCAL_CONFIG_FLAG,
+        description: 'Under `--resolve`, run a head whose `rafa.config.ts` or `rafa.config.mjs` `origin/<base>` does'
+          + ' not hold as the same file, printing one warning line; without it such a head is refused with exit 1.',
         type: 'boolean',
       },
       {

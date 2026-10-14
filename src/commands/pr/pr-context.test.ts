@@ -233,7 +233,7 @@ describe('the usage lines', () => {
 
   it('puts every flag after the number, so the usage line is the order that works', () => {
     expect(PR_USAGE.merge).toBe('rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]');
-    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]');
+    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]');
     expect(PR_USAGE.wait).toBe('rafa pr wait [<n>] [--timeout=<minutes>]');
     expect(PR_USAGE.close).toBe('rafa pr close <n> --reason=<text> [--delete-branch] [--yes]');
   });

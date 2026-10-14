@@ -67,6 +67,7 @@ module's note is the long form.
 | `src/commands/pr/triage-read.ts` | what `pr triage` gathers that is neither the line nor the pull request: the Actions run id off a check link, the `--log-failed` capture of each failing run, the repository's workflow count when no check reported, and the conflicting file list, read with `git merge-tree` between refs resolved first and never fetched |
 | `src/commands/pr/triage-resolve.ts` | what `--resolve` does with an assessment: the worktree added and removed, the pinned plan filled and capped at `pr.resolveBudget`, one loop run an attempt, the CI wait after each, the attempt guard's two stops, the comment with its dependabot rebase note, and the exit code 3 a run that gave up ends with; a `conflict-version` assessment is dispatched to `./triage-convert.ts` ahead of the pinned-plan check and the loop path |
 | `src/commands/pr/triage-convert.ts` | the `conflict-version` run of `--resolve`: the resolve worktree added, `convertStampedVersion` (`src/pr/triage/version-convert.ts`) making one commit that turns the stamped changelog section into a release fragment and sets the version file and the changelog back to the merge base's, the branch pushed with `pushResolved` and never forced, and the worktree removed; no plan, no session, no CI wait, no attempt raised and no comment written, exit 0 when converted or already unstamped and 3 when the conversion or the push is refused |
+| `src/commands/pr/triage-config-trust.ts` | the config trust rule `--resolve` runs after the cross-repository refusal and before the worktree is added: each of `rafa.config.ts` and `rafa.config.mjs` the head holds (the local branch, else `origin/<branch>`) compared by blob id through `git rev-parse` with `origin/<base>` as last fetched, one absent from the base or differing from it refused with exit 1 naming the file, the base and `--allow-local-config`, and that flag letting it through with one warning line |
 | `src/commands/pr/triage-trust.ts` | board trust as `pr triage` asks it, over `src/board/trust.ts`: the newest `rafa:pr-triage` marker comment whose author holds write access or is listed in `board.trustedAuthors`, with every newer one passed over and reported rather than read, and the exit-2 refusal `--resolve` makes over a pull request whose own author is neither trusted nor a known dependency-bump bot |
 | `src/commands/pr/resolve-loop.ts` | one `--resolve` attempt's loop: the filled plan written under `~/.rafa/resolve/pr-<n>/attempt-<k>`, outside the worktree so the loop's own commit cannot push it, and `rafa loop start --plan=<file> --no-ci-wait` spawned in the worktree with its stdout forwarded a line at a time |
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
@@ -2493,7 +2494,7 @@ New; it replaces no earlier text. What a row or an action added to
   declare the argument `n` and no flag. `pr merge`
   declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and
   `pr triage` the argument `n` and the flags `comment`, `resolve`,
-  `max-attempts` and `hint`, and `pr close` the argument `n` and the
+  `allow-local-config`, `max-attempts` and `hint`, and `pr close` the argument `n` and the
   flags `reason`, `delete-branch` and `yes`; each declares `text` and
   `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
@@ -2617,7 +2618,10 @@ New; it replaces no earlier text. What a row or an action added to
   stray word, a word that is no whole number from 1, a flag that swallowed
   the number, a config that cannot be used, a `--max-attempts` that is no
   whole number from 1, `--resolve` beside `--no-comment`, a number the
-  repository has no pull request for, and a provider call that rejected; 2
+  repository has no pull request for, a provider call that rejected, and
+  with `--resolve` a head whose `rafa.config.ts` or `rafa.config.mjs`
+  `origin/<base>` does not hold as the same blob, unless
+  `--allow-local-config`; 2
   for more than one red candidate with `--resolve`, a cross-repository pull
   request with `--resolve`, and a pull request whose author is neither
   trusted nor a known dependency-bump bot with `--resolve`; and 3 when the
