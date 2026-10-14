@@ -35,11 +35,11 @@ none (a store and `plansDir` both passed).
 
 **Both backends write under `.rafa/effort/` in the project root, unless
 `RAFA_EFFORT_DIR` names another directory.** `EFFORT_STORE_DIR` in
-`src/effort/store.ts` spells the directory, and `effortStoreDir`
-(`store/location.ts`) resolves it once for both backends:
-`sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's files join
-their names under it. `effortStorePath` in `store.ts` still joins under
-`.rafa/effort/` whatever the variable holds, and no backend calls it.
+`src/effort/store/ndjson-files.ts` spells the directory, and
+`effortStoreDir` (`store/location.ts`) resolves it once for both
+backends: `sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's
+files join their names under it. `effortStorePath` in
+`store/ndjson-files.ts` still joins under `.rafa/effort/` whatever the variable holds, and no backend calls it.
 `RAFA_EFFORT_DIR` moves the SQLite and NDJSON files together for one
 command line; it is a variable and not a config key so that it never
 moves the loop's own store. A relative value is refused (`is not an
@@ -57,7 +57,8 @@ parity suites name is the sibling's own store, read through
 ### Imports
 
 **Import store code from `./store/index.js` and port types from
-`./store/types.js`, never from `./store.js`.** `src/effort/store.ts` is the
+`./store/types.js`, never from `./store/ndjson-files.js` or its
+re-export `./store.js`.** `src/effort/store/ndjson-files.ts` is the
 sibling loop's pre-port module, and its `openEffortStore`, `EffortRowKind`
 and `AppendResult` are different declarations under the same names.
 
@@ -65,7 +66,7 @@ and `AppendResult` are different declarations under the same names.
 
 **A new `EffortRowByKind` kind turns `check-types` red away from the
 fix:** TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
-`STORE_FILE_NAMES` in `store.ts` names the kind's file, and TS2741 in
+`STORE_FILE_NAMES` in `store/ndjson-files.ts` names the kind's file, and TS2741 in
 `store/sqlite.ts` until `KIND_TABLES` has the kind.
 
 **`collectSessionRow` (`collect.ts`) copies attribution fields one by

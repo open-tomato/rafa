@@ -38,16 +38,15 @@
  * read or made, so a test copies stores under the temporary directory
  * only.
  */
-import type { EffortRowKind } from '../store.js';
+import type { EffortRowKind } from './ndjson-files.js';
 
 import { copyFileSync, constants, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-import { effortStoreFileName } from '../store.js';
-
 import { guardTestProcess } from './location.js';
+import { effortStoreFileName } from './ndjson-files.js';
 import { activeStoreSettings } from './settings.js';
 import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 

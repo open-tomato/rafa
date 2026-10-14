@@ -85,7 +85,7 @@
  * exported there for its own suite, are not exported here, and neither
  * is the adapter registry the selector resolves through.
  *
- * `effort/store.ts`, the sibling's store bound to one file, is not
+ * `ndjson-files.ts`, the sibling's store bound to one file, is not
  * re-exported either. It is what the NDJSON backend runs, not a third
  * backend.
  *

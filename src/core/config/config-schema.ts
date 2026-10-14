@@ -226,9 +226,9 @@ import {
  * The config file, relative to the directory it sits under: the project
  * root for the project's, the home directory for the user scope's.
  *
- * `join` rather than a literal, as `effort/store.ts` spells its own
- * directory, so a path built here compares equal to one a caller built
- * with `join` of its own.
+ * `join` rather than a literal, as `effort/store/ndjson-files.ts` spells
+ * its own directory, so a path built here compares equal to one a
+ * caller built with `join` of its own.
  */
 export const CONFIG_FILE: string = join('.rafa', 'config.yaml');
 

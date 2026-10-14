@@ -364,6 +364,7 @@
     "src/effort/store/migrate.ts": "c5",
     "src/effort/store/migrations.ts": "c5",
     "src/effort/store/move.ts": "c5",
+    "src/effort/store/ndjson-files.ts": "c5",
     "src/effort/store/ndjson.ts": "c5",
     "src/effort/store/origins.ts": "c5",
     "src/effort/store/plan-ci.ts": "c5",

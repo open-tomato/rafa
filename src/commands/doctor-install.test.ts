@@ -21,7 +21,7 @@ import { delimiter, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { LEGACY_EFFORT_STORE_DIR, STORE_FILE_NAMES } from '../effort/store/legacy.js';
-import { EFFORT_STORE_DIR } from '../effort/store.js';
+import { EFFORT_STORE_DIR } from '../effort/store/ndjson-files.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { readInstall, writeInstall } from './doctor-install.js';

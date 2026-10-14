@@ -3955,13 +3955,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/effort/store/copy.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/store.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/effort/store/development-build.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3997,31 +3990,10 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/effort/store/legacy.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/store.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/location.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/store.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/effort/store/merge-commit-gaps.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
           "to": "src/effort/commits.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/ndjson.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/store.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -4110,8 +4082,8 @@
         }
       ],
       "fileCounts": {
-        "source": 79,
-        "test": 95,
+        "source": 80,
+        "test": 96,
         "testSupport": 2
       },
       "files": [
@@ -4230,6 +4202,8 @@
         "src/effort/store/migrations.ts",
         "src/effort/store/move.test.ts",
         "src/effort/store/move.ts",
+        "src/effort/store/ndjson-files.test.ts",
+        "src/effort/store/ndjson-files.ts",
         "src/effort/store/ndjson.test.ts",
         "src/effort/store/ndjson.ts",
         "src/effort/store/origins.test.ts",
@@ -4294,7 +4268,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 98,
+        "src/effort/store/": 100,
         "src/ports/": 2
       },
       "folders": [
@@ -4310,8 +4284,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 55,
-      "upwardEdges": 68
+      "remaining": 51,
+      "upwardEdges": 64
     },
     {
       "clearedByIssue118": 0,
@@ -7080,8 +7054,8 @@
         }
       ],
       "fileCounts": {
-        "source": 37,
-        "test": 36,
+        "source": 36,
+        "test": 35,
         "testSupport": 0
       },
       "files": [
@@ -7141,8 +7115,6 @@
         "src/effort/skill-signals.ts",
         "src/effort/skill-use.test.ts",
         "src/effort/skill-use.ts",
-        "src/effort/store.test.ts",
-        "src/effort/store.ts",
         "src/effort/sync/contact.test.ts",
         "src/effort/sync/contact.ts",
         "src/effort/sync/doctor-reading.test.ts",
@@ -7160,7 +7132,7 @@
         "src/schema/frontmatter.ts"
       ],
       "filesByFolder": {
-        "src/effort/": 71
+        "src/effort/": 69
       },
       "folders": [
         "src/effort/"
@@ -8030,10 +8002,10 @@
     "clearedByIssue118": 13,
     "files": 1934,
     "leftToPlace": 699,
-    "nonTestEdges": 4321,
+    "nonTestEdges": 4320,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 312
+    "upwardEdges": 308
   },
   "unassigned": [
     {
