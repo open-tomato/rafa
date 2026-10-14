@@ -2295,7 +2295,7 @@
     {
       "kind": "source",
       "path": "src/project/scope.ts",
-      "upwardEdgesIn": 13
+      "upwardEdgesIn": 12
     },
     {
       "kind": "source",
@@ -2600,6 +2600,11 @@
     {
       "kind": "test",
       "path": "src/tests/core-barrels.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-reexport-bindings.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3955,13 +3960,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/effort/store/development-build.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/effort/store/dispatches.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4233,8 +4231,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 43,
-      "upwardEdges": 56
+      "remaining": 42,
+      "upwardEdges": 55
     },
     {
       "clearedByIssue118": 0,
@@ -7176,7 +7174,7 @@
       "edges": [],
       "fileCounts": {
         "source": 257,
-        "test": 458,
+        "test": 459,
         "testSupport": 26
       },
       "files": [
@@ -7721,6 +7719,7 @@
         "src/tests/context-page-imports.sweep.test.ts",
         "src/tests/core-barrel-load-spawned.test.ts",
         "src/tests/core-barrels.sweep.test.ts",
+        "src/tests/core-reexport-bindings.test.ts",
         "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
         "src/tests/declaration-flags.test.ts",
@@ -7941,12 +7940,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1938,
-    "leftToPlace": 699,
+    "files": 1939,
+    "leftToPlace": 700,
     "nonTestEdges": 4325,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 299
+    "upwardEdges": 298
   },
   "unassigned": [
     {

@@ -61,10 +61,10 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute } from 'node:path';
 
 import { RAFA_VERSION } from '../../core/command/index.js';
+import { SCOPE_DIR } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions, runsDir } from '../../core/loop/index.js';
 import { readRuntimeIdentity } from '../../core/runtime/index.js';
-import { SCOPE_DIR } from '../../project/scope.js';
 
 import { EFFORT_DIR_VARIABLE, isUnderTempDir } from './location.js';
 

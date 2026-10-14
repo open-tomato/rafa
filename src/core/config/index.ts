@@ -106,6 +106,7 @@ export {
   CONFIG_FILE,
   isCommandLineSetting,
   knownKeysAbove,
+  SCOPE_DIR,
   SECTIONS,
   SETTING_BY_KEY,
   SETTING_NAMES,

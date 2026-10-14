@@ -154,7 +154,7 @@ import type { TestsSettings } from '../../config-schema-tests.js';
 import type { TriageSettings } from '../../config-schema-triage.js';
 import type { WrapUpSettings } from '../../config-schema-wrap-up.js';
 
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
@@ -231,6 +231,13 @@ import {
  * caller built with `join` of its own.
  */
 export const CONFIG_FILE: string = join('.rafa', 'config.yaml');
+
+/**
+ * The directory a scope keeps its files in, relative to the project
+ * root or the home: `.rafa`. Taken from `CONFIG_FILE`, so the two
+ * cannot name different directories.
+ */
+export const SCOPE_DIR: string = dirname(CONFIG_FILE);
 
 /**
  * Every setting, resolved. The module note maps each to its file key;
