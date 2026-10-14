@@ -48,6 +48,7 @@ const FIRST: ReportBug = {
   what: 'Parser drops the last line',
   artifact: 'parse returned too few lines for the input',
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -56,6 +57,7 @@ const REWORDED: ReportBug = {
   what: 'Parser drops the final line',
   artifact: 'parse returned too few lines for the text',
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -64,6 +66,7 @@ const UNRELATED: ReportBug = {
   what: 'Config loader ignores the home file',
   artifact: 'readConfig skipped the home config',
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -72,6 +75,7 @@ const DISJOINT: ReportBug = {
   what: 'Zebra quokka',
   artifact: 'wombat',
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -139,6 +143,7 @@ function reportOf(bug: ReportBug): TaskReport {
     blockers: [],
     outOfScopeBugs: [bug],
     changes: [],
+    staleDocs: [],
     extras: [],
   };
 }

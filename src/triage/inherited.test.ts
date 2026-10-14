@@ -55,6 +55,7 @@ const BUG: ReportBug = {
   what: 'Parser drops the last line',
   artifact: ARTIFACT,
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -175,6 +176,8 @@ function reportOf(bug: ReportBug): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [bug],
+    staleDocs: [],
+    changes: [],
     extras: [],
   };
 }

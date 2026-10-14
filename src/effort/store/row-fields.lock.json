@@ -46,5 +46,28 @@
   "keyProjections": [
     "commits",
     "sessions"
+  ],
+  "staleDocs": [
+    "collectedAt",
+    "id",
+    "kind",
+    "outcome",
+    "planStub",
+    "sessionId",
+    "taskLine",
+    "what",
+    "where"
+  ],
+  "bugRoutes": [
+    "collectedAt",
+    "entryIndex",
+    "id",
+    "kind",
+    "planStub",
+    "route",
+    "said",
+    "sessionId",
+    "taskLine",
+    "what"
   ]
 }

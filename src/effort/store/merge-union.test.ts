@@ -55,6 +55,11 @@ const FIXTURES: Readonly<Record<OriginTable, (key: string) => FixtureRow>> = {
   plan_ci: (key) => ({
     plan_stub: 'rafa-322', pr: 9, head_sha: `sha-${key}`, verdict: 'none', failing: '[]', read_at: COLLECTED_AT,
   }),
+  stale_docs: (key) => ({ ...reportRow(key), kind: 'sighting', where_at: `context/${key}.md:12`, what: `stale ${key}` }),
+  bug_routes: (key) => ({
+    id: `id-${key}`, session_id: `session-${key}`, task_line: `task ${key}`, entry_index: 0, what: `bug ${key}`,
+    said: null, kind: 'bug', route: 'filed', collected_at: COLLECTED_AT,
+  }),
 };
 
 const opened: Database[] = [];

@@ -21,7 +21,9 @@
  *     passing the same task again is that stop's own way out, not
  *     progress past it;
  *   - the finished task is a repair task (`isRepairTask` in
- *     `start/suite-blocker.ts`): a repair is the red step's own fix.
+ *     `start/suite-blocker.ts`): a repair is the red step's own fix,
+ *     or the fix of a leftover the plan's own tasks left
+ *     (`triage/leftover-repair.ts`), and neither is a plan task.
  *
  * So a red task step after a plan task, its repair done, the repair's
  * own step red again, and the repair done again spend on toward the

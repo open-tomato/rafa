@@ -6,12 +6,14 @@
  * one of two things, never both:
  *
  *   - A report. Its findings go through `writeFindings`, its blockers and
- *     out-of-scope bugs through `writeTriage`, its change notes through
- *     `writeChanges`, and its `status` and `skills_used` through
- *     `writeTaskReport`, one `task_reports` row per session. A report
- *     whose four lists are all empty writes no finding, blocker, bug or
- *     change row, as each list writer does with nothing to insert, and
- *     still writes its status row, creating the store when it is absent.
+ *     out-of-scope bugs through `writeTriage`, its stale-doc entries
+ *     through `writeStaleDocs` under the kind `sighting`, its change
+ *     notes through `writeChanges`, and its `status` and `skills_used`
+ *     through `writeTaskReport`, one `task_reports` row per session. A
+ *     report whose five lists are all empty writes no finding, blocker,
+ *     bug, stale-doc or change row, as each list writer does with nothing
+ *     to insert, and still writes its status row, creating the store
+ *     when it is absent.
  *     Each list writer still opens a store that exists, for its schema
  *     check, so a store past this rafa's version is refused before any
  *     row is written.
@@ -27,17 +29,21 @@
  *
  * A writer that refuses throws, and nothing here catches it: what a store
  * the loop cannot write means for the run is `start.ts`'s decision.
- * Findings are written first, then triage, then the change notes, then
- * the status row, each writer in its own transaction, so a writer that
- * throws leaves what the writers before it stored. Every table is
- * deduplicated per session, so recording the same output for the same
- * session again adds no row.
+ * Findings are written first, then triage, then the stale-doc entries,
+ * then the change notes, then the status row, each writer in its own
+ * transaction, so a writer that throws leaves what the writers before it
+ * stored. Every table is deduplicated per session, so recording the same
+ * output for the same session again adds no row.
  *
  * `writeChanges` takes no outcome, and none is passed to it: a change
  * note is about the diff the session left, which is in the commit
  * whatever the loop made of the task (`effort/store/changes.ts`). The
  * session's own verdict is in the `task_reports` row under the same
  * session id.
+ *
+ * Every `stale_docs` entry of a task's report is a `sighting`: a line the
+ * task saw and left. This module writes no other kind, whichever task
+ * the session ran (`effort/store/stale-docs.ts` has the two kinds).
  *
  * {@link describeTaskReportRecord} is the operator's view of a record:
  * a summary of what was stored, and one warning for each thing that was
@@ -54,12 +60,14 @@ import type {
   FindingsWriteResult,
 } from '../effort/store/findings.js';
 import type { TaskReportWriteResult } from '../effort/store/reports.js';
+import type { StaleDocsWriteResult } from '../effort/store/stale-docs.js';
 import type { TriageListResult, TriageWriteResult } from '../effort/store/triage.js';
 
 import { writeReportAbsence } from '../effort/store/absences.js';
 import { writeChanges } from '../effort/store/changes.js';
 import { writeFindings } from '../effort/store/findings.js';
 import { writeTaskReport } from '../effort/store/reports.js';
+import { writeStaleDocs } from '../effort/store/stale-docs.js';
 import { writeTriage } from '../effort/store/triage.js';
 
 import { parseReport } from './parse.js';
@@ -78,6 +86,8 @@ export interface RecordedReport {
   readonly reading: ReportPresent;
   readonly findings: FindingsWriteResult;
   readonly triage: TriageWriteResult;
+  /** What the report's `stale_docs` list wrote, one `sighting` row per entry kept. */
+  readonly staleDocs: StaleDocsWriteResult;
   /** What the report's `changes` list wrote, one row per note kept. */
   readonly changes: ChangesWriteResult;
   /** The session's one `task_reports` row, its status beside the outcome. */
@@ -132,9 +142,14 @@ export function recordTaskReport(
     { dispatch, outcome, blockers: report.blockers, outOfScopeBugs: report.outOfScopeBugs },
     seams,
   );
+  const staleDocs = writeStaleDocs(
+    repoRoot,
+    { dispatch, outcome, kind: 'sighting', staleDocs: report.staleDocs },
+    seams,
+  );
   const changes = writeChanges(repoRoot, { dispatch, changes: report.changes }, seams);
   const taskReport = writeTaskReport(repoRoot, { dispatch, outcome, report }, seams);
-  return { present: true, reading, findings, triage, changes, taskReport };
+  return { present: true, reading, findings, triage, staleDocs, changes, taskReport };
 }
 
 /** One writer's counts for one list, whichever writer answered them. */
@@ -162,12 +177,13 @@ export function describeTaskReportRecord(record: TaskReportRecord): TaskReportLi
     return { notes: [], warnings: [`No task report: ${record.reading.text}; ${recorded}`] };
   }
 
-  const { reading, findings, triage, changes } = record;
+  const { reading, findings, triage, staleDocs, changes } = record;
   const summary = [
     `Report: status ${reading.report.status ?? 'not given'}`,
     tally('findings', findings),
     tally('blockers', triage.blockers),
     tally('out-of-scope bugs', triage.outOfScopeBugs),
+    tally('stale docs', staleDocs),
     tally('changes', changes),
   ].join('; ');
 
@@ -176,6 +192,7 @@ export function describeTaskReportRecord(record: TaskReportRecord): TaskReportLi
     ...findings.rejected,
     ...triage.blockers.rejected,
     ...triage.outOfScopeBugs.rejected,
+    ...staleDocs.rejected,
     ...changes.rejected,
   ].map(({ text }) => `Report: ${text}`);
   return { notes: [summary], warnings };

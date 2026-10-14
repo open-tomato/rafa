@@ -418,13 +418,26 @@ export function attributesOf(text: string): Readonly<Record<string, string>> {
 }
 
 /** A tag the parser reads: element name, whether it closes, whether it self-closes. */
-const TAG = /<(\/?)(testsuites|testsuite|testcase|failure|error)\b([^>]*?)(\/?)>/g;
+const TAG = /<(\/?)(testsuites|testsuite|testcase|failure|error|skipped)\b([^>]*?)(\/?)>/g;
+
+/** How one testcase of a JUnit report ended: it held a failure, a `<skipped>` element, or neither. */
+export type JunitOutcome = 'passed' | 'failed' | 'skipped';
+
+/** One testcase of a JUnit report: its file, its full name and how it ended. */
+export interface JunitCase {
+  readonly file: string;
+  /** Its describe names, outermost first, and its own, joined by ` > `. */
+  readonly name: string;
+  readonly outcome: JunitOutcome;
+}
 
 /** The testcase being read, until its closing tag. */
 interface OpenCase {
   readonly file: string;
   readonly name: string;
   failed: boolean;
+  /** True once a `<skipped>` element was read inside it. */
+  skipped: boolean;
   /** The first message line read from its failure elements, once one is. */
   message?: string;
 }
@@ -435,14 +448,27 @@ interface JunitWalk {
   readonly failures: SuiteFailure[];
   /** Each test file once, in the order its suite opened. */
   readonly files: string[];
+  /** Each test once, whatever its outcome, in the order its case closed. */
+  readonly cases: JunitCase[];
   open: OpenCase | null;
 }
 
-/** Records `open` as a failure when it failed and its pair is not yet held. */
+/** How `open` ended; a failure outranks a skip. */
+function outcomeOf(open: OpenCase): JunitOutcome {
+  if (open.failed) return 'failed';
+  return open.skipped
+    ? 'skipped'
+    : 'passed';
+}
+
+/** Records `open` as a case, and as a failure when it failed, each pair once. */
 function closeCase(walk: JunitWalk): void {
   const open = walk.open;
   walk.open = null;
-  if (open === null || !open.failed) return;
+  if (open === null) return;
+  const seen = walk.cases.some((testCase) => testCase.file === open.file && testCase.name === open.name);
+  if (!seen) walk.cases.push({ file: open.file, name: open.name, outcome: outcomeOf(open) });
+  if (!open.failed) return;
   const held = walk.failures.some((failure) => failure.file === open.file && failure.name === open.name);
   if (held) return;
   walk.failures.push(open.message === undefined
@@ -469,7 +495,7 @@ function openCase(walk: JunitWalk, attributes: Readonly<Record<string, string>>)
   const [fileSuite, ...describes] = walk.suites;
   const file = attributes['file'] ?? fileSuite?.file ?? '';
   const name = [...describes.map((suite) => suite.name), attributes['name'] ?? ''].join(' > ');
-  walk.open = { file, name, failed: false };
+  walk.open = { file, name, failed: false, skipped: false };
 }
 
 /** Opens a suite from its attributes; one opened under no other is a test file, held once. */
@@ -494,7 +520,9 @@ function takeTag(walk: JunitWalk, match: RegExpMatchArray): void {
     if (selfClosing === '/') closeCase(walk);
     return;
   }
-  if ((element === 'failure' || element === 'error') && closing !== '/' && walk.open !== null) failCase(walk.open, attributes);
+  if (closing === '/' || walk.open === null) return;
+  if (element === 'failure' || element === 'error') failCase(walk.open, attributes);
+  if (element === 'skipped') walk.open.skipped = true;
 }
 
 /**
@@ -515,10 +543,25 @@ export function parseJunitFiles(xml: string): readonly string[] | null {
   return walkJunit(xml)?.files ?? null;
 }
 
+/**
+ * Every test a Bun JUnit report names, passed, failed or skipped, each
+ * file and name pair once with the outcome of its first testcase, in the
+ * order it names them; or null when `xml` is not a whole `<testsuites>`
+ * document. A test is named as a failure is (see the module note), so a
+ * pair {@link parseJunitFailures} answers is here as `failed`. A
+ * testcase holding a `<skipped>` element, as Bun writes for `it.skip`
+ * and `it.todo`, is `skipped` unless it failed too.
+ * `src/triage/base-run.ts` reads it to tell a case that passed from one
+ * the run never held.
+ */
+export function parseJunitCases(xml: string): readonly JunitCase[] | null {
+  return walkJunit(xml)?.cases ?? null;
+}
+
 /** The walk over a whole `<testsuites>` document, or null when `xml` is none. */
 function walkJunit(xml: string): JunitWalk | null {
   if (!/<testsuites\b/.test(xml) || !xml.includes('</testsuites>')) return null;
-  const walk: JunitWalk = { suites: [], failures: [], files: [], open: null };
+  const walk: JunitWalk = { suites: [], failures: [], files: [], cases: [], open: null };
   for (const match of xml.matchAll(TAG)) {
     if (match[2] !== 'testsuites') takeTag(walk, match);
   }

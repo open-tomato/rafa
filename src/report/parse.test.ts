@@ -44,6 +44,22 @@
  * `CHANGE_LEVELS` (2), and `changes` read before
  * `out_of_scope_bugs` (1, the issue-order case). The module was green
  * before and after, and restored byte-identical (sha256) after each.
+ *
+ * Eight more were driven on 2026-10-14, when `stale_docs` joined the
+ * report, against the 118 cases this file then held: the list never
+ * read and `stale_docs` dropped from the key roster (14 red each), an
+ * entry with no `what` kept (4), `where` made required (4), `what` made
+ * optional (3), `stale_docs` read before `changes` (1), `what` read
+ * before `where` (1, the same issue-order case), and an absent
+ * `stale_docs` key reported as missing (73, the seven-field case among
+ * them). The module was green before and after, and restored
+ * byte-identical (sha256).
+ *
+ * The `kind` of an `out_of_scope_bugs` entry is pinned by its own
+ * describe block, by the spec-example case, and by the older-prompt
+ * fixture `testdata/no-kind-report.txt`, a report shaped as the task
+ * prompt asked for one before the key existed (built by hand, not
+ * captured from a session).
  */
 import type { ReportAbsent, ReportFinding, ReportPresent, ReportReading } from './parse.js';
 
@@ -54,6 +70,7 @@ import { describe, expect, it } from 'bun:test';
 import { INSTINCT_DOMAINS } from '../schema/instinct.js';
 
 import {
+  BUG_KINDS,
   CHANGE_LEVELS,
   FINDING_DOMAINS,
   FINDING_KINDS,
@@ -104,8 +121,11 @@ function issuePairs(reading: ReportPresent): string[] {
   return reading.issues.map((issue) => `${issue.reason} ${issue.field}`);
 }
 
-/** The spec's own example body, which exercises every field once. */
-const SPEC_BODY = [
+/**
+ * The report a session on an older prompt writes: all seven fields that
+ * came before `stale_docs`, and no `stale_docs` key.
+ */
+const SEVEN_FIELD_BODY = [
   'status: done',
   'feedback: |',
   '  What was done and how it went, one block.',
@@ -130,6 +150,16 @@ const SPEC_BODY = [
   '  - level: minor',
   '    area: "loop"',
   '    summary: "the task report carries change notes"',
+];
+
+/** The spec's own example body, which exercises every field once. */
+const SPEC_BODY = [
+  ...SEVEN_FIELD_BODY.flatMap((line) => line === '    security: false'
+    ? [line, '    kind: bug']
+    : [line]),
+  'stale_docs:',
+  '  - where: "context/triage.md:12"',
+  '    what: "says triage has three channels"',
 ];
 
 /** A finding with every required field and nothing else, as body lines. */
@@ -191,11 +221,16 @@ describe('the report a session output ends with', () => {
       ],
       skillsUsed: ['progress-hygiene'],
       blockers: [{ what: 'LINEAR_API_KEY unset', artifact: '401 Unauthorized', extras: [] }],
-      outOfScopeBugs: [{ what: '...', artifact: '...', security: false, extras: [] }],
+      outOfScopeBugs: [{ what: '...', artifact: '...', security: false, kind: 'bug', extras: [] }],
       changes: [{
         level: 'minor',
         area: 'loop',
         summary: 'the task report carries change notes',
+        extras: [],
+      }],
+      staleDocs: [{
+        where: 'context/triage.md:12',
+        what: 'says triage has three channels',
         extras: [],
       }],
       extras: [],
@@ -215,6 +250,7 @@ describe('the report a session output ends with', () => {
     expect([...FINDING_KINDS]).toEqual(['gotcha', 'pattern', 'location', 'skill-suggestion']);
     expect([...FINDING_SIGNALS]).toEqual(['loud', 'silent']);
     expect([...CHANGE_LEVELS]).toEqual(['patch', 'minor', 'major', 'none']);
+    expect([...BUG_KINDS]).toEqual(['bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine']);
   });
 });
 
@@ -640,7 +676,9 @@ describe('the blockers and out_of_scope_bugs lists', () => {
   it('reports a missing security flag instead of defaulting it to false', () => {
     const reading = reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"');
 
-    expect(reading.report.outOfScopeBugs).toEqual([{ what: 'bug', artifact: null, security: null, extras: [] }]);
+    expect(reading.report.outOfScopeBugs).toEqual([
+      { what: 'bug', artifact: null, security: null, kind: 'bug', extras: [] },
+    ]);
     expect(issuePairs(reading)).toEqual(['missing-field out_of_scope_bugs[0].security']);
   });
 
@@ -649,6 +687,109 @@ describe('the blockers and out_of_scope_bugs lists', () => {
 
     expect(reading.report).toMatchObject({ blockers: [], outOfScopeBugs: [] });
     expect(issuePairs(reading)).toEqual(['unusable-field blockers[0]', 'unusable-field out_of_scope_bugs[0]']);
+  });
+});
+
+describe('an out_of_scope_bugs entry\'s kind', () => {
+  /** One bug entry with every required field, and `kindLines` after them. */
+  function bugReport(...kindLines: string[]): ReportPresent {
+    return reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"', '    security: false', ...kindLines);
+  }
+
+  it.each([...BUG_KINDS])('reads kind %s as written, with no issue', (kind) => {
+    const reading = bugReport(`    kind: ${kind}`);
+
+    expect(reading.report.outOfScopeBugs).toEqual([
+      { what: 'bug', artifact: null, security: false, kind, extras: [] },
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['an absent key', []],
+    ['a null value', ['    kind: null']],
+    ['an empty value', ['    kind:']],
+  ])('reads %s as bug, with no issue', (_label, kindLines) => {
+    const reading = bugReport(...kindLines);
+
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['gotcha', '"gotcha"'],
+    ['Bug', '"Bug"'],
+    ['own_gap', '"own_gap"'],
+    ['"  "', '"  "'],
+    ['3', 'the number 3'],
+    ['[bug]', 'a list'],
+  ])('reads kind %s as bug and reports it as unusable', (written, described) => {
+    const reading = bugReport(`    kind: ${written}`);
+
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'out_of_scope_bugs[0].kind',
+      text: `out_of_scope_bugs[0].kind is ${described}, not one of ${BUG_KINDS.join(', ')}`,
+    }]);
+  });
+
+  it('answers a kind issue after the security issue of the same entry', () => {
+    const reading = reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"', '    kind: other');
+
+    expect(issuePairs(reading)).toEqual([
+      'missing-field out_of_scope_bugs[0].security',
+      'unusable-field out_of_scope_bugs[0].kind',
+    ]);
+  });
+
+  it('leaves a finding\'s kind to its own list', () => {
+    const reading = reportOf(
+      'status: done',
+      'findings:',
+      ...findingLines('t', 'w').map((line) => line.replace('gotcha', 'own-gap')),
+      'out_of_scope_bugs:',
+      '  - what: "bug"',
+      '    security: false',
+      '    kind: gotcha',
+    );
+
+    expect(reading.report.findings[0]?.kind).toBeNull();
+    expect(reading.report.outOfScopeBugs[0]?.kind).toBe('bug');
+    expect(issuePairs(reading)).toEqual([
+      'unusable-field findings[0].kind',
+      'unusable-field out_of_scope_bugs[0].kind',
+    ]);
+  });
+
+  describe('in a report written on the prompt before the key existed', () => {
+    const output = readFileSync(new URL('./testdata/no-kind-report.txt', import.meta.url), 'utf8');
+    const reading = presentOf(parseReport(output));
+
+    it('holds bug entries and no kind key, read off the raw text', () => {
+      expect(output.match(/^ {2}- what:/gm)).toHaveLength(2);
+      expect(output).not.toMatch(/^ +kind:/m);
+    });
+
+    it('reads every entry as bug, with no issue', () => {
+      expect(reading.report.outOfScopeBugs).toEqual([
+        {
+          what: 'the stage step reads the retry count before the config is loaded',
+          artifact: 'retries is undefined',
+          security: false,
+          kind: 'bug',
+          extras: [],
+        },
+        {
+          what: 'a plan path with a space is passed unquoted to the shell',
+          artifact: 'No such file or directory',
+          security: true,
+          kind: 'bug',
+          extras: [],
+        },
+      ]);
+      expect(reading.issues).toEqual([]);
+    });
   });
 });
 
@@ -793,6 +934,161 @@ describe('the changes list', () => {
       'missing-field out_of_scope_bugs[0].security',
       'missing-field changes[0].level',
       'missing-field changes[0].summary',
+    ]);
+  });
+});
+
+describe('the stale_docs list', () => {
+  it('reads an entry with its where and what, kept as written', () => {
+    const reading = reportOf(
+      'status: done',
+      'stale_docs:',
+      '  - where: " context/triage.md:12 "',
+      '    what: "says triage has three channels"',
+    );
+
+    expect(reading.report.staleDocs).toEqual([
+      { where: ' context/triage.md:12 ', what: 'says triage has three channels', extras: [] },
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reads a seven-field report as an empty list, with no issue and no extra', () => {
+    const reading = reportOf(...SEVEN_FIELD_BODY);
+
+    expect(SEVEN_FIELD_BODY.join('\n')).not.toContain('stale_docs');
+    expect(reading.report.staleDocs).toEqual([]);
+    expect(reading.report.extras).toEqual([]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reads the near miss: the same seven fields with a broken eighth, which is reported', () => {
+    const reading = reportOf(...SEVEN_FIELD_BODY, 'stale_docs:', '  - where: "context/triage.md:12"');
+
+    expect(reading.report.staleDocs).toEqual([]);
+    expect(issuePairs(reading)).toEqual(['missing-field stale_docs[0].what']);
+  });
+
+  it('reads a null or empty stale_docs key as empty, without an issue', () => {
+    expect(reportOf('status: done', 'stale_docs:').report.staleDocs).toEqual([]);
+    expect(reportOf('status: done', 'stale_docs:').issues).toEqual([]);
+    expect(reportOf('status: done', 'stale_docs: []').report.staleDocs).toEqual([]);
+    expect(reportOf('status: done', 'stale_docs: []').issues).toEqual([]);
+  });
+
+  it('keeps an entry with no where, leaving it null and reporting nothing', () => {
+    const reading = reportOf('status: done', 'stale_docs:', '  - what: "names a removed flag"');
+
+    expect(reading.report.staleDocs).toEqual([{ where: null, what: 'names a removed flag', extras: [] }]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('drops an entry with no what and reports it, keeping its neighbours in order', () => {
+    const reading = reportOf(
+      'status: done',
+      'stale_docs:',
+      '  - where: "README.md:3"',
+      '    what: "first"',
+      '  - where: "context/cli.md:40"',
+      '  - where: "AGENTS.md"',
+      '    what: "second"',
+    );
+
+    expect(reading.report.staleDocs).toEqual([
+      { where: 'README.md:3', what: 'first', extras: [] },
+      { where: 'AGENTS.md', what: 'second', extras: [] },
+    ]);
+    expect(reading.issues).toEqual([{
+      reason: 'missing-field',
+      field: 'stale_docs[1].what',
+      text: 'stale_docs[1].what is missing',
+    }]);
+  });
+
+  it.each([
+    ['blank', '"   "', 'stale_docs[0].what is blank'],
+    ['a number', '404', 'stale_docs[0].what is the number 404, not a string; quote it'],
+  ])('drops an entry whose what is %s, and reports it as unusable', (_name, written, text) => {
+    const reading = reportOf('status: done', 'stale_docs:', '  - where: "README.md"', `    what: ${written}`);
+
+    expect(reading.report.staleDocs).toEqual([]);
+    expect(reading.issues).toEqual([{ reason: 'unusable-field', field: 'stale_docs[0].what', text }]);
+  });
+
+  it('refuses a where that is not a string, keeping the entry with where null', () => {
+    const reading = reportOf('status: done', 'stale_docs:', '  - where: 12', '    what: "names a removed flag"');
+
+    expect(reading.report.staleDocs).toEqual([{ where: null, what: 'names a removed flag', extras: [] }]);
+    expect(reading.issues.map((issue) => issue.text)).toEqual([
+      'stale_docs[0].where is the number 12, not a string; quote it',
+    ]);
+  });
+
+  it('carries every entry in order, identical entries included', () => {
+    const reading = reportOf(
+      'status: done',
+      'stale_docs:',
+      '  - where: "README.md"',
+      '    what: "first"',
+      '  - where: "README.md"',
+      '    what: "first"',
+      '  - what: "second"',
+    );
+
+    expect(reading.report.staleDocs.map((entry) => [entry.where, entry.what])).toEqual([
+      ['README.md', 'first'],
+      ['README.md', 'first'],
+      [null, 'second'],
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it.each([
+    ['a scalar', 'stale_docs: README.md is out of date', '"README.md is out of date"'],
+    ['a mapping', 'stale_docs: { what: stale }', 'a mapping'],
+  ])('reads stale_docs holding %s as empty, and reports it', (_name, line, described) => {
+    const reading = reportOf('status: done', line);
+
+    expect(reading.report.staleDocs).toEqual([]);
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'stale_docs',
+      text: `stale_docs is ${described}, not a list`,
+    }]);
+  });
+
+  it('drops an entry that is not a mapping, naming the keys it wanted', () => {
+    const reading = reportOf('status: done', 'stale_docs:', '  - "README.md is out of date"', '  - what: "kept"');
+
+    expect(reading.report.staleDocs).toEqual([{ where: null, what: 'kept', extras: [] }]);
+    expect(reading.issues).toEqual([{
+      reason: 'unusable-field',
+      field: 'stale_docs[0]',
+      text: 'stale_docs[0] is "README.md is out of date", not a mapping of where, what; dropped',
+    }]);
+  });
+
+  it('retains an unknown key inside an entry as its extra', () => {
+    const reading = reportOf('status: done', 'stale_docs:', '  - what: "kept"', '    line: 12');
+
+    expect(reading.report.staleDocs[0]?.extras).toEqual([{ key: 'line', value: 12 }]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('answers its issues last, after the lists written above it, and where before what', () => {
+    const reading = reportOf(
+      'status: done',
+      'stale_docs:',
+      '  - where: 12',
+      'changes:',
+      '  - area: "loop"',
+    );
+
+    expect(issuePairs(reading)).toEqual([
+      'missing-field changes[0].level',
+      'missing-field changes[0].summary',
+      'unusable-field stale_docs[0].where',
+      'missing-field stale_docs[0].what',
     ]);
   });
 });
@@ -963,11 +1259,14 @@ describe('the final message a real session ended with', () => {
       'superpowers:verification-before-completion',
     ]);
     expect(reading.report.blockers).toEqual([]);
+    expect(output).not.toContain('stale_docs');
+    expect(reading.report.staleDocs).toEqual([]);
     expect(reading.report.outOfScopeBugs).toEqual([
       {
         what: 'Early break from a `Statement.iterate()` loop in an existing query helper poisons its cached statement',
         artifact: 'bad parameter or other API misuse',
         security: false,
+        kind: 'bug',
         extras: [],
       },
     ]);

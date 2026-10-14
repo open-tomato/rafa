@@ -78,6 +78,7 @@ const COLUMNS = [
 /** Every table a store at the last version holds, by name. */
 const TABLES = [
   'blockers',
+  'bug_routes',
   'changes',
   'commits',
   'dispatches',
@@ -91,6 +92,7 @@ const TABLES = [
   'schema_migrations',
   'sessions',
   'skill_invocations',
+  'stale_docs',
   'store_meta',
   'store_replaced',
   'task_reports',
@@ -189,7 +191,7 @@ describe('the dispatches table', () => {
     // The control: the first six entries make every earlier table and no
     // dispatches table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'dispatches' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     writeDispatch(root, writeOf('s-1', 'Do it'), CLOCK);
 

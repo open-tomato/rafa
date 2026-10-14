@@ -13,7 +13,8 @@
  *     every production `INSERT INTO` in this tree already names its
  *     columns (`changes.ts`, `dispatches.ts`, `findings.ts`,
  *     `triage.ts`, `absences.ts`, `preflight.ts`, `reports.ts`,
- *     `plan-ci.ts`, `skill-invocations.ts`, `tracker-refs.ts`,
+ *     `plan-ci.ts`, `skill-invocations.ts`, `stale-docs.ts`,
+ *     `tracker-refs.ts`,
  *     `sqlite.ts`'s row store, `bring-forward.ts`'s log insert).
  *   - No `new Database(` outside `sqlite.ts`, `fix-schema.ts`,
  *     `copy.ts`, `schema-report.ts`, `migrate.ts`, `merge-store.ts`,

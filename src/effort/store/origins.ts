@@ -63,9 +63,11 @@
 
 /**
  * The tables a merge unions, each carrying `origin_store` and
- * `origin_seq` since migration `row-origins`. A production insert that
- * writes a new row into one of them is stamped. Three inserts carry
- * rows that exist already and leave the pair as the row holds it:
+ * `origin_seq`: since migration `row-origins` for the twelve tables
+ * older than it, and from the migration that creates it for
+ * `stale_docs` and `bug_routes`. A production insert that writes a new
+ * row into one of them is stamped. Three inserts carry rows that exist
+ * already and leave the pair as the row holds it:
  * the copy in `fix-schema.ts`, column for column from the live store;
  * the union in `merge-union.ts`, which gives another store's row a new
  * local `seq` and keeps its origin; and the restore in
@@ -88,6 +90,8 @@ export const ORIGIN_TABLES = [
   'changes',
   'skill_invocations',
   'plan_ci',
+  'stale_docs',
+  'bug_routes',
 ] as const;
 
 /** One of the {@link ORIGIN_TABLES}. */

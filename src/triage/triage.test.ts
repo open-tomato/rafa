@@ -218,13 +218,14 @@ function reportWith(parts: Partial<TaskReport> = {}): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [],
+    staleDocs: [],
     extras: [],
     ...parts,
   };
 }
 
 function bug(what: string | null, artifact: string | null, security: boolean | null): ReportBug {
-  return { what, artifact, security, extras: [] };
+  return { what, artifact, security, kind: 'bug', extras: [] };
 }
 
 function blocker(what: string | null): ReportBlocker {

@@ -257,6 +257,14 @@ out_of_scope_bugs:
   - what: "bun:sqlite connection pooling"
     artifact: "SQLITE_MISUSE"
     security: false
+    kind: bug
+changes:
+  - level: minor
+    area: "store"
+    summary: "the store reads and writes through one interface"
+stale_docs:
+  - where: "context/effort-store.md:41"
+    what: "says the store has one backend"
 ```
 ````
 
@@ -269,8 +277,9 @@ Report fields:
 | `findings` | list of objects | Findings discovered during the task (see below) |
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
-| `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
+| `out_of_scope_bugs` | list of objects | Bugs and other leftovers found outside this task's scope, each with a `kind` (see below) |
 | `changes` | list of objects | Release notes for this task's own diff (contributing to the release fragment), one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none`. The wrap-up collects these from all tasks and writes them to the fragment that `rafa release settle` processes after the branch merges. |
+| `stale_docs` | list of objects | Documentation lines the task saw that no longer match the code and that its own change did not falsify (see below). An absent list is empty with no issue |
 
 Finding entry fields:
 
@@ -293,6 +302,13 @@ Change note entry fields:
 | `area` | string | no | The changelog section the line groups under (e.g., `cli`, `store`) |
 | `summary` | string | yes | One line a user of the project would understand, quoted |
 
+Stale doc entry fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `where` | string | no | The file, with the line when known, as one string (e.g., `context/triage.md:12`). An entry without one is kept |
+| `what` | string | yes | What no longer matches. An entry without one is reported as an issue and dropped |
+
 Blocker/bug entry fields:
 
 | Field | Type | Required | Description |
@@ -300,6 +316,18 @@ Blocker/bug entry fields:
 | `what` | string | yes | Description of the blocker or bug |
 | `artifact` | string | no | Error message or diagnostic output |
 | `security` | boolean | yes (bugs only) | Whether this is a security issue; never defaulted when missing |
+| `kind` | string | no (bugs only) | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
+
+Out-of-scope entry kinds:
+
+| Kind | When it applies |
+| --- | --- |
+| `bug` | The code does the wrong thing, and this plan did not cause it |
+| `own-fallout` | Something an earlier task of this plan broke or left stale |
+| `own-gap` | Something this plan built and left unfinished |
+| `convention` | A file too long, a name off the pattern |
+| `docs` | A stale doc line |
+| `machine` | This machine's fault |
 
 ---
 
@@ -354,6 +382,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 | `tools` | tool names, comma-separated with no spaces | `--tools` | never passed: the definition names its tool set |
 | `skills` | skill names, comma-separated with no spaces | nothing: no flag carries a skill | kept on the record beside the agent |
 | `tests` | `affected`, `module` or `full`; `affected` when absent | nothing: the loop's runner reads it | kept on the record beside the agent |
+| `docs` | `repair`, its one value; any other is recorded as an issue and read as absent | nothing: the loop reads it | kept on the record beside the agent |
 
 * `agent=<name>` outranks `model` and `tools`, and `effort` only when its
   definition declares one, as the last column says. The outranked keys
@@ -378,7 +407,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list and whose `readTestScope` reads a test scope; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
@@ -452,6 +481,41 @@ A task's text never asks its session for a whole-suite run, or for any command t
   and the runner runs the suite after the commit; a task that needs a long
   run's output reads it from the file a `[start]` prerequisite or the
   runner wrote.
+
+### The closing doc task
+
+* A plan with one task not declared `agent=doc-updater` ends on one task
+  declared `agent=doc-updater docs=repair`. That task is the plan's last
+  task line, and it repairs the docs of what the plan changed: the loop
+  hands it the `stale_docs` rows the plan's tasks reported and the files
+  its commits touched.
+* A plan whose every task is declared `agent=doc-updater` gets no closing
+  doc task: it is prose only, and every task in it is documentation.
+* `rafa plan validate` reports a plan with a code task and no `docs=repair`
+  task on its last line as the warning `missing-doc-task`. The warning never
+  refuses a plan, so a plan written before this rule still runs.
+
+A plan of code tasks ends on the closing task:
+
+````markdown
+  # Stage: Store
+
+  - [ ] Add the `stale_docs` table migration with its unit tests  {agent=loop-implementer effort=high}
+  - [ ] Add the store writer for stale-doc rows with its unit tests  {agent=loop-implementer effort=medium}
+
+  # Stage: Close-out
+
+  - [ ] Repair the docs of what this plan changed  {agent=doc-updater docs=repair effort=medium}
+````
+
+A prose-only plan gets none:
+
+````markdown
+  # Stage: Pages
+
+  - [ ] Rewrite the triage page for four channels  {agent=doc-updater effort=medium}
+  - [ ] Add the doc task to the workflow page  {agent=doc-updater effort=medium}
+````
 
 ---
 

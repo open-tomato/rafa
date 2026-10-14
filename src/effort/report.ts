@@ -4,8 +4,8 @@
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
  * reads the config, the store the config selects, and the task reports,
- * preflight checks and dispatches the loop stored, and nothing else — no
- * log, no clock — so a report is
+ * preflight checks, dispatches, out-of-scope bugs and routes the loop stored, and
+ * nothing else — no log, no clock — so a report is
  * a pure projection of rows already on disk and two runs over an
  * unchanged store produce identical bytes.
  *
@@ -66,6 +66,8 @@
  * holds no dollar figure, and a text-mode session prints none. The
  * command prints the budgets under its no-rows line as it prints the
  * tallies there, and the filters do not narrow them.
+ * {@link EffortReport.docOnlyBugs} is `report-doc-bugs.ts`'s to describe,
+ * and {@link EffortReport.bugKinds}, read from `bug_routes`, `report-kinds.ts`'s.
  *
  * ## What a group is keyed on
  *
@@ -140,12 +142,12 @@
  * `--skills` prints the skills report (`report-skills.ts`) in place of all
  * of the above, narrowed by `--plan=` to the plans named, and a stub the
  * store holds no row for reads as no plan rather than as a refusal.
- * {@link readSkillsReport} resolves what it reads as the rest resolves the
- * store: the config under the repo root and the home, so a config the loop
- * cannot run on is refused the same way, the three tiers read under both
- * and resolved under that config as a loop session is served them
- * (`start/serving.ts`), and the lessons held in both instinct scopes. In
- * text mode the lines are `report-skills-format.ts`'s, and in json mode
+ * `readSkillsReport` (`report-skills-read.ts`) resolves what it reads as
+ * the rest resolves the store: the config under the repo root and the home,
+ * so a config the loop cannot run on is refused the same way, the three
+ * tiers read under both and resolved under that config as a loop session
+ * is served them (`start/serving.ts`), and the lessons held in both
+ * instinct scopes. In text mode the lines are `report-skills-format.ts`'s, and in json mode
  * the report is the result's data, as the session report is.
  *
  * ## The trend report instead
@@ -166,6 +168,8 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { BudgetedSession } from './report-budgets.js';
+import type { DocOnlyBugs } from './report-doc-bugs.js';
+import type { BugKindsReading } from './report-kinds.js';
 import type { SkillsReport } from './report-skills.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { SessionBudget } from './store/dispatches.js';
@@ -180,20 +184,16 @@ import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { activeOutput, activeOutputMode } from '../core/output/index.js';
-import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
 import { parseReportArgs } from './report-args.js';
 import { budgetedSessions } from './report-budgets.js';
-import {
-  formatBudgets,
-  formatPreflightHalts,
-  formatReport,
-  formatTaskReports,
-} from './report-format.js';
+import { readDocOnlyBugs } from './report-doc-bugs.js';
+import { formatReport, formatStoredSections } from './report-format.js';
+import { readBugKinds } from './report-kinds.js';
 import { formatSkillsReport } from './report-skills-format.js';
-import { buildSkillsReport, readHeldLessons } from './report-skills.js';
+import { readSkillsReport } from './report-skills-read.js';
 import { writeTrendReport } from './report-trend-read.js';
 import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
@@ -313,6 +313,10 @@ export interface EffortReport {
    * module note.
    */
   budgets: readonly BudgetedSession[];
+  /** The stored bugs of scope `rafa`, and those naming only documentation. Never narrowed. */
+  docOnlyBugs: DocOnlyBugs;
+  /** The routed out-of-scope entries by plan and kind, or why they could not be read. Never narrowed. */
+  bugKinds: BugKindsReading;
 }
 
 /** Where a report reads from and what it narrows to. */
@@ -555,8 +559,8 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  * Rolls rows up into the report.
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
- * planted row needs no store, no log and no repository. `taskReports`
- * and `preflightHalts` are carried into the report as they are handed
+ * planted row needs no store, no log and no repository. `taskReports`,
+ * `preflightHalts`, `docOnlyBugs` and `bugKinds` are carried into the report as handed
  * in, never filtered, and each of `budgets` is joined against every row
  * handed in, filtered out or not (`report-budgets.ts`).
  */
@@ -566,6 +570,8 @@ export function summariseSessions(
   taskReports: readonly TaskReportTally[] = [],
   preflightHalts: readonly PreflightHalt[] = [],
   budgets: readonly SessionBudget[] = [],
+  docOnlyBugs: DocOnlyBugs = { bugs: 0, docOnly: 0 },
+  bugKinds: BugKindsReading = { plans: [], problem: null },
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -602,6 +608,8 @@ export function summariseSessions(
     taskReports,
     preflightHalts,
     budgets: budgetedSessions(rows, budgets),
+    docOnlyBugs,
+    bugKinds,
   };
 }
 
@@ -623,14 +631,14 @@ function resolveStore(
 }
 
 /**
- * Reads the session rows of the selected store, and the task report
- * tallies and preflight halts under the repo root, and rolls the rows up.
+ * Reads the session rows of the selected store, and what the report's
+ * other tables hold under the repo root, and rolls the rows up.
  *
  * A missing store answers an EMPTY report rather than throwing — every
  * backend answers absence as the first-run case — so the command below
  * is what says "nothing collected yet" in words, which is the one thing
- * a table of zeroes cannot convey. A missing SQLite file answers no
- * tallies and no halts the same way.
+ * a table of zeroes cannot convey. A missing SQLite file answers nothing
+ * for each of those tables, and a count of zero, the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
  * and a config file under the repo root or the home is one the loop
@@ -649,44 +657,9 @@ export function buildReport(options: ReportOptions): EffortReport {
     readTaskReportTallies(repoRoot),
     readPreflightHalts(repoRoot),
     readSessionBudgets(repoRoot),
+    readDocOnlyBugs(repoRoot),
+    readBugKinds(repoRoot),
   );
-}
-
-/** Where the skills report reads from and what it narrows to. */
-export interface SkillsReportOptions {
-  /** The project root, with no default. Governs the config, the tiers, the lessons and the store. */
-  repoRoot: string;
-  /** The home the user scope's config, tier and lessons are read under. No default. */
-  home: string;
-  /** The plan stubs to read; every plan when null or left out. */
-  plans?: readonly string[] | null;
-  /** The entry the rafa tier sits beside. Defaults to `Bun.main`. */
-  entry?: string;
-}
-
-/**
- * The skills report over the store under the repo root, each skill's
- * failure strings read from the tiers as they resolve now under the
- * config and each lesson resolved through the held set. See the module
- * note.
- *
- * Throws a `ConfigError`, having read no row, when a config file under
- * the repo root or the home is one the loop cannot run on.
- */
-export function readSkillsReport(options: SkillsReportOptions): SkillsReport {
-  const { repoRoot: root, home, entry } = options;
-  const { config } = loadConfig({ root, home });
-  const pinned = entry === undefined
-    ? {}
-    : { entry };
-  return buildSkillsReport({
-    repoRoot: root,
-    ...(options.plans === null || options.plans === undefined
-      ? {}
-      : { plans: options.plans }),
-    resolution: resolveSessionTiers({ root, home, settings: config, ...pinned }),
-    lessons: readHeldLessons({ home, projectRoot: root, ...pinned }),
-  });
 }
 
 /** Refuses the run with exit code 1, its message one line per refusal. */
@@ -788,8 +761,7 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (built.rowsRead === 0) {
     output.info('effort report: no session rows stored yet'
       + ' (run `rafa effort collect` first)');
-    const sections = [...formatTaskReports(built), ...formatPreflightHalts(built), ...formatBudgets(built)];
-    for (const line of sections) output.info(line);
+    for (const line of formatStoredSections(built)) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {

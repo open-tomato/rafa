@@ -44,8 +44,9 @@
  *    removes the worktree. A git step it refuses is exit 1, naming the
  *    command and what git said; a removal git refuses is a `warn` line.
  * 7. The verdicts. Every check that answered `fail` is filed as an
- *    out-of-scope bug through `triageReport` (`src/triage/triage.ts`) and
- *    the close is refused. A check whose session answered nothing is
+ *    out-of-scope bug through `triageReport` (`src/triage/triage.ts`), or,
+ *    when its criterion names only documentation, sent to the `docs`
+ *    channel (`./close-docs.ts`), and the close is refused. A check whose session answered nothing is
  *    neither a pass nor a fail, and refuses the close too, filing
  *    nothing: running the close again asks it again.
  * 8. The close: one `IssueBoard.closeIssue` with reason `completed` and
@@ -86,11 +87,12 @@
  * Each failed check is one report of its own, holding one bug and no
  * blocker, handed to `triageReport` with the check session's id, since
  * that session is where the evidence came from, and `failed` as the
- * outcome. The bug is `security: false`: a criterion that does not hold is
- * a product bug, so it goes to the public tracker the chain resolves,
- * resolved once and only when a check failed (`resolveTracker`, with
- * `unresolvedTracker` from `src/start/triage.ts` standing in for a chain
- * that landed nowhere, so each bug then fails with its refusal). Its
+ * outcome. The bug is `security: false` and `kind: bug`: a criterion that
+ * does not hold is a product bug, so it goes to the public tracker the
+ * chain resolves, resolved once and only when a check failed
+ * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
+ * standing in for a chain that landed nowhere, so each bug then fails
+ * with its refusal). Its
  * `what` names the epic and the criterion, and its `artifact` is
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
@@ -106,6 +108,13 @@
  * thing `triageReport` writes into its tracker file. The feedback holds
  * the check, the commit and the evidence. When #249's ladder lands it
  * routes these bugs; until then they are filed as out-of-scope bugs are.
+ *
+ * A failed check whose criterion's text names only documentation
+ * (`namesOnlyDocs`, `src/triage/doc-only.ts`) is no bug: in place of the
+ * report it is one `unsettled` stale-docs row with no plan stub and one
+ * line on the release's stale-docs issue, on the same tracker, the
+ * version read once per run ({@link EpicCloseSeams.staleDocsVersion}).
+ * `./close-docs.ts` says what is stored and written.
  *
  * ## The project refresh
  *
@@ -168,11 +177,14 @@ import { selectEffortStore } from '../../effort/store/index.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
 import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
+import { readStaleDocsVersion } from '../../start/stale-docs.js';
 import { unresolvedTracker } from '../../start/triage.js';
-import { namedSecrets, triageReport } from '../../triage/triage.js';
+import { localPathRedactor } from '../../triage/local-paths.js';
+import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { readSwitch } from '../plan/plan-files.js';
 
+import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 import { closeTarget, refreshProjectAfterEpic } from './epic-project.js';
 
 /** The exit code every refusal of the gate ends the command with. */
@@ -245,6 +257,8 @@ export interface EpicCloseSeams extends EpicProjectSeams {
   readonly findings?: FindingsWriterSeams;
   /** The board's relationships, which read the epic's members; `labels` mode when left out. See the module note. */
   readonly relations?: EpicRelations;
+  /** Reads the version the stale-docs issue is titled for. `readStaleDocsVersion` in the project root when left out. */
+  readonly staleDocsVersion?: () => string;
 }
 
 /** `#40`. */
@@ -442,9 +456,11 @@ export function failedCheckReport(epic: number, failure: CheckAnswered, commit: 
       what: `Epic ${ref(epic)} acceptance criterion ${String(criterion.number)} fails against main: ${oneLine(criterion.text)}`,
       artifact: failedCheckArtifact(epic, criterion),
       security: false,
+      kind: 'bug',
       extras: [],
     })],
     changes: [],
+    staleDocs: [],
     extras: [],
   });
 }
@@ -476,6 +492,13 @@ export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly te
     }
     case 'failed': {
       return { text: `${which}: not filed on the ${bug.channel} tracker: ${bug.problem ?? 'no reason given'}`, warn: true };
+    }
+    case 'repair':
+    case 'follow-up':
+    case 'pr-body':
+    case 'docs': {
+      // Answered only by kind routing, which this run never turns on.
+      return { text: `${which}: not filed: routed to ${bug.action} by its kind.`, warn: true };
     }
   }
 }
@@ -512,8 +535,22 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
     warn(run, `No tracker resolved, so no failed check is filed: ${messageOf(error)}`);
     tracker = unresolvedTracker(run.config.trackerDefault, messageOf(error));
   }
+  const local = localPathRedactor([run.root], run.home);
+  let version: string | null = null;
+  const docs = {
+    repoRoot: run.root, epic, tracker, seams: run.seams.findings,
+    redact: (text: string): string => local(redactSecrets(text, secrets)),
+    version: (): string => version ??= (run.seams.staleDocsVersion ?? (() => readStaleDocsVersion({ repoRoot: run.root, checkout: run.root, config: run.config })))(),
+  };
   for (const failure of failures) {
     const { criterion } = failure.check;
+    if (isDocsOnlyCriterion(criterion)) {
+      for (const line of await routeDocsOnlyFailure({ ...docs, criterion, sessionId: failure.sessionId })) {
+        if (line.warn) warn(run, line.text);
+        else say(run, line.text);
+      }
+      continue;
+    }
     try {
       const result = await triageReport({
         repoRoot: run.root,
@@ -555,6 +592,7 @@ async function weighResults(run: CloseRun, epic: number, ran: VerifyRunRan): Pro
   const answered = ran.results.filter((result): result is CheckAnswered => result.kind === 'answered');
   const unanswered = ran.results.filter((result): result is CheckUnanswered => result.kind === 'unanswered');
   const failed = answered.filter((result) => result.result === 'fail');
+  const docsOnly = failed.filter((result) => isDocsOnlyCriterion(result.check.criterion)).length;
   for (const result of ran.results) {
     const name = criterionName(result.check.criterion);
     if (result.kind === 'unanswered') warn(run, `No answer for ${name} — ${result.reason}`);
@@ -571,11 +609,14 @@ async function weighResults(run: CloseRun, epic: number, ran: VerifyRunRan): Pro
   if (failed.length === 0 && unanswered.length === 0) return answered;
 
   const parts = [
-    ...(failed.length === 0
+    ...(failed.length === docsOnly
       ? []
-      : [`${criteria(failed.length)} failed ${failed.length === 1
+      : [`${criteria(failed.length - docsOnly)} failed ${failed.length - docsOnly === 1
         ? 'its check'
         : 'their checks'}, each filed as a bug`]),
+    ...(docsOnly === 0
+      ? []
+      : [`${criteria(docsOnly)} naming only documentation failed, each a line on the release's stale-docs issue`]),
     ...(unanswered.length === 0
       ? []
       : [`${criteria(unanswered.length)} got no answer; run the close again to ask again`]),
@@ -697,7 +738,8 @@ export function createEpicCloseCommand(seams: EpicCloseSeams = {}): RafaCommand 
     description: 'Refuses with exit code 2, naming them, while any member of the epic is open. Then one session'
       + ' plans a check for each acceptance criterion, or names it uncheckable with a reason, and each check runs'
       + ' as its own session in a detached worktree of origin/main. Any uncheckable criterion refuses the close'
-      + ` before a check runs, unless --${ACCEPT_UNCHECKED_FLAG} is passed; each failed check is filed as a bug and`
+      + ` before a check runs, unless --${ACCEPT_UNCHECKED_FLAG} is passed; each failed check is filed as a bug, or`
+      + ' added as a line to the release\'s stale-docs issue when its criterion names only documentation, and'
       + ' refuses the close. Otherwise the epic is closed as completed with a comment naming each criterion, and'
       + ' what its members cost, summed from the effort store, is printed beside its estimate. With'
       + ' `--output=json` the close is the data of the terminal result event.',

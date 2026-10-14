@@ -28,10 +28,14 @@
  *   - what: "..."
  *     artifact: "..."
  *     security: false
+ *     kind: bug
  * changes:
  *   - level: patch
  *     area: "loop"
  *     summary: "the loop waits for the running task's commit"
+ * stale_docs:
+ *   - where: "context/triage.md:12"
+ *     what: "says triage has three channels"
  * ```
  * ````
  *
@@ -83,8 +87,8 @@
  *     `unusable-field`. That covers a string field holding something
  *     other than a string or only whitespace, a closed-set field holding
  *     a value outside {@link REPORT_STATUSES}, {@link FINDING_KINDS},
- *     {@link FINDING_SIGNALS}, {@link FINDING_DOMAINS} or
- *     {@link CHANGE_LEVELS}, and a `security`
+ *     {@link FINDING_SIGNALS}, {@link FINDING_DOMAINS},
+ *     {@link CHANGE_LEVELS} or {@link BUG_KINDS}, and a `security`
  *     flag that is not a boolean. The sets are closed because stored rows
  *     are keyed on them. A later phase promotes a `silent` finding on its
  *     first sighting, for example, so a signal spelled any other way must
@@ -96,9 +100,23 @@
  *
  * Required fields: `status`; a finding's `trigger`, `kind`, `what` and
  * `signal`; a blocker's `what`; an out-of-scope bug's `what` and
- * `security`; a change note's `level` and `summary`. A missing `security`
- * flag stays null rather than defaulting to false, because this parser
- * does not get to decide that a bug has no security impact.
+ * `security`; a change note's `level` and `summary`; a stale doc's `what`.
+ * A missing `security` flag stays null rather than defaulting to false,
+ * because this parser does not get to decide that a bug has no security
+ * impact.
+ *
+ * ## An out-of-scope entry's kind
+ *
+ * An `out_of_scope_bugs` entry's `kind` says what sort of leftover it
+ * is, one of {@link BUG_KINDS}. It is a different field from a
+ * finding's `kind`, with its own list.
+ *
+ * It is the one closed-set field that never reads as null. The key was
+ * added after reports of three keys per entry were already being
+ * written, so an entry with no `kind` reads as `bug` with no issue: a
+ * session on an older prompt changes nothing. A value outside the list
+ * is reported as `unusable-field` and also reads as `bug`, the kind an
+ * entry had before the key existed.
  *
  * ## Change notes
  *
@@ -115,6 +133,23 @@
  * carries no ranking. Whatever computes a release level out of a plan's
  * notes orders them itself; reading precedence off this list's indices
  * would make `none` the highest of the four.
+ *
+ * ## Stale docs
+ *
+ * `stale_docs` is the list of documentation lines a task saw that no
+ * longer match the code and that its own change did not falsify. An
+ * entry's `where` is the file, with the line when known, as one string
+ * such as `context/triage.md:12`; its `what` says what no longer matches.
+ *
+ * This is the one list whose entry is dropped for a field: an entry with
+ * no usable `what` is reported and left out of {@link TaskReport.staleDocs},
+ * because a place with nothing said about it is not a row anyone can
+ * settle. An entry with no usable `where` is kept, with `where` null.
+ *
+ * The key is the eighth, added after reports of seven were already being
+ * written. A report with no `stale_docs` key reads as an empty list with
+ * no issue, like every other absent list, so a session on an older prompt
+ * is neither failed nor flagged for writing seven fields.
  *
  * Strings are kept exactly as written, never trimmed. `artifact` is the
  * byte string a recurrence is matched on. A blank one is refused, because
@@ -212,6 +247,22 @@ export const CHANGE_LEVELS = ['patch', 'minor', 'major', 'none'] as const;
 /** One of the four change levels. */
 export type ChangeLevel = (typeof CHANGE_LEVELS)[number];
 
+/**
+ * What sort of leftover an `out_of_scope_bugs` entry is: `bug`, code
+ * doing the wrong thing that this plan did not cause; `own-fallout`,
+ * something an earlier task of this plan broke or left stale; `own-gap`,
+ * something this plan built and left unfinished; `convention`, a file
+ * too long or a name off the pattern; `docs`, a stale doc line;
+ * `machine`, this machine's fault.
+ */
+export const BUG_KINDS = ['bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine'] as const;
+
+/** One of the six out-of-scope entry kinds. */
+export type BugKind = (typeof BUG_KINDS)[number];
+
+/** The kind an entry with no usable `kind` reads as. */
+const DEFAULT_BUG_KIND: BugKind = 'bug';
+
 /** One key the parser does not know, at whatever level it was written. */
 export interface ReportExtra {
   /** The key as written. */
@@ -263,6 +314,12 @@ export interface ReportBug {
   readonly artifact: string | null;
   /** Whether the bug has a security impact. Required; never defaulted. */
   readonly security: boolean | null;
+  /**
+   * What sort of leftover it is. Never null: an absent key reads as
+   * `bug` with no issue, and a value outside {@link BUG_KINDS} as `bug`
+   * with an `unusable-field` issue.
+   */
+  readonly kind: BugKind;
   /** Every key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -275,6 +332,16 @@ export interface ReportChange {
   readonly area: string | null;
   /** One line a user of the project would understand. Required. */
   readonly summary: string | null;
+  /** Every key that names no field. */
+  readonly extras: readonly ReportExtra[];
+}
+
+/** One `stale_docs` entry: a documentation line that no longer matches. */
+export interface ReportStaleDoc {
+  /** The file, with the line when known: `context/triage.md:12`. */
+  readonly where: string | null;
+  /** What no longer matches. Required; an entry without one is dropped. */
+  readonly what: string;
   /** Every key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -295,6 +362,8 @@ export interface TaskReport {
   readonly outOfScopeBugs: readonly ReportBug[];
   /** Every usable `changes` entry, in order. */
   readonly changes: readonly ReportChange[];
+  /** Every `stale_docs` entry that says what is stale, in order. */
+  readonly staleDocs: readonly ReportStaleDoc[];
   /** Every top-level key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -384,6 +453,7 @@ const REPORT_KEYS = [
   'blockers',
   'out_of_scope_bugs',
   'changes',
+  'stale_docs',
 ];
 
 /** A finding's keys. */
@@ -402,10 +472,13 @@ const FINDING_KEYS = [
 const BLOCKER_KEYS = ['what', 'artifact'];
 
 /** An out-of-scope bug's keys. */
-const BUG_KEYS = ['what', 'artifact', 'security'];
+const BUG_KEYS = ['what', 'artifact', 'security', 'kind'];
 
 /** A change note's keys. */
 const CHANGE_KEYS = ['level', 'area', 'summary'];
+
+/** A stale doc's keys. */
+const STALE_DOC_KEYS = ['where', 'what'];
 
 /** True for a mapping; false for a list, a scalar or null. */
 function isMapping(value: unknown): value is Mapping {
@@ -593,6 +666,7 @@ function readBug(item: unknown, field: string, issues: ReportIssue[]): ReportBug
     what: stringField(scope, 'what', REQUIRED),
     artifact: stringField(scope, 'artifact', OPTIONAL),
     security: booleanField(scope, 'security', REQUIRED),
+    kind: choiceField(scope, 'kind', BUG_KINDS, OPTIONAL) ?? DEFAULT_BUG_KIND,
     extras: scope.extras,
   };
 }
@@ -609,6 +683,19 @@ function readChange(item: unknown, field: string, issues: ReportIssue[]): Report
   };
 }
 
+/**
+ * One `stale_docs` entry, or null for one with no usable `what`, which the
+ * `what` field has reported by then.
+ */
+function readStaleDoc(item: unknown, field: string, issues: ReportIssue[]): ReportStaleDoc | null {
+  const scope = entryScope(item, field, STALE_DOC_KEYS, issues);
+  if (scope === null) return null;
+  const where = stringField(scope, 'where', OPTIONAL);
+  const what = stringField(scope, 'what', REQUIRED);
+  if (what === null) return null;
+  return { where, what, extras: scope.extras };
+}
+
 /** Reads the report's fields out of a parsed block body. */
 function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
   const scope = scopeOf(document, REPORT_KEYS, '', issues);
@@ -620,6 +707,7 @@ function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
     blockers: listField(scope, 'blockers', readBlocker),
     outOfScopeBugs: listField(scope, 'out_of_scope_bugs', readBug),
     changes: listField(scope, 'changes', readChange),
+    staleDocs: listField(scope, 'stale_docs', readStaleDoc),
     extras: scope.extras,
   };
 }

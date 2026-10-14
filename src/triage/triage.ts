@@ -2,7 +2,7 @@
  * Loop-owned triage: what a task report's blockers and out-of-scope bugs
  * become once the report is stored and the task's tracker line is marked.
  *
- * {@link triageReport} takes one parsed report and does two things, in
+ * {@link triageReport} takes one parsed report and does three things, in
  * this order:
  *
  *   - Blockers. The `what` of every blocker that has one, joined with
@@ -19,10 +19,16 @@
  *     machine-fault reading answers, and otherwise by its `security`
  *     flag. A bug with no usable `what` is skipped: it says nothing to
  *     file, and the store's triage writer refuses it for the same
- *     reason. A public bug the run inherited files nothing; see below.
+ *     reason. Given {@link TriageOptions.kinds}, every other entry is
+ *     then routed by its kind (`./kind-route.ts`), and only one read as
+ *     `bug`, or one the security rule keeps private, goes on to a
+ *     tracker. A public bug the run inherited files nothing; see below.
+ *   - `stale_docs` entries, each answered as `skipped` on the `docs`
+ *     channel, which has no tracker either (`./stale-docs.ts`).
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
- * declares a task for it.
+ * declares a task for it. A leftover of the plan's own, `own-fallout` or
+ * `own-gap`, is no bug: `./kind-route.ts` inserts its repair task.
  *
  * ## The key a bug is looked up by
  *
@@ -246,6 +252,7 @@
  */
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
+import type { KindRouteOptions } from './kind-route.js';
 import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
@@ -258,7 +265,7 @@ import type {
 import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
-import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
+import type { BugKind, ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -277,10 +284,12 @@ import {
   issueTitle,
   similarCommentOpening,
 } from './issue-text.js';
+import { routeByKind } from './kind-route.js';
 import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 import { nearestOpenBugs } from './similarity.js';
+import { triageStaleDocs } from './stale-docs.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
@@ -306,9 +315,9 @@ export interface NamedSecret {
 
 /**
  * Where a bug goes: the tracker the chain landed on, the private one, or
- * `machine`, the channel with no tracker at all; see the module note.
+ * neither: `machine` and `docs` have no tracker at all; see the module note.
  */
-export type BugChannel = 'public' | 'private' | 'machine';
+export type BugChannel = 'public' | 'private' | 'machine' | 'docs';
 
 /** What became of one bug. */
 export type BugTriageAction =
@@ -323,12 +332,20 @@ export type BugTriageAction =
    */
   | 'inherited'
   /**
-   * Nothing was called for it: it is machine-scoped, or it had no `what`
-   * to file. Its problem says which.
+   * Nothing was called for it: it is machine-scoped, it had no `what` to
+   * file, or it is a `stale_docs` entry. Its problem says which.
    */
   | 'skipped'
   /** A step failed before an issue was filed or commented on. */
-  | 'failed';
+  | 'failed'
+  /** A plan's own leftover: a repair task was inserted for it (`./kind-route.ts`). */
+  | 'repair'
+  /** A plan's own leftover past the repair cap: it goes to the plan's follow-up issue. */
+  | 'follow-up'
+  /** A `convention` entry: it goes to the pull request's body. */
+  | 'pr-body'
+  /** A `docs` entry: it was stored as a stale-doc row. */
+  | 'docs';
 
 /**
  * How the issue a recurrence was commented on was found: by a stored
@@ -369,6 +386,10 @@ export interface BugTriage {
    * a failed one found by it; absent otherwise.
    */
   readonly score?: number;
+  /** The kind it was routed under (`./kind-route.ts`); absent with {@link TriageOptions.kinds} left out. */
+  readonly kind?: BugKind;
+  /** For a `repair`, the inserted task's line, counting from zero; absent otherwise. */
+  readonly repairLine?: number;
 }
 
 /** What {@link triageReport} did. */
@@ -376,6 +397,8 @@ export interface TriageResult {
   readonly blocker: BlockerTriage;
   /** One per out-of-scope bug, in the report's order. */
   readonly bugs: readonly BugTriage[];
+  /** One per `stale_docs` entry, in the report's order, each `skipped` on `docs`. */
+  readonly staleDocs: readonly BugTriage[];
 }
 
 /** What {@link triageReport} needs to triage one report. */
@@ -427,6 +450,8 @@ export interface TriageOptions {
    * that step is off.
    */
   readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
+  /** The kind check's readings and the repair cap; left out, no entry is routed by its kind. */
+  readonly kinds?: KindRouteOptions;
 }
 
 /** The environment a secret's value is read from. */
@@ -610,8 +635,8 @@ function legacyKeysOf(
   return [...new Set(keys)].filter((legacy) => legacy !== key);
 }
 
-/** The channels that have a tracker to route a bug to: every one but `machine`. */
-type TrackedChannel = Exclude<BugChannel, 'machine'>;
+/** The channels that have a tracker to route a bug to: every one but `machine` and `docs`. */
+type TrackedChannel = Exclude<BugChannel, 'machine' | 'docs'>;
 
 /** Where one channel files, and the store calls only the public channel makes. */
 interface Route {
@@ -901,8 +926,8 @@ function checkPrivateTracker(tracker: Tracker, privateTracker: Tracker): void {
  * tracker line, then files, or comments on, each out-of-scope bug
  * through the channel it is routed to — the machine one, which files
  * nothing, when the machine-fault reading answers, and otherwise the one
- * its `security` flag names — and answers what became of each; see the
- * module note.
+ * its `security` flag names — and answers what became of each, and of
+ * each `stale_docs` entry, which reaches no tracker; see the module note.
  *
  * Rejects, having written and called nothing, only for a private tracker
  * it refuses. Every other failure is answered in the result.
@@ -944,6 +969,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   };
 
   const bugs: BugTriage[] = [];
+  const commented = options.inherited?.commented ?? new Set<string>();
   for (const [index, bug] of options.report.outOfScopeBugs.entries()) {
     const fault = readMachineFault(bug);
     if (fault !== null) {
@@ -958,15 +984,23 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
+    const routed = await routeByKind({ bug, index, what, redact }, options);
+    if (routed.settled) {
+      bugs.push(routed.row);
+      continue;
+    }
     const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
     const run: BugRun = { route, index, filing, redact };
     const { inherited } = options;
-    const isInherited = route.channel === 'public'
+    const isInherited = routed.inherited || (route.channel === 'public'
       && inherited !== undefined
-      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null;
-    bugs.push(isInherited
-      ? await triageInherited(run, inherited.commented)
-      : await triageBug(run));
+      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null);
+    const result = isInherited
+      ? await triageInherited(run, commented)
+      : await triageBug(run);
+    bugs.push(routed.kind === null
+      ? result
+      : { ...result, kind: routed.kind });
   }
-  return { blocker, bugs };
+  return { blocker, bugs, staleDocs: triageStaleDocs(options.report.staleDocs, redact) };
 }

@@ -1,25 +1,27 @@
 /**
- * `rafa release status`: the six readings an operator needs before
+ * `rafa release status`: the eight readings an operator needs before
  * they tag anything — the version the version file declares, the
  * latest release tag the repository holds, the versions the changelog
  * calls released that carry no tag, the change notes waiting for
  * the current plan's release, the change fragments waiting on the
  * base branch with the release settling them would make (read in
- * `./status-fragments.ts`), and the audit of the changelog's released
- * history (`src/release/audit.ts`).
+ * `./status-fragments.ts`), the audit of the changelog's released
+ * history (`src/release/audit.ts`), and how many lines the release's
+ * stale-docs issues hold open (read in `./status-stale-docs.ts`).
  *
  * The loop writes a version and a changelog entry with every pull
  * request (`src/start/release-stage.ts`), and stops there: the merge
  * commit is not its to tag, so the tag and the publish are an operator
  * step (from the changelog and release spec, its step 4). This action is
  * the readout that step is taken from, and it WRITES NOTHING: every git
- * command it sends is a read, no file is opened for writing, and no
- * network is reached.
+ * command it sends is a read and no file is opened for writing. The
+ * stale-docs count is the one reading that can reach the network, as a
+ * listing of the tracker the chain lands on.
  *
  * ## The two halves
  *
  * This file is the command half: the command, its `--plan` flag, the
- * version file and pending notes readings, and the block the six
+ * version file and pending notes readings, and the block the eight
  * render to. The readers other folders use are its library half,
  * `src/release/status-readings.ts`: `compareVersions`,
  * `changelogVersions`, `readTags`, `readUntagged` and the types they
@@ -53,21 +55,24 @@
  *
  * ## Nothing here refuses for a reading that failed
  *
- * Each of the six is read on its own and each is allowed to fail:
+ * Each of the eight is read on its own and each is allowed to fail:
  * a missing version file, a git that cannot list tags, an unreadable
- * changelog, a store this rafa cannot open. A cell nothing could be
+ * changelog, a store this rafa cannot open, a tracker the chain cannot
+ * land on or list. A cell nothing could be
  * read for renders {@link UNREADABLE} and the reason goes on its own
  * line under the block, which is the convention `pr list` keeps for
  * its per-row probes. Refusing the whole command for one of them
- * would hide the ones that were readable, and every one of the six
- * is worth having alone. The audit is the one exception to a reason
- * of its own: it reads the changelog the untagged reading reads, so
- * an unreadable changelog is said once, under that reading.
+ * would hide the ones that were readable, and every one of the eight is worth
+ * having alone. The stale-docs count in particular never changes the exit
+ * code: an open line refuses no release. The audit is the one exception to a
+ * reason of its own: it reads the changelog the untagged reading reads, so an
+ * unreadable changelog is said once, under that reading.
  *
  * The refusals left are the line's own: a stray word, and a config
  * `loadConfig` refuses. Both exit 1.
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
+import type { StaleDocsReader, StaleDocsReading, StaleDocsSettings } from './status-stale-docs.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { PlanChange } from '../../effort/store/changes.js';
@@ -93,6 +98,7 @@ import { readTags, readUntagged } from '../../release/status-readings.js';
 import { readManifestVersion } from '../../release/version.js';
 
 import { readWaiting, waitingCell, waitingLines, waitingSettingsOf } from './status-fragments.js';
+import { readStaleDocs, readStaleDocsSafely, staleDocsCell, staleDocsProblem } from './status-stale-docs.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_STATUS_USAGE = 'rafa release status [--plan=<stub>]';
@@ -110,18 +116,20 @@ const INDENT = '  ';
 const GAP = '  ';
 
 /**
- * How this action reaches git and the store; each left out is the
- * system's own. `release tag` takes the same shape, so one test
- * replaces both the same way.
+ * How this action reaches git, the store and the tracker; each left out
+ * is the system's own. `release tag` takes the same shape, so one test
+ * replaces both the same way; `release tag` reads no stale-docs line.
  */
 export interface ReleaseSeams {
   /** Makes the git runner every read of this action goes through. */
   readonly git?: (root: string) => GitRunner;
   /** A plan's stored change notes, oldest first. */
   readonly readNotes?: (repoRoot: string, planStub: string) => readonly PlanChange[];
+  /** How many stale-docs lines are open, through the tracker chain (`./status-stale-docs.ts`). */
+  readonly readStaleDocs?: StaleDocsReader;
 }
 
-/** The seams the registered action runs with: the system's own, both. */
+/** The seams the registered action runs with: the system's own, all three. */
 export const DEFAULT_RELEASE_SEAMS: ReleaseSeams = Object.freeze({});
 
 /** What the version file declared, or why it declared nothing. */
@@ -164,7 +172,7 @@ export interface PendingNotesReading {
   readonly problem: string | null;
 }
 
-/** The six readings one run of this action answers. */
+/** The eight readings one run of this action answers. */
 export interface ReleaseStatusReading {
   /** The version the version file declares. */
   readonly versionFile: VersionFileReading;
@@ -178,11 +186,13 @@ export interface ReleaseStatusReading {
   readonly waiting: WaitingReading;
   /** The audit of the changelog's released history. */
   readonly audit: AuditReading;
+  /** How many lines the release's stale-docs issues hold open. */
+  readonly staleDocs: StaleDocsReading;
 }
 
 /** What json mode gives as the terminal result's `data`. */
 export interface ReleaseStatusResult {
-  /** The six readings. */
+  /** The eight readings. */
   readonly reading: ReleaseStatusReading;
   /** The block text mode writes. */
   readonly text: string;
@@ -353,16 +363,20 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
       : reading.untagged.problem,
     reading.plan.problem,
     ...reading.waiting.problems,
+    reading.staleDocs.problem === null
+      ? null
+      : staleDocsProblem(reading.staleDocs.problem),
   ].filter((problem): problem is string => problem !== null);
 }
 
-/** The label of each of the six lines, in the order the block writes them. */
-const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'audit'] as const;
+/** The label of each of the eight lines, in the order the block writes them. */
+const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'audit', 'stale docs'] as const;
 
 /**
  * The whole block for one reading: a line per reading, the pending
  * notes under theirs, the waiting fragments under theirs, the audit's
- * findings under its line, and a line for every reading that failed.
+ * findings under its line, the open stale-docs lines last, and a line
+ * for every reading that failed.
  * Pure and total.
  */
 export function renderStatus(reading: ReleaseStatusReading): string {
@@ -376,8 +390,9 @@ export function renderStatus(reading: ReleaseStatusReading): string {
     auditCell(reading.audit) ?? (reading.untagged.missing
       ? MISSING_CHANGELOG_CELL
       : UNREADABLE),
+    staleDocsCell(reading.staleDocs, NOTHING) ?? UNREADABLE,
   ];
-  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, auditLine] = LABELS
+  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, auditLine, staleDocsLine] = LABELS
     .map((label, index) => `${INDENT}${label.padEnd(width)}${GAP}${cells[index] ?? ''}`);
   const under = (line: string): string => `${INDENT}${' '.repeat(width)}${GAP}${line}`;
   const problems = problemsOf(reading).map((problem) => `${INDENT}${problem}`);
@@ -385,6 +400,7 @@ export function renderStatus(reading: ReleaseStatusReading): string {
     versionLine, tagLine, untaggedLine, pendingLine, ...pendingLines(reading.plan).map(under),
     waitingLine, ...waitingLines(reading.waiting).map(under),
     auditLine, ...auditLines(reading.audit).map(under),
+    staleDocsLine,
   ].join('\n');
   return problems.length === 0
     ? block
@@ -401,7 +417,13 @@ function projectOf(context: RafaContext): ProjectFound {
 function statusConfig(
   project: ProjectFound,
   warn: (message: string) => void,
-): { versionFile: string; changelog: string; planDir: string; waiting: WaitingSettings } {
+): {
+  versionFile: string;
+  changelog: string;
+  planDir: string;
+  waiting: WaitingSettings;
+  tracker: StaleDocsSettings;
+} {
   try {
     const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
     return {
@@ -409,6 +431,7 @@ function statusConfig(
       changelog: config.releaseChangelog,
       planDir: config.planDir,
       waiting: waitingSettingsOf(config),
+      tracker: { trackerDefault: config.trackerDefault, trackerFallback: config.trackerFallback },
     };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
@@ -444,11 +467,11 @@ function expectNoArguments(args: readonly string[]): void {
   );
 }
 
-/** The six readings for one invocation, and the block they render to. */
-export function readStatus(
+/** The eight readings for one invocation, and the block they render to. */
+export async function readStatus(
   context: RafaContext,
   seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS,
-): ReleaseStatusResult {
+): Promise<ReleaseStatusResult> {
   expectNoArguments(context.args);
   const asked = readPlanFlag(context);
   const project = projectOf(context);
@@ -472,6 +495,7 @@ export function readStatus(
     ),
     waiting: readWaiting(git, config.waiting),
     audit: readAudit(project.root, config.changelog, tags.tags.map((tag) => tag.version)),
+    staleDocs: await readStaleDocsSafely(seams.readStaleDocs ?? readStaleDocs, project, config.tracker),
   };
   return { reading, text: renderStatus(reading) };
 }
@@ -482,19 +506,23 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
     name: 'release status',
     subject: 'release',
     action: 'status',
-    summary: 'show the version, the latest tag, the untagged releases, the pending notes and the waiting fragments',
-    description: 'Reads six things about the release state of the project and writes nothing: the version'
+    summary: 'show the version, the latest tag, the untagged releases, the pending notes, the waiting fragments'
+      + ' and the open stale-docs lines',
+    description: 'Reads eight things about the release state of the project and writes nothing: the version'
       + ' `release.versionFile` declares, the latest release tag of the repository by semantic version'
       + ' precedence, the versions `release.changelog` calls released that carry no tag, the change notes'
       + ' the current plan\'s sessions have stored for its next release, and the change fragments waiting on'
       + ' `origin/<pr.base>` as last fetched, with the release `rafa release settle` would fold them into,'
       + ' and an audit of the changelog\'s released history: a version two headings name, a gap between'
-      + ' versions, dates out of order, and a heading newer than the releases made before settle with no tag.'
+      + ' versions, dates out of order, and a heading newer than the releases made before settle with no tag,'
+      + ' and how many lines the open stale-docs issues of the tracker the chain lands on hold unticked,'
+      + ' `none` when they hold none. That count is the one reading that can reach the network, and it never'
+      + ' changes the exit code.'
       + ' The current plan is the one'
       + ' `--plan=<stub>` names, and otherwise the one the checked-out branch\'s `<type>/<stub>` names,'
       + ' resolved against the plans in `plan.dir`. A reading that could not be made leaves its cell as `?`'
       + ' and says why on a line under the block rather than refusing the others. With `--output=json`'
-      + ' the six readings and the rendered block are the data of the terminal result event.',
+      + ' the eight readings and the rendered block are the data of the terminal result event.',
     args: [],
     flags: [
       {
@@ -515,7 +543,7 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      const status = readStatus(context, seams);
+      const status = await readStatus(context, seams);
       if (context.outputMode === 'json') {
         context.output.result(status);
         return;

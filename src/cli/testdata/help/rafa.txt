@@ -24,6 +24,7 @@ Quick start:
   rafa ci status --branch=stretch/9
   rafa stretch start --dry-run
   rafa bug codes
+  rafa docs plan
   rafa status
   rafa next
   rafa roadmap
@@ -71,6 +72,7 @@ Subjects:
              the operators in tmux 🪙
   bug        list the cause codes a bug can carry, rank the closest to a cause
              in words, and check for codes that read alike
+  docs       write a plan repairing the open lines of the stale-docs issues
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe

@@ -11,7 +11,9 @@
  * holds only the template's placeholder criterion; epic #43 on
  * `epic:bare` has no criteria section; each has one closed member. Epic
  * #44 on `epic:lonely` has no member, #45 carries no `epic:` label, #50 is
- * a closed epic and #61 is no epic.
+ * a closed epic and #61 is no epic. Epic #46 on `epic:pages`, its member
+ * #14 closed, has one criterion naming only a page and one naming a source
+ * file beside it.
  *
  * The planted spawner tells the planning session from a check session by
  * the prompt's first line (`VERIFY_PROMPT_PREFIX`, `CHECK_PROMPT_PREFIX`)
@@ -29,6 +31,9 @@
  *   key is shown stable rather than assumed.
  * - The uncheckable case is run with and without `--accept-unchecked`
  *   over the same script, so the flag is what changes the outcome.
+ * - Epic #46's two criteria fail in one run: the one naming a source file
+ *   is filed as a bug, so the page-only one reaching no bug is its route
+ *   and not a tracker that files nothing.
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -52,13 +57,16 @@ import { createLocalTracker } from '../../adapters/tracker/local.js';
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../../board/epic-template.js';
 import { renderCloseComment } from '../../board/epic-trail.js';
 import { parseBoardListing } from '../../board/roadmap-board.js';
+import { staleDocsTitle } from '../../docs/release-issue.js';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '../../effort/epic-cost.js';
+import { readStaleDocsForPlan } from '../../effort/store/stale-docs.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { bugKeyOf } from '../../triage/triage.js';
 
 import closeCommand, {
+  bugLine,
   closeTriageFile,
   createEpicCloseCommand,
   EPIC_CLOSE_REFUSAL_EXIT,
@@ -84,6 +92,10 @@ const EPIC_SUBJECT = { name: 'epic', summary: 'the epics' };
 /** Epic #40's two criteria, as written. */
 const CRITERION_1 = '- `rafa roadmap` shows each epic with its state.';
 const CRITERION_2 = '- `rafa epics` shows one epic\'s issues.';
+
+/** Epic #46's two criteria: a page alone, and a source file beside it. */
+const PAGE_CRITERION = '- `context/triage.md` names the four channels.';
+const SOURCE_CRITERION = '- `src/triage/triage.ts` and `context/triage.md` agree on the channels.';
 
 /** Epic #40's body. */
 const BODY_40 = `Estimate: two weeks\n\n## Acceptance criteria\n\n${CRITERION_1}\n${CRITERION_2}\n\n## Specs\n\n- [x] #12 a\n- [x] #13 b\n`;
@@ -117,6 +129,8 @@ const LISTING: readonly object[] = [
   raw(32, ['epic:bare']),
   raw(44, ['type:epic', 'epic:lonely'], { state: 'OPEN', body: BODY_40 }),
   raw(45, ['type:epic'], { state: 'OPEN', body: BODY_40 }),
+  raw(46, ['type:epic', 'epic:pages'], { state: 'OPEN', body: `Estimate: a day\n\n## Acceptance criteria\n\n${PAGE_CRITERION}\n${SOURCE_CRITERION}\n` }),
+  raw(14, ['epic:pages']),
   raw(50, ['type:epic', 'epic:old']),
   raw(61, ['type:feature'], { state: 'OPEN' }),
 ];
@@ -256,6 +270,9 @@ interface CaseSetup {
   readonly projectRefresh?: EpicCloseSeams['projectRefresh'];
 }
 
+/** The version every case's stale-docs issue is titled for. */
+const STALE_DOCS_VERSION = '1.4.0';
+
 /** The config every case runs with but those opting into a project. */
 const LOCAL_CONFIG = 'tracker:\n  default: local\n';
 
@@ -285,6 +302,7 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
       return plantedStore();
     },
     resolve: () => Promise.resolve({ tracker: publicTracker.tracker, degraded: false, reason: null } as never),
+    staleDocsVersion: () => STALE_DOCS_VERSION,
     ...setup.projectRefresh === undefined
       ? {}
       : { projectRefresh: setup.projectRefresh },
@@ -419,6 +437,19 @@ describe('failedCheckReport', () => {
   });
 });
 
+describe('bugLine', () => {
+  it('warns that a row routed by its kind was not filed, and notes a filed one', () => {
+    const criterion = criterionOf(CRITERION_2);
+    const row = { index: 0, channel: 'public', ref: null, foundBy: null, stored: null, problem: null } as const;
+
+    const routed = bugLine(criterion, { ...row, action: 'pr-body' });
+    const filed = bugLine(criterion, { ...row, action: 'filed' });
+
+    expect(routed).toEqual({ text: 'Criterion 2: not filed: routed to pr-body by its kind.', warn: true });
+    expect(filed).toEqual({ text: 'Criterion 2: filed on the public tracker as an issue.', warn: false });
+  });
+});
+
 describe('rafa epic close, dispatched', () => {
   it('refuses with exit 2 while a member is open, naming it, with no session, no git and no write', async () => {
     const outcome = await run(['41']);
@@ -470,6 +501,49 @@ describe('rafa epic close, dispatched', () => {
     expect(second.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(second.trackerCalls.map((call) => call.split(' ')[0])).toEqual(['comment']);
     expect(second.stdout).toContain('Criterion 2: recurs in local issue');
+  });
+
+  it('sends a failed page-only criterion to the docs channel and still files one naming a source file as a bug', async () => {
+    const script: Script = {
+      plan: planOutput({ 1: { check: 'Read the triage page' }, 2: { check: 'Compare the module with the page' } }),
+      checks: {
+        'Read the triage page': { exitCode: 0, stdout: verdictOutput('fail', 'it names three channels') },
+        'Compare the module with the page': { exitCode: 0, stdout: verdictOutput('fail', 'they disagree') },
+      },
+    };
+
+    const outcome = await run(['46'], { script });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.trackerCalls).toHaveLength(2);
+    expect(outcome.trackerCalls[0]).toBe(`create ${staleDocsTitle(STALE_DOCS_VERSION)}`);
+    expect(outcome.trackerCalls[1]).toStartWith('create Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
+    expect(outcome.stdout).toContain(`Criterion 1: names only documentation, so no bug is filed; opened local issue 1, ${staleDocsTitle(STALE_DOCS_VERSION)}, with the line.`);
+    expect(outcome.stdout).toContain('Criterion 2: filed on the public tracker as local issue 2.');
+    expect(outcome.stderr).toContain('1 criterion failed its check, each filed as a bug, and 1 criterion naming only documentation failed,'
+      + ' each a line on the release\'s stale-docs issue.');
+    const rows = readStaleDocsForPlan(outcome.project.root, null);
+    expect(rows.map((row) => [row.kind, row.planStub, row.what])).toEqual([
+      ['unsettled', null, `Epic #46 acceptance criterion 1 fails against main: ${PAGE_CRITERION}`],
+    ]);
+    expect(closesOf(outcome.ghCalls)).toEqual([]);
+  });
+
+  it('adds a repeated page-only failure to the same issue once, filing no bug', async () => {
+    const script: Script = {
+      plan: planOutput({ 1: { check: 'Read the triage page' }, 2: { check: 'Compare the module with the page' } }),
+      checks: { 'Read the triage page': { exitCode: 0, stdout: verdictOutput('fail', 'it names three channels') } },
+    };
+    const first = await run(['46'], { script });
+
+    const second = await run(['46'], { script, project: first.project });
+
+    expect(first.trackerCalls).toEqual([`create ${staleDocsTitle(STALE_DOCS_VERSION)}`]);
+    expect(second.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(second.trackerCalls).toEqual([]);
+    expect(second.stdout).toContain(`Criterion 1: names only documentation, so no bug is filed; local issue 1, ${staleDocsTitle(STALE_DOCS_VERSION)}, already holds the line.`);
+    expect(second.stderr).toContain('1 criterion naming only documentation failed, each a line on the release\'s stale-docs issue.');
+    expect(second.stderr).not.toContain('filed as a bug');
   });
 
   /** A fresh project under `extraConfig` whose local tracker holds one open bug worded near criterion 2's failure. */
