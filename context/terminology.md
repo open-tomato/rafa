@@ -101,7 +101,8 @@ plans a verification-only run from the epic's acceptance criteria,
 where each criterion is a check against `origin/main`. If a criterion
 cannot be checked (it is prose, not runnable), the close refuses unless
 you pass `--accept-unchecked`. If a check fails, the failure is filed
-as a bug and the close refuses. On success, the epic closes as
+as a bug, or added as a line to the release's stale-docs issue when its
+criterion names only documentation, and the close refuses. On success, the epic closes as
 completed. Use "closing gate" in prose and specifications when the
 step between "all members done" and "epic closed" is what you mean.
 Use "verification" when the step itself, without the "gate" framing,
