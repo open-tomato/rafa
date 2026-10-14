@@ -1,7 +1,7 @@
 /**
  * Loop-owned triage in `loop start`: what the run does with a task
- * report's blockers and out-of-scope bugs once the report is stored and
- * the task's tracker line is marked.
+ * report's blockers, out-of-scope bugs and stale-doc entries once the
+ * report is stored and the task's tracker line is marked.
  *
  * `start()` makes one {@link StartTriage} per run through
  * {@link createStartTriage}, before its first dispatch, and hands it each
@@ -9,9 +9,11 @@
  * of the task: done, blocked, failed or interrupted. The triage reads the
  * session's output with `parseReport`, as the store did, and hands the
  * report to `triageReport` (`triage/triage.ts`), which writes the blocker
- * text onto the task's line and files, or comments on, each out-of-scope
- * bug. An output with no report, and a report with no blocker text and no
- * out-of-scope bug, are left alone: nothing is resolved, called or printed.
+ * text onto the task's line, files, or comments on, each out-of-scope
+ * bug, and answers each `stale_docs` entry with nothing filed. An output
+ * with no report, and a report with no blocker text, no out-of-scope bug
+ * and no `stale_docs` entry, are left alone: nothing is resolved, called
+ * or printed.
  *
  * ## The tracker chain, once per run
  *
@@ -39,6 +41,22 @@
  * security bug. The same stand-in carries a chain that landed nowhere: each
  * public bug then fails with the chain's own refusal as its problem, while
  * the report's blocker text and security bugs are written as ever.
+ *
+ * ## Stale documentation
+ *
+ * A `stale_docs` entry is no bug and reaches no tracker
+ * (`triage/stale-docs.ts`), so it never counts towards resolving the
+ * chain: a report holding only such entries is triaged, and resolves
+ * nothing. Each entry is printed as one note, through `info`, naming
+ * `stale_docs[<index>]`, where the stale line is and what no longer
+ * matches, as stored with nothing filed.
+ *
+ * "Stored" is the caller's order and not a reading taken here: `start()`
+ * stores the report before it hands the task over, and that write puts
+ * each entry in the store's `stale_docs` table (`report/record.ts`). A
+ * write that refused an entry is warned about by the store step itself;
+ * this module is handed no result of it, so the note is printed either
+ * way.
  *
  * ## Inherited red, read once per run
  *
@@ -95,7 +113,8 @@
  * wants one fixed declares a task. Nothing here adds a line to the tracker
  * file. A bug becomes an issue file or a comment, and a stored reference,
  * unless it is machine-scoped: that one becomes a warned line here and
- * its stored row alone (`triage/triage.ts`).
+ * its stored row alone (`triage/triage.ts`). A `stale_docs` entry becomes
+ * a noted line here and its stored row alone.
  * A blocker's text goes onto its own task's line, escaped
  * (`writeTrackerBlocker` in `utils/tracker.ts`), so no text a session wrote
  * opens a line `findNextTask` could answer as a task.
@@ -243,9 +262,11 @@ function filesPublicly(bug: ReportBug): boolean {
   return bug.security === false && typeof bug.what === 'string' && bug.what.trim().length > 0;
 }
 
-/** True for a report holding a blocker text or an out-of-scope bug. */
+/** True for a report holding a blocker text, an out-of-scope bug or a `stale_docs` entry. */
 function hasTriage(report: TaskReport): boolean {
-  return blockerTextOf(report.blockers) !== null || report.outOfScopeBugs.length > 0;
+  return blockerTextOf(report.blockers) !== null
+    || report.outOfScopeBugs.length > 0
+    || report.staleDocs.length > 0;
 }
 
 /** How a line names an issue: its URL, or its kind and id when it has none. */
@@ -306,9 +327,22 @@ function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTri
 }
 
 /**
+ * The note for one `stale_docs` entry: its problem line, which names
+ * `stale_docs[<index>]`, where the stale line is and what no longer
+ * matches, already redacted and on one line (`triage/stale-docs.ts`),
+ * then that it is stored and nothing was filed. See the module note for
+ * what "stored" rests on.
+ */
+function staleDocNote(entry: BugTriage): string {
+  const named = entry.problem ?? `stale_docs[${entry.index}] is stale documentation`;
+  return `${named}; stored as a stale-doc row, and nothing was filed.`;
+}
+
+/**
  * What the operator is told about one triage, each line opening
- * `Triage: `: a note for the blocker text written and for each bug filed,
- * commented on or inherited, and a warning for everything that was not.
+ * `Triage: `: a note for the blocker text written, for each bug filed,
+ * commented on or inherited, and for each `stale_docs` entry, after the
+ * bugs' notes, and a warning for everything that was not.
  * `inherited` holds, by a bug's index, the run-start failure an inherited
  * bug is, which its note names. Pure, so the lines are tested beside what
  * triage did.
@@ -327,7 +361,11 @@ export function describeStartTriage(
   const bugs = result.bugs.map((bug) => bugLines(bug, inherited.get(bug.index)));
   const prefixed = (lines: readonly string[]): string[] => lines.map((line) => `${LINE_PREFIX}${line}`);
   return {
-    notes: prefixed([...blockerNotes, ...bugs.flatMap((lines) => lines.notes)]),
+    notes: prefixed([
+      ...blockerNotes,
+      ...bugs.flatMap((lines) => lines.notes),
+      ...result.staleDocs.map(staleDocNote),
+    ]),
     warnings: prefixed([...blockerWarnings, ...bugs.flatMap((lines) => lines.warnings)]),
   };
 }
