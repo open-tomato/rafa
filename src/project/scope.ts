@@ -1,7 +1,8 @@
 /**
  * Where a rafa command stands: its PROJECT scope, found by walking up
- * from a directory to the first one holding `.rafa/config.yaml`, and
- * its USER scope under the home directory. These are the two scopes of
+ * from a directory to the first one holding any of the three lookup
+ * names {@link CONFIG_LOOKUP} lists, and its USER scope under the home
+ * directory. These are the two scopes of
  * "Scope resolution" in `.rafa/specs/phase-1-installable.md`.
  *
  * {@link resolveScope} answers one of two shapes. Inside a project it
@@ -25,12 +26,25 @@
  * `/private/var/folders/...` — so a caller compares the answered root
  * with a real path.
  *
- * A directory holds the file when `existsSync` finds anything at its
- * `.rafa/config.yaml`, the test `loadConfig` reads the file by. A
- * directory planted at that path is therefore found, and `loadConfig`
- * then refuses it by name. A stricter "is a regular file" test would
- * walk past it to whatever project sits above and run on that
- * project's settings without a word.
+ * ## The three names
+ *
+ * A directory is a project root when it holds any of the names
+ * `loadConfig` looks a project scope up by, in its order:
+ * `rafa.config.ts`, then `rafa.config.mjs`, then `.rafa/config.yaml`
+ * ({@link CONFIG_LOOKUP}). The walk probes the three in that order in
+ * each directory, nearest directory first, and stops at the first
+ * directory holding any one of them; the project scope's
+ * {@link Scope.configFile} names the first of the three found there,
+ * the file `loadConfig` reads for that scope when it is a file. A
+ * directory holding only `rafa.config.ts` is therefore a project as
+ * much as one holding only the YAML file, and a nearer directory
+ * holding either wins over a farther one holding the other.
+ *
+ * A directory holds a name when `existsSync` finds anything at it. A
+ * directory planted at `.rafa/config.yaml` is therefore found, and
+ * `loadConfig` then refuses it by name. A stricter "is a regular file"
+ * test would walk past it to whatever project sits above and run on
+ * that project's settings without a word.
  *
  * ## The home is not a project
  *
@@ -40,9 +54,10 @@
  * home the project root, a root `rafa init` refuses, and a command run
  * in any directory under the home without a project of its own would
  * run there. So the walk passes over the home directory, compared by
- * real path, and goes on above it. When the home it passed over holds
- * the user scope's file, the hint names that file as marking no
- * project, since it is the file an operator finds when they look.
+ * real path, and goes on above it, whichever of the three names the
+ * home holds. When the home it passed over holds one, the hint names
+ * the first of them as marking no project, since it is the file an
+ * operator finds when they look.
  *
  * Comparing real paths matches a home spelled through a link, and a
  * home spelled in another case: measured on bun 1.3.14 on macOS,
@@ -55,7 +70,8 @@
  * the main checkout reaches no project of its own. Worse, it may reach
  * someone else's: a worktree beside the main checkout under a parent
  * folder that holds its own `.rafa/config.yaml` would climb straight
- * past the repository into the parent's project.
+ * past the repository into the parent's project. A parent holding
+ * `rafa.config.ts` alone is the same trap.
  *
  * So the walk STOPS at the top level of the git working tree holding
  * the start: the first directory, climbing, whose {@link GIT_MARKER}
@@ -66,8 +82,8 @@
  * to there, or found nothing up to the filesystem root because no
  * directory holds the marker, the resolution asks for the MAIN CHECKOUT
  * of the repository holding the start, `mainCheckoutOf` in
- * `worktree-root.ts`, and answers it as the root when it holds
- * `.rafa/config.yaml`. Only when it does not does the walk go on above
+ * `worktree-root.ts`, and answers it as the root when it holds any of
+ * the three names, probed in the walk's order. Only when it does not does the walk go on above
  * the top level to the filesystem root, so a repository inside a
  * project, such as a checkout under a project's folder with no config
  * of its own, still runs in that project.
@@ -83,8 +99,8 @@
  * The main checkout is not probed when it is the start or a directory
  * above it, which the walk climbs whether or not it stops at the top
  * level, and it is not taken when it is the home, for the reason the
- * home is passed over. When the main checkout it probed holds no file
- * either, the hint names it.
+ * home is passed over. When the main checkout it probed holds none of
+ * the three either, the hint names it.
  *
  * Git answers the main checkout as a real path, measured in
  * `worktree-root.ts`, so it compares with the real paths the walk
@@ -116,7 +132,7 @@
 import type { ConfigRoots } from '../core/config/load.js';
 
 import { existsSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { CONFIG_FILE, configFilePath } from '../core/config/index.js';
 import { describeValue, messageOf } from '../core/config/sections.js';
@@ -129,6 +145,16 @@ import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
  * cannot name different directories.
  */
 export const SCOPE_DIR: string = dirname(CONFIG_FILE);
+
+/**
+ * The names a directory is probed for, in `loadConfig`'s lookup order
+ * for a project scope: the two module files at the directory, then the
+ * YAML file under its `.rafa/`. The last is `CONFIG_FILE`, so the two
+ * cannot name different YAML files; the module names are spelled again
+ * in `config-load.ts`, and `scope.test.ts` holds the two lists to one
+ * answer by driving `loadConfig` over a root holding each name alone.
+ */
+const CONFIG_LOOKUP: readonly string[] = Object.freeze(['rafa.config.ts', 'rafa.config.mjs', CONFIG_FILE]);
 
 /** The command the hint sends an operator to. */
 export const INIT_COMMAND = 'rafa init';
@@ -166,11 +192,15 @@ export interface ScopeSeams {
   readonly mainCheckout?: (dir: string) => string | null;
 }
 
-/** One scope's paths: its `.rafa` directory and the config file in it. */
+/** One scope's paths: its `.rafa` directory and its config file. */
 export interface Scope {
   /** `<base>/.rafa`. */
   readonly dir: string;
-  /** `<base>/.rafa/config.yaml`. */
+  /**
+   * The config file. For a project found, the first of
+   * {@link CONFIG_LOOKUP} its root holds; otherwise, and for the user
+   * scope, `<base>/.rafa/config.yaml`, the file `rafa init` writes.
+   */
   readonly configFile: string;
 }
 
@@ -218,18 +248,31 @@ export class ScopeError extends Error {
   }
 }
 
-/** The scope under `base`: `base` is a project root or a home directory. */
-export function scopeAt(base: string): Scope {
-  return { dir: join(base, SCOPE_DIR), configFile: configFilePath(base) };
+/**
+ * The scope under `base`: `base` is a project root or a home directory.
+ * `configFile` is `file` when given, the lookup name found under
+ * `base`, and `<base>/.rafa/config.yaml` otherwise.
+ */
+export function scopeAt(base: string, file: string = configFilePath(base)): Scope {
+  return { dir: join(base, SCOPE_DIR), configFile: file };
+}
+
+/** The first of {@link CONFIG_LOOKUP} under `dir` that `fs` finds, or null. */
+function lookupIn(dir: string, fs: ScopeFileSystem): string | null {
+  for (const name of CONFIG_LOOKUP) {
+    const path = join(dir, name);
+    if (fs.exists(path)) return path;
+  }
+  return null;
 }
 
 /**
  * The hint printed outside a project: the directory the walk started
- * from, the file no directory at or above it holds, and `rafa init`.
- * When the walk passed over a home holding the user scope's file, that
- * file is named as marking no project; and when the fallback probed a
- * main checkout holding no file either, that checkout is named. See
- * the module note.
+ * from, the three names no directory at or above it holds, and
+ * `rafa init`. When the walk passed over a home holding one of them,
+ * the first it found there is named as marking no project; and when the
+ * fallback probed a main checkout holding none either, that checkout is
+ * named. See the module note.
  */
 export function initHint(
   start: string,
@@ -238,16 +281,22 @@ export function initHint(
 ): string {
   const passed = passedUserConfig === null
     ? []
-    : [`${passedUserConfig} is the user scope's config and marks no project`];
+    : [`${passedUserConfig} is in the home directory, and the home marks no project`];
   const main = probedMainCheckout === null
     ? []
     : [`nor in ${probedMainCheckout}, the main checkout of the repository holding it`];
   return [
-    `not inside a rafa project: no ${CONFIG_FILE} in ${start} or any directory above it`,
+    `not inside a rafa project: no ${lookupNames()} in ${start} or any directory above it`,
     ...main,
     ...passed,
     `run \`${INIT_COMMAND}\` to set one up`,
   ].join('\n');
+}
+
+/** {@link CONFIG_LOOKUP} as one phrase: `a, b or c`. */
+function lookupNames(): string {
+  const last = CONFIG_LOOKUP.at(-1) ?? CONFIG_FILE;
+  return `${CONFIG_LOOKUP.slice(0, -1).join(', ')} or ${last}`;
 }
 
 /** Refuses a path that is not absolute; see the module note. */
@@ -292,20 +341,23 @@ export function selfAndAncestors(path: string): readonly string[] {
 const GIT_MARKER = '.git';
 
 /**
- * Where one stretch of the walk stopped: the root it found, whether it
- * passed over a home holding the user file, and the working tree's top
- * level it stopped at, when it stopped at one.
+ * Where one stretch of the walk stopped: the root it found with the
+ * lookup name found there, the first lookup name of a home it passed
+ * over, and the working tree's top level it stopped at, when it
+ * stopped at one.
  */
 interface Walk {
   readonly root: string | null;
-  readonly passedUserConfig: boolean;
+  readonly file: string | null;
+  readonly passedHomeFile: string | null;
   readonly topLevel: string | null;
 }
 
 /**
  * Climbs `dirs`, nearest first, to the first directory other than the
- * home holding the file. With `stopAtTopLevel`, a directory holding no
- * file but holding {@link GIT_MARKER} ends the climb; see the module note.
+ * home holding any of {@link CONFIG_LOOKUP}. With `stopAtTopLevel`, a
+ * directory holding none but holding {@link GIT_MARKER} ends the climb;
+ * see the module note.
  */
 function walkUp(
   dirs: readonly string[],
@@ -313,17 +365,18 @@ function walkUp(
   fs: ScopeFileSystem,
   stopAtTopLevel: boolean,
 ): Walk {
-  let passedUserConfig = false;
+  let passedHomeFile: string | null = null;
   for (const dir of dirs) {
-    if (fs.exists(configFilePath(dir))) {
-      if (dir !== realHome) return { root: dir, passedUserConfig, topLevel: null };
-      passedUserConfig = true;
+    const file = lookupIn(dir, fs);
+    if (file !== null) {
+      if (dir !== realHome) return { root: dir, file, passedHomeFile, topLevel: null };
+      passedHomeFile = file;
     }
     if (stopAtTopLevel && fs.exists(join(dir, GIT_MARKER))) {
-      return { root: null, passedUserConfig, topLevel: dir };
+      return { root: null, file: null, passedHomeFile, topLevel: dir };
     }
   }
-  return { root: null, passedUserConfig, topLevel: null };
+  return { root: null, file: null, passedHomeFile, topLevel: null };
 }
 
 /** The main checkout of the repository holding `realStart`, a refusal wrapped as a {@link ScopeError}. */
@@ -336,15 +389,20 @@ function mainCheckoutAt(realStart: string, mainCheckout: (dir: string) => string
   }
 }
 
-/** What the fallback found: the main checkout as the root, or the one it probed in vain. */
+/**
+ * What the fallback found: the main checkout as the root with the
+ * lookup name found there, or the one it probed in vain.
+ */
 interface Fallback {
   readonly root: string | null;
+  readonly file: string | null;
   readonly probed: string | null;
 }
 
 /**
  * The main checkout as the root when the walk from `realStart` found
- * none and the checkout holds the file; see the module note. Probes
+ * none and the checkout holds any of {@link CONFIG_LOOKUP}, probed in
+ * order; see the module note. Probes
  * nothing when the checkout is null, the home, or a directory at or
  * above the start, which the walk probes whether or not it stops at
  * the top level.
@@ -357,11 +415,12 @@ function fallBack(
 ): Fallback {
   const main = mainCheckoutAt(realStart, mainCheckout);
   if (main === null || main === realHome || selfAndAncestors(realStart).includes(main)) {
-    return { root: null, probed: null };
+    return { root: null, file: null, probed: null };
   }
-  return fs.exists(configFilePath(main))
-    ? { root: main, probed: main }
-    : { root: null, probed: main };
+  const file = lookupIn(main, fs);
+  return file === null
+    ? { root: null, file: null, probed: main }
+    : { root: main, file, probed: main };
 }
 
 /**
@@ -372,19 +431,32 @@ function walkAbove(lower: Walk, realHome: string | null, fs: ScopeFileSystem): W
   if (lower.topLevel === null) return lower;
   const above = selfAndAncestors(lower.topLevel).slice(1);
   const upper = walkUp(above, realHome, fs, false);
-  return { ...upper, passedUserConfig: lower.passedUserConfig || upper.passedUserConfig };
+  return { ...upper, passedHomeFile: lower.passedHomeFile ?? upper.passedHomeFile };
+}
+
+/**
+ * `path`, found under the real home `realHome`, spelled under the home
+ * as the caller gave it, so the hint names the file where the operator
+ * looks for it.
+ */
+function homeSpelled(path: string, realHome: string | null, home: string): string {
+  return realHome === null
+    ? path
+    : join(home, relative(realHome, path));
 }
 
 /**
  * Resolves the scopes a command run in `start` stands in: the project
- * whose root is the nearest directory at or above `start` holding
- * `.rafa/config.yaml`, the home passed over, and the user scope under
- * `seams.home`. The walk stops at the top level of the git working tree
- * holding `start`; when it found no file up to there, the main checkout
- * of the repository holding `start` is the root if it holds the file,
+ * whose root is the nearest directory at or above `start` holding any
+ * of {@link CONFIG_LOOKUP}, the home passed over, and the user scope
+ * under `seams.home`. The project scope's `configFile` names the first
+ * of the three its root holds. The walk stops at the top level of the
+ * git working tree holding `start`; when it found none up to there, the
+ * main checkout of the repository holding `start` is the root if it
+ * holds any of the three,
  * and only then does the walk go on above the top level to the
  * filesystem root. Answers {@link NoProject}, carrying the `rafa init`
- * hint, when nothing holds the file.
+ * hint, when nothing holds any of them.
  *
  * Throws a {@link ScopeError} for a relative start or home, for a
  * start that does not resolve, and for a git that cannot say which
@@ -402,16 +474,17 @@ export function resolveScope(start: string, seams: ScopeSeams): ScopeResolution 
   const lower = walkUp(selfAndAncestors(realStart), realHome, fs, true);
   const fallback = lower.root === null
     ? fallBack(realStart, realHome, fs, mainCheckout)
-    : { root: lower.root, probed: null };
+    : { root: lower.root, file: lower.file, probed: null };
   const walk = fallback.root === null
     ? walkAbove(lower, realHome, fs)
     : lower;
   const root = fallback.root ?? walk.root;
-  if (root === null) {
-    const passed = walk.passedUserConfig
-      ? user.configFile
-      : null;
+  const file = fallback.file ?? walk.file;
+  if (root === null || file === null) {
+    const passed = walk.passedHomeFile === null
+      ? null
+      : homeSpelled(walk.passedHomeFile, realHome, home);
     return { found: false, start, home, user, hint: initHint(start, passed, fallback.probed) };
   }
-  return { found: true, root, home, project: scopeAt(root), user };
+  return { found: true, root, home, project: scopeAt(root, file), user };
 }

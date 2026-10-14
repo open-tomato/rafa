@@ -149,13 +149,14 @@ module's note is the long form.
 ### Project scope and configuration discovery
 
 The dispatcher's `resolveProjectConfig` reads the git root, walks upward for
+the first directory holding `rafa.config.ts`, `rafa.config.mjs` or
 `.rafa/config.yaml`, and stops at the repository's top level (`src/project/scope.ts`).
 When the start folder is inside a git working tree, the walk never leaves that
 tree to read a `.rafa/` above it. A linked worktree answers its main checkout's
-`.rafa/` through a fallback in `src/project/worktree-root.ts`, which is consulted
-when the walk finds nothing. A project always has its own `.rafa/` if it runs at
-all, so a setup relying on a parent config must keep the parent folder outside
-any repository. The project root the dispatcher found is handed to every command,
+config through a fallback in `src/project/worktree-root.ts`, which is consulted
+when the walk finds nothing and reads the same three names. A project always
+has its own config file if it runs at all, so a setup relying on a parent
+config must keep the parent folder outside any repository. The project root the dispatcher found is handed to every command,
 so all reads are consistent even when run from a subdirectory.
 
 ### `rafa next --roadmap`: the hop rows
@@ -2782,14 +2783,16 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 - **A command runs inside a project, or not at all.** Once the spec of a
   command needing a project is read, `resolveScope` walks up from the
   working directory, `process.cwd()` unless the `cwd` option names
-  another, to the nearest `.rafa/config.yaml`, passing over the home,
+  another, to the nearest directory holding `rafa.config.ts`,
+  `rafa.config.mjs` or `.rafa/config.yaml` (the project scope's
+  `configFile` names the first of the three found), passing over the home,
   `homedir()` unless `home` names another. The walk stops at the top
   level of the git working tree holding the working directory, the first
   directory with a `.git`. When it finds none up to there, the main
-  checkout of the repository is the project if it holds
-  `.rafa/config.yaml`, so a linked worktree beside it, which has no
-  `.rafa/` of its own, runs in the main checkout's project even under a
-  parent folder holding its own `.rafa/config.yaml`; only then does the
+  checkout of the repository is the project if it holds any of the
+  three, so a linked worktree beside it, which has no `.rafa/` of its
+  own, runs in the main checkout's project even under a parent folder
+  holding its own config; only then does the
   walk go on above the top level. The project found is the context's
   `project`. With none, the invocation ends as `no_project`
   with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text

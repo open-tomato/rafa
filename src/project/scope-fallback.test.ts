@@ -1,7 +1,8 @@
 /**
  * Tests for the fallback of scope resolution to the main checkout: a
- * walk from a linked worktree that finds no `.rafa/config.yaml` answers
- * the main checkout's `.rafa/` when it holds one.
+ * walk from a linked worktree that finds no config file answers the main
+ * checkout when it holds `rafa.config.ts`, `rafa.config.mjs` or
+ * `.rafa/config.yaml`.
  *
  * Cases on DISK run the real git in scratch repositories under this
  * file's temporary root: a main checkout with one worktree beside it and
@@ -120,6 +121,19 @@ function plantConfig(dir: string): void {
   const file = join(dir, '.rafa', 'config.yaml');
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, 'version: 1\n');
+}
+
+/** Plants `text` at `name`, a path relative to `dir`, and answers its path. */
+function plantFile(dir: string, name: string, text = 'export default [];\n'): string {
+  const file = join(dir, name);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  return file;
+}
+
+/** The three paths the walk probes under `dir`, in its order, spelled as literals. */
+function lookups(dir: string): readonly string[] {
+  return [join(dir, 'rafa.config.ts'), join(dir, 'rafa.config.mjs'), join(dir, '.rafa', 'config.yaml')];
 }
 
 /** A main checkout with one commit, a worktree beside it and one under `.rafa/worktrees`. */
@@ -331,6 +345,41 @@ describe('resolveScope from a linked worktree under a parent folder holding .raf
   });
 });
 
+describe('resolveScope falling back to a main checkout holding a module file', () => {
+  it('answers a main checkout holding rafa.config.ts alone, naming it, beside the same start with no fallback', () => {
+    const { main, beside } = plantRepository();
+    const file = plantFile(main, 'rafa.config.ts');
+
+    const resolution = resolveScope(beside, { home, mainCheckout: isolatedMainCheckout });
+    const withoutFallback = resolveScope(beside, { home, mainCheckout: () => null });
+
+    expect(rootOf(resolution)).toBe(main);
+    if (!resolution.found) return;
+    expect(resolution.project).toEqual({ dir: join(main, '.rafa'), configFile: file });
+    expect(withoutFallback.found).toBe(false);
+  });
+
+  it('answers the main checkout over a parent folder holding rafa.config.ts alone', () => {
+    const { base, main, beside } = plantRepository();
+    plantFile(base, 'rafa.config.ts');
+    plantConfig(main);
+
+    expect(rootOf(resolveScope(beside, { home, mainCheckout: isolatedMainCheckout }))).toBe(main);
+    expect(rootOf(resolveScope(beside, { home, mainCheckout: () => null }))).toBe(base);
+  });
+
+  it('probes the main checkout\'s three names in order, stopping at the first found', () => {
+    const fs = memoryFs(['/', '/p', '/p/main', '/p/wt'], ['/p/main/.git', '/p/wt/.git', '/p/main/rafa.config.mjs', '/p/main/.rafa/config.yaml']);
+
+    const resolution = resolveScope('/p/wt', { home: '/home/op', fs, mainCheckout: () => '/p/main' });
+
+    expect(rootOf(resolution)).toBe('/p/main');
+    if (!resolution.found) return;
+    expect(resolution.project.configFile).toBe('/p/main/rafa.config.mjs');
+    expect(fs.probes).toEqual([...lookups('/p/wt'), '/p/wt/.git', '/p/main/rafa.config.ts', '/p/main/rafa.config.mjs']);
+  });
+});
+
 describe('resolveScope stopping at the working tree\'s top level', () => {
   const dirs = ['/', '/p', '/p/main', '/p/wt', '/p/wt/src', '/home', '/home/op'];
   const markers = ['/p/main/.git', '/p/wt/.git'];
@@ -342,11 +391,11 @@ describe('resolveScope stopping at the working tree\'s top level', () => {
 
     expect(rootOf(resolution)).toBe('/p/main');
     expect(fs.probes).toEqual([
-      '/p/wt/src/.rafa/config.yaml',
+      ...lookups('/p/wt/src'),
       '/p/wt/src/.git',
-      '/p/wt/.rafa/config.yaml',
+      ...lookups('/p/wt'),
       '/p/wt/.git',
-      '/p/main/.rafa/config.yaml',
+      ...lookups('/p/main'),
     ]);
   });
 
@@ -357,12 +406,12 @@ describe('resolveScope stopping at the working tree\'s top level', () => {
 
     expect(rootOf(resolution)).toBe('/p');
     expect(fs.probes).toEqual([
-      '/p/wt/src/.rafa/config.yaml',
+      ...lookups('/p/wt/src'),
       '/p/wt/src/.git',
-      '/p/wt/.rafa/config.yaml',
+      ...lookups('/p/wt'),
       '/p/wt/.git',
-      '/p/main/.rafa/config.yaml',
-      '/p/.rafa/config.yaml',
+      ...lookups('/p/main'),
+      ...lookups('/p'),
     ]);
   });
 
@@ -383,12 +432,12 @@ describe('resolveScope stopping at the working tree\'s top level', () => {
 
     expect(hintOf(resolution)).toBe(initHint('/p/main/trees/x'));
     expect(fs.probes).toEqual([
-      '/p/main/trees/x/.rafa/config.yaml',
+      ...lookups('/p/main/trees/x'),
       '/p/main/trees/x/.git',
-      '/p/main/trees/.rafa/config.yaml',
-      '/p/main/.rafa/config.yaml',
-      '/p/.rafa/config.yaml',
-      '/.rafa/config.yaml',
+      ...lookups('/p/main/trees'),
+      ...lookups('/p/main'),
+      ...lookups('/p'),
+      ...lookups('/'),
     ]);
   });
 
@@ -420,13 +469,13 @@ describe('resolveScope fallback rules', () => {
 
     expect(hintOf(resolution)).toBe(initHint('/b/wt', null, '/a/main'));
     expect(fs.probes).toEqual([
-      '/b/wt/.rafa/config.yaml',
+      ...lookups('/b/wt'),
       '/b/wt/.git',
-      '/b/.rafa/config.yaml',
+      ...lookups('/b'),
       '/b/.git',
-      '/.rafa/config.yaml',
+      ...lookups('/'),
       '/.git',
-      '/a/main/.rafa/config.yaml',
+      ...lookups('/a/main'),
     ]);
   });
 
@@ -437,13 +486,13 @@ describe('resolveScope fallback rules', () => {
 
     expect(hintOf(resolution)).toBe(initHint('/b/wt/src'));
     expect(fs.probes).toEqual([
-      '/b/wt/src/.rafa/config.yaml',
+      ...lookups('/b/wt/src'),
       '/b/wt/src/.git',
-      '/b/wt/.rafa/config.yaml',
+      ...lookups('/b/wt'),
       '/b/wt/.git',
-      '/b/.rafa/config.yaml',
+      ...lookups('/b'),
       '/b/.git',
-      '/.rafa/config.yaml',
+      ...lookups('/'),
       '/.git',
     ]);
   });
