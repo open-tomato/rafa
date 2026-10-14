@@ -12,7 +12,9 @@
  * `start/step-only-report.ts`), the loop guard reads the
  * checkout against the HEAD the session's commits left
  * (`start/checkout-watch.ts`), step 3 of the release verifies, commits
- * and pushes the fragment, the pull request is DELIVERED (below), and,
+ * and pushes the fragment, the pull request is DELIVERED (below), the
+ * plan's `convention` entries go into its `## Conventions` section, or
+ * are printed under a `none` provider (`start/convention-body.ts`), and,
  * when the run waits on CI, the pull request's checks are waited on
  * (`start/pr-lifecycle.ts`). The session
  * record reads `wrap-up` from the start of the branch, `pull-request` as
@@ -125,6 +127,7 @@ import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
+import { writeConventionLines } from './convention-body.js';
 import { fileFollowUps } from './follow-ups.js';
 import { forcedDraftSeamsIn, markForcedDraft, refuseUndraftedPullRequest } from './forced-draft.js';
 import { emitLoopEvent } from './loop-events.js';
@@ -311,6 +314,11 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     // A `none` provider delivers nothing: the event carries its reason, with no lookup.
     await emitPullRequestEvent(expected.branch, null, lookup);
   }
+  // The plan's `convention` entries, in the `## Conventions` section of
+  // the pull request the delivery answered, or printed under a `none`
+  // provider, through the run's own provider reading. It never throws
+  // (`start/convention-body.ts`).
+  await writeConventionLines({ repoRoot, checkout, branch: expected.branch, settings, planStub }, { readProvider });
   if (ciWait) {
     emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });
     session.pullRequestStarted();
