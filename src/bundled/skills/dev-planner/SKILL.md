@@ -469,6 +469,41 @@ A task's text never asks its session for a whole-suite run, or for any command t
   run's output reads it from the file a `[start]` prerequisite or the
   runner wrote.
 
+### The closing doc task
+
+* A plan with one task not declared `agent=doc-updater` ends on one task
+  declared `agent=doc-updater docs=repair`. That task is the plan's last
+  task line, and it repairs the docs of what the plan changed: the loop
+  hands it the `stale_docs` rows the plan's tasks reported and the files
+  its commits touched.
+* A plan whose every task is declared `agent=doc-updater` gets no closing
+  doc task: it is prose only, and every task in it is documentation.
+* `rafa plan validate` reports a plan with a code task and no `docs=repair`
+  task on its last line as the warning `missing-doc-task`. The warning never
+  refuses a plan, so a plan written before this rule still runs.
+
+A plan of code tasks ends on the closing task:
+
+````markdown
+  # Stage: Store
+
+  - [ ] Add the `stale_docs` table migration with its unit tests  {agent=loop-implementer effort=high}
+  - [ ] Add the store writer for stale-doc rows with its unit tests  {agent=loop-implementer effort=medium}
+
+  # Stage: Close-out
+
+  - [ ] Repair the docs of what this plan changed  {agent=doc-updater docs=repair effort=medium}
+````
+
+A prose-only plan gets none:
+
+````markdown
+  # Stage: Pages
+
+  - [ ] Rewrite the triage page for four channels  {agent=doc-updater effort=medium}
+  - [ ] Add the doc task to the workflow page  {agent=doc-updater effort=medium}
+````
+
 ---
 
 ## Three task-context injection modes
