@@ -4,7 +4,7 @@
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
  * reads the config, the store the config selects, and the task reports,
- * preflight checks, dispatches and out-of-scope bugs the loop stored, and
+ * preflight checks, dispatches, out-of-scope bugs and routes the loop stored, and
  * nothing else — no log, no clock — so a report is
  * a pure projection of rows already on disk and two runs over an
  * unchanged store produce identical bytes.
@@ -66,7 +66,8 @@
  * holds no dollar figure, and a text-mode session prints none. The
  * command prints the budgets under its no-rows line as it prints the
  * tallies there, and the filters do not narrow them.
- * {@link EffortReport.docOnlyBugs} is `report-doc-bugs.ts`'s to describe.
+ * {@link EffortReport.docOnlyBugs} is `report-doc-bugs.ts`'s to describe,
+ * and {@link EffortReport.bugKinds}, read from `bug_routes`, `report-kinds.ts`'s.
  *
  * ## What a group is keyed on
  *
@@ -168,6 +169,7 @@ import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { BudgetedSession } from './report-budgets.js';
 import type { DocOnlyBugs } from './report-doc-bugs.js';
+import type { BugKindsReading } from './report-kinds.js';
 import type { SkillsReport } from './report-skills.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { SessionBudget } from './store/dispatches.js';
@@ -190,6 +192,7 @@ import { parseReportArgs } from './report-args.js';
 import { budgetedSessions } from './report-budgets.js';
 import { readDocOnlyBugs } from './report-doc-bugs.js';
 import { formatReport, formatStoredSections } from './report-format.js';
+import { readBugKinds } from './report-kinds.js';
 import { formatSkillsReport } from './report-skills-format.js';
 import { buildSkillsReport, readHeldLessons } from './report-skills.js';
 import { writeTrendReport } from './report-trend-read.js';
@@ -313,6 +316,8 @@ export interface EffortReport {
   budgets: readonly BudgetedSession[];
   /** The stored bugs of scope `rafa`, and those naming only documentation. Never narrowed. */
   docOnlyBugs: DocOnlyBugs;
+  /** The routed out-of-scope entries by plan and kind, or why they could not be read. Never narrowed. */
+  bugKinds: BugKindsReading;
 }
 
 /** Where a report reads from and what it narrows to. */
@@ -556,7 +561,7 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
  * planted row needs no store, no log and no repository. `taskReports`,
- * `preflightHalts` and `docOnlyBugs` are carried into the report as handed
+ * `preflightHalts`, `docOnlyBugs` and `bugKinds` are carried into the report as handed
  * in, never filtered, and each of `budgets` is joined against every row
  * handed in, filtered out or not (`report-budgets.ts`).
  */
@@ -567,6 +572,7 @@ export function summariseSessions(
   preflightHalts: readonly PreflightHalt[] = [],
   budgets: readonly SessionBudget[] = [],
   docOnlyBugs: DocOnlyBugs = { bugs: 0, docOnly: 0 },
+  bugKinds: BugKindsReading = { plans: [], problem: null },
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -604,6 +610,7 @@ export function summariseSessions(
     preflightHalts,
     budgets: budgetedSessions(rows, budgets),
     docOnlyBugs,
+    bugKinds,
   };
 }
 
@@ -652,6 +659,7 @@ export function buildReport(options: ReportOptions): EffortReport {
     readPreflightHalts(repoRoot),
     readSessionBudgets(repoRoot),
     readDocOnlyBugs(repoRoot),
+    readBugKinds(repoRoot),
   );
 }
 

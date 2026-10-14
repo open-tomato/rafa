@@ -845,7 +845,10 @@ file is absent; `readPreflightHalts` reads `preflight` back the same way,
 `rafa effort report --trend`. `readDocOnlyBugs`
 (`src/effort/report-doc-bugs.ts`) reads the `out_of_scope_bugs` rows of
 scope `rafa` the same way, for the report's count of those naming only
-documentation.
+documentation, and `readBugKinds` (`src/effort/report-kinds.ts`) every
+`bug_routes` row, for its count per plan of the entries routed under
+each kind and the share filed; it answers a `problem` in place of a
+throw when the store cannot be read.
 `readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
 `task_reports` and `report_absences` back the same way, for the rough ETA
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every

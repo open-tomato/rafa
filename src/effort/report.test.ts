@@ -147,6 +147,7 @@ import {
   summariseSessions,
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
+import { writeBugRoutes } from './store/bug-routes.js';
 import { writeDispatch } from './store/dispatches.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
 import { writePreflightChecks } from './store/preflight.js';
@@ -1017,6 +1018,28 @@ describe('the doc-only bug count a report carries', () => {
 
     // The control: the same session rows with no bug stored.
     expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).docOnlyBugs).toEqual({ bugs: 0, docOnly: 0 });
+  });
+});
+
+describe('the bug kinds a report carries', () => {
+  it('carries the routed entries under the root, unfiltered, and none from a root that stores no route', () => {
+    const root = plantStore(ROWS);
+    writeBugRoutes(root, {
+      dispatch: { sessionId: 'q19-a', planStub: 'q19-loop-economics', taskLine: 'A task' },
+      routes: [
+        { entryIndex: 0, what: 'a bug', said: null, kind: 'bug', route: 'filed' },
+        { entryIndex: 1, what: 'a fallout', said: 'own-fallout', kind: 'own-fallout', route: 'repair' },
+      ],
+    });
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.bugKinds.problem).toBeNull();
+    expect(filtered.bugKinds.plans.map((plan) => [plan.planStub, plan.entries, plan.filed]))
+      .toEqual([['q19-loop-economics', 2, 1]]);
+
+    // The control: the same session rows with no route stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).bugKinds).toEqual({ plans: [], problem: null });
   });
 });
 
