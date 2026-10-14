@@ -60,7 +60,7 @@
  * session invoked, and `plan_ci`, one row per reading of a plan's CI.
  * An eleventh, `stale_docs`, is filled from task reports as the first
  * six are, one row per documentation line a report named as stale;
- * `stale-docs.ts` holds its row type. The twelfth is
+ * `stale-docs.ts` writes it and holds its row type. The twelfth is
  * `schema_migrations`, the migration log, which only
  * `bring-forward.ts` writes; the section on bringing a store forward
  * says what it holds. The last four are the store's own identity and
@@ -73,7 +73,7 @@
  * and `plan-ci.ts` the tenth. `tracker-refs.ts` writes the first as
  * well, setting a filed issue's reference on a row and inserting the
  * row when there is none. `findings.ts`, `triage.ts`, `changes.ts`,
- * `preflight.ts` and `skill-invocations.ts` write through
+ * `stale-docs.ts`, `preflight.ts` and `skill-invocations.ts` write through
  * {@link writeSqliteStore}, as an append does, so a write left with
  * nothing to insert still meets the schema check. `absences.ts` always
  * has its one row and opens {@link withSqliteStore} directly, as

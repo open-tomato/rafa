@@ -42,6 +42,7 @@ import { readPreflightHalts, writePreflightChecks } from './preflight.js';
 import { readReportedSkills, readTaskReportTallies, writeTaskReport } from './reports.js';
 import { readSkillInvocations, writeSkillInvocations } from './skill-invocations.js';
 import { openSqliteStore, sqliteStorePath, withSqliteStore } from './sqlite.js';
+import { readStaleDocsForPlan, writeStaleDocs } from './stale-docs.js';
 import { readStoreMeta } from './store-meta.js';
 import { readTaskFinishes } from './task-finishes.js';
 import { readTrackerRef, writeTrackerRef } from './tracker-refs.js';
@@ -164,13 +165,13 @@ function appendSession(root: string, session: string): void {
 
 /**
  * The merged tables no module under `src/effort/store/` inserts into:
- * `stale_docs`, which the migration `stale-docs` creates and no writer
- * fills. The last group below reads the modules' source and fails once
- * one of them inserts into a table listed here, so a table leaves this
- * list for {@link WRITERS} and {@link PLANTED} in the commit that adds
- * its writer.
+ * none today. A table whose migration lands ahead of its writer is
+ * listed here. The last group below reads the modules' source and fails
+ * once one of them inserts into a table listed here, so a table leaves
+ * this list for {@link WRITERS} and {@link PLANTED} in the commit that
+ * adds its writer, as `stale_docs` did.
  */
-const UNWRITTEN_TABLES: readonly OriginTable[] = ['stale_docs'];
+const UNWRITTEN_TABLES: readonly OriginTable[] = [];
 
 /** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
 const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
@@ -296,6 +297,18 @@ const WRITERS: readonly WriterCase[] = [
     },
   },
   {
+    name: 'writeStaleDocs',
+    tables: ['stale_docs'],
+    write: (root, session) => {
+      writeStaleDocs(root, {
+        dispatch: dispatchOf(session),
+        outcome: 'done',
+        kind: 'sighting',
+        staleDocs: [{ where: null, what: `the ${session} line`, extras: [] }],
+      }, seamsOf(`stale-${session}`));
+    },
+  },
+  {
     name: 'writeTrackerRef, inserting the row it sets the reference on',
     tables: ['findings'],
     write: (root, session) => {
@@ -310,11 +323,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the twelve merged tables a writer fills, and leaves out only the one no writer does', () => {
+  it('covers each of the thirteen merged tables, a writer filling every one', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
     expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
-    expect(WRITTEN_TABLES).toHaveLength(12);
+    expect(WRITTEN_TABLES).toHaveLength(13);
+    expect(UNWRITTEN_TABLES).toEqual([]);
     expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 
@@ -390,10 +404,13 @@ describe('seq across a new mint', () => {
 });
 
 /**
- * One row for each of the twelve tables as a runtime before `row-origins`
- * inserts it: every column it knew named, the origin columns left out,
- * all under task session `old` (its absence under `old-absent`) and
- * {@link PLAN}, each shaped for the reader of its table to answer it.
+ * One row for each of the thirteen tables with the origin columns left
+ * out of its insert: for the twelve tables older than `row-origins`, as
+ * a runtime before that migration inserts it, every column it knew
+ * named; for `stale_docs`, which no such runtime holds, the same shape
+ * of insert. All under task session `old` (its absence under
+ * `old-absent`) and {@link PLAN}, each shaped for the reader of its
+ * table to answer it.
  */
 const PLANTED: readonly (readonly [OriginTable, string])[] = [
   ['sessions', 'INSERT INTO sessions (session_id, row_json) VALUES (\'old\', \'{"sessionId":"old","assistantRecordCount":1}\')'],
@@ -418,6 +435,8 @@ const PLANTED: readonly (readonly [OriginTable, string])[] = [
   ['skill_invocations', 'INSERT INTO skill_invocations (session_id, name, sidechain, count) VALUES (\'old\', \'old-skill\', 1, 3)'],
   ['plan_ci', 'INSERT INTO plan_ci (plan_stub, pr, head_sha, verdict, failing, read_at)'
     + ' VALUES (\'phase-1\', 6, \'sha-old\', \'red\', \'["lint"]\', \'2026-09-28T10:00:00.000Z\')'],
+  ['stale_docs', 'INSERT INTO stale_docs (id, session_id, plan_stub, task_line, kind, where_at, what, outcome, collected_at)'
+    + ' VALUES (\'d-old\', \'old\', \'phase-1\', \'Add the module\', \'sighting\', NULL, \'the old line\', \'done\', \'2026-09-28T10:00:00.000Z\')'],
 ];
 
 describe('a row planted with NULL origins', () => {
@@ -497,6 +516,10 @@ describe('a row planted with NULL origins', () => {
     ]);
   });
 
+  it('is read by readStaleDocsForPlan', () => {
+    expect(readStaleDocsForPlan(root, PLAN).map(({ what }) => what)).toEqual(['the old line', 'the new line']);
+  });
+
   it('is read by readPlanCi', () => {
     expect(readPlanCi(root).map(({ headSha, verdict }) => [headSha, verdict])).toEqual([['sha-old', 'red'], ['sha-new', 'green']]);
   });
@@ -566,7 +589,7 @@ describe('the production inserts, read from source', () => {
 
     expect([...stamped].sort()).toEqual([
       'absences.ts', 'changes.ts', 'dispatches.ts', 'findings.ts', 'plan-ci.ts', 'preflight.ts',
-      'reports.ts', 'skill-invocations.ts', 'sqlite.ts', 'tracker-refs.ts', 'triage.ts', 'triage.ts',
+      'reports.ts', 'skill-invocations.ts', 'sqlite.ts', 'stale-docs.ts', 'tracker-refs.ts', 'triage.ts', 'triage.ts',
     ]);
     expect(unstamped.sort()).toEqual([
       ['bring-forward.ts: ', '${', 'MIGRATION_LOG_TABLE}'].join(''),
@@ -586,10 +609,14 @@ describe('the production inserts, read from source', () => {
     expect(found.filter(({ table }) => unwritten.includes(table))).toEqual([]);
   });
 
-  it('reads an insert into an unwritten table as one, so the case above can fail (control)', () => {
+  it('reads an insert into a table by its name, so the case above can fail for a listed one (control)', () => {
     const source = 'const SQL = `INSERT INTO stale_docs (id, session_id) VALUES (?, ?)`;';
+    const listed: readonly string[] = ['stale_docs'];
 
-    expect(insertsIn('planted.ts', source).map(({ table }) => table)).toEqual([...UNWRITTEN_TABLES]);
+    const inserts = insertsIn('planted.ts', source);
+
+    expect(inserts.map(({ table }) => table)).toEqual(['stale_docs']);
+    expect(inserts.filter(({ table }) => listed.includes(table))).toHaveLength(1);
   });
 
   it('reads an insert whose column list lacks the stamp as unstamped (control)', () => {

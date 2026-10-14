@@ -830,8 +830,8 @@ Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
 nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
-`writeTriage`, `writeChanges`, `writePreflightChecks` and
-`writeSkillInvocations` do, so an empty write on a store that exists
+`writeTriage`, `writeChanges`, `writeStaleDocs`, `writePreflightChecks`
+and `writeSkillInvocations` do, so an empty write on a store that exists
 still meets the schema check. `writeReportAbsence` always has its one
 row and opens `withSqliteStore` directly, as `writeTrackerRef` does.
 `writeTaskReport` always has its one row too, and passes
@@ -848,7 +848,9 @@ file is absent; `readPreflightHalts` reads `preflight` back the same way,
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
 `changes` row under one plan stub, in `ACROSS_STORES_ORDER`
 (`store/origins.ts`: `collected_at`, the origin pair, then `seq`), for a
-release step to render. A reader that answers rows in order over a table
+release step to render, and `readStaleDocsForPlan`
+(`store/stale-docs.ts`) every `stale_docs` row under one plan stub in
+that order. A reader that answers rows in order over a table
 with `collected_at` sorts by that constant rather than `seq`, since a
 merge gives the other store's rows new local `seq` values after its own.
 
@@ -1150,12 +1152,20 @@ naming no place collide, and the same entry under the other kind is a
 second row. The table is `merged`, append-only by `id`, and one of the
 `ORIGIN_TABLES`. `store/stale-docs.ts` holds the row type
 (`StaleDocRow`, its keys pinned as `staleDocs` in
-`row-fields.lock.json`) and `STALE_DOC_KINDS`. The table is no kind of
+`row-fields.lock.json`), `STALE_DOC_KINDS`, the writer and the reader.
+`writeStaleDocs` stores one row per entry of a report's `stale_docs`
+list under the `kind` its caller names, and refuses the whole write,
+before the store is opened, for a dispatch or outcome `checkDispatch`
+refuses or a `kind` outside the set; an entry whose `what` or `where`
+cannot be stored is refused alone and answered in `rejected`, as
+`writeChanges` answers a note. `readStaleDocsForPlan` answers the rows
+under one plan stub, of both kinds, as `StaleDocRow`s; the stub null
+reads the rows written under no plan. The table is no kind of
 the port, so neither backend routes it: it sits in `effort.sqlite`
 whichever backend `store` selects, and the NDJSON files are left as
 they were. `stale-docs-migration.test.ts` holds the entry to a store an
 older runtime left, the table to each CHECK and index, and both of
-those readings.
+those readings; `stale-docs.test.ts` holds the writer and the reader.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

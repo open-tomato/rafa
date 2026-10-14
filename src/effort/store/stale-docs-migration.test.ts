@@ -10,9 +10,11 @@
  * table read afterwards cannot have been there already, and every other
  * table is compared row for row across the open.
  *
- * The table's own refusals are read through raw inserts, since the
- * table has no writer to go through: each CHECK and each unique index
- * is paired with the row that differs in one value and is stored.
+ * The table's own refusals are read through raw inserts and never
+ * through `writeStaleDocs`, which refuses those values before the table
+ * sees them: each CHECK and each unique index is paired with the row
+ * that differs in one value and is stored. `stale-docs.test.ts` holds
+ * the writer.
  *
  * Every store is planted under this file's own temporary directory.
  */
