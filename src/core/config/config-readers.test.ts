@@ -1,5 +1,5 @@
 /**
- * Tests for the readers `config-schema.ts` builds its settings from:
+ * Tests for the readers `core-section.ts` builds its settings from:
  * `mapOf`, and the named readers the settings are read through.
  *
  * Each refusal sits beside an accepting control of the same reader, as

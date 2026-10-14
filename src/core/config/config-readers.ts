@@ -1,11 +1,11 @@
 /**
- * The readers `config-schema.ts` and `config-schema-release.ts` build
+ * The readers `core-section.ts` and `config-schema-release.ts` build
  * their settings from, beyond the value readers `config-sections.ts`
  * exports whole: {@link mapOf}, and
  * the named readers the schema's settings are read through, each built
  * on `mapOf` or on `config-sections.ts`'s `text` or `oneOf`. The readers a single
  * setting spells inline, such as `oneOf(STORE_BACKENDS)`, stay beside
- * their key in `config-schema.ts`, or in `config-schema-release.ts` for
+ * their key in `core-section.ts`, or in `config-schema-release.ts` for
  * a `pr` or `release` key.
  *
  * They sat in `config-schema.ts` until that module reached the 800-line

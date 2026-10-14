@@ -2,21 +2,21 @@
  * The five limits of the `board.project` section: how a call to the
  * GitHub project is retried, how often a long refresh says where it is,
  * and how its field writes are batched and spaced. Each has its field,
- * its default, its reader and its spec here. `config-schema.ts`'s
- * `RafaConfig` extends {@link BoardProjectLimitSettings}, and its
+ * its default, its reader and its spec here. `core/config/config-merged.ts`
+ * adds {@link BoardProjectLimitSettings} to `RafaConfig`, and its
  * `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right after
  * `board.project.number`, so the order settings are reported in holds the
  * `board.project` section together.
  *
- * `board.project.template` and `board.project.number` stay in
- * `config-schema.ts`, whose readings note in `config-schema-readings.ts`
- * argues them. These five have their own module, as the `loop.wrapUp`
+ * `board.project.template` and `board.project.number` are core's, in
+ * `core/config/core-section.ts`; `config-schema-readings.ts` argues
+ * them. These five have their own module, as the `loop.wrapUp`
  * key does, because `config-schema.ts` stood at 617 lines and
  * `config-sections.ts` at 744, measured with `wc -l`, when they were
  * added: five more specs and five readers would have put the readers'
- * module within a page of the 800-line cap of `context/source.md`. Only
- * `config-schema.ts` imports this file; a caller reads each setting off
- * the resolved `RafaConfig`.
+ * module within a page of the 800-line cap of `context/source.md`.
+ * `config-merged.ts` imports this file to spread it; a caller reads each
+ * setting off the resolved `RafaConfig`.
  *
  * ## The keys
  *

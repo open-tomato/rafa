@@ -1,7 +1,7 @@
 /**
  * The `errors` section of the config schema: `errors.codes`, the cause
- * codes a project adds to rafa's list (#949). `config-schema.ts`'s
- * `RafaConfig` extends {@link ErrorsSettings}, and its `CONFIG_DEFAULTS`
+ * codes a project adds to rafa's list (#949). `core/config/config-merged.ts`
+ * adds {@link ErrorsSettings} to `RafaConfig`, and its `CONFIG_DEFAULTS`
  * and `SETTINGS` spread the objects below right after the `release`
  * section. It has its own module because `config-schema.ts` stood at 643
  * lines and `config-sections.ts` at 744 when it was added.

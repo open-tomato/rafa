@@ -4,7 +4,7 @@
  *
  * A {@link ConfigSection} is one package's part of the schema: its
  * `settings` (each setting's file key, reader and command-line flag, as
- * a partial of the record `config-schema.ts` builds today), its
+ * a partial of the record `config-merged.ts` builds today), its
  * `defaults` (a partial of {@link RafaConfig}), and the cross-key
  * `checks` run over the resolved config. {@link registerConfigSections}
  * merges sections into the active registry, which {@link activeSettings},

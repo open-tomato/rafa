@@ -1,8 +1,8 @@
 /**
  * The `issues` section of the config schema: the five keys a bug record
  * is filed and listed with (#951), each one's field, its default, its
- * spec and its reader. `config-schema.ts`'s `RafaConfig` extends
- * {@link IssuesConfigSettings}, and its `CONFIG_DEFAULTS` and `SETTINGS`
+ * spec and its reader. `core/config/config-merged.ts` adds
+ * {@link IssuesConfigSettings} to `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `logger` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
  *

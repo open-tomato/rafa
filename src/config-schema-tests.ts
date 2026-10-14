@@ -2,8 +2,8 @@
  * The `tests` section of the config schema: the three settings the
  * runner reads when it chooses which tests a recorded step runs, and the
  * one that says whether a step reruns a newly red file alone, each
- * one's field, its default, its spec and its reader. `config-schema.ts`'s
- * `RafaConfig` extends {@link TestsSettings}, and its `CONFIG_DEFAULTS`
+ * one's field, its default, its spec and its reader. `core/config/config-merged.ts`
+ * adds {@link TestsSettings} to `RafaConfig`, and its `CONFIG_DEFAULTS`
  * and `SETTINGS` spread the objects below last, after the `task`
  * section, so the order settings are reported in holds the section.
  *
@@ -12,8 +12,8 @@
  * `wc -l`, when these keys were added, and takes nothing new under the
  * 800-line cap of `context/source.md`. The one reader the three glob keys
  * share, {@link globList}, is a rule about a VALUE and sits here all the
- * same, for that reason. Only `config-schema.ts` imports this file; a
- * caller reads these settings off the resolved `RafaConfig`.
+ * same, for that reason. `config-merged.ts` imports this file to spread
+ * it; a caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The three glob keys
  *

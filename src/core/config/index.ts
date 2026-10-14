@@ -1,12 +1,13 @@
 /**
  * The barrel over the config's schema and its layers: every name
- * `config-items.ts`, `config-schema.ts` and `config.ts` export, less the
- * names the `sections.ts` barrel holds, and nothing else.
+ * `config-items.ts`, `config-schema.ts`, `config-merged.ts`,
+ * `core-section.ts` and `config.ts` export, less the names the
+ * `sections.ts` barrel holds, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the three
+ * A file outside `src/core/` imports this file and never the five
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the three directly and never this
+ * file inside `src/core/` imports the five directly and never this
  * file.
  *
  * ## The barrels hold no name in common
@@ -15,7 +16,7 @@
  * in `scripts/survey/core-moves.ts`. `sections.ts` holds the leaf pair,
  * `config-sections.ts` and `config-readers.ts`, and argues why the pair
  * has a barrel of its own. `load.ts` holds `config-load.ts` alone, and
- * argues the same for it. This one holds the three files that read a
+ * argues the same for it. This one holds the five files that read a
  * key or rank a layer.
  *
  * `config.ts` re-exports twenty-seven names of `config-sections.ts`
@@ -25,18 +26,18 @@
  * be learned from. A file that used to take `ConfigError` and
  * `OUTPUT_MODES` in one line from `config.js` now spells two lines.
  *
- * ## Why one barrel can hold all three
+ * ## Why one barrel can hold all five
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. Two of the three
- * files behind this one import outward by value: `config-schema.ts`
- * reads the eleven section files (`src/config-schema-*.ts`) and
- * `src/tiers/routing.ts`, and `config.ts` reads
+ * imports the barrel back by value is a runtime cycle. Three of the five
+ * files behind this one import outward by value: `config-merged.ts`
+ * reads the eleven section files (`src/config-schema-*.ts`),
+ * `core-section.ts` reads `src/tiers/routing.ts`, and `config.ts` reads
  * `src/config-schema-hub.ts`. Each of those twelve files imports this
  * barrel with `import type` alone (`SettingSpec`, `ConfigSource`,
  * `ConfigLayers`), which is erased before anything loads. The values a
  * section file reads come from `sections.ts`, which imports none of the
- * three.
+ * five. `config-schema.ts` imports types alone.
  *
  * Measured when the three moved: the value imports of the non-test files
  * under `src/`, `scripts/` and `packages/` held six cycles before the
@@ -45,24 +46,33 @@
  * first in a fresh `bun` process, `SETTINGS` holding its 89 entries
  * each time.
  *
+ * Measured again when core's keys moved into `core-section.ts`, on bun
+ * 1.3.14: each barrel, each of the five files, `section.ts`,
+ * `src/tiers/routing.ts` and each section file loaded first in a fresh
+ * `bun` process, `SETTINGS` and `CONFIG_DEFAULTS` holding 89 entries and
+ * `CORE_SECTION` 42 each time. The control, `config-schema-hub.ts`
+ * reading `SETTINGS` off this barrel at load, threw `Cannot access
+ * 'HUB_DEFAULTS' before initialization` when loaded first.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as `sections.ts` spells
  * its own, and taken from the file that declares it: `config.ts`
- * re-exports `RafaConfig`, `CONFIG_DEFAULTS` and `CONFIG_FILE` from
- * `config-schema.ts` and the item types and kind lists from
- * `config-items.ts`, and each is exported here once. `HubContext` and
- * `HubTimeout` are the two names none of the three declares:
+ * re-exports `RafaConfig` from `config-schema.ts`, `CONFIG_DEFAULTS`
+ * from `config-merged.ts`, `CONFIG_FILE` from `core-section.ts` and the
+ * item types and kind lists from `config-items.ts`, and each is
+ * exported here once. `HubContext` and `HubTimeout` are the two names
+ * none of the five declares:
  * `config.ts` re-exports them as types from `src/config-schema-hub.ts`,
  * and they pass through unchanged.
  *
  * The published surface is narrower than this file. `src/index.ts`
  * re-exports part of it, and of the runtime names leaves out the
- * schema's indexes and the item readers (`SETTINGS`, `moduleSource` and
- * ten more), which `src/index.test.ts` spells under
- * `CONFIG_BARREL_ONLY`.
+ * schema's indexes, core's section and the item readers (`SETTINGS`,
+ * `CORE_SECTION`, `moduleSource` and ten more), which `src/index.test.ts`
+ * spells under `CONFIG_BARREL_ONLY`.
  *
- * `index.test.ts` holds the list to the three files: every name any of
+ * `index.test.ts` holds the list to the five files: every name any of
  * them exports and `sections.ts` does not is here once, as the same
  * binding, and no other name is here.
  */
@@ -80,6 +90,7 @@ export type {
   RafaConfig,
   SettingSpec,
 } from './config-schema.js';
+export type { CoreSection, CoreSetting } from './core-section.js';
 export type {
   ConfigFile,
   ConfigLayer,
@@ -103,14 +114,14 @@ export {
 } from './config-items.js';
 export {
   CONFIG_DEFAULTS,
-  CONFIG_FILE,
   isCommandLineSetting,
   knownKeysAbove,
   SECTIONS,
   SETTING_BY_KEY,
   SETTING_NAMES,
   SETTINGS,
-} from './config-schema.js';
+} from './config-merged.js';
+export { CONFIG_FILE, CORE_SECTION } from './core-section.js';
 export {
   ConfigError,
   configFilePath,

@@ -145,7 +145,7 @@ barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
 proves nothing about it. The four barrels beyond the subject indexes are
 the splits made so far. `config/sections.ts` holds the leaf pair
-`config-sections.ts` and `config-readers.ts`, because `config-schema.ts`
+`config-sections.ts` and `config-readers.ts`, because `config-merged.ts`
 imports section files that import the pair back. `config/load.ts` stands
 alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
@@ -296,8 +296,9 @@ a thing to split.
 **A new key in `SETTINGS` reaches six files beyond the schema, sections
 and `init` scaffold.** `RafaConfig` literals have to be complete, so the
 layer literal in `src/core/config/config.ts` needs it.
-`src/core/config/config-schema.test.ts` pins the key set as closed
-lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`). Both config suites
+`src/core/config/config-merged.test.ts` pins the key set as closed
+lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`), and a core key is
+also spelled in `src/core/config/core-section.test.ts`. Both config suites
 also check that every setting appears exactly once:
 `src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
 `FULL_VALUES`, its cases and `KNOWN`) and

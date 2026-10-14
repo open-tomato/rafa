@@ -39,22 +39,26 @@
  *     shapes, read through the helpers `config-sections.ts` exports.
  *     This module re-exports its types and kind lists, as it did while
  *     they sat in `config-sections.ts`.
- *   - `config-schema.ts` holds every rule about a KEY: {@link RafaConfig}
- *     and its file keys, {@link CONFIG_DEFAULTS}, {@link CONFIG_FILE},
- *     the setting specs, and the section and known-key indexes built off
- *     them. The four readings the spec leaves to the reader — open
- *     tracker kinds, empty prerequisite tiers, `version: 1` alone, and
- *     `loop.settingSources` as an ordered list — are argued there; the
- *     readings each later section's spec leaves are argued in
+ *   - The rules about a KEY sit in three modules. `config-schema.ts`
+ *     declares {@link RafaConfig}'s core fields and the setting types,
+ *     and exports no value. `core-section.ts` holds core's file keys,
+ *     specs and defaults, and {@link CONFIG_FILE}. `config-merged.ts`
+ *     spreads core's section and the section files into
+ *     {@link CONFIG_DEFAULTS}, the setting specs, and the section and
+ *     known-key indexes built off them. The four readings the spec
+ *     leaves to the reader — open tracker kinds, empty prerequisite
+ *     tiers, `version: 1` alone, and `loop.settingSources` as an
+ *     ordered list — are argued in `core-section.ts`; the readings each
+ *     later section's spec leaves are argued in
  *     `config-schema-readings.ts`, a note that exports nothing, except
  *     the `pr` and `release` sections', which sit with their fields in
  *     `config-schema-release.ts`, the `tests` section's, which sit
  *     with theirs in `config-schema-tests.ts`, the `triage`
  *     section's, in `config-schema-triage.ts`, and the `errors`
  *     section's, in `config-schema-errors.ts`, each spread into
- *     `config-schema.ts`.
+ *     `config-merged.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
- *     `config-schema.ts` reads its settings through. No caller reads a
+ *     `core-section.ts` reads its settings through. No caller reads a
  *     setting through them but the schema, so nothing here re-exports
  *     them.
  *   - This module holds the rules about LAYERS: which layer answers a
@@ -64,7 +68,8 @@
  * `context/source.md`, which no gate reads. Measured with `wc -l` at the
  * commit that added the `pr` section: `config.ts` is 506 lines,
  * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
- * one field, one default and one spec in `config-schema.ts` (in
+ * one field in `config-schema.ts` with one default and one spec in
+ * `core-section.ts` (in
  * `config-schema-release.ts` for a `pr` or `release` key, in
  * `config-schema-tests.ts` for a `tests` key, in
  * `config-schema-triage.ts` for a `triage` key, in
@@ -120,7 +125,7 @@
  * `roadmap.issue` — and the rule holds for them unchanged: a file naming one with no value is
  * silent, and silence there resolves to the same null from the defaults
  * layer, reported as `default` rather than `file`. What null means to a
- * caller is `config-schema.ts`'s to say.
+ * caller is `core-section.ts`'s and `config-schema-release.ts`'s to say.
  *
  * A setting's dotted path is built by joining keys, so `plan.inject`
  * written flat at the top level reaches the same setting as `inject`
@@ -129,7 +134,7 @@
  * parser keeps both, and letting one win would be a silent choice.
  *
  * Every key here is looked up in the `Map` and the `Set`
- * `config-schema.ts` builds, never with `in` or an object index; the
+ * `config-merged.ts` builds, never with `in` or an object index; the
  * reason is argued there.
  *
  * ## The parser, measured on bun 1.3.14
@@ -178,26 +183,27 @@ import { hubUrlProblems } from '../../config-schema-hub.js';
 
 import {
   CONFIG_DEFAULTS,
-  CONFIG_FILE,
   isCommandLineSetting,
   knownKeysAbove,
   SECTIONS,
   SETTING_BY_KEY,
   SETTING_NAMES,
   SETTINGS,
-} from './config-schema.js';
+} from './config-merged.js';
 import {
   describeValue,
   isMapping,
   messageOf,
 } from './config-sections.js';
+import { CONFIG_FILE } from './core-section.js';
 
 export type {
   CommandLineSetting,
   ConfigSetting,
   RafaConfig,
 } from './config-schema.js';
-export { CONFIG_DEFAULTS, CONFIG_FILE } from './config-schema.js';
+export { CONFIG_DEFAULTS } from './config-merged.js';
+export { CONFIG_FILE } from './core-section.js';
 export type { HubContext, HubTimeout } from '../../config-schema-hub.js';
 export type {
   BoardRelationshipMode,

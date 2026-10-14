@@ -2,16 +2,16 @@
  * `loop.retries`, the loop's own retry count: how many times in a row one
  * run re-enters its task loop after a stop a blind re-run is known to pass,
  * with its field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link LoopRetriesSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
+ * `core/config/config-merged.ts` adds {@link LoopRetriesSettings} to
+ * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
  * after `loop.worktreeDir` and ahead of `loop.wrapUp`, so the order
  * settings are reported in holds the `loop` section together.
  *
  * The key has its own module, as `config-schema-wrap-up.ts` has, because
  * `config-schema.ts`'s own note asks a new section for a sibling, and
  * the reader is a rule about a VALUE that only this key reads, so it
- * sits here beside it. Only `config-schema.ts` imports this file; a
- * caller reads the setting off the resolved `RafaConfig`, and
+ * sits here beside it. `config-merged.ts` imports this file to spread
+ * it; a caller reads the setting off the resolved `RafaConfig`, and
  * `start/run-setup.ts` checks `--retry` against the same two bounds.
  *
  * ## The key

@@ -2,7 +2,7 @@
  * The `loop.wrapUp` section of the config schema: the one setting the
  * wrap-up reads when its session ends without an open pull request,
  * with its field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link WrapUpSettings}, and
+ * `core/config/config-merged.ts` adds {@link WrapUpSettings} to `RafaConfig`, and
  * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
  * after `loop.worktreeDir`, so the order settings are reported in holds
  * the `loop` section together.
@@ -12,8 +12,9 @@
  * lines and `config-sections.ts` at 642, measured with `wc -l`, when
  * this key was added: the schema module's own note asks a new section
  * for a sibling, and the reader is a rule about a VALUE that only this
- * key reads, so it sits here beside it. Only `config-schema.ts` imports
- * this file; a caller reads the setting off the resolved `RafaConfig`.
+ * key reads, so it sits here beside it. `config-merged.ts` imports this
+ * file to spread it; a caller reads the setting off the resolved
+ * `RafaConfig`.
  *
  * ## The key
  *

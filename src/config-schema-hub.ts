@@ -3,8 +3,8 @@
  * to reach a `rafa-hub` under `effort.sync: service`, each with its
  * field, its default, its spec and its reader, the one refusal that
  * reads two settings at once, and the {@link HubContext} an adapter is
- * handed. `config-schema.ts`'s `RafaConfig` extends {@link HubSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread {@link HUB_DEFAULTS}
+ * handed. `core/config/config-merged.ts` adds {@link HubSettings} to
+ * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread {@link HUB_DEFAULTS}
  * and {@link HUB_SETTINGS} right after `effort.sync`, the setting they
  * serve, as `config-schema-release.ts`'s sections are spread.
  *
@@ -13,7 +13,7 @@
  * with `wc -l` when it was added, `config-schema.ts` stood at 554 lines
  * and `config-sections.ts` at 699, so the value rules here would have
  * pushed the second against the 800-line cap of `context/source.md`.
- * Every rule `config-schema.ts` states about a KEY holds here, as every
+ * Every rule `config-merged.ts` states about a KEY holds here, as every
  * rule `config-sections.ts` states about a VALUE does: nothing is
  * coerced, and a string spelled like a number is refused.
  *

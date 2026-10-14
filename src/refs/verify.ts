@@ -167,7 +167,7 @@
  * ## Keys
  *
  * A key is `present` when some entry of `SETTINGS` in
- * `src/core/config/config-schema.ts` has it as its `key`.
+ * `src/core/config/config-merged.ts` has it as its `key`.
  */
 import type { Ref } from './extract.js';
 import type { IssueState, LiveReading } from './stamp.js';

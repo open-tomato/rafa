@@ -138,7 +138,7 @@ import { openNdjsonStore } from '../../effort/store/ndjson.js';
 import { openSqliteStore } from '../../effort/store/sqlite.js';
 import { createFileSync } from '../../effort/sync/file.js';
 import { createLocalSync } from '../../effort/sync/select.js';
-import { CONFIG_DEFAULTS } from '../config/config-schema.js';
+import { CONFIG_DEFAULTS } from '../config/config-merged.js';
 import { describeValue, STORE_BACKENDS } from '../config/config-sections.js';
 
 /** What every refusal opens with. */

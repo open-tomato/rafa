@@ -12,7 +12,7 @@
  *
  * `src/core/config/` has three barrels, all listed under `CORE_BARRELS`
  * in `scripts/survey/core-moves.ts`. `sections.ts` holds the leaf pair
- * and `index.ts` the three files that read a key or rank a layer; each
+ * and `index.ts` the five files that read a key or rank a layer; each
  * argues its own grouping. This one holds `config-load.ts` alone,
  * because neither of the other two can take it.
  *

@@ -2,7 +2,7 @@
  * The `triage` section of the config schema: the two settings triage
  * reads when it looks for the nearest open bug a report repeats, each
  * one's field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link TriageSettings}, and
+ * `core/config/config-merged.ts` adds {@link TriageSettings} to `RafaConfig`, and
  * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
  * after the `claims` section.
  *
@@ -12,7 +12,7 @@
  * these keys were added: the schema module's own note asks a new
  * section for a sibling, and the readers are rules about a VALUE that
  * only these keys read, so they sit here beside them. Only
- * `config-schema.ts` imports this file; a caller reads the settings off
+ * `config-merged.ts` imports this file; a caller reads the settings off
  * the resolved `RafaConfig`.
  *
  * ## The two keys

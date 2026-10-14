@@ -3,8 +3,8 @@
  * three refusals and the sentences they spell, and the active registry
  * the readers answer.
  *
- * The fixture sections borrow real specs from `SETTINGS` in
- * `config-schema.ts`, since a section's setting names are
+ * The fixture sections borrow real specs from `CORE_SECTION` in
+ * `core-section.ts`, since a section's setting names are
  * {@link RafaConfig} fields and a made-up name would not compile. Every
  * refusal is spelled here in full, and each sits beside a case the merge
  * accepts, so a merge refusing everything fails as surely as one
@@ -35,8 +35,8 @@ import type {
 
 import { describe, expect, it } from 'bun:test';
 
-import { SETTINGS } from './config-schema.js';
 import { resolveConfig } from './config.js';
+import { CORE_SECTION } from './core-section.js';
 import {
   activeChecks,
   activeDefaults,
@@ -47,6 +47,9 @@ import {
   registerConfigSections,
   restoreConfigSections,
 } from './section.js';
+
+/** Core's specs, which the fixture sections borrow. */
+const SETTINGS = CORE_SECTION.settings;
 
 /** A check refusing every config, with one sentence naming `name` and the store it read. */
 function refusing(name: string): ConfigCheck {

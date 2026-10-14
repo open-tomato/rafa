@@ -1,8 +1,8 @@
 /**
  * The `logger` section of the config schema: the six keys the logger
  * reads (#950), each one's field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link LoggerConfigSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
+ * `core/config/config-merged.ts` adds {@link LoggerConfigSettings} to
+ * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
  * after the `errors` section. It has its own module for the reason
  * `config-schema-errors.ts` gives.
  *

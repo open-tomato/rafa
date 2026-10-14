@@ -1,17 +1,19 @@
 /**
- * Tests for the config schema: the settings, the file key each is
+ * Tests for the merged schema: the settings, the file key each is
  * spelled with, and the indexes built off them.
  *
- * `config-schema.ts` is imported directly here, which nothing outside
- * the config trio does — every name it exports reaches a caller through
- * `config.ts`. What is driven here is what only the schema module
- * answers: the dotted key per setting, which settings a command line
- * may name, the sections a file may open, and the known-key index a
- * warning is built from. `CONFIG_FILE` and `CONFIG_DEFAULTS` are driven
- * through `config.js` in `config.test.ts` and are not repeated; the
- * layers, the refusals and the warning sentence are driven there too.
- * `mapOf` and the named readers the settings share are driven in
- * `config-readers.test.ts`.
+ * `config-merged.ts` is imported directly here, which nothing outside
+ * `src/core/config/` does — every name it exports reaches a caller
+ * through `config.ts` or the barrel. What is driven here is what only
+ * the merge answers: the dotted key per setting and its place in the
+ * order core's runs and the section files are spread in, which settings
+ * a command line may name, the sections a file may open, and the
+ * known-key index a warning is built from. `CONFIG_FILE` and
+ * `CONFIG_DEFAULTS` are driven through `config.js` in `config.test.ts`
+ * and are not repeated; core's own section is driven in
+ * `core-section.test.ts`; the layers, the refusals and the warning
+ * sentence are driven in `config.test.ts`. `mapOf` and the named
+ * readers the settings share are driven in `config-readers.test.ts`.
  *
  * Every key and every section is SPELLED here, never read off
  * {@link SETTINGS}, so a module that renames a key or drops a section
@@ -28,7 +30,7 @@ import {
   SETTING_BY_KEY,
   SETTING_NAMES,
   SETTINGS,
-} from './config-schema.js';
+} from './config-merged.js';
 
 /** Every setting and the file key it is spelled with, in schema order. */
 const KEYS: readonly (readonly [ConfigSetting, string])[] = [

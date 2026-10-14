@@ -3,16 +3,16 @@
  * their defaults, their specs and their readers:
  * `loop.retriesOnContinue`, `loop.continue.criteria`,
  * `loop.continue.criteriaMode` and `loop.forceWrapUp.maxNewFailures`.
- * `config-schema.ts`'s `RafaConfig` extends {@link LoopContinueSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
+ * `core/config/config-merged.ts` adds {@link LoopContinueSettings} to
+ * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
  * after `loop.retries` and ahead of `loop.wrapUp`, so the order settings
  * are reported in holds the `loop` section together.
  *
  * The keys have their own module, as `config-schema-loop-retries.ts`
  * has, because `config-schema.ts`'s own note asks a new section for a
  * sibling, and the two count readers are rules about VALUES that only
- * these keys read. Only `config-schema.ts` imports this file; a caller
- * reads the settings off the resolved `RafaConfig`.
+ * these keys read. `config-merged.ts` imports this file to spread it; a
+ * caller reads the settings off the resolved `RafaConfig`.
  *
  * ## The keys
  *

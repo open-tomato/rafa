@@ -10,9 +10,10 @@
  * item-shape readers in `config-items.test.ts`; here each section is
  * reached through a file's text. The schema itself — the
  * dotted file key per setting, the sections a file may open, and the
- * known-key index — is `config-schema.ts`, driven in
- * `config-schema.test.ts`; here it is reached through `config.js`,
- * which re-exports every name a caller reads.
+ * known-key index — is `config-merged.ts`, driven in
+ * `config-merged.test.ts`, with core's own keys in `core-section.ts`,
+ * driven in `core-section.test.ts`; here it is reached through
+ * `config.js`, which re-exports every name a caller reads.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that

@@ -15,7 +15,7 @@
  * `config-sections.ts`), `node:path`, and four modules that import none
  * of the config back. The schema's section files (`src/config-schema-*.ts`)
  * import the pair by value and are imported by value by
- * `config-schema.ts`, so one barrel over the pair and the schema would
+ * `config-merged.ts`, so one barrel over the pair and the schema would
  * make every section file import a barrel that imports it back: a
  * runtime cycle that fails as a `ReferenceError` at load, in one import
  * order only.

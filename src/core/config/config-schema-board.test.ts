@@ -21,7 +21,7 @@ import type { ConfigOverrides } from './config.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { isCommandLineSetting, SETTINGS } from './config-schema.js';
+import { isCommandLineSetting, SETTINGS } from './config-merged.js';
 import {
   BOARD_RELATIONSHIP_MODES,
   CONFIG_DEFAULTS,

@@ -20,11 +20,11 @@
  * The first config module is read through its barrel,
  * `src/core/config/index.ts`, the one path a file outside `src/core/`
  * may import it by. The barrel is wider than the root: it also holds
- * the schema's indexes and the item readers, which the tree reads and
- * the package does not publish. Those twelve names are spelled under
- * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
- * name added to the barrel still reds it until the name is added to the
- * root or to that list. The ten runtime names `config.ts` re-exports
+ * the schema's indexes, core's section and the item readers, which the
+ * tree reads and the package does not publish. Those thirteen names are
+ * spelled under {@link CONFIG_BARREL_ONLY} and left out of the
+ * containment case, so a name added to the barrel still reds it until
+ * the name is added to the root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
  * other barrel, `sections.ts`, and are held by the spelled list alone.
  * The second config module, `config-load.ts`, is read through a barrel
@@ -375,9 +375,10 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 
 /**
  * The runtime names the config barrel holds and the root does not
- * publish: the schema's indexes and the item readers.
+ * publish: the schema's indexes, core's section and the item readers.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
+  'CORE_SECTION',
   'MODULE_SOURCE_KEYS',
   'OPTIONAL_ITEM_KEYS',
   'REQUIRED_ITEM_KEYS',
