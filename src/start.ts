@@ -795,6 +795,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         handout,
         base,
         guard: { expected, trackerPath },
+        docTask: { planStub, prBase: runConfig.config.prBase },
       });
       const { exitCode } = dispatch;
 
