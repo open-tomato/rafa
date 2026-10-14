@@ -942,13 +942,17 @@ describe('rafa plan through the adapter registry', () => {
     expect(readRecord(scratch)).toMatchObject({ request: { specPath: snapshot } });
   }, 30_000);
 
-  it('prints the dangerous.acceptStaleRefs pass line first and plans past check 4 with the setting on', () => {
+  it('prints the loader pass line of dangerous.acceptStaleRefs, then the one of check 4, and plans past check 4 with the setting on', () => {
     const scratch = plantScratch({ body: GONE_BODY, config: 'dangerous:\n  acceptStaleRefs: true\n' });
 
     const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
 
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
-    expect(run.stdout.split('\n')[0]).toBe(`warn: ${acceptStaleRefsPassLine()}`);
+    const configFile = join(realpathSync(scratch.repo), '.rafa', 'config.yaml');
+    expect(run.stdout.split('\n').slice(0, 2)).toEqual([
+      `warn: dangerous.acceptStaleRefs: true (${configFile}, entry 0)`,
+      `warn: ${acceptStaleRefsPassLine()}`,
+    ]);
     expect(run.stdout).toContain('🔖 dangerous.acceptStaleRefs: re-stamped 1 reference of issue #20 as reviewed.');
     expect(existsSync(scratch.record)).toBe(true);
   }, 30_000);

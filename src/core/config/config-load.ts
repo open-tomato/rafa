@@ -164,6 +164,7 @@ import {
   readConfigDocument,
   resolveConfig,
 } from './config.js';
+import { writeDangerousPassLines } from './dangerous.js';
 import { activeConfigLoadHook, activeSections, activeSettingByKey, activeSettings } from './section.js';
 import { schemaSectionsOf } from './standard-schema.js';
 
@@ -558,6 +559,9 @@ function printWarning(message: string): void {
  * under `roots.root`, ranks both against `cli`, and prints a warning
  * per shadowed YAML file, per key set twice in one file and per unknown
  * key through `warn`, the active output's `warn` when none is given.
+ * After them it writes one pass line per `dangerous.*` key set off its
+ * default (`dangerous.ts`), once per invocation: the active output's
+ * when `warn` is the default, the sink's own when one is given.
  *
  * The resolved config is handed to the load hook (`activeConfigLoadHook`
  * in `section.ts`) before any warning is printed. The registry,
@@ -605,6 +609,9 @@ export async function loadConfig(
   };
   activeConfigLoadHook()?.(loaded.config);
   for (const warning of loaded.warnings) warn(warning);
+  writeDangerousPassLines(loaded, warn, warn === printWarning
+    ? activeOutput()
+    : warn);
   setActiveStoreSettings({ busyTimeoutMs: loaded.config.effortBusyTimeoutMs });
   return loaded;
 }

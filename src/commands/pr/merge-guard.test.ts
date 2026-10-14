@@ -421,7 +421,7 @@ describe('a branch the guard reads collision', () => {
     expect(run.sent).not.toContain(MERGE_SENT);
   });
 
-  it('merges under dangerous.acceptVersionCollision, warning that the setting let it through', async () => {
+  it('merges under dangerous.acceptVersionCollision, its pass line first, warning that the setting let it through', async () => {
     const repo = plantWorld({
       branch: STAMPED_BRANCH,
       baseAfter: BASE_RELEASED,
@@ -431,7 +431,8 @@ describe('a branch the guard reads collision', () => {
     const run = await ran(repo, ['--yes']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.warned[0]?.startsWith('Release guard: collision')).toBe(true);
+    expect(run.warned[0]).toBe(`dangerous.acceptVersionCollision: true (${join(repo.work, '.rafa', 'config.yaml')}, entry 0)`);
+    expect(run.warned[1]?.startsWith('Release guard: collision')).toBe(true);
     expect(run.warned).toContain(`#${NUMBER} merges anyway: dangerous.acceptVersionCollision is true.`);
     expect(run.sent).toContain(MERGE_SENT);
     expect(run.guard).toMatchObject({ answer: 'collision', reaction: 'accept' });
