@@ -8,6 +8,10 @@
  * alone. It calls nothing and reads no tree: a path is documentation by
  * its name, whether or not a file sits there.
  *
+ * The path reader under it is exported as {@link pathsNamedIn}: the kind
+ * check (`./own-check.ts`) reads the files an entry names with it, so a
+ * path is one thing to both readings.
+ *
  * ## What counts as a path
  *
  * The text is cut at white space, commas, semicolons, quotes, brackets,
@@ -112,8 +116,12 @@ function isDocPath(path: string): boolean {
   return segments.length > 1 && DOC_FOLDERS.includes(segments[0]!);
 }
 
-/** The paths `text` names, in the order it names them. */
-function namedPaths(text: string): readonly string[] {
+/**
+ * The paths `text` names, in the order it names them, each as written
+ * once its sentence's punctuation and any `:12` position are taken off;
+ * see the module note for what counts as a path.
+ */
+export function pathsNamedIn(text: string): readonly string[] {
   return text
     .split(SEPARATORS)
     .map((piece) => piece.replace(TRAILING, ''))
@@ -127,6 +135,6 @@ function namedPaths(text: string): readonly string[] {
  * `false`, since nothing in it says what it is about.
  */
 export function namesOnlyDocs(text: string): boolean {
-  const paths = namedPaths(text);
+  const paths = pathsNamedIn(text);
   return paths.length > 0 && paths.every(isDocPath);
 }

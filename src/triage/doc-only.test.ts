@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { namesOnlyDocs } from './doc-only.js';
+import { namesOnlyDocs, pathsNamedIn } from './doc-only.js';
 
 describe('namesOnlyDocs', () => {
   it('answers true for each kind of documentation path alone', () => {
@@ -91,5 +91,24 @@ describe('namesOnlyDocs', () => {
     // The documented limit: `and/or` has the shape of `src/triage`.
     expect(namesOnlyDocs('README.md and/or CHANGELOG.md are stale')).toBe(false);
     expect(namesOnlyDocs('README.md and CHANGELOG.md are stale')).toBe(true);
+  });
+});
+
+describe('pathsNamedIn', () => {
+  it('answers no path for a text naming none', () => {
+    expect(pathsNamedIn('the page says three channels')).toEqual([]);
+    expect(pathsNamedIn('')).toEqual([]);
+  });
+
+  it('answers every path in the order the text names them, punctuation and position taken off', () => {
+    const text = 'see `src/start.ts:12`, then README.md and ./docs/guide.md:3:1.';
+
+    expect(pathsNamedIn(text)).toEqual(['src/start.ts', 'README.md', './docs/guide.md']);
+  });
+
+  it('answers no URL, dotted name or figure, the path beside them kept', () => {
+    const text = 'https://example.invalid/src/a.ts TaskReport.staleDocs 24/7 v1.2.3 src/a.ts';
+
+    expect(pathsNamedIn(text)).toEqual(['src/a.ts']);
   });
 });
