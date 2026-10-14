@@ -215,7 +215,7 @@ const WRITERS: readonly WriterCase[] = [
         dispatch: dispatchOf(session),
         outcome: 'blocked',
         blockers: [{ what: 'the fixture is missing', artifact: null, extras: [] }],
-        outOfScopeBugs: [{ what: 'the helper drops a row', artifact: null, security: false, extras: [] }],
+        outOfScopeBugs: [{ what: 'the helper drops a row', artifact: null, security: false, kind: 'bug', extras: [] }],
       }, seamsOf(`triage-${session}`));
     },
   },

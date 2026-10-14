@@ -34,7 +34,7 @@ afterAll(() => {
 const TRACKER_TEXT = ['# Plan', '', '- [BLOCKED] Wire the loop', ''].join('\n');
 const BLOCKED_LINE = 2;
 const ARTIFACT = 'src/parse/parse.test.ts:\nerror: expect(received).toBe(expected)\n(fail) parse > drops the last line';
-const BUG: ReportBug = { what: 'Parser drops the last line', artifact: ARTIFACT, security: false, extras: [] };
+const BUG: ReportBug = { what: 'Parser drops the last line', artifact: ARTIFACT, security: false, kind: 'bug', extras: [] };
 
 interface Case {
   readonly root: string;

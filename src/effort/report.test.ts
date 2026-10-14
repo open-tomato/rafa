@@ -103,7 +103,7 @@
  *
  * The skills report cases came with `--skills` and `--plan=`. They plant a
  * dispatch offering a project skill and a held lesson under a scratch root,
- * and hold {@link readSkillsReport} to reading the tiers, the lessons and
+ * and hold `readSkillsReport` to reading the tiers, the lessons and
  * the config under that root, each against a control that reads otherwise
  * once the plant is taken away. The command cases hold `--skills` to the
  * same report in both output modes, a text run to exactly the formatter's
@@ -134,13 +134,13 @@ import { expectExit } from '../tests/cli-capture.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { formatSkillsReport, SKILLS_REPORT_HEADER } from './report-skills-format.js';
+import { readSkillsReport } from './report-skills-read.js';
 import {
   buildReport,
   dominantEntrypoint,
   emptyGroup,
   groupKeyOf,
   matchesFilters,
-  readSkillsReport,
   SESSION_KINDS,
   sessionSpanMinutes,
   sortGroups,
@@ -1000,8 +1000,8 @@ function plantBugs(root: string, sessionId: string): void {
     outcome: 'done',
     blockers: [],
     outOfScopeBugs: [
-      { what: 'context/triage.md still says three channels', artifact: null, security: false, extras: [] },
-      { what: 'src/triage/triage.ts drops the last entry', artifact: null, security: false, extras: [] },
+      { what: 'context/triage.md still says three channels', artifact: null, security: false, kind: 'bug', extras: [] },
+      { what: 'src/triage/triage.ts drops the last entry', artifact: null, security: false, kind: 'bug', extras: [] },
     ],
   });
 }

@@ -142,12 +142,12 @@
  * `--skills` prints the skills report (`report-skills.ts`) in place of all
  * of the above, narrowed by `--plan=` to the plans named, and a stub the
  * store holds no row for reads as no plan rather than as a refusal.
- * {@link readSkillsReport} resolves what it reads as the rest resolves the
- * store: the config under the repo root and the home, so a config the loop
- * cannot run on is refused the same way, the three tiers read under both
- * and resolved under that config as a loop session is served them
- * (`start/serving.ts`), and the lessons held in both instinct scopes. In
- * text mode the lines are `report-skills-format.ts`'s, and in json mode
+ * `readSkillsReport` (`report-skills-read.ts`) resolves what it reads as
+ * the rest resolves the store: the config under the repo root and the home,
+ * so a config the loop cannot run on is refused the same way, the three
+ * tiers read under both and resolved under that config as a loop session
+ * is served them (`start/serving.ts`), and the lessons held in both
+ * instinct scopes. In text mode the lines are `report-skills-format.ts`'s, and in json mode
  * the report is the result's data, as the session report is.
  *
  * ## The trend report instead
@@ -184,7 +184,6 @@ import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { activeOutput, activeOutputMode } from '../core/output/index.js';
-import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
@@ -194,7 +193,7 @@ import { readDocOnlyBugs } from './report-doc-bugs.js';
 import { formatReport, formatStoredSections } from './report-format.js';
 import { readBugKinds } from './report-kinds.js';
 import { formatSkillsReport } from './report-skills-format.js';
-import { buildSkillsReport, readHeldLessons } from './report-skills.js';
+import { readSkillsReport } from './report-skills-read.js';
 import { writeTrendReport } from './report-trend-read.js';
 import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
@@ -661,43 +660,6 @@ export function buildReport(options: ReportOptions): EffortReport {
     readDocOnlyBugs(repoRoot),
     readBugKinds(repoRoot),
   );
-}
-
-/** Where the skills report reads from and what it narrows to. */
-export interface SkillsReportOptions {
-  /** The project root, with no default. Governs the config, the tiers, the lessons and the store. */
-  repoRoot: string;
-  /** The home the user scope's config, tier and lessons are read under. No default. */
-  home: string;
-  /** The plan stubs to read; every plan when null or left out. */
-  plans?: readonly string[] | null;
-  /** The entry the rafa tier sits beside. Defaults to `Bun.main`. */
-  entry?: string;
-}
-
-/**
- * The skills report over the store under the repo root, each skill's
- * failure strings read from the tiers as they resolve now under the
- * config and each lesson resolved through the held set. See the module
- * note.
- *
- * Throws a `ConfigError`, having read no row, when a config file under
- * the repo root or the home is one the loop cannot run on.
- */
-export function readSkillsReport(options: SkillsReportOptions): SkillsReport {
-  const { repoRoot: root, home, entry } = options;
-  const { config } = loadConfig({ root, home });
-  const pinned = entry === undefined
-    ? {}
-    : { entry };
-  return buildSkillsReport({
-    repoRoot: root,
-    ...(options.plans === null || options.plans === undefined
-      ? {}
-      : { plans: options.plans }),
-    resolution: resolveSessionTiers({ root, home, settings: config, ...pinned }),
-    lessons: readHeldLessons({ home, projectRoot: root, ...pinned }),
-  });
 }
 
 /** Refuses the run with exit code 1, its message one line per refusal. */

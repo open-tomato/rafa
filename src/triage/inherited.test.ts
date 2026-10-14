@@ -55,6 +55,7 @@ const BUG: ReportBug = {
   what: 'Parser drops the last line',
   artifact: ARTIFACT,
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
