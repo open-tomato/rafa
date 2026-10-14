@@ -17,7 +17,7 @@
  * value is reported with a `ConfigError` naming it, as every other
  * unusable value is.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigFile, ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -290,7 +290,7 @@ describe('an unusable value of the six', () => {
 
   it.each(UNUSABLE)('leaves %s at its default: a refused reading is silence', (setting, raw) => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, [setting]: readAs(setting, raw).value }, extras: [], path: PATH };
+    const file: ConfigFile = { values: { ...values, [setting]: readAs(setting, raw).value } as ConfigFile['values'], extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config[setting]).toEqual(CONFIG_DEFAULTS[setting]);
@@ -299,7 +299,7 @@ describe('an unusable value of the six', () => {
 
   it('answers the file, as the control, when the value it carries is usable', () => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, releaseTag: readAs('releaseTag', 'settle').value }, extras: [], path: PATH };
+    const file: ConfigFile = { values: { ...values, releaseTag: 'settle' }, extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.releaseTag).toBe('settle');
