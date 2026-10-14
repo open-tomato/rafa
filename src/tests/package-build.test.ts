@@ -340,9 +340,12 @@
  * through the emitted files (`ts.preProcessFile`, so a specifier inside a
  * comment is not read as one) and holds every other specifier, a
  * `node:` or `bun:` builtin and `@open-tomato/define-config` alike, to
- * none. Its control plants a static `import type` of the library and an
- * `import('bun:sqlite')` type into a copy of two reached declarations,
- * one two hops from the entry, and reads both back.
+ * none. A declaration under `dist/` that the types target does not reach
+ * is out of the check: the subpath's promise is that its declaration
+ * imports nothing outside rafa, and the eleven above stay where `tsc`
+ * wrote them. The case's control plants a static `import type` of the
+ * library and an `import('bun:sqlite')` type into a copy of two reached
+ * declarations, one two hops from the entry, and reads both back.
  *
  * The scratch package links `typescript`, `@types/bun` and `@types/node`
  * as the repository installed them, and `node_modules/.bin/tsc`, which
