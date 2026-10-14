@@ -1006,6 +1006,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/status-readings.js', ['readTags', 'readUntagged']],
     ['../../release/version.js', ['readManifestVersion']],
     ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
+    ['./status-stale-docs.js', ['readStaleDocs', 'readStaleDocsSafely', 'staleDocsCell', 'staleDocsProblem']],
   ]],
   ['./commands/release/settle.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],

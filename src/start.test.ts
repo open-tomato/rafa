@@ -416,8 +416,10 @@ describe('where start.ts takes the suite steps', () => {
   });
 
   it('takes the task step from the task\'s base once its commit is stored', () => {
-    expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
-    const after = indexOf(EVERY, 'afterTask');
+    // `staleDocs.afterTask` shares the name; the suite step's is the one over the task and its base.
+    const suiteAfter = EVERY.find((call) => call.name === 'afterTask' && call.args.length === 2);
+    expect(suiteAfter?.args).toEqual(['taskInfo', 'base']);
+    const after = EVERY.findIndex((call) => call === suiteAfter);
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
     expect(START).toContain(
@@ -652,6 +654,7 @@ describe('the events file start.ts binds around the run', () => {
   it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {
     expect(finallyOf(STATEMENTS)).toEqual([
       'decisionsAtEnd();',
+      'staleDocs.atRunEnd();',
       // The test files a suite step read red only in the step, printed as the run's last lines (`start/step-only-report.ts`).
       'announceRunStepOnly(readRunStepOnly(repoRoot, session.id));',
       'unbindEventsFile();',
