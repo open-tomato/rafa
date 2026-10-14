@@ -3,16 +3,18 @@
  * which puts the files every part of rafa depends on into `src/core/`
  * before any package is cut (epic #801).
  *
- * Three things are listed, and nothing here reads the tree:
+ * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the nineteen files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
  *     file moves with its file into the same folder and keeps its base
  *     name too ({@link testTarget});
  *   - {@link CORE_BARRELS}: the barrel files of each subject, the only
- *     files under `src/core/` a file outside it may import.
+ *     files under `src/core/` a file outside it may import;
+ *   - {@link CORE_REEXPORTS}: the old paths that still hold a re-export
+ *     of their moved file.
  *
  * A colocated test file is a test file in the moving file's folder whose
  * name opens with the file's stem and that has no source file of its own:
@@ -36,7 +38,7 @@
 export const CORE_FOLDER = 'src/core/';
 
 /** The subject folders under `src/core/`, sorted. */
-export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan'] as const;
+export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime'] as const;
 
 /** One subject folder under `src/core/`. */
 export type CoreSubject = (typeof CORE_SUBJECTS)[number];
@@ -69,7 +71,11 @@ export interface Collision {
   readonly claims: readonly string[];
 }
 
-/** The nineteen files that move, sorted by their path today. */
+/**
+ * The twenty files that move, sorted by their path today: the nineteen
+ * of #905, and `src/runtime/identity.ts`, which #1088 moved so the
+ * effort store imports nothing above core for it.
+ */
 export const CORE_MOVES: readonly CoreMove[] = [
   {
     from: 'src/adapters/output/active.ts',
@@ -181,6 +187,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
     to: 'src/core/git/git.ts',
   },
   {
+    from: 'src/runtime/identity.ts',
+    subject: 'runtime',
+    tests: ['src/runtime/identity.test.ts'],
+    to: 'src/core/runtime/identity.ts',
+  },
+  {
     from: 'src/utils/claude.ts',
     subject: 'loop',
     tests: ['src/utils/claude.test.ts'],
@@ -193,6 +205,15 @@ export const CORE_MOVES: readonly CoreMove[] = [
     to: 'src/core/git/commit.ts',
   },
 ];
+
+/**
+ * The old paths of moved files that still hold a file: a re-export of
+ * the moved file's names, kept while a non-test file outside core
+ * imports the old path, sorted. Each is the `from` of a move in
+ * {@link CORE_MOVES}. The third step of core's move into its package
+ * (#1090) removes them.
+ */
+export const CORE_REEXPORTS: readonly string[] = ['src/runtime/identity.ts'];
 
 /**
  * The barrel files of each subject, sorted. `config` has three. The
@@ -214,6 +235,9 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * a cycle through the tracker. `index.ts` holds `parse.ts` and
  * `plan-files.ts`.
  *
+ * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
+ * file under `src/` and so reaches nothing that imports it back.
+ *
  * `loop` has two. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
@@ -230,6 +254,7 @@ export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   loop: ['src/core/loop/index.ts', 'src/core/loop/readings.ts'],
   output: ['src/core/output/index.ts'],
   plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
+  runtime: ['src/core/runtime/index.ts'],
 };
 
 /**

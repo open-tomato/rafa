@@ -1,5 +1,5 @@
 /**
- * Tests for the machine-fault reading (`src/triage/machine-fault.ts`):
+ * Tests for the machine-fault reading (`src/effort/store/machine-fault.ts`):
  * the three families it recognises, the second reading a package manager
  * needs, and the measurement over the bodies rafa itself filed.
  *

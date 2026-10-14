@@ -44,26 +44,18 @@
  * over `PullRequests.checks` (`./types.ts`) without either side naming
  * the CLI. {@link parseChecks} is what turns one provider's stdout into
  * those rows, and the `gh` adapter is its only caller.
+ *
+ * The row type, the verdict type, {@link verdictOf} and `failingRows`
+ * are core's (`src/effort/store/check-rows.ts`), where the store's plan
+ * CI writer reads them; this file re-exports them under the same names.
  */
 
-/** Whether a single check has passed, failed, or is still in flight. */
-export type CheckOutcome = 'pass' | 'fail' | 'pending';
+import type { CheckOutcome, CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
 
-/** One row of `gh pr checks --json name,state,link`. */
-export interface CheckRow {
-  name: string;
-  /** GitHub's raw state, kept verbatim so an unknown one stays reportable. */
-  state: string;
-  link: string;
-  outcome: CheckOutcome;
-}
+import { verdictOf } from '../effort/store/check-rows.js';
 
-/**
- * The verdict over every row: `none` when the PR has no checks at all,
- * which is the shape a conflicting PR produces, and the shape of a head
- * pushed seconds ago whose first check has not registered yet.
- */
-export type ChecksVerdict = 'green' | 'red' | 'pending' | 'none';
+export type { CheckOutcome, CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
+export { failingRows, verdictOf } from '../effort/store/check-rows.js';
 
 const PASSING_STATES = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
 
@@ -133,22 +125,6 @@ export function parseChecks(stdout: string): CheckRow[] {
     rows.push(toRow(entry as Record<string, unknown>));
   }
   return rows;
-}
-
-/**
- * Reduces rows to one verdict. Pending outranks failure so a run that is
- * still going is never reported as red on a partial reading.
- */
-export function verdictOf(rows: readonly CheckRow[]): ChecksVerdict {
-  if (rows.length === 0) return 'none';
-  if (rows.some((r) => r.outcome === 'pending')) return 'pending';
-  if (rows.some((r) => r.outcome === 'fail')) return 'red';
-  return 'green';
-}
-
-/** Rows the caller should act on: the failing ones, for a repair prompt. */
-export function failingRows(rows: readonly CheckRow[]): CheckRow[] {
-  return rows.filter((r) => r.outcome === 'fail');
 }
 
 /** One line per check, for the console and for a repair prompt. */

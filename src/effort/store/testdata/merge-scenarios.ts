@@ -74,8 +74,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 
 import { beginSession } from '../../../core/loop/index.js';
-import { minutesBetween } from '../../commits.js';
 import { bringForward } from '../bring-forward.js';
+import { minutesBetween } from '../commit-stats.js';
 import { vacuumInto } from '../copy.js';
 import { guardTestProcess } from '../location.js';
 import { LEGACY_GATE_OPEN, SQLITE_MIGRATIONS } from '../migrations.js';

@@ -147,7 +147,7 @@ export {
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
 } from './config-items.js';
-export { CONFIG_FILE, CORE_SECTION } from './core-section.js';
+export { CONFIG_FILE, CORE_SECTION, SCOPE_DIR } from './core-section.js';
 export {
   activeChecks,
   activeConfigLoadHook,

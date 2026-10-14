@@ -77,7 +77,7 @@ import type { RafaConfig, SettingSpec } from './config-schema.js';
 import type { ClaudeSettingSource, TierPin } from './config-sections.js';
 import type { ConfigSection } from './section.js';
 
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { DEFAULT_ROUTING } from '../../tiers/routing.js';
 
@@ -131,11 +131,18 @@ import {
  * The config file, relative to the directory it sits under: the project
  * root for the project's, the home directory for the user scope's.
  *
- * `join` rather than a literal, as `effort/store.ts` spells its own
- * directory, so a path built here compares equal to one a caller built
- * with `join` of its own.
+ * `join` rather than a literal, as `effort/store/ndjson-files.ts` spells
+ * its own directory, so a path built here compares equal to one a
+ * caller built with `join` of its own.
  */
 export const CONFIG_FILE: string = join('.rafa', 'config.yaml');
+
+/**
+ * The directory a scope keeps its files in, relative to the project
+ * root or the home: `.rafa`. Taken from `CONFIG_FILE`, so the two
+ * cannot name different directories.
+ */
+export const SCOPE_DIR: string = dirname(CONFIG_FILE);
 
 /** The package name core's section is registered under, which every refusal names. */
 const CORE_PACKAGE = 'core';

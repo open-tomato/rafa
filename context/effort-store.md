@@ -35,11 +35,11 @@ none (a store and `plansDir` both passed).
 
 **Both backends write under `.rafa/effort/` in the project root, unless
 `RAFA_EFFORT_DIR` names another directory.** `EFFORT_STORE_DIR` in
-`src/effort/store.ts` spells the directory, and `effortStoreDir`
-(`store/location.ts`) resolves it once for both backends:
-`sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's files join
-their names under it. `effortStorePath` in `store.ts` still joins under
-`.rafa/effort/` whatever the variable holds, and no backend calls it.
+`src/effort/store/ndjson-files.ts` spells the directory, and
+`effortStoreDir` (`store/location.ts`) resolves it once for both
+backends: `sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's
+files join their names under it. `effortStorePath` in
+`store/ndjson-files.ts` still joins under `.rafa/effort/` whatever the variable holds, and no backend calls it.
 `RAFA_EFFORT_DIR` moves the SQLite and NDJSON files together for one
 command line; it is a variable and not a config key so that it never
 moves the loop's own store. A relative value is refused (`is not an
@@ -57,7 +57,8 @@ parity suites name is the sibling's own store, read through
 ### Imports
 
 **Import store code from `./store/index.js` and port types from
-`./store/types.js`, never from `./store.js`.** `src/effort/store.ts` is the
+`./store/types.js`, never from `./store/ndjson-files.js` or its
+re-export `./store.js`.** `src/effort/store/ndjson-files.ts` is the
 sibling loop's pre-port module, and its `openEffortStore`, `EffortRowKind`
 and `AppendResult` are different declarations under the same names.
 
@@ -65,7 +66,7 @@ and `AppendResult` are different declarations under the same names.
 
 **A new `EffortRowByKind` kind turns `check-types` red away from the
 fix:** TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
-`STORE_FILE_NAMES` in `store.ts` names the kind's file, and TS2741 in
+`STORE_FILE_NAMES` in `store/ndjson-files.ts` names the kind's file, and TS2741 in
 `store/sqlite.ts` until `KIND_TABLES` has the kind.
 
 **`collectSessionRow` (`collect.ts`) copies attribution fields one by
@@ -294,7 +295,7 @@ database file matters. Importing each other's files in a loop is safe
 and idempotent: a repeat of the same file merges nothing new.
 
 **The `service` strategy syncs rows through a wire format over HTTP, defined
-in `src/effort/sync/wire.ts`, and merged only by `mergeStore`.** Push
+in `src/effort/store/wire.ts`, and merged only by `mergeStore`.** Push
 exports rows the local store wrote (identified by its origin pair) past a
 per-table, per-device cursor, building a JSON payload of every `merged`
 table's rows that have a `seq` higher than the cursor's value for that
@@ -318,7 +319,8 @@ store and no project: the merge records no other store in `merges`, and its
 other-project refusal has nothing to compare. The cursor for the next push
 advances only after a successful push; after a successful pull, the next pull
 starts from the new rows the merge brought in. The codec, `mergeStore` and
-`TRUSTED_PERMISSIONS` are exported from the `./store` subpath for the
+`TRUSTED_PERMISSIONS` (`store/trusted-permissions.ts`, re-exported by
+`src/board/trust.ts`) are exported from the `./store` subpath for the
 packages under `packages/`.
 
 **The `service` strategy makes one contact per command through
@@ -668,7 +670,7 @@ build's package version unless the caller names another.
 own.** Between the first plan and the lock, an open with anything to
 adopt or apply asks `refuseUnownedDevelopmentWrite`
 (`src/effort/store/development-build.ts`). `readRuntimeIdentity`
-(`src/runtime/identity.ts`) walks up from `Bun.main`, through its real
+(`src/core/runtime/identity.ts`) walks up from `Bun.main`, through its real
 path, to the nearest `package.json` named `@open-tomato/rafa`; the build
 is a development build when that directory also holds `src/rafa.ts`, so
 `bun src/rafa.ts`, a checkout's `dist/cli.js` and every `bun test`
@@ -1020,10 +1022,10 @@ and task line (null for plan CI), field name, and the field's whole `text`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
-`src/triage/machine-fault.ts` reads off the bug's `what` and `artifact`,
-which `store/triage.ts` calls for each bug it stores: `machine` for a
-fault of the machine the session ran on, `rafa` otherwise, and never
-NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
+`src/effort/store/machine-fault.ts` reads off the bug's `what` and
+`artifact`, which `store/triage.ts` calls for each bug it stores:
+`machine` for a fault of the machine the session ran on, `rafa`
+otherwise, and never NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
 the first migration that creates no table, so a row a version-8 store
 already held reads NULL — stored before the reading existed. It is
 outside `out_of_scope_bugs_by_entry` because it is a function of `what`
@@ -1053,6 +1055,12 @@ dispatch is written ahead of the task report; a refused dispatch row
 stores no report. A dispatch handed no handout stores a NULL resolver
 beside two `[]` offers. No column holds the outcome: `task_reports` and
 `report_absences` hold it under the same session id.
+The declaration a write carries is a `DispatchDeclaration`, declared in
+`store/dispatches.ts` from the six fields of the parser's
+`TaskDeclaration` it stores (`raw`, `agent`, `model`, `effort`, `budget`,
+`tools`), so the store imports nothing of `src/utils/declaration.ts`; its
+`effort` is typed by `EffortLevel`, which `store/effort-levels.ts` holds
+with `EFFORT_LEVELS`, both re-exported by `src/utils/declaration.ts`.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
@@ -1124,11 +1132,13 @@ the plan stub the head branch resolves to, the verdict (`green`, `red` or
 no row. `readPlanCi` reads every row, or one plan's, in append order.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
-`verdictOf` answers the settled verdict over every check, and the `failing`
-list is the failing checks' names; a CHECK keeps `failing` non-empty
-exactly when the verdict is `red`. The key is `(pr, head_sha, read_at)`:
-the same head read twice at two times is two rows, and the same reading
-written twice is stored once (the second counted as skipped).
+`verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all
+re-exported by `src/pr/checks.ts`) answers the settled verdict over every
+check, and the `failing` list is the failing checks' names; a CHECK keeps
+`failing` non-empty exactly when the verdict is `red`. The key is
+`(pr, head_sha, read_at)`: the same head read twice at two times is two
+rows, and the same reading written twice is stored once (the second
+counted as skipped).
 **The plan stub.** The head branch is read as `<type>/<stub>` by
 `attributeBranch`, and the stub resolved against the plan roster by
 `resolvePlanStub`, as `effort collect` resolves a session's branch. A stub
@@ -1250,7 +1260,8 @@ by `rafa effort report --skills`, which reads `invoked` and never
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
-twice. No column says the run halted: a run halted when a required check
+twice. A check's type, tier and outcome are core's
+(`store/preflight-check.ts`, re-exported by `src/preflight/run.ts`). No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
 and writes nothing for a run with no item to check. `rafa doctor` checks
@@ -1300,7 +1311,7 @@ text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
 
 **A branch stub is not a queue id.** `QUEUE_ID` in
-`src/effort/attribution.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
+`src/effort/store/plan-stubs.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
 `q`-prefixed leading token is read as one. A `rafa-<n>` stub carries
 none and resolves by exact match alone, which is why the branch
 `feat/rafa-21` matches no plan called `rafa-21-changelog-and-release`.

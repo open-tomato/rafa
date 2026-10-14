@@ -10,6 +10,7 @@ import {
   CORE_BARRELS,
   CORE_FOLDER,
   CORE_MOVES,
+  CORE_REEXPORTS,
   CORE_SUBJECTS,
   findCollisions,
   isCoreBarrel,
@@ -46,11 +47,11 @@ function plant(from: string, to: string, tests: readonly string[] = []): CoreMov
 }
 
 describe('CORE_MOVES', () => {
-  it('lists nineteen files, each once, sorted by the path it has today', () => {
+  it('lists twenty files, each once, sorted by the path it has today', () => {
     const from = CORE_MOVES.map((move) => move.from);
 
-    expect(from).toHaveLength(19);
-    expect(new Set(from).size).toBe(19);
+    expect(from).toHaveLength(20);
+    expect(new Set(from).size).toBe(20);
     expect(from).toEqual([...from].sort());
   });
 
@@ -80,10 +81,10 @@ describe('CORE_MOVES', () => {
     }
   });
 
-  it('holds 22 test files, with none for plan-files.ts and session-readings.ts', () => {
+  it('holds 23 test files, with none for plan-files.ts and session-readings.ts', () => {
     const without = CORE_MOVES.filter((move) => move.tests.length === 0).map((move) => move.from);
 
-    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(22);
+    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(23);
     expect(without).toEqual(['src/loop/session-readings.ts', 'src/plan/plan-files.ts']);
   });
 
@@ -108,7 +109,7 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists eleven barrels, three of them for config, two for loop and two for plan', () => {
+  it('lists twelve barrels, three of them for config, two for loop and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'src/core/adapters/index.ts',
       'src/core/command/index.ts',
@@ -121,6 +122,7 @@ describe('CORE_BARRELS', () => {
       'src/core/output/index.ts',
       'src/core/plan/block-reader.ts',
       'src/core/plan/index.ts',
+      'src/core/runtime/index.ts',
     ]);
   });
 
@@ -131,15 +133,18 @@ describe('CORE_BARRELS', () => {
     expect(isCoreBarrel('src/core/plan/blocks.ts')).toBe(false);
     expect(isCoreBarrel('src/core/loop/readings.ts')).toBe(true);
     expect(isCoreBarrel('src/core/loop/session-readings.ts')).toBe(false);
+    expect(isCoreBarrel('src/core/runtime/index.ts')).toBe(true);
+    expect(isCoreBarrel('src/core/runtime/identity.ts')).toBe(false);
+    expect(isCoreBarrel('src/runtime/identity.ts')).toBe(false);
     expect(isCoreBarrel('src/plan/index.ts')).toBe(false);
   });
 });
 
 describe('movedPaths and movedTo', () => {
-  it('spreads the moves into 41 paths, a file first and its test files after it', () => {
+  it('spreads the moves into 43 paths, a file first and its test files after it', () => {
     const paths = movedPaths();
 
-    expect(paths).toHaveLength(41);
+    expect(paths).toHaveLength(43);
     expect(paths.slice(0, 2)).toEqual([
       { from: 'src/adapters/output/active.ts', to: 'src/core/output/active.ts' },
       { from: 'src/adapters/output/active.test.ts', to: 'src/core/output/active.test.ts' },
@@ -156,7 +161,7 @@ describe('movedPaths and movedTo', () => {
 });
 
 describe('findCollisions', () => {
-  it('finds none across the nineteen moves, their test files and the barrels', () => {
+  it('finds none across the twenty moves, their test files and the barrels', () => {
     expect(findCollisions(CORE_MOVES, CORE_BARRELS)).toEqual([]);
   });
 
@@ -214,24 +219,46 @@ describe('findCollisions', () => {
   });
 });
 
+describe('CORE_REEXPORTS', () => {
+  it('lists the old path of a moved source file, each once, sorted', () => {
+    const from = CORE_MOVES.map((move) => move.from);
+
+    expect(CORE_REEXPORTS).toEqual(['src/runtime/identity.ts']);
+    expect(CORE_REEXPORTS).toEqual([...new Set(CORE_REEXPORTS)].sort());
+    for (const path of CORE_REEXPORTS) {
+      expect([path, from.includes(path)]).toEqual([path, true]);
+    }
+  });
+});
+
 /**
  * The lists against the tracked tree. These stay true through the move:
  * a listed path is tracked where it is today or at its target, and never
- * at both.
+ * at both, but for an old path {@link CORE_REEXPORTS} keeps as a
+ * re-export, which is tracked at both once its file has moved.
  */
 describe('the lists against the tracked tree', () => {
   const tracked = new Set(listTrackedFiles(REPO_ROOT).all);
+  const kept = new Set(CORE_REEXPORTS);
 
-  it('finds every listed file and test file at its old path or at its target, never both', () => {
+  it('finds every listed file and test file at its old path or at its target, never both but for a kept re-export', () => {
     const paths = movedPaths();
     const placed = paths.map((moved) => [moved.from, Number(tracked.has(moved.from)) + Number(tracked.has(moved.to))]);
 
     expect(tracked.size).toBeGreaterThan(0);
-    expect(placed).toEqual(paths.map((moved) => [moved.from, 1]));
+    expect(placed).toEqual(paths.map((moved) => [moved.from, kept.has(moved.from) && tracked.has(moved.to)
+      ? 2
+      : 1]));
+  });
+
+  it('finds every kept re-export at its old path once its file sits at its target', () => {
+    const moved = CORE_MOVES.filter((move) => kept.has(move.from) && tracked.has(move.to));
+
+    expect(moved.map((move) => [move.from, tracked.has(move.from)])).toEqual(moved.map((move) => [move.from, true]));
   });
 
   it('lists every test file named after a file still at its old path that has no source file of its own', () => {
-    const unmoved = CORE_MOVES.filter((move) => tracked.has(move.from));
+    const unmoved = CORE_MOVES.filter((move) => tracked.has(move.from) && !tracked.has(move.to));
     const listed = new Set(unmoved.flatMap((move) => move.tests));
     const owned = [...tracked].filter((path) => {
       if (classifyFile(path) !== 'test' || !path.endsWith(TEST_SUFFIX)) {

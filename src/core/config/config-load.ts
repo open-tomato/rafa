@@ -133,8 +133,8 @@
  * ## Existence
  *
  * define-config's lookup passes over a directory at a lookup name. Only
- * absence is absorbed here — the rule `effort/store.ts` applies to its
- * own files — so a scope whose loader found no file, while something
+ * absence is absorbed here — the rule `effort/store/ndjson-files.ts`
+ * applies to its own files — so a scope whose loader found no file, while something
  * stands at one of its names, is refused naming it: a
  * `.rafa/config.yaml` that is a directory would otherwise pass for no
  * config, and the run would go on at defaults. {@link readConfigFile}

@@ -17,9 +17,9 @@
  * refusal has the same import as a dry run beside it, which runs.
  */
 import type { ImportCommandSeams } from './import.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { FileSyncOptions } from '../../effort/sync/file.js';
 import type { SyncPullRequest } from '../../ports/index.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';

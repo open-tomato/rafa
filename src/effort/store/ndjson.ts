@@ -3,7 +3,7 @@
  * behind the kind-parameterised port.
  *
  * Its behaviour is the sibling's by construction, not by copy. Every
- * read and every write goes through the functions of `effort/store.ts`,
+ * read and every write goes through the functions of `ndjson-files.ts`,
  * the sibling's own module, byte-identical to the sibling's
  * `tools/ralph/effort/store.ts` when this backend was added (measured
  * with `diff`); the phase 1 store move has since changed its directory
@@ -11,7 +11,7 @@
  * a kind lives in, and which key it is deduplicated by. The sibling's
  * rules hold here because they are the same code, and the suite beside
  * that module is a suite over the code this backend runs. Retiring
- * `effort/store.ts` therefore means moving those functions here, not
+ * `ndjson-files.ts` therefore means moving those functions here, not
  * deleting them.
  *
  * ## Layout
@@ -23,7 +23,7 @@
  * everything again; that store sits under `.ralph/effort/`, which the
  * phase 1 move left behind, and no backend reads it. The directory is
  * the one `effortStoreDir` (`location.ts`) spells for both backends:
- * `EFFORT_STORE_DIR` from `effort/store.ts`, which the project's
+ * `EFFORT_STORE_DIR` from `ndjson-files.ts`, which the project's
  * `.gitignore` entry for `.rafa/` ignores, unless `RAFA_EFFORT_DIR`
  * names another. Every read and append runs the test guard there first.
  *
@@ -62,7 +62,7 @@
  * batch. A mismatch that got past the caller's types still writes
  * nothing.
  */
-import type { StoreReadResult } from '../store.js';
+import type { StoreReadResult } from './ndjson-files.js';
 import type {
   AppendResult,
   EffortRow,
@@ -72,17 +72,16 @@ import type {
 
 import { join } from 'node:path';
 
+import { effortStoreDir, guardTestProcess } from './location.js';
 import {
   appendRows,
   collectedKeys,
   effortStoreFileName,
   readStoreRows,
-} from '../store.js';
-
-import { effortStoreDir, guardTestProcess } from './location.js';
+} from './ndjson-files.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
 
-export type { StoreReadResult } from '../store.js';
+export type { StoreReadResult } from './ndjson-files.js';
 
 /**
  * What one NDJSON append did: the port's answer, plus the one reading

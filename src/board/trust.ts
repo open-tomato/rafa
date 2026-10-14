@@ -211,19 +211,13 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { CommandExit } from '../core/command/index.js';
 import { describeValue, isGitHubLogin, isMapping, messageOf } from '../core/config/sections.js';
+import { TRUSTED_PERMISSIONS } from '../effort/store/trusted-permissions.js';
+
+export type { TrustedPermission } from '../effort/store/trusted-permissions.js';
+export { TRUSTED_PERMISSIONS } from '../effort/store/trusted-permissions.js';
 
 /** The repository placeholders `gh api` expands from the directory it runs in. */
 const REPO_PATH = '{owner}/{repo}';
-
-/**
- * The permissions that mean the login may change the repository. The
- * `./store` subpath exports it too (`src/effort/store/index.ts`), so a
- * workspace package checking a login spells write access as core does.
- */
-export const TRUSTED_PERMISSIONS = ['admin', 'maintain', 'write'] as const;
-
-/** One of the three permissions that are trust. */
-export type TrustedPermission = (typeof TRUSTED_PERMISSIONS)[number];
 
 /** The exit code a refused read of board text ends with; the spec's own. */
 export const TRUST_REFUSAL_EXIT = 2;

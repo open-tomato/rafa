@@ -15,7 +15,7 @@
  */
 import type { SqliteMigration } from './migrations.js';
 import type { SessionRecord } from '../../core/loop/index.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import {
   mkdirSync,

@@ -134,17 +134,17 @@ import type { ConfigRoots } from '../core/config/load.js';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
-import { CONFIG_FILE, configFilePath } from '../core/config/index.js';
+import { CONFIG_FILE, configFilePath, SCOPE_DIR } from '../core/config/index.js';
 import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 
 /**
- * The directory a scope keeps its files in, relative to the project
- * root or the home: `.rafa`. Taken from `CONFIG_FILE`, so the two
- * cannot name different directories.
+ * The directory a scope keeps its files in: `.rafa`. Declared beside
+ * `CONFIG_FILE` in the core config module and re-exported here under
+ * the same name, so this module's importers read the same binding.
  */
-export const SCOPE_DIR: string = dirname(CONFIG_FILE);
+export { SCOPE_DIR };
 
 /**
  * The names a directory is probed for, in `loadConfig`'s lookup order

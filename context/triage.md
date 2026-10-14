@@ -101,10 +101,11 @@ there. The GitHub advisory channel stays one a human opens.
 
 **Machine.** A bug whose `what` and `artifact` name a system toolchain, an
 SDK path, or a package-manager build failure: a fault of the MACHINE the
-session ran on and not of rafa. `./machine-fault.ts` reads the families and
-is the whole of that reading. Such a bug goes to a channel with no tracker
-at all: neither tracker is asked anything, no reference is stored, and its
-action is `skipped`. Its problem says the family and the text that matched,
+session ran on and not of rafa. `src/effort/store/machine-fault.ts`, which
+`./machine-fault.ts` re-exports, reads the families and is the whole of
+that reading. Such a bug goes to a channel with no tracker at all:
+neither tracker is asked anything, no reference is stored, and its action
+is `skipped`. Its problem says the family and the text that matched,
 redacted as every problem here is, so a run says why nothing was filed. The
 bug is not lost — `writeTriage` stores every out-of-scope bug and its scope
 column, so the row says `machine`. An entry of kind `machine` takes the same

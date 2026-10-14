@@ -138,7 +138,7 @@ import {
   SESSION_KINDS,
   buildReport,
 } from '../effort/report.js';
-import { readStoreRows } from '../effort/store.js';
+import { readStoreRows } from '../effort/store/ndjson-files.js';
 
 /** Per-turn usage. One distinct decimal magnitude per column. */
 const TURN_INPUT = 100;

@@ -14,9 +14,9 @@
  * it holding the one directory, so an emptiness check that could not
  * see a directory would fail there.
  */
+import type { MergeOptions } from './merge-store.js';
 import type { MaterialiseOptions, WirePayload, WireRow } from './wire.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
-import type { MergeOptions } from '../store/merge-store.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,11 +25,10 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { bringForward } from '../store/bring-forward.js';
-import { MERGE_RULES } from '../store/merge-rules.js';
-import { mergeStore } from '../store/merge-store.js';
-import { SQLITE_MIGRATIONS } from '../store/migrations.js';
-
+import { bringForward } from './bring-forward.js';
+import { MERGE_RULES } from './merge-rules.js';
+import { mergeStore } from './merge-store.js';
+import { SQLITE_MIGRATIONS } from './migrations.js';
 import {
   decodeWirePayload,
   encodeWirePayload,

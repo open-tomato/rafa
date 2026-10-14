@@ -27,7 +27,7 @@
  * (`store-sources.sweep.test.ts`), so nothing outside a test file may import
  * from one.
  */
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { Device } from '../../tests/merged-stores.js';
 import type { OriginTable } from '../store/origins.js';
 

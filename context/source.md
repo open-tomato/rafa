@@ -89,14 +89,21 @@ holds one under `packages/`.
 **Core is `src/core/`, the code every part of rafa reads.** The nineteen
 files that #905 moves there are the connective tissue of the codebase:
 graph analysis calls such files high-betweenness nodes, since many paths
-between the rest of the tree run through them. They sit in seven subject
-folders. `config/` holds the value readers, core's keys of the schema,
-the section contract, core's own section and the loader; `command/` the command contract (`RafaCommand`, `RafaContext`,
+between the rest of the tree run through them. A twentieth,
+`runtime/identity.ts`, moved there in #1088 so the effort store imports
+nothing above core for it. They sit in eight subject folders. `config/`
+holds the value readers, core's keys of the schema, the section
+contract, core's own section and the loader; `command/` the command
+contract (`RafaCommand`, `RafaContext`,
 `CommandExit`), the version and the confirm prompt; `output/` the active
 output; `adapters/` the adapter registry; `git/` the git runner and the
 commit helpers; `plan/` the block reader, the plan parser and the
 plan-file readers; `loop/` the loop's session helpers, its session
-readings and the Claude spawner. A file keeps its base name when it moves.
+readings and the Claude spawner; `runtime/` the reading of which build
+is running. A file keeps its base name when it moves. A moved file keeps
+a re-export at its old path while a non-test file outside core still
+imports it there; `CORE_REEXPORTS` of `scripts/survey/core-moves.ts`
+lists those paths, today `src/runtime/identity.ts`.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it
@@ -106,7 +113,7 @@ report code, but the effort store reads it, so it is core. Core is also
 `src/report/record.ts`: core by assignment, kept where they are.
 
 **A subject's barrel is the only file under `src/core/` that a file
-outside it may import.** There are eleven, all listed in `CORE_BARRELS` of
+outside it may import.** There are twelve, all listed in `CORE_BARRELS` of
 `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
 four more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts` and
 `plan/block-reader.ts`. A barrel re-exports the names of the files behind

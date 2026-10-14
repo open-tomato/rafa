@@ -36,7 +36,7 @@
  *     from it. A bug whose `what` and `artifact` name a system
  *     toolchain, a machine's SDK path or a package-manager build failure
  *     is a fault of the machine the session ran on and not of rafa, and
- *     `triage/machine-fault.ts` is the whole of that reading; this
+ *     `./machine-fault.ts` is the whole of that reading; this
  *     writer calls `isMachineFault` and stores `machine` or `rafa`.
  *     `triage/triage.ts` takes the same reading to decide that such a
  *     bug reaches no tracker at all, so the row and the routing can
@@ -156,9 +156,8 @@ import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
 
-import { isMachineFault } from '../../triage/machine-fault.js';
-
 import { checkDispatch, describeValue, textProblem } from './findings.js';
+import { isMachineFault } from './machine-fault.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, writeSqliteStore } from './sqlite.js';
 
