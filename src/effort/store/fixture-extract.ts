@@ -182,6 +182,8 @@ export const KEPT_COLUMNS: Readonly<Record<string, ShapeCheck>> = {
   'preflight.kind': isWord,
   'preflight.outcome': isWord,
   'plan_ci.verdict': isWord,
+  'stale_docs.kind': isWord,
+  'stale_docs.outcome': isWord,
   'dispatches.resolver': isWord,
   'schema_migrations.id': isWord,
   'schema_migrations.sha256': (value) => SHA256_HEX.test(value),

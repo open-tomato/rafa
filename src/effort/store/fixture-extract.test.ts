@@ -134,6 +134,9 @@ const FIXTURES: Readonly<Record<OriginTable, (key: string) => FixtureRow>> = {
     plan_stub: 'SRC-plan', pr: 9, head_sha: `SRC-head-${key}`, verdict: 'red', failing: '["SRC lint"]',
     read_at: timeOf(key),
   }),
+  stale_docs: (key) => ({
+    ...reportRow(key), kind: 'sighting', where_at: `SRC context/${key}.md:12`, what: `SRC stale line ${key}`,
+  }),
 };
 
 let base = '';

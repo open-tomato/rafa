@@ -736,7 +736,7 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
 `report_absences`, `task_reports`, `preflight`, `dispatches`,
-`skill_invocations`, `plan_ci`, `store_meta`, `merges`,
+`skill_invocations`, `plan_ci`, `stale_docs`, `store_meta`, `merges`,
 `merge_conflicts` and `store_replaced` are SQLite-only and stay out of
 the port's row map. Migration `store-replaced` creates the last one,
 `store_replaced` (`store_id` as its primary key, `replaced_at`): one row per
@@ -806,7 +806,7 @@ spelling does not mint; the device and inode are bigints. A `.bak`
 renamed over the store has a new inode and mints, but one restored
 with `cp` over the existing file keeps the old inode and does not
 (measured on tmpfs); the merge's collision check is what catches it.
-Every production insert into the twelve tables a merge unions stamps
+Every production insert into the thirteen tables a merge unions stamps
 `origin_store` from that row and `origin_seq` as the row's own `seq`,
 which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
 two cannot differ: `STAMPED_COLUMNS` and `stampedValues`
@@ -870,6 +870,20 @@ commit:**
   index, and an `UPDATE <table> SET <column>` in a production module
   under `src/` whose column has no rule; a new edit of an existing
   table's column needs its rule the same way;
+- for a merged table, **one fixture row in each builder that plants
+  every merged table**: `FIXTURES` in `merge-union.test.ts` and in
+  `fixture-extract.test.ts`, and `taskRows` in
+  `testdata/merge-scenarios.ts`, where a table the legacy history does
+  not create also joins `PAST_LEGACY_TABLES`, since the `plan-ci` side
+  of scenario 6 holds no such table. A column whose CHECK admits a
+  closed set of words joins `KEPT_COLUMNS` (`store/fixture-extract.ts`):
+  without it the extract replaces the word with a placeholder and the
+  restore fails that CHECK (measured for `stale_docs.kind`: `CHECK
+  constraint failed: kind IN ('sighting', 'unsettled')`);
+- for a merged table, **its writer in `WRITERS` and its planted row in
+  `PLANTED`** (`origins.test.ts`). A table whose migration lands ahead
+  of its writer is listed in that file's `UNWRITTEN_TABLES` instead,
+  and a case there fails once a module under `store/` inserts into it;
 - the table-list expectations below.
 
 A new table moves every full table-list expectation with it: two in
@@ -1117,6 +1131,31 @@ sha. `pr merge` calls it from `runMerge` straight after its one checks read
 and before any refusal, so a merge refused on red checks still stores what
 it read. Both tests are in `commands/pr/`: `triage-plan-ci.test.ts` and
 `merge-plan-ci.test.ts`.
+
+**`stale_docs` holds one row per documentation line a task report
+named as stale.** Migration `stale-docs` creates it, shaped as
+`out_of_scope_bugs` is: `seq`, an `id`, the findings provenance
+(`session_id`, `plan_stub`, `task_line`, `outcome`, `collected_at`),
+the entry, and the origin pair with `stale_docs_by_origin`, which the
+table holds from its first row since it is created after `row-origins`.
+The entry's `where` is the column `where_at`, WHERE being an SQL
+keyword, NULL for an entry that named no place; `what` is `NOT NULL`
+and non-empty. `kind` is the one column no report holds: `sighting`
+for an entry a task reported, `unsettled` for one the plan's doc task
+could not settle, and the CHECK admits nothing else. `plan_stub` is
+NULL for a row written under no plan. `stale_docs_by_entry` is unique
+over `session_id`, `kind`, `ifnull(where_at, '')` and `what`, so one
+session's repeat of an entry under one kind is one row, two entries
+naming no place collide, and the same entry under the other kind is a
+second row. The table is `merged`, append-only by `id`, and one of the
+`ORIGIN_TABLES`. `store/stale-docs.ts` holds the row type
+(`StaleDocRow`, its keys pinned as `staleDocs` in
+`row-fields.lock.json`) and `STALE_DOC_KINDS`. The table is no kind of
+the port, so neither backend routes it: it sits in `effort.sqlite`
+whichever backend `store` selects, and the NDJSON files are left as
+they were. `stale-docs-migration.test.ts` holds the entry to a store an
+older runtime left, the table to each CHECK and index, and both of
+those readings.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

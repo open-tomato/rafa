@@ -162,6 +162,19 @@ function appendSession(root: string, session: string): void {
   openSqliteStore(root).append('sessions', [row]);
 }
 
+/**
+ * The merged tables no module under `src/effort/store/` inserts into:
+ * `stale_docs`, which the migration `stale-docs` creates and no writer
+ * fills. The last group below reads the modules' source and fails once
+ * one of them inserts into a table listed here, so a table leaves this
+ * list for {@link WRITERS} and {@link PLANTED} in the commit that adds
+ * its writer.
+ */
+const UNWRITTEN_TABLES: readonly OriginTable[] = ['stale_docs'];
+
+/** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
+const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
+
 /** One production writer, the tables it inserts into, and one write of task session `session`. */
 interface WriterCase {
   readonly name: string;
@@ -297,10 +310,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the twelve tables a merge unions', () => {
+  it('covers each of the twelve merged tables a writer fills, and leaves out only the one no writer does', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
-    expect([...covered].sort()).toEqual([...ORIGIN_TABLES].sort());
+    expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
+    expect(WRITTEN_TABLES).toHaveLength(12);
+    expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 
   it.each(WRITERS.map((writer) => [writer.name, writer] as const))('%s stamps the minted origin and each row\'s own seq', (_, writer) => {
@@ -424,14 +439,14 @@ describe('a row planted with NULL origins', () => {
 
   const root = mixedRoot();
 
-  it('sits beside stamped rows in every table, NULL in both columns', () => {
-    for (const table of ORIGIN_TABLES) {
+  it('sits beside stamped rows in every table a writer fills, NULL in both columns', () => {
+    for (const table of WRITTEN_TABLES) {
       const rows = originsOf(root, table);
       expect(rows[0]).toEqual({ seq: 1, origin_store: null, origin_seq: null });
       expect(rows.slice(1).length).toBeGreaterThan(0);
       expect(rows.slice(1)).toEqual(rows.slice(1).map(({ seq }) => ({ seq, origin_store: 'store-a', origin_seq: seq })));
     }
-    expect(PLANTED.map(([table]) => table)).toEqual([...ORIGIN_TABLES]);
+    expect(PLANTED.map(([table]) => table)).toEqual([...WRITTEN_TABLES]);
   });
 
   it('is read by the port\'s read and keys', () => {
@@ -563,6 +578,18 @@ describe('the production inserts, read from source', () => {
       'store-meta.ts: store_meta',
       'store-replaced.ts: store_replaced',
     ]);
+  });
+
+  it('finds no insert into a table listed as unwritten', () => {
+    const unwritten: readonly string[] = UNWRITTEN_TABLES;
+
+    expect(found.filter(({ table }) => unwritten.includes(table))).toEqual([]);
+  });
+
+  it('reads an insert into an unwritten table as one, so the case above can fail (control)', () => {
+    const source = 'const SQL = `INSERT INTO stale_docs (id, session_id) VALUES (?, ?)`;';
+
+    expect(insertsIn('planted.ts', source).map(({ table }) => table)).toEqual([...UNWRITTEN_TABLES]);
   });
 
   it('reads an insert whose column list lacks the stamp as unstamped (control)', () => {

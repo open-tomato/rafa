@@ -269,7 +269,7 @@ describe('the task reports migration', () => {
     expect(rawQuery<{ name: string }>(root, columns, 'task_reports').map(({ name }) => name))
       .toEqual(COLUMNS);
     expect(tablesOf(root))
-      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'store_replaced', 'task_reports']);
+      .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'stale_docs', 'store_meta', 'store_replaced', 'task_reports']);
     expect(rawQuery(root, 'PRAGMA user_version'))
       .toEqual([{ user_version: LEGACY_GATE_OPEN }]);
   });

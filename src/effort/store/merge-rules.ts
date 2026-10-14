@@ -6,8 +6,9 @@
  *
  * A `merged` table travels: a merge unions its rows from both stores,
  * one copy of each identity. Each carries `origin_store` and
- * `origin_seq` since migration `row-origins`, with the partial unique
- * index `<table>_by_origin` over the pair, and is one of the
+ * `origin_seq`, since migration `row-origins` or, for a table created
+ * after it, from its own migration, with the partial unique index
+ * `<table>_by_origin` over the pair, and is one of the
  * `ORIGIN_TABLES` (`origins.ts`). A `local` table never leaves its
  * machine: the migration log, the store's identity row, the ids it
  * replaced and the merge trail describe this one file, and a merge neither reads them from the
@@ -119,6 +120,7 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   changes: appendOnly('id'),
   skill_invocations: appendOnly('session_id', 'name', 'sidechain'),
   plan_ci: appendOnly('pr', 'head_sha', 'read_at'),
+  stale_docs: appendOnly('id'),
   schema_migrations: { scope: 'local' },
   store_meta: { scope: 'local' },
   store_replaced: { scope: 'local' },

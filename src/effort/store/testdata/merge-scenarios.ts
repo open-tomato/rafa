@@ -34,13 +34,15 @@
  *
  * ## The rows
  *
- * A device writes tasks and commits. A task is one row in each of the
- * eleven merged tables other than `commits`, keyed by the task's name;
- * a commit is one `commits` row whose `minutesSincePrevious` is measured
- * against the commit before it in time in that store, as a collection
- * measures it. So every merged table is exercised, and each builder
- * knows the rows the union of its devices holds from the names it
- * wrote: {@link Scenario.union}.
+ * A device writes tasks and commits. A task is one row in each merged
+ * table other than `commits` that the store holds, keyed by the task's
+ * name; a commit is one `commits` row whose `minutesSincePrevious` is
+ * measured against the commit before it in time in that store, as a
+ * collection measures it. A store left at the legacy history holds no
+ * `stale_docs` table, so a task written there has no row in it:
+ * {@link PAST_LEGACY_TABLES}. So every merged table is exercised, and
+ * each builder knows the rows the union of its devices holds from the
+ * names it wrote: {@link Scenario.union}.
  *
  * Rows are inserted as a production insert stamps them, through
  * `STAMPED_COLUMNS` and `stampedValues` (`origins.ts`), so a store's
@@ -152,6 +154,13 @@ const MS_PER_MINUTE = 60_000;
 /** The merged tables a task writes one row to: every one but `commits`. */
 const TASK_TABLES = ORIGIN_TABLES.filter((table) => table !== 'commits');
 
+/**
+ * The merged tables an entry past the legacy history creates. A store
+ * left at `plan-ci` holds none of them, so a task written there has no
+ * row in any.
+ */
+const PAST_LEGACY_TABLES: ReadonlySet<OriginTable> = new Set<OriginTable>(['stale_docs']);
+
 /** A task or commit a device writes: its name, and when, in minutes past {@link EPOCH_MS}. */
 interface Written {
   readonly key: string;
@@ -197,6 +206,10 @@ function taskRows({ key, minute }: Written): readonly PlantedRow[] {
     changes: { ...report, id: `change-${key}`, level: 'patch', area: null, summary: `summary ${key}`, collected_at: time },
     skill_invocations: { session_id: session, name: 'ts-symbols', sidechain: 0, count: 1 },
     plan_ci: { plan_stub: PLAN_STUB, pr: PLAN_PR, head_sha: `head-${key}`, verdict: 'none', failing: '[]', read_at: time },
+    stale_docs: {
+      ...report, id: `stale-${key}`, kind: 'sighting', where_at: `context/${key}.md:12`, what: `stale ${key}`,
+      outcome: 'done', collected_at: time,
+    },
   };
   return TASK_TABLES.map((table) => ({ table, values: rows[table] }));
 }
@@ -230,12 +243,19 @@ function insertRow(db: Database, row: PlantedRow, stamped: boolean): void {
     .run(...Object.values(row.values));
 }
 
-/** Writes each task to the store at `path`, in order. */
+/** The tables the store holds, by name. */
+function tablesOf(db: Database): ReadonlySet<string> {
+  return new Set(db.query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\'').all()
+    .map(({ name }) => name));
+}
+
+/** Writes each task to the store at `path`, in order, one row in each task table the store holds. */
 function writeTasks(path: string, tasks: readonly Written[]): void {
   withStore(path, (db) => {
     const stamped = hasOrigins(db);
+    const held = tablesOf(db);
     for (const task of tasks) {
-      for (const row of taskRows(task)) insertRow(db, row, stamped);
+      for (const row of taskRows(task).filter(({ table }) => held.has(table))) insertRow(db, row, stamped);
     }
   });
 }
@@ -349,13 +369,34 @@ function task(key: string, minute: number): Written {
 /** A commit made at `minute`. */
 const commit = task;
 
-/** The rows each merged table holds over the distinct tasks and commits written. */
-function unionOf(tasks: readonly Written[], commits: readonly Written[]): Readonly<Record<OriginTable, number>> {
-  const taskCount = new Set(tasks.map(({ key }) => key)).size;
-  const commitCount = new Set(commits.map(({ key }) => key)).size;
-  return Object.fromEntries(ORIGIN_TABLES.map((table) => [table, table === 'commits'
-    ? commitCount
-    : taskCount])) as Record<OriginTable, number>;
+/** What a scenario's devices wrote between them. */
+interface WrittenRows {
+  readonly tasks: readonly Written[];
+  readonly commits: readonly Written[];
+  /** The tasks among `tasks` written to a store at the legacy history; none when left out. */
+  readonly legacyTasks?: readonly Written[];
+}
+
+/** How many distinct names `written` holds. */
+function distinct(written: readonly Written[]): number {
+  return new Set(written.map(({ key }) => key)).size;
+}
+
+/**
+ * The rows each merged table holds over the distinct tasks and commits
+ * written. A task written to a store at the legacy history counts in
+ * no table of {@link PAST_LEGACY_TABLES}.
+ */
+function unionOf({ tasks, commits, legacyTasks = [] }: WrittenRows): Readonly<Record<OriginTable, number>> {
+  const legacyKeys = new Set(legacyTasks.map(({ key }) => key));
+  const pastLegacy = distinct(tasks.filter(({ key }) => !legacyKeys.has(key)));
+  const rowsOf = (table: OriginTable): number => {
+    if (table === 'commits') return distinct(commits);
+    return PAST_LEGACY_TABLES.has(table)
+      ? pastLegacy
+      : distinct(tasks);
+  };
+  return Object.fromEntries(ORIGIN_TABLES.map((table) => [table, rowsOf(table)])) as Record<OriginTable, number>;
 }
 
 /** A scenario that merges, with the union of what its devices wrote. */
@@ -363,9 +404,9 @@ function merging(
   name: ScenarioName,
   number: number,
   devices: readonly ScenarioDevice[],
-  written: { readonly tasks: readonly Written[]; readonly commits: readonly Written[] },
+  written: WrittenRows,
 ): Scenario {
-  return { name, number, devices, union: unionOf(written.tasks, written.commits), refusal: null, collisions: [] };
+  return { name, number, devices, union: unionOf(written), refusal: null, collisions: [] };
 }
 
 /** Scenario 3: two clean starts, one history of commits collected on both under two origins. */
@@ -426,7 +467,8 @@ export function buildRestoredBak(scope: string): Scenario {
  * Scenario 6: a store a 0.24.x runtime wrote, at `plan-ci`, copied to a
  * second device; the first brought through `row-origins` and
  * `store-meta` and minted, the second left at `plan-ci`, both written.
- * The shared rows carry no origin on either side.
+ * The shared rows carry no origin on either side, and only the task the
+ * first device wrote after it was brought forward has a `stale_docs` row.
  */
 export function buildPlanCiSide(scope: string): Scenario {
   const dir = scenarioDir(scope, 'plan-ci-side');
@@ -448,6 +490,7 @@ export function buildPlanCiSide(scope: string): Scenario {
   return merging('plan-ci-side', 6, [a, legacy], {
     tasks: [...seedTasks, ...tasksA, ...tasksOld],
     commits: [...seedCommits, ...commitsA, ...commitsOld],
+    legacyTasks: [...seedTasks, ...tasksOld],
   });
 }
 

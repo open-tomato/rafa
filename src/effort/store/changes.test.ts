@@ -121,6 +121,7 @@ const TABLES = [
   'schema_migrations',
   'sessions',
   'skill_invocations',
+  'stale_docs',
   'store_meta',
   'store_replaced',
   'task_reports',
@@ -304,7 +305,7 @@ describe('the changes migration', () => {
     // The control: the first seven entries make every earlier table and no
     // changes table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     const result = writeChanges(root, writeOf({ changes: [change()] }), seams('from-v7'));
 
@@ -916,7 +917,7 @@ describe('readPlanChanges', () => {
     const db = new Database(storeFile(root), { create: true, readwrite: true });
     migrateSchema(db, storeFile(root), SQLITE_MIGRATIONS.slice(0, 7));
     db.close();
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'changes' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     expect(readPlanChanges(root, 'rafa-21-changelog-and-release')).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);

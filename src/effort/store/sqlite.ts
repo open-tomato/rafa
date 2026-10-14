@@ -49,7 +49,7 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds eleven tables that are not kinds. Six are filled from
+ * The file holds sixteen tables that are not kinds. Six are filled from
  * task reports: `findings`, `blockers`, `out_of_scope_bugs` and
  * `changes`, one per list a report carries, `report_absences`, one row
  * per task session whose output held no report to read, and
@@ -58,9 +58,14 @@
  * row per item a run's preflight checked, `dispatches`, one row per task
  * session the loop spawned, `skill_invocations`, one row per skill a
  * session invoked, and `plan_ci`, one row per reading of a plan's CI.
- * The last is `schema_migrations`, the migration log, which only
+ * An eleventh, `stale_docs`, is filled from task reports as the first
+ * six are, one row per documentation line a report named as stale;
+ * `stale-docs.ts` holds its row type. The twelfth is
+ * `schema_migrations`, the migration log, which only
  * `bring-forward.ts` writes; the section on bringing a store forward
- * says what it holds. The port's row map names none of them, and
+ * says what it holds. The last four are the store's own identity and
+ * merge trail: `store_meta`, `store_replaced`, `merges` and
+ * `merge_conflicts`. The port's row map names none of them, and
  * nothing in this module reads or writes them. `findings.ts` writes the
  * first, `triage.ts` the next two, `changes.ts` the fourth,
  * `absences.ts` the fifth, `reports.ts` the sixth, `preflight.ts` the
