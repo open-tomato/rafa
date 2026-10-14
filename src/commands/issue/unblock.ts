@@ -299,4 +299,5 @@ export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_
   return Object.freeze(command);
 }
 
-export default createIssueUnblockCommand();
+const command: RafaCommand = createIssueUnblockCommand();
+export default command;

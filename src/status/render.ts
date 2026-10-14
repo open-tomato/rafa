@@ -86,7 +86,7 @@ import { formatCounts } from '../core/plan/index.js';
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 
 /** Each section's title, in the order the text lists them. */
-export const STATUS_SECTION_TITLES = Object.freeze({
+export const STATUS_SECTION_TITLES: Readonly<{ branch: 'Branch'; loops: 'Loops'; pull: 'Pull request'; board: 'Board'; claims: 'Claims'; housekeeping: 'Housekeeping'; }> = Object.freeze({
   branch: 'Branch',
   loops: 'Loops',
   pull: 'Pull request',

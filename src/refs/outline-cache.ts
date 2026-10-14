@@ -38,7 +38,7 @@ import { join, resolve } from 'node:path';
 import { SCOPE_DIR } from '../project/scope.js';
 
 /** Where kept outlines are written, relative to the project root. */
-export const OUTLINE_CACHE_DIR = join(SCOPE_DIR, 'cache', 'outline', 'v2');
+export const OUTLINE_CACHE_DIR: string = join(SCOPE_DIR, 'cache', 'outline', 'v2');
 
 /** The kept names in `path`, or null when there are none this version can read. */
 function readKept(path: string): readonly string[] | null {

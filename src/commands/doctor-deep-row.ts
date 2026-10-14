@@ -50,7 +50,7 @@ export const STATUS_WIDTH = 5;
 const ROW_INDENT = '  ';
 
 /** The line a section with no rows shows under its title. */
-export const EMPTY_SECTION_LINE = `${ROW_INDENT}nothing to report`;
+export const EMPTY_SECTION_LINE: string = `${ROW_INDENT}nothing to report`;
 
 /** The lines one row renders to: the row, and its fix when it has one. */
 export function renderDeepRow(row: DeepRow): readonly string[] {

@@ -271,4 +271,5 @@ const loopStart: RafaCommand = Object.freeze({
   },
 });
 
-export default endingWith(loopStart);
+const command: RafaCommand = endingWith(loopStart);
+export default command;

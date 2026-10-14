@@ -23,7 +23,7 @@ import { CONFIG_DEFAULTS } from '../core/config/index.js';
  * each at its schema default. `src/project/scaffold.ts` places them
  * under `# release:`, after `heading`.
  */
-export const RELEASE_FRAGMENT_LINES = Object.freeze([
+export const RELEASE_FRAGMENT_LINES: readonly string[] = Object.freeze([
   `#   fragments: ${CONFIG_DEFAULTS.releaseFragments}           # relative path, not under .rafa/, the change fragments are written into`,
   `#   strategy: ${CONFIG_DEFAULTS.releaseStrategy}      # semver-by-level, the only strategy`,
   `#   settle: ${CONFIG_DEFAULTS.releaseSettle}                 # push | pr, how settle lands the version on the base branch`,
@@ -31,9 +31,9 @@ export const RELEASE_FRAGMENT_LINES = Object.freeze([
 ]);
 
 /** The commented `pr.versionCollision` line, placed under `# pr:`. */
-export const PR_VERSION_COLLISION_LINE =
+export const PR_VERSION_COLLISION_LINE: string =
   `#   versionCollision: ${CONFIG_DEFAULTS.prVersionCollision}       # allow | report | ask | refuse, how pr merge meets a missing or stale fragment`;
 
 /** The commented `dangerous.acceptVersionCollision` line, placed under `# dangerous:`. */
-export const DANGEROUS_VERSION_COLLISION_LINE =
+export const DANGEROUS_VERSION_COLLISION_LINE: string =
   `#   acceptVersionCollision: ${String(CONFIG_DEFAULTS.dangerousAcceptVersionCollision)}  # true has pr merge accept a version collision on every run`;

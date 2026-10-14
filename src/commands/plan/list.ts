@@ -157,4 +157,5 @@ const planListCommand: RafaCommand = {
   },
 };
 
-export default Object.freeze(planListCommand);
+const command: RafaCommand = Object.freeze(planListCommand);
+export default command;

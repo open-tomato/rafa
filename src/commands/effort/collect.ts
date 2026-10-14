@@ -8,10 +8,12 @@
  * `src/effort/collect-args.ts` and refuses any other, and the ones
  * declared here are those it reads.
  */
+import type { RafaCommand } from '../../core/command/index.js';
+
 import collect from '../../effort/collect.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-export default wrapPhaseZeroCommand({
+const command: RafaCommand = wrapPhaseZeroCommand({
   name: 'effort collect',
   subject: 'effort',
   action: 'collect',
@@ -67,3 +69,4 @@ export default wrapPhaseZeroCommand({
   ],
   outputs: ['text', 'json'],
 }, collect);
+export default command;

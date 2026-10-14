@@ -144,7 +144,7 @@ export const TRIAGE_MARKER = '<!-- rafa:pr-triage v1 -->';
 export const TRIAGE_BLOCK_KIND = 'triage';
 
 /** The info string that block's fence opens with, as a problem names it. */
-export const TRIAGE_BLOCK_FENCE = `rafa:${TRIAGE_BLOCK_KIND}`;
+export const TRIAGE_BLOCK_FENCE: string = `rafa:${TRIAGE_BLOCK_KIND}`;
 
 /** The `rafa:triage` block, each field null when it was absent or unusable. */
 export interface TriageBlock {

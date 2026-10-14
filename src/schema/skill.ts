@@ -157,7 +157,7 @@ export const SKILL_NAME_LIST_FIELDS = ['relates', 'supersedes'] as const;
  * Measured against the 200 skill directories in `~/.claude/skills` on
  * 2026-09-18, every one of which matches.
  */
-export const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const SKILL_NAME_PATTERN: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Why a skill's frontmatter was refused. One code per RULE. */
 export type SkillIssueCode =

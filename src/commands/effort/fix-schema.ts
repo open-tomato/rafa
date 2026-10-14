@@ -243,4 +243,5 @@ export function createFixSchemaCommand(seams: FixSchemaCommandSeams = {}): RafaC
   return Object.freeze(command);
 }
 
-export default createFixSchemaCommand();
+const command: RafaCommand = createFixSchemaCommand();
+export default command;

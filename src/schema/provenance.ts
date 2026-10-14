@@ -58,7 +58,7 @@ export const REQUIRED_PROVENANCE_KEYS = ['origin', 'license'] as const;
  * The shape `reviewed` takes: a reviewer that starts and ends with a
  * non-space character, whitespace, then a `YYYY-MM-DD` date.
  */
-export const REVIEWED_PATTERN = /^(\S(?:.*\S)?)\s+(\d{4}-\d{2}-\d{2})$/;
+export const REVIEWED_PATTERN: RegExp = /^(\S(?:.*\S)?)\s+(\d{4}-\d{2}-\d{2})$/;
 
 /** Why a `provenance` value was refused. One code per rule. */
 export type ProvenanceIssueCode =

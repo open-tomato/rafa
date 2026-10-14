@@ -51,10 +51,10 @@ import { realEntry } from '../schema/tiers.js';
 import { stretchFolder } from './folder.js';
 
 /** The operators folder beside the running entry. */
-export const BUNDLED_OPERATORS_DIR = join('bundled', 'operators');
+export const BUNDLED_OPERATORS_DIR: string = join('bundled', 'operators');
 
 /** The file that makes the operators folder a Claude Code plugin. */
-export const PLUGIN_MANIFEST = join('.claude-plugin', 'plugin.json');
+export const PLUGIN_MANIFEST: string = join('.claude-plugin', 'plugin.json');
 
 /** The name of a stretch's own copy inside `.rafa/stretch/<n>/`. */
 export const OPERATORS_COPY = 'operators';

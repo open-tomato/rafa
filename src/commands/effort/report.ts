@@ -9,10 +9,12 @@
  * typed, it writes one deprecation line to stderr, and the dispatcher
  * reads it as `--output=json` (`src/cli/dispatch.ts`).
  */
+import type { RafaCommand } from '../../core/command/index.js';
+
 import report from '../../effort/report.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-export default wrapPhaseZeroCommand({
+const command: RafaCommand = wrapPhaseZeroCommand({
   name: 'effort report',
   subject: 'effort',
   action: 'report',
@@ -114,3 +116,4 @@ export default wrapPhaseZeroCommand({
   ],
   outputs: ['text', 'json'],
 }, report);
+export default command;

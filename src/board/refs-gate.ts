@@ -97,7 +97,7 @@ import { ACCEPT_REFS_FLAG } from './flags.js';
 export { ACCEPT_REFS_FLAG };
 
 /** The config key that accepts every reference on every run, as `SETTINGS` spells it. */
-export const ACCEPT_STALE_REFS_KEY = SETTINGS.dangerousAcceptStaleRefs.key;
+export const ACCEPT_STALE_REFS_KEY: string = SETTINGS.dangerousAcceptStaleRefs.key;
 
 /**
  * Why check 4 refuses nothing on a run: nobody said so, `--accept-refs`

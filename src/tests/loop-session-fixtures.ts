@@ -44,7 +44,7 @@ export const STARTED_AT = '2026-09-15T12:00:00.000Z';
 export const PID = 7171;
 
 /** The plan every planted project holds under `.plans/`. */
-export const DEMO_PLAN = [
+export const DEMO_PLAN: string = [
   '# Plan: demo',
   '',
   '# Stage: one',
@@ -57,7 +57,7 @@ export const DEMO_PLAN = [
 ].join('\n');
 
 /** Its tracker: the first task ticked, the second blocked, the rest open. */
-export const DEMO_TRACKER = DEMO_PLAN
+export const DEMO_TRACKER: string = DEMO_PLAN
   .replace('- [ ] First task', '- [x] First task')
   .replace('- [ ] Second task', '- [BLOCKED] Second task');
 

@@ -106,7 +106,7 @@ export const DEMOTION_REPORT_COLUMNS: readonly string[] = [
 export const EMPTY_CELL = '-';
 
 /** The hash column's shape: sha256 in lower-case hex. */
-export const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+export const SHA256_PATTERN: RegExp = /^[0-9a-f]{64}$/;
 
 /** The heading the written report opens its body with. */
 export const REPORT_TITLE = '# Demotion report';

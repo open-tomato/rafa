@@ -20,7 +20,7 @@
  */
 
 /** The Stage field's options, left to right, by the template's exact names. */
-export const STAGE_OPTIONS = Object.freeze([
+export const STAGE_OPTIONS: readonly ['Backlog', 'Triage', 'Needs work', 'Ready', 'Blocked', 'Claimed', 'In development', 'Waiting for approval', 'In review', 'Done', 'Cancelled'] = Object.freeze([
   'Backlog',
   'Triage',
   'Needs work',
@@ -38,7 +38,7 @@ export const STAGE_OPTIONS = Object.freeze([
 export type StageOption = (typeof STAGE_OPTIONS)[number];
 
 /** The Horizon field's options, left to right, by the template's exact names. */
-export const HORIZON_OPTIONS = Object.freeze([
+export const HORIZON_OPTIONS: readonly ['Later', 'Next', 'Now', 'Done', 'Cancelled'] = Object.freeze([
   'Later',
   'Next',
   'Now',

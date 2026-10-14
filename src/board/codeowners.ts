@@ -73,7 +73,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Where GitHub looks for the file, repo-relative, in the order it looks. */
-export const CODEOWNERS_LOCATIONS = Object.freeze([
+export const CODEOWNERS_LOCATIONS: readonly string[] = Object.freeze([
   '.github/CODEOWNERS',
   'CODEOWNERS',
   'docs/CODEOWNERS',

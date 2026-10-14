@@ -87,7 +87,7 @@ export interface StoreRuleProblem {
 export const STORE_SCHEMA_PROBE = 'rafa effort schema --check';
 
 /** The item the missing-probe problem tells the planner to add, as the dev-planner rule spells it. */
-export const STORE_SCHEMA_PROBE_ITEM = `- [ ] The installed rafa can read and write the live store: \`${STORE_SCHEMA_PROBE}\``;
+export const STORE_SCHEMA_PROBE_ITEM: string = `- [ ] The installed rafa can read and write the live store: \`${STORE_SCHEMA_PROBE}\``;
 
 /** The variable a development build's store is pointed at a copy through. */
 const EFFORT_DIR_VARIABLE = 'RAFA_EFFORT_DIR';

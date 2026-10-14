@@ -96,7 +96,14 @@ import { cleanupCounts } from '../cleanup/index.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
 /** The six group headings, in the order they are listed. */
-export const CLEANUP_GROUP_TITLES = Object.freeze({
+export const CLEANUP_GROUP_TITLES: Readonly<{
+  merged: string;
+  stale: string;
+  notPushed: string;
+  worktrees: string;
+  runs: string;
+  remoteOnly: string;
+}> = Object.freeze({
   merged: 'Merged',
   stale: 'Stale',
   notPushed: 'Not pushed',

@@ -146,4 +146,5 @@ export function createModuleListCommand(seams: ModuleLoadSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createModuleListCommand();
+const command: RafaCommand = createModuleListCommand();
+export default command;

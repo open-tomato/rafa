@@ -162,4 +162,5 @@ export function createImportCommand(seams: ImportCommandSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createImportCommand();
+const command: RafaCommand = createImportCommand();
+export default command;

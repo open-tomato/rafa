@@ -349,4 +349,5 @@ export function createPrListCommand(seams: PrListSeams = DEFAULT_PR_SEAMS): Rafa
   return Object.freeze(command);
 }
 
-export default createPrListCommand();
+const command: RafaCommand = createPrListCommand();
+export default command;

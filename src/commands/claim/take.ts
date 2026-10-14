@@ -391,4 +391,5 @@ export function createClaimTakeCommand(makeSeams: ClaimTakeSeamsFactory = DEFAUL
   return Object.freeze(command);
 }
 
-export default createClaimTakeCommand();
+const command: RafaCommand = createClaimTakeCommand();
+export default command;

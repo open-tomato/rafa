@@ -158,4 +158,5 @@ export function createLoopListCommand(seams: LoopSessionSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createLoopListCommand();
+const command: RafaCommand = createLoopListCommand();
+export default command;

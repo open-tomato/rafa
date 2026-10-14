@@ -87,7 +87,7 @@ export const PR_REFUSAL_EXIT = 2;
  * The one message every `pr` action refuses with when the provider is
  * not `gh`. One string, for the reason in the module note.
  */
-export const PR_NEEDS_GH = [
+export const PR_NEEDS_GH: string = [
   'rafa pr needs the GitHub CLI, and this repository resolves to pr.provider: none.',
   'Set pr.provider: gh in .rafa/config.yaml when origin is a GitHub repository,',
   'install gh (https://cli.github.com) and run gh auth login.',

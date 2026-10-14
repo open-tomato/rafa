@@ -67,4 +67,5 @@ export function createEpicPromoteCommand(seams: EpicHorizonSeams = {}): RafaComm
   return Object.freeze(command);
 }
 
-export default createEpicPromoteCommand();
+const command: RafaCommand = createEpicPromoteCommand();
+export default command;

@@ -226,4 +226,5 @@ export function createPrCurrentCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaC
   return Object.freeze(command);
 }
 
-export default createPrCurrentCommand();
+const command: RafaCommand = createPrCurrentCommand();
+export default command;

@@ -169,7 +169,7 @@ export const EPIC_NEW_REFUSAL_EXIT = 2;
 export const DEFAULT_HORIZON: Horizon = 'later';
 
 /** A kebab word: lowercase letters and digits, in runs joined by single hyphens. */
-export const KEBAB_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+export const KEBAB_SLUG: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 /** A line break, which a title may not hold. */
 const LINE_BREAK = /[\r\n]/u;
@@ -188,7 +188,7 @@ export interface NativeEpicDraft {
 }
 
 /** The warning a native-mode line giving `--slug` gets; see the module note. */
-export const NATIVE_SLUG_WARNING = `${NATIVE_MODE}: an epic is named by its number and title, so --slug is not used`
+export const NATIVE_SLUG_WARNING: string = `${NATIVE_MODE}: an epic is named by its number and title, so --slug is not used`
   + ' and no epic: label is created';
 
 /** Whether the repository held the epic's label, or this run created it. */
@@ -567,4 +567,5 @@ export function createEpicNewCommand(seams: EpicNewSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createEpicNewCommand();
+const command: RafaCommand = createEpicNewCommand();
+export default command;

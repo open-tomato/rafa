@@ -252,10 +252,10 @@ export const BASELINE_FLAG = '--baseline';
 export const AGAINST_FLAG = '--against=';
 
 /** The one folder every file under `src/core/` counts as under `coreRules`. */
-export const CORE_UNIT = CORE_FOLDER.replace(/\/$/, '');
+export const CORE_UNIT: string = CORE_FOLDER.replace(/\/$/, '');
 
 /** The baseline's path, relative to the repository root. */
-export const BASELINE_PATH = `${OUTPUT_DIR}/test-index.baseline.json`;
+export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
 
 /** How many test files the summary lists by index. */
 export const TOP_INDEXES = 20;

@@ -566,4 +566,5 @@ export function createSkillBackfillCommand(seams: SkillBackfillSeams = DEFAULT_B
   return Object.freeze(command);
 }
 
-export default createSkillBackfillCommand();
+const command: RafaCommand = createSkillBackfillCommand();
+export default command;

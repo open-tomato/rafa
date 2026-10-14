@@ -73,7 +73,12 @@ import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@
 import { HubUpgradeRequired } from './store/sqlite.js';
 
 /** The path each route answers on. */
-export const HUB_ROUTES = Object.freeze({
+export const HUB_ROUTES: Readonly<{
+  health: '/health';
+  status: '/v1/status';
+  push: '/v1/effort/push';
+  pull: '/v1/effort/pull';
+}> = Object.freeze({
   health: '/health',
   status: '/v1/status',
   push: '/v1/effort/push',

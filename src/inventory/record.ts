@@ -54,7 +54,7 @@ import { readFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT } from '../schema/skill.js';
 
 /** Longest a summary may be, in codepoints: the checker's description cap. */
-export const SUMMARY_LIMIT = DESCRIPTION_LIMIT;
+export const SUMMARY_LIMIT: number = DESCRIPTION_LIMIT;
 
 /** What an inventory row describes. */
 export type InventoryKind = 'skill' | 'agent';

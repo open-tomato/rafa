@@ -54,7 +54,7 @@ import { EFFORT_STORE_DIR, effortStoreFileName } from '../store.js';
 import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 
 /** Where the store sat before phase 1, under the project root: `.ralph/effort`. */
-export const LEGACY_EFFORT_STORE_DIR = join('.ralph', 'effort');
+export const LEGACY_EFFORT_STORE_DIR: string = join('.ralph', 'effort');
 
 /** Every NDJSON row kind, so a kind added to `EffortRowKind` fails to compile here until it is named. */
 const NDJSON_KINDS: Readonly<Record<EffortRowKind, true>> = { sessions: true, commits: true };

@@ -216,13 +216,13 @@ export const RESOLVE_STOP_EXIT = 3;
 export const RESOLVE_REFUSE_EXIT = 2;
 
 /** How long the CI wait after an attempt runs for, from the loop's own gate. */
-export const RESOLVE_CI_TIMEOUT_MS = DEFAULT_CI_TIMEOUT_MIN * 60_000;
+export const RESOLVE_CI_TIMEOUT_MS: number = DEFAULT_CI_TIMEOUT_MIN * 60_000;
 
 /** The reading taken when an attempt pushed nothing; see the module note. */
 export const ATTEMPT_OUTCOME_UNCHANGED = 'the attempt pushed nothing, so it ended as it began';
 
 /** What a comment on a dependabot branch says about the push; the spec's rule. */
-export const DEPENDABOT_REBASE_NOTE = 'Note: rafa pushed to this dependabot branch. Dependabot stops'
+export const DEPENDABOT_REBASE_NOTE: string = 'Note: rafa pushed to this dependabot branch. Dependabot stops'
   + ' rebasing a branch once anyone else has pushed to it, so this pull request will not be'
   + ' refreshed by dependabot again; close it and let dependabot open a new one if that is wanted.';
 

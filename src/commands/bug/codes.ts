@@ -274,4 +274,5 @@ export function createCodesCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createCodesCommand();
+const command: RafaCommand = createCodesCommand();
+export default command;

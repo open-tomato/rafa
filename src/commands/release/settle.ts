@@ -418,4 +418,5 @@ export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_R
   return Object.freeze(command);
 }
 
-export default createReleaseSettleCommand();
+const command: RafaCommand = createReleaseSettleCommand();
+export default command;

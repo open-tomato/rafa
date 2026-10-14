@@ -161,4 +161,5 @@ export function createCopyCommand(seams: CopyCommandSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createCopyCommand();
+const command: RafaCommand = createCopyCommand();
+export default command;

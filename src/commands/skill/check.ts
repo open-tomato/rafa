@@ -103,4 +103,5 @@ export function createSkillCheckCommand(seams: CheckCommandSeams = DEFAULT_CHECK
   return Object.freeze(command);
 }
 
-export default createSkillCheckCommand();
+const command: RafaCommand = createSkillCheckCommand();
+export default command;

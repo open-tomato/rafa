@@ -395,4 +395,5 @@ export function createStretchEndCommand(seams?: StretchEndSeams): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createStretchEndCommand();
+const command: RafaCommand = createStretchEndCommand();
+export default command;

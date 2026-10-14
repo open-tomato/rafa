@@ -388,7 +388,7 @@ import { refuseUnservedSync } from './preflight-sync.js';
  * The sentence a task prompt carries after its `known-missing:` lines,
  * so the session neither repairs an absence nor works around it.
  */
-export const KNOWN_MISSING_SENTENCE = 'A known-missing item is neither a bug to fix nor a credential to patch'
+export const KNOWN_MISSING_SENTENCE: string = 'A known-missing item is neither a bug to fix nor a credential to patch'
   + ' around: the preflight found it unavailable on this machine, so do the task without it.';
 
 /** What the agent roster is resolved against; see the module note. */

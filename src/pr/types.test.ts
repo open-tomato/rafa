@@ -452,7 +452,7 @@ beforeAll(() => {
   compiled = {
     program: ts.createProgram({
       rootNames: probes.map(([file]) => join(tempDir, file)),
-      options: parsed.options,
+      options: { ...parsed.options, isolatedDeclarations: false },
     }),
     configErrors: [...config.error === undefined
       ? []

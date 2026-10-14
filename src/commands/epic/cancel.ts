@@ -786,4 +786,5 @@ export function createEpicCancelCommand(seams: EpicCancelSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createEpicCancelCommand();
+const command: RafaCommand = createEpicCancelCommand();
+export default command;

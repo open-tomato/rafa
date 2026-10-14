@@ -115,7 +115,7 @@ const ONE_LINE = /\s+/gu;
 export const COMMENT_REMEDY = 'Close the gaps, label the issue `spec:ready` again, and plan from it again.';
 
 /** What the comment tells the author when the plan was written anyway. */
-export const ASSUMED_COMMENT_REMEDY = 'Answer these in the spec where an assumption is wrong, and plan from it'
+export const ASSUMED_COMMENT_REMEDY: string = 'Answer these in the spec where an assumption is wrong, and plan from it'
   + ' again. No label changed: none of these gaps blocked planning.';
 
 /** What the comment says about its own edits, so a reader knows there is one of it. */

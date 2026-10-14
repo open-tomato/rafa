@@ -115,7 +115,7 @@ export const LOOP_OUTPUT = 'events';
 export const RECORD_POLL_MS = 2_000;
 
 /** How long an item without `--wait` looks for the loop's session record. */
-export const RECORD_WAIT_MS = 5 * 60_000;
+export const RECORD_WAIT_MS: number = 5 * 60_000;
 
 /** How many of the log's last lines a loop that ended early is shown by. */
 export const LOG_TAIL_LINES = 20;
@@ -541,4 +541,5 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createStretchItemCommand();
+const command: RafaCommand = createStretchItemCommand();
+export default command;
