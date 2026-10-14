@@ -16,8 +16,8 @@
  * A source names its module by what phase 1 can read of it:
  *
  *   - `path`: the directory, resolved against the project root when the
- *     project's `.rafa/config.yaml` gives `modules:` and against the home
- *     when the user scope's does. Its `package.json` is read, and the
+ *     project's config gives `modules:` and against the home when the
+ *     user scope's does. Its `package.json` is read, and the
  *     module's name is that file's `name`, its manifest the `rafa` key.
  *   - `npm`: the package name. Refused: installing a package is phase 7's.
  *   - `github`: the `owner/repo` it names. Refused, for the same reason.
@@ -438,7 +438,7 @@ export async function loadInvocationModules(place: InvocationPlace, seams: Modul
   try {
     const scope = resolveScope(place.cwd, { home: place.home });
     if (!scope.found) return noModules();
-    const resolved = loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
+    const resolved = await loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
     return await loadModules(moduleSettings(resolved, scope), seams);
   } catch (error) {
     if (error instanceof ConfigError || error instanceof ScopeError) return noModules();

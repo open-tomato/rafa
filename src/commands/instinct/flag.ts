@@ -103,7 +103,7 @@ export async function flagInstinct(context: RafaContext, seams: InstinctFlagSeam
   const [id, reason] = expectTwoArguments(context.args, USAGE);
   if (reason.trim() === '') throw new CommandExit(1, blankReasonMessage(id));
   const project = requireProject(context, NAME);
-  const config = resolveProjectConfig(project, NAME, (message) => {
+  const config = await resolveProjectConfig(project, NAME, (message) => {
     context.output.warn(message);
   });
   const kind = config.learningAdapter;

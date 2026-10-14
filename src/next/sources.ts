@@ -474,9 +474,9 @@ function nextProject(context: RafaContext): ProjectFound {
 }
 
 /** The settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
-function nextConfig(project: ProjectFound, warn: (message: string) => void): NextConfig {
+async function nextConfig(project: ProjectFound, warn: (message: string) => void): Promise<NextConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [
@@ -539,13 +539,13 @@ export interface OpenedNextSources extends NextSources {
  * read off git, the board or the provider here: every reading is a
  * function the table calls only where a row asks for it.
  */
-export function openNextSources(
+export async function openNextSources(
   context: RafaContext,
   seams: NextSourceSeams = DEFAULT_NEXT_SOURCE_SEAMS,
   options: NextSourcesOptions = {},
-): OpenedNextSources {
+): Promise<OpenedNextSources> {
   const project = nextProject(context);
-  const config = nextConfig(project, (message: string) => {
+  const config = await nextConfig(project, (message: string) => {
     context.output.warn(message);
   });
   requireGhProvider(resolvePrProvider({

@@ -20,18 +20,23 @@
  * The first config module is read through its barrel,
  * `src/core/config/index.ts`, the one path a file outside `src/core/`
  * may import it by. The barrel is wider than the root: it also holds
- * the schema's indexes and the item readers, which the tree reads and
- * the package does not publish. Those twelve names are spelled under
+ * core's section, the item readers and the section registry with the
+ * key indexes it answers, which the tree reads and the package does not
+ * publish. Those twenty names are spelled under
  * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
  * name added to the barrel still reds it until the name is added to the
  * root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
  * other barrel, `sections.ts`, and are held by the spelled list alone.
+ * The barrel holds no `CONFIG_DEFAULTS`: the root publishes the
+ * registry's, `src/config-registry.ts`, and the re-export case holds it
+ * to the registry's.
  * The second config module, `config-load.ts`, is read through a barrel
  * of its own, `src/core/config/load.ts`, which holds that module's
  * names and no other, so nothing is left out of its containment case.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
+ * config registry (`src/config-registry.ts`) for its effect, then the
  * dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
@@ -126,10 +131,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
+import { CONFIG_DEFAULTS } from './config-registry.js';
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
 import * as registryModule from './core/adapters/index.js';
 import {
-  CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,
@@ -375,21 +380,33 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 
 /**
  * The runtime names the config barrel holds and the root does not
- * publish: the schema's indexes and the item readers.
+ * publish: core's section, the item readers and the section registry
+ * with its key indexes and its load hook.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
+  'CORE_SECTION',
+  'ConfigSectionError',
+  'EMPTY_CONFIG_REGISTRY',
   'MODULE_SOURCE_KEYS',
   'OPTIONAL_ITEM_KEYS',
   'REQUIRED_ITEM_KEYS',
-  'SECTIONS',
-  'SETTINGS',
-  'SETTING_BY_KEY',
-  'SETTING_NAMES',
-  'isCommandLineSetting',
-  'knownKeysAbove',
+  'activeChecks',
+  'activeConfigLoadHook',
+  'activeDefaults',
+  'activeKnownKeysAbove',
+  'activeSectionPaths',
+  'activeSections',
+  'activeSettingByKey',
+  'activeSettings',
+  'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
+  'parseConfigDocument',
+  'readConfigDocument',
+  'registerConfigSections',
   'requiredPrerequisite',
+  'restoreConfigSections',
+  'setConfigLoadHook',
 ];
 
 /** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
@@ -423,8 +440,9 @@ const ENTRY_PATH = join(SRC_DIR, 'index.ts');
  */
 type ImportList = readonly (readonly [string, readonly string[]])[];
 
-/** What `src/rafa.ts` imports, spelled here. */
+/** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
+  ['./config-registry.js', []],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
@@ -783,6 +801,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readBooleanFlag',
       'readPullArgument',
     ]],
+    ['./triage-config-trust.js', ['ALLOW_LOCAL_CONFIG_FLAG']],
     ['./triage-guard.js', ['readTriageGuard', 'triageVerdict']],
     ['./triage-read.js', ['readConflictFiles', 'readFailedLogs', 'readWorkflowCount']],
     ['./triage-report.js', ['evidenceOf', 'renderTriages', 'workflowCountOf']],
@@ -1266,6 +1285,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../utils/agent-shell.js', ['AGENT_SHELL_ENV', 'isAgentShell']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
+  ['./commands/config/show.js', [
+    ['../../config-registry.js', ['SETTING_BY_KEY', 'SETTING_NAMES', 'SETTINGS']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
+  ]],
   ['./commands/ci/status.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../ci/failed-cases.js', ['readFailedCases']],
@@ -1477,6 +1503,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../utils/tracker.js', ['trackerPathFor']],
     ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'relationsResultOf', 'renderDoctorBoard']],
     ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
+    ['./doctor-config.js', ['loadDoctorConfig']],
     ['./doctor-deep.js', ['readDeep', 'renderDeep']],
     ['./doctor-description.js', ['DOCTOR_DESCRIPTION']],
     ['./doctor-effort-schema.js', ['effortSchemaRefusal', 'readDoctorEffortSchema', 'writeDoctorEffortSchema']],
@@ -1501,8 +1528,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
+    ['../config-registry.js', ['SETTINGS']],
     ['../core/command/index.js', ['CommandExit']],
-    ['../core/config/index.js', ['SETTINGS']],
     ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
     ['../core/loop/index.js', ['isPidAlive']],
@@ -1515,11 +1542,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
 ];
 
 /**
- * A static relative import, possibly spanning lines, type-only or not.
- * Its clause holds no `;`, so a match never runs on from an import of a
- * bare module above it, such as `node:fs`, to the next relative one.
+ * A static relative import, possibly spanning lines, type-only or not,
+ * or one taken for its effect alone, with no clause. Its clause holds
+ * no `;`, so a match never runs on from an import of a bare module
+ * above it, such as `node:fs`, to the next relative one.
  */
-const IMPORT_PATTERN = /^import\s+(type\s+)?([^;]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
+const IMPORT_PATTERN = /^import\s+(?:(type\s+)?([^;]+?)\s+from\s+)?'(\.\.?\/[^']+)';$/gm;
 
 /** One import's clause read as the bindings it takes. */
 function bindingsOf(clause: string): string[] {
@@ -1543,7 +1571,12 @@ function readImports(path: string): [string, string[]][] {
   const source = readFileSync(path.replace(/\.js$/, '.ts'), 'utf8');
   return [...source.matchAll(IMPORT_PATTERN)]
     .filter((match) => match[1] === undefined)
-    .map((match) => [match[3] ?? '', bindingsOf(match[2] ?? '')]);
+    .map((match) => [
+      match[3] ?? '',
+      match[2] === undefined
+        ? []
+        : bindingsOf(match[2]),
+    ]);
 }
 
 /** An import list spelled here, in the shape {@link readImports} answers. */
@@ -1756,6 +1789,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/update/next.js',
       './commands/update/latest.js',
       './commands/config/set.js',
+      './commands/config/show.js',
       './commands/ci/status.js',
       './commands/stretch/start.js',
       './commands/stretch/item.js',

@@ -489,13 +489,13 @@ describe('writePreflightChecks rows', () => {
     expect(rowsOf(root)).toEqual([]);
   });
 
-  it('writes into the SQLite file when the config selects the NDJSON backend', () => {
+  it('writes into the SQLite file when the config selects the NDJSON backend', async () => {
     const root = freshRoot('ndjson-selected');
     mkdirSync(join(root, '.rafa'), { recursive: true });
     writeFileSync(join(root, '.rafa', 'config.yaml'), 'store: ndjson\n');
 
     // The control: the planted config really selects the other backend.
-    expect(loadConfig({ root, home: join(tempBase, 'home') }, {}, () => undefined).config.store).toBe('ndjson');
+    expect((await loadConfig({ root, home: join(tempBase, 'home') }, {}, () => undefined)).config.store).toBe('ndjson');
 
     writePreflightChecks(root, { runId: 'run-ndjson', checks: [PASS_CHECK] }, CLOCK);
 

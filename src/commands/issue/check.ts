@@ -275,7 +275,7 @@ export async function checkIssue(context: RafaContext, seams: IssueCheckSeams = 
   const stamp = readSwitch(STAMP_FLAG, context.flags[STAMP_FLAG], `Write it after the issue number: rafa issue check <n> --${STAMP_FLAG}.`);
   const issue = readCheckIssue(context.args);
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => {
+  const config = await issueSubjectConfig(project, (message) => {
     context.output.warn(message);
   });
   const copy = findSavedCopy(project.root, config.specsDir, issue);

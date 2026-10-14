@@ -3,6 +3,13 @@
  * move of #905 put any file under `src/core/`. The move is paths only: a
  * barrel that gains or loses a name, runtime value or type, fails here.
  *
+ * It also pins `src/config-registry.ts`, the module the merged schema's
+ * names moved to from the core config barrel (`SETTINGS`,
+ * `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
+ * `knownKeysAbove`), with the list of sections it registers and the
+ * load hook it sets, `handConfigToLogger`. It is no
+ * published entry; `src/index.ts` takes `CONFIG_DEFAULTS` from it.
+ *
  * Names are read with the TypeScript checker, so type-only exports count.
  * A deliberate change to a published name edits the list below in the
  * same commit.
@@ -212,6 +219,16 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'selfAndAncestors',
     'startCommand',
     'validateManifest',
+  ],
+  'src/config-registry.ts': [
+    'CONFIG_DEFAULTS',
+    'CONFIG_SECTIONS',
+    'SECTIONS',
+    'SETTINGS',
+    'SETTING_BY_KEY',
+    'SETTING_NAMES',
+    'handConfigToLogger',
+    'knownKeysAbove',
   ],
   'src/plan/index.ts': [
     'CheckOutcome',

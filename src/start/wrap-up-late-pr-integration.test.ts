@@ -239,7 +239,7 @@ import { loadRunConfig } from ${JSON.stringify(moduleUrl('./run-config.ts'))};
 import { runWrapUp } from ${JSON.stringify(moduleUrl('./wrap-up-run.ts'))};
 
 const [repo, home, runId, branch, stub, infosFile, plan] = process.argv.slice(1);
-const settings = loadRunConfig({ root: repo, home }, []).config;
+const settings = (await loadRunConfig({ root: repo, home }, [])).config;
 setActiveOutput(sinkOutput({ info: (line) => appendFileSync(infosFile, line + '\\n') }), 'events');
 bindEventsFile(repo, runId);
 const none = () => undefined;

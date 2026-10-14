@@ -123,7 +123,7 @@ function valuedFlag(args: readonly string[], flag: string): string | undefined {
 
 /**
  * Resolves the settings a run starts on: `--inject=` and
- * `--skills-resolver=` over the project's `.rafa/config.yaml` under
+ * `--skills-resolver=` over the project's config under
  * `roots.root`, that over the user scope's under `roots.home`, and both
  * over the defaults, as `config.ts` ranks them.
  *
@@ -140,11 +140,11 @@ function valuedFlag(args: readonly string[], flag: string): string | undefined {
  * active output's `warn` when none is given, as `loadConfig` writes one
  * when it is handed no sink either.
  */
-export function loadRunConfig(
+export async function loadRunConfig(
   roots: ConfigRoots,
   args: readonly string[],
   warn: (message: string) => void = warnThroughActiveOutput,
-): ResolvedConfig {
+): Promise<ResolvedConfig> {
   return loadConfig(roots, {
     inject: valuedFlag(args, INJECT_FLAG),
     taskSkills: valuedFlag(args, SKILLS_RESOLVER_FLAG),

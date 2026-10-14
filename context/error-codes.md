@@ -61,7 +61,7 @@ commit.
 
 ### A project's codes
 
-`errors.codes` in `.rafa/config.yaml` is a list of entries with the keys
+`errors.codes` in the project's config is a list of entries with the keys
 `code`, `description`, `hint`, `level` and, optionally, `since`, read by
 `src/config-schema-errors.ts`. `legacy` is rafa's alone: on a project
 entry it is an unknown key.

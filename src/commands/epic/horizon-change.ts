@@ -370,7 +370,7 @@ async function closeWork(board: IssueBoard, change: HorizonChange, reason: strin
 export async function changeEpicHorizon(context: RafaContext, action: HorizonAction, seams: EpicHorizonSeams): Promise<EpicHorizonResult> {
   const line = readHorizonLine(context, action);
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => {
+  const config = await issueSubjectConfig(project, (message) => {
     context.output.warn(message);
   });
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });

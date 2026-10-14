@@ -28,13 +28,14 @@ import type { ConfigOverrides, ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
-  isCommandLineSetting,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** The label every project-file case parses under. No file is read at it. */
@@ -81,8 +82,6 @@ describe('board.project in the schema', () => {
     expect(SETTINGS.boardProjectNumber.key).toBe('board.project.number');
     expect(SETTINGS.boardProjectTemplate.cli).toBe(false);
     expect(SETTINGS.boardProjectNumber.cli).toBe(false);
-    expect(isCommandLineSetting('boardProjectTemplate')).toBe(false);
-    expect(isCommandLineSetting('boardProjectNumber')).toBe(false);
   });
 
   it('defaults to open-tomato\'s template and no number, in the defaults and a resolution naming nothing', () => {
@@ -360,7 +359,6 @@ describe('board.project limits in the schema', () => {
   it.each(LIMIT_ROWS)('spells %s under board.project, file-only', (name, limit) => {
     expect(SETTINGS[limit.setting].key).toBe(`board.project.${name}`);
     expect(SETTINGS[limit.setting].cli).toBe(false);
-    expect(isCommandLineSetting(limit.setting)).toBe(false);
   });
 
   it.each(LIMIT_ROWS)('defaults %s to the plan\'s value, in the defaults and a resolution naming nothing', (_name, limit) => {
@@ -475,5 +473,46 @@ describe('board.project limits in a file and across the layers', () => {
     expect(resolved.config.boardProjectRetries).toBe(3);
     expect(resolved.config.boardProjectWriteBatchSize).toBe(20);
     expect(resolved.sources.boardProjectRetries).toBe('default');
+  });
+});
+
+describe('the section', () => {
+  it('is package board-project, defining its keys in this order with these defaults, with no check', () => {
+    expect(BOARD_PROJECT_SECTION.package).toBe('board-project');
+    expect(Object.entries(BOARD_PROJECT_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['boardProjectRetries', 'board.project.retries'],
+      ['boardProjectRetryWaitSeconds', 'board.project.retryWaitSeconds'],
+      ['boardProjectProgressSeconds', 'board.project.progressSeconds'],
+      ['boardProjectWriteBatchSize', 'board.project.writeBatchSize'],
+      ['boardProjectWritePauseMs', 'board.project.writePauseMs'],
+    ]);
+    expect(BOARD_PROJECT_SECTION.defaults).toEqual({
+      boardProjectRetries: 3,
+      boardProjectRetryWaitSeconds: 2,
+      boardProjectProgressSeconds: 10,
+      boardProjectWriteBatchSize: 20,
+      boardProjectWritePauseMs: 1000,
+    });
+    expect(BOARD_PROJECT_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(BOARD_PROJECT_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(BOARD_PROJECT_SECTION)).toBe(true);
+    expect(Object.isFrozen(BOARD_PROJECT_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(BOARD_PROJECT_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [BOARD_PROJECT_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['board-project']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(BOARD_PROJECT_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(BOARD_PROJECT_SECTION.settings).sort());
   });
 });

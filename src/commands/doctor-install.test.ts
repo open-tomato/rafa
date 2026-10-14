@@ -48,7 +48,7 @@ function goodPath(): string {
 }
 
 /** The readings of the planted project under `path`. */
-function read(path: string = goodPath()): InstallReadings {
+async function read(path: string = goodPath()): Promise<InstallReadings> {
   return readInstall({ env: { PATH: path } }, { root, home });
 }
 
@@ -62,8 +62,8 @@ function written(install: InstallReadings, mode: 'text' | 'json'): { info: strin
 }
 
 describe('readInstall', () => {
-  it('reads a clean project with no warning and no store problem', () => {
-    const install = read();
+  it('reads a clean project with no warning and no store problem', async () => {
+    const install = await read();
 
     expect(install.storeProblem).toBeNull();
     expect(install.binPath.warning).toBeNull();
@@ -72,33 +72,33 @@ describe('readInstall', () => {
     expect(install.previousCopies).toEqual({ count: 0, warning: null });
   });
 
-  it('reads a store left under .ralph/effort/ alone as a legacy-store warning', () => {
+  it('reads a store left under .ralph/effort/ alone as a legacy-store warning', async () => {
     mkdirSync(join(root, LEGACY_EFFORT_STORE_DIR), { recursive: true });
     writeFileSync(join(root, LEGACY_EFFORT_STORE_DIR, STORE_FILE_NAMES[0] ?? ''), '');
 
-    expect(read().legacyStore?.warning).toContain(LEGACY_EFFORT_STORE_DIR);
+    expect((await read()).legacyStore?.warning).toContain(LEGACY_EFFORT_STORE_DIR);
   });
 
-  it('turns a store file that cannot be checked into a store problem, not a throw', () => {
+  it('turns a store file that cannot be checked into a store problem, not a throw', async () => {
     const storeDir = join(root, EFFORT_STORE_DIR);
     mkdirSync(storeDir, { recursive: true });
     const looped = join(storeDir, STORE_FILE_NAMES[0] ?? '');
     symlinkSync(looped, looped);
 
-    const install = read();
+    const install = await read();
 
     expect(install.legacyStore).toBeNull();
     expect(install.storeProblem).toStartWith('rafa doctor: the effort store directories could not be checked: ');
   });
 
-  it('reads a PATH without ~/.rafa/bin as a bin-path warning', () => {
-    expect(read(join(home, '.bun', 'bin')).binPath.warning).not.toBeNull();
+  it('reads a PATH without ~/.rafa/bin as a bin-path warning', async () => {
+    expect((await read(join(home, '.bun', 'bin'))).binPath.warning).not.toBeNull();
   });
 });
 
 describe('writeInstall', () => {
-  it('writes the PATH-order line at info in text mode for a clean project, and nothing in json mode', () => {
-    const install = read();
+  it('writes the PATH-order line at info in text mode for a clean project, and nothing in json mode', async () => {
+    const install = await read();
 
     expect(written(install, 'text')).toEqual({
       info: [`${join(home, '.rafa', 'bin')} is on PATH, and ${join(home, '.bun', 'bin')} is not ahead of it.`],
@@ -107,12 +107,12 @@ describe('writeInstall', () => {
     expect(written(install, 'json')).toEqual({ info: [], warn: [] });
   });
 
-  it('writes every warning in both modes, the store problem first and the PATH warning last, with no info line', () => {
+  it('writes every warning in both modes, the store problem first and the PATH warning last, with no info line', async () => {
     const storeDir = join(root, EFFORT_STORE_DIR);
     mkdirSync(storeDir, { recursive: true });
     const looped = join(storeDir, STORE_FILE_NAMES[0] ?? '');
     symlinkSync(looped, looped);
-    const install = read(join(home, '.bun', 'bin'));
+    const install = await read(join(home, '.bun', 'bin'));
     const expected = { info: [], warn: [install.storeProblem ?? 'no store problem', install.binPath.warning ?? 'no PATH warning'] };
 
     expect(written(install, 'text')).toEqual(expected);

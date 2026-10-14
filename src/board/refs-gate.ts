@@ -79,8 +79,8 @@ import type { RefVerifier } from '../refs/verify.js';
 
 import { readFileSync } from 'node:fs';
 
+import { SETTINGS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { SETTINGS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js';

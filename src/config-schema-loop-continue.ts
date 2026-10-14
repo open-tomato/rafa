@@ -3,16 +3,21 @@
  * their defaults, their specs and their readers:
  * `loop.retriesOnContinue`, `loop.continue.criteria`,
  * `loop.continue.criteriaMode` and `loop.forceWrapUp.maxNewFailures`.
- * `config-schema.ts`'s `RafaConfig` extends {@link LoopContinueSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after `loop.retries` and ahead of `loop.wrapUp`, so the order settings
- * are reported in holds the `loop` section together.
+ * {@link LOOP_CONTINUE_SECTION} hands them to core as one
+ * `ConfigSection`, package `loop-continue`, and the `declare module`
+ * below adds {@link LoopContinueSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `loop.retries` and ahead of
+ * `loop.wrapUp`, so the order settings are reported in holds the `loop`
+ * section together.
  *
  * The keys have their own module, as `config-schema-loop-retries.ts`
  * has, because `config-schema.ts`'s own note asks a new section for a
  * sibling, and the two count readers are rules about VALUES that only
- * these keys read. Only `config-schema.ts` imports this file; a caller
- * reads the settings off the resolved `RafaConfig`.
+ * these keys read. `config-registry.ts` imports this file to spread it; a
+ * caller reads the settings off the resolved `RafaConfig`.
  *
  * ## The keys
  *
@@ -45,12 +50,31 @@
  * None is a `CommandLineSetting`: the flags that outrank a key for one
  * run (`--retry=<n>`) are read by `start/run-setup.ts`.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { join } from 'node:path';
 
 import { oneOf, refused, text } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `loop-continue` section's fields, added to core's. */
+  interface RafaConfig extends LoopContinueSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `loop` keys `loop start --continue` reads, added to the shared namespace. */
+  interface LoopShape {
+    readonly retriesOnContinue: ContinueCount;
+    readonly continue: {
+      readonly criteria: string;
+      readonly criteriaMode: ContinueCriteriaMode;
+    };
+    readonly forceWrapUp: {
+      readonly maxNewFailures: ContinueCount;
+    };
+  }
+}
 
 /** The fewest retries `loop.retriesOnContinue` accepts as a number. */
 export const RETRIES_ON_CONTINUE_MIN = 1;
@@ -138,3 +162,10 @@ export const LOOP_CONTINUE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `loop-continue` section: the four keys `loop start --continue` reads, with their defaults and no check. */
+export const LOOP_CONTINUE_SECTION: ConfigSection = Object.freeze({
+  package: 'loop-continue',
+  settings: Object.freeze(LOOP_CONTINUE_SETTINGS),
+  defaults: LOOP_CONTINUE_DEFAULTS,
+});

@@ -59,7 +59,7 @@ const DEMO: RafaCommand = Object.freeze({
   examples: [{ cmd: 'rafa demo run', note: 'Runs the fixture.' }],
   outputs: ['text', 'json'] as const,
   run: async (context: RafaContext) => {
-    resolveProjectConfig(requireProject(context, COMMAND_NAME), COMMAND_NAME, (message) => {
+    await resolveProjectConfig(requireProject(context, COMMAND_NAME), COMMAND_NAME, (message) => {
       context.output.warn(message);
     });
     context.output.info('answer');

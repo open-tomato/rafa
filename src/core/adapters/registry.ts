@@ -121,7 +121,6 @@ import type {
   Tracker,
 } from '../../ports/index.js';
 import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
-import type { HubContext } from '../config/config.js';
 import type { CapturingSpawner } from '../loop/claude.js';
 
 import { homedir } from 'node:os';
@@ -138,11 +137,26 @@ import { openNdjsonStore } from '../../effort/store/ndjson.js';
 import { openSqliteStore } from '../../effort/store/sqlite.js';
 import { createFileSync } from '../../effort/sync/file.js';
 import { createLocalSync } from '../../effort/sync/select.js';
-import { CONFIG_DEFAULTS } from '../config/config-schema.js';
 import { describeValue, STORE_BACKENDS } from '../config/config-sections.js';
+import { activeDefaults } from '../config/section.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';
+
+/**
+ * The registered default of `learning.bless.minConfidence`, for a
+ * learning adapter made with none: read off the sections registered
+ * with `section.ts`, since core imports no list of them. Throws when
+ * nothing registered one, naming the module that registers them.
+ */
+function registeredBlessMinConfidence(): number {
+  const value = activeDefaults().learningBlessMinConfidence;
+  if (value === undefined) {
+    throw new Error(`${REFUSAL}: learning.bless.minConfidence has no registered default:`
+      + ' import src/config-registry.ts before making the local learning adapter without one');
+  }
+  return value;
+}
 
 /**
  * The version core serves of each port, by port type.
@@ -247,8 +261,21 @@ export interface AdapterContext {
    * `hub.tokenSecret` and `hub.timeout`, the last in milliseconds.
    * Handed on by `selectSync` whenever `hub.url` is set, and read by a
    * module's `service` strategy alone; core's adapters never read it.
+   *
+   * The shape is spelled here rather than imported: it is the
+   * `HubContext` the `hub` section declares in
+   * `src/config-schema-hub.ts`, and core imports no section file.
+   * `selectSync` hands that section's value in, so the checker holds
+   * the two shapes together there.
    */
-  readonly hub?: HubContext;
+  readonly hub?: {
+    /** The hub's address: the resolved `hub.url`. */
+    readonly url: string;
+    /** The secret store name of the token, or null: the resolved `hub.tokenSecret`. */
+    readonly tokenSecret: string | null;
+    /** How long one request may take, in milliseconds: the resolved `hub.timeout`. */
+    readonly timeoutMs: number;
+  };
 }
 
 /**
@@ -486,7 +513,7 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     create: ({
       repoRoot,
       home = homedir(),
-      learningBlessMinConfidence = CONFIG_DEFAULTS.learningBlessMinConfidence,
+      learningBlessMinConfidence = registeredBlessMinConfidence(),
     }) => createLocalLearning({
       instinctsDir: localInstinctsDir(repoRoot),
       home,

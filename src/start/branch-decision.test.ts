@@ -136,6 +136,13 @@ describe('the branch a plan runs on', () => {
     expect(remoteTrackingRef('feat/rafa-49')).toBe('refs/remotes/origin/feat/rafa-49');
     expect(REMOTE).toBe('origin');
   });
+
+  it('is the naming.branch template with the stub for {stub}, when one is handed in', () => {
+    expect(branchNameFor('rafa-49', 'work/{stub}')).toBe('work/rafa-49');
+    expect(branchNameFor('rafa-49', '{stub}-wip')).toBe('rafa-49-wip');
+    // The control: the default template is the prefix and the stub.
+    expect(branchNameFor('rafa-49', 'feat/{stub}')).toBe(`${BRANCH_PREFIX}rafa-49`);
+  });
 });
 
 describe('a detached HEAD', () => {
@@ -231,6 +238,14 @@ describe('readBranchOffer', () => {
       .toEqual({ branch: 'feat/rafa-49', route: 'switch-local' });
     expect(taken(readBranchOffer(situation({ createBranch: true, remoteBranch: true }))))
       .toEqual({ branch: 'feat/rafa-49', route: 'switch-remote' });
+  });
+
+  it('names the branch from the naming.branch template, in the answer and the question', () => {
+    const offer = asked(readBranchOffer(situation({ branchTemplate: 'work/{stub}' })));
+    expect(offer.branch).toBe('work/rafa-49');
+    expect(offer.question).toBe('Create work/rafa-49 from the latest origin/main and run there? [y/N] ');
+    expect(taken(readBranchOffer(situation({ branchTemplate: 'work/{stub}', createBranch: true }))))
+      .toEqual({ branch: 'work/rafa-49', route: 'create' });
   });
 
   it('takes the branch under --create-branch with no terminal to ask on', () => {

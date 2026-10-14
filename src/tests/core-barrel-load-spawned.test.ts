@@ -11,7 +11,10 @@ import { expectExit } from './cli-capture.js';
 /**
  * A barrel that closes a runtime cycle fails with a `ReferenceError` in one
  * import order only, so a green `tsc` proves nothing. Each case here loads
- * one file first in a fresh `bun` process, then reads a setting.
+ * one file first in a fresh `bun` process, then the registry
+ * (`src/config-registry.ts`), which registers the sections with core, and
+ * reads a setting both off the registry's `SETTINGS` and off the specs the
+ * core barrel's `activeSettings()` answers.
  */
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
@@ -24,11 +27,13 @@ const SECTION_FILES = readdirSync(SRC)
   .filter((name) => /^config-schema-.+\.ts$/.test(name) && !name.endsWith('.test.ts'))
   .sort();
 
-/** The child's program: load `first`, then read from the config barrel. */
+/** The child's program: load `first`, then the registry, then read from both and the config barrel. */
 const CHILD = `
-const [first, barrel] = process.argv.slice(1);
+const [first, registry, barrel] = process.argv.slice(1);
 const loaded = await import(first);
+const { SETTINGS } = await import(registry);
 const config = await import(barrel);
+const active = config.activeSettings();
 const records = Object.entries(loaded)
   .filter(([name]) => name.endsWith('_SETTINGS'))
   .map(([, record]) => record);
@@ -36,15 +41,16 @@ const read = [];
 for (const record of records) {
   const key = Object.keys(record)[0];
   if (key === undefined) throw new Error('an empty settings record in ' + first);
-  if (config.SETTINGS[key] !== record[key]) throw new Error('SETTINGS does not hold ' + key + ' from ' + first);
+  if (SETTINGS[key] !== record[key]) throw new Error('SETTINGS does not hold ' + key + ' from ' + first);
+  if (active[key] !== record[key]) throw new Error('activeSettings() does not hold ' + key + ' from ' + first);
   read.push(key);
 }
-console.log(JSON.stringify({ names: Object.keys(loaded).length, read, settings: Object.keys(config.SETTINGS).length }));
+console.log(JSON.stringify({ names: Object.keys(loaded).length, read, settings: Object.keys(active).length }));
 `;
 
 async function loadFirst(first: string): Promise<CapturedRun> {
   const child = Bun.spawn(
-    ['bun', '-e', CHILD, first, join(CONFIG_BARREL_DIR, 'index.ts')],
+    ['bun', '-e', CHILD, first, join(SRC, 'config-registry.ts'), join(CONFIG_BARREL_DIR, 'index.ts')],
     { cwd: SRC, stdout: 'pipe', stderr: 'pipe' },
   );
   const [stdout, stderr, exitCode] = await Promise.all([

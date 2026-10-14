@@ -10,7 +10,8 @@ The template is at `https://github.com/orgs/open-tomato/projects/6` (the
 "rafa board template"), public, with five fields, three saved views, and all
 six automations turned off. The template URL is the default of
 `board.project.template`, and `board.project.number` is the number of the
-project copied to the repository's owner. Both are read from `.rafa/config.yaml`.
+project copied to the repository's owner. Both are read from the project's
+config.
 
 Every GitHub project that mirrors rafa's board carries the same five fields
 with the same names and options; rafa finds them by exact match and skips any

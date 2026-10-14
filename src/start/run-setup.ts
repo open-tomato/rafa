@@ -173,6 +173,11 @@ export interface RunBranchRequest {
   readonly standing?: RunStanding;
   /** The words of the run's line, which the two branch flags are read from. */
   readonly args: readonly string[];
+  /**
+   * `naming.branch`, the template the plan's branch is named from;
+   * `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /**
@@ -218,6 +223,7 @@ export async function resolveRunBranch(
     standing,
     anyBranch: args.includes(ANY_BRANCH_FLAG),
     createBranch: args.includes(CREATE_BRANCH_FLAG),
+    branchTemplate: request.branchTemplate,
   }, seams);
 
   if (outcome.kind === 'moved') return outcome.branch;

@@ -47,9 +47,9 @@ import { loadConfig } from '../core/config/load.js';
 import { resolvePrProvider } from '../pr/index.js';
 
 /** The settings the mode is read from, or null where `openNextSources` refuses the config. */
-function modeConfig(root: string, home: string): RafaConfig | null {
+async function modeConfig(root: string, home: string): Promise<RafaConfig | null> {
   try {
-    return loadConfig({ root, home }, {}, () => undefined).config;
+    return (await loadConfig({ root, home }, {}, () => undefined)).config;
   } catch (error) {
     if (error instanceof ConfigError) return null;
     throw error;
@@ -68,7 +68,7 @@ export async function openNextRelations(
 ): Promise<EpicRelations | undefined> {
   const { project } = context;
   if (project === null) return undefined;
-  const config = modeConfig(project.root, project.home);
+  const config = await modeConfig(project.root, project.home);
   if (config?.boardRelationships !== 'native') return undefined;
   const provider = resolvePrProvider({ configured: config.prProvider, dir: project.root, readRemote: seams.readRemote });
   if (provider.provider !== 'gh') return undefined;

@@ -10,9 +10,12 @@
  * item-shape readers in `config-items.test.ts`; here each section is
  * reached through a file's text. The schema itself — the
  * dotted file key per setting, the sections a file may open, and the
- * known-key index — is `config-schema.ts`, driven in
- * `config-schema.test.ts`; here it is reached through `config.js`,
- * which re-exports every name a caller reads.
+ * known-key index — is read off the registered sections by `section.ts`,
+ * driven in `section.test.ts`, and merged by `src/config-registry.ts`,
+ * driven in `src/config-registry.test.ts`, with core's own keys in
+ * `core-section.ts`, driven in `core-section.test.ts`; here it is
+ * reached through `config.js`, which re-exports every name a caller
+ * reads.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that
@@ -57,6 +60,13 @@
  * Two of those, warnings never printed and the command line judged
  * before the file, were mutations of `loadConfig`, which has since
  * moved to `config-load.ts` with the cases that caught them.
+ *
+ * A layer and a resolution read every setting off the sections
+ * registered with `section.ts`, so this file imports
+ * `src/config-registry.ts` for the registration its import makes. The
+ * cases under `the registered sections` register a section of their own
+ * or empty the registry, and each puts the registry it found back in a
+ * `finally`, since bun runs every test file in one process.
  */
 import type {
   ConfigLayer,
@@ -72,14 +82,23 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
+
 import {
-  CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,
+  parseConfigDocument,
   parseConfigText,
+  readConfigDocument,
   resolveConfig,
 } from './config.js';
+import {
+  activeSettings,
+  EMPTY_CONFIG_REGISTRY,
+  registerConfigSections,
+  restoreConfigSections,
+} from './section.js';
 
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -90,9 +109,9 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)';
 
-/** Every setting, in the order a layer holds them. */
+/** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
   'version',
   'store',
@@ -179,6 +198,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'routing',
   'taskSkills',
   'taskLessons',
+  'mergeDuplicates',
+  'namingBranch',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsAlwaysRun',
@@ -278,6 +299,8 @@ const DEFAULTS: RafaConfig = {
   ]),
   taskSkills: 'planner',
   taskLessons: 'on',
+  mergeDuplicates: 'warn',
+  namingBranch: 'feat/{stub}',
   testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
   testsIntegration: [
     '**/*-integration.test.ts',
@@ -427,6 +450,10 @@ const FULL = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'merge:',
+  '  duplicates: allow',
+  'naming:',
+  '  branch: "work/{stub}"',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
@@ -539,6 +566,8 @@ const FULL_VALUES: RafaConfig = {
   routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  mergeDuplicates: 'allow',
+  namingBranch: 'work/{stub}',
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
@@ -583,9 +612,13 @@ function sourcesWith(
   return { ...all, ...named } as Record<ConfigSetting, ConfigSource>;
 }
 
-/** Holds a layer to saying nothing, with every setting still present. */
+/**
+ * Holds a layer to saying nothing, with every setting still present, in
+ * the order the sections were registered.
+ */
 function expectSilent(values: ConfigLayer): void {
-  expect(Object.keys(values)).toEqual([...SETTINGS]);
+  expect(Object.keys(values).sort()).toEqual([...SETTINGS].sort());
+  expect(Object.keys(values)).toEqual(Object.keys(activeSettings()));
   expect(Object.values(values).filter((value) => value !== undefined)).toEqual([]);
 }
 
@@ -1199,6 +1232,16 @@ describe('parseConfigText', () => {
         'task:\n  lessons: off', 'taskLessons', 'off',
       ],
       [
+        'merge.duplicates', 'merge:\n  duplicates: fail',
+        'merge.duplicates is "fail", expected one of: warn, error, allow',
+        'merge:\n  duplicates: error', 'mergeDuplicates', 'error',
+      ],
+      [
+        'naming.branch', 'naming:\n  branch: feat/{stub}-{stub}',
+        'naming.branch is "feat/{stub}-{stub}", expected a branch name template holding {stub} exactly once',
+        'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
+      ],
+      [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
         'tests.fullSuiteTriggers is "package.json", expected a list of glob patterns',
         'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1289,7 +1332,45 @@ describe('parseConfigText', () => {
   });
 });
 
+describe('parseConfigDocument and readConfigDocument', () => {
+  it('are parseConfigText in two halves: the document, then the layer read off it', () => {
+    const text = 'store: ndjson\nplan:\n  inject: task\nnonesuch: 1\n';
+    const document = parseConfigDocument(text, PATH);
+
+    expect(document).toEqual({ store: 'ndjson', plan: { inject: 'task' }, nonesuch: 1 });
+    expect(readConfigDocument(document, PATH)).toEqual(parseConfigText(text, PATH));
+  });
+
+  it('parses without judging a key, and refuses a tab before the parser', () => {
+    expect(parseConfigDocument('store: postgres\n', PATH)).toEqual({ store: 'postgres' });
+    expect(() => parseConfigDocument('plan:\n\tinject: full\n', PATH)).toThrow(ConfigError);
+    expect(() => readConfigDocument({ store: 'postgres' }, PATH)).toThrow(ConfigError);
+  });
+
+  it('reads null as a file that says nothing, and refuses anything else that is not a mapping', () => {
+    expect(readConfigDocument(null, PATH).extras).toEqual([]);
+    expect(() => readConfigDocument([{ store: 'ndjson' }], PATH)).toThrow(
+      `${PATH}: expected a mapping at the top level, found a list`,
+    );
+  });
+});
+
 describe('resolveConfig', () => {
+  it('names the file and entry of each setting a file answered, and none for the command line or a default', () => {
+    const file = { ...parseConfigText('store: ndjson\nplan:\n  dir: p\n', PATH), entries: new Map<ConfigSetting, number>([['planDir', 3]]) };
+    const user = parseConfigText('plan:\n  inject: task\n', USER_PATH);
+    const resolved = resolveConfig({ cli: { specsDir: 'cli-specs' }, file, user });
+
+    expect([
+      resolved.provenance.store,
+      resolved.provenance.planDir,
+      resolved.provenance.inject,
+      resolved.provenance.specsDir,
+      resolved.provenance.trackingAll,
+    ]).toEqual([{ file: PATH, entry: 0 }, { file: PATH, entry: 3 }, { file: USER_PATH, entry: 0 }, null, null]);
+    expect(resolved.shadowed).toEqual([]);
+  });
+
   it('merges a file\'s routing rows by key over the five defaults', () => {
     const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
 
@@ -1308,6 +1389,8 @@ describe('resolveConfig', () => {
       extras: [],
       userExtras: [],
       warnings: [],
+      provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
+      shadowed: [],
     });
   });
 
@@ -1601,5 +1684,57 @@ describe('claims', () => {
     const resolved = resolveConfig({ cli });
 
     expect([resolved.config.claimsStaleAfter, resolved.config.claimsAhead]).toEqual(['3d', 'off']);
+  });
+});
+
+describe('the registered sections', () => {
+  /** Runs `run` with the registry emptied, putting the one it found back after. */
+  function withEmptyRegistry(run: () => void): void {
+    const previous = registerConfigSections([]);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      run();
+    } finally {
+      restoreConfigSections(previous);
+    }
+  }
+
+  it('runs every registered section\'s check over the resolution, refusing with every problem they report', () => {
+    const user = fileOf('effort:\n  sync: service\n', USER_PATH);
+    const file = fileOf('store: ndjson\n');
+    const seen: unknown[] = [];
+    const previous = registerConfigSections([{
+      package: 'probe',
+      settings: {},
+      defaults: {},
+      checks: [({ config, sources, path, userPath }) => {
+        seen.push([config.store, sources.store, sources.effortSync, path, userPath]);
+        return [`probe refuses store ${config.store}`];
+      }],
+    }]);
+    try {
+      expect(refusal(() => resolveConfig({ file, user })).problems).toEqual([
+        `${USER_PATH}: effort.sync is "service" and no config file names hub.url;`
+          + ' expected hub.url, the address of the hub, such as https://hub.example.org',
+        'probe refuses store ndjson',
+      ]);
+      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH]]);
+    } finally {
+      restoreConfigSections(previous);
+    }
+  });
+
+  it('resolves with no check refusing when the registered checks report nothing', () => {
+    const resolved = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
+
+    expect([resolved.config.effortSync, resolved.config.hubUrl]).toEqual(['service', 'https://hub.example.org']);
+  });
+
+  it('reads no setting with no section registered, the registry and not a literal naming the settings', () => {
+    withEmptyRegistry(() => {
+      expect(Object.keys(parseConfigText('store: ndjson\n', PATH).values)).toEqual([]);
+      expect(Object.keys(resolveConfig({ cli: { store: 'ndjson' } }).config)).toEqual([]);
+      expect(Object.keys(resolveConfig({ file: fileOf('effort:\n  sync: service\n') }).sources)).toEqual([]);
+    });
   });
 });

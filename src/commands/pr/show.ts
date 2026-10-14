@@ -339,7 +339,7 @@ async function probe<T>(call: () => Promise<T>): Promise<Probe<T>> {
 /** Reads one pull request, its checks and its last triage; see the module note. */
 export async function readShow(context: RafaContext, seams: PrSeams): Promise<PrShowResult> {
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   const detail = await onProvider(`read pull request #${pick.number}`, () => pr.pulls.get(pick.number));
   if (detail === null) {

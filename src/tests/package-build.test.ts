@@ -27,7 +27,7 @@
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
- *   - The five library entries are built together with `--splitting`.
+ *   - The six library entries are built together with `--splitting`.
  *     Without it each entry is a bundle of its own, and `parsePlan`,
  *     `parseReport`, `openSqliteStore` and `EFFORT_KEY_PROJECTIONS` were
  *     each a different value from `dist/index.js` than from their
@@ -36,6 +36,9 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
+ *   - `tsc -p tsconfig.config-types.json` follows them and writes the
+ *     declarations of the `./config` subpath, the one entry whose types
+ *     the manifest publishes; see "The config subpath's declarations".
  *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
  *     are copied into `dist/`. `start.ts` and `plan.ts` find the first two
  *     beside themselves through `import.meta.url`, and a bundle inlining
@@ -199,8 +202,9 @@
  * from `package.json` as `describe` does, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
- * `README.md` says only `./plan`, `./ports` and `./learning` load under
- * node; `./learning` is read below, in its own section. The
+ * `README.md` says only `./plan`, `./ports`, `./learning` and `./config`
+ * load under node; `./learning` is read below, in its own section, and
+ * `./config` in the config subpath's cases. The
  * preflight brought `Bun.spawn`, `Bun.which` and `Bun.file` calls into
  * `./plan`, so one case imports `dist/plan/index.js` under node and holds
  * its names to its source's. It imports `dist/index.js` the same way as
@@ -276,6 +280,90 @@
  * which the pack case above pins. It builds both commands from the
  * manifest's own `name`, so renaming the package reddens it too.
  *
+ * ## The config library, folded in
+ *
+ * `@open-tomato/define-config` is a devDependency, pinned at `0.5.0`, that
+ * `bun build` folds into the bundles, so the published manifest still
+ * declares no runtime dependency. Three cases hold that: the manifest
+ * `bun pm pack` writes into the tarball carries no `dependencies` (or an
+ * empty one), `dist/cli.js` carries no `import`, `from` or `require` of
+ * the package, and a copy of the build where no `node_modules` sits at
+ * or above it answers `--version`, exit 0. A fourth builds a probe that
+ * calls `defineConfig` twice: left external, the bundle carries
+ * `from "@open-tomato/define-config"` and the matcher sees it; folded in,
+ * the bundle carries `function defineConfig(` and no load.
+ *
+ * The `--version` run passes `--no-install`. Measured on bun 1.3.14:
+ * with no `node_modules` found, bun auto-installs a package the script
+ * imports, so a probe importing the library from an empty directory
+ * printed `function`, exit 0, and the same probe under `--no-install`
+ * exited 1 with `Cannot find module '@open-tomato/define-config'`.
+ *
+ * Driven on 2026-10-14, one run of this file each, 66 pass before and after,
+ * with `package.json` and `src/rafa.ts` restored byte-identical (sha256).
+ * `dependencies` naming the library reddened 2 of 66: the pack case and
+ * the absence case above. `src/rafa.ts` importing the library with the
+ * CLI built `--external` to it reddened 1 of 66 without `--no-install`
+ * (the matcher case), and 2 of 66 with it, the `--version` run among
+ * them. The same import with no `--external` stopped the build itself,
+ * 55 of 66: the scratch package copies no `node_modules`, so its build
+ * cannot resolve the library until it is given one.
+ *
+ * It is given one now. `src/core/config/config-load.ts` imports
+ * `createLoader` by value, so the scratch package's `node_modules` links
+ * the library the repository installed, as the probe's directory does;
+ * without the link the build exits 1 on `Could not resolve:
+ * "@open-tomato/define-config"`, measured when that import landed. The
+ * `--version` copy sits beside the package, not under it, so no
+ * `node_modules` is at or above it still.
+ *
+ * ## The config subpath's declarations
+ *
+ * `./config` is the one exports entry carrying conditions: `types` at
+ * `dist/config/index.d.ts`, and `import` at `dist/config/index.js`, which
+ * the `--splitting` build writes beside the other entries. The
+ * declarations come from `tsc -p tsconfig.config-types.json`, a config
+ * extending `tsconfig.base.json` with `noEmit` off, `emitDeclarationOnly`
+ * and `declarationDir: dist`, including `src/config/index.ts` alone.
+ *
+ * `tsc` writes a declaration for every file of its program, and the
+ * program is every file the entry reaches in source, value imports
+ * included: through `src/config-registry.ts` that is the sections, core
+ * and the effort store, 121 files measured on 2026-10-14 with
+ * typescript 5.9.3. Eleven of them import a specifier outside rafa:
+ * nine `bun:sqlite` (the store's modules), `core/command/confirm.d.ts`
+ * `node:stream`, and `core/config/standard-schema.d.ts`
+ * `@open-tomato/define-config`. None of the eleven is reached from
+ * `dist/config/index.d.ts`, whose own reach was 16 files, so a consumer
+ * type-checking a `rafa.config.ts` loads none of them. The case reads
+ * that reach: it follows every relative specifier from the types target
+ * through the emitted files (`ts.preProcessFile`, so a specifier inside a
+ * comment is not read as one) and holds every other specifier, a
+ * `node:` or `bun:` builtin and `@open-tomato/define-config` alike, to
+ * none. A declaration under `dist/` that the types target does not reach
+ * is out of the check: the subpath's promise is that its declaration
+ * imports nothing outside rafa, and the eleven above stay where `tsc`
+ * wrote them. The case's control plants a static `import type` of the
+ * library and an `import('bun:sqlite')` type into a copy of two reached
+ * declarations, one two hops from the entry, and reads both back.
+ *
+ * The scratch package links `typescript`, `@types/bun` and `@types/node`
+ * as the repository installed them, and `node_modules/.bin/tsc`, which
+ * `bun run` puts on the script's PATH. Without the `tsc` link the build
+ * exited 127 on `tsc: command not found`, and with it but without the
+ * two `@types` links it exited 2 on 151 errors, the first
+ * `Cannot find module 'node:async_hooks'`, both measured on 2026-10-14.
+ *
+ * Three mutations of `package.json` were driven on 2026-10-14, one run
+ * of this file each, with the manifest restored byte-identical (sha256).
+ * Dropping the `./config` exports entry reddened the exports map case
+ * alone, 1 of 72, before the node case joined. With it, 73 pass before
+ * and after: dropping the `tsc` step reddened 4 of 73, the
+ * exports-target case and the three declaration cases, and dropping
+ * `src/config/index.ts` from the entry list reddened 5 of 73, the
+ * exports-target case, the two computed `dist/config/index.js` cases,
+ * the defaults case and the node case.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -331,12 +419,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import ts from 'typescript';
 
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
+import * as configSource from '../config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import * as storeSource from '../effort/store/index.js';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
@@ -370,7 +460,14 @@ const EXPORTS = {
   './store': './dist/effort/store/index.js',
   './ports': './dist/ports/index.js',
   './learning': './dist/learning/index.js',
+  './config': {
+    types: './dist/config/index.d.ts',
+    import: './dist/config/index.js',
+  },
 };
+
+/** The declaration the `./config` subpath publishes, under `dist/`. */
+const CONFIG_TYPES = 'config/index.d.ts';
 
 /** What the manifest publishes: the build, and the NOTICE the licence asks to travel with it (npm adds LICENSE and README by itself). */
 const FILES = ['dist', 'NOTICE'];
@@ -416,6 +513,22 @@ const DEPENDENCY_KEYS = [
   'bundledDependencies',
 ];
 
+/** The config library the build folds into its bundles, and the version the manifest pins it at. */
+const DEFINE_CONFIG = '@open-tomato/define-config';
+const DEFINE_CONFIG_VERSION = '0.5.0';
+
+/**
+ * Each form a bundle can load {@link DEFINE_CONFIG} by at run time: a
+ * static `import ... from`, a bare `import '...'`, a dynamic `import()`
+ * and a `require()`, each with or without a subpath. A literal naming the
+ * package anywhere else, such as in a message, is not a load.
+ */
+const DEFINE_CONFIG_LOADS = [
+  /\bfrom\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]/g,
+  /\bimport\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]/g,
+  /\b(?:import|require)\s*\(\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]\s*\)/g,
+];
+
 /** The rafa tier in a checkout, from the repository root, and where the build copies it under `dist/`. */
 const BUNDLED = ['src/bundled', 'bundled'] as const;
 
@@ -432,7 +545,10 @@ const PLAN_FORMAT_IN_TIER = 'bundled/skills/dev-planner/SKILL.md';
 const SKILL = `src/${PLAN_FORMAT_IN_TIER}`;
 
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md'];
+const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'tsconfig.config-types.json', 'README.md'];
+
+/** The installed packages the declaration step reads, linked into the scratch package; see the module note. */
+const TYPESCRIPT_PACKAGES = ['typescript', '@types/bun', '@types/node'];
 
 /** Each library entry: its path under `dist/`, and its source module. */
 const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
@@ -441,6 +557,7 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
   ['effort/store/index.js', storeSource],
   ['ports/index.js', portsSource],
   ['learning/index.js', learningSource],
+  ['config/index.js', configSource],
 ];
 
 /** The subpath bundles whose every name the root bundle carries too. */
@@ -578,6 +695,8 @@ beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
+  linkDefineConfig(PACKAGE_DIR);
+  linkTypeScript(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
   mkdirSync(boardTemplates, { recursive: true });
   writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
@@ -593,6 +712,111 @@ afterAll(() => {
 /** The repository's manifest. */
 function readManifest(): Record<string, unknown> {
   return JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
+}
+
+/** Every load of {@link DEFINE_CONFIG} that `text` carries, in the order of {@link DEFINE_CONFIG_LOADS}. */
+function defineConfigLoads(text: string): string[] {
+  return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
+}
+
+/** Links the package `name` as the repository installed it into `dir`'s `node_modules`. */
+function linkInstalled(dir: string, name: string): void {
+  mkdirSync(dirname(join(dir, 'node_modules', name)), { recursive: true });
+  const installed = realpathSync(join(REPO_ROOT, 'node_modules', name));
+  symlinkSync(installed, join(dir, 'node_modules', name), 'dir');
+}
+
+/** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
+function linkDefineConfig(dir: string): void {
+  linkInstalled(dir, DEFINE_CONFIG);
+}
+
+/** Links {@link TYPESCRIPT_PACKAGES} into `dir`'s `node_modules`, and `tsc` into its `.bin`. */
+function linkTypeScript(dir: string): void {
+  for (const name of TYPESCRIPT_PACKAGES) linkInstalled(dir, name);
+  mkdirSync(join(dir, 'node_modules', '.bin'), { recursive: true });
+  symlinkSync(join('..', 'typescript', 'bin', 'tsc'), join(dir, 'node_modules', '.bin', 'tsc'));
+}
+
+/** What {@link declarationReach} found from one declaration. */
+interface DeclarationReach {
+  /** Every declaration reached, relative to the root it was read under, sorted. */
+  readonly reached: string[];
+  /** Each specifier outside rafa, as `<declaration>: <specifier>`, sorted. */
+  readonly outside: string[];
+  /** Each relative specifier naming no emitted declaration, as `<declaration>: <specifier>`, sorted. */
+  readonly missing: string[];
+}
+
+/**
+ * Follows every relative specifier from `entry`, a declaration under
+ * `root`, through the declarations beside it, and names every specifier
+ * that is not relative: a package, a builtin, or a `/// <reference
+ * types>`. See the module note.
+ */
+function declarationReach(root: string, entry: string): DeclarationReach {
+  const reached = new Set<string>();
+  const outside: string[] = [];
+  const missing: string[] = [];
+  const queue = [entry];
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (reached.has(file)) continue;
+    reached.add(file);
+    const read = ts.preProcessFile(readFileSync(join(root, file), 'utf8'), true, false);
+    for (const { fileName } of read.typeReferenceDirectives) outside.push(`${file}: types ${fileName}`);
+    for (const { fileName } of read.importedFiles) {
+      if (!fileName.startsWith('.')) {
+        outside.push(`${file}: ${fileName}`);
+        continue;
+      }
+      const target = relative(root, join(root, dirname(file), fileName.replace(/\.js$/, '.d.ts')));
+      if (existsSync(join(root, target))) queue.push(target);
+      else missing.push(`${file}: ${fileName}`);
+    }
+  }
+  return { reached: [...reached].sort(), outside: outside.sort(), missing: missing.sort() };
+}
+
+/** Every target the binary and the exports map name, a condition's target included. */
+function manifestTargets(): string[] {
+  return [...Object.values(BIN), ...Object.values(EXPORTS)]
+    .flatMap((target) => typeof target === 'string'
+      ? [target]
+      : Object.values(target));
+}
+
+/**
+ * Builds a probe calling `defineConfig` to `out.js` under its own scratch
+ * directory, whose `node_modules` links the package the repository
+ * installed, with `external` naming the packages the build leaves to be
+ * loaded at run time. Returns the bundle's text.
+ */
+function buildDefineConfigProbe(name: string, external: readonly string[]): string {
+  const dir = join(tempRoot, `define-config-${name}`);
+  mkdirSync(dir, { recursive: true });
+  linkDefineConfig(dir);
+  writeFileSync(join(dir, 'probe.ts'), [
+    `import { defineConfig } from '${DEFINE_CONFIG}';`,
+    'console.log(typeof defineConfig);',
+    '',
+  ].join('\n'), 'utf8');
+  const flags = external.map((name) => `--external=${name}`);
+  const built = run(
+    [process.execPath, 'build', 'probe.ts', '--target=bun', '--outfile=out.js', ...flags],
+    dir,
+    withBunOnPath(),
+  );
+  expectExit(built, 0, { cwd: dir });
+  return readFileSync(join(dir, 'out.js'), 'utf8');
+}
+
+/** `directory` and every directory above it that holds a `node_modules`. */
+function nodeModulesAbove(directory: string): string[] {
+  const found: string[] = [];
+  for (let current = directory; ; current = dirname(current)) {
+    if (existsSync(join(current, 'node_modules'))) found.push(current);
+    if (dirname(current) === current) return found;
+  }
 }
 
 /** Every file the build wrote, relative to `dist/`, sorted. */
@@ -725,11 +949,11 @@ function filesUnder(directory: string): string[] {
  * (`/var` for `/private/var`): `rafa plan` runs on {@link dispatchedRoot},
  * and `planCommand` on the root its caller hands it.
  */
-function expectedPlanPrompt(scratch: PlanScratch, root: string): string {
+async function expectedPlanPrompt(scratch: PlanScratch, root: string): Promise<string> {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
   const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
   const home = scratch.env['HOME'] ?? '';
-  const { config } = loadConfig({ root: scratch.repo, home });
+  const { config } = await loadConfig({ root: scratch.repo, home });
   const index = readPlanSkillIndex(scratch.repo, home, config, join(REPO_ROOT, 'src', 'plan.ts'));
   const planDir = join(root, '.rafa', 'plans');
   return buildPlanPrompt(template, skill, SPEC, 'spec', planDir, undefined, undefined, index);
@@ -749,7 +973,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the five subpaths to their builds, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -783,6 +1007,52 @@ describe('the package manifest', () => {
   });
 });
 
+describe('the config library, folded into the build', () => {
+  it('is a devDependency at the version the plan pins, and the packed manifest declares no runtime dependency', () => {
+    const destination = mkdtempSync(join(tempRoot, 'packed-'));
+    const pack = run(
+      [process.execPath, 'pm', 'pack', '--ignore-scripts', '--quiet', '--destination', destination],
+      PACKAGE_DIR,
+      withBunOnPath(),
+    );
+    const tarball = readdirSync(destination).find((file) => file.endsWith('.tgz')) ?? '';
+    const extract = run(['tar', '-xzf', tarball, 'package/package.json'], destination, withBunOnPath());
+    const packed = JSON.parse(readFileSync(join(destination, 'package', 'package.json'), 'utf8')) as Record<string, unknown>;
+    const devDependencies = readManifest()['devDependencies'] as Record<string, unknown>;
+
+    expectExit(pack, 0, { cwd: PACKAGE_DIR });
+    expectExit(extract, 0, { cwd: destination });
+    expect(devDependencies[DEFINE_CONFIG]).toBe(DEFINE_CONFIG_VERSION);
+    expect(packed['name']).toBe(readManifest()['name']);
+    expect(packed['dependencies'] ?? {}).toEqual({});
+  }, 30_000);
+
+  it('leaves dist/cli.js carrying no import or require of the library', () => {
+    expect(defineConfigLoads(readFileSync(join(DIST, 'cli.js'), 'utf8'))).toEqual([]);
+  });
+
+  it('sees a load the build leaves external, and none once the build folds the library in', () => {
+    const external = buildDefineConfigProbe('external', [DEFINE_CONFIG]);
+    const folded = buildDefineConfigProbe('folded', []);
+
+    expect(defineConfigLoads(external)).toEqual([`from "${DEFINE_CONFIG}"`]);
+    expect(folded).toContain('function defineConfig(');
+    expect(defineConfigLoads(folded)).toEqual([]);
+  }, 30_000);
+
+  it('answers --version from a copy of the build where no node_modules sits at or above it', () => {
+    const copy = join(tempRoot, 'version-outside', 'dist');
+    cpSync(DIST, copy, { recursive: true });
+    const env = { TMPDIR: tmpdir(), PATH: withBunOnPath()['PATH'], ...scratchHomeEnv(tempRoot) };
+    // `--no-install`: with no node_modules found, bun fetches a missing package by itself; see the module note.
+    const version = run([process.execPath, '--no-install', 'cli.js', '--version'], copy, env);
+
+    expect(nodeModulesAbove(copy)).toEqual([]);
+    expectExit(version, 0, { cwd: copy });
+    expect(version.stdout).toBe(`rafa ${String(readManifest()['version'])}\n`);
+  }, 30_000);
+});
+
 describe('the README', () => {
   it('gives both global install commands, each naming the package the manifest does', () => {
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
@@ -799,11 +1069,10 @@ describe('the build script, run in a copy of the package', () => {
   });
 
   it('writes every file the binary and the exports map name', () => {
-    const named = [...Object.values(BIN), ...Object.values(EXPORTS)];
-    const targets = [...new Set(named.map((target) => join(PACKAGE_DIR, target)))];
+    const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(6);
+    expect(targets).toHaveLength(8);
     expect(missing).toEqual([]);
   });
 
@@ -993,6 +1262,157 @@ describe('the learning subpath, imported by the package name', () => {
   }, 30_000);
 });
 
+describe('the config subpath in the build', () => {
+  it('gives dist/config/index.js the defaults and the defineConfig its source does', async () => {
+    const built = await importBuilt('config/index.js');
+    const defineConfig = built['defineConfig'] as (config: unknown) => unknown;
+    const entries = [{ plan: { inject: 'stage' } }];
+
+    expect(built['defaults']).toEqual(configSource.defaults);
+    expect(defineConfig(entries)).toBe(entries);
+  });
+
+  it('loads dist/config/index.js under node with the names its source exports', () => {
+    const node = Bun.which('node');
+    if (node === null) throw new Error('node is not on the PATH this suite runs under');
+    const href = pathToFileURL(join(DIST, 'config', 'index.js')).href;
+    const load = run([
+      node,
+      '--input-type=module',
+      '-e',
+      `console.log(JSON.stringify(Object.keys(await import(${JSON.stringify(href)})).sort()));`,
+    ], tempRoot, process.env);
+
+    expect(load).toEqual({
+      exitCode: 0,
+      stdout: `${JSON.stringify(Object.keys(configSource).sort())}\n`,
+      stderr: '',
+    });
+  }, 30_000);
+
+  it('writes the declaration the types condition of ./config names, carrying the entry\'s names', () => {
+    const declaration = readFileSync(join(DIST, CONFIG_TYPES), 'utf8');
+
+    expect(EXPORTS['./config'].types).toBe(`./dist/${CONFIG_TYPES}`);
+    expect(declaration).toContain('export { defineConfig } from \'./entry.js\';');
+    expect(declaration).toContain('export declare const defaults: ConfigEntry;');
+    expect(declaration).toContain('export type { Config, ConfigEntry } from \'./entry.js\';');
+  });
+
+  it('reaches no specifier outside rafa from dist/config/index.d.ts, and no declaration that is not there', () => {
+    const reach = declarationReach(DIST, CONFIG_TYPES);
+
+    expect(reach.reached).toContain('config/shape.d.ts');
+    expect(reach.reached).toContain('core/config/index.d.ts');
+    expect(reach.missing).toEqual([]);
+    expect(reach.outside).toEqual([]);
+  });
+
+  it('sees a specifier outside rafa planted two hops from the entry, as a static and as a type import', () => {
+    const copy = mkdtempSync(join(tempRoot, 'declarations-'));
+    cpSync(DIST, copy, { recursive: true });
+    const plant = (file: string, line: string) => writeFileSync(
+      join(copy, file),
+      `${line}\n${readFileSync(join(copy, file), 'utf8')}`,
+      'utf8',
+    );
+    plant('config/shape.d.ts', 'export type Planted = import(\'bun:sqlite\').Database;');
+    plant('core/config/index.d.ts', `import type { StandardSchemaV1 } from '${DEFINE_CONFIG}';`);
+
+    expect(declarationReach(copy, CONFIG_TYPES).outside).toEqual([
+      'config/shape.d.ts: bun:sqlite',
+      `core/config/index.d.ts: ${DEFINE_CONFIG}`,
+    ]);
+  });
+});
+
+describe('the config subpath, installed from the packed tarball', () => {
+  /** The entries both config files hold; `plan.inject` is a setting the defaults entry names. */
+  const ENTRIES = '[{ plan: { inject: \'stage\' } }]';
+
+  /** A scratch project with the tarball of the built copy installed into it, and nothing else. */
+  function installFromTarball(): string {
+    const destination = mkdtempSync(join(tempRoot, 'tarball-'));
+    const pack = run(
+      [process.execPath, 'pm', 'pack', '--ignore-scripts', '--quiet', '--destination', destination],
+      PACKAGE_DIR,
+      withBunOnPath(),
+    );
+    expectExit(pack, 0, { cwd: PACKAGE_DIR });
+    const tarball = readdirSync(destination).find((file) => file.endsWith('.tgz')) ?? '';
+    expect(tarball).not.toBe('');
+
+    const project = mkdtempSync(join(tempRoot, 'consumer-'));
+    writeFileSync(join(project, 'package.json'), '{"name":"consumer","private":true,"type":"module"}\n', 'utf8');
+    const add = run(
+      [process.execPath, 'add', join(destination, tarball), '--no-progress'],
+      project,
+      { ...withBunOnPath(), TMPDIR: tmpdir(), ...scratchHomeEnv(join(project, 'home')) },
+    );
+    expectExit(add, 0, { cwd: project });
+    return project;
+  }
+
+  it('type-checks both rafa.config.ts forms with tsc --noEmit, and imports the first under bun', () => {
+    const project = installFromTarball();
+    writeFileSync(join(project, 'rafa.config.ts'), [
+      'import { defineConfig } from \'@open-tomato/rafa/config\';',
+      '',
+      `export default defineConfig(${ENTRIES});`,
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'typed.config.ts'), [
+      'import type { Config } from \'@open-tomato/rafa/config\';',
+      '',
+      `export default ${ENTRIES} satisfies Config;`,
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        strict: true,
+        noEmit: true,
+        skipLibCheck: true,
+        types: [],
+      },
+      files: ['rafa.config.ts', 'typed.config.ts'],
+    }), 'utf8');
+    const env = withBunOnPath();
+
+    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, env);
+    const load = run([
+      process.execPath,
+      '-e',
+      'console.log(JSON.stringify((await import(\'./rafa.config.ts\')).default));',
+    ], project, env);
+
+    expectExit(check, 0, { cwd: project });
+    expectExit(load, 0, { cwd: project });
+    expect(load.stdout).toBe(`${JSON.stringify([{ plan: { inject: 'stage' } }])}\n`);
+  }, 120_000);
+
+  it('refuses a config entry the type does not allow, so the check can fail', () => {
+    const project = installFromTarball();
+    writeFileSync(join(project, 'bad.config.ts'), [
+      'import type { Config } from \'@open-tomato/rafa/config\';',
+      '',
+      'export default [{ plan: { inject: 42 } }] satisfies Config;',
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, types: [] },
+      files: ['bad.config.ts'],
+    }), 'utf8');
+
+    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
+
+    expect(check.exitCode).not.toBe(0);
+    expect(check.stdout).toContain('bad.config.ts');
+  }, 120_000);
+});
+
 describe('the prompt templates in the build', () => {
   it.each(TEMPLATES)('copies %s into dist as %s, unchanged', (source, name) => {
     const built = join(DIST, name);
@@ -1022,22 +1442,22 @@ describe('the prompt templates in the build', () => {
     expect(readBundledFile(name, DIST)).toBe(source);
   });
 
-  it('hands rafa plan the template beside dist/cli.js', () => {
+  it('hands rafa plan the template beside dist/cli.js', async () => {
     const scratch = plantPlanScratch('cli');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
-  it('spawns rafa plan under the setting sources a user config names', () => {
+  it('spawns rafa plan under the setting sources a user config names', async () => {
     const scratch = plantPlanScratch('sources');
     plantUserConfig(scratch, 'loop:\n  settingSources: local,user\n');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
@@ -1053,7 +1473,7 @@ describe('the prompt templates in the build', () => {
     expect(existsSync(scratch.args)).toBe(false);
   }, 30_000);
 
-  it('hands planCommand the template beside dist/index.js', () => {
+  it('hands planCommand the template beside dist/index.js', async () => {
     const scratch = plantPlanScratch('library');
     const probe = join(scratch.root, 'probe.ts');
     writeFileSync(probe, [
@@ -1063,11 +1483,11 @@ describe('the prompt templates in the build', () => {
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, scratch.repo));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, scratch.repo));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
-  it('names the plan under the root planCommand is handed through a link, as that root is spelled', () => {
+  it('names the plan under the root planCommand is handed through a link, as that root is spelled', async () => {
     const scratch = plantPlanScratch('library-link');
     const link = join(scratch.root, 'link');
     symlinkSync(scratch.repo, link, 'dir');
@@ -1080,18 +1500,18 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, probe], link, scratch.env);
 
     expect(realpathSync(link)).not.toBe(link);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, link));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, link));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
-  it('hands rafa plan the format from a copy of the build outside the package', () => {
+  it('hands rafa plan the format from a copy of the build outside the package', async () => {
     const scratch = plantPlanScratch('outside');
     const copy = copyBuildOutsidePackage(scratch, null);
     const plan = run([process.execPath, join(copy, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
     expect(existsSync(join(copy, '..', 'src'))).toBe(false);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 

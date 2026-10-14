@@ -94,11 +94,11 @@ function refusalExit(error: unknown): CommandExit | null {
 }
 
 /** Runs one invocation. See the module note. */
-export function runMove(context: RafaContext): void {
+export async function runMove(context: RafaContext): Promise<void> {
   expectNoArgument(context.args, MOVE_USAGE);
   readTarget(context);
   const project = requireProject(context, COMMAND_NAME);
-  resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message));
+  await resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message));
   try {
     effortStoreDir(project.root, context.env);
   } catch (error) {
@@ -152,7 +152,7 @@ export function createMoveCommand(): RafaCommand {
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      runMove(context);
+      await runMove(context);
       await Promise.resolve();
     },
   };

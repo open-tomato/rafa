@@ -69,7 +69,8 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CONFIG_DEFAULTS, configFilePath } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { configFilePath } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
@@ -148,6 +149,10 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '#   base:                        # the branch a PR opens into; unset is the remote default',
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
   PR_VERSION_COLLISION_LINE,
+  '# merge:',
+  `#   duplicates: ${CONFIG_DEFAULTS.mergeDuplicates}               # warn | error | allow, two entries of one file setting one key`,
+  '# naming:',
+  `#   branch: ${CONFIG_DEFAULTS.namingBranch}          # the branch loop start creates, {stub} once for the plan's stub`,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,

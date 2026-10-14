@@ -2,9 +2,13 @@
  * The `triage` section of the config schema: the two settings triage
  * reads when it looks for the nearest open bug a report repeats, each
  * one's field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link TriageSettings}, and
- * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after the `claims` section.
+ * {@link TRIAGE_SECTION} hands them to core as one `ConfigSection`,
+ * package `triage`, and the `declare module` below adds
+ * {@link TriageSettings} to `RafaConfig`.
+ * A second, on `src/config/shape.ts`, adds the keys a file writes to
+ * `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after the `claims` section.
  *
  * The section has its own module, as `config-schema-tests.ts` and
  * `config-schema-wrap-up.ts` do, because `config-schema.ts` stood at 592
@@ -12,7 +16,7 @@
  * these keys were added: the schema module's own note asks a new
  * section for a sibling, and the readers are rules about a VALUE that
  * only these keys read, so they sit here beside them. Only
- * `config-schema.ts` imports this file; a caller reads the settings off
+ * `config-registry.ts` imports this file; a caller reads the settings off
  * the resolved `RafaConfig`.
  *
  * ## The two keys
@@ -40,10 +44,27 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `triage` section's fields, added to core's. */
+  interface RafaConfig extends TriageSettings {}
+}
+
+declare module './config/shape.js' {
+  /** The `triage` keys a file writes. */
+  interface ConfigShape {
+    readonly triage: {
+      readonly similarity: {
+        readonly threshold: SimilarityThreshold;
+        readonly candidates: number;
+      };
+    };
+  }
+}
 
 /** The most `triage.similarity.threshold` accepts. */
 export const SIMILARITY_THRESHOLD_MAX = 1;
@@ -124,3 +145,10 @@ export const TRIAGE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `triage` section: the two `triage` keys, with their defaults and no check. */
+export const TRIAGE_SECTION: ConfigSection = Object.freeze({
+  package: 'triage',
+  settings: Object.freeze(TRIAGE_SETTINGS),
+  defaults: TRIAGE_DEFAULTS,
+});

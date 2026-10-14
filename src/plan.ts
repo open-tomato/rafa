@@ -208,8 +208,8 @@
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
- * names, resolved from the project's and the user scope's
- * `.rafa/config.yaml` as `rafa start` resolves them (`config-load.ts`),
+ * names, resolved from the project's and the user scope's config
+ * as `rafa start` resolves them (`config-load.ts`),
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
@@ -584,9 +584,9 @@ export function runBranchLine(planPath: string): string | null {
  * named, as `rafa start` refuses one, before any session starts: a
  * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
-function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
+async function resolvePlanConfig(repoRoot: string, home: string): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: repoRoot, home }).config;
+    return (await loadConfig({ root: repoRoot, home })).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -601,7 +601,7 @@ export default async function plan(
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const home = homedir();
-  const config = resolvePlanConfig(repoRoot, home);
+  const config = await resolvePlanConfig(repoRoot, home);
   const {
     settingSources,
     routing,

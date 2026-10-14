@@ -303,7 +303,7 @@ export async function pullBeforeRead(input: PullBeforeReadInput, seams: HubConta
   let resolved: ResolvedConfig;
   try {
     // Read silently: the command reads the config itself and writes its warnings once.
-    resolved = loadConfig(roots, {}, () => {});
+    resolved = await loadConfig(roots, {}, () => {});
   } catch (error) {
     if (error instanceof ConfigError) return null;
     throw error;

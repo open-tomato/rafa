@@ -213,7 +213,7 @@ async function readLines(context: RafaContext, seams: IssueSeams): Promise<{
   readonly plansDir: PlansDir;
 }> {
   const project = requireProject(context, COMMAND_NAME);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const tracker = await landTracker(config, project, seams);

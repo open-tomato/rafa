@@ -49,9 +49,9 @@ export interface InstallReadings {
  * the preflight loads it, with the warnings dropped so a person reads
  * each of them once: `resolvedConfig` writes them.
  */
-function readPreInit(project: InstallProject): PreInitDirsReading | null {
+async function readPreInit(project: InstallProject): Promise<PreInitDirsReading | null> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
     return readPreInitDirs(config);
   } catch {
     return null;
@@ -59,9 +59,9 @@ function readPreInit(project: InstallProject): PreInitDirsReading | null {
 }
 
 /** The previous-copy count under `specs.dir`; null for a config that could not be loaded or a `previous/` that could not be read. */
-function readPrevious(project: InstallProject): PreviousCopiesReading | null {
+async function readPrevious(project: InstallProject): Promise<PreviousCopiesReading | null> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
     return readPreviousCopies(project.root, config);
   } catch {
     return null;
@@ -69,10 +69,10 @@ function readPrevious(project: InstallProject): PreviousCopiesReading | null {
 }
 
 /** Every reading about the install; a store that cannot be checked is a warning, not a failure. */
-export function readInstall(context: Pick<RafaContext, 'env'>, project: InstallProject): InstallReadings {
+export async function readInstall(context: Pick<RafaContext, 'env'>, project: InstallProject): Promise<InstallReadings> {
   const binPath = readBinPath(context.env['PATH'], project.home);
-  const preInitDirs = readPreInit(project);
-  const previousCopies = readPrevious(project);
+  const preInitDirs = await readPreInit(project);
+  const previousCopies = await readPrevious(project);
   try {
     return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, previousCopies, storeProblem: null };
   } catch (error) {

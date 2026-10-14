@@ -23,7 +23,8 @@ import type { InventorySource } from '../inventory/record.js';
 import { describe, expect, it } from 'bun:test';
 
 import { BUILT_IN_AGENTS } from '../agents/roster.js';
-import { CONFIG_DEFAULTS, parseConfigText } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { parseConfigText } from '../core/config/index.js';
 import { routeTable } from '../core/config/sections.js';
 
 import { resolveTiers } from './resolve.js';

@@ -100,7 +100,7 @@ import type { SourceItem, TreeListing } from './trees.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { Resolution, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { isSkillTier } from '../schema/tiers.js';
 import { pinKey, readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveVerdict } from '../tiers/serve.js';

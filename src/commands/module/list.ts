@@ -95,7 +95,7 @@ async function runList(context: RafaContext, seams: ModuleLoadSeams): Promise<vo
 
   let loaded;
   try {
-    const resolved = loadConfig({ root: project.root, home: project.home });
+    const resolved = await loadConfig({ root: project.root, home: project.home });
     loaded = await loadModules(moduleSettings(resolved, project), seams);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;

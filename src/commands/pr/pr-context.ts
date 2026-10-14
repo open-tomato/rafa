@@ -135,7 +135,7 @@ export const PR_USAGE: Readonly<Record<PrAction, string>> = Object.freeze({
   view: 'rafa pr view [<n>]',
   list: 'rafa pr list',
   merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]',
-  triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]',
+  triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]',
   wait: 'rafa pr wait [<n>] [--timeout=<minutes>]',
   open: 'rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>',
   retarget: 'rafa pr retarget <n> --base=<branch>',
@@ -279,9 +279,9 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** The `pr` settings as the config resolves for the project, refusing a config `loadConfig` refuses. */
-function prConfig(project: ProjectFound, warn: (message: string) => void): PrConfig {
+async function prConfig(project: ProjectFound, warn: (message: string) => void): Promise<PrConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(
@@ -306,9 +306,9 @@ function gitBranch(root: string): string {
  * the config raises are written through the command's output. See the
  * module note for what it checks and what it leaves to preflight.
  */
-export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_SEAMS): PrContext {
+export async function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_SEAMS): Promise<PrContext> {
   const project = projectOf(context);
-  const config = prConfig(project, (message: string) => {
+  const config = await prConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const reading = requireGhProvider(resolvePrProvider({

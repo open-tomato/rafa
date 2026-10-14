@@ -432,7 +432,7 @@ export async function runCleanup(context: RafaContext, seams: CleanupCommandSeam
   expectNoArgument(context.args, CLEANUP_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${CLEANUP_USAGE}`);
   const project = projectOf(context);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const cwd = (seams.cwd ?? ((): string => process.cwd()))();

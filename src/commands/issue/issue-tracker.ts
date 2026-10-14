@@ -14,8 +14,8 @@
  * ## The tracker, through the chain
  *
  * An action reads its line first. Then it resolves the config as
- * `loop start` does (`config-load.ts`): the project's
- * `.rafa/config.yaml` over the user scope's, over the defaults. It hands
+ * `loop start` does (`config-load.ts`): the project's config over the
+ * user scope's, over the defaults. It hands
  * `tracker.default` and `tracker.fallback` to `resolveTracker`
  * (`adapters/tracker/resolve.ts`), the chain `loop start`'s triage files
  * through, with the project root as the repository. The chain tries
@@ -240,9 +240,9 @@ export function issueProject(context: RafaContext): ProjectFound {
  * `./ready.ts` takes `board.trustedAuthors`. One reader is what keeps
  * the refusal spelled once for the subject.
  */
-export function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+export async function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, ['❌ The config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)].join('\n'));
@@ -262,7 +262,7 @@ export async function resolveIssueTracker(context: RafaContext, seams: IssueSeam
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
 
   let resolution: TrackerResolution;
   try {

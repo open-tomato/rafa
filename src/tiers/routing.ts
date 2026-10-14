@@ -61,7 +61,7 @@
  *      an `unloaded` tier, or held by no tier at all (`missing`).
  *
  * The built-ins are a parameter rather than an import because
- * `config-schema.ts` imports this module for {@link DEFAULT_ROUTING},
+ * `core-section.ts` imports this module for {@link DEFAULT_ROUTING},
  * and `agents/roster.ts` reaches the plan parser; a routing module
  * importing it would put that graph under the config's.
  *

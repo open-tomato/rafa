@@ -459,7 +459,7 @@ export async function projectInventory(
   commandName = 'rafa skill list',
 ): Promise<{ readonly inventory: Inventory; readonly settingSources: readonly ClaudeSettingSource[] }> {
   try {
-    const resolved = loadConfig({ root: project.root, home: project.home });
+    const resolved = await loadConfig({ root: project.root, home: project.home });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);
     const { settingSources, tiersRafa, tiersSkills, tiersAgents } = resolved.config;
     const inventory = buildInventory({

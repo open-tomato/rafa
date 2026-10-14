@@ -14,11 +14,14 @@
  * two files import each other one way (`config-readers.ts` reads
  * `config-sections.ts`), `node:path`, and four modules that import none
  * of the config back. The schema's section files (`src/config-schema-*.ts`)
- * import the pair by value and are imported by value by
- * `config-schema.ts`, so one barrel over the pair and the schema would
- * make every section file import a barrel that imports it back: a
- * runtime cycle that fails as a `ReferenceError` at load, in one import
- * order only.
+ * import the pair by value. While `config-merged.ts` imported them by
+ * value in turn, one barrel over the pair and the schema would have made
+ * every section file import a barrel that imports it back: a runtime
+ * cycle that fails as a `ReferenceError` at load, in one import order
+ * only. That file is retired, and measured since, no value import of a
+ * file behind `index.ts` reaches a section file, so that cycle is no
+ * longer what keeps the two barrels apart; they stay as the move left
+ * them, a name with one barrel to be learned from.
  *
  * ## What it exports
  *
@@ -45,6 +48,7 @@ export type {
   ClaudeSettingSource,
   ConfigExtra,
   ConfigVersion,
+  DuplicatesLevel,
   InjectMode,
   LessonSwitch,
   Mapping,
@@ -64,8 +68,13 @@ export type {
 } from './config-sections.js';
 
 export {
+  BRANCH_STUB,
+  branchFromTemplate,
+  branchTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
   directory,
   fragmentsDirectory,
+  isBranchTemplate,
   mapOf,
   RELEASE_SETTLE_MODES,
   RELEASE_STRATEGIES,
@@ -97,6 +106,8 @@ export {
   CONFIG_VERSIONS,
   dayCount,
   describeValue,
+  DUPLICATE_LEVELS,
+  duplicatesLevel,
   flag,
   githubLogin,
   INJECT_MODES,

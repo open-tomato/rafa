@@ -196,12 +196,12 @@ function probeSeams(seams: MergeCommandSeams): Partial<MergeOptions> {
 }
 
 /** Runs one invocation. See the module note. */
-export function runMerge(context: RafaContext, seams: MergeCommandSeams): void {
+export async function runMerge(context: RafaContext, seams: MergeCommandSeams): Promise<void> {
   const file = expectOneArgument(context.args, MERGE_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${MERGE_USAGE}`);
   const project = requireProject(context, COMMAND_NAME);
   const path = mergeTargetPath(context, project.root);
-  const backend = resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message)).store;
+  const backend = (await resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message))).store;
   const now = seams.now ?? ((): Date => new Date());
   const otherPath = resolve((seams.cwd ?? ((): string => process.cwd()))(), file);
 
@@ -268,7 +268,7 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      runMerge(context, seams);
+      await runMerge(context, seams);
       await Promise.resolve();
     },
   };

@@ -162,9 +162,9 @@ export interface PlanValidationResult extends PlanValidation, RosterFindings {
 }
 
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
-function resolvedConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+async function resolvedConfig(project: ProjectFound, warn: (message: string) => void): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [
@@ -181,14 +181,14 @@ function resolvedConfig(project: ProjectFound, warn: (message: string) => void):
  * None, with one line saying so, when the command
  * was handed no project; see the module note.
  */
-function checkRoster(context: RafaContext, markdown: string): RosterFindings {
+async function checkRoster(context: RafaContext, markdown: string): Promise<RosterFindings> {
   const project = context.project;
   if (project === null) {
     context.output.info('ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.');
     return { missingAgents: [], skillCollisions: [], unresolvedSkills: [] };
   }
 
-  const config = resolvedConfig(project, (message) => {
+  const config = await resolvedConfig(project, (message) => {
     context.output.warn(message);
   });
   const roots = { repoRoot: project.root, home: project.home };
@@ -287,7 +287,7 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       const validation = validatePlan(file);
       const { issues, stages, tasks } = validation;
       const markdown = readFileSync(file, 'utf8');
-      const findings = checkRoster(context, markdown);
+      const findings = await checkRoster(context, markdown);
       const { missingAgents, skillCollisions, unresolvedSkills } = findings;
       const storeProblems = checkStoreRules(file, markdown);
       const result: PlanValidationResult = { ...validation, ...findings, storeProblems };

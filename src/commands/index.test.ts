@@ -9,7 +9,7 @@
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
+ * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -193,6 +193,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'update next': ['text', 'json'],
   'update latest': ['text', 'json'],
   'config set': ['text', 'json'],
+  'config show': ['text', 'json'],
   'ci status': ['text', 'json'],
   'stretch start': ['text'],
   'stretch item': ['text'],
@@ -232,7 +233,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr list': [[], []],
   'pr wait': [['n'], ['timeout', 'hint']],
   'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
-  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
+  'pr triage': [['n'], ['comment', 'resolve', 'allow-local-config', 'max-attempts', 'hint']],
   'pr open': [[], ['head', 'base', 'title', 'body-file']],
   'pr retarget': [['n'], ['base']],
   'pr close': [['n'], ['reason', 'delete-branch', 'yes']],
@@ -293,6 +294,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'update next': [[], []],
   'update latest': [[], []],
   'config set': [['assignment'], []],
+  'config show': [[], ['resolved', 'sources']],
   'ci status': [[], ['branch', 'workflow']],
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
@@ -410,6 +412,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['update self 0.34.0', 'update self', ['0.34.0'], ''],
   ['update port', 'update port', [], ''],
   ['config set pr.base=stretch/9', 'config set', ['pr.base=stretch/9'], ''],
+  ['config show --sources', 'config show', ['--sources'], ''],
   ['ci status --branch=stretch/9', 'ci status', ['--branch=stretch/9'], ''],
   ['stretch start --role=watchtower --n=5', 'stretch start', ['--role=watchtower', '--n=5'], ''],
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
@@ -513,7 +516,7 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
-  sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
 };
 
 /** The value a spelled English number names, a hyphenated tens word and ones word added together. */
@@ -530,7 +533,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -616,6 +619,7 @@ describe('the core roster', () => {
       'update next',
       'update latest',
       'config set',
+      'config show',
       'ci status',
       'stretch start',
       'stretch item',

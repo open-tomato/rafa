@@ -374,6 +374,28 @@ describe('--create-branch', () => {
     expect(moved(outcome).route).toBe('switch-local');
     expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', `switch ${BRANCH}`]);
   });
+
+  it('reads and switches to the branch naming.branch names, never feat/<stub>', async () => {
+    const named = 'work/rafa-49';
+    const git = world({
+      [`show-ref --verify --quiet refs/heads/${named}`]: ok(''),
+      [`show-ref --verify --quiet refs/remotes/origin/${named}`]: failed(),
+      [`switch ${named}`]: ok(),
+    });
+    const outcome = await offerRunBranch(
+      request({ createBranch: true, branchTemplate: 'work/{stub}' }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(moved(outcome).branch).toBe(named);
+    expect(moved(outcome).route).toBe('switch-local');
+    expect(git.ran).toEqual([
+      `show-ref --verify --quiet refs/heads/${named}`,
+      `show-ref --verify --quiet refs/remotes/origin/${named}`,
+      'status --porcelain',
+      `switch ${named}`,
+    ]);
+  });
 });
 
 describe('the working tree, read after the answer', () => {

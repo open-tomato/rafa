@@ -37,6 +37,8 @@
  * reads is written under the case's own temporary directory, and each
  * loader case asserts the path it names resolves under that directory.
  */
+import '../config-registry.js';
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';

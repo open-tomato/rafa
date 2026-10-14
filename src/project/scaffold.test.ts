@@ -49,7 +49,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { parseConfigText, resolveConfig } from '../core/config/index.js';
 
 import {
   CONFIG_SETTINGS_LINES,
@@ -135,8 +136,9 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file });
 
     expect(resolved.config).toEqual(CONFIG_DEFAULTS);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file'))
-      .toEqual(VALUELESS.map((pair) => [...pair]));
+    const unanswered: (readonly [string, string])[] = Object.entries(resolved.sources)
+      .filter(([, source]) => source !== 'file');
+    expect(unanswered.sort()).toEqual([...VALUELESS].sort());
     expect(file.extras).toEqual([]);
   });
 

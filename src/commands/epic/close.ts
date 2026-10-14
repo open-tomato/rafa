@@ -655,7 +655,7 @@ function printCost(run: CloseRun, target: EpicToClose): EpicCost | null {
 export async function closeEpic(context: RafaContext, seams: EpicCloseSeams): Promise<EpicCloseResult> {
   const line = readCloseLine(context);
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => context.output.warn(message));
+  const config = await issueSubjectConfig(project, (message) => context.output.warn(message));
   const run: CloseRun = {
     context,
     root: project.root,

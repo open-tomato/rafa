@@ -243,8 +243,8 @@ function projectOf(context: RafaContext, kind: InventoryKind): ProjectFound {
 }
 
 /** The store the `search` rows go to: the one the project's config names. */
-function storeOf(project: ProjectFound): EffortStore {
-  const resolved = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+async function storeOf(project: ProjectFound): Promise<EffortStore> {
+  const resolved = await loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
   return selectEffortStore(project.root, resolved.config);
 }
 
@@ -257,7 +257,7 @@ async function runSearchCommand(context: RafaContext, seams: SearchSeams, kind: 
   for (const warning of warnings) context.output.warn(warning);
 
   const store = line.model
-    ? storeOf(project)
+    ? await storeOf(project)
     : null;
   const searches: KindSearch[] = [];
   for (const searched of line.kinds) {

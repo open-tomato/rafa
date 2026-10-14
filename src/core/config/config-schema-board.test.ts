@@ -17,14 +17,14 @@
  * as silence, leaves the setting at its default.
  */
 import type { ConfigSetting } from './config-schema.js';
-import type { ConfigOverrides } from './config.js';
+import type { ConfigLayer, ConfigOverrides } from './config.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { isCommandLineSetting, SETTINGS } from './config-schema.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
+
 import {
   BOARD_RELATIONSHIP_MODES,
-  CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
@@ -68,7 +68,6 @@ describe('board.relationships in the schema', () => {
   it('spells the setting as board.relationships, file-only', () => {
     expect(SETTINGS.boardRelationships.key).toBe('board.relationships');
     expect(SETTINGS.boardRelationships.cli).toBe(false);
-    expect(isCommandLineSetting('boardRelationships')).toBe(false);
   });
 
   it('names the two modes, labels first', () => {
@@ -122,7 +121,7 @@ describe('board.relationships validation', () => {
 
   it('leaves the setting at its default when the file value is refused and read as silence', () => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, boardRelationships: readAs('sub-issues').value }, extras: [], path: PATH };
+    const file = { values: { ...values, boardRelationships: readAs('sub-issues').value ?? undefined } as ConfigLayer, extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.boardRelationships).toBe('labels');

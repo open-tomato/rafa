@@ -190,11 +190,11 @@ function recordFor(reading: FoundBranch, request: HandRequest, issue: number, st
 }
 
 /** Hands over, or withdraws a handover of, this device's claim on the issue the line names; see the module note. */
-export function handClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): ClaimHandResult {
+export async function handClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): Promise<ClaimHandResult> {
   const request = readHandRequest(context.flags);
   const issue = readIssueArgument(context.args, USAGE);
   const project = requireProject(context, COMMAND);
-  const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
+  const config = await resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
@@ -272,7 +272,7 @@ export function createClaimHandCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SE
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      const result = handClaim(context, makeSeams);
+      const result = await handClaim(context, makeSeams);
       if (context.outputMode === 'json') {
         context.output.result(result);
       } else {
