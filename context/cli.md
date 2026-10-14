@@ -151,15 +151,31 @@ module's note is the long form.
 
 ### Project scope and configuration discovery
 
-The dispatcher's `resolveProjectConfig` reads the git root, walks upward for
-the first directory holding `rafa.config.ts`, `rafa.config.mjs` or
-`.rafa/config.yaml`, and stops at the repository's top level (`src/project/scope.ts`).
-When the start folder is inside a git working tree, the walk never leaves that
-tree to read a `.rafa/` above it. A linked worktree answers its main checkout's
-config through a fallback in `src/project/worktree-root.ts`, which is consulted
-when the walk finds nothing and reads the same three names. A project always
-has its own config file if it runs at all, so a setup relying on a parent
-config must keep the parent folder outside any repository. The project root the dispatcher found is handed to every command,
+Each scope is read from one file, the first of three names that is a file.
+The project scope looks up `rafa.config.ts`, then `rafa.config.mjs`, then
+`.rafa/config.yaml`, under the project root. The user scope looks up the same
+two module names, then `config.yaml`, under `~/.rafa/`. The others are not
+read: a `rafa.config.ts` beside a `.rafa/config.yaml` leaves the YAML file
+unread, `rafa doctor` lists it until its keys move, and the load warns once
+about it.
+
+The layers are `defaults` under `user` under `project`. A setting takes the
+project file's value when that file sets it, else the user file's, else its
+default. `rafa config show --sources` prints the layer and the file each
+setting came from (`config-origins.ts`, `src/commands/config/show.ts`).
+
+The dispatcher's `resolveProjectConfig` (`src/project/scope.ts`) walks upward
+from the start folder. In each directory it probes the three project names in
+that order and stops at the first directory holding any of them; a name that
+is a directory counts, and `loadConfig` then refuses it by name. The walk
+stops at the top level of the git working tree holding the start. When the
+tree holds none of the three, the main checkout of a linked worktree answers
+for it (`src/project/worktree-root.ts`), and it is the root when it holds one.
+Only when neither holds one does the walk go on above the top level, so a
+repository inside a project's folder with no config of its own still runs in
+that project. The walk passes over the home directory even when it holds one
+of the names, because `~/.rafa/config.yaml` is the user scope's file, not a
+project's. The project root the dispatcher found is handed to every command,
 so all reads are consistent even when run from a subdirectory.
 
 ### `rafa next --roadmap`: the hop rows
@@ -430,6 +446,16 @@ New; it replaces no earlier text. What a row or an action added to
   `unregisteredNamed` in `src/commands/index.test.ts` reads that
   sentence and holds every name it lists absent from the registry; keep
   the wording when registering one of them. This replaces nothing.
+- **Two entries name a flag, not a new action.** `config show [--resolved |
+  --sources]` (`src/commands/config/show.ts`) is registered under `config`
+  beside `config set`: with no flag or `--resolved` it prints each setting's
+  merged value as a file spells it, with `--sources` each setting's layer and
+  file, and it exits 1 for both flags at once. `--allow-local-config` is a flag
+  of `pr triage`, not an action (`src/commands/pr/triage-config-trust.ts`): with
+  `--resolve` it lets through a head's `rafa.config.ts` or `rafa.config.mjs`
+  that the base lacks or holds with other content, with one warning line, where
+  the trust rule refuses that file with exit 1 naming the file, the base and the
+  flag.
 - **`loop start --runtime=<path|version>` runs the loop from an installed
   rafa** (`start/runtime.ts`): a version names
   `~/.rafa/runtime/<version>/cli.js`, and a path, against the working

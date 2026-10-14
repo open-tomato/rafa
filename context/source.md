@@ -90,8 +90,8 @@ holds one under `packages/`.
 files that #905 moves there are the connective tissue of the codebase:
 graph analysis calls such files high-betweenness nodes, since many paths
 between the rest of the tree run through them. They sit in seven subject
-folders. `config/` holds the config readers, schema, sections and loader;
-`command/` the command contract (`RafaCommand`, `RafaContext`,
+folders. `config/` holds the value readers, core's keys of the schema,
+the section contract, core's own section and the loader; `command/` the command contract (`RafaCommand`, `RafaContext`,
 `CommandExit`), the version and the confirm prompt; `output/` the active
 output; `adapters/` the adapter registry; `git/` the git runner and the
 commit helpers; `plan/` the block reader, the plan parser and the
@@ -144,6 +144,38 @@ file writes to add its fields to `RafaConfig`, is answered under
 the config barrel, two augmentations merged with each other and not with
 `RafaConfig`, whose `keyof` missed both. That file is one more path the
 core package will have to export (#808).
+
+**The config sections are handed in, never imported.** Core declares the
+section contract in `src/core/config/section.ts`: a `ConfigSection` carries its
+`package` name, its `settings`, its `defaults` and its cross-key `checks`. Core
+names no section. The twelve are listed in `src/config-registry.ts`, which sits
+outside `src/core/`: core's own (`core-section.ts`) and the eleven
+`src/config-schema-*.ts` files. Importing that module registers the twelve with
+core once, and `src/rafa.ts` and `src/index.ts` import it ahead of anything
+that loads a config. A file outside `src/core/` takes the merged `SETTINGS`,
+`CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
+`knownKeysAbove` from the registry, never from the core barrel, which exports
+none of them; core reads the same through the `active*` functions of
+`section.ts`. A registration that breaks a rule throws at import, naming what
+it refused: a setting name two sections define, or a `dangerous.*` key one
+section lists and a second defines, each naming both packages.
+
+**A section adds its keys to `RafaConfig` by `declare module`.**
+`RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
+keys. Each section file adds its own by a `declare module` naming that file,
+`'./core/config/config-schema.js'`, and not the config barrel, for the reason
+the augment note in the deep-import sweep paragraph above gives. A second
+`declare module`, on `'./config/shape.js'`, adds the file's keys to
+`ConfigShape`, the nested file shape. So `ConfigSetting` names every key,
+and nothing in core names a section.
+
+**The sweep holds core off the section files.**
+`src/tests/core-config-sections.sweep.test.ts` reads every code file under
+`src/core/` and fails on any import of a `src/config-schema-*.ts` file, by any
+specifier `textImports` finds, so a dynamic `import()` or a `require()` counts
+as much as a static import. Like the barrel sweep, it does not see an
+argument that is not a string literal. A second `describe` holds `loadConfig`
+with no section registered to a refusal naming `src/config-registry.ts`.
 
 **A barrel is split, never widened, when it closes a runtime cycle.** A
 barrel that groups a file with one outside `src/core/` that imports the
