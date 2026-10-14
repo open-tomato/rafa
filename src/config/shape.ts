@@ -19,21 +19,25 @@
  *
  * ## Who declares what
  *
- * Core declares {@link ConfigShape} with its own top-level keys, the
- * keys of `src/core/config/core-section.ts`. The eleven section files
- * (`src/config-schema-*.ts`) add theirs by declaration merging, a
- * `declare module` on this file beside the one each writes on
- * `src/core/config/config-schema.ts` for `RafaConfig`, so this module
- * names no section file and nothing here imports one.
+ * This module declares core's own top-level keys, the keys of
+ * `src/core/config/core-section.ts`, and composes {@link ConfigShape}
+ * from them and the interface each of the eleven section files
+ * (`src/config-schema-*.ts`) exports for the keys it writes: `HubShape`
+ * for `hub`, `ReleaseShape` for `pr` and `release`, and so on, each
+ * extended by {@link ConfigShape}. A namespace two packages share is a
+ * named interface here holding core's keys and extending the part each
+ * section exports as an interface of its own: {@link LoopShape} extends
+ * `LoopRetriesShape`, `LoopContinueShape` and `WrapUpShape`,
+ * {@link BoardProjectShape} extends `BoardProjectLimitsShape`, and
+ * {@link DangerousShape} extends `ReleaseDangerousShape`.
  *
- * A namespace two packages share is a named interface here that each
- * adds its keys to: {@link LoopShape}, {@link BoardShape},
- * {@link BoardProjectShape} and {@link DangerousShape}. A property
- * declared twice across augmentations is a compile error, so a section
- * adds no top-level key core declares, and core declares no namespace
- * it holds no key of: `pr` and `release` are the `release` section's
- * own, declared there, since an interface core left empty for them
- * would be refused by `@typescript-eslint/no-empty-object-type`.
+ * The composition is written out, not merged into this file by a
+ * section's `declare module`, so the declaration emitted for this file
+ * imports each section's emitted declaration and a reader of the
+ * `./config` subpath's `.d.ts` files alone sees every key.
+ * `shape.test.ts` emits the declarations in memory over
+ * `src/config/index.ts` and reads `ConfigShape['hub']['url']` as
+ * `string` from them.
  *
  * `shape.test.ts` reads every leaf back as a setting's key and every
  * setting's key as a leaf, so a key added to a section without its leaf
@@ -41,6 +45,17 @@
  *
  * Every type is `import type`, so this module loads nothing.
  */
+import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
+import type { ErrorsShape } from '../config-schema-errors.js';
+import type { HubShape } from '../config-schema-hub.js';
+import type { IssuesShape } from '../config-schema-issues.js';
+import type { LoggerShape } from '../config-schema-logger.js';
+import type { LoopContinueShape } from '../config-schema-loop-continue.js';
+import type { LoopRetriesShape } from '../config-schema-loop-retries.js';
+import type { ReleaseDangerousShape, ReleaseShape } from '../config-schema-release.js';
+import type { TestsShape } from '../config-schema-tests.js';
+import type { TriageShape } from '../config-schema-triage.js';
+import type { WrapUpShape } from '../config-schema-wrap-up.js';
 import type {
   ModuleSourceKind,
   PrerequisiteKind,
@@ -95,9 +110,9 @@ export type ModuleFileItem =
 
 /**
  * The `loop` namespace: core's two keys, and the keys the
- * `loop-retries`, `loop-continue` and `wrap-up` sections add.
+ * `loop-retries`, `loop-continue` and `wrap-up` sections write.
  */
-export interface LoopShape {
+export interface LoopShape extends LoopRetriesShape, LoopContinueShape, WrapUpShape {
   /** `loop.settingSources`: a comma-separated subset of `user`, `project`, `local`. */
   readonly settingSources: string;
   /** `loop.worktreeDir`: where the loop's worktrees are made. */
@@ -105,7 +120,7 @@ export interface LoopShape {
 }
 
 /** The `board.project` namespace: core's two keys and the `board-project` section's limits. */
-export interface BoardProjectShape {
+export interface BoardProjectShape extends BoardProjectLimitsShape {
   /** `board.project.template`: the project board copied for a new board. */
   readonly template: string;
   /** `board.project.number`: the project board this repository's issues go on. */
@@ -124,17 +139,24 @@ export interface BoardShape {
 
 /**
  * The `dangerous` namespace: each key a person's consent to a step rafa
- * otherwise refuses. Core's two, and the one the `release` section adds.
+ * otherwise refuses. Core's two, and the one the `release` section writes.
  */
-export interface DangerousShape {
+export interface DangerousShape extends ReleaseDangerousShape {
   /** `dangerous.acceptStaleRefs`. */
   readonly acceptStaleRefs: boolean;
   /** `dangerous.selfUpdateDuringLoop`. */
   readonly selfUpdateDuringLoop: boolean;
 }
 
-/** The nested file shape; see the module note. */
-export interface ConfigShape {
+/** The nested file shape: core's keys, and each section's; see the module note. */
+export interface ConfigShape extends
+  ErrorsShape,
+  HubShape,
+  IssuesShape,
+  LoggerShape,
+  ReleaseShape,
+  TestsShape,
+  TriageShape {
   /** `version`: the config format's version. */
   readonly version: ConfigVersion;
   /** `store`: the effort store's backend. */

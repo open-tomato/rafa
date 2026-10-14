@@ -5,8 +5,9 @@
  * {@link LOOP_RETRIES_SECTION} hands it to core as one `ConfigSection`,
  * package `loop-retries`, and the `declare module` below adds
  * {@link LoopRetriesSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link LoopRetriesShape} holds its part of the shared `loop` namespace,
+ * which `src/config/shape.ts` composes into `LoopShape` of `ConfigShape`,
+ * the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `loop.worktreeDir` and ahead of
  * `loop.wrapUp`, so the order settings are reported in holds the `loop`
@@ -58,11 +59,12 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends LoopRetriesSettings {}
 }
 
-declare module './config/shape.js' {
-  /** `loop.retries`, added to the shared namespace. */
-  interface LoopShape {
-    readonly retries: LoopRetries;
-  }
+/**
+ * `loop.retries`, the section's part of the shared `loop` namespace;
+ * `src/config/shape.ts` composes it into `LoopShape`.
+ */
+export interface LoopRetriesShape {
+  readonly retries: LoopRetries;
 }
 
 /** The fewest retries `loop.retries` accepts as a number. */

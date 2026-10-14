@@ -20,12 +20,13 @@
  *
  * Importing this module imports the registry, so the sections are
  * registered with core as `src/rafa.ts` and `src/index.ts` register
- * them. In a program built from source that import also brings in every
- * section's `declare module` on `shape.ts`, so `ConfigShape` names every
- * section's keys. A declaration emitted from this file does not: it
- * keeps the type imports alone, and no emitted `.d.ts` it reaches
- * imports a section file (measured with `tsc --emitDeclarationOnly`
- * over this file).
+ * them. `ConfigShape` does not lean on that import for its keys:
+ * `shape.ts` composes it from each section's exported interface by
+ * `import type`, so the declaration emitted for `shape.ts` imports every
+ * section's emitted `.d.ts` and `ConfigShape` names every section's keys
+ * in the published declarations as in a program built from source
+ * (`shape.test.ts` reads `ConfigShape['hub']['url']` as `string` from
+ * declarations emitted over this file).
  */
 import type { ConfigEntry } from './entry.js';
 import type { ConfigSetting } from '../core/config/index.js';

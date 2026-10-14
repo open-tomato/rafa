@@ -171,10 +171,25 @@ section lists and a second defines, each naming both packages.
 `RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
 keys. Each section file adds its own by a `declare module` naming that file,
 `'./core/config/config-schema.js'`, and not the config barrel, for the reason
-the augment note in the deep-import sweep paragraph above gives. A second
-`declare module`, on `'./config/shape.js'`, adds the file's keys to
-`ConfigShape`, the nested file shape. So `ConfigSetting` names every key,
-and nothing in core names a section.
+the augment note in the deep-import sweep paragraph above gives. So
+`ConfigSetting` names every key, and nothing in core names a section.
+
+**`ConfigShape` is composed from the sections, not merged into.** Each
+section file exports an interface of the keys a file writes for it
+(`HubShape` holds `hub`, `ReleaseShape` holds `pr` and `release`), and its
+part of a namespace it shares with core as an interface of its own:
+`LoopRetriesShape`, `LoopContinueShape` and `WrapUpShape` for `loop`,
+`BoardProjectLimitsShape` for `board.project`, `ReleaseDangerousShape`
+for `dangerous`. `src/config/shape.ts`, outside `src/core/`, holds core's
+keys and composes `ConfigShape`, `LoopShape`, `BoardProjectShape` and
+`DangerousShape` from those interfaces by `extends`, through `import type`.
+Each section's `declare module` on `shape.ts`, the form this replaced,
+merged only in a program that loaded the section files: the emitted
+`dist/config/shape.d.ts` imported none of them, so a consumer of the
+`./config` subpath saw core's keys alone. Written out, the emitted `shape.d.ts` imports every section's
+emitted declaration, and `src/config/shape.test.ts` reads
+`ConfigShape['hub']['url']` as `string` from declarations emitted in
+memory.
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under

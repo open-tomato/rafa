@@ -5,8 +5,8 @@
  * field, its default, its spec and its reader. {@link TESTS_SECTION}
  * hands them to core as one `ConfigSection`, package `tests`, and the
  * `declare module` below adds {@link TestsSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link TestsShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below last, after the `task` section, so the order
  * settings are reported in holds the section.
@@ -114,16 +114,14 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends TestsSettings {}
 }
 
-declare module './config/shape.js' {
-  /** The `tests` keys a file writes. */
-  interface ConfigShape {
-    readonly tests: {
-      readonly fullSuiteTriggers: readonly string[];
-      readonly integration: readonly string[];
-      readonly alwaysRun: readonly string[];
-      readonly retakeRedAlone: boolean;
-    };
-  }
+/** The `tests` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface TestsShape {
+  readonly tests: {
+    readonly fullSuiteTriggers: readonly string[];
+    readonly integration: readonly string[];
+    readonly alwaysRun: readonly string[];
+    readonly retakeRedAlone: boolean;
+  };
 }
 
 /** The `tests` section's settings, resolved. */

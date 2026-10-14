@@ -4,8 +4,8 @@
  * {@link LOGGER_SECTION} hands them to core as one `ConfigSection`,
  * package `logger`, and the `declare module` below adds
  * {@link LoggerConfigSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link LoggerShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `errors` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
@@ -53,18 +53,19 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends LoggerConfigSettings {}
 }
 
-declare module './config/shape.js' {
-  /** The `logger` keys a file writes, each `logger.modules` entry a mapping holding `level`. */
-  interface ConfigShape {
-    readonly logger: {
-      readonly kind: string;
-      readonly level: LogLevel;
-      readonly theme: LoggerTheme;
-      readonly modules: Readonly<Record<string, { readonly level: LogLevel }>>;
-      readonly callSite: boolean;
-      readonly api: boolean;
-    };
-  }
+/**
+ * The `logger` keys a file writes, each `logger.modules` entry a mapping
+ * holding `level`; `src/config/shape.ts` composes them into `ConfigShape`.
+ */
+export interface LoggerShape {
+  readonly logger: {
+    readonly kind: string;
+    readonly level: LogLevel;
+    readonly theme: LoggerTheme;
+    readonly modules: Readonly<Record<string, { readonly level: LogLevel }>>;
+    readonly callSite: boolean;
+    readonly api: boolean;
+  };
 }
 
 /** The `logger` settings. */

@@ -11,6 +11,12 @@
  * `src/config/index.ts`, importing it as a config module would, and is
  * read by its own diagnostics. Each refusal is a control: it proves the
  * acceptance beside it could have failed.
+ *
+ * A second `describe` emits the declarations `tsconfig.config-types.json`
+ * writes over `src/config/index.ts`, in memory, and checks a probe in a
+ * program that reads those `.d.ts` files and TypeScript's lib alone: a
+ * consumer of the published subpath sees `ConfigShape['hub']['url']` as
+ * `string`, and a key the hub namespace lacks is refused there.
  */
 import { resolve } from 'node:path';
 
@@ -165,13 +171,18 @@ function buildProgram(cases: readonly Case[]): ts.Program {
   return ts.createProgram([INDEX, ...sources.keys()], parsed.options, host);
 }
 
+/** The messages `program` reports for one of its files. */
+function messagesOf(program: ts.Program, file: ts.SourceFile): string[] {
+  return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)].map(
+    (diagnostic) => `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`,
+  );
+}
+
 /** The messages `program` reports for one case. */
 function diagnosticsOf(program: ts.Program, name: string): string[] {
   const file = program.getSourceFile(casePath(name));
   if (file === undefined) throw new Error(`not in program: ${name}`);
-  return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)].map(
-    (diagnostic) => `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`,
-  );
+  return messagesOf(program, file);
 }
 
 /** True when `type` is a namespace of the shape: a mapping with named keys alone, no list and no keyed map. */
@@ -251,4 +262,106 @@ describe('the nested file shape against the registry', () => {
       expect(messages[0]).toContain(because);
     });
   }
+});
+
+/** Where the in-memory declarations are written: a path nothing on disk holds. */
+const EMITTED = resolve(ROOT, '__emitted');
+
+/**
+ * The declarations `tsconfig.config-types.json` emits over
+ * `src/config/index.ts`, as the build does, each kept in memory by its
+ * path under {@link EMITTED} rather than written.
+ */
+function emitDeclarations(): ReadonlyMap<string, string> {
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    resolve(ROOT, 'tsconfig.config-types.json'),
+    { declarationDir: EMITTED, rootDir: resolve(ROOT, 'src') },
+    { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {} },
+  );
+  if (parsed === undefined) throw new Error('tsconfig.config-types.json did not parse');
+  const emitted = new Map<string, string>();
+  const result = ts.createProgram([INDEX], parsed.options).emit(
+    undefined,
+    (path, text) => emitted.set(path, text),
+    undefined,
+    true,
+  );
+  if (result.emitSkipped) throw new Error('the declaration emit was skipped');
+  return emitted;
+}
+
+/**
+ * A probe module beside the emitted `config/index.d.ts`, checked in a
+ * program that reads the emitted declarations and TypeScript's own lib
+ * files and nothing else: no source file, no `node_modules` package.
+ */
+function probeEmitted(emitted: ReadonlyMap<string, string>, source: string): ts.Program {
+  const probe = resolve(EMITTED, 'config/__probe.ts');
+  const files = new Map([...emitted, [probe, source]]);
+  const options: ts.CompilerOptions = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    strict: true,
+    noEmit: true,
+    types: [],
+  };
+  const host = ts.createCompilerHost(options);
+  const libDir = host.getDefaultLibLocation?.() ?? '';
+  const { fileExists, readFile, getSourceFile } = host;
+  const isLib = (path: string): boolean => libDir !== '' && path.startsWith(libDir);
+  host.fileExists = (path) => files.has(path) || (isLib(path) && fileExists.call(host, path));
+  host.readFile = (path) => files.get(path) ?? (isLib(path)
+    ? readFile.call(host, path)
+    : undefined);
+  host.getSourceFile = (path, language, ...rest) => {
+    const text = files.get(path);
+    if (text !== undefined) return ts.createSourceFile(path, text, language);
+    return isLib(path)
+      ? getSourceFile.call(host, path, language, ...rest)
+      : undefined;
+  };
+  host.directoryExists = (path) => isLib(path)
+    || [...files.keys()].some((file) => file.startsWith(`${path}/`));
+  return ts.createProgram([probe], options, host);
+}
+
+/** A probe naming the type at `ConfigShape['hub'][key]` as its exported `Probe` alias. */
+function hubProbe(key: string): string {
+  return `import type { ConfigShape } from './index.js';\n\nexport type Probe = ConfigShape['hub']['${key}'];\n`;
+}
+
+/** The probe's messages, and the type its exported `Probe` alias names. */
+function readProbe(program: ts.Program): { readonly messages: string[]; readonly type: string } {
+  const file = program.getSourceFile(resolve(EMITTED, 'config/__probe.ts'));
+  if (file === undefined) throw new Error('the probe is not in its program');
+  const messages = messagesOf(program, file);
+  const checker = program.getTypeChecker();
+  const alias = file.statements.find(ts.isTypeAliasDeclaration);
+  if (alias === undefined) throw new Error('the probe declares no type alias');
+  return { messages, type: checker.typeToString(checker.getTypeAtLocation(alias.name)) };
+}
+
+describe('the nested file shape in the emitted declarations', () => {
+  let emitted: ReadonlyMap<string, string>;
+
+  beforeAll(() => {
+    emitted = emitDeclarations();
+  }, 60_000);
+
+  test('the emit writes the subpath\'s declaration and the hub section\'s, in memory', () => {
+    expect(emitted.has(resolve(EMITTED, 'config/index.d.ts'))).toBe(true);
+    expect(emitted.has(resolve(EMITTED, 'config-schema-hub.d.ts'))).toBe(true);
+  });
+
+  test('ConfigShape[\'hub\'][\'url\'] reads as string from the emitted files alone', () => {
+    const probe = readProbe(probeEmitted(emitted, hubProbe('url')));
+    expect(probe).toEqual({ messages: [], type: 'string' });
+  });
+
+  test('the control: a key the emitted hub namespace lacks is refused there', () => {
+    const probe = readProbe(probeEmitted(emitted, hubProbe('urlX')));
+    expect(probe.messages).toHaveLength(1);
+    expect(probe.messages[0]).toContain('\'urlX\'');
+  });
 });
