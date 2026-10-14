@@ -3974,13 +3974,6 @@
           "toPackage": "rafa-board"
         },
         {
-          "from": "src/effort/store/preflight.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/preflight/run.ts",
-          "toPackage": "rafa-run"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3996,8 +3989,8 @@
         }
       ],
       "fileCounts": {
-        "source": 86,
-        "test": 99,
+        "source": 87,
+        "test": 100,
         "testSupport": 2
       },
       "files": [
@@ -4089,6 +4082,8 @@
         "src/effort/store/development-build.ts",
         "src/effort/store/dispatches.test.ts",
         "src/effort/store/dispatches.ts",
+        "src/effort/store/effort-levels.test.ts",
+        "src/effort/store/effort-levels.ts",
         "src/effort/store/findings.test.ts",
         "src/effort/store/findings.ts",
         "src/effort/store/fix-schema.test.ts",
@@ -4191,7 +4186,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 109,
+        "src/effort/store/": 111,
         "src/ports/": 2
       },
       "folders": [
@@ -4207,8 +4202,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 38,
-      "upwardEdges": 51
+      "remaining": 37,
+      "upwardEdges": 50
     },
     {
       "clearedByIssue118": 0,
@@ -7915,12 +7910,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1942,
+    "files": 1944,
     "leftToPlace": 700,
-    "nonTestEdges": 4325,
+    "nonTestEdges": 4326,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 294
+    "upwardEdges": 293
   },
   "unassigned": [
     {

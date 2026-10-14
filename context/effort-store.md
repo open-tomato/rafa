@@ -1258,7 +1258,8 @@ by `rafa effort report --skills`, which reads `invoked` and never
 **`preflight` is the one such table no task report fills.**
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
-twice. No column says the run halted: a run halted when a required check
+twice. A check's type, tier and outcome are core's
+(`store/preflight-check.ts`, re-exported by `src/preflight/run.ts`). No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
 and writes nothing for a run with no item to check. `rafa doctor` checks
