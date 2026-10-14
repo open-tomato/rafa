@@ -17,7 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { name as RAFA_PACKAGE_NAME } from '../../package.json';
+import { name as RAFA_PACKAGE_NAME } from '../../../package.json';
 
 import { readRuntimeIdentity } from './identity.js';
 
@@ -106,7 +106,7 @@ describe('a development build', () => {
   });
 
   it('is what the running test process reads as, naming this checkout', () => {
-    const checkout = realpathSync(resolve(import.meta.dir, '..', '..'));
+    const checkout = realpathSync(resolve(import.meta.dir, '..', '..', '..'));
 
     expect(readRuntimeIdentity()).toMatchObject({ kind: 'development', checkout });
   });

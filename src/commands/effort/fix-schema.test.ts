@@ -8,7 +8,7 @@
  * project outside the child's temporary directory.
  */
 import type { FixSchemaCommandSeams } from './fix-schema.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';

@@ -2333,14 +2333,9 @@
       "upwardEdgesIn": 1
     },
     {
-      "kind": "test",
-      "path": "src/runtime/identity.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "source",
       "path": "src/runtime/identity.ts",
-      "upwardEdgesIn": 5
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -3974,24 +3969,10 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/effort/store/development-build.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/runtime/identity.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/effort/store/dispatches.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
           "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/effort/store/fix-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/runtime/identity.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -4035,20 +4016,6 @@
           "kind": "value",
           "to": "src/effort/commits.ts",
           "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/merge-store.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/runtime/identity.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/effort/store/migrate.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/runtime/identity.ts",
-          "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/effort/store/ndjson.ts",
@@ -4143,8 +4110,8 @@
         }
       ],
       "fileCounts": {
-        "source": 77,
-        "test": 93,
+        "source": 79,
+        "test": 95,
         "testSupport": 2
       },
       "files": [
@@ -4212,6 +4179,10 @@
         "src/core/plan/parse.test.ts",
         "src/core/plan/parse.ts",
         "src/core/plan/plan-files.ts",
+        "src/core/runtime/identity.test.ts",
+        "src/core/runtime/identity.ts",
+        "src/core/runtime/index.test.ts",
+        "src/core/runtime/index.ts",
         "src/effort/store/absences.test.ts",
         "src/effort/store/absences.ts",
         "src/effort/store/bring-forward.test.ts",
@@ -4322,7 +4293,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 64,
+        "src/core/": 68,
         "src/effort/store/": 98,
         "src/ports/": 2
       },
@@ -4339,8 +4310,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 59,
-      "upwardEdges": 72
+      "remaining": 55,
+      "upwardEdges": 68
     },
     {
       "clearedByIssue118": 0,
@@ -7292,7 +7263,7 @@
       "edges": [],
       "fileCounts": {
         "source": 257,
-        "test": 459,
+        "test": 458,
         "testSupport": 26
       },
       "files": [
@@ -7781,7 +7752,6 @@
         "src/rafa.ts",
         "src/report/lessons.test.ts",
         "src/report/lessons.ts",
-        "src/runtime/identity.test.ts",
         "src/runtime/identity.ts",
         "src/runtime/install.test.ts",
         "src/runtime/install.ts",
@@ -8058,12 +8028,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1931,
-    "leftToPlace": 700,
-    "nonTestEdges": 4319,
+    "files": 1934,
+    "leftToPlace": 699,
+    "nonTestEdges": 4321,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 316
+    "upwardEdges": 312
   },
   "unassigned": [
     {

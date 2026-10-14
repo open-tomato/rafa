@@ -311,6 +311,8 @@
     "src/core/output/active.ts": "c3",
     "src/core/plan/blocks.ts": "c3",
     "src/core/plan/parse.ts": "c3",
+    "src/core/runtime/identity.ts": "c5",
+    "src/core/runtime/index.ts": "c5",
     "src/demote/apply.ts": "c4",
     "src/demote/classify.ts": "c4",
     "src/demote/draft.ts": "c4",

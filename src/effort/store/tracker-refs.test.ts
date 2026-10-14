@@ -45,9 +45,9 @@
  */
 import type { FindingsWriterSeams } from './findings.js';
 import type { TrackerRefWrite } from './tracker-refs.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { IssueRef } from '../../ports/index.js';
 import type { ReportFinding } from '../../report/parse.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -15,7 +15,7 @@
  * see a directory would fail there.
  */
 import type { MaterialiseOptions, WirePayload, WireRow } from './wire.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { MergeOptions } from '../store/merge-store.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';

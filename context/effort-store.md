@@ -667,7 +667,7 @@ build's package version unless the caller names another.
 own.** Between the first plan and the lock, an open with anything to
 adopt or apply asks `refuseUnownedDevelopmentWrite`
 (`src/effort/store/development-build.ts`). `readRuntimeIdentity`
-(`src/runtime/identity.ts`) walks up from `Bun.main`, through its real
+(`src/core/runtime/identity.ts`) walks up from `Bun.main`, through its real
 path, to the nearest `package.json` named `@open-tomato/rafa`; the build
 is a development build when that directory also holds `src/rafa.ts`, so
 `bun src/rafa.ts`, a checkout's `dist/cli.js` and every `bun test`

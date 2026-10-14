@@ -89,7 +89,7 @@ import { Database } from 'bun:sqlite';
 
 import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions } from '../../core/loop/index.js';
-import { readRuntimeIdentity } from '../../runtime/identity.js';
+import { readRuntimeIdentity } from '../../core/runtime/index.js';
 
 import { bringForward, writeNames } from './bring-forward.js';
 import { vacuumInto } from './copy.js';

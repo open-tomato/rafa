@@ -23,9 +23,9 @@
  * Every case writes once before the command reads the store id, since a
  * read never mints and a read-only check passes while wrong.
  */
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { StoreIdentitySeams } from '../../effort/store/store-meta.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';

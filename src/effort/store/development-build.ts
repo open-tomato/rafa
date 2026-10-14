@@ -10,7 +10,7 @@
  * migration. It refuses when both hold:
  *
  *   - the running rafa is a development build, as `readRuntimeIdentity`
- *     (`src/runtime/identity.ts`) reads it: `bun src/rafa.ts`, a
+ *     (`src/core/runtime/identity.ts`) reads it: `bun src/rafa.ts`, a
  *     checkout's `dist/cli.js` or a `bun test` process;
  *   - the store is not one it owns ({@link isOwnedStore}).
  *
@@ -55,7 +55,7 @@
  */
 import type { StoreEnvironment } from './location.js';
 import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute } from 'node:path';
@@ -63,8 +63,8 @@ import { basename, dirname, isAbsolute } from 'node:path';
 import { RAFA_VERSION } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions, runsDir } from '../../core/loop/index.js';
+import { readRuntimeIdentity } from '../../core/runtime/index.js';
 import { SCOPE_DIR } from '../../project/scope.js';
-import { readRuntimeIdentity } from '../../runtime/identity.js';
 
 import { EFFORT_DIR_VARIABLE, isUnderTempDir } from './location.js';
 

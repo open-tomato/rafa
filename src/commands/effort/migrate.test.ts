@@ -8,8 +8,8 @@
  * row count, so each case has a control that could have failed.
  */
 import type { MigrateCommandSeams } from './migrate.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';

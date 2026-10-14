@@ -12,8 +12,8 @@
  * a list that throws when it runs out, so a write minting more than the
  * case expects fails there.
  */
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { StoreIdentitySeams, StoreMeta } from '../../effort/store/store-meta.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync } from 'node:fs';
