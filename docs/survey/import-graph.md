@@ -1,15 +1,15 @@
 # Import graph
 
-Coverage: 1939 of 1939 tracked files read (src/ and packages/*/src/).
+Coverage: 1940 of 1940 tracked files read (src/ and packages/*/src/).
 
-1939 files, 9937 edges (7773 value, 2164 type), 27 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
+1940 files, 9938 edges (7774 value, 2164 type), 27 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
 
 ## Clusters by size
 
 | Cluster | Files | Folders |
 | --- | --- | --- |
 | `c01-github` | 344 | `src/board` (110), `src/board/project` (41), `src/commands` (30), `src/commands/epic` (23), `src/tests` (23), `src/next` (22), `src/board/relations` (19), `src/commands/issue` (18), `src/commands/plan` (10), `src/status` (10), `src/commands/pr` (8), `src/core/git` (6), `src/claims` (4), `src/commands/board` (4), `src/pr` (3), `src/adapters/tracker` (2), `src/commands/release` (2), `src/project` (2), `src/start` (2), `src/suite` (2), `src/cleanup` (1), `src/epic` (1), `src/refs` (1) |
-| `c02-sqlite` | 275 | `src/effort/store` (97), `src/effort` (57), `src/triage` (33), `src/commands/effort` (15), `src/start` (14), `src/tests` (13), `src/inventory/search` (10), `src/commands/epic` (4), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/epic` (3), `src/report` (3), `src/utils` (3), `src/docs` (2), `src/fixtures` (2), `src` (1), `src/adapters/tracker` (1), `src/claims` (1), `src/commands/claim` (1), `src/runtime` (1) |
+| `c02-sqlite` | 276 | `src/effort/store` (99), `src/effort` (57), `src/triage` (32), `src/commands/effort` (15), `src/start` (14), `src/tests` (13), `src/inventory/search` (10), `src/commands/epic` (4), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/epic` (3), `src/report` (3), `src/utils` (3), `src/docs` (2), `src/fixtures` (2), `src` (1), `src/adapters/tracker` (1), `src/claims` (1), `src/commands/claim` (1), `src/runtime` (1) |
 | `c03-index` | 245 | `src/commands/pr` (59), `src/release` (32), `src/pr` (30), `src/next` (23), `src/cleanup` (20), `src/pr/triage` (20), `src/commands` (12), `src/cli/prompt` (10), `src/commands/release` (10), `src/tests` (9), `src/start` (8), `src/pr/plans` (5), `src/inventory` (2), `src/release/strategies` (2), `src/status` (2), `src/board` (1) |
 | `c04-sections` | 203 | `src/commands` (27), `src` (20), `src/core/config` (18), `src/release` (15), `src/tiers` (13), `src/inventory` (12), `src/start` (12), `src/plan/risk` (10), `src/tests` (9), `src/preflight` (8), `src/task` (8), `src/pr` (7), `src/schema` (6), `src/agents` (4), `src/check` (4), `src/effort/sync` (4), `src/utils` (4), `src/commands/agent` (3), `src/plan` (3), `src/project` (3), `src/board` (2), `src/effort` (2), `src/effort/store` (2), `src/inventory/search` (2), `src/commands/config` (1), `src/commands/skill` (1), `src/modules` (1), `src/notices` (1), `src/suite` (1) |
 | `c05-index` | 197 | `src/start` (95), `src/tests` (20), `src/board` (13), `src/commands/plan` (12), `src/plan` (11), `src/core/loop` (10), `src/suite` (10), `src/core/plan` (9), `src/utils` (6), `src` (2), `src/adapters/planner` (2), `src/loop` (2), `src/core/output` (1), `src/notices` (1), `src/ports` (1), `src/release` (1), `src/triage` (1) |
@@ -57,12 +57,12 @@ Coverage: 1939 of 1939 tracked files read (src/ and packages/*/src/).
 | 15 | `src/pr/index.ts` | 14096.183571 | `c03-index` |
 | 16 | `src/core/command/command.ts` | 13902.99218 | `c06-index` |
 | 17 | `src/core/adapters/index.ts` | 13898.25982 | `c08-index` |
-| 18 | `src/commands/index.ts` | 13790.250764 | `c06-index` |
+| 18 | `src/commands/index.ts` | 13810.000764 | `c06-index` |
 | 19 | `src/core/adapters/registry.ts` | 13614.926486 | `c08-index` |
 | 20 | `src/project/scope.ts` | 13346.096633 | `c06-index` |
 | 21 | `src/core/loop/sessions.ts` | 12478.086534 | `c05-index` |
 | 22 | `src/board/relations/labels.ts` | 12167.409661 | `c01-github` |
-| 23 | `src/start/dispatch.ts` | 11837.849053 | `c05-index` |
+| 23 | `src/start/dispatch.ts` | 11838.182387 | `c05-index` |
 | 24 | `src/next/sources.ts` | 11438.470085 | `c01-github` |
 | 25 | `src/board/setup.ts` | 11009.427913 | `c01-github` |
 | 26 | `src/effort/store/sqlite.ts` | 10458.598657 | `c02-sqlite` |

@@ -1020,10 +1020,10 @@ and task line (null for plan CI), field name, and the field's whole `text`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
-`src/triage/machine-fault.ts` reads off the bug's `what` and `artifact`,
-which `store/triage.ts` calls for each bug it stores: `machine` for a
-fault of the machine the session ran on, `rafa` otherwise, and never
-NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
+`src/effort/store/machine-fault.ts` reads off the bug's `what` and
+`artifact`, which `store/triage.ts` calls for each bug it stores:
+`machine` for a fault of the machine the session ran on, `rafa`
+otherwise, and never NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
 the first migration that creates no table, so a row a version-8 store
 already held reads NULL — stored before the reading existed. It is
 outside `out_of_scope_bugs_by_entry` because it is a function of `what`

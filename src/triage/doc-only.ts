@@ -35,10 +35,10 @@
  * The cost is on the safe side: such a text answers `false`, a bug counted
  * as naming code when it named only pages, never the reverse.
  *
- * Measured on 2026-10-14 over the 27 filed bodies `machine-fault.test.ts`
- * holds: five such pieces in four bodies (`doc/behavior`,
- * `app/dependabot`), none of them a folder, and taking them out changed
- * no body's answer. Three bodies answer `true` on their `what`, #33, #34
+ * Measured on 2026-10-14 over the 27 filed bodies
+ * `src/effort/store/machine-fault.test.ts` holds: five such pieces in
+ * four bodies (`doc/behavior`, `app/dependabot`), none of them a folder,
+ * and taking them out changed no body's answer. Three bodies answer `true` on their `what`, #33, #34
  * and #45, each a report of a stale page. The `artifact` of all three
  * quotes the page's sentence and names no path, so it answers `false`
  * alone: a caller holding both fields reads them as one text.

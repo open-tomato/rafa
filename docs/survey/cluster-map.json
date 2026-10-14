@@ -357,6 +357,7 @@
     "src/effort/store/index.ts": "c7",
     "src/effort/store/legacy.ts": "c5",
     "src/effort/store/location.ts": "c5",
+    "src/effort/store/machine-fault.ts": "c1",
     "src/effort/store/merge-commit-gaps.ts": "c5",
     "src/effort/store/merge-conflicts.ts": "c5",
     "src/effort/store/merge-rules.ts": "c5",

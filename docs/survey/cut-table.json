@@ -4002,13 +4002,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/effort/store/triage.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/triage/machine-fault.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4024,8 +4017,8 @@
         }
       ],
       "fileCounts": {
-        "source": 84,
-        "test": 97,
+        "source": 85,
+        "test": 98,
         "testSupport": 2
       },
       "files": [
@@ -4128,6 +4121,8 @@
         "src/effort/store/legacy.ts",
         "src/effort/store/location.test.ts",
         "src/effort/store/location.ts",
+        "src/effort/store/machine-fault.test.ts",
+        "src/effort/store/machine-fault.ts",
         "src/effort/store/merge-commit-gaps.test.ts",
         "src/effort/store/merge-commit-gaps.ts",
         "src/effort/store/merge-conflicts.test.ts",
@@ -4215,7 +4210,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 105,
+        "src/effort/store/": 107,
         "src/ports/": 2
       },
       "folders": [
@@ -4231,8 +4226,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 42,
-      "upwardEdges": 55
+      "remaining": 41,
+      "upwardEdges": 54
     },
     {
       "clearedByIssue118": 0,
@@ -5717,7 +5712,7 @@
       ],
       "fileCounts": {
         "source": 75,
-        "test": 99,
+        "test": 98,
         "testSupport": 2
       },
       "files": [
@@ -5875,7 +5870,6 @@
         "src/triage/leftover-repair.ts",
         "src/triage/local-paths.test.ts",
         "src/triage/local-paths.ts",
-        "src/triage/machine-fault.test.ts",
         "src/triage/machine-fault.ts",
         "src/triage/own-check.integration.test.ts",
         "src/triage/own-check.test.ts",
@@ -5901,7 +5895,7 @@
       "filesByFolder": {
         "src/commands/pr/": 71,
         "src/pr/": 65,
-        "src/triage/": 38
+        "src/triage/": 37
       },
       "folders": [
         "src/commands/pr/",
@@ -7940,12 +7934,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1939,
+    "files": 1940,
     "leftToPlace": 700,
-    "nonTestEdges": 4325,
+    "nonTestEdges": 4326,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 298
+    "upwardEdges": 297
   },
   "unassigned": [
     {
