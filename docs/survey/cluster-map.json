@@ -369,6 +369,7 @@
     "src/effort/store/ndjson.ts": "c5",
     "src/effort/store/origins.ts": "c5",
     "src/effort/store/plan-ci.ts": "c5",
+    "src/effort/store/plan-stubs.ts": "c7",
     "src/effort/store/preflight.ts": "c5",
     "src/effort/store/rebuild-aside.ts": "c5",
     "src/effort/store/reports.ts": "c5",

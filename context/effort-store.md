@@ -1300,7 +1300,7 @@ text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
 
 **A branch stub is not a queue id.** `QUEUE_ID` in
-`src/effort/attribution.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
+`src/effort/store/plan-stubs.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
 `q`-prefixed leading token is read as one. A `rafa-<n>` stub carries
 none and resolves by exact match alone, which is why the branch
 `feat/rafa-21` matches no plan called `rafa-21-changelog-and-release`.

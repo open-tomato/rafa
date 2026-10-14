@@ -54,8 +54,8 @@
  * and `bun:sqlite`'s `run` and `all` return plain values rather than
  * promises, measured on bun 1.3.14.
  */
-import type { PlanStubMatch } from '../attribution.js';
 import type { CommitStats } from './commit-stats.js';
+import type { PlanStubMatch } from './plan-stubs.js';
 import type {
   SessionKind,
   SessionStats,

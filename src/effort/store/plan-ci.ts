@@ -82,10 +82,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { failingRows, verdictOf } from '../../pr/checks.js';
-import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from '../attribution.js';
 
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
+import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from './plan-stubs.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** A settled verdict: what the table stores, `pending` left out. */

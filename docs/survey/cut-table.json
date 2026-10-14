@@ -3993,13 +3993,6 @@
           "from": "src/effort/store/plan-ci.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
-          "to": "src/effort/attribution.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/plan-ci.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
           "to": "src/pr/checks.ts",
           "toPackage": "rafa-pr"
         },
@@ -4025,13 +4018,6 @@
           "toPackage": "rafa-pr"
         },
         {
-          "from": "src/effort/store/types.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/effort/attribution.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4047,7 +4033,7 @@
         }
       ],
       "fileCounts": {
-        "source": 81,
+        "source": 83,
         "test": 96,
         "testSupport": 2
       },
@@ -4176,6 +4162,7 @@
         "src/effort/store/origins.ts",
         "src/effort/store/plan-ci.test.ts",
         "src/effort/store/plan-ci.ts",
+        "src/effort/store/plan-stubs.ts",
         "src/effort/store/preflight.test.ts",
         "src/effort/store/preflight.ts",
         "src/effort/store/rebuild-aside.test.ts",
@@ -4189,6 +4176,7 @@
         "src/effort/store/schema-plan.ts",
         "src/effort/store/schema-report.ts",
         "src/effort/store/search-row.test.ts",
+        "src/effort/store/session-row-types.ts",
         "src/effort/store/session-worktree.test.ts",
         "src/effort/store/settings.test.ts",
         "src/effort/store/settings.ts",
@@ -4234,7 +4222,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 101,
+        "src/effort/store/": 103,
         "src/ports/": 2
       },
       "folders": [
@@ -4250,8 +4238,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 46,
-      "upwardEdges": 59
+      "remaining": 44,
+      "upwardEdges": 57
     },
     {
       "clearedByIssue118": 0,
@@ -7967,12 +7955,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1936,
+    "files": 1938,
     "leftToPlace": 699,
-    "nonTestEdges": 4321,
+    "nonTestEdges": 4325,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 303
+    "upwardEdges": 301
   },
   "unassigned": [
     {
