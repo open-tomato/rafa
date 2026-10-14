@@ -295,7 +295,7 @@
     {
       "kind": "source",
       "path": "src/cleanup/branches.ts",
-      "upwardEdgesIn": 0
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -320,7 +320,7 @@
     {
       "kind": "source",
       "path": "src/cleanup/index.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -330,6 +330,21 @@
     {
       "kind": "source",
       "path": "src/cleanup/past-head.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/cleanup/remote-only-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/cleanup/remote-only.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/cleanup/remote-only.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -469,6 +484,11 @@
     },
     {
       "kind": "test",
+      "path": "src/commands/config/set-agent-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/commands/config/set.test.ts",
       "upwardEdgesIn": 0
     },
@@ -485,6 +505,16 @@
     {
       "kind": "source",
       "path": "src/commands/describe.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/commands/docs/plan.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/commands/docs/plan.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -845,6 +875,11 @@
     {
       "kind": "source",
       "path": "src/commands/effort/schema.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/commands/index.roster.sweep.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -1270,7 +1305,7 @@
     {
       "kind": "source",
       "path": "src/commands/self-update.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -1495,7 +1530,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-loop-retries.ts",
-      "upwardEdgesIn": 4
+      "upwardEdgesIn": 7
     },
     {
       "kind": "source",
@@ -1554,13 +1589,43 @@
     },
     {
       "kind": "test",
+      "path": "src/docs/open-lines.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/docs/open-lines.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
+      "path": "src/docs/release-issue.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/docs/release-issue.ts",
+      "upwardEdgesIn": 2
+    },
+    {
+      "kind": "test",
+      "path": "src/docs/task-reading.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/docs/task-reading.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
       "path": "src/epic/verify-plan.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "source",
       "path": "src/epic/verify-plan.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 3
     },
     {
       "kind": "test",
@@ -1849,6 +1914,11 @@
     },
     {
       "kind": "test",
+      "path": "src/next/loop-worktree-tree-driven.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/next/owner-gate.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1999,6 +2069,16 @@
     },
     {
       "kind": "test",
+      "path": "src/plan/doc-task.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/plan/doc-task.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/plan/index.test.ts",
       "upwardEdgesIn": 0
     },
@@ -2060,6 +2140,16 @@
     {
       "kind": "source",
       "path": "src/plan/risk/commands.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/plan/risk/long-runs.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/plan/risk/long-runs.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -2205,7 +2295,7 @@
     {
       "kind": "source",
       "path": "src/project/scope.ts",
-      "upwardEdgesIn": 12
+      "upwardEdgesIn": 13
     },
     {
       "kind": "source",
@@ -2260,6 +2350,16 @@
     {
       "kind": "source",
       "path": "src/runtime/install.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
+      "path": "src/runtime/live-loops.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/runtime/live-loops.ts",
       "upwardEdgesIn": 1
     },
     {
@@ -2509,6 +2609,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/cut-table-shape.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/declaration-dispatch.test.ts",
       "upwardEdgesIn": 0
     },
@@ -2540,6 +2645,11 @@
     {
       "kind": "test",
       "path": "src/tests/dispatch-records.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/docs-plan-spawned.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3303,6 +3413,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test-support",
+      "path": "src/tests/sweep-timeout.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test",
       "path": "src/tests/switch-drift-spawned.test.ts",
       "upwardEdgesIn": 0
@@ -3419,13 +3534,23 @@
     },
     {
       "kind": "test",
+      "path": "src/utils/agent-shell.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/utils/agent-shell.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/utils/declaration.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "source",
       "path": "src/utils/declaration.ts",
-      "upwardEdgesIn": 15
+      "upwardEdgesIn": 19
     },
     {
       "kind": "test",
@@ -3465,7 +3590,7 @@
     {
       "kind": "source",
       "path": "src/utils/session-env.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 3
     },
     {
       "kind": "test",
@@ -3480,7 +3605,7 @@
     {
       "kind": "source",
       "path": "src/utils/tracker.ts",
-      "upwardEdgesIn": 19
+      "upwardEdgesIn": 23
     }
   ],
   "order": [
@@ -4018,8 +4143,8 @@
         }
       ],
       "fileCounts": {
-        "source": 75,
-        "test": 89,
+        "source": 77,
+        "test": 93,
         "testSupport": 2
       },
       "files": [
@@ -4091,6 +4216,9 @@
         "src/effort/store/absences.ts",
         "src/effort/store/bring-forward.test.ts",
         "src/effort/store/bring-forward.ts",
+        "src/effort/store/bug-routes-migration.test.ts",
+        "src/effort/store/bug-routes.test.ts",
+        "src/effort/store/bug-routes.ts",
         "src/effort/store/changes.test.ts",
         "src/effort/store/changes.ts",
         "src/effort/store/contract.test.ts",
@@ -4157,6 +4285,9 @@
         "src/effort/store/skill-invocations.ts",
         "src/effort/store/sqlite.test.ts",
         "src/effort/store/sqlite.ts",
+        "src/effort/store/stale-docs-migration.test.ts",
+        "src/effort/store/stale-docs.test.ts",
+        "src/effort/store/stale-docs.ts",
         "src/effort/store/store-generation.test.ts",
         "src/effort/store/store-generation.ts",
         "src/effort/store/store-identity.test.ts",
@@ -4192,7 +4323,7 @@
       ],
       "filesByFolder": {
         "src/core/": 64,
-        "src/effort/store/": 92,
+        "src/effort/store/": 98,
         "src/ports/": 2
       },
       "folders": [
@@ -4680,6 +4811,27 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/commands/epic/close-docs.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/docs/release-issue.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/commands/epic/close-docs.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/epic/verify-plan.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/commands/epic/close-docs.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/triage/doc-only.ts",
+          "toPackage": "rafa-pr"
+        },
+        {
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
@@ -4718,8 +4870,22 @@
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
+          "to": "src/start/stale-docs.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/epic/close.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
           "to": "src/start/triage.ts",
           "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/epic/close.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/triage/local-paths.ts",
+          "toPackage": "rafa-pr"
         },
         {
           "from": "src/commands/epic/close.ts",
@@ -4968,8 +5134,8 @@
         }
       ],
       "fileCounts": {
-        "source": 133,
-        "test": 157,
+        "source": 136,
+        "test": 160,
         "testSupport": 7
       },
       "files": [
@@ -4979,6 +5145,8 @@
         "src/adapters/tracker/github-edit.ts",
         "src/adapters/tracker/github-fake.test.ts",
         "src/adapters/tracker/github-fake.ts",
+        "src/adapters/tracker/github-open-issues.test.ts",
+        "src/adapters/tracker/github-open-issues.ts",
         "src/adapters/tracker/github-timeout.test.ts",
         "src/adapters/tracker/github.test.ts",
         "src/adapters/tracker/github.ts",
@@ -5196,6 +5364,8 @@
         "src/commands/epic/cancel-unblock.ts",
         "src/commands/epic/cancel.test.ts",
         "src/commands/epic/cancel.ts",
+        "src/commands/epic/close-docs.test.ts",
+        "src/commands/epic/close-docs.ts",
         "src/commands/epic/close-native.test.ts",
         "src/commands/epic/close.test.ts",
         "src/commands/epic/close.ts",
@@ -5228,6 +5398,8 @@
         "src/commands/issue/create-bug.ts",
         "src/commands/issue/create.test.ts",
         "src/commands/issue/create.ts",
+        "src/commands/issue/edit-priority.test.ts",
+        "src/commands/issue/edit-priority.ts",
         "src/commands/issue/edit-run.test.ts",
         "src/commands/issue/edit-run.ts",
         "src/commands/issue/edit.test.ts",
@@ -5272,12 +5444,12 @@
         "src/refs/verify.ts"
       ],
       "filesByFolder": {
-        "src/adapters/tracker/": 15,
+        "src/adapters/tracker/": 17,
         "src/board/": 129,
         "src/board/project/": 41,
         "src/commands/board/": 4,
-        "src/commands/epic/": 27,
-        "src/commands/issue/": 39,
+        "src/commands/epic/": 29,
+        "src/commands/issue/": 41,
         "src/refs/": 13
       },
       "folders": [
@@ -5308,8 +5480,8 @@
         "src/board/trust.ts"
       ],
       "rank": 3,
-      "remaining": 62,
-      "upwardEdges": 62
+      "remaining": 67,
+      "upwardEdges": 67
     },
     {
       "clearedByIssue118": 0,
@@ -5353,7 +5525,7 @@
           "from": "src/commands/pr/merge-cleanup.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/commands/self-update.ts",
+          "to": "src/runtime/live-loops.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -5588,11 +5760,53 @@
           "toPackage": "rafa-release"
         },
         {
+          "from": "src/triage/base-run.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/suite/run.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/triage/base-run.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/utils/session-env.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/suite/run.ts",
           "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/triage/kind-route.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/config-schema-loop-retries.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/triage/leftover-repair.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/config-schema-loop-retries.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/triage/leftover-repair.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/utils/declaration.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/triage/leftover-repair.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/utils/tracker.ts",
+          "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/triage/refs-section.ts",
@@ -5610,11 +5824,13 @@
         }
       ],
       "fileCounts": {
-        "source": 66,
-        "test": 88,
+        "source": 75,
+        "test": 99,
         "testSupport": 2
       },
       "files": [
+        "src/commands/pr/close.test.ts",
+        "src/commands/pr/close.ts",
         "src/commands/pr/current.test.ts",
         "src/commands/pr/current.ts",
         "src/commands/pr/last-triage.test.ts",
@@ -5681,12 +5897,15 @@
         "src/commands/pr/version-collision-incident-spawn.test.ts",
         "src/commands/pr/view.test.ts",
         "src/commands/pr/view.ts",
+        "src/commands/pr/wait-grace-driven.test.ts",
         "src/commands/pr/wait.test.ts",
         "src/commands/pr/wait.ts",
         "src/pr/checks.test.ts",
         "src/pr/checks.ts",
         "src/pr/conflict-sentence.sweep.test.ts",
         "src/pr/conflict-sentence.ts",
+        "src/pr/gh-close.test.ts",
+        "src/pr/gh-close.ts",
         "src/pr/gh-closing-issues.test.ts",
         "src/pr/gh-closing-issues.ts",
         "src/pr/gh-create.test.ts",
@@ -5748,16 +5967,29 @@
         "src/pr/workflow-triggers.ts",
         "src/pr/worktree.test.ts",
         "src/pr/worktree.ts",
+        "src/triage/base-run.test.ts",
+        "src/triage/base-run.ts",
         "src/triage/bug-key.test.ts",
         "src/triage/bug-key.ts",
         "src/triage/closed-issue-triage.test.ts",
+        "src/triage/doc-only.test.ts",
+        "src/triage/doc-only.ts",
         "src/triage/inherited.test.ts",
         "src/triage/inherited.ts",
         "src/triage/issue-text.ts",
+        "src/triage/kind-route.test.ts",
+        "src/triage/kind-route.ts",
+        "src/triage/leftover-repair.test.ts",
+        "src/triage/leftover-repair.ts",
         "src/triage/local-paths.test.ts",
         "src/triage/local-paths.ts",
         "src/triage/machine-fault.test.ts",
         "src/triage/machine-fault.ts",
+        "src/triage/own-check.integration.test.ts",
+        "src/triage/own-check.test.ts",
+        "src/triage/own-check.ts",
+        "src/triage/plan-commits.test.ts",
+        "src/triage/plan-commits.ts",
         "src/triage/refs-section.test.ts",
         "src/triage/refs-section.ts",
         "src/triage/scoring-fixture.test.ts",
@@ -5766,6 +5998,8 @@
         "src/triage/similarity-triage.test.ts",
         "src/triage/similarity.test.ts",
         "src/triage/similarity.ts",
+        "src/triage/stale-docs.test.ts",
+        "src/triage/stale-docs.ts",
         "src/triage/test-failure-triage.test.ts",
         "src/triage/test-failure.test.ts",
         "src/triage/test-failure.ts",
@@ -5773,9 +6007,9 @@
         "src/triage/triage.ts"
       ],
       "filesByFolder": {
-        "src/commands/pr/": 68,
-        "src/pr/": 63,
-        "src/triage/": 23
+        "src/commands/pr/": 71,
+        "src/pr/": 65,
+        "src/triage/": 38
       },
       "folders": [
         "src/commands/pr/",
@@ -5787,8 +6021,8 @@
         "src/pr/index.ts"
       ],
       "rank": 4,
-      "remaining": 42,
-      "upwardEdges": 42
+      "remaining": 48,
+      "upwardEdges": 48
     },
     {
       "clearedByIssue118": 0,
@@ -5892,6 +6126,13 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/start/convention-body.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/tracker.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/start/decision-prompt.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
@@ -5955,6 +6196,34 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/start/doc-task.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/cleanup/branches.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/doc-task.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/docs/task-reading.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/doc-task.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/declaration.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/follow-ups.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/tracker.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/start/handout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
@@ -6001,6 +6270,20 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/loop-events.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/declaration.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/loop-events.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/tracker.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -6133,6 +6416,13 @@
           "from": "src/start/run-checkout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
+          "to": "src/cleanup/index.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/run-checkout.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
           "to": "src/utils/git.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -6200,6 +6490,62 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/docs/release-issue.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/enabled.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/forecast.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/fragment-tree.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/settle.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/strategy.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/release/version.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/declaration.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/start/stamp.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
@@ -6246,6 +6592,20 @@
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/triage-kinds.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/cleanup/branches.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/triage-kinds.ts",
+          "fromPackage": "rafa-run",
+          "kind": "type",
+          "to": "src/config-schema-loop-retries.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -6306,8 +6666,8 @@
         }
       ],
       "fileCounts": {
-        "source": 85,
-        "test": 112,
+        "source": 92,
+        "test": 129,
         "testSupport": 0
       },
       "files": [
@@ -6377,14 +6737,23 @@
         "src/start/continue-exits.ts",
         "src/start/continue-run.test.ts",
         "src/start/continue-run.ts",
+        "src/start/convention-body.test.ts",
+        "src/start/convention-body.ts",
         "src/start/decision-parse.test.ts",
         "src/start/decision-parse.ts",
         "src/start/decision-prompt.test.ts",
         "src/start/decision-prompt.ts",
         "src/start/decision-session.test.ts",
         "src/start/decision-session.ts",
+        "src/start/detached-head-integration.test.ts",
         "src/start/dispatch.test.ts",
         "src/start/dispatch.ts",
+        "src/start/doc-task-integration.test.ts",
+        "src/start/doc-task.test.ts",
+        "src/start/doc-task.ts",
+        "src/start/follow-ups-integration.test.ts",
+        "src/start/follow-ups.test.ts",
+        "src/start/follow-ups.ts",
         "src/start/forced-draft.test.ts",
         "src/start/forced-draft.ts",
         "src/start/handout.test.ts",
@@ -6428,6 +6797,7 @@
         "src/start/retry-budget.ts",
         "src/start/risk-total.test.ts",
         "src/start/risk-total.ts",
+        "src/start/run-checkout-base-integration.test.ts",
         "src/start/run-checkout.test.ts",
         "src/start/run-checkout.ts",
         "src/start/run-config.test.ts",
@@ -6447,18 +6817,24 @@
         "src/start/session-worktree.test.ts",
         "src/start/session.test.ts",
         "src/start/session.ts",
+        "src/start/stale-docs-integration.test.ts",
+        "src/start/stale-docs.test.ts",
+        "src/start/stale-docs.ts",
         "src/start/stamp.test.ts",
         "src/start/stamp.ts",
         "src/start/step-only-report.test.ts",
         "src/start/step-only-report.ts",
         "src/start/suite-blocker.test.ts",
         "src/start/suite-blocker.ts",
+        "src/start/suite-outside-case.test.ts",
+        "src/start/suite-outside-case.ts",
         "src/start/suite-retake-alone.test.ts",
         "src/start/suite-retake-alone.ts",
         "src/start/suite-stage-step.test.ts",
         "src/start/suite-stage-step.ts",
         "src/start/suite-step-known-baseline-failure-integration.test.ts",
         "src/start/suite-step-no-owns-full-suite-tally-integration.test.ts",
+        "src/start/suite-step-outside-case-integration.test.ts",
         "src/start/suite-step-pre-wrap-up-repair-integration.test.ts",
         "src/start/suite-step-retake-alone-integration.test.ts",
         "src/start/suite-step-stage-blocker-integration.test.ts",
@@ -6478,12 +6854,20 @@
         "src/start/task-step-checks.test.ts",
         "src/start/task-step-checks.ts",
         "src/start/triage-inherited.test.ts",
+        "src/start/triage-kind-routes.test.ts",
+        "src/start/triage-kinds-integration.test.ts",
+        "src/start/triage-kinds.test.ts",
+        "src/start/triage-kinds.ts",
+        "src/start/triage-stale-docs-integration.test.ts",
         "src/start/triage.test.ts",
         "src/start/triage.ts",
         "src/start/type-step.test.ts",
         "src/start/type-step.ts",
         "src/start/worktree-dir.test.ts",
         "src/start/worktree-dir.ts",
+        "src/start/worktree-upstream-integration.test.ts",
+        "src/start/worktree-upstream.test.ts",
+        "src/start/worktree-upstream.ts",
         "src/start/worktree.test.ts",
         "src/start/worktree.ts",
         "src/start/wrap-up-delivered-integration.test.ts",
@@ -6513,7 +6897,7 @@
         "src/claims/": 18,
         "src/commands/claim/": 9,
         "src/preflight/": 8,
-        "src/start/": 147,
+        "src/start/": 171,
         "src/suite/": 13
       },
       "folders": [
@@ -6528,8 +6912,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 73,
-      "upwardEdges": 73
+      "remaining": 91,
+      "upwardEdges": 91
     },
     {
       "clearedByIssue118": 0,
@@ -6543,6 +6927,20 @@
         },
         {
           "from": "src/commands/release/settle.ts",
+          "fromPackage": "rafa-release",
+          "kind": "type",
+          "to": "src/project/scope.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/commands/release/status-stale-docs.ts",
+          "fromPackage": "rafa-release",
+          "kind": "value",
+          "to": "src/docs/open-lines.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/commands/release/status-stale-docs.ts",
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
@@ -6578,8 +6976,8 @@
         }
       ],
       "fileCounts": {
-        "source": 34,
-        "test": 37,
+        "source": 35,
+        "test": 38,
         "testSupport": 0
       },
       "files": [
@@ -6592,6 +6990,8 @@
         "src/commands/release/status-audit.test.ts",
         "src/commands/release/status-fragments.test.ts",
         "src/commands/release/status-fragments.ts",
+        "src/commands/release/status-stale-docs.test.ts",
+        "src/commands/release/status-stale-docs.ts",
         "src/commands/release/status-worktree-spawned.test.ts",
         "src/commands/release/status.test.ts",
         "src/commands/release/status.ts",
@@ -6656,7 +7056,7 @@
         "src/release/version.ts"
       ],
       "filesByFolder": {
-        "src/commands/release/": 15,
+        "src/commands/release/": 17,
         "src/release/": 56
       },
       "folders": [
@@ -6666,8 +7066,8 @@
       "name": "rafa-release",
       "named": [],
       "rank": 6,
-      "remaining": 6,
-      "upwardEdges": 6
+      "remaining": 8,
+      "upwardEdges": 8
     },
     {
       "clearedByIssue118": 0,
@@ -6709,8 +7109,8 @@
         }
       ],
       "fileCounts": {
-        "source": 34,
-        "test": 34,
+        "source": 37,
+        "test": 36,
         "testSupport": 0
       },
       "files": [
@@ -6741,10 +7141,15 @@
         "src/effort/report-args.ts",
         "src/effort/report-budgets.test.ts",
         "src/effort/report-budgets.ts",
+        "src/effort/report-doc-bugs.test.ts",
+        "src/effort/report-doc-bugs.ts",
         "src/effort/report-format.test.ts",
         "src/effort/report-format.ts",
+        "src/effort/report-kinds.test.ts",
+        "src/effort/report-kinds.ts",
         "src/effort/report-skills-format.test.ts",
         "src/effort/report-skills-format.ts",
+        "src/effort/report-skills-read.ts",
         "src/effort/report-skills.test.ts",
         "src/effort/report-skills.ts",
         "src/effort/report-trend-format.test.ts",
@@ -6784,7 +7189,7 @@
         "src/schema/frontmatter.ts"
       ],
       "filesByFolder": {
-        "src/effort/": 66
+        "src/effort/": 71
       },
       "folders": [
         "src/effort/"
@@ -6886,9 +7291,9 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 248,
-        "test": 444,
-        "testSupport": 25
+        "source": 257,
+        "test": 459,
+        "testSupport": 26
       },
       "files": [
         "src/adapters/learning/held.test.ts",
@@ -6936,6 +7341,9 @@
         "src/cleanup/index.ts",
         "src/cleanup/past-head.test.ts",
         "src/cleanup/past-head.ts",
+        "src/cleanup/remote-only-integration.test.ts",
+        "src/cleanup/remote-only.test.ts",
+        "src/cleanup/remote-only.ts",
         "src/cleanup/runs.test.ts",
         "src/cleanup/runs.ts",
         "src/cleanup/scratch-repository.test.ts",
@@ -7000,10 +7408,13 @@
         "src/commands/cleanup-render.ts",
         "src/commands/cleanup.test.ts",
         "src/commands/cleanup.ts",
+        "src/commands/config/set-agent-integration.test.ts",
         "src/commands/config/set.test.ts",
         "src/commands/config/set.ts",
         "src/commands/describe.test.ts",
         "src/commands/describe.ts",
+        "src/commands/docs/plan.test.ts",
+        "src/commands/docs/plan.ts",
         "src/commands/doctor-blocked.test.ts",
         "src/commands/doctor-blocked.ts",
         "src/commands/doctor-board-native.test.ts",
@@ -7076,6 +7487,7 @@
         "src/commands/effort/report.ts",
         "src/commands/effort/schema.test.ts",
         "src/commands/effort/schema.ts",
+        "src/commands/index.roster.sweep.test.ts",
         "src/commands/index.test.ts",
         "src/commands/index.ts",
         "src/commands/init-board-move.test.ts",
@@ -7219,6 +7631,12 @@
         "src/config-schema-wrap-up.ts",
         "src/config-set.test.ts",
         "src/config-set.ts",
+        "src/docs/open-lines.test.ts",
+        "src/docs/open-lines.ts",
+        "src/docs/release-issue.test.ts",
+        "src/docs/release-issue.ts",
+        "src/docs/task-reading.test.ts",
+        "src/docs/task-reading.ts",
         "src/epic/verify-plan.test.ts",
         "src/epic/verify-plan.ts",
         "src/epic/verify-run.test.ts",
@@ -7278,6 +7696,7 @@
         "src/next/hop-rows.ts",
         "src/next/lines.test.ts",
         "src/next/lines.ts",
+        "src/next/loop-worktree-tree-driven.test.ts",
         "src/next/owner-gate.test.ts",
         "src/next/owner-gate.ts",
         "src/next/preconditions.ts",
@@ -7308,6 +7727,8 @@
         "src/notices/run.ts",
         "src/plan.test.ts",
         "src/plan.ts",
+        "src/plan/doc-task.test.ts",
+        "src/plan/doc-task.ts",
         "src/plan/index.test.ts",
         "src/plan/index.ts",
         "src/plan/inject.test.ts",
@@ -7321,6 +7742,8 @@
         "src/plan/risk/accounts.ts",
         "src/plan/risk/commands.test.ts",
         "src/plan/risk/commands.ts",
+        "src/plan/risk/long-runs.test.ts",
+        "src/plan/risk/long-runs.ts",
         "src/plan/risk/patterns.test.ts",
         "src/plan/risk/patterns.ts",
         "src/plan/risk/secrets.test.ts",
@@ -7362,6 +7785,8 @@
         "src/runtime/identity.ts",
         "src/runtime/install.test.ts",
         "src/runtime/install.ts",
+        "src/runtime/live-loops.test.ts",
+        "src/runtime/live-loops.ts",
         "src/schema/agent.test.ts",
         "src/schema/agent.ts",
         "src/start.test.ts",
@@ -7413,6 +7838,7 @@
         "src/tests/context-page-imports.sweep.test.ts",
         "src/tests/core-barrel-load-spawned.test.ts",
         "src/tests/core-barrels.sweep.test.ts",
+        "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
         "src/tests/declaration-flags.test.ts",
         "src/tests/declaration-negatives.test.ts",
@@ -7420,6 +7846,7 @@
         "src/tests/demotion-pass.test.ts",
         "src/tests/detached-head-start-integration.test.ts",
         "src/tests/dispatch-records.test.ts",
+        "src/tests/docs-plan-spawned.test.ts",
         "src/tests/doctor-deep-env-integration.test.ts",
         "src/tests/doctor-deep-spawned.test.ts",
         "src/tests/doctor-preflight-parity.test.ts",
@@ -7572,6 +7999,7 @@
         "src/tests/stretch-dry-run-spawned.test.ts",
         "src/tests/stretch-lines-spawned.test.ts",
         "src/tests/sweep-suffix.sweep.test.ts",
+        "src/tests/sweep-timeout.ts",
         "src/tests/switch-drift-spawned.test.ts",
         "src/tests/switch-next-plan-cli.test.ts",
         "src/tests/sync-contact-spawned.test.ts",
@@ -7595,6 +8023,8 @@
         "src/tools/ts-symbols/fixtures/proj/src/util.ts",
         "src/utils/agent-definition.test.ts",
         "src/utils/agent-definition.ts",
+        "src/utils/agent-shell.test.ts",
+        "src/utils/agent-shell.ts",
         "src/utils/declaration.test.ts",
         "src/utils/declaration.ts",
         "src/utils/git.test.ts",
@@ -7628,12 +8058,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1843,
-    "leftToPlace": 675,
-    "nonTestEdges": 4095,
+    "files": 1931,
+    "leftToPlace": 700,
+    "nonTestEdges": 4319,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 285
+    "upwardEdges": 316
   },
   "unassigned": [
     {
