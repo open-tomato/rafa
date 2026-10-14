@@ -33,6 +33,7 @@ import { readProgressFindings } from '../../utils/progress.js';
 import { readSkillFacts } from '../skill-facts.js';
 
 import { writeReportAbsence } from './absences.js';
+import { readBugRoutesForPlan, writeBugRoutes } from './bug-routes.js';
 import { readPlanChanges, writeChanges } from './changes.js';
 import { readSessionBudgets, writeDispatch } from './dispatches.js';
 import { writeFindings } from './findings.js';
@@ -165,14 +166,13 @@ function appendSession(root: string, session: string): void {
 
 /**
  * The merged tables no module under `src/effort/store/` inserts into:
- * `bug_routes`, whose migration lands ahead of its writer. A table whose
- * migration lands ahead of its writer is listed here. The last group
- * below reads the modules' source and fails once one of them inserts
- * into a table listed here, so a table leaves this list for
- * {@link WRITERS} and {@link PLANTED} in the commit that adds its
- * writer, as `stale_docs` did.
+ * none today. A table whose migration lands ahead of its writer is
+ * listed here. The last group below reads the modules' source and fails
+ * once one of them inserts into a table listed here, so a table leaves
+ * this list for {@link WRITERS} and {@link PLANTED} in the commit that
+ * adds its writer, as `stale_docs` and `bug_routes` did.
  */
-const UNWRITTEN_TABLES: readonly OriginTable[] = ['bug_routes'];
+const UNWRITTEN_TABLES: readonly OriginTable[] = [];
 
 /** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
 const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
@@ -310,6 +310,16 @@ const WRITERS: readonly WriterCase[] = [
     },
   },
   {
+    name: 'writeBugRoutes',
+    tables: ['bug_routes'],
+    write: (root, session) => {
+      writeBugRoutes(root, {
+        dispatch: dispatchOf(session),
+        routes: [{ entryIndex: 0, what: `the ${session} entry`, said: null, kind: 'bug', route: 'filed' }],
+      }, seamsOf(`route-${session}`));
+    },
+  },
+  {
     name: 'writeTrackerRef, inserting the row it sets the reference on',
     tables: ['findings'],
     write: (root, session) => {
@@ -324,12 +334,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the fourteen merged tables, a writer filling every one but the unwritten', () => {
+  it('covers each of the fourteen merged tables, a writer filling every one', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
     expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
-    expect(WRITTEN_TABLES).toHaveLength(13);
-    expect(UNWRITTEN_TABLES).toEqual(['bug_routes']);
+    expect(WRITTEN_TABLES).toHaveLength(14);
+    expect(UNWRITTEN_TABLES).toEqual([]);
     expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 
@@ -405,11 +415,11 @@ describe('seq across a new mint', () => {
 });
 
 /**
- * One row for each of the thirteen {@link WRITTEN_TABLES} with the
+ * One row for each of the fourteen {@link WRITTEN_TABLES} with the
  * origin columns left out of its insert: for the twelve tables older
  * than `row-origins`, as a runtime before that migration inserts it,
- * every column it knew named; for `stale_docs`, which no such runtime
- * holds, the same shape of insert. All under task session `old` (its absence under
+ * every column it knew named; for `stale_docs` and `bug_routes`, which
+ * no such runtime holds, the same shape of insert. All under task session `old` (its absence under
  * `old-absent`) and {@link PLAN}, each shaped for the reader of its
  * table to answer it.
  */
@@ -438,6 +448,8 @@ const PLANTED: readonly (readonly [OriginTable, string])[] = [
     + ' VALUES (\'phase-1\', 6, \'sha-old\', \'red\', \'["lint"]\', \'2026-09-28T10:00:00.000Z\')'],
   ['stale_docs', 'INSERT INTO stale_docs (id, session_id, plan_stub, task_line, kind, where_at, what, outcome, collected_at)'
     + ' VALUES (\'d-old\', \'old\', \'phase-1\', \'Add the module\', \'sighting\', NULL, \'the old line\', \'done\', \'2026-09-28T10:00:00.000Z\')'],
+  ['bug_routes', 'INSERT INTO bug_routes (id, session_id, plan_stub, task_line, entry_index, what, said, kind, route, collected_at)'
+    + ' VALUES (\'g-old\', \'old\', \'phase-1\', \'Add the module\', 0, \'the old entry\', NULL, \'bug\', \'filed\', \'2026-09-28T10:00:00.000Z\')'],
 ];
 
 describe('a row planted with NULL origins', () => {
@@ -521,6 +533,10 @@ describe('a row planted with NULL origins', () => {
     expect(readStaleDocsForPlan(root, PLAN).map(({ what }) => what)).toEqual(['the old line', 'the new line']);
   });
 
+  it('is read by readBugRoutesForPlan', () => {
+    expect(readBugRoutesForPlan(root, PLAN).map(({ what }) => what)).toEqual(['the old entry', 'the new entry']);
+  });
+
   it('is read by readPlanCi', () => {
     expect(readPlanCi(root).map(({ headSha, verdict }) => [headSha, verdict])).toEqual([['sha-old', 'red'], ['sha-new', 'green']]);
   });
@@ -589,7 +605,7 @@ describe('the production inserts, read from source', () => {
     const stamped = found.filter((insert) => insert.stamped).map(({ file }) => file);
 
     expect([...stamped].sort()).toEqual([
-      'absences.ts', 'changes.ts', 'dispatches.ts', 'findings.ts', 'plan-ci.ts', 'preflight.ts',
+      'absences.ts', 'bug-routes.ts', 'changes.ts', 'dispatches.ts', 'findings.ts', 'plan-ci.ts', 'preflight.ts',
       'reports.ts', 'skill-invocations.ts', 'sqlite.ts', 'stale-docs.ts', 'tracker-refs.ts', 'triage.ts', 'triage.ts',
     ]);
     expect(unstamped.sort()).toEqual([

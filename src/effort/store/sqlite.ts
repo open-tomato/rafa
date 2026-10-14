@@ -62,8 +62,8 @@
  * six are, one row per documentation line a report named as stale;
  * `stale-docs.ts` writes it and holds its row type. A twelfth,
  * `bug_routes`, holds one row per `out_of_scope_bugs` entry the triage
- * step routed; `bug-routes.ts` holds its row type. The thirteenth is
- * `schema_migrations`, the migration log, which only
+ * step routed; `bug-routes.ts` writes it and holds its row type. The
+ * thirteenth is `schema_migrations`, the migration log, which only
  * `bring-forward.ts` writes; the section on bringing a store forward
  * says what it holds. The last four are the store's own identity and
  * merge trail: `store_meta`, `store_replaced`, `merges` and

@@ -830,9 +830,9 @@ Each arrives as a new `SQLITE_MIGRATIONS` entry, is written under the
 `sqliteStorePath` that `store/sqlite.ts` exports, and lands in
 `effort.sqlite` whatever `store` selects. A writer that can be left with
 nothing to insert goes through `writeSqliteStore`, as `writeFindings`,
-`writeTriage`, `writeChanges`, `writeStaleDocs`, `writePreflightChecks`
-and `writeSkillInvocations` do, so an empty write on a store that exists
-still meets the schema check. `writeReportAbsence` always has its one
+`writeTriage`, `writeChanges`, `writeStaleDocs`, `writeBugRoutes`,
+`writePreflightChecks` and `writeSkillInvocations` do, so an empty write
+on a store that exists still meets the schema check. `writeReportAbsence` always has its one
 row and opens `withSqliteStore` directly, as `writeTrackerRef` does.
 `writeTaskReport` always has its one row too, and passes
 `writeSqliteStore` a count of one, which opens the store as that direct
@@ -851,9 +851,10 @@ documentation.
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
 `changes` row under one plan stub, in `ACROSS_STORES_ORDER`
 (`store/origins.ts`: `collected_at`, the origin pair, then `seq`), for a
-release step to render, and `readStaleDocsForPlan`
+release step to render, `readStaleDocsForPlan`
 (`store/stale-docs.ts`) every `stale_docs` row under one plan stub in
-that order. A reader that answers rows in order over a table
+that order, and `readBugRoutesForPlan` (`store/bug-routes.ts`) every
+`bug_routes` row under one plan stub in that order too. A reader that answers rows in order over a table
 with `collected_at` sorts by that constant rather than `seq`, since a
 merge gives the other store's rows new local `seq` values after its own.
 
@@ -1190,13 +1191,22 @@ in `route`, and nothing else. `plan_stub` is NULL for a row written
 under no plan. `bug_routes_by_entry` is unique over `session_id`,
 `entry_index` and `what`, so a triage repeated on a resumed run writes
 its rows once. The table is `merged`, append-only by `id`, and one of
-the `ORIGIN_TABLES`; it has no writer yet, so `origins.test.ts` lists
-it in `UNWRITTEN_TABLES`. `store/bug-routes.ts` holds the row type
+the `ORIGIN_TABLES`. `store/bug-routes.ts` holds the row type
 (`BugRouteRow`, its keys pinned as `bugRoutes` in
-`row-fields.lock.json`) and `BUG_ROUTES`. Like `stale_docs`, it sits in
+`row-fields.lock.json`), `BUG_ROUTES`, the writer and the reader.
+`writeBugRoutes` stores one row per routed entry its caller names, with
+no outcome, and refuses the whole write, before the store is opened,
+for a dispatch `checkDispatch` refuses; an entry whose `entryIndex`,
+`what`, `said`, `kind` or `route` the table cannot hold is refused
+alone and answered in `rejected`, so a refused row leaves the others
+written. An entry the session already holds adds nothing, and the
+first row's kind and route stay. `readBugRoutesForPlan` answers the
+rows under one plan stub as `BugRouteRow`s; the stub null reads the
+rows written under no plan. Like `stale_docs`, it sits in
 `effort.sqlite` whichever backend `store` selects.
 `bug-routes-migration.test.ts` holds the entry to a store an older
-runtime left, the table to each CHECK and index, and both backends.
+runtime left, the table to each CHECK and index, and both backends;
+`bug-routes.test.ts` holds the writer and the reader.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so
