@@ -3,7 +3,9 @@
  * `findNextTask` answers no open task (`start.ts`).
  *
  * In order: the session record names no task, the operator is told the
- * wrap-up is starting, step 1 of the release writes the plan's change
+ * wrap-up is starting, the plan's leftovers held past its cap on repair
+ * tasks are filed in its follow-up issue, or printed
+ * (`start/follow-ups.ts`), step 1 of the release writes the plan's change
  * fragment (`start/release-stage.ts`), the wrap-up session is spawned
  * with that record and the list of the test files the run's suite steps
  * read red only in the step (`start/wrap-up.ts`,
@@ -123,6 +125,7 @@ import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
+import { fileFollowUps } from './follow-ups.js';
 import { forcedDraftSeamsIn, markForcedDraft, refuseUndraftedPullRequest } from './forced-draft.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
@@ -198,6 +201,11 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   activeOutput().info(passedOver.length === 0
     ? '\n✅ All tasks completed!'
     : `\n⚠️  Wrapping up with ${passedOver.length} passed-over task(s) left open (--force-wrap-up): the pull request becomes a draft listing them.`);
+  // The plan's leftovers held past its cap on repair tasks, filed once
+  // the last task is done and before anything that can end the branch
+  // early, so a moved checkout or a blocked delivery still files them
+  // (`start/follow-ups.ts`). It never throws.
+  await fileFollowUps({ repoRoot, checkout, settings, planStub });
   activeOutput().info('🧹 Wrap-up session starting: promote the listed lessons, sync with main, then commit, push and open the PR.');
   activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
   // Step 1 of the release, written BEFORE the session that
