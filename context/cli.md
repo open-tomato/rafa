@@ -734,6 +734,7 @@ New; it replaces no earlier text. What a row or an action added to
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`, `start/wrap-up-run.ts`,
+  `start/follow-ups.ts`, `start/convention-body.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
   `start/retry-budget.ts`, `start/continue-run.ts`,
   `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,
