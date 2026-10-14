@@ -82,7 +82,7 @@
  * module state, so a case that sets settings outside a scope sets `null`
  * after it.
  */
-import type { LogLevel } from '../../ports/index.js';
+import type { LogLevel } from '../../ports/log-level.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 

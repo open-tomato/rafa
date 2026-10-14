@@ -43,7 +43,7 @@
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
 import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
-import type { LogLevel } from './ports/index.js';
+import type { LogLevel } from './ports/log-level.js';
 
 import { DEFAULT_LOGGER_KIND, LOG_LEVELS, LOGGER_THEMES } from './adapters/logger/settings.js';
 import { below, flag, isMapping, mapOf, oneOf, refused, text } from './core/config/sections.js';
