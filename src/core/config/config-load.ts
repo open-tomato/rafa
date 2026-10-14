@@ -80,7 +80,7 @@ import { activeOutput } from '../output/active.js';
 
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
-import { activeConfigLoadHook } from './section.js';
+import { activeConfigLoadHook, activeSettings } from './section.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
 export interface ConfigRoots {
@@ -174,6 +174,9 @@ export function loadConfig(
   cli: ConfigOverrides = {},
   warn: (message: string) => void = printWarning,
 ): ResolvedConfig {
+  if (Object.keys(activeSettings()).length === 0) {
+    throw new Error('no config section is registered: import src/config-registry.ts before loadConfig');
+  }
   const user = readUserConfigFile(roots);
   const file = readConfigFile(roots.root);
   const resolved = resolveConfig({ cli, file, user });
