@@ -1158,7 +1158,11 @@ list under the `kind` its caller names, and refuses the whole write,
 before the store is opened, for a dispatch or outcome `checkDispatch`
 refuses or a `kind` outside the set; an entry whose `what` or `where`
 cannot be stored is refused alone and answered in `rejected`, as
-`writeChanges` answers a note. `readStaleDocsForPlan` answers the rows
+`writeChanges` answers a note. `recordTaskReport`
+(`src/report/record.ts`) calls it for every task report, after
+`writeTriage` and before `writeChanges`, always under `sighting`, and
+its counts join the record's summary line as `stale docs`.
+`readStaleDocsForPlan` answers the rows
 under one plan stub, of both kinds, as `StaleDocRow`s; the stub null
 reads the rows written under no plan. The table is no kind of
 the port, so neither backend routes it: it sits in `effort.sqlite`

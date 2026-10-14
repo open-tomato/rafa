@@ -3,7 +3,7 @@
  * the lines the loop prints about a record.
  *
  * Every output is a whole session output, prose and then a `rafa:report`
- * block, recorded under a fresh temporary repo root. What the five report
+ * block, recorded under a fresh temporary repo root. What the six report
  * tables hold is read back through `bun:sqlite` directly and never
  * through the writers, so each case reads the disk rather than the
  * answer.
@@ -26,6 +26,14 @@
  * notes never written (6 of the 14 cases red), the changes tally dropped
  * from the summary line (3), and the refused notes left out of the
  * warnings (1).
+ *
+ * Four more came with the `stale_docs` table, driven the same way once
+ * the cases reading it were in, the module restored sha256-identical:
+ * the entries never written (2 of the 17 cases red), written as
+ * `unsettled` (2), the stale docs tally dropped from the summary line
+ * (2), and written as `done` whatever the outcome (1). No case reaches a
+ * refused entry's warning: `parseReport` answers no entry the writer
+ * refuses, so that line of `describeTaskReportRecord` is unmeasured here.
  */
 import type { TaskReportInput } from './record.js';
 
@@ -148,6 +156,7 @@ describe('recordTaskReport', () => {
     expect(rowsOf(root, 'out_of_scope_bugs', `${PROVENANCE}, what, security`))
       .toEqual([{ ...stored, what: 'the collector double counts', security: 0 }]);
     expect(rowsOf(root, 'report_absences', PROVENANCE)).toEqual([]);
+    expect(rowsOf(root, 'stale_docs', 'id')).toEqual([]);
 
     // The changes table carries no outcome column, so its rows are read
     // by the dispatch alone; the throw below is the control that the
@@ -181,7 +190,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(false);
     expect(rowsOf(root, 'report_absences', `${PROVENANCE}, reason, block_body`))
       .toEqual([{ ...DISPATCHED, outcome: 'failed', reason: 'no-block', block_body: null }]);
-    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'changes', 'task_reports']) {
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'stale_docs', 'changes', 'task_reports']) {
       expect(rowsOf(root, table, 'id')).toEqual([]);
     }
   });
@@ -207,7 +216,7 @@ describe('recordTaskReport', () => {
     expect(record.present).toBe(true);
     expect(rowsOf(root, 'task_reports', `${PROVENANCE}, status`))
       .toEqual([{ ...DISPATCHED, outcome: 'done', status: 'done' }]);
-    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'changes', 'report_absences']) {
+    for (const table of ['findings', 'blockers', 'out_of_scope_bugs', 'stale_docs', 'changes', 'report_absences']) {
       expect(rowsOf(root, table, 'id')).toEqual([]);
     }
   });
@@ -250,6 +259,48 @@ describe('recordTaskReport', () => {
       { level: 'patch', summary: 'The first note is written.' },
       { level: 'none', summary: 'The third note is written too.' },
     ]);
+  });
+
+  it('stores a stale_docs entry as one sighting row beside the report\'s bug', () => {
+    const root = freshRoot('stale-one');
+    const report = reportBlock(
+      'status: done',
+      'out_of_scope_bugs:',
+      '  - what: "the collector double counts"',
+      '    security: false',
+      'stale_docs:',
+      '  - where: "context/triage.md:12"',
+      '    what: "names a channel that was removed"',
+    );
+    const record = recordTaskReport(root, inputOf(outputOf(report), { outcome: 'blocked' }));
+    const stored = { ...DISPATCHED, outcome: 'blocked' };
+
+    if (!record.present) throw new Error('a fixture output read wrongly');
+    expect([record.staleDocs.appended, record.staleDocs.skipped]).toEqual([1, 0]);
+    expect(record.staleDocs.rejected).toEqual([]);
+    expect(rowsOf(root, 'stale_docs', `${PROVENANCE}, kind, where_at, what`)).toEqual([{
+      ...stored,
+      kind: 'sighting',
+      where_at: 'context/triage.md:12',
+      what: 'names a channel that was removed',
+    }]);
+    // The entry is no bug: the bug table holds the report's one bug only.
+    expect(rowsOf(root, 'out_of_scope_bugs', `${PROVENANCE}, what`))
+      .toEqual([{ ...stored, what: 'the collector double counts' }]);
+  });
+
+  it('stores no stale_docs row for a report holding no entry', () => {
+    const root = freshRoot('stale-none');
+    const record = recordTaskReport(root, inputOf(outputOf(FULL_REPORT)));
+
+    if (!record.present) throw new Error('a fixture output read wrongly');
+    expect(FULL_REPORT).not.toContain('stale_docs');
+    expect(record.reading.issues).toEqual([]);
+    expect([record.staleDocs.appended, record.staleDocs.skipped]).toEqual([0, 0]);
+    expect(record.staleDocs.rejected).toEqual([]);
+    expect(rowsOf(root, 'stale_docs', 'id')).toEqual([]);
+    // The control: the same output did write its other lists.
+    expect(rowsOf(root, 'out_of_scope_bugs', 'id')).toHaveLength(1);
   });
 
   it('adds no row when one session output is recorded twice', () => {
@@ -295,6 +346,7 @@ describe('describeTaskReportRecord', () => {
         'findings 2 stored, 0 already held, 0 refused',
         'blockers 1 stored, 0 already held, 0 refused',
         'out-of-scope bugs 1 stored, 0 already held, 0 refused',
+        'stale docs 0 stored, 0 already held, 0 refused',
         'changes 2 stored, 0 already held, 0 refused',
       ].join('; ')],
       warnings: [],
@@ -353,6 +405,18 @@ describe('describeTaskReportRecord', () => {
     expect(lines.warnings).toHaveLength(2);
     expect(lines.warnings[0]).toContain('changes[1].summary');
     expect(lines.warnings[1]).toBe('Report: changes[1].summary is missing; not written');
+  });
+
+  it('counts a stale_docs entry stored, then already held on a second record', () => {
+    const root = freshRoot('describe-stale');
+    const report = reportBlock('status: done', 'stale_docs:', '  - what: "names a removed flag"');
+    const first = describeTaskReportRecord(recordTaskReport(root, inputOf(outputOf(report))));
+    const again = describeTaskReportRecord(recordTaskReport(root, inputOf(outputOf(report))));
+
+    expect(first.notes[0]).toContain('stale docs 1 stored, 0 already held, 0 refused');
+    expect(again.notes[0]).toContain('stale docs 0 stored, 1 already held, 0 refused');
+    expect(first.warnings).toEqual([]);
+    expect(rowsOf(root, 'stale_docs', 'kind, where_at')).toEqual([{ kind: 'sighting', where_at: null }]);
   });
 
   it('names a report that gives no status', () => {
