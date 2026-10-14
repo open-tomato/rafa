@@ -257,6 +257,7 @@ out_of_scope_bugs:
   - what: "bun:sqlite connection pooling"
     artifact: "SQLITE_MISUSE"
     security: false
+    kind: bug
 changes:
   - level: minor
     area: "store"
@@ -276,7 +277,7 @@ Report fields:
 | `findings` | list of objects | Findings discovered during the task (see below) |
 | `skills_used` | list of strings | Names of skills referenced or applied |
 | `blockers` | list of objects | What blocked the task. Any entry marks the task `[BLOCKED]` whatever `status` says, so write `[]` when nothing did |
-| `out_of_scope_bugs` | list of objects | Bugs found that are outside this task's scope |
+| `out_of_scope_bugs` | list of objects | Bugs and other leftovers found outside this task's scope, each with a `kind` (see below) |
 | `changes` | list of objects | Release notes for this task's own diff (contributing to the release fragment), one entry per user-visible change (see below). An absent list is empty with no issue; a task whose diff a user would notice nothing of writes one entry at level `none`. The wrap-up collects these from all tasks and writes them to the fragment that `rafa release settle` processes after the branch merges. |
 | `stale_docs` | list of objects | Documentation lines the task saw that no longer match the code and that its own change did not falsify (see below). An absent list is empty with no issue |
 
@@ -315,6 +316,18 @@ Blocker/bug entry fields:
 | `what` | string | yes | Description of the blocker or bug |
 | `artifact` | string | no | Error message or diagnostic output |
 | `security` | boolean | yes (bugs only) | Whether this is a security issue; never defaulted when missing |
+| `kind` | string | no (bugs only) | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
+
+Out-of-scope entry kinds:
+
+| Kind | When it applies |
+| --- | --- |
+| `bug` | The code does the wrong thing, and this plan did not cause it |
+| `own-fallout` | Something an earlier task of this plan broke or left stale |
+| `own-gap` | Something this plan built and left unfinished |
+| `convention` | A file too long, a name off the pattern |
+| `docs` | A stale doc line |
+| `machine` | This machine's fault |
 
 ---
 

@@ -627,7 +627,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.
-    const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
+    const triageTask = createStartTriage({ repoRoot, config: runConfig.config, kinds: { checkout, prBase: runConfig.config.prBase, retries: runRetries } });
 
     // The runner's suite steps around the sessions (`start/suite-steps-run.ts`):
     // `bun test` run here, in the checkout, and recorded on the run record.

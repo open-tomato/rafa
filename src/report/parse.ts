@@ -28,6 +28,7 @@
  *   - what: "..."
  *     artifact: "..."
  *     security: false
+ *     kind: bug
  * changes:
  *   - level: patch
  *     area: "loop"
@@ -86,8 +87,8 @@
  *     `unusable-field`. That covers a string field holding something
  *     other than a string or only whitespace, a closed-set field holding
  *     a value outside {@link REPORT_STATUSES}, {@link FINDING_KINDS},
- *     {@link FINDING_SIGNALS}, {@link FINDING_DOMAINS} or
- *     {@link CHANGE_LEVELS}, and a `security`
+ *     {@link FINDING_SIGNALS}, {@link FINDING_DOMAINS},
+ *     {@link CHANGE_LEVELS} or {@link BUG_KINDS}, and a `security`
  *     flag that is not a boolean. The sets are closed because stored rows
  *     are keyed on them. A later phase promotes a `silent` finding on its
  *     first sighting, for example, so a signal spelled any other way must
@@ -103,6 +104,19 @@
  * A missing `security` flag stays null rather than defaulting to false,
  * because this parser does not get to decide that a bug has no security
  * impact.
+ *
+ * ## An out-of-scope entry's kind
+ *
+ * An `out_of_scope_bugs` entry's `kind` says what sort of leftover it
+ * is, one of {@link BUG_KINDS}. It is a different field from a
+ * finding's `kind`, with its own list.
+ *
+ * It is the one closed-set field that never reads as null. The key was
+ * added after reports of three keys per entry were already being
+ * written, so an entry with no `kind` reads as `bug` with no issue: a
+ * session on an older prompt changes nothing. A value outside the list
+ * is reported as `unusable-field` and also reads as `bug`, the kind an
+ * entry had before the key existed.
  *
  * ## Change notes
  *
@@ -233,6 +247,22 @@ export const CHANGE_LEVELS = ['patch', 'minor', 'major', 'none'] as const;
 /** One of the four change levels. */
 export type ChangeLevel = (typeof CHANGE_LEVELS)[number];
 
+/**
+ * What sort of leftover an `out_of_scope_bugs` entry is: `bug`, code
+ * doing the wrong thing that this plan did not cause; `own-fallout`,
+ * something an earlier task of this plan broke or left stale; `own-gap`,
+ * something this plan built and left unfinished; `convention`, a file
+ * too long or a name off the pattern; `docs`, a stale doc line;
+ * `machine`, this machine's fault.
+ */
+export const BUG_KINDS = ['bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine'] as const;
+
+/** One of the six out-of-scope entry kinds. */
+export type BugKind = (typeof BUG_KINDS)[number];
+
+/** The kind an entry with no usable `kind` reads as. */
+const DEFAULT_BUG_KIND: BugKind = 'bug';
+
 /** One key the parser does not know, at whatever level it was written. */
 export interface ReportExtra {
   /** The key as written. */
@@ -284,6 +314,12 @@ export interface ReportBug {
   readonly artifact: string | null;
   /** Whether the bug has a security impact. Required; never defaulted. */
   readonly security: boolean | null;
+  /**
+   * What sort of leftover it is. Never null: an absent key reads as
+   * `bug` with no issue, and a value outside {@link BUG_KINDS} as `bug`
+   * with an `unusable-field` issue.
+   */
+  readonly kind: BugKind;
   /** Every key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -436,7 +472,7 @@ const FINDING_KEYS = [
 const BLOCKER_KEYS = ['what', 'artifact'];
 
 /** An out-of-scope bug's keys. */
-const BUG_KEYS = ['what', 'artifact', 'security'];
+const BUG_KEYS = ['what', 'artifact', 'security', 'kind'];
 
 /** A change note's keys. */
 const CHANGE_KEYS = ['level', 'area', 'summary'];
@@ -630,6 +666,7 @@ function readBug(item: unknown, field: string, issues: ReportIssue[]): ReportBug
     what: stringField(scope, 'what', REQUIRED),
     artifact: stringField(scope, 'artifact', OPTIONAL),
     security: booleanField(scope, 'security', REQUIRED),
+    kind: choiceField(scope, 'kind', BUG_KINDS, OPTIONAL) ?? DEFAULT_BUG_KIND,
     extras: scope.extras,
   };
 }

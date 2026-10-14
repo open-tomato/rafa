@@ -127,7 +127,7 @@ function blocker(what: string, artifact: string | null): ReportBlocker {
 
 /** An out-of-scope bug as `parseReport` answers one. */
 function bug(what: string, artifact: string | null): ReportBug {
-  return { what, artifact, security: false, extras: [] };
+  return { what, artifact, security: false, kind: 'bug', extras: [] };
 }
 
 /** A CI reading of `planStub`. */

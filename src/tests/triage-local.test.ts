@@ -106,7 +106,7 @@ afterEach(() => {
 
 /** One `out_of_scope_bugs` entry, as a session's report would carry it. */
 function bug(what: string, artifact: string | null, security: boolean | null): ReportBug {
-  return { what, artifact, security, extras: [] };
+  return { what, artifact, security, kind: 'bug', extras: [] };
 }
 
 /** One `blockers` entry naming `what`, with no artifact of its own. */

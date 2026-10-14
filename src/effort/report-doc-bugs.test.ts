@@ -40,7 +40,7 @@ function freshRoot(): string {
 
 /** A bug as `parseReport` answers one, its `what` never null. */
 function bug(what: string, artifact: string | null = null): ReportBug & BugText {
-  return { what, artifact, security: false, extras: [] };
+  return { what, artifact, security: false, kind: 'bug', extras: [] };
 }
 
 /** Stores one session's bugs under a root, as the loop stores a report's. */

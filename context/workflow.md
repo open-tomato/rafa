@@ -124,7 +124,8 @@ merge base with the run's base branch. A plan whose sessions reported no stale
 line is handed the files alone, under a line saying so. The task's own report
 then splits what it found: a line it could not settle goes into its
 `stale_docs` field and is stored as an `unsettled` row; a line about code goes
-into `out_of_scope_bugs` and takes the ordinary bug route.
+into `out_of_scope_bugs` under its `kind`, and takes the route that kind has
+(`context/triage.md`).
 
 **The per-release issue.** Each unsettled row becomes one line in the release's
 stale-docs issue: a `chore` issue titled
@@ -284,7 +285,7 @@ the repair got its session. The stage steps still due run before the first
 open task after it. The blocked task holds until its session completes or a
 human unblocks it by removing the `[BLOCKED]` mark on its line in the tracker.
 
-**A repair line names the task it repairs, and the repair is handed that
+**A suite repair line names the task it repairs, and the repair is handed that
 task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
 after its declaration and before its blocker comment, and `TaskInfo.repairs`
 reads the text back (`src/utils/tracker.ts`). A task-step repair names the
@@ -296,6 +297,8 @@ below the named task, and under `plan.inject: task` as the repair's line alone
 within that stage's context. A repair that names nothing is handed the whole
 plan with no warning. One that names a task the plan no longer holds is handed
 the whole plan too, with a warning that says the repair was looking for it.
+A leftover repair the triage adds (`context/triage.md`) carries no repairs
+comment, so it names no task.
 
 ### What reaches a loop session
 

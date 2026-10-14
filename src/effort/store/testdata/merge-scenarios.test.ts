@@ -196,6 +196,8 @@ describe('the scenarios, read back', () => {
     expect(shared(a, old, 'findings')).toEqual(['["finding-s1"]', '["finding-s2"]']);
     expect(hasTable(old, 'stale_docs')).toBe(false);
     expect([...byIdentity(a, 'stale_docs').keys()]).toEqual(['["stale-a1"]']);
+    expect(hasTable(old, 'bug_routes')).toBe(false);
+    expect([...byIdentity(a, 'bug_routes').keys()]).toEqual(['["route-a1"]']);
   });
 
   it('7: the two stores name different projects', () => {

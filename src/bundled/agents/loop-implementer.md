@@ -33,6 +33,16 @@ with no `packages/` directory and no workspace boundaries to navigate.
   past the width cap.
 - **Never widen scope.** The task is the deliverable. A real problem found
   outside it is reported, not fixed.
+- **Kind of each out-of-scope entry.** Every entry of `out_of_scope_bugs`
+  carries a `kind`: `bug`, `own-fallout`, `own-gap`, `convention`, `docs`
+  or `machine`. `bug` is for code that does the wrong thing and that this
+  plan did not cause. What an earlier task of this plan broke or left
+  stale is `own-fallout`; what this plan built and left unfinished is
+  `own-gap`. A file too long or a name off the pattern is `convention`,
+  and this machine's fault is `machine`. A stale doc line goes into
+  `stale_docs`; `docs` is the fallback for one written in the wrong field.
+  The loop checks every `own-` claim, so a guess between `bug` and
+  `own-fallout` is written as `bug`.
 
 ## Verification
 

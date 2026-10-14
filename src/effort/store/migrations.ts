@@ -626,6 +626,47 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
     WHERE origin_store IS NOT NULL;
   `,
   },
+  // One row per `out_of_scope_bugs` entry the triage step routed, outside
+  // the port's row map and shaped as `stale_docs` is: `seq`, the findings
+  // provenance with no `outcome`, the entry, and the origin pair, which
+  // this table holds from its first row since it is created after
+  // `row-origins`. `entry_index` is the entry's place in the report's
+  // parsed list, from 0. `said` is the kind the session wrote, NULL for an
+  // entry whose report held no `kind` key; `kind` is the one the loop
+  // routed it under; `route` is where it went. The three CHECKs spell the
+  // six kinds of `BUG_KINDS` (`src/report/parse.ts`) and the eight routes
+  // of `BUG_ROUTES` (`bug-routes.ts`). `plan_stub` is NULL for a row
+  // written under no plan. `bug_routes_by_entry` holds one session's
+  // repeat of an entry to one row, so a triage repeated on a resumed run
+  // writes its rows once. `bug-routes.ts` holds the row type.
+  {
+    id: 'bug-routes',
+    breaks: [],
+    sql: `
+  CREATE TABLE bug_routes (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    entry_index  INTEGER NOT NULL CHECK (entry_index >= 0),
+    what         TEXT NOT NULL CHECK (what <> ''),
+    said         TEXT CHECK (said IN ('bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine')),
+    kind         TEXT NOT NULL CHECK (kind IN ('bug', 'own-fallout', 'own-gap', 'convention', 'docs', 'machine')),
+    route        TEXT NOT NULL CHECK (route IN ('filed', 'private', 'machine', 'inherited', 'repair', 'follow-up', 'pr-body', 'docs')),
+    collected_at TEXT NOT NULL,
+    origin_store TEXT,
+    origin_seq   INTEGER
+  );
+
+  CREATE UNIQUE INDEX bug_routes_by_entry
+    ON bug_routes (session_id, entry_index, what);
+
+  CREATE UNIQUE INDEX bug_routes_by_origin
+    ON bug_routes (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+  `,
+  },
 ];
 
 /**

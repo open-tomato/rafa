@@ -25,8 +25,9 @@ import type { LoopRow, LoopsSegment, TrendOptions, TrendSegment } from './report
 import type { EffortReport } from './report.js';
 
 import { readStatusWidget } from './dashboard-status.js';
+import { readSkillsReport } from './report-skills-read.js';
 import { readTrendInputs, trendReportOf } from './report-trend-read.js';
-import { buildReport, readSkillsReport } from './report.js';
+import { buildReport } from './report.js';
 
 /** The outcome a finished task reports. */
 const DONE_OUTCOME = 'done';

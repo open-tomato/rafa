@@ -402,7 +402,7 @@ describe('triage: writeTriage records blockers and out-of-scope bugs', () => {
       taskLine: 'Add the forward-compat suite',
     };
     const blocker: ReportBlocker = { what: 'a blocker the tail did not cause', artifact: null, extras: [] };
-    const bug: ReportBug = { what: 'a bug the tail did not cause', artifact: null, security: false, extras: [] };
+    const bug: ReportBug = { what: 'a bug the tail did not cause', artifact: null, security: false, kind: 'bug', extras: [] };
 
     const result = writeTriage(repoRoot, { dispatch, outcome: 'done', blockers: [blocker], outOfScopeBugs: [bug] });
 

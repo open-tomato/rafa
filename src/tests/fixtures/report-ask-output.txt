@@ -1,17 +1,17 @@
-`planted-gotcha.md` describes one gotcha, reported below as one finding. No files were changed.
+`planted-gotcha.md` describes one gotcha: in Node.js, `Buffer.prototype.slice()` doesn't copy the bytes. It returns a view onto the same memory, so writing through the slice also changes the original buffer.
 
-The gotcha is that `.slice()` on a Node.js `Buffer` returns a view, a second handle onto the same memory, so a write through the slice also changes the original buffer. The file names no fix, so the resolution in the finding (copy with `Buffer.from(buf)` when independent bytes are needed) comes from general Node.js knowledge and was not run here.
+Nothing fails when this happens, so it's a silent gotcha. To get an independent copy, use `Buffer.from(buf.subarray(start, end))`, or allocate a new buffer and `copy()` into it. I only read the file and made no changes to the directory.
 
 ```rafa:report
 status: done
 feedback: |
-  Read planted-gotcha.md and reported the gotcha it describes as one finding. The file states the behaviour only; the resolution field is general Node.js knowledge and was not executed in this session. No files were changed and no commands were run beyond reading the file.
+  Read planted-gotcha.md and reported its single gotcha as one finding. Buffer.slice() in Node.js returns a view over the same memory, so writes through the slice change the original buffer. No files were changed.
 findings:
-  - trigger: "when calling .slice() on a Node.js Buffer and then writing through the result"
+  - trigger: "when slicing a Node.js Buffer and then writing to the slice"
     kind: gotcha
-    what: "Buffer.slice() returns a view onto the same underlying memory, so writing through the slice also mutates the bytes of the buffer it was sliced from"
-    cause: "a Buffer slice shares the original buffer's memory instead of copying it, unlike Array.prototype.slice"
-    resolution: "copy explicitly when independent bytes are needed, for example Buffer.from(buf) or Uint8Array.prototype.slice.call(buf), and treat a slice as a shared view"
+    what: "Buffer.slice() returns a view onto the same underlying memory, not a copy, so writes through the slice also change the source buffer"
+    cause: "Buffer.prototype.slice shares the parent buffer's ArrayBuffer memory, the same as subarray(), unlike Array.prototype.slice, which copies"
+    resolution: "copy explicitly when an independent buffer is needed, for example Buffer.from(buf.subarray(start, end)) or Buffer.alloc plus buf.copy()"
     artifact: ".slice()"
     signal: silent
     domain: general-best-practices
@@ -20,6 +20,6 @@ blockers: []
 out_of_scope_bugs: []
 changes:
   - level: none
-    summary: "no code changed; the planted gotcha was read and reported as a finding"
+    summary: "no code changes; one gotcha reported from planted-gotcha.md"
 stale_docs: []
 ```

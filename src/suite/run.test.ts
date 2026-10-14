@@ -51,6 +51,7 @@ import {
   CLAUDE_CODE_ENV,
   FORCE_COLOR_ENV,
   OUTPUT_TAIL_LINES,
+  parseJunitCases,
   parseJunitFailures,
   parseJunitFiles,
   readNoTestFiles,
@@ -242,6 +243,38 @@ describe('parseJunitFiles', () => {
   it('answers null for text that is not a whole report', () => {
     expect(parseJunitFiles('')).toBeNull();
     expect(parseJunitFiles('<testsuites><testsuite name="a.test.ts">')).toBeNull();
+  });
+});
+
+describe('parseJunitCases', () => {
+  it('answers every case once with its outcome, a passing and a skipped one included', () => {
+    expect(parseJunitCases(fixture('mixed.junit.xml'))).toEqual([
+      { file: 'a.test.ts', name: 'passes', outcome: 'passed' },
+      { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>', outcome: 'failed' },
+      { file: 'a.test.ts', name: 'skipped', outcome: 'skipped' },
+      { file: 'a.test.ts', name: 'todo one', outcome: 'skipped' },
+      { file: 'sub/b.test.ts', name: 'b fails', outcome: 'failed' },
+      { file: 'sub/b.test.ts', name: 'b ok', outcome: 'passed' },
+    ]);
+  });
+
+  it('names a failed case as parseJunitFailures does', () => {
+    const failed = parseJunitCases(fixture('failed-cases.junit.xml'))
+      ?.filter((testCase) => testCase.outcome === 'failed')
+      .map(({ file, name }) => ({ file, name }));
+
+    expect(failed).toEqual(failuresOf('failed-cases')?.map(({ file, name }) => ({ file, name })));
+    expect(failed?.length).toBeGreaterThan(0);
+  });
+
+  it('reads a failure as outranking a skip in one testcase', () => {
+    expect(parseJunitCases(oneCase('<skipped /><failure type="Error" message="boom" />'))).toEqual([{ file: 'x.test.ts', name: 't', outcome: 'failed' }]);
+    expect(parseJunitCases(oneCase('<skipped message="TODO" />'))).toEqual([{ file: 'x.test.ts', name: 't', outcome: 'skipped' }]);
+  });
+
+  it('answers null for text that is not a whole report', () => {
+    expect(parseJunitCases('')).toBeNull();
+    expect(parseJunitCases('<testsuites><testsuite name="a.test.ts">')).toBeNull();
   });
 });
 

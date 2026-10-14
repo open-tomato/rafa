@@ -86,7 +86,7 @@ function reportOf(bug: ReportBug): TaskReport {
 }
 
 function testBug(what: string, artifact: string): ReportBug {
-  return { what, artifact, security: false, extras: [] };
+  return { what, artifact, security: false, kind: 'bug', extras: [] };
 }
 
 function triagePlan(

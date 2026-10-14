@@ -165,7 +165,7 @@ function staleDoc(where: string | null, what: string): ReportStaleDoc {
 
 /** A bug with no artifact: it has no key, so it is filed with one `create` and no lookup. */
 function bug(what: string, security: boolean): ReportBug {
-  return { what, artifact: null, security, extras: [] };
+  return { what, artifact: null, security, kind: 'bug', extras: [] };
 }
 
 /** The row an entry at `index` is answered with, its line `problem`. */

@@ -925,7 +925,27 @@ describe('the pull request event in each output mode', () => {
     expect(WRAP_UP_RUN.lastIndexOf('await emitPullRequestEvent(expected.branch, null, lookup);', halt)).toBeGreaterThan(-1);
     expect(delivered).toBeGreaterThan(-1);
     expect(delivered).toBeLessThan(interrupted);
-    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\(expected\.branch, null, lookup\);\n\s*\}\n\s*if \(ciWait\)/);
+    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\(expected\.branch, null, lookup\);\n\s*\}\n/);
+  });
+});
+
+describe('where runWrapUp writes the plan\'s conventions section', () => {
+  it('writes it once, after both delivery branches and before the CI gate', () => {
+    const write = WRAP_UP_RUN.indexOf('await writeConventionLines(');
+    const noneBranch = WRAP_UP_RUN.indexOf('// A `none` provider delivers nothing');
+
+    expect(NAMES.filter((name) => name === 'writeConventionLines')).toHaveLength(1);
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('writeConventionLines'));
+    expect(NAMES.indexOf('writeConventionLines')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+    expect(noneBranch).toBeGreaterThan(-1);
+    expect(write).toBeGreaterThan(noneBranch);
+  });
+
+  it('hands it the run\'s roots, branch, settings and stub, and the run\'s provider reading', () => {
+    expect(callTo(CALLS, 'writeConventionLines').args).toEqual([
+      '{ repoRoot, checkout, branch: expected.branch, settings, planStub }',
+      '{ readProvider }',
+    ]);
   });
 });
 

@@ -1,24 +1,94 @@
 ## Triage
 
-`src/triage/` routes each out-of-scope bug in a task report to a channel and
-decides whether to file a new issue, comment on an existing one, or skip it.
-It also answers each `stale_docs` entry of a report on the `docs` channel,
-which reaches no tracker. The loop calls `triageReport` from
-`src/start/triage.ts` and `rafa epic close` from `src/commands/epic/close.ts`;
-the triage writer stores every bug and its action in the effort store, keyed
-by the bug's recurrence key, not the artifact the report's findings use.
+`src/triage/` routes each out-of-scope entry of a task report by its kind,
+and each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
+`own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
+`bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
+from `src/start/triage.ts` and `rafa epic close` from
+`src/commands/epic/close.ts`. The triage writer stores every bug and its
+action in the effort store, keyed by the bug's recurrence key, not the
+artifact the report's findings use, and each routed entry leaves one row in
+the `bug_routes` table (`src/effort/store/bug-routes.ts`) naming the kind the
+session said, the kind the loop routed it under and the route it took.
 
-### The four channels
+### The kinds and their routes
 
-A bug is routed to one of three channels before it reaches the tracker, and a
-`stale_docs` entry to a fourth:
+`src/triage/kind-route.ts` routes an entry after the security rule and the
+kind check. Read top to bottom:
 
-**Public.** A bug the machine-fault reading does not match and whose
-`security` flag is `false`. It is looked up by its key, and a recurrence is
-read for state: open issues are commented on; closed as completed (done or
-released), it is superseded by a new issue; closed as not planned or
-duplicate, it is commented on only. Security bugs stay off this channel
-entirely; a stored reference is never read or written for one.
+| Kind | Route |
+| --- | --- |
+| `bug` | the check may read it as `own-fallout`, `own-gap` or inherited; otherwise the public, private or machine channel, as before kinds |
+| `own-fallout` | after the check: a `repair` task while the plan holds fewer than its cap, else a `follow-up` row |
+| `own-gap` | as `own-fallout` |
+| `convention` | a `pr-body` row: one line of the pull request's `## Conventions` section; no tracker call |
+| `docs` | a `docs` row: a `sighting` row of `stale_docs`; no tracker call |
+| `machine` | a `machine` row: skipped on the machine channel, as a machine-fault bug is; no tracker call |
+
+A session that wrote no `kind` key reads its entry as `bug`, with no parser
+issue, so a session on an older prompt changes nothing. A value outside the
+six is reported as an `unusable-field` issue and also reads as `bug`.
+`bug_routes.said` holds the kind the session wrote, null when it wrote no
+usable one; the effort report counts the routed kind, never the said one.
+
+**The security rule comes first.** An entry whose `security` flag is `true`
+or missing takes the private channel whatever its kind. No test is run for
+it, and no repair task, follow-up line, pull request line or `stale_docs` row
+is written for it, so no security entry leaves the private channel.
+
+### The check on the base and the head
+
+The session that reports a red test is not the one that turned it red, and it
+cannot see the plan's base, so the loop checks every `own-` claim and every
+`bug` that names a test or a path. `checkKind` (`src/triage/own-check.ts`)
+reads the entry down a decision table, the first row that holds answering.
+An entry the session said is `convention`, `docs` or `machine` is taken as
+said and nothing is read.
+
+| The entry | Answer |
+| --- | --- |
+| names a test case, not red on the head | `bug` |
+| names a test case, not runnable on the plan's base | `bug` |
+| names a test case, red on the base and on the head | inherited: unfiled, as a run-start failure is |
+| names a test case, green on the base, red on the head | `own-fallout` |
+| names no test case, the plan's files not read | `bug` |
+| names no test case, a path outside the plan's files | `bug` |
+| names no test case, every path one of the plan's files | `own-gap` |
+| names neither a test case nor a path | the kind as said |
+
+An `own-` claim the check does not confirm reads as `bug`. For `own-gap`
+every path the entry names must be one of the plan's files, so one neighbour's
+file makes the entry a `bug`. A named path is a plan file when it equals one,
+with any leading `./` taken off; when it is absolute and ends in one; or when
+it is a bare file name and a plan file has that base name.
+
+**What it costs.** The head is read first: the named test file runs once at
+`HEAD` of the run checkout, and only when the case is red there does it run
+once at the plan's base. Each run is one test file, never the suite. It runs
+in a detached temporary worktree of that commit with the run checkout's
+`node_modules` linked in, removed afterwards, and is cached per commit and
+file for the whole run, so two bugs naming two cases of one file cost one
+run (`src/triage/base-run.ts`). A file missing at the commit, under
+`node_modules` or outside the checkout is not run, and reads as
+`unrunnable`, so its entry is a `bug`. The plan's base is the merge base of
+`HEAD` and `refs/remotes/origin/<pr.base>`, and the plan's files are the
+paths `git diff --name-only -z` names between that base and `HEAD`
+(`src/triage/plan-commits.ts`). A report with no test named costs those git
+reads, made again for each report. A failed read reads as a base or a file
+list the loop cannot use, so the entry is a `bug`: the cost falls on filing,
+never on hiding.
+
+### The channels
+
+A bug is routed to one of three channels before it reaches the tracker, and
+a `stale_docs` entry to a fourth:
+
+**Public.** A `bug` whose `security` flag is `false`, which the machine-fault
+reading does not match and the check leaves a `bug`. It is looked up by its
+key, and a recurrence is read for state: open issues are commented on; closed
+as completed (done or released), it is superseded by a new issue; closed as
+not planned or duplicate, it is commented on only. Security bugs stay off this
+channel entirely; a stored reference is never read or written for one.
 
 **Private.** A bug whose `security` flag is `true` or missing. It goes to a
 second local tracker rooted at `PRIVATE_TRIAGE_DIR` (`.rafa/triage/private`),
@@ -37,7 +107,9 @@ at all: neither tracker is asked anything, no reference is stored, and its
 action is `skipped`. Its problem says the family and the text that matched,
 redacted as every problem here is, so a run says why nothing was filed. The
 bug is not lost — `writeTriage` stores every out-of-scope bug and its scope
-column, so the row says `machine`.
+column, so the row says `machine`. An entry of kind `machine` takes the same
+channel with the same action, its problem saying it is machine-scoped as its
+kind says.
 
 **Docs.** A `stale_docs` entry, which is no bug. It is the `machine`
 channel's twin: no find, no create, no comment on either tracker, no
@@ -56,7 +128,75 @@ The entries are kept, but not by this channel. The loop stores the report
 before it is triaged, and `storeTaskReport` (`src/report/record.ts`) writes
 each entry to the store's `stale_docs` table as a `sighting` row
 (`src/effort/store/stale-docs.ts`). The docs row says the entry reached no
-tracker; it says nothing of whether its store row was written.
+tracker; it says nothing of whether its store row was written. A `docs` kind
+entry of `out_of_scope_bugs` is the other route to that table: it is stored
+as a `sighting` row whose `where` is the first path its `what`, then its
+`artifact`, names, or null, and its `bug_routes` row says `docs`.
+
+### The repair task and its cap
+
+`src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
+`own-gap` entry through `insertTrackerTask` (`src/utils/tracker.ts`),
+directly above the plan's first open task, `[ ]` or `[BLOCKED]`, or after the
+last task when none is open:
+
+```text
+- [BLOCKED] Repair the own-fallout leftover: <what> <!-- leftover -->  {agent=build-error-resolver}  <!-- blocked: ... -->
+```
+
+The `what` is redacted, then escaped as a blocker is, so a line break or a
+`- [ ]` in it opens no task and a `<!--` in it opens no comment. The blocker
+names the kind, the `what` and the artifact that showed it. An `own-fallout`
+repair is declared `build-error-resolver`, the agent of the suite step's
+repair; an `own-gap` repair `loop-implementer`, since it finishes what the
+plan built. Being blocked, the line is the one the next dispatch answers
+first. `isRepairTask` in `src/start/suite-blocker.ts` reads the same sentence
+as the suite step's repair.
+
+The cap is per plan, and it is counted from the tracker alone: the file's
+`<!-- leftover -->` lines, ticked ones included, are the plan's repairs. No
+repair is added once that count reaches the run's resolved retry count
+(`resolveRunRetries`: `--retry` over `loop.retries`), with `false` as zero.
+Under the default `false` no leftover becomes a repair, and every one goes to
+the follow-up issue. A leftover past the cap, a line the tracker refuses and a
+tracker that cannot be read each become a `follow-up` row, the problem naming
+the failure, so an entry is never lost. Each repair the run adds is one
+`Triage:` line naming its tracker line.
+
+### The follow-up issue
+
+`src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's follow-up
+issue once, after the last task, from `src/start/wrap-up-run.ts`. Its lines
+are the plan's `bug_routes` rows routed `follow-up`, in append order, one
+`- <kind>: <what>` line each, redacted and escaped; a plan with none has no
+issue, and nothing is resolved, called or printed for it.
+
+The issue is of type `bug`, titled `Follow-ups of <stub>`, and its body opens
+with `<!-- rafa:follow-ups <stub> -->`, so it is told from a person's issue
+of the same title. It is found by `openIssues('bug')`, kept to bodies holding
+that marker, then the exact title. A found issue has the lines its body does
+not already hold appended through `edit`, and a body holding every line is
+left alone, so a resumed run or a second wrap-up adds no duplicate. No issue
+found is `create`d with every line. A tracker chain that lands nowhere, or a
+tracker with no `edit` or no `openIssues`, creates nothing: its lines are
+printed once under a heading naming the issue they would have gone to. A
+failure is one warning line, the rows stay in the store, and the next
+wrap-up files them again.
+
+### The conventions section
+
+`src/start/convention-body.ts` (`writeConventionLines`) writes the plan's
+`convention` lines into a `## Conventions` section of the open pull request's
+body, from `src/start/wrap-up-run.ts` once the pull request is delivered. Each
+line is `- <what>`, redacted and escaped as a follow-up line is. A section
+that is not there goes below the body's last paragraph; one that is there
+gets the lines it lacks before the next heading of level one or two.
+
+The body is written through the same read-modify-write as the release body
+(`src/start/release-body.ts`), so a body the section would not change is left
+alone, and a re-run writes nothing. A `none` provider spawns no `gh`: the
+lines are printed instead. A plan with no `pr-body` row has no section. A
+failure is one warning line, and never stops the run.
 
 ### Stale-doc rows: two kinds
 
@@ -99,21 +239,32 @@ tracker that cannot list and edit answers `kept`, and the line is printed,
 since the close has no "after the last task" to hold it for. The close is
 refused all the same, since the criterion does not hold.
 
-### The drift count in `rafa effort report`
+### What `rafa effort report` reads
 
-`rafa effort report` prints one line, `filed bugs naming only documentation:
-N of M`, from `src/effort/report-doc-bugs.ts`. M counts the
-`out_of_scope_bugs` rows of scope `rafa`, the bugs a tracker could be handed,
-and N counts those whose `what` and `artifact` read as ONE text name only
-documentation, by `namesOnlyDocs`. The two fields are joined by a line break
-because the reading is split across the pair both ways: a `what` naming a page
-beside an `artifact` naming a source file is a bug about code, and a `what`
-naming a page beside an artifact quoting the page's sentence is a bug about
-the page. A `machine` row is in neither figure.
+`rafa effort report` prints two readings of the triage.
 
-This count is the control for a session filing a stale page as a bug instead
-of a `stale_docs` entry. It reads zero while the sessions keep the two fields
-apart; a figure that rises says they have stopped.
+The first is one line, `filed bugs naming only documentation: N of M`, from
+`src/effort/report-doc-bugs.ts`. M counts the `out_of_scope_bugs` rows of
+scope `rafa`, the bugs a tracker could be handed, and N counts those whose
+`what` and `artifact` read as ONE text name only documentation, by
+`namesOnlyDocs`. The two fields are joined by a line break because the
+reading is split across the pair both ways: a `what` naming a page beside an
+`artifact` naming a source file is a bug about code, and a `what` naming a
+page beside an artifact quoting the page's sentence is a bug about the page.
+A `machine` row is in neither figure. This count is the control for a session
+filing a stale page as a bug instead of a `stale_docs` entry. It reads zero
+while the sessions keep the two fields apart; a figure that rises says they
+have stopped.
+
+The second is the section `out-of-scope entries by routed kind`
+(`src/effort/report-kinds.ts`, rendered by `src/effort/report-format.ts`): one
+row per plan, under its stub with the rows of no plan last, giving its
+entries, those routed `filed`, the share of them filed, and the count under
+each kind in the order of `BUG_KINDS`. It counts the kind the loop routed each
+entry under, so a sweep whose entries are its own fallout reads a low share
+and one that files everything reads a high one. A store with no `bug_routes`
+row prints no section; a store that cannot be read prints the heading with
+the problem in place of the rows.
 
 ### The key and the two-step match
 
@@ -172,7 +323,9 @@ the comment is made, so one red test reported by every task of a run comments
 once. A closed issue, or none, is left alone, and create is never called.
 Closed as completed, the run still files nothing, since it inherited the
 failure before its own work. Security and machine-scoped bugs are never read
-against the failures.
+against the failures. The check's red-on-both answer
+(`src/triage/own-check.ts`) is unfiled in the same way, with its route row
+`inherited`.
 
 ### State read on a repeat
 
@@ -204,3 +357,32 @@ Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
   `Possible duplicates` section when the step files a bug with no match at
   the threshold. Default is `3`.
 
+### Three cases, lightest first
+
+The problem these kinds answer, in the design session's words: "its bug
+sweeps are creating more bugs than closing in some iterations", and "I want
+to be done leaving breadcrumbs (as analogy of microscopic repetitive issues)
+every time we chomp on an issue of the board."
+
+**A plan of two tasks.** The second task meets a test the first turned red,
+and its report names that test as `own-fallout`. The check runs the test at
+the plan's base, where it is green, and at `HEAD`, where it is red, and the
+triage adds a repair task above the second task's line, which the next
+dispatch takes, so the fix lands in the same pull request. This needs the
+run's retry count at one or more. Under the default `false` the same entry is
+a `follow-up` row, a line of the plan's follow-up issue.
+
+**A bug sweep of several fixes.** One fix leaves a gap in a file its own
+commits touched, and its report says `own-gap`. Every path it names is one of
+the plan's files, so the check confirms it, and the repair is finished in the
+same sweep rather than filed for the next one. The cap is the same as above.
+
+**A long plan that runs out of retries.** Once the plan holds as many repair
+tasks as its cap allows, each further leftover becomes a `follow-up` row. At
+wrap-up those rows are one `bug` issue, `Follow-ups of <stub>`, with a line
+per leftover, and a later wrap-up of the same plan appends to that issue
+without a duplicate.
+
+Rejected, each with its reason: the session decides the kind alone, since it
+cannot see the plan's base; and filing every leftover now and closing it at
+the next pit stop, since the issue would still exist first.

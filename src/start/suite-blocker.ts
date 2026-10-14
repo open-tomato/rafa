@@ -106,6 +106,12 @@
  * the most a pre-wrap-up step adds, and a second red is answered as a
  * repair blocked again ({@link RepairWritten.inserted} false), which the
  * caller halts on.
+ *
+ * {@link isRepairTask} also reads the line the triage inserts for a
+ * leftover of the plan's own, `Repair the own-fallout leftover: <what>
+ * <!-- leftover -->` and its `own-gap` twin (`isLeftoverRepairTask` in
+ * `triage/leftover-repair.ts`), as a repair's: a red task step after one
+ * writes its blocker on that line, as it does after a step's repair.
  */
 import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
 import type { PlanTask } from '../core/plan/index.js';
@@ -116,6 +122,7 @@ import type { InsertedTask } from '../utils/tracker.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { parsePlan } from '../core/plan/index.js';
+import { isLeftoverRepairTask } from '../triage/leftover-repair.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { outsideCaseText } from './suite-outside-case.js';
@@ -424,9 +431,12 @@ export function repairTaskText(kind: RepairStepKind, commit: string | null): str
   return `Repair the red ${kind} step at commit ${shown}`;
 }
 
-/** True when `text`, a task's sentence without its declaration, is a repair task's. */
+/**
+ * True when `text`, a task's sentence without its declaration, is a
+ * repair task's: a red step's, or a leftover's the triage inserted.
+ */
 export function isRepairTask(text: string): boolean {
-  return REPAIR_TASK.test(text.trim());
+  return REPAIR_TASK.test(text.trim()) || isLeftoverRepairTask(text);
 }
 
 /** The line of the last task whose sentence is `text`, or null. */
