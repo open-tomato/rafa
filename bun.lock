@@ -7,6 +7,7 @@
       "devDependencies": {
         "@eslint/js": "^9.39.4",
         "@eslint/markdown": "^8.0.3",
+        "@open-tomato/define-config": "0.5.0",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/bun": "^1.4.0",
         "@types/node": "^26.4.1",
@@ -68,6 +69,8 @@
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
+
+    "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
 
     "@open-tomato/rafa-hub": ["@open-tomato/rafa-hub@workspace:packages/rafa-hub"],
 

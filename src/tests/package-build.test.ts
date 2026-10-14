@@ -276,6 +276,35 @@
  * which the pack case above pins. It builds both commands from the
  * manifest's own `name`, so renaming the package reddens it too.
  *
+ * ## The config library, folded in
+ *
+ * `@open-tomato/define-config` is a devDependency, pinned at `0.5.0`, that
+ * `bun build` folds into the bundles, so the published manifest still
+ * declares no runtime dependency. Three cases hold that: the manifest
+ * `bun pm pack` writes into the tarball carries no `dependencies` (or an
+ * empty one), `dist/cli.js` carries no `import`, `from` or `require` of
+ * the package, and a copy of the build where no `node_modules` sits at
+ * or above it answers `--version`, exit 0. A fourth builds a probe that
+ * calls `defineConfig` twice: left external, the bundle carries
+ * `from "@open-tomato/define-config"` and the matcher sees it; folded in,
+ * the bundle carries `function defineConfig(` and no load.
+ *
+ * The `--version` run passes `--no-install`. Measured on bun 1.3.14:
+ * with no `node_modules` found, bun auto-installs a package the script
+ * imports, so a probe importing the library from an empty directory
+ * printed `function`, exit 0, and the same probe under `--no-install`
+ * exited 1 with `Cannot find module '@open-tomato/define-config'`.
+ *
+ * Driven on 2026-10-14, one run of this file each, 66 pass before and after,
+ * with `package.json` and `src/rafa.ts` restored byte-identical (sha256).
+ * `dependencies` naming the library reddened 2 of 66: the pack case and
+ * the absence case above. `src/rafa.ts` importing the library with the
+ * CLI built `--external` to it reddened 1 of 66 without `--no-install`
+ * (the matcher case), and 2 of 66 with it, the `--version` run among
+ * them. The same import with no `--external` stopped the build itself,
+ * 55 of 66: the scratch package copies no `node_modules`, so its build
+ * cannot resolve the library until it is given one.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -414,6 +443,22 @@ const DEPENDENCY_KEYS = [
   'optionalDependencies',
   'bundleDependencies',
   'bundledDependencies',
+];
+
+/** The config library the build folds into its bundles, and the version the manifest pins it at. */
+const DEFINE_CONFIG = '@open-tomato/define-config';
+const DEFINE_CONFIG_VERSION = '0.5.0';
+
+/**
+ * Each form a bundle can load {@link DEFINE_CONFIG} by at run time: a
+ * static `import ... from`, a bare `import '...'`, a dynamic `import()`
+ * and a `require()`, each with or without a subpath. A literal naming the
+ * package anywhere else, such as in a message, is not a load.
+ */
+const DEFINE_CONFIG_LOADS = [
+  /\bfrom\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]/g,
+  /\bimport\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]/g,
+  /\b(?:import|require)\s*\(\s*['"`]@open-tomato\/define-config(?:\/[^'"`]*)?['"`]\s*\)/g,
 ];
 
 /** The rafa tier in a checkout, from the repository root, and where the build copies it under `dist/`. */
@@ -593,6 +638,46 @@ afterAll(() => {
 /** The repository's manifest. */
 function readManifest(): Record<string, unknown> {
   return JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
+}
+
+/** Every load of {@link DEFINE_CONFIG} that `text` carries, in the order of {@link DEFINE_CONFIG_LOADS}. */
+function defineConfigLoads(text: string): string[] {
+  return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
+}
+
+/**
+ * Builds a probe calling `defineConfig` to `out.js` under its own scratch
+ * directory, whose `node_modules` links the package the repository
+ * installed, with `external` naming the packages the build leaves to be
+ * loaded at run time. Returns the bundle's text.
+ */
+function buildDefineConfigProbe(name: string, external: readonly string[]): string {
+  const dir = join(tempRoot, `define-config-${name}`);
+  mkdirSync(join(dir, 'node_modules', '@open-tomato'), { recursive: true });
+  const installed = realpathSync(join(REPO_ROOT, 'node_modules', DEFINE_CONFIG));
+  symlinkSync(installed, join(dir, 'node_modules', DEFINE_CONFIG), 'dir');
+  writeFileSync(join(dir, 'probe.ts'), [
+    `import { defineConfig } from '${DEFINE_CONFIG}';`,
+    'console.log(typeof defineConfig);',
+    '',
+  ].join('\n'), 'utf8');
+  const flags = external.map((name) => `--external=${name}`);
+  const built = run(
+    [process.execPath, 'build', 'probe.ts', '--target=bun', '--outfile=out.js', ...flags],
+    dir,
+    withBunOnPath(),
+  );
+  expectExit(built, 0, { cwd: dir });
+  return readFileSync(join(dir, 'out.js'), 'utf8');
+}
+
+/** `directory` and every directory above it that holds a `node_modules`. */
+function nodeModulesAbove(directory: string): string[] {
+  const found: string[] = [];
+  for (let current = directory; ; current = dirname(current)) {
+    if (existsSync(join(current, 'node_modules'))) found.push(current);
+    if (dirname(current) === current) return found;
+  }
 }
 
 /** Every file the build wrote, relative to `dist/`, sorted. */
@@ -781,6 +866,52 @@ describe('the package manifest', () => {
     expect(DEPENDENCY_KEYS.filter((key) => key in manifest)).toEqual([]);
     expect(Object.keys(manifest['devDependencies'] as Record<string, unknown>).length).toBeGreaterThan(0);
   });
+});
+
+describe('the config library, folded into the build', () => {
+  it('is a devDependency at the version the plan pins, and the packed manifest declares no runtime dependency', () => {
+    const destination = mkdtempSync(join(tempRoot, 'packed-'));
+    const pack = run(
+      [process.execPath, 'pm', 'pack', '--ignore-scripts', '--quiet', '--destination', destination],
+      PACKAGE_DIR,
+      withBunOnPath(),
+    );
+    const tarball = readdirSync(destination).find((file) => file.endsWith('.tgz')) ?? '';
+    const extract = run(['tar', '-xzf', tarball, 'package/package.json'], destination, withBunOnPath());
+    const packed = JSON.parse(readFileSync(join(destination, 'package', 'package.json'), 'utf8')) as Record<string, unknown>;
+    const devDependencies = readManifest()['devDependencies'] as Record<string, unknown>;
+
+    expectExit(pack, 0, { cwd: PACKAGE_DIR });
+    expectExit(extract, 0, { cwd: destination });
+    expect(devDependencies[DEFINE_CONFIG]).toBe(DEFINE_CONFIG_VERSION);
+    expect(packed['name']).toBe(readManifest()['name']);
+    expect(packed['dependencies'] ?? {}).toEqual({});
+  }, 30_000);
+
+  it('leaves dist/cli.js carrying no import or require of the library', () => {
+    expect(defineConfigLoads(readFileSync(join(DIST, 'cli.js'), 'utf8'))).toEqual([]);
+  });
+
+  it('sees a load the build leaves external, and none once the build folds the library in', () => {
+    const external = buildDefineConfigProbe('external', [DEFINE_CONFIG]);
+    const folded = buildDefineConfigProbe('folded', []);
+
+    expect(defineConfigLoads(external)).toEqual([`from "${DEFINE_CONFIG}"`]);
+    expect(folded).toContain('function defineConfig(');
+    expect(defineConfigLoads(folded)).toEqual([]);
+  }, 30_000);
+
+  it('answers --version from a copy of the build where no node_modules sits at or above it', () => {
+    const copy = join(tempRoot, 'version-outside', 'dist');
+    cpSync(DIST, copy, { recursive: true });
+    const env = { TMPDIR: tmpdir(), PATH: withBunOnPath()['PATH'], ...scratchHomeEnv(tempRoot) };
+    // `--no-install`: with no node_modules found, bun fetches a missing package by itself; see the module note.
+    const version = run([process.execPath, '--no-install', 'cli.js', '--version'], copy, env);
+
+    expect(nodeModulesAbove(copy)).toEqual([]);
+    expectExit(version, 0, { cwd: copy });
+    expect(version.stdout).toBe(`rafa ${String(readManifest()['version'])}\n`);
+  }, 30_000);
 });
 
 describe('the README', () => {
