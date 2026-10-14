@@ -1690,7 +1690,7 @@
     {
       "kind": "source",
       "path": "src/fixtures/scrub.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -3960,13 +3960,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/effort/store/fixture-extract.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/fixtures/scrub.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3982,7 +3975,7 @@
         }
       ],
       "fileCounts": {
-        "source": 88,
+        "source": 89,
         "test": 101,
         "testSupport": 2
       },
@@ -4164,6 +4157,7 @@
         "src/effort/store/tracker-refs.ts",
         "src/effort/store/triage.test.ts",
         "src/effort/store/triage.ts",
+        "src/effort/store/trusted-permissions.ts",
         "src/effort/store/types.test.ts",
         "src/effort/store/types.ts",
         "src/effort/store/wire.test.ts",
@@ -4181,7 +4175,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 113,
+        "src/effort/store/": 114,
         "src/ports/": 2
       },
       "folders": [
@@ -4197,8 +4191,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 36,
-      "upwardEdges": 49
+      "remaining": 35,
+      "upwardEdges": 48
     },
     {
       "clearedByIssue118": 0,
@@ -7905,12 +7899,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1946,
+    "files": 1947,
     "leftToPlace": 700,
-    "nonTestEdges": 4328,
+    "nonTestEdges": 4329,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 292
+    "upwardEdges": 291
   },
   "unassigned": [
     {

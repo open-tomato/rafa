@@ -85,15 +85,18 @@
  *
  * ## The scrub
  *
- * Every text value written goes through the fixture scrub of
- * `src/fixtures/scrub.ts` first: each string of the three files and each
- * object key, placeholders, kept words, timestamps and DDL included. A
- * placeholder never names the machine, but a kept value can: a one-word
- * count-map key or a closed-vocabulary word may be the host name, and a
- * JSON leaf may hold an address. The scrub redacts home paths, email
- * addresses, the host name and named secrets, and throws `ScrubRefusal`,
- * writing nothing, when a leak is left. Two keys of one object that the
- * scrub makes equal throw too, since one would silently drop the other.
+ * Every text value written goes through the scrub the caller hands in
+ * first: each string of the three files and each object key,
+ * placeholders, kept words, timestamps and DDL included. A placeholder
+ * never names the machine, but a kept value can: a one-word count-map
+ * key or a closed-vocabulary word may be the host name, and a JSON leaf
+ * may hold an address. The store builds no scrub of its own, since the
+ * fixture scrub of `src/fixtures/scrub.ts` lives above core:
+ * `scripts/extract-merge-fixture.ts` builds it for the running machine
+ * and hands it in. That scrub redacts home paths, email addresses, the
+ * host name and named secrets, and throws `ScrubRefusal`, writing
+ * nothing, when a leak is left. Two keys of one object that the scrub
+ * makes equal throw too, since one would silently drop the other.
  *
  * Both stores are opened read-only. Every path is passed through the
  * test guard (`guardTestProcess`, `location.ts`) first, so a test reads
@@ -106,8 +109,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
-
-import { fixtureScrubber, machineScrubContext } from '../../fixtures/scrub.js';
 
 import { guardTestProcess } from './location.js';
 import { MERGE_RULES } from './merge-rules.js';
@@ -572,15 +573,14 @@ export function scrubbedTree(value: unknown, scrub: TextScrub): unknown {
 /**
  * Writes `extract` under `outDir` as {@link EXTRACT_FILE_NAMES}, making
  * the directory when absent, and answers the paths written. Every text
- * value goes through `scrub` first, the running machine's fixture scrub
- * unless the caller hands one, as the module note says. Refuses, writing
- * nothing, when any of the three files is already there or when the
- * scrub refuses a value.
+ * value goes through `scrub` first, which the caller hands in, as the
+ * module note says. Refuses, writing nothing, when any of the three
+ * files is already there or when the scrub refuses a value.
  */
 export function writeExtract(
   extract: Extract,
   outDir: string,
-  scrub: TextScrub = fixtureScrubber(machineScrubContext(process.cwd())),
+  scrub: TextScrub,
 ): readonly string[] {
   guardTestProcess(outDir);
   const files: readonly [string, unknown][] = [
