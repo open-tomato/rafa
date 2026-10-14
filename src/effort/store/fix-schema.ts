@@ -79,11 +79,11 @@
  *
  * ## A development build never swaps
  *
- * A development build (`readRuntimeIdentity`, `src/runtime/identity.ts`)
- * builds, checks and deletes a rebuild under `dryRun`, and is refused
- * the swap before anything is built: its migrations may be a branch's,
- * which no installed runtime knows. The parallel file is brought forward
- * with `builtAside`, so the open's own development-build question, which
+ * A development build (`readRuntimeIdentity`,
+ * `src/core/runtime/identity.ts`) builds, checks and deletes a rebuild
+ * under `dryRun`, and is refused the swap before anything is built: its
+ * migrations may be a branch's, which no installed runtime knows. The
+ * parallel file is brought forward with `builtAside`, so the open's own development-build question, which
  * would refuse a file in the project's store directory, is not asked of
  * it; this refusal is that question, asked of the swap.
  *
@@ -94,13 +94,13 @@
 import type { SqliteMigration } from './migrations.js';
 import type { TableRows } from './rebuild-aside.js';
 import type { LoggedMigration, RefusalReason, StoreSchema } from './schema-plan.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { existsSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
-import { readRuntimeIdentity } from '../../runtime/identity.js';
+import { readRuntimeIdentity } from '../../core/runtime/index.js';
 
 import { bringForward, MIGRATION_LOG_TABLE, readStoreSchema, writeNames } from './bring-forward.js';
 import { appliedByName } from './development-build.js';

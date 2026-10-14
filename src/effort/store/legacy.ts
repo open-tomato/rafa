@@ -3,7 +3,7 @@
  * phase 1: the reading `rafa doctor` warns by.
  *
  * Phase 1 moved the store from `.ralph/effort/` to `.rafa/effort/`
- * (`EFFORT_STORE_DIR` in `effort/store.ts`), and no backend reads the old
+ * (`EFFORT_STORE_DIR` in `ndjson-files.ts`), and no backend reads the old
  * directory. So a project whose rows sit only there meets an empty store
  * on its first `effort collect` or `effort report` under this build, and
  * nothing says why. {@link readLegacyStore} answers which store files each
@@ -43,14 +43,14 @@
  * a file, holds no store file. Any other failure, such as a directory with
  * no search permission, throws, naming the path.
  */
-import type { EffortRowKind } from '../store.js';
+import type { EffortRowKind } from './ndjson-files.js';
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { messageOf } from '../../core/config/sections.js';
-import { EFFORT_STORE_DIR, effortStoreFileName } from '../store.js';
 
+import { EFFORT_STORE_DIR, effortStoreFileName } from './ndjson-files.js';
 import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 
 /** Where the store sat before phase 1, under the project root: `.ralph/effort`. */

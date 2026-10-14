@@ -29,10 +29,10 @@
  * one case can never read back a row another left behind.
  */
 import type { SqliteMigration } from './migrations.js';
+import type { PreflightCheck } from './preflight-check.js';
 import type { CommitEffortRow, SessionEffortRow } from './types.js';
 import type { PrerequisiteItem } from '../../core/config/index.js';
 import type { IssueRef } from '../../ports/index.js';
-import type { PreflightCheck } from '../../preflight/run.js';
 import type {
   ReportBlocker,
   ReportBug,

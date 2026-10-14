@@ -60,7 +60,7 @@ import {
   openEffortStore,
   parseStoreText,
   readStoreRows,
-} from './store.js';
+} from './ndjson-files.js';
 
 /** A row shape of this suite's own, not one of the collector's. */
 interface Row {

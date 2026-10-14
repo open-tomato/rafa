@@ -90,24 +90,25 @@
  * the item gives one: `known-missing: mgrep (faster search; grep is the
  * fallback)`. Each run of whitespace in the name or the reason is one
  * space there, so the line stays one line.
+ *
+ * The check's type, its tier and its outcome are core's
+ * (`src/effort/store/preflight-check.ts`), where the store's preflight
+ * writer reads them; this file re-exports them under the same names.
  */
 import type { PreflightItems } from './prerequisites-md.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
+import type { PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
 
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
+
+export type { CheckOutcome, PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;
 
 /** The shell a probe runs through, by absolute path; see the module note. */
 const SHELL = '/bin/sh';
-
-/** The tier an item was configured on. */
-export type PreflightTier = 'required' | 'optional';
-
-/** How one check went: `timeout` is a failure that ran out of time. */
-export type CheckOutcome = 'pass' | 'fail' | 'timeout';
 
 /** The environment a check reads and a probe runs in. */
 export type PreflightEnv = Readonly<Record<string, string | undefined>>;
@@ -141,17 +142,6 @@ export interface ServiceRequestInit {
 
 /** Sends one HTTP request, as `fetch` does; any response is an answer. */
 export type ServiceRequester = (url: string, init: ServiceRequestInit) => Promise<unknown>;
-
-/** One item, checked. */
-export interface PreflightCheck {
-  readonly tier: PreflightTier;
-  readonly item: PrerequisiteItem;
-  readonly outcome: CheckOutcome;
-  /** How long the check took, in whole milliseconds. */
-  readonly durationMs: number;
-  /** What failed, as the halt and the warning word it; null for a pass. */
-  readonly failure: string | null;
-}
 
 /** What a preflight found. */
 export interface PreflightReport {

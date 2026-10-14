@@ -67,8 +67,8 @@
  * is measured rather than habitual: `Bun.file(path).exists()` answers
  * false for a DIRECTORY, so a `.rafa/config.yaml` that is one would
  * pass for no config and the run would go on at defaults. Only absence
- * is absorbed — the rule `effort/store.ts` applies to its own files —
- * and anything at the path that cannot be read is refused.
+ * is absorbed — the rule `effort/store/ndjson-files.ts` applies to its
+ * own files — and anything at the path that cannot be read is refused.
  */
 import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
 

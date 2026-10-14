@@ -99,8 +99,8 @@
  *   - Any text holding a lone UTF-16 surrogate, which SQLite text cannot
  *     hold.
  */
+import type { EffortLevel } from './effort-levels.js';
 import type { SkillResolverName } from '../../core/config/sections.js';
-import type { TaskDeclaration } from '../../utils/declaration.js';
 
 import { existsSync } from 'node:fs';
 
@@ -110,8 +110,26 @@ import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { LONE_SURROGATE, sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
-/** The part of the parser's record a row stores. */
-export type DispatchDeclaration = Pick<TaskDeclaration, 'raw' | 'agent' | 'model' | 'effort' | 'budget' | 'tools'>;
+/**
+ * The part of the parser's record a row stores: the six fields of the
+ * declaration parser's `TaskDeclaration` (`src/utils/declaration.ts`)
+ * this writer reads, declared here so the store imports nothing above
+ * core. A `TaskDeclaration` is assignable to it.
+ */
+export interface DispatchDeclaration {
+  /** The block as it appeared, braces included. */
+  readonly raw: string;
+  /** Agent to dispatch under, or null. */
+  readonly agent: string | null;
+  /** Model alias or full name, or null. */
+  readonly model: string | null;
+  /** Effort level, or null. */
+  readonly effort: EffortLevel | null;
+  /** Budget in US dollars, above zero, or null. */
+  readonly budget: number | null;
+  /** Tool names, deduped in first-seen order, or null. */
+  readonly tools: readonly string[] | null;
+}
 
 /** One write: a dispatched task session, what it declared and what it was spawned with. */
 export interface DispatchWrite {

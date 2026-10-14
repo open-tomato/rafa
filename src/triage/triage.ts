@@ -176,9 +176,10 @@
  *
  * A bug whose `what` and `artifact` name a system toolchain, a machine's
  * SDK path or a package-manager build failure is a fault of the MACHINE
- * the session ran on and not of rafa. `./machine-fault.ts` is the whole
- * of that reading, and its note holds the families, the near misses that
- * shaped them and what it reads over the 27 bugs rafa's own runs filed.
+ * the session ran on and not of rafa. `./machine-fault.ts` re-exports
+ * `src/effort/store/machine-fault.ts`, the whole of that reading, whose
+ * note holds the families, the near misses that shaped them and what it
+ * reads over the 27 bugs rafa's own runs filed.
  * Such a bug goes to a third channel, which has no tracker at all:
  *
  *   - neither tracker is asked anything, the public one or the private

@@ -27,9 +27,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { EFFORT_STORE_DIR, effortStorePath } from '../store.js';
-
 import { LEGACY_EFFORT_STORE_DIR, readLegacyStore, shellQuoted, STORE_FILE_NAMES } from './legacy.js';
+import { EFFORT_STORE_DIR, effortStorePath } from './ndjson-files.js';
 import { sqliteStorePath } from './sqlite.js';
 
 /** A temporary directory of this file's own, its real path. */

@@ -58,8 +58,8 @@
  * refuse are each a {@link WireFormatError}, with the directory removed.
  * The caller removes it after the merge with `release`.
  */
-import type { RuntimeIdentity } from '../../runtime/identity.js';
-import type { SqliteMigration } from '../store/migrations.js';
+import type { SqliteMigration } from './migrations.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -67,15 +67,16 @@ import { join } from 'node:path';
 
 import { Database, SQLiteError } from 'bun:sqlite';
 
-import { readRuntimeIdentity } from '../../runtime/identity.js';
-import { bringForward, MIGRATION_LOG_TABLE } from '../store/bring-forward.js';
-import { appliedByName } from '../store/development-build.js';
-import { guardTestProcess } from '../store/location.js';
-import { MERGE_RULES } from '../store/merge-rules.js';
-import { SQLITE_MIGRATIONS } from '../store/migrations.js';
-import { quoted } from '../store/rebuild-aside.js';
-import { activeStoreSettings } from '../store/settings.js';
-import { SQLITE_STORE_FILE_NAME } from '../store/sqlite.js';
+import { readRuntimeIdentity } from '../../core/runtime/index.js';
+
+import { bringForward, MIGRATION_LOG_TABLE } from './bring-forward.js';
+import { appliedByName } from './development-build.js';
+import { guardTestProcess } from './location.js';
+import { MERGE_RULES } from './merge-rules.js';
+import { SQLITE_MIGRATIONS } from './migrations.js';
+import { quoted } from './rebuild-aside.js';
+import { activeStoreSettings } from './settings.js';
+import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 
 /** What every payload's `format` holds. */
 export const WIRE_FORMAT = 'rafa-effort-wire';

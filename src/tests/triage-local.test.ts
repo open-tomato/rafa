@@ -292,8 +292,8 @@ describe('a machine-scoped bug over the local adapter', () => {
   /**
    * #17's artifact: a linker failure against an Xcode Command Line Tools
    * SDK installed on the machine the session ran on, not against rafa.
-   * `src/triage/machine-fault.test.ts` and `src/triage/triage.test.ts`
-   * already exercise the reading and its routing over spied trackers;
+   * `src/effort/store/machine-fault.test.ts` and
+   * `src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
    * this case is the same pairing over the real `local` adapter.
    */
   const TOOLCHAIN_ARTIFACT = 'ld: tapi error: malformed file: '

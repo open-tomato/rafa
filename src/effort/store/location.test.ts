@@ -25,7 +25,6 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { expectExit, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { EFFORT_STORE_DIR } from '../store.js';
 
 import { fixStoreSchema } from './fix-schema.js';
 import {
@@ -35,6 +34,7 @@ import {
   isTestProcess,
   isUnderTempDir,
 } from './location.js';
+import { EFFORT_STORE_DIR } from './ndjson-files.js';
 import { openNdjsonStore } from './ndjson.js';
 import { openSqliteStore, sqliteStorePath, withSqliteStore } from './sqlite.js';
 

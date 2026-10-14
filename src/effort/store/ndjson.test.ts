@@ -12,12 +12,12 @@
  * the file names and the key fields, rather than read off the module,
  * so a backend routed wrongly fails instead of agreeing with itself.
  * The rule cases hold the sibling's rules at the port's surface, while
- * `effort/store.test.ts` covers the functions underneath. The parity
+ * `ndjson-files.test.ts` covers the functions underneath. The parity
  * case replays one sequence of batches, a planted partial line and a
  * refusal included, through this backend and through the sibling's
  * store opened with the projections the sibling's collector binds, and
  * requires the same bytes and the same answers at every step. It
- * imports that store directly, so retiring `effort/store.ts` has to
+ * imports that store directly, so retiring `ndjson-files.ts` has to
  * carry this case over rather than drop it.
  *
  * Rows are planted by casting partial objects, as the port's own suite
@@ -64,8 +64,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { openEffortStore } from '../store.js';
-
+import { openEffortStore } from './ndjson-files.js';
 import { openNdjsonStore } from './ndjson.js';
 
 /** A session row carrying its key and one counter. The cast is the plant. */
