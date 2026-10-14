@@ -451,6 +451,6 @@ describe('pullBeforeRead', () => {
     expect(reading).toBeNull();
     expect(lines).toEqual([]);
     expect(service.calls).toEqual([]);
-    expect(() => loadConfig({ root, home: HOME }, {}, () => {})).toThrow(ConfigError);
+    await expect(loadConfig({ root, home: HOME }, {}, () => {})).rejects.toThrow(ConfigError);
   });
 });

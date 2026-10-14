@@ -245,7 +245,7 @@ describe('resolveScope on disk', () => {
     expect(rootOf(resolveScope(link, { home: join(freshDir(), 'home') }))).toBe(realpathSync(project));
   });
 
-  it('finds a directory planted at the config path, which loadConfig then refuses', () => {
+  it('finds a directory planted at the config path, which loadConfig then refuses', async () => {
     const parent = freshDir();
     plantConfig(parent);
     const child = join(parent, 'child');
@@ -255,7 +255,7 @@ describe('resolveScope on disk', () => {
 
     expect(rootOf(resolution)).toBe(realpathSync(child));
     if (!resolution.found) return;
-    expect(() => loadConfig(resolution, {}, () => {})).toThrow(ConfigError);
+    await expect(loadConfig(resolution, {}, () => {})).rejects.toThrow(ConfigError);
   });
 
   it('walks past a .rafa directory that holds no config file', () => {
