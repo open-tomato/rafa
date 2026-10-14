@@ -753,6 +753,7 @@ describe('the lines a triage prints', () => {
         { ...unset, index: 5, channel: 'public', action: 'failed', problem: 'reading the stored reference failed: SQLITE_CORRUPT' },
         { ...unset, index: 6, channel: 'public', action: 'skipped', problem: 'out_of_scope_bugs[6] has no what to file' },
       ],
+      staleDocs: [],
     };
 
     expect(describeStartTriage(result)).toEqual({
@@ -775,7 +776,7 @@ describe('the lines a triage prints', () => {
   });
 
   it('are none for a report whose blocker had no text and which listed no bug', () => {
-    expect(describeStartTriage({ blocker: { text: null, written: false, problem: null }, bugs: [] })).toEqual({
+    expect(describeStartTriage({ blocker: { text: null, written: false, problem: null }, bugs: [], staleDocs: [] })).toEqual({
       notes: [],
       warnings: [],
     });

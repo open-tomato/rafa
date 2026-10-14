@@ -123,6 +123,7 @@ function reportWith(parts: Partial<TaskReport> = {}): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [],
+    staleDocs: [],
     extras: [],
     ...parts,
   };
