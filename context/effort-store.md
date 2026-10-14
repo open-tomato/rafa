@@ -1053,6 +1053,12 @@ dispatch is written ahead of the task report; a refused dispatch row
 stores no report. A dispatch handed no handout stores a NULL resolver
 beside two `[]` offers. No column holds the outcome: `task_reports` and
 `report_absences` hold it under the same session id.
+The declaration a write carries is a `DispatchDeclaration`, declared in
+`store/dispatches.ts` from the six fields of the parser's
+`TaskDeclaration` it stores (`raw`, `agent`, `model`, `effort`, `budget`,
+`tools`), so the store imports nothing of `src/utils/declaration.ts`; its
+`effort` is typed by `EffortLevel`, which `store/effort-levels.ts` holds
+with `EFFORT_LEVELS`, both re-exported by `src/utils/declaration.ts`.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a

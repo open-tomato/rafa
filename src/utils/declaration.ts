@@ -103,7 +103,18 @@
  * that refuses `--effort medum`. An unrecognised KEY is not an issue at
  * all: it is retained in {@link TaskDeclaration.extras} for telemetry,
  * which is what lets a grammar grow without every older plan going red.
+ *
+ * `EFFORT_LEVELS` and `EffortLevel` are core's
+ * (`src/effort/store/effort-levels.ts`), where the store's dispatch writer
+ * types a declared effort; this file re-exports them under the same names.
  */
+
+import type { EffortLevel } from '../effort/store/effort-levels.js';
+
+import { EFFORT_LEVELS } from '../effort/store/effort-levels.js';
+
+export type { EffortLevel } from '../effort/store/effort-levels.js';
+export { EFFORT_LEVELS } from '../effort/store/effort-levels.js';
 
 /**
  * Keys this module answers to, in the order flags are emitted. `budget`
@@ -152,18 +163,6 @@ export const AGENT_OWNED_KEYS = ['model', 'tools'] as const;
  * generation changing underneath the plan.
  */
 export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku', 'fable'] as const;
-
-/** Levels `--effort` accepts, taken from the CLI's own help text. */
-export const EFFORT_LEVELS = [
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-] as const;
-
-/** One of the five levels `--effort` accepts. */
-export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 /**
  * How much of the suite the runner runs after a task commits, as a

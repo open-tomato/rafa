@@ -1,15 +1,15 @@
 # Import graph
 
-Coverage: 1940 of 1940 tracked files read (src/ and packages/*/src/).
+Coverage: 1942 of 1942 tracked files read (src/ and packages/*/src/).
 
-1940 files, 9935 edges (7773 value, 2162 type), 27 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
+1942 files, 9938 edges (7776 value, 2162 type), 27 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
 
 ## Clusters by size
 
 | Cluster | Files | Folders |
 | --- | --- | --- |
 | `c01-github` | 344 | `src/board` (110), `src/board/project` (41), `src/commands` (30), `src/commands/epic` (23), `src/tests` (23), `src/next` (22), `src/board/relations` (19), `src/commands/issue` (18), `src/commands/plan` (10), `src/status` (10), `src/commands/pr` (8), `src/core/git` (6), `src/claims` (4), `src/commands/board` (4), `src/pr` (3), `src/adapters/tracker` (2), `src/commands/release` (2), `src/project` (2), `src/start` (2), `src/suite` (2), `src/cleanup` (1), `src/epic` (1), `src/refs` (1) |
-| `c02-sqlite` | 276 | `src/effort/store` (99), `src/effort` (57), `src/triage` (32), `src/commands/effort` (15), `src/start` (14), `src/tests` (13), `src/inventory/search` (10), `src/commands/epic` (4), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/epic` (3), `src/report` (3), `src/utils` (3), `src/docs` (2), `src/fixtures` (2), `src` (1), `src/adapters/tracker` (1), `src/claims` (1), `src/commands/claim` (1), `src/runtime` (1) |
+| `c02-sqlite` | 278 | `src/effort/store` (101), `src/effort` (57), `src/triage` (32), `src/commands/effort` (15), `src/start` (14), `src/tests` (13), `src/inventory/search` (10), `src/commands/epic` (4), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/epic` (3), `src/report` (3), `src/utils` (3), `src/docs` (2), `src/fixtures` (2), `src` (1), `src/adapters/tracker` (1), `src/claims` (1), `src/commands/claim` (1), `src/runtime` (1) |
 | `c03-cli-capture` | 213 | `src/tests` (89), `src/release` (38), `src/start` (17), `src/commands/release` (13), `src/commands/pr` (9), `src/commands/loop` (7), `src/loop` (6), `src/commands` (5), `src/runtime` (4), `src` (3), `src/project` (3), `src/utils` (3), `src/next` (2), `src/pr` (2), `src/pr/triage` (2), `src/release/strategies` (2), `src/cleanup` (1), `src/commands/bug` (1), `src/commands/config` (1), `src/commands/effort` (1), `src/commands/skill` (1), `src/commands/stretch` (1), `src/core/loop` (1), `src/notices` (1) |
 | `c04-sections` | 203 | `src/commands` (27), `src` (20), `src/core/config` (18), `src/release` (15), `src/tiers` (13), `src/inventory` (12), `src/start` (12), `src/plan/risk` (10), `src/tests` (9), `src/preflight` (8), `src/task` (8), `src/pr` (7), `src/schema` (6), `src/agents` (4), `src/check` (4), `src/effort/sync` (4), `src/utils` (4), `src/commands/agent` (3), `src/plan` (3), `src/project` (3), `src/board` (2), `src/effort` (2), `src/effort/store` (2), `src/inventory/search` (2), `src/commands/config` (1), `src/commands/skill` (1), `src/modules` (1), `src/notices` (1), `src/suite` (1) |
 | `c05-index` | 197 | `src/start` (95), `src/tests` (20), `src/board` (13), `src/commands/plan` (12), `src/plan` (11), `src/core/loop` (10), `src/suite` (10), `src/core/plan` (9), `src/utils` (6), `src` (2), `src/adapters/planner` (2), `src/loop` (2), `src/core/output` (1), `src/notices` (1), `src/ports` (1), `src/release` (1), `src/triage` (1) |
@@ -40,33 +40,33 @@ Coverage: 1940 of 1940 tracked files read (src/ and packages/*/src/).
 
 | Rank | File | Betweenness | Cluster |
 | --- | --- | --- | --- |
-| 1 | `src/ports/index.ts` | 60845.905405 | `c08-index` |
-| 2 | `src/core/config/index.ts` | 56998.102479 | `c04-sections` |
-| 3 | `src/core/config/config-schema.ts` | 52769.47407 | `c04-sections` |
-| 4 | `src/effort/store/merge-store.ts` | 52153.205801 | `c02-sqlite` |
-| 5 | `src/tests/cli-capture.ts` | 26528.860154 | `c03-cli-capture` |
-| 6 | `src/core/loop/index.ts` | 20423.423281 | `c03-cli-capture` |
-| 7 | `src/core/command/index.ts` | 17378.823419 | `c07-index` |
-| 8 | `src/adapters/tracker/github.ts` | 17226.109406 | `c01-github` |
-| 9 | `src/inventory/record.ts` | 16294.311092 | `c04-sections` |
-| 10 | `src/effort/store/development-build.ts` | 15700.55275 | `c02-sqlite` |
-| 11 | `src/tiers/routing.ts` | 15626.259885 | `c04-sections` |
-| 12 | `src/config-schema-issues.ts` | 14804.080755 | `c09-frontmatter` |
-| 13 | `src/board/roadmap.ts` | 14415.050608 | `c01-github` |
-| 14 | `src/tiers/resolve.ts` | 14346.408009 | `c04-sections` |
-| 15 | `src/pr/index.ts` | 14099.599968 | `c06-index` |
-| 16 | `src/core/command/command.ts` | 13907.475614 | `c07-index` |
-| 17 | `src/core/adapters/index.ts` | 13898.25982 | `c08-index` |
-| 18 | `src/commands/index.ts` | 13810.024073 | `c07-index` |
-| 19 | `src/core/adapters/registry.ts` | 13614.926486 | `c08-index` |
-| 20 | `src/project/scope.ts` | 13346.096633 | `c07-index` |
-| 21 | `src/core/loop/sessions.ts` | 12478.976917 | `c05-index` |
-| 22 | `src/board/relations/labels.ts` | 12167.409661 | `c01-github` |
-| 23 | `src/start/dispatch.ts` | 11838.182387 | `c05-index` |
-| 24 | `src/next/sources.ts` | 11438.470085 | `c01-github` |
-| 25 | `src/board/setup.ts` | 11009.427913 | `c01-github` |
-| 26 | `src/effort/store/sqlite.ts` | 10463.77843 | `c02-sqlite` |
-| 27 | `src/start/loop-events.ts` | 10309.467932 | `c05-index` |
-| 28 | `src/cli/dispatch.ts` | 10180.198829 | `c07-index` |
-| 29 | `src/check/run.ts` | 9933.185911 | `c09-frontmatter` |
+| 1 | `src/ports/index.ts` | 60912.782028 | `c08-index` |
+| 2 | `src/core/config/index.ts` | 57070.964364 | `c04-sections` |
+| 3 | `src/core/config/config-schema.ts` | 52795.844698 | `c04-sections` |
+| 4 | `src/effort/store/merge-store.ts` | 52229.318138 | `c02-sqlite` |
+| 5 | `src/tests/cli-capture.ts` | 26563.712385 | `c03-cli-capture` |
+| 6 | `src/core/loop/index.ts` | 20471.767603 | `c03-cli-capture` |
+| 7 | `src/core/command/index.ts` | 17467.125877 | `c07-index` |
+| 8 | `src/adapters/tracker/github.ts` | 17277.825229 | `c01-github` |
+| 9 | `src/inventory/record.ts` | 16303.311092 | `c04-sections` |
+| 10 | `src/effort/store/development-build.ts` | 15707.461083 | `c02-sqlite` |
+| 11 | `src/tiers/routing.ts` | 15628.759885 | `c04-sections` |
+| 12 | `src/config-schema-issues.ts` | 14804.480755 | `c09-frontmatter` |
+| 13 | `src/pr/index.ts` | 14494.047981 | `c06-index` |
+| 14 | `src/board/roadmap.ts` | 14436.620879 | `c01-github` |
+| 15 | `src/tiers/resolve.ts` | 14352.967532 | `c04-sections` |
+| 16 | `src/core/command/command.ts` | 13998.778072 | `c07-index` |
+| 17 | `src/core/adapters/index.ts` | 13903.454697 | `c08-index` |
+| 18 | `src/commands/index.ts` | 13829.024073 | `c07-index` |
+| 19 | `src/core/adapters/registry.ts` | 13622.621364 | `c08-index` |
+| 20 | `src/project/scope.ts` | 13360.225179 | `c07-index` |
+| 21 | `src/core/loop/sessions.ts` | 12511.524078 | `c05-index` |
+| 22 | `src/board/relations/labels.ts` | 12171.483074 | `c01-github` |
+| 23 | `src/start/dispatch.ts` | 11861.914529 | `c05-index` |
+| 24 | `src/next/sources.ts` | 11449.796276 | `c01-github` |
+| 25 | `src/board/setup.ts` | 11015.95997 | `c01-github` |
+| 26 | `src/effort/store/sqlite.ts` | 10497.864394 | `c02-sqlite` |
+| 27 | `src/start/loop-events.ts` | 10313.084599 | `c05-index` |
+| 28 | `src/cli/dispatch.ts` | 10181.017011 | `c07-index` |
+| 29 | `src/check/run.ts` | 9948.352578 | `c09-frontmatter` |
 | 30 | `src/bugs/record.ts` | 9337.984199 | `c09-frontmatter` |

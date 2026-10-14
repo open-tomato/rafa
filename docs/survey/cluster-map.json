@@ -352,6 +352,7 @@
     "src/effort/store/copy.ts": "c5",
     "src/effort/store/development-build.ts": "c5",
     "src/effort/store/dispatches.ts": "c5",
+    "src/effort/store/effort-levels.ts": "c3",
     "src/effort/store/findings.ts": "c5",
     "src/effort/store/fix-schema.ts": "c5",
     "src/effort/store/fixture-extract.ts": "c5",
