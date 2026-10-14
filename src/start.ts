@@ -25,7 +25,7 @@
  * (`plan/inject.ts`): `full` hands over the plan as it stands, `stage` the plan
  * context plus the task's stage, `task` the plan context plus the task line.
  * The mode is resolved once, before the run is deferred, from `--inject=`
- * over `.rafa/config.yaml` over the default (`config.ts`), and a value no mode
+ * over the project's config over the default (`config.ts`), and a value no mode
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start. `start/run-config.ts`
  * does both. The same resolution names the setting sources every session the

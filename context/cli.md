@@ -156,7 +156,7 @@ The project scope looks up `rafa.config.ts`, then `rafa.config.mjs`, then
 `.rafa/config.yaml`, under the project root. The user scope looks up the same
 two module names, then `config.yaml`, under `~/.rafa/`. The others are not
 read: a `rafa.config.ts` beside a `.rafa/config.yaml` leaves the YAML file
-unread, `rafa doctor` lists it until its keys move, and the load warns once
+unread, `rafa doctor` lists it until its keys move, and every load warns
 about it.
 
 The layers are `defaults` under `user` under `project`. A setting takes the

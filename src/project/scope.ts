@@ -48,7 +48,7 @@
  *
  * ## The home is not a project
  *
- * The user scope's `~/.rafa/config.yaml` sits exactly where the walk
+ * The user scope's config under `~/.rafa/` sits exactly where the walk
  * looks once it reaches the home directory, and a walk from anywhere
  * under the home reaches it. Read as a project file it would make the
  * home the project root, a root `rafa init` refuses, and a command run

@@ -14,8 +14,8 @@
  * ## The tracker, through the chain
  *
  * An action reads its line first. Then it resolves the config as
- * `loop start` does (`config-load.ts`): the project's
- * `.rafa/config.yaml` over the user scope's, over the defaults. It hands
+ * `loop start` does (`config-load.ts`): the project's config over the
+ * user scope's, over the defaults. It hands
  * `tracker.default` and `tracker.fallback` to `resolveTracker`
  * (`adapters/tracker/resolve.ts`), the chain `loop start`'s triage files
  * through, with the project root as the repository. The chain tries

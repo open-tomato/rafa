@@ -123,7 +123,7 @@ function valuedFlag(args: readonly string[], flag: string): string | undefined {
 
 /**
  * Resolves the settings a run starts on: `--inject=` and
- * `--skills-resolver=` over the project's `.rafa/config.yaml` under
+ * `--skills-resolver=` over the project's config under
  * `roots.root`, that over the user scope's under `roots.home`, and both
  * over the defaults, as `config.ts` ranks them.
  *

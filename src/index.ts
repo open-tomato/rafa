@@ -32,15 +32,15 @@
  *     selector, with what the workspace packages take from it: the
  *     sync wire codec, `mergeStore` and `TRUSTED_PERMISSIONS`.
  *   - The whole config, `config.ts` and `config-load.ts`:
- *     {@link loadConfig}, which reads the project's `.rafa/config.yaml`
- *     under a root and the user scope's under a home and ranks the
+ *     {@link loadConfig}, which reads the project's config under a root
+ *     and the user scope's under a home and ranks the
  *     command line over both, the pure {@link parseConfigText} and
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
  *     {@link ConfigError}, and the names and defaults every setting
  *     takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
- *     which walks up from a directory to the nearest one holding
- *     `.rafa/config.yaml`, or else to the main checkout of the
+ *     which walks up from a directory to the nearest one holding a
+ *     project config, or else to the main checkout of the
  *     repository holding it when that checkout holds one, and answers
  *     the project root with both scopes,
  *     the `ConfigRoots` {@link loadConfig} reads, or the `rafa init` hint
@@ -76,7 +76,7 @@
  * A command is the terminal's contract, not a library call. Each takes
  * the argument list the command line would get, then the root of the
  * project it acts on, which behind the terminal is the nearest directory
- * at or above the working directory holding `.rafa/config.yaml`, and
+ * at or above the working directory holding a project config, and
  * prints what the command prints. Each writes through the active output
  * (`src/core/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls

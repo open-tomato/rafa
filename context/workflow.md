@@ -25,8 +25,9 @@ the shape discriminates where the verb does not.
 (`DEFAULT_ROUTES` in `src/tiers/routing.ts`) by `src/tiers/routing-table.ts`,
 and `routing-table.test.ts` fails when the page and the generator
 disagree, so change a row there and regenerate the table rather than
-editing it here. A project's own `.rafa/config.yaml` can add, re-point
-or remove a row under `routing`, and the planner reads the resolved map
+editing it here. A project's own config (`.rafa/config.yaml`, or a
+`rafa.config.ts` or `rafa.config.mjs`) can add, re-point or remove a row
+under `routing`, and the planner reads the resolved map
 from its `{ROUTING}` slot rather than from this page.
 
 Every agent the table names lives in `src/bundled/agents/`, the rafa
@@ -373,7 +374,7 @@ lessons join the prompt.** Both are configuration settings: `task.skills`
 takes `planner`, `tag` or `none` and defaults to `planner`; `task.lessons`
 takes the words `on` and `off` and defaults to `on`. `task.skills` is a
 command-line setting (the `--skills-resolver=` flag), so it overrides
-the project's `.rafa/config.yaml` and any user-level `~/.rafa/config.yaml`.
+the project's config and any user-level config under `~/.rafa/`.
 `task.lessons` has no flag. Both are optional, so a config file spelling
 neither uses the defaults, and a file spelling one but not the other
 keeps the other at its default.
@@ -662,7 +663,7 @@ for the one session they will start if the person reaches the form. No
 command spawns a second Claude session, no prompt asks the person to
 continue in Claude Code, and no runtime dependency enters the package:
 the prompt kit runs in raw mode on `stdio` and every session reads the
-API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
+API from the `RafaContext.env` values or the project's config, so the
 loop's own machinery (`src/core/loop/claude.ts` for the session and
 `src/effort/store/` for the record) runs all the code.
 

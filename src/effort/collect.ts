@@ -68,7 +68,7 @@
  * the reading that says the collector's key and the store's agree.
  *
  * The store is the one a caller passes as {@link CollectOptions.store},
- * else the one the config selects: `.rafa/config.yaml` under the repo
+ * else the one the config selects: the project's config under the repo
  * root over the user scope's under {@link CollectOptions.home}, and
  * `sqlite` when neither names one. That selection is made ONCE per run,
  * before either half reads a log or runs git, and both halves use the

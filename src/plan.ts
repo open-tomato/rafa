@@ -208,8 +208,8 @@
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
- * names, resolved from the project's and the user scope's
- * `.rafa/config.yaml` as `rafa start` resolves them (`config-load.ts`),
+ * names, resolved from the project's and the user scope's config
+ * as `rafa start` resolves them (`config-load.ts`),
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */

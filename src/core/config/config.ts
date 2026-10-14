@@ -1,9 +1,10 @@
 /**
- * Reading rafa's settings: the phase 1 schema of `.rafa/config.yaml`.
+ * Reading rafa's settings: the phase 1 schema of the project's config
+ * (`.rafa/config.yaml`, `rafa.config.ts` or `rafa.config.mjs`).
  *
  * Every setting takes the value the COMMAND LINE gave it, else the
- * value the project's `.rafa/config.yaml` gave it, else the value the
- * user scope's `~/.rafa/config.yaml` gave it, else its default. Each
+ * value the project's config gave it, else the value the user scope's
+ * config under `~/.rafa/` gave it, else its default. Each
  * setting is ranked on its own, so a flag naming one leaves the others
  * to the files and a project file naming one leaves the others to the
  * user's, and {@link ResolvedConfig.sources} records which layer

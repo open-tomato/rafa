@@ -14,9 +14,9 @@
  * ## What it checks, in order
  *
  *   1. **The config**, as `loop start` resolves it (`config-load.ts`): the
- *      project's `.rafa/config.yaml` over the user scope's, over the
- *      defaults. A config `loadConfig` refuses is refused. Its rows follow
- *      the load (`./doctor-config.ts`): a `warn` per warning, a shadowed
+ *      project's config over the user scope's, over the defaults. A config
+ *      `loadConfig` refuses is refused. Its rows follow the load
+ *      (`./doctor-config.ts`): a `warn` per warning, a shadowed
  *      YAML file's included, and a `note` per `dangerous.*` key passed.
  *   2. **The plan**: the file `--plan=<file>` names, resolved against the
  *      project root, or the default plan `loop start` falls back to
