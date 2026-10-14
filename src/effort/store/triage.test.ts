@@ -205,6 +205,7 @@ function bug(overrides: Partial<ReportBug> = {}): ReportBug {
     what: 'report writer drops the last line',
     artifact: 'Unexpected end of JSON input',
     security: false,
+    kind: 'bug',
     extras: [],
     ...overrides,
   };
