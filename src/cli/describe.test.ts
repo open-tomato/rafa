@@ -255,6 +255,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'loop')?.actions.map((action) => action.name)).toEqual(['start', 'stop', 'pause', 'resume', 'status', 'list', 'wait']);
     expect(document.subjects.find((subject) => subject.name === 'stretch')?.actions.map((action) => action.name)).toContain('start');
     expect(document.subjects.find((subject) => subject.name === 'bug')?.actions.map((action) => action.name)).toEqual(['codes']);
+    expect(document.subjects.find((subject) => subject.name === 'docs')?.actions.map((action) => action.name)).toEqual(['plan']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -287,6 +288,7 @@ describe('the document over the core registry', () => {
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
     expect(spendsOf('bug', 'codes')).toBeNull();
+    expect(spendsOf('docs', 'plan')).toBeNull();
     expect(spendsOf('board', 'sync')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();

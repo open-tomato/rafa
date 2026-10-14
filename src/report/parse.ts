@@ -32,6 +32,9 @@
  *   - level: patch
  *     area: "loop"
  *     summary: "the loop waits for the running task's commit"
+ * stale_docs:
+ *   - where: "context/triage.md:12"
+ *     what: "says triage has three channels"
  * ```
  * ````
  *
@@ -96,9 +99,10 @@
  *
  * Required fields: `status`; a finding's `trigger`, `kind`, `what` and
  * `signal`; a blocker's `what`; an out-of-scope bug's `what` and
- * `security`; a change note's `level` and `summary`. A missing `security`
- * flag stays null rather than defaulting to false, because this parser
- * does not get to decide that a bug has no security impact.
+ * `security`; a change note's `level` and `summary`; a stale doc's `what`.
+ * A missing `security` flag stays null rather than defaulting to false,
+ * because this parser does not get to decide that a bug has no security
+ * impact.
  *
  * ## Change notes
  *
@@ -115,6 +119,23 @@
  * carries no ranking. Whatever computes a release level out of a plan's
  * notes orders them itself; reading precedence off this list's indices
  * would make `none` the highest of the four.
+ *
+ * ## Stale docs
+ *
+ * `stale_docs` is the list of documentation lines a task saw that no
+ * longer match the code and that its own change did not falsify. An
+ * entry's `where` is the file, with the line when known, as one string
+ * such as `context/triage.md:12`; its `what` says what no longer matches.
+ *
+ * This is the one list whose entry is dropped for a field: an entry with
+ * no usable `what` is reported and left out of {@link TaskReport.staleDocs},
+ * because a place with nothing said about it is not a row anyone can
+ * settle. An entry with no usable `where` is kept, with `where` null.
+ *
+ * The key is the eighth, added after reports of seven were already being
+ * written. A report with no `stale_docs` key reads as an empty list with
+ * no issue, like every other absent list, so a session on an older prompt
+ * is neither failed nor flagged for writing seven fields.
  *
  * Strings are kept exactly as written, never trimmed. `artifact` is the
  * byte string a recurrence is matched on. A blank one is refused, because
@@ -279,6 +300,16 @@ export interface ReportChange {
   readonly extras: readonly ReportExtra[];
 }
 
+/** One `stale_docs` entry: a documentation line that no longer matches. */
+export interface ReportStaleDoc {
+  /** The file, with the line when known: `context/triage.md:12`. */
+  readonly where: string | null;
+  /** What no longer matches. Required; an entry without one is dropped. */
+  readonly what: string;
+  /** Every key that names no field. */
+  readonly extras: readonly ReportExtra[];
+}
+
 /** A `rafa:report` block, read. */
 export interface TaskReport {
   /** The session's claim for its task. Required. */
@@ -295,6 +326,8 @@ export interface TaskReport {
   readonly outOfScopeBugs: readonly ReportBug[];
   /** Every usable `changes` entry, in order. */
   readonly changes: readonly ReportChange[];
+  /** Every `stale_docs` entry that says what is stale, in order. */
+  readonly staleDocs: readonly ReportStaleDoc[];
   /** Every top-level key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -384,6 +417,7 @@ const REPORT_KEYS = [
   'blockers',
   'out_of_scope_bugs',
   'changes',
+  'stale_docs',
 ];
 
 /** A finding's keys. */
@@ -406,6 +440,9 @@ const BUG_KEYS = ['what', 'artifact', 'security'];
 
 /** A change note's keys. */
 const CHANGE_KEYS = ['level', 'area', 'summary'];
+
+/** A stale doc's keys. */
+const STALE_DOC_KEYS = ['where', 'what'];
 
 /** True for a mapping; false for a list, a scalar or null. */
 function isMapping(value: unknown): value is Mapping {
@@ -609,6 +646,19 @@ function readChange(item: unknown, field: string, issues: ReportIssue[]): Report
   };
 }
 
+/**
+ * One `stale_docs` entry, or null for one with no usable `what`, which the
+ * `what` field has reported by then.
+ */
+function readStaleDoc(item: unknown, field: string, issues: ReportIssue[]): ReportStaleDoc | null {
+  const scope = entryScope(item, field, STALE_DOC_KEYS, issues);
+  if (scope === null) return null;
+  const where = stringField(scope, 'where', OPTIONAL);
+  const what = stringField(scope, 'what', REQUIRED);
+  if (what === null) return null;
+  return { where, what, extras: scope.extras };
+}
+
 /** Reads the report's fields out of a parsed block body. */
 function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
   const scope = scopeOf(document, REPORT_KEYS, '', issues);
@@ -620,6 +670,7 @@ function readReport(document: Mapping, issues: ReportIssue[]): TaskReport {
     blockers: listField(scope, 'blockers', readBlocker),
     outOfScopeBugs: listField(scope, 'out_of_scope_bugs', readBug),
     changes: listField(scope, 'changes', readChange),
+    staleDocs: listField(scope, 'stale_docs', readStaleDoc),
     extras: scope.extras,
   };
 }

@@ -4,8 +4,8 @@
  * The collector answers one row per session; this answers one row per
  * PLAN, which is the unit a cost question is actually asked in. It
  * reads the config, the store the config selects, and the task reports,
- * preflight checks and dispatches the loop stored, and nothing else — no
- * log, no clock — so a report is
+ * preflight checks, dispatches and out-of-scope bugs the loop stored, and
+ * nothing else — no log, no clock — so a report is
  * a pure projection of rows already on disk and two runs over an
  * unchanged store produce identical bytes.
  *
@@ -66,6 +66,7 @@
  * holds no dollar figure, and a text-mode session prints none. The
  * command prints the budgets under its no-rows line as it prints the
  * tallies there, and the filters do not narrow them.
+ * {@link EffortReport.docOnlyBugs} is `report-doc-bugs.ts`'s to describe.
  *
  * ## What a group is keyed on
  *
@@ -166,6 +167,7 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { BudgetedSession } from './report-budgets.js';
+import type { DocOnlyBugs } from './report-doc-bugs.js';
 import type { SkillsReport } from './report-skills.js';
 import type { SessionUsageTotals } from './session-log.js';
 import type { SessionBudget } from './store/dispatches.js';
@@ -186,12 +188,8 @@ import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
 import { parseReportArgs } from './report-args.js';
 import { budgetedSessions } from './report-budgets.js';
-import {
-  formatBudgets,
-  formatPreflightHalts,
-  formatReport,
-  formatTaskReports,
-} from './report-format.js';
+import { readDocOnlyBugs } from './report-doc-bugs.js';
+import { formatReport, formatStoredSections } from './report-format.js';
 import { formatSkillsReport } from './report-skills-format.js';
 import { buildSkillsReport, readHeldLessons } from './report-skills.js';
 import { writeTrendReport } from './report-trend-read.js';
@@ -313,6 +311,8 @@ export interface EffortReport {
    * module note.
    */
   budgets: readonly BudgetedSession[];
+  /** The stored bugs of scope `rafa`, and those naming only documentation. Never narrowed. */
+  docOnlyBugs: DocOnlyBugs;
 }
 
 /** Where a report reads from and what it narrows to. */
@@ -555,8 +555,8 @@ export function sortGroups(groups: readonly EffortGroup[]): EffortGroup[] {
  * Rolls rows up into the report.
  *
  * Pure over its inputs, which is the seam the whole suite drives: a
- * planted row needs no store, no log and no repository. `taskReports`
- * and `preflightHalts` are carried into the report as they are handed
+ * planted row needs no store, no log and no repository. `taskReports`,
+ * `preflightHalts` and `docOnlyBugs` are carried into the report as handed
  * in, never filtered, and each of `budgets` is joined against every row
  * handed in, filtered out or not (`report-budgets.ts`).
  */
@@ -566,6 +566,7 @@ export function summariseSessions(
   taskReports: readonly TaskReportTally[] = [],
   preflightHalts: readonly PreflightHalt[] = [],
   budgets: readonly SessionBudget[] = [],
+  docOnlyBugs: DocOnlyBugs = { bugs: 0, docOnly: 0 },
 ): EffortReport {
   const groups = new Map<string, EffortGroup>();
   const totals = emptyGroup(TOTAL_KEY, 'total');
@@ -602,6 +603,7 @@ export function summariseSessions(
     taskReports,
     preflightHalts,
     budgets: budgetedSessions(rows, budgets),
+    docOnlyBugs,
   };
 }
 
@@ -623,14 +625,14 @@ function resolveStore(
 }
 
 /**
- * Reads the session rows of the selected store, and the task report
- * tallies and preflight halts under the repo root, and rolls the rows up.
+ * Reads the session rows of the selected store, and what the report's
+ * other tables hold under the repo root, and rolls the rows up.
  *
  * A missing store answers an EMPTY report rather than throwing — every
  * backend answers absence as the first-run case — so the command below
  * is what says "nothing collected yet" in words, which is the one thing
- * a table of zeroes cannot convey. A missing SQLite file answers no
- * tallies and no halts the same way.
+ * a table of zeroes cannot convey. A missing SQLite file answers nothing
+ * for each of those tables, and a count of zero, the same way.
  *
  * Throws a `ConfigError`, having read no row, when no store is passed
  * and a config file under the repo root or the home is one the loop
@@ -649,6 +651,7 @@ export function buildReport(options: ReportOptions): EffortReport {
     readTaskReportTallies(repoRoot),
     readPreflightHalts(repoRoot),
     readSessionBudgets(repoRoot),
+    readDocOnlyBugs(repoRoot),
   );
 }
 
@@ -788,8 +791,7 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (built.rowsRead === 0) {
     output.info('effort report: no session rows stored yet'
       + ' (run `rafa effort collect` first)');
-    const sections = [...formatTaskReports(built), ...formatPreflightHalts(built), ...formatBudgets(built)];
-    for (const line of sections) output.info(line);
+    for (const line of formatStoredSections(built)) output.info(line);
     return;
   }
   for (const line of formatReport(built)) {

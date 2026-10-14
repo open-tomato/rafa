@@ -55,12 +55,14 @@ import { describe, expect, it } from 'bun:test';
 import {
   formatBudgets,
   formatCount,
+  formatDocOnlyBugs,
   formatHistogram,
   formatMinutes,
   formatPreflightHalts,
   formatReport,
   formatReportHeader,
   formatReportTable,
+  formatStoredSections,
   formatTaskReports,
 } from './report-format.js';
 import { emptyGroup } from './report.js';
@@ -85,6 +87,7 @@ function plantReport(fields: Partial<EffortReport> = {}): EffortReport {
     taskReports: [],
     preflightHalts: [],
     budgets: [],
+    docOnlyBugs: { bugs: 0, docOnly: 0 },
     ...fields,
   };
 }
@@ -470,5 +473,40 @@ describe('formatBudgets', () => {
     expect(filtered).toHaveLength(8);
     expect(formatBudgets(plantReport({ budgets: BUDGETS })).join('\n'))
       .not.toContain('narrow');
+  });
+});
+
+describe('formatDocOnlyBugs', () => {
+  it('writes the count beside the bugs it was taken over, on one line after a blank one', () => {
+    expect(formatDocOnlyBugs({ bugs: 1234, docOnly: 3 })).toEqual([
+      '',
+      'filed bugs naming only documentation: 3 of 1,234',
+    ]);
+  });
+
+  it('writes a count of zero when bugs are stored, and nothing when none is', () => {
+    expect(formatDocOnlyBugs({ bugs: 27, docOnly: 0 })).toEqual([
+      '',
+      'filed bugs naming only documentation: 0 of 27',
+    ]);
+    expect(formatDocOnlyBugs({ bugs: 0, docOnly: 0 })).toEqual([]);
+  });
+
+  it('ends the report and the stored sections, after the budgets', () => {
+    const full = { ...REPORT, taskReports: TALLIES, preflightHalts: HALTS, budgets: BUDGETS };
+    const counted = { ...full, docOnlyBugs: { bugs: 5, docOnly: 2 } };
+    const line = 'filed bugs naming only documentation: 2 of 5';
+
+    expect(formatStoredSections(counted)).toEqual([
+      ...formatTaskReports(full),
+      ...formatPreflightHalts(full),
+      ...formatBudgets(full),
+      '',
+      line,
+    ]);
+    expect(formatReport(counted)).toEqual([...formatReport(full), '', line]);
+
+    // The control: the same report with no bug stored holds no such line.
+    expect(formatReport(full).join('\n')).not.toContain('filed bugs');
   });
 });

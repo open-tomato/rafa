@@ -206,7 +206,14 @@ describe('what rafa plan validate reads', () => {
     const root = plantPlans();
     const file = join(root, 'plans', 'clean.md');
 
-    expect(validatePlan(file)).toEqual({ file, stages: 1, tasks: { total: 3, done: 1, blocked: 1, open: 1 }, issues: [] });
+    expect(validatePlan(file)).toEqual({
+      file,
+      stages: 1,
+      tasks: { total: 3, done: 1, blocked: 1, open: 1 },
+      issues: [],
+      // Its tasks declare no agent and none `docs=repair`, so it is warned about on its last line.
+      warnings: [expect.objectContaining({ reason: 'missing-doc-task', line: 7 })],
+    });
   });
 
   it('holds the broken plan to three issues of three reasons, in line order', () => {

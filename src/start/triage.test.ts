@@ -37,6 +37,12 @@
  * rethrown, the context from the working directory, a skip unmatched and
  * the found-by fixed; 1 for each of the other sixteen.
  *
+ * Four more were driven on 2026-10-14, when `stale_docs` entries joined
+ * the triage, on a baseline of 20 pass, the module restored
+ * sha256-identical after each: `hasTriage` blind to the entries and the
+ * entries resolving the chain (2 red each), the entries' notes dropped
+ * and the notes printed as warnings (3 red each).
+ *
  * `start()` handing each stored report to the triage it made is reached by
  * no case here, since `start()` spawns the CLI with no seam. It was read the
  * same day by spawning `loop start` twice in a scratch repository on a
@@ -140,11 +146,26 @@ const CONFIG: StartTriageOptions['config'] = {
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
 type BugEntry = readonly [what: string, artifact: string | null, security: boolean | null];
 
+/** One `stale_docs` entry as a report lists it: where the stale line is, and what no longer matches. */
+type StaleDocEntry = readonly [where: string | null, what: string];
+
 /** The lists a session's report holds. */
 interface ReportParts {
   readonly feedback?: string;
   readonly blockers?: readonly string[];
   readonly bugs?: readonly BugEntry[];
+  /** Left out, the report has no `stale_docs` key at all, as a session on an older prompt writes it. */
+  readonly staleDocs?: readonly StaleDocEntry[];
+}
+
+/** The `stale_docs` lines of a report: none for no list, `[]` for an empty one. */
+function staleDocLines(entries: readonly StaleDocEntry[] | undefined): string[] {
+  if (entries === undefined) return [];
+  if (entries.length === 0) return ['stale_docs: []'];
+  return [
+    'stale_docs:',
+    ...entries.flatMap(([where, what]) => [`  - where: ${scalar(where)}`, `    what: ${scalar(what)}`]),
+  ];
 }
 
 /** A YAML scalar: a double-quoted string, or the bare word for anything else. */
@@ -181,6 +202,7 @@ function sessionOutput(parts: ReportParts = {}): string {
     'skills_used: []',
     ...blockerLines,
     ...bugLines,
+    ...staleDocLines(parts.staleDocs),
     '```',
     '',
   ].join('\n');
@@ -502,6 +524,7 @@ describe('an output with nothing to triage', () => {
 
     expect(await triage(taskInput(f, 'The session printed no report.'))).toBeNull();
     expect(await triage(taskInput(f, sessionOutput()))).toBeNull();
+    expect(await triage(taskInput(f, sessionOutput({ staleDocs: [] })))).toBeNull();
     expect(readFileSync(f.trackerPath, 'utf8')).toBe(TRACKER_TEXT);
     expect(existsSync(sqliteStorePath(f.root))).toBe(false);
     expect(lines).toEqual({ info: [], warn: [], error: [] });
@@ -513,6 +536,71 @@ describe('an output with nothing to triage', () => {
     expect(chain.calls).toEqual([]);
     expect(f.privateSpy.calls).toEqual([]);
     expect(lines.info).toEqual(['   Triage: blockers: written onto the task line, for the next dispatch of this task.']);
+  });
+});
+
+describe('a report\'s stale_docs entries', () => {
+  const STALE: readonly StaleDocEntry[] = [
+    ['context/triage.md:12', 'says three channels, the code has four'],
+    [null, 'the README names a flag the CLI dropped'],
+  ];
+  const STALE_NOTES = [
+    '   Triage: stale_docs[0] is stale documentation at context/triage.md:12: says three channels, the code has four;'
+      + ' stored as a stale-doc row, and nothing was filed.',
+    '   Triage: stale_docs[1] is stale documentation: the README names a flag the CLI dropped;'
+      + ' stored as a stale-doc row, and nothing was filed.',
+  ];
+
+  it('alone are triaged with no chain resolved and no tracker called, where a later report with a public bug resolves it', async () => {
+    const lines = captureLines();
+    const f = fixture();
+    const chain = chainLanding(f.publicSpy.tracker);
+    const triage = triageFor(f, chain);
+
+    const result = await triage(taskInput(f, sessionOutput({ staleDocs: STALE })));
+
+    expect(result?.staleDocs.map(({ index, channel, action }) => [index, channel, action])).toEqual([
+      [0, 'docs', 'skipped'],
+      [1, 'docs', 'skipped'],
+    ]);
+    expect(result?.bugs).toEqual([]);
+    expect(chain.calls).toEqual([]);
+    expect(f.publicSpy.calls).toEqual([]);
+    expect(f.privateSpy.calls).toEqual([]);
+    expect(issueNames(f.publicDir)).toEqual([]);
+    expect(issueNames(f.privateDir)).toEqual([]);
+    expect(readFileSync(f.trackerPath, 'utf8')).toBe(TRACKER_TEXT);
+    expect(lines).toEqual({ info: STALE_NOTES, warn: [], error: [] });
+
+    await triage(taskInput(f, sessionOutput({ bugs: [['The parser drops a field', 'parse.ts: field dropped', false]], staleDocs: STALE }), 'session-2'));
+
+    expect(chain.calls).toHaveLength(1);
+    expect(methodsOf(f.publicSpy)).toContain('create');
+    expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    expect(lines.info.slice(-2)).toEqual(STALE_NOTES);
+    expect(lines.warn).toEqual([]);
+  });
+
+  it('are noted with each named secret redacted, where none named leaves it in', async () => {
+    const leaky = sessionOutput({ staleDocs: [['docs/deploy.md', 'still shows the token dpl-7f3a9c']] });
+    const redactedLines = captureLines();
+    const redacted = fixture();
+    await triageFor(redacted, chainLanding(redacted.publicSpy.tracker), {
+      config: { ...CONFIG, prerequisitesRequired: [{ kind: 'env', name: 'DEPLOY_TOKEN', probe: null }] },
+      env: { DEPLOY_TOKEN: 'dpl-7f3a9c' },
+    })(taskInput(redacted, leaky));
+    const plainLines = captureLines();
+    const plain = fixture();
+    await triageFor(plain, chainLanding(plain.publicSpy.tracker))(taskInput(plain, leaky));
+
+    expect(redactedLines.info).toEqual([
+      '   Triage: stale_docs[0] is stale documentation at docs/deploy.md: still shows the token [redacted: DEPLOY_TOKEN];'
+        + ' stored as a stale-doc row, and nothing was filed.',
+    ]);
+    expect(plainLines.info).toEqual([
+      '   Triage: stale_docs[0] is stale documentation at docs/deploy.md: still shows the token dpl-7f3a9c;'
+        + ' stored as a stale-doc row, and nothing was filed.',
+    ]);
   });
 });
 
@@ -753,6 +841,7 @@ describe('the lines a triage prints', () => {
         { ...unset, index: 5, channel: 'public', action: 'failed', problem: 'reading the stored reference failed: SQLITE_CORRUPT' },
         { ...unset, index: 6, channel: 'public', action: 'skipped', problem: 'out_of_scope_bugs[6] has no what to file' },
       ],
+      staleDocs: [],
     };
 
     expect(describeStartTriage(result)).toEqual({
@@ -774,8 +863,46 @@ describe('the lines a triage prints', () => {
     });
   });
 
+  it('hold one note per stale_docs entry, after the bugs\' notes, each naming its index as stored with nothing filed, and no warning', () => {
+    const unset = { ref: null, foundBy: null, stored: null } as const;
+    const result: TriageResult = {
+      blocker: { text: null, written: false, problem: null },
+      bugs: [
+        {
+          ...unset,
+          index: 0,
+          channel: 'public',
+          action: 'filed',
+          ref: { opt: 0, kind: 'github', externalId: '9', url: null },
+          problem: null,
+        },
+      ],
+      staleDocs: [
+        {
+          ...unset,
+          index: 0,
+          channel: 'docs',
+          action: 'skipped',
+          problem: 'stale_docs[0] is stale documentation at context/cli.md:4: names a command that was renamed',
+        },
+        { ...unset, index: 1, channel: 'docs', action: 'skipped', problem: null },
+      ],
+    };
+
+    expect(describeStartTriage(result)).toEqual({
+      notes: [
+        'Triage: out_of_scope_bugs[0]: filed on the public tracker as github issue 9.',
+        'Triage: stale_docs[0] is stale documentation at context/cli.md:4: names a command that was renamed;'
+          + ' stored as a stale-doc row, and nothing was filed.',
+        'Triage: stale_docs[1] is stale documentation; stored as a stale-doc row, and nothing was filed.',
+      ],
+      warnings: [],
+    });
+    expect(describeStartTriage({ ...result, staleDocs: [] }).notes).toHaveLength(1);
+  });
+
   it('are none for a report whose blocker had no text and which listed no bug', () => {
-    expect(describeStartTriage({ blocker: { text: null, written: false, problem: null }, bugs: [] })).toEqual({
+    expect(describeStartTriage({ blocker: { text: null, written: false, problem: null }, bugs: [], staleDocs: [] })).toEqual({
       notes: [],
       warnings: [],
     });

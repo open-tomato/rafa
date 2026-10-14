@@ -96,9 +96,13 @@ file's wrapped lines before searching.
 
 ## Boundaries
 
-- A sentence your own change falsified is yours to repair in the same
-  commit. A stale sentence your change did not touch is reported, not
-  repaired.
+- A doc line your own change falsified is repaired in the same commit.
+  Any other stale doc line you find goes into the report's `stale_docs`
+  field, with `where` and `what`, and never into `out_of_scope_bugs`.
+- The doc task has two outputs beyond its own repairs. A row it could not
+  settle goes into its own `stale_docs` field. A row it finds to be about
+  code, not prose, goes into `out_of_scope_bugs`, which takes the ordinary
+  bug route.
 - Never commit, never push, never open a pull request, never merge. The
   loop owns all four, and `src/PROMPT.md` states what it does once this
   session exits cleanly. Leave your work in the tree in a state the

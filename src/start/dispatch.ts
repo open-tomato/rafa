@@ -46,6 +46,8 @@
  * rendered empty; with both absent the prompt is the one built before
  * sections existed. After them, when the run started on a red suite, goes
  * the `## Failures this run inherited` section (`start/inherited-notice.ts`).
+ * A task declared `docs=repair` is handed the doc task's section last,
+ * ahead of `PROMPT.md` (`start/doc-task.ts`).
  *
  * Two directories reach a dispatch, and are never confused. The PROJECT
  * ROOT, {@link TaskDispatchOptions.repoRoot}, holds `.rafa/`: the store
@@ -91,6 +93,7 @@
  * {@link TaskDispatch.halted} with no session spawned.
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
+import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
@@ -123,6 +126,7 @@ import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
+import { docTaskPrompt } from './doc-task.js';
 import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
@@ -316,6 +320,8 @@ export interface TaskDispatchOptions {
    * driving the `run` seam with no checkout of its own names.
    */
   guard?: DispatchGuard | null;
+  /** Where a `docs=repair` task reads its section (`start/doc-task.ts`). None when left out. */
+  docTask?: DocTaskPlace | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -627,7 +633,7 @@ export async function dispatchTask(
 
   const prompt = withStamp(buildTaskPrompt(
     taskText,
-    options.promptContent,
+    docTaskPrompt(options.promptContent, { ...options, declaration, place: options.docTask }),
     injection.text,
     options.knownMissing,
     taskInfo.blocker ?? null,

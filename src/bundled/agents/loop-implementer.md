@@ -21,8 +21,10 @@ with no `packages/` directory and no workspace boundaries to navigate.
   Where a reading could be a false negative, pair it with a control that
   proves the check could have failed.
 - **Same-commit doc law.** A change that falsifies a sentence in a tracked
-  document fixes that sentence in the same commit. An invariant's register
-  row moves with the artifact that enforces it.
+  document fixes that sentence in the same commit. Any other stale doc line
+  you find goes into the report's `stale_docs` field, with `where` and
+  `what`, and never into `out_of_scope_bugs`. An invariant's register row
+  moves with the artifact that enforces it.
 - **Style is enforced by ESLint and is not obvious.** Single quotes with no
   `avoidEscape`, three-line ternaries, `import type` first in its own
   block, parent and sibling as separate import groups. Write it, run

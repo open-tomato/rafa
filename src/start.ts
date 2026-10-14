@@ -427,6 +427,7 @@ import {
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { haltBeforeSession } from './start/session-guard.js';
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
+import { createStartStaleDocs } from './start/stale-docs.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { announceRunStepOnly, readRunStepOnly } from './start/step-only-report.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
@@ -546,6 +547,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // (`start/loop-events.ts`).
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   bindEventsFile(repoRoot, session.id);
+  // The doc task's unsettled lines: an issue line each, or the print at the end (`start/stale-docs.ts`).
+  const staleDocs = createStartStaleDocs({ repoRoot, checkout, planPath, config: runConfig.config });
   // Set once the run's `--continue` decisions are made, and asked at its
   // end however it ends: a `--decide` no decision point used is named.
   let decisionsAtEnd = (): void => undefined;
@@ -795,6 +798,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         handout,
         base,
         guard: { expected, trackerPath },
+        docTask: { planStub, prBase: runConfig.config.prBase },
       });
       const { exitCode } = dispatch;
 
@@ -815,6 +819,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
+        await staleDocs.afterTask({ planStub, dispatch, outcome });
         await hubContact.pushThenPull();
         return stored;
       };
@@ -902,6 +907,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     throw error;
   } finally {
     decisionsAtEnd();
+    staleDocs.atRunEnd();
     // The test files a suite step read red only in the step, which
     // blocked nothing: named once more as the run's last lines.
     announceRunStepOnly(readRunStepOnly(repoRoot, session.id));

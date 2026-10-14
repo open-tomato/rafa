@@ -175,6 +175,8 @@ function reportOf(bug: ReportBug): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [bug],
+    staleDocs: [],
+    changes: [],
     extras: [],
   };
 }

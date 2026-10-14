@@ -29,6 +29,8 @@
  * was, and a control shows the column's CHECK refuses an empty value.
  * `session-worktree` is held to a store an older runtime left in
  * `session-worktree.test.ts`, beside the backend that fills its column.
+ * `stale-docs` is held to one in `stale-docs-migration.test.ts`, beside
+ * the refusals of the table it creates.
  */
 import type { CreatedObject, ShapeProblem } from './migration-shapes.js';
 import type { MigrationBreak, MigrationLock, MigrationSpec, SqliteMigration } from './migrations.js';
@@ -428,6 +430,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   'store-meta-generation': ['add-column'],
   'session-worktree': ['add-column'],
   'store-replaced': ['create-table'],
+  'stale-docs': ['create-table', 'create-unique-index-on-new-table', 'create-unique-index-on-new-table'],
 };
 
 describe('classifyMigration over the catalogue', () => {

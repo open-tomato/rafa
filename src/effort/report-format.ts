@@ -3,8 +3,10 @@
  * prints in table mode: the per-plan session table, then, when any task
  * report is stored, the reports tallied by plan, status and outcome, then,
  * when any run's preflight halted, the required checks that halted it,
- * and then, when any session was dispatched with a budget, each such
- * session's budget beside the tokens it used.
+ * then, when any session was dispatched with a budget, each such
+ * session's budget beside the tokens it used, and then, when any bug a
+ * tracker could be handed is stored, the one line counting those that
+ * name only documentation.
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
@@ -20,6 +22,7 @@
  * again rather than deriving one of its own.
  */
 import type { BudgetedSession } from './report-budgets.js';
+import type { DocOnlyBugs } from './report-doc-bugs.js';
 import type { EffortGroup, EffortReport } from './report.js';
 import type { HaltedCheck, PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
@@ -360,14 +363,48 @@ export function formatBudgets(report: EffortReport): string[] {
   return [...lines, ...alignRows(BUDGET_COLUMNS, rows, BUDGET_RIGHT_ALIGNED)];
 }
 
+/**
+ * The reading "filed bugs naming only documentation": a blank line, then
+ * one line holding how many of the stored bugs of scope `rafa` name only
+ * documentation, and how many such bugs there are.
+ *
+ * Nothing at all when no such bug is stored, so a store holding none
+ * prints what it printed before the line existed. A store holding some
+ * prints the line at zero too: zero of them is the reading the line is
+ * there for, and a line left out would not say it was taken. The filters
+ * do not narrow the count, since a bug row carries neither a kind nor an
+ * entrypoint; the line has no note saying so, being one line.
+ */
+export function formatDocOnlyBugs(counted: DocOnlyBugs): string[] {
+  if (counted.bugs === 0) return [];
+
+  return [
+    '',
+    `filed bugs naming only documentation: ${formatCount(counted.docOnly)} of ${formatCount(counted.bugs)}`,
+  ];
+}
+
+/**
+ * The sections read from the tables beside the session rows, in the order
+ * they print: task reports, preflight halts, budgets, then the doc-only
+ * bug line. Each is nothing when its table holds nothing to show, so the
+ * command prints these under its no-rows line as well as under the table.
+ */
+export function formatStoredSections(report: EffortReport): string[] {
+  return [
+    ...formatTaskReports(report),
+    ...formatPreflightHalts(report),
+    ...formatBudgets(report),
+    ...formatDocOnlyBugs(report.docOnlyBugs),
+  ];
+}
+
 /** Everything the command prints in table mode. */
 export function formatReport(report: EffortReport): string[] {
   return [
     ...formatReportHeader(report),
     '',
     ...formatReportTable(report),
-    ...formatTaskReports(report),
-    ...formatPreflightHalts(report),
-    ...formatBudgets(report),
+    ...formatStoredSections(report),
   ];
 }

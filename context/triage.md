@@ -2,14 +2,16 @@
 
 `src/triage/` routes each out-of-scope bug in a task report to a channel and
 decides whether to file a new issue, comment on an existing one, or skip it.
-The loop calls `triageReport` from `src/start/triage.ts` and `rafa epic close`
-from `src/commands/epic/close.ts`; the triage writer stores every bug and its
-action in the effort store, keyed by the bug's recurrence key, not the artifact
-the report's findings use.
+It also answers each `stale_docs` entry of a report on the `docs` channel,
+which reaches no tracker. The loop calls `triageReport` from
+`src/start/triage.ts` and `rafa epic close` from `src/commands/epic/close.ts`;
+the triage writer stores every bug and its action in the effort store, keyed
+by the bug's recurrence key, not the artifact the report's findings use.
 
-### The three channels
+### The four channels
 
-A bug is routed to one of three channels before it reaches the tracker:
+A bug is routed to one of three channels before it reaches the tracker, and a
+`stale_docs` entry to a fourth:
 
 **Public.** A bug the machine-fault reading does not match and whose
 `security` flag is `false`. It is looked up by its key, and a recurrence is
@@ -36,6 +38,82 @@ action is `skipped`. Its problem says the family and the text that matched,
 redacted as every problem here is, so a run says why nothing was filed. The
 bug is not lost — `writeTriage` stores every out-of-scope bug and its scope
 column, so the row says `machine`.
+
+**Docs.** A `stale_docs` entry, which is no bug. It is the `machine`
+channel's twin: no find, no create, no comment on either tracker, no
+reference stored or read, and its action is `skipped`. `./stale-docs.ts`
+(`triageStaleDocs`) is handed no tracker at all, so there is none it could
+call. Its problem is one line, `stale_docs[<index>] is stale documentation at
+<where>: <what>`, redacted first. The index is the entry's place in the list
+the parser answered, which can differ from where the entry was written when
+the parser dropped an earlier entry with no `what`. No entry is read for a
+machine fault or a `security` flag, and none is compared with anything: a
+page naming a toolchain is still a page. A report whose only content is
+`stale_docs` entries resolves no public tracker (`src/start/triage.ts`),
+since resolving runs `gh auth status` and `gh repo view`.
+
+The entries are kept, but not by this channel. The loop stores the report
+before it is triaged, and `storeTaskReport` (`src/report/record.ts`) writes
+each entry to the store's `stale_docs` table as a `sighting` row
+(`src/effort/store/stale-docs.ts`). The docs row says the entry reached no
+tracker; it says nothing of whether its store row was written.
+
+### Stale-doc rows: two kinds
+
+The `stale_docs` table holds one row per entry per session and kind. Its
+`kind` is one of two values:
+
+- `sighting`: an entry a task reported as a stale line, written by
+  `storeTaskReport` for every task, the doc task included. It is the reading
+  a plan's doc task is handed.
+- `unsettled`: an entry the doc task could not settle, which is what the
+  doc task's own `stale_docs` field names. `src/start/stale-docs.ts` writes
+  these only for a task declared `docs=repair` that ended `done`, and adds
+  each as one line to the release's stale-docs issue (see
+  `src/docs/release-issue.ts`). A blocked, failed or interrupted doc task
+  stores nothing: its next attempt reports again.
+
+The unique index covers the session, the kind, the place and the text, so a
+report written twice writes its rows once. `kind` is in the index, so an
+unsettled row is not dropped as a sighting's duplicate. Rows with no plan
+stub are the epic-close kind below. The rows are append-only in merges, by
+their `id`.
+
+### Documentation-only failures in `rafa epic close`
+
+A failed acceptance check of `rafa epic close` whose criterion's text names
+only documentation is no bug. `namesOnlyDocs` (`src/triage/doc-only.ts`)
+decides it: at least one path named, and every named path a `.md` or `.mdx`
+file, a path under `docs/` or `context/`, or a `README` or `CHANGELOG`. A
+criterion naming a source file beside a page, or no path at all, is filed as
+a bug as before. The reading of `namesOnlyDocs` is the same as the
+effort-report count below, so the two cannot disagree on one text.
+
+For such a failure `./close-docs.ts` (`routeDocsOnlyFailure`) does, in place
+of the bug report, two things. It stores one `unsettled` row under the check
+session's id with no plan stub, since an epic close runs under no plan. It
+adds one line to the release's stale-docs issue, on the tracker the close
+resolved for its bugs. The entry names no `where`: a criterion is no file and
+line, so its `what` is the epic, the criterion's number and its text. A
+tracker that cannot list and edit answers `kept`, and the line is printed,
+since the close has no "after the last task" to hold it for. The close is
+refused all the same, since the criterion does not hold.
+
+### The drift count in `rafa effort report`
+
+`rafa effort report` prints one line, `filed bugs naming only documentation:
+N of M`, from `src/effort/report-doc-bugs.ts`. M counts the
+`out_of_scope_bugs` rows of scope `rafa`, the bugs a tracker could be handed,
+and N counts those whose `what` and `artifact` read as ONE text name only
+documentation, by `namesOnlyDocs`. The two fields are joined by a line break
+because the reading is split across the pair both ways: a `what` naming a page
+beside an `artifact` naming a source file is a bug about code, and a `what`
+naming a page beside an artifact quoting the page's sentence is a bug about
+the page. A `machine` row is in neither figure.
+
+This count is the control for a session filing a stale page as a bug instead
+of a `stale_docs` entry. It reads zero while the sessions keep the two fields
+apart; a figure that rises says they have stopped.
 
 ### The key and the two-step match
 

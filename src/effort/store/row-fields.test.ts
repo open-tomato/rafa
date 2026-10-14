@@ -1,5 +1,5 @@
 /**
- * Pins the keys of a session row, a commit row, and
+ * Pins the keys of a session row, a commit row, a `stale_docs` row and
  * {@link EFFORT_KEY_PROJECTIONS} against `row-fields.lock.json`.
  *
  * A store row is read back by an older installed runtime long after this
@@ -13,7 +13,11 @@
  *
  * `SESSION_SAMPLE` and `COMMIT_SAMPLE` are typed with no cast against
  * {@link SessionEffortRow} and {@link CommitEffortRow}, one field per
- * property the interfaces declare. `tsconfig.json` excludes `*.test.ts`
+ * property the interfaces declare, and `STALE_DOC_SAMPLE` against
+ * {@link StaleDocRow}. That last row is no kind of the port: its table
+ * holds a column per field, which `migrations.lock.json` freezes with
+ * the entry that creates it, and the lock here holds the names a reader
+ * answers those columns under. `tsconfig.json` excludes `*.test.ts`
  * from `check-types`, so a field dropped from a sample here compiles
  * regardless; what actually pins the shape is `Object.keys` read back at
  * run time and compared with the lock, below. `refuseRemovedKeys` is the
@@ -22,6 +26,7 @@
  * dropping one key from a lock-shaped list, without touching the
  * checked-in lock or either sample.
  */
+import type { StaleDocRow } from './stale-docs.js';
 import type { CommitEffortRow, SessionEffortRow } from './types.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -34,6 +39,7 @@ interface RowFieldsLock {
   readonly sessions: readonly string[];
   readonly commits: readonly string[];
   readonly keyProjections: readonly string[];
+  readonly staleDocs: readonly string[];
 }
 
 const LOCK: RowFieldsLock = ROW_FIELDS_LOCK;
@@ -106,6 +112,22 @@ const COMMIT_SAMPLE: CommitEffortRow = {
   minutesSincePrevious: 12.345,
 };
 
+/**
+ * A `stale_docs` row with every field {@link StaleDocRow} declares, as a
+ * reader of the table would answer one.
+ */
+const STALE_DOC_SAMPLE: StaleDocRow = {
+  id: '57a1ed0c-0000-4000-8000-000000000001',
+  sessionId: '5ea4c400-0000-4000-8000-000000000001',
+  planStub: 'rafa-1072-spec-loop-files-no',
+  taskLine: 'Add the module',
+  kind: 'sighting',
+  where: 'context/triage.md:12',
+  what: 'the page names three channels',
+  outcome: 'done',
+  collectedAt: '2026-10-14T10:00:00.000Z',
+};
+
 /** A sample's own keys, sorted — what the lock is checked against. */
 function sortedKeys(sample: object): readonly string[] {
   return Object.keys(sample).sort();
@@ -137,6 +159,12 @@ describe('the row fields lock', () => {
     expect(() => refuseRemovedKeys(LOCK.commits, actual)).not.toThrow();
   });
 
+  it('holds exactly the stale_docs row\'s keys, sorted', () => {
+    const actual = sortedKeys(STALE_DOC_SAMPLE);
+    expect(actual).toEqual([...LOCK.staleDocs].sort());
+    expect(() => refuseRemovedKeys(LOCK.staleDocs, actual)).not.toThrow();
+  });
+
   it('holds exactly EFFORT_KEY_PROJECTIONS\'s keys, sorted', () => {
     const actual = sortedKeys(EFFORT_KEY_PROJECTIONS);
     expect(actual).toEqual([...LOCK.keyProjections].sort());
@@ -156,6 +184,13 @@ describe('a stored row field removed or renamed (control)', () => {
     const withoutSha = LOCK.commits.filter((key) => key !== 'sha');
 
     expect(() => refuseRemovedKeys(LOCK.commits, withoutSha))
+      .toThrow(REMOVED_FIELD_REFUSAL);
+  });
+
+  it('refuses with the spec\'s text when a stale_docs key drops out', () => {
+    const withoutWhere = LOCK.staleDocs.filter((key) => key !== 'where');
+
+    expect(() => refuseRemovedKeys(LOCK.staleDocs, withoutWhere))
       .toThrow(REMOVED_FIELD_REFUSAL);
   });
 

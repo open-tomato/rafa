@@ -584,6 +584,48 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   );
   `,
   },
+  // One row per documentation line a task report named as stale, outside
+  // the port's row map and shaped as `out_of_scope_bugs` is: `seq`, the
+  // findings provenance, the entry, and the origin pair, which this table
+  // holds from its first row since it is created after `row-origins`.
+  // `where_at` is the entry's `where`, renamed because WHERE is an SQL
+  // keyword, and NULL for an entry that named no place. `kind` says who
+  // wrote the row: `sighting` for an entry a task reported, `unsettled`
+  // for one the plan's doc task could not settle. `plan_stub` is NULL for
+  // a row written under no plan, as an epic close writes one, and
+  // `outcome` has no CHECK for the reason `findings.ts` gives.
+  // `stale_docs_by_entry` holds one session's repeat of an entry to one
+  // row: the two fields copied from the report, `where_at` through
+  // `ifnull` so two entries naming no place collide, and `kind`, so an
+  // entry stored as a sighting never swallows the same session's
+  // unsettled row for it. `stale-docs.ts` holds the row type.
+  {
+    id: 'stale-docs',
+    breaks: [],
+    sql: `
+  CREATE TABLE stale_docs (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('sighting', 'unsettled')),
+    where_at     TEXT CHECK (where_at <> ''),
+    what         TEXT NOT NULL CHECK (what <> ''),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL,
+    origin_store TEXT,
+    origin_seq   INTEGER
+  );
+
+  CREATE UNIQUE INDEX stale_docs_by_entry
+    ON stale_docs (session_id, kind, ifnull(where_at, ''), what);
+
+  CREATE UNIQUE INDEX stale_docs_by_origin
+    ON stale_docs (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+  `,
+  },
 ];
 
 /**
