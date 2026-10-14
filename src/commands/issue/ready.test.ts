@@ -985,6 +985,92 @@ describe('rafa issue ready, dispatched', () => {
     expect(gh.calls()).toEqual([]);
   });
 
+  /** A command at a terminal whose prompter may not be opened, for the `--dry-run` cases. */
+  function terminalWithoutPrompter(gh: ReturnType<typeof dispatchedGh>): RafaCommand {
+    return createIssueReadyCommand({
+      openGh: () => gh.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --dry-run');
+      },
+    });
+  }
+
+  it('refuses --dry-run with --yes with exit 1 naming both flags, sending no command', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', '--yes', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('--dry-run');
+    expect(outcome.stderr).toContain('--yes');
+    expect(outcome.stderr).toContain(`Usage: ${READY_USAGE}`);
+    expect(outcome.stdout).toBe('');
+    expect(gh.calls()).toEqual([]);
+  });
+
+  it('checks at a terminal under --dry-run, opening no prompter and sending no edit, which the run without it sends', async () => {
+    const dry = dispatchedGh();
+    const plain = dispatchedGh();
+    const answering = createIssueReadyCommand({
+      openGh: () => plain.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => ({ say: () => undefined, ask: () => Promise.resolve('y'), close: () => undefined }),
+    });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', NO_HINT], SUBJECTS, [terminalWithoutPrompter(dry)], plant());
+    await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [answering], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: `#57 was opened by maintainer, who has write access to ${REPO}\n`
+        + '#57 fills every heading the spec template asks for, with no placeholder left\n'
+        + '#57 is ready to mark; --dry-run wrote nothing.\n',
+      stderr: '',
+    });
+    expect(dry.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(false);
+    expect(plain.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(true);
+  });
+
+  it('refuses a body with gaps under --dry-run with exit 2, naming the heading and sending no edit', async () => {
+    const gh = dispatchedGh({ body: THIN });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', NO_HINT], SUBJECTS, [terminalWithoutPrompter(gh)], plant());
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('issue #57 is not ready to plan from:');
+    expect(outcome.stderr).toContain('"What you get" is missing');
+    expect(gh.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(false);
+  });
+
+  it('gives status checked as the data of the one result event in json mode under --dry-run', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run', '--output=json', NO_HINT],
+      SUBJECTS,
+      [terminalWithoutPrompter(gh)],
+      plant(),
+    );
+    const results = eventsOf(outcome.stdout).filter((event) => event.type === 'result');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.data).toMatchObject({ issue: 57, status: 'checked' });
+  });
+
+  it('refuses a value given to --dry-run with exit 1, sending no command', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run=maybe', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('--dry-run takes no value');
+    expect(gh.calls()).toEqual([]);
+  });
+
   it('refuses a line naming no issue, a second word and a word that is no number, sending no command', async () => {
     const gh = dispatchedGh();
     const command = createIssueReadyCommand({
@@ -1083,6 +1169,28 @@ describe('the ending it names the next step with', () => {
     expect([probe.reads(), outcome.stdout.includes('Next:')]).toEqual([0, false]);
   });
 
+  it('reads nothing under --dry-run, on a checked issue or one already carrying spec:ready', async () => {
+    const checked = endingProbe();
+    const already = endingProbe();
+
+    const first = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh(), 'y', checked.seams)],
+      plant(),
+    );
+    const second = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh({ labels: [SPEC_READY_LABEL] }), 'y', already.seams)],
+      plant(),
+    );
+
+    expect([first.exitCode, second.exitCode]).toEqual([0, 0]);
+    expect([checked.reads(), already.reads()]).toEqual([0, 0]);
+    expect(first.stdout.includes('Next:') || second.stdout.includes('Next:')).toBe(false);
+  });
+
   it('declares the flag that turns it off beside --yes, which skips the marking question alone', () => {
     const command = createIssueReadyCommand();
 
@@ -1105,5 +1213,20 @@ describe('the describe entry', () => {
       aliases: [],
     });
     expect(ready?.examples.map((example) => example.cmd)).toContain('rafa issue ready 57 --yes');
+  });
+
+  it('lists --dry-run as a boolean that is not required and has no default, with its example', () => {
+    const ready = describeRegistry(CORE_REGISTRY, '0.0.0').subjects
+      .find((subject) => subject.name === 'issue')
+      ?.actions
+      .find((action) => action.name === 'ready');
+
+    expect(ready?.flags.find((flag) => flag.name === 'dry-run')).toMatchObject({
+      type: 'boolean',
+      required: false,
+      default: null,
+      aliases: [],
+    });
+    expect(ready?.examples.map((example) => example.cmd)).toContain('rafa issue ready 57 --dry-run');
   });
 });
