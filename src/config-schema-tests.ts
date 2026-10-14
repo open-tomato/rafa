@@ -5,7 +5,7 @@
  * field, its default, its spec and its reader. {@link TESTS_SECTION}
  * hands them to core as one `ConfigSection`, package `tests`, and the
  * `declare module` below adds {@link TestsSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below last, after the `task` section, so the order
  * settings are reported in holds the section.
  *
@@ -14,7 +14,7 @@
  * `wc -l`, when these keys were added, and takes nothing new under the
  * 800-line cap of `context/source.md`. The one reader the three glob keys
  * share, {@link globList}, is a rule about a VALUE and sits here all the
- * same, for that reason. `config-merged.ts` imports this file to spread
+ * same, for that reason. `config-registry.ts` imports this file to spread
  * it; a caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The three glob keys

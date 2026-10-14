@@ -10,10 +10,12 @@
  * item-shape readers in `config-items.test.ts`; here each section is
  * reached through a file's text. The schema itself — the
  * dotted file key per setting, the sections a file may open, and the
- * known-key index — is `config-merged.ts`, driven in
- * `config-merged.test.ts`, with core's own keys in `core-section.ts`,
- * driven in `core-section.test.ts`; here it is reached through
- * `config.js`, which re-exports every name a caller reads.
+ * known-key index — is read off the registered sections by `section.ts`,
+ * driven in `section.test.ts`, and merged by `src/config-registry.ts`,
+ * driven in `src/config-registry.test.ts`, with core's own keys in
+ * `core-section.ts`, driven in `core-section.test.ts`; here it is
+ * reached through `config.js`, which re-exports every name a caller
+ * reads.
  *
  * Every precedence case plants values that DIFFER from the defaults in
  * each layer it names, which is what lets it fail: a resolver that
@@ -76,14 +78,13 @@ import type {
   TierPin,
 } from './config.js';
 
-import '../../config-registry.js';
-
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
+
 import {
-  CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,

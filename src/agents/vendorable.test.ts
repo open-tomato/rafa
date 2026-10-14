@@ -27,7 +27,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { VENDOR_COMMAND } from './roster.js';
 import { vendorableAgentLine, vendorableAgents, vendorableAgentWarnings } from './vendorable.js';

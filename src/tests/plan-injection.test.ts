@@ -56,7 +56,8 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { ConfigError } from '../core/config/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';

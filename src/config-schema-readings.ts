@@ -9,8 +9,8 @@
  * specs and defaults in `core-section.ts` with the four readings the
  * phase-1 spec leaves to the reader (open tracker kinds, empty
  * prerequisite tiers, `version: 1` alone, `loop.settingSources` as an
- * ordered list), and `CONFIG_DEFAULTS` and `SETTINGS` in
- * `config-merged.ts`. The readings below sat in `config-schema.ts`'s
+ * ordered list); `CONFIG_DEFAULTS` and `SETTINGS` are merged in
+ * `src/config-registry.ts`. The readings below sat in `config-schema.ts`'s
  * note until that module reached 780 lines
  * of the 800-line cap of `context/source.md`, and moved here before
  * another key was added, so a new key is not paid for by rewrapping

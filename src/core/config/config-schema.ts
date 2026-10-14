@@ -14,7 +14,8 @@
  * a `declare module` on this file, so this module names no section file
  * and {@link ConfigSetting} still names every setting. Nothing merged —
  * the settings record, the defaults, the key indexes — is exported
- * here: `config-merged.ts` builds them.
+ * here: `src/config-registry.ts` merges the sections into them, and
+ * core reads the registered ones off `section.ts`.
  *
  * `config.ts` re-exports {@link RafaConfig}, {@link ConfigSetting} and
  * {@link CommandLineSetting}, and the config barrel `index.ts` every

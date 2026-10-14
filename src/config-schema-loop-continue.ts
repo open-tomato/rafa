@@ -6,7 +6,7 @@
  * {@link LOOP_CONTINUE_SECTION} hands them to core as one
  * `ConfigSection`, package `loop-continue`, and the `declare module`
  * below adds {@link LoopContinueSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `loop.retries` and ahead of
  * `loop.wrapUp`, so the order settings are reported in holds the `loop`
  * section together.
@@ -14,7 +14,7 @@
  * The keys have their own module, as `config-schema-loop-retries.ts`
  * has, because `config-schema.ts`'s own note asks a new section for a
  * sibling, and the two count readers are rules about VALUES that only
- * these keys read. `config-merged.ts` imports this file to spread it; a
+ * these keys read. `config-registry.ts` imports this file to spread it; a
  * caller reads the settings off the resolved `RafaConfig`.
  *
  * ## The keys

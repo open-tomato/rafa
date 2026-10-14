@@ -4,12 +4,13 @@
  *
  * A {@link ConfigSection} is one package's part of the schema: its
  * `settings` (each setting's file key, reader and command-line flag, as
- * a partial of the record `config-merged.ts` builds today), its
+ * a partial of the record of every setting, {@link SettingsRecord}), its
  * `defaults` (a partial of {@link RafaConfig}), and the cross-key
  * `checks` run over the resolved config. {@link registerConfigSections}
  * merges sections into the active registry, which {@link activeSettings},
- * {@link activeDefaults} and {@link activeChecks} answer. Core names no
- * section here: the list of sections lives outside `src/core/`, in the
+ * {@link activeDefaults} and {@link activeChecks} answer, and the key
+ * indexes below are read off. Core names no section here: the list of
+ * sections lives outside `src/core/`, in `src/config-registry.ts`, the
  * module that calls {@link registerConfigSections}.
  *
  * This file imports types alone, so it loads first in any order and can
@@ -59,6 +60,26 @@
  * in one process, so a case that registers puts the previous registry
  * back in a `finally`, or every file bun runs later reads its sections.
  * {@link EMPTY_CONFIG_REGISTRY} is the registry before any registration.
+ *
+ * ## The key indexes
+ *
+ * `config.ts` sorts a file's keys through three indexes of the active
+ * registry's settings: {@link activeSettingByKey}, the setting each
+ * dotted file key names; {@link activeSectionPaths}, every dotted prefix
+ * a setting sits under, which are the sections a file may open; and
+ * {@link activeKnownKeysAbove}, the keys a warning about an unknown key
+ * lists. Each is built on first read and kept per registry, so a
+ * registration or a restore is read at once and a registry is indexed
+ * once. Keys are looked up in a `Map` and a `Set`, never with `in` or an
+ * object index: `Bun.YAML.parse` returns a key spelled `constructor`,
+ * `toString` or `__proto__` as an ordinary own key, and an object lookup
+ * would match it against `Object.prototype` instead.
+ *
+ * The indexes follow registration order: the keys under a path are
+ * listed in the order their settings were registered. The registry
+ * registers its sections cut into the order the schema has always
+ * reported problems in, so a warning lists the keys it always listed;
+ * `src/config-registry.test.ts` holds the indexes to the registry's own.
  *
  * ## The load hook
  *
@@ -297,6 +318,91 @@ export function activeDefaults(): Readonly<Partial<RafaConfig>> {
 /** Every registered section's checks, in registration order. */
 export function activeChecks(): readonly ConfigCheck[] {
   return active.checks;
+}
+
+/** The key indexes read off one registry's settings; see the module note. */
+interface KeyIndex {
+  /** Setting names by the dotted key a file spells them with. */
+  readonly settingByKey: ReadonlyMap<string, ConfigSetting>;
+  /** Every dotted prefix a setting sits under: the sections a file opens. */
+  readonly sectionPaths: ReadonlySet<string>;
+  /** The keys known under each path, `''` for the top and `<list>[]` for an item. */
+  readonly knownUnder: ReadonlyMap<string, readonly string[]>;
+}
+
+/** `plan.inject` → `['plan']`; `a.b.c` → `['a', 'a.b']`; `store` → `[]`. */
+function prefixesOf(key: string): string[] {
+  const parts = key.split('.');
+  return parts.slice(1).map((_, index) => parts.slice(0, index + 1).join('.'));
+}
+
+/** The indexes of `registry`'s settings, in registration order. */
+function keyIndexOf(registry: ConfigSectionRegistry): KeyIndex {
+  const settingByKey = new Map<string, ConfigSetting>();
+  const knownUnder = new Map<string, string[]>();
+  const add = (parent: string, name: string): void => {
+    const names = knownUnder.get(parent) ?? [];
+    if (!names.includes(name)) knownUnder.set(parent, [...names, name]);
+  };
+  for (const [name, spec] of Object.entries(registry.settings)) {
+    if (spec === undefined) continue;
+    settingByKey.set(spec.key, name as ConfigSetting);
+    const parts = spec.key.split('.');
+    parts.forEach((part, index) => add(parts.slice(0, index).join('.'), part));
+    for (const item of spec.itemKeys ?? []) add(`${spec.key}[]`, item);
+  }
+  const sectionPaths = new Set([...settingByKey.keys()].flatMap(prefixesOf));
+  return { settingByKey, sectionPaths, knownUnder };
+}
+
+/** The indexes built so far, one per registry, so a registry is indexed once. */
+const keyIndexes = new WeakMap<ConfigSectionRegistry, KeyIndex>();
+
+/** The indexes of the active registry, built on first read. */
+function activeKeyIndex(): KeyIndex {
+  const cached = keyIndexes.get(active);
+  if (cached !== undefined) return cached;
+  const built = keyIndexOf(active);
+  keyIndexes.set(active, built);
+  return built;
+}
+
+/** Every registered setting's name, by the dotted key a file spells it with. */
+export function activeSettingByKey(): ReadonlyMap<string, ConfigSetting> {
+  return activeKeyIndex().settingByKey;
+}
+
+/** Every dotted prefix a registered setting sits under: the sections a file opens. */
+export function activeSectionPaths(): ReadonlySet<string> {
+  return activeKeyIndex().sectionPaths;
+}
+
+/** The path a key sits under: `plan` for `plan.depth`, `''` at the top. */
+function parentOf(key: string): string {
+  const cut = key.lastIndexOf('.');
+  return cut < 0
+    ? ''
+    : key.slice(0, cut);
+}
+
+/** Matches a list index closing a path: `[0]` in `modules[0]`. */
+const TRAILING_INDEX = /\[\d+\]$/;
+
+/**
+ * The nearest path above `key` with registered keys, and those keys, in
+ * registration order. An item path such as `modules[0]` looks up the
+ * item keys of `modules`.
+ *
+ * @param key - A dotted key a file spelled, `modules[0].kind` included.
+ * @returns The path the keys sit under, `''` for the top, and the keys.
+ */
+export function activeKnownKeysAbove(key: string): [string, readonly string[]] {
+  const { knownUnder } = activeKeyIndex();
+  for (let parent = parentOf(key); parent !== ''; parent = parentOf(parent)) {
+    const names = knownUnder.get(parent.replace(TRAILING_INDEX, '[]'));
+    if (names !== undefined) return [parent, names];
+  }
+  return ['', knownUnder.get('') ?? []];
 }
 
 /**

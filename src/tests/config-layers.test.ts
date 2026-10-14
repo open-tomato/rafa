@@ -54,7 +54,8 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { setActiveStoreSettings } from '../effort/store/settings.js';
 

@@ -12,10 +12,9 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
-import './config-registry.js';
-
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
   similarityCandidates,
   similarityThreshold,
@@ -23,13 +22,11 @@ import {
   TRIAGE_SECTION,
 } from './config-schema-triage.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */

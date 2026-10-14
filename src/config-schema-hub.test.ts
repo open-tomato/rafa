@@ -22,10 +22,9 @@ import type {
 } from './core/config/index.js';
 import type { SyncStrategy, ValueAt } from './core/config/sections.js';
 
-import './config-registry.js';
-
 import { describe, expect, it } from 'bun:test';
 
+import { SETTINGS } from './config-registry.js';
 import {
   HUB_SECTION,
   hubContextOf,
@@ -40,7 +39,6 @@ import {
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** Where every reader case reads its value. */

@@ -151,8 +151,10 @@ barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
 proves nothing about it. The four barrels beyond the subject indexes are
 the splits made so far. `config/sections.ts` holds the leaf pair
-`config-sections.ts` and `config-readers.ts`, because `config-merged.ts`
-imports section files that import the pair back. `config/load.ts` stands
+`config-sections.ts` and `config-readers.ts`, split while
+`config-merged.ts` imported section files that import the pair back;
+that file is retired and nothing behind `config/index.ts` imports a
+section file now, so the split stands as it was made. `config/load.ts` stands
 alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
@@ -303,12 +305,11 @@ a thing to split.
 sections and `init` scaffold.** `src/core/config/config.ts` is not one:
 it builds a layer by a loop over the names registered with
 `src/core/config/section.ts`, so it names no setting.
-`src/core/config/config-merged.test.ts` and `src/config-registry.test.ts`
-pin the key set as closed lists (`KEYS`, `TOP`, `SECTIONS`,
-`knownKeysAbove`), and a core key is also spelled in
-`src/core/config/core-section.test.ts` and takes its place in one of the
-runs of core's names that `config-merged.ts` and `src/config-registry.ts`
-each spell, while the core barrel still exports the merged names. Both config suites
+`src/config-registry.test.ts` pins the key set as closed lists (`KEYS`,
+`TOP`, `SECTIONS`, `knownKeysAbove`), and a core key
+is also spelled in `src/core/config/core-section.test.ts` and takes its
+place in one of the runs of core's names that `src/config-registry.ts`
+spells. Both config suites
 also check that every setting appears exactly once:
 `src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
 `FULL_VALUES`, its cases and `KNOWN`) and

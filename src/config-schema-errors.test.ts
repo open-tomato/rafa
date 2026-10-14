@@ -11,8 +11,9 @@ import type { ErrorCodeEntry } from './errors/codes.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { SETTINGS } from './config-registry.js';
 import { ERRORS_SECTION } from './config-schema-errors.js';
-import { EMPTY_CONFIG_REGISTRY, mergeConfigSections, SETTINGS } from './core/config/index.js';
+import { EMPTY_CONFIG_REGISTRY, mergeConfigSections } from './core/config/index.js';
 
 /** Where every case reads the key. */
 const AT = { label: 'F: errors.codes', key: 'errors.codes' };

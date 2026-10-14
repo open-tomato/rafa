@@ -19,14 +19,12 @@
 import type { ConfigSetting } from './config-schema.js';
 import type { ConfigLayer, ConfigOverrides } from './config.js';
 
-import '../../config-registry.js';
-
 import { describe, expect, it } from 'bun:test';
 
-import { isCommandLineSetting, SETTINGS } from './config-merged.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
+
 import {
   BOARD_RELATIONSHIP_MODES,
-  CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
@@ -70,7 +68,6 @@ describe('board.relationships in the schema', () => {
   it('spells the setting as board.relationships, file-only', () => {
     expect(SETTINGS.boardRelationships.key).toBe('board.relationships');
     expect(SETTINGS.boardRelationships.cli).toBe(false);
-    expect(isCommandLineSetting('boardRelationships')).toBe(false);
   });
 
   it('names the two modes, labels first', () => {

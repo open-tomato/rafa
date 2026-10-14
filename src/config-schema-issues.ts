@@ -4,7 +4,7 @@
  * spec and its reader. {@link ISSUES_SECTION} hands them to core as one
  * `ConfigSection`, package `issues`, and the `declare module` below adds
  * {@link IssuesConfigSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `logger` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
  *

@@ -11,19 +11,16 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
-import './config-registry.js';
-
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, wrapUpRetries } from './config-schema-wrap-up.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */

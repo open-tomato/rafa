@@ -26,6 +26,13 @@
  * active registry unchanged (2), the package refusal dropped (1), and
  * the merged checks left empty (2).
  *
+ * The key indexes (`activeSettingByKey`, `activeSectionPaths` and
+ * `activeKnownKeysAbove`) are driven over the fixture sections alone,
+ * in an emptied registry, so every key and section they answer is one
+ * a case here registered. Each index is built once per registry, so a
+ * case registers a second section after reading the first and holds
+ * that the read answers the new registry rather than the cached one.
+ *
  * The load hook is module state too, apart from the registry. Each case
  * that sets one reads the hook in place first and puts it back in a
  * `finally`, so the hook `src/config-registry.ts` set for every later
@@ -49,6 +56,9 @@ import {
   activeChecks,
   activeConfigLoadHook,
   activeDefaults,
+  activeKnownKeysAbove,
+  activeSectionPaths,
+  activeSettingByKey,
   activeSettings,
   ConfigSectionError,
   EMPTY_CONFIG_REGISTRY,
@@ -324,6 +334,95 @@ describe('registerConfigSections', () => {
       expect(activeSettings()).toEqual({});
       expect(activeDefaults()).toEqual({});
       expect(activeChecks()).toEqual([]);
+    });
+  });
+});
+
+/** The prerequisite lists and the modules, under the package `gamma`: settings with item keys. */
+function gamma(): ConfigSection {
+  return {
+    package: 'gamma',
+    settings: {
+      prerequisitesRequired: SETTINGS.prerequisitesRequired,
+      modules: SETTINGS.modules,
+      learningBlessMinConfidence: SETTINGS.learningBlessMinConfidence,
+    },
+    defaults: {
+      prerequisitesRequired: [],
+      modules: [],
+      learningBlessMinConfidence: 0.5,
+    },
+  };
+}
+
+describe('the key indexes', () => {
+  it('reads every registered file key back to its setting, and nothing else', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha(), beta()]);
+
+      expect([...activeSettingByKey()]).toEqual([
+        ['store', 'store'],
+        ['plan.dir', 'planDir'],
+        ['dangerous.acceptStaleRefs', 'dangerousAcceptStaleRefs'],
+      ]);
+      expect(activeSettingByKey().get('plan')).toBeUndefined();
+      expect(activeSettingByKey().get('constructor')).toBeUndefined();
+    });
+  });
+
+  it('opens every dotted prefix a registered setting sits under, and no setting key', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha(), gamma()]);
+
+      expect([...activeSectionPaths()].sort()).toEqual(['learning', 'learning.bless', 'plan', 'prerequisites']);
+      expect(activeSectionPaths().has('modules')).toBe(false);
+      expect(activeSectionPaths().has('__proto__')).toBe(false);
+    });
+  });
+
+  it('answers the nearest registered path above a key, in registration order, falling back to the top', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha(), gamma(), beta()]);
+
+      expect(activeKnownKeysAbove('nonesuch')).toEqual(['', ['store', 'plan', 'prerequisites', 'modules', 'learning', 'dangerous']]);
+      expect(activeKnownKeysAbove('plan.depth')).toEqual(['plan', ['dir']]);
+      expect(activeKnownKeysAbove('plan.a.b')).toEqual(['plan', ['dir']]);
+      expect(activeKnownKeysAbove('learning.bless.after')).toEqual(['learning.bless', ['minConfidence']]);
+      expect(activeKnownKeysAbove('learning.promote')).toEqual(['learning', ['bless']]);
+      expect(activeKnownKeysAbove('nonesuch.deeper.deepest')[0]).toBe('');
+    });
+  });
+
+  it('collapses a list index, so an item key answers the item shape', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([gamma()]);
+
+      expect(activeKnownKeysAbove('prerequisites.required[0].timeout')).toEqual([
+        'prerequisites.required[0]',
+        ['tool', 'env', 'service', 'lsp', 'probe'],
+      ]);
+      expect(activeKnownKeysAbove('modules[2].nonesuch')).toEqual(['modules[2]', ['npm', 'github', 'path', 'ref']]);
+    });
+  });
+
+  it('answers the registry in place after a registration, not the one read before it', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha()]);
+      const before = [activeSettingByKey().size, [...activeSectionPaths()], activeKnownKeysAbove('x')[1]];
+      registerConfigSections([beta()]);
+
+      expect(before).toEqual([2, ['plan'], ['store', 'plan']]);
+      expect(activeSettingByKey().get('dangerous.acceptStaleRefs')).toBe('dangerousAcceptStaleRefs');
+      expect([...activeSectionPaths()]).toEqual(['plan', 'dangerous']);
+      expect(activeKnownKeysAbove('x')[1]).toEqual(['store', 'plan', 'dangerous']);
+    });
+  });
+
+  it('answers nothing with no section registered', () => {
+    withEmptyRegistry(() => {
+      expect(activeSettingByKey().size).toBe(0);
+      expect(activeSectionPaths().size).toBe(0);
+      expect(activeKnownKeysAbove('plan.inject')).toEqual(['', []]);
     });
   });
 });

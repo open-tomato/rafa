@@ -150,6 +150,11 @@ import { parseLocalIssue } from '../../adapters/tracker/local.js';
 import { parseSpecReview } from '../../board/spec-review.js';
 import { actionHash } from '../../learning/index.js';
 import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
+import {
+  EMPTY_CONFIG_REGISTRY,
+  registerConfigSections,
+  restoreConfigSections,
+} from '../config/section.js';
 
 import {
   CORE_ADAPTER_REGISTRY,
@@ -532,6 +537,24 @@ describe('the core adapter registry', () => {
     // Control: the floor the record meets answers it.
     expect(await pull({ learningBlessMinConfidence: 0.6 })).toEqual(['user-1']);
     expect(existsSync(root)).toBe(false);
+  });
+
+  it('refuses a local learning adapter with no floor when no section registered one, naming the registry', () => {
+    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
+    const held = registerConfigSections([]);
+    try {
+      restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+
+      expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered') })).toThrow(
+        'adapter registry: learning.bless.minConfidence has no registered default:'
+          + ' import src/config-registry.ts before making the local learning adapter without one',
+      );
+      // Control: a floor the context names needs no registered default.
+      expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered'), learningBlessMinConfidence: 0.5 }))
+        .not.toThrow();
+    } finally {
+      restoreConfigSections(held);
+    }
   });
 
   it('reads the user scope under the HOME the process started with when its context names no home', async () => {

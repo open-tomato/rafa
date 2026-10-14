@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
 
 import { activeStoreSettings, setActiveStoreSettings } from './settings.js';
 import { openSqliteStore, sqliteStorePath, withSqliteStore } from './sqlite.js';

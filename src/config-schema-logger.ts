@@ -4,7 +4,7 @@
  * {@link LOGGER_SECTION} hands them to core as one `ConfigSection`,
  * package `logger`, and the `declare module` below adds
  * {@link LoggerConfigSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `errors` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
  *

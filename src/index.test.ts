@@ -20,17 +20,17 @@
  * The first config module is read through its barrel,
  * `src/core/config/index.ts`, the one path a file outside `src/core/`
  * may import it by. The barrel is wider than the root: it also holds
- * the schema's indexes, core's section, the item readers and the section
- * registry, which the tree reads and the package does not publish. Those
- * twenty-three names are spelled under {@link CONFIG_BARREL_ONLY} and left out of the
- * containment case, so a name added to the barrel still reds it until
- * the name is added to the root or to that list. The ten runtime names `config.ts` re-exports
+ * core's section, the item readers and the section registry with the
+ * key indexes it answers, which the tree reads and the package does not
+ * publish. Those twenty names are spelled under
+ * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
+ * name added to the barrel still reds it until the name is added to the
+ * root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
  * other barrel, `sections.ts`, and are held by the spelled list alone.
- * The barrel's `CONFIG_DEFAULTS` is left out of the containment case
- * too, under {@link CONFIG_BARREL_SHADOWED}: the root publishes the
- * registry's, `src/config-registry.ts`, a different object of the same
- * name, and the re-export case holds it to the registry's.
+ * The barrel holds no `CONFIG_DEFAULTS`: the root publishes the
+ * registry's, `src/config-registry.ts`, and the re-export case holds it
+ * to the registry's.
  * The second config module, `config-load.ts`, is read through a barrel
  * of its own, `src/core/config/load.ts`, which holds that module's
  * names and no other, so nothing is left out of its containment case.
@@ -380,8 +380,8 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 
 /**
  * The runtime names the config barrel holds and the root does not
- * publish: the schema's indexes, core's section, the item readers and
- * the section registry with its load hook.
+ * publish: core's section, the item readers and the section registry
+ * with its key indexes and its load hook.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
   'CORE_SECTION',
@@ -390,16 +390,13 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'MODULE_SOURCE_KEYS',
   'OPTIONAL_ITEM_KEYS',
   'REQUIRED_ITEM_KEYS',
-  'SECTIONS',
-  'SETTINGS',
-  'SETTING_BY_KEY',
-  'SETTING_NAMES',
   'activeChecks',
   'activeConfigLoadHook',
   'activeDefaults',
+  'activeKnownKeysAbove',
+  'activeSectionPaths',
+  'activeSettingByKey',
   'activeSettings',
-  'isCommandLineSetting',
-  'knownKeysAbove',
   'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
@@ -409,18 +406,9 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'setConfigLoadHook',
 ];
 
-/**
- * The runtime names the config barrel holds and the root publishes from
- * `src/config-registry.ts` instead, a different object of the same
- * name, until the barrel loses them.
- */
-const CONFIG_BARREL_SHADOWED: readonly string[] = ['CONFIG_DEFAULTS'];
-
-/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY} and {@link CONFIG_BARREL_SHADOWED}. */
+/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
 const configModule: Record<string, unknown> = Object.fromEntries(
-  Object.entries(configBarrel).filter(
-    ([name]) => !CONFIG_BARREL_ONLY.includes(name) && !CONFIG_BARREL_SHADOWED.includes(name),
-  ),
+  Object.entries(configBarrel).filter(([name]) => !CONFIG_BARREL_ONLY.includes(name)),
 );
 
 /** The modules whose every runtime name the root also carries. */

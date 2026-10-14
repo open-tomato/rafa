@@ -8,7 +8,8 @@
  * names no section. This module, outside `src/core/`, is the one place
  * the twelve are listed, {@link CONFIG_SECTIONS}: core's own
  * (`CORE_SECTION`) and the eleven files `src/config-schema-*.ts`.
- * Importing it calls `registerConfigSections` with that list, once, so
+ * Importing it calls `registerConfigSections` once, with that list cut
+ * into the runs {@link SETTINGS} holds (see the order below), so
  * `activeSettings()` and `activeDefaults()` answer every setting.
  * `src/rafa.ts` and `src/index.ts` import it ahead of every other
  * import, before anything that loads a config; core never imports it.
@@ -27,10 +28,19 @@
  * two of them, so `hub.url` follows `effort.sync` and the `board.project`
  * limits follow `board.project.number`. The `release` section is spread
  * in three parts, its `pr`, `release` and `dangerous.` keys, each where
- * its keys have always stood. The registry `registerConfigSections`
- * builds holds core's section first and the eleven in the list's order;
- * `config-registry.test.ts` holds that both hold the same settings, as
- * the same specs, and the same defaults, as the same values.
+ * its keys have always stood.
+ *
+ * Core reads every setting in the order it was registered: a layer, a
+ * resolution, and the keys a warning about an unknown key lists. So the
+ * sections are registered cut into the runs {@link SETTINGS} holds them
+ * in (`inSettingOrder`), each cut under its section's package and a
+ * section's checks on its first cut, and core's registry holds every
+ * setting in this order. Registering the list whole would put core's
+ * forty-two first, and the warning recorded in
+ * `src/tests/fixtures/config-parity/` would list `hub` after `task`.
+ * `config-registry.test.ts` holds that the registry holds the same
+ * settings, in the same order, as the same specs, and the same defaults,
+ * as the same values.
  *
  * ## The closed set
  *
@@ -42,14 +52,18 @@
  * `__proto__` as an ordinary own key, and an object lookup would match
  * it against `Object.prototype` instead.
  *
- * ## Beside the core barrel
+ * ## Beside core
  *
- * The core barrel `src/core/config/index.ts` still exports the six
- * names, built by `src/core/config/config-merged.ts`, until their
- * importers move here. The two builds spread the same section objects,
- * so each default is the same value in both; the two records and the
- * two default objects are different objects. `src/index.ts` publishes
- * this module's {@link CONFIG_DEFAULTS}.
+ * This module is the one place the six names are built: the core barrel
+ * `src/core/config/index.ts` exports none of them, and a file outside
+ * `src/core/` imports them from here. Core reads the registered
+ * settings and defaults through `activeSettings()` and
+ * `activeDefaults()`, and the key indexes through `activeSettingByKey()`,
+ * `activeSectionPaths()` and `activeKnownKeysAbove()`, all in
+ * `src/core/config/section.ts`. Those follow registration order, which
+ * is the order here, so they answer what {@link SETTING_BY_KEY},
+ * {@link SECTIONS} and {@link knownKeysAbove} answer.
+ * `src/index.ts` publishes this module's {@link CONFIG_DEFAULTS}.
  */
 import type {
   ConfigSection,
@@ -114,8 +128,6 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   ISSUES_SECTION,
   TESTS_SECTION,
 ]);
-
-registerConfigSections(CONFIG_SECTIONS);
 
 /**
  * The hook `loadConfig` calls with every config it resolves: it hands
@@ -256,6 +268,47 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = Objec
 
 /** Every setting name, read off the closed record above. */
 export const SETTING_NAMES: readonly ConfigSetting[] = Object.freeze(Object.keys(SETTINGS) as ConfigSetting[]);
+
+/** One run of consecutive setting names a single section defines. */
+interface Cut {
+  readonly section: ConfigSection;
+  readonly names: readonly ConfigSetting[];
+}
+
+/**
+ * `sections` cut into the runs `names` holds them in: one cut per run of
+ * consecutive names one section defines, each under its section's
+ * package, the first cut of a section carrying its checks. Registered in
+ * this order, the registry core reads holds every setting in the order
+ * of `names`. Throws on a name no section defines.
+ *
+ * @param sections - The sections to cut, each defining its own names.
+ * @param names - Every setting, in the order to register them.
+ * @returns The cuts, as sections, in the order of `names`.
+ */
+function inSettingOrder(
+  sections: readonly ConfigSection[],
+  names: readonly ConfigSetting[],
+): ConfigSection[] {
+  const cuts = names.reduce<readonly Cut[]>((runs, name) => {
+    const section = sections.find((candidate) => Object.hasOwn(candidate.settings, name));
+    if (section === undefined) throw new Error(`rafa config registry: no section defines setting ${name}`);
+    const last = runs.at(-1);
+    return last?.section === section
+      ? [...runs.slice(0, -1), { section, names: [...last.names, name] }]
+      : [...runs, { section, names: [name] }];
+  }, []);
+  return cuts.map(({ section, names: run }, index) => ({
+    package: section.package,
+    settings: Object.fromEntries(run.map((name) => [name, section.settings[name]])),
+    defaults: Object.fromEntries(run.map((name) => [name, section.defaults[name]])),
+    checks: cuts.findIndex((cut) => cut.section === section) === index
+      ? section.checks ?? []
+      : [],
+  }));
+}
+
+registerConfigSections(inSettingOrder(CONFIG_SECTIONS, SETTING_NAMES));
 
 /** Setting names by the dotted key the file spells them with. */
 export const SETTING_BY_KEY: ReadonlyMap<string, ConfigSetting> = new Map(

@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { withSourceHeader } from '../commands/agent/vendor.js';
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import {

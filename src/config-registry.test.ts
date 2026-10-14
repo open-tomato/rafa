@@ -21,6 +21,17 @@
  * and that function to hand the logger the settings of the config it is
  * given, each away from its default so a hook that handed the defaults
  * fails.
+ *
+ * The cases on the item keys, the command-line settings and the
+ * known-key index of every section came here from
+ * `src/core/config/config-merged.test.ts` when that module was retired:
+ * this module is the one that builds the merged schema in schema order.
+ * Core reads the same key indexes off the registered sections
+ * (`activeSettingByKey`, `activeSectionPaths` and `activeKnownKeysAbove`
+ * in `section.ts`), in registration order, and this module registers its
+ * sections cut into schema order. The last cases hold core's indexes to
+ * this module's, order included, under every path; registering the list
+ * whole is their control, which puts the top level's `hub` after `task`.
  */
 import type { ConfigSetting, RafaConfig } from './core/config/index.js';
 
@@ -43,9 +54,14 @@ import {
   activeChecks,
   activeConfigLoadHook,
   activeDefaults,
+  activeKnownKeysAbove,
+  activeSectionPaths,
+  activeSettingByKey,
   activeSettings,
   ConfigSectionError,
+  EMPTY_CONFIG_REGISTRY,
   registerConfigSections,
+  restoreConfigSections,
 } from './core/config/index.js';
 
 /** The twelve packages, in the order the registry lists their sections. */
@@ -191,6 +207,19 @@ const TOP = [
   'tests',
 ];
 
+/** The settings a flag may name: every one the file spells as a string. */
+const COMMAND_LINE: readonly ConfigSetting[] = [
+  'store',
+  'inject',
+  'planDir',
+  'specsDir',
+  'trackerDefault',
+  'learningAdapter',
+  'outputMode',
+  'settingSources',
+  'taskSkills',
+];
+
 /** The settings and defaults core's registry answers once `module` is imported first, in a fresh process. */
 function probeRegistered(module: string): { settings: number; defaults: number } {
   const barrel = join(import.meta.dir, 'core', 'config', 'index.ts');
@@ -238,6 +267,40 @@ describe('the registration at import', () => {
 
     expect(registered).toEqual([...SETTING_NAMES].sort());
     expect(differing).toEqual([]);
+  });
+
+  it('registers every setting in schema order, the order SETTINGS holds', () => {
+    expect(Object.keys(activeSettings())).toEqual(KEYS.map(([setting]) => setting));
+    expect(Object.keys(activeDefaults())).toEqual(KEYS.map(([setting]) => setting));
+  });
+
+  it('registers each cut under its section\'s package, in schema order', () => {
+    const held = registerConfigSections([]);
+    try {
+      expect(held.sections.map((section) => section.package)).toEqual([
+        'core',
+        'hub',
+        'core',
+        'loop-retries',
+        'loop-continue',
+        'wrap-up',
+        'release',
+        'core',
+        'board-project',
+        'core',
+        'triage',
+        'release',
+        'errors',
+        'logger',
+        'issues',
+        'core',
+        'release',
+        'core',
+        'tests',
+      ]);
+    } finally {
+      restoreConfigSections(held);
+    }
   });
 
   it('registers the hub\'s check, the one a section carries', () => {
@@ -316,6 +379,23 @@ describe('the registration in a fresh process', () => {
 describe('SETTINGS', () => {
   it('spells one dotted file key per setting, in schema order', () => {
     expect(SETTING_NAMES.map((setting) => [setting, SETTINGS[setting].key])).toEqual(KEYS.map((pair) => [...pair]));
+  });
+
+  it('carries item keys for the lists of mappings and for nothing else', () => {
+    const withItems = SETTING_NAMES
+      .filter((setting) => SETTINGS[setting].itemKeys !== undefined)
+      .map((setting) => [setting, SETTINGS[setting].itemKeys]);
+
+    expect(withItems).toEqual([
+      ['prerequisitesRequired', ['tool', 'env', 'service', 'lsp', 'probe']],
+      ['prerequisitesOptional', ['tool', 'env', 'service', 'lsp', 'probe', 'reason']],
+      ['modules', ['npm', 'github', 'path', 'ref']],
+      ['errorsCodes', ['code', 'description', 'hint', 'level', 'since']],
+    ]);
+  });
+
+  it('lets a flag name the settings spelled as a string and no other', () => {
+    expect(SETTING_NAMES.filter((setting) => SETTINGS[setting].cli)).toEqual([...COMMAND_LINE]);
   });
 
   it('is frozen, as CONFIG_DEFAULTS and SETTING_NAMES are', () => {
@@ -398,10 +478,108 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('nonesuch.deeper.deepest')).toEqual(['', TOP]);
   });
 
+  it('answers each section for a key under it', () => {
+    expect(knownKeysAbove('pr.nonesuch')).toEqual([
+      'pr',
+      ['provider', 'mergeMethod', 'base', 'resolveBudget', 'versionCollision'],
+    ]);
+    expect(knownKeysAbove('release.bump')).toEqual([
+      'release',
+      [
+        'enabled',
+        'versionFile',
+        'changelog',
+        'heading',
+        'fragments',
+        'strategy',
+        'settle',
+        'tag',
+        'publishCommand',
+      ],
+    ]);
+    expect(knownKeysAbove('cleanup.staleDayz')).toEqual([
+      'cleanup',
+      ['staleDays', 'worktreeIdleDays', 'keep'],
+    ]);
+    expect(knownKeysAbove('dangerous.acceptStaleRef')).toEqual([
+      'dangerous',
+      ['acceptStaleRefs', 'acceptVersionCollision', 'selfUpdateDuringLoop'],
+    ]);
+    expect(knownKeysAbove('loop.worktreeDirs')).toEqual([
+      'loop',
+      ['settingSources', 'worktreeDir', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
+    ]);
+    expect(knownKeysAbove('loop.continue.mode')).toEqual(['loop.continue', ['criteria', 'criteriaMode']]);
+    expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
+    expect(knownKeysAbove('learning.promote.afters')).toEqual([
+      'learning.promote',
+      ['after', 'minConfidence'],
+    ]);
+    expect(knownKeysAbove('learning.blessed')).toEqual(['learning', ['adapter', 'bless', 'promote']]);
+    expect(knownKeysAbove('tiers.lessons')).toEqual(['tiers', ['rafa', 'skills', 'agents']]);
+    expect(knownKeysAbove('task.resolver')).toEqual(['task', ['skills', 'lessons']]);
+    expect(knownKeysAbove('triage.similarity.thresholds')).toEqual([
+      'triage.similarity',
+      ['threshold', 'candidates'],
+    ]);
+    expect(knownKeysAbove('triage.nearest')).toEqual(['triage', ['similarity']]);
+  });
+
+  it('answers the tiers section for a map name spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('tiers.skills.tdd-guide')).toBeUndefined();
+    expect(knownKeysAbove('tiers.skills.tdd-guide')).toEqual([
+      'tiers',
+      ['rafa', 'skills', 'agents'],
+    ]);
+  });
+
+  it('answers the top level for a routing shape spelled flat, which no setting reads', () => {
+    expect(SETTING_BY_KEY.get('routing.prose')).toBeUndefined();
+    expect(SECTIONS.has('routing')).toBe(false);
+    expect(knownKeysAbove('routing.prose')).toEqual(['', TOP]);
+  });
+
   it('collapses a list index, so an item key answers the item shape', () => {
+    expect(knownKeysAbove('prerequisites.required[0].timeout')).toEqual([
+      'prerequisites.required[0]',
+      ['tool', 'env', 'service', 'lsp', 'probe'],
+    ]);
     expect(knownKeysAbove('modules[2].nonesuch')).toEqual([
       'modules[2]',
       ['npm', 'github', 'path', 'ref'],
     ]);
+  });
+});
+
+describe('the key indexes core reads off the registration', () => {
+  it('reads every file key back to the setting SETTING_BY_KEY names', () => {
+    expect([...activeSettingByKey()].sort()).toEqual([...SETTING_BY_KEY].sort());
+    expect(activeSettingByKey().size).toBe(KEYS.length);
+  });
+
+  it('opens the sections SECTIONS holds', () => {
+    expect([...activeSectionPaths()].sort()).toEqual([...SECTIONS].sort());
+  });
+
+  it('lists the keys knownKeysAbove lists, in its order, under every path', () => {
+    const paths = ['nonesuch', ...SECTIONS, 'modules[0]', 'prerequisites.optional[1]', 'errors.codes[0]']
+      .map((path) => `${path}.nonesuch`);
+
+    expect(paths.map((path) => activeKnownKeysAbove(path))).toEqual(paths.map((path) => knownKeysAbove(path)));
+    expect(activeKnownKeysAbove('nonesuch')).toEqual(['', TOP]);
+  });
+
+  it('lists hub after task when the list is registered whole, the control', () => {
+    const held = registerConfigSections([]);
+    try {
+      restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+      registerConfigSections(CONFIG_SECTIONS);
+      const top = activeKnownKeysAbove('nonesuch')[1];
+
+      expect(top.indexOf('hub')).toBeGreaterThan(top.indexOf('task'));
+      expect(top).not.toEqual(TOP);
+    } finally {
+      restoreConfigSections(held);
+    }
   });
 });

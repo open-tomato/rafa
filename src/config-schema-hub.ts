@@ -6,7 +6,7 @@
  * handed. {@link HUB_SECTION} hands them to core as one `ConfigSection`,
  * package `hub`, with {@link hubUrlProblems} as its check, and the
  * `declare module` below adds {@link HubSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread {@link HUB_DEFAULTS} and {@link HUB_SETTINGS} right after
  * `effort.sync`, the setting they serve, as `config-schema-release.ts`'s
  * sections are spread.
@@ -16,7 +16,7 @@
  * with `wc -l` when it was added, `config-schema.ts` stood at 554 lines
  * and `config-sections.ts` at 699, so the value rules here would have
  * pushed the second against the 800-line cap of `context/source.md`.
- * Every rule `config-merged.ts` states about a KEY holds here, as every
+ * Every rule `config.ts` and `section.ts` state about a KEY holds here, as every
  * rule `config-sections.ts` states about a VALUE does: nothing is
  * coerced, and a string spelled like a number is refused.
  *

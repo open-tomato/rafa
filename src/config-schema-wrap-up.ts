@@ -5,7 +5,7 @@
  * {@link WRAP_UP_SECTION} hands it to core as one `ConfigSection`,
  * package `wrap-up`, and the `declare module` below adds
  * {@link WrapUpSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `loop.worktreeDir`, so the order
  * settings are reported in holds the `loop` section together.
  *
@@ -14,7 +14,7 @@
  * lines and `config-sections.ts` at 642, measured with `wc -l`, when
  * this key was added: the schema module's own note asks a new section
  * for a sibling, and the reader is a rule about a VALUE that only this
- * key reads, so it sits here beside it. `config-merged.ts` imports this
+ * key reads, so it sits here beside it. `config-registry.ts` imports this
  * file to spread it; a caller reads the setting off the resolved
  * `RafaConfig`.
  *

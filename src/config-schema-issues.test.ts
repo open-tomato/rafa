@@ -13,14 +13,13 @@ import type { ConfigSetting } from './core/config/index.js';
 import { describe, expect, it } from 'bun:test';
 
 import { templateProblem } from './bugs/title.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
 import {
-  CONFIG_DEFAULTS,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 import { projectConfigText } from './project/scaffold.js';

@@ -3,7 +3,7 @@
  * codes a project adds to rafa's list (#949). {@link ERRORS_SECTION}
  * hands it to core as one `ConfigSection`, package `errors`, and the
  * `declare module` below adds {@link ErrorsSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `release` section. It has its
  * own module because `config-schema.ts` stood at 643 lines and
  * `config-sections.ts` at 744 when it was added.

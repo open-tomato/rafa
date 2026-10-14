@@ -197,11 +197,16 @@ export const CORE_MOVES: readonly CoreMove[] = [
 /**
  * The barrel files of each subject, sorted. `config` has three. The
  * leaf pair `config-sections.ts` and `config-readers.ts` sits behind
- * `sections.ts`, because `config-merged.ts` imports section files that
- * import that pair back, and one barrel over all of them would close a
- * cycle through every section file. `config-load.ts` sits alone behind
- * `load.ts`, because it imports `src/effort/store/settings.ts`, which
- * imports `index.ts` and `sections.ts` back.
+ * `sections.ts`; it was split off while `config-merged.ts` imported
+ * section files that import that pair back, when one barrel over all of
+ * them would have closed a cycle through every section file. That file
+ * is retired and nothing behind `index.ts` imports a section file, so
+ * the split stands as the move left it. `index.ts` holds
+ * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`
+ * and `config.ts`. `config-load.ts` sits alone behind `load.ts`,
+ * because it imports `src/effort/store/settings.ts`, which imports
+ * `src/config-registry.ts`, which imports `index.ts` back, and
+ * `sections.ts` directly.
  *
  * `plan` has two. The leaf `blocks.ts` sits alone behind
  * `block-reader.ts`, because `parse.ts` imports `src/utils/tracker.ts`,

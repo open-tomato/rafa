@@ -16,12 +16,11 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { LOGGER_SECTION, loggerSettingsOf } from './config-schema-logger.js';
 import {
-  CONFIG_DEFAULTS,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
-  SETTINGS,
 } from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';
 import { projectConfigText } from './project/scaffold.js';

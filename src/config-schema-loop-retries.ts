@@ -5,7 +5,7 @@
  * {@link LOOP_RETRIES_SECTION} hands it to core as one `ConfigSection`,
  * package `loop-retries`, and the `declare module` below adds
  * {@link LoopRetriesSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `loop.worktreeDir` and ahead of
  * `loop.wrapUp`, so the order settings are reported in holds the `loop`
  * section together.
@@ -13,7 +13,7 @@
  * The key has its own module, as `config-schema-wrap-up.ts` has, because
  * `config-schema.ts`'s own note asks a new section for a sibling, and
  * the reader is a rule about a VALUE that only this key reads, so it
- * sits here beside it. `config-merged.ts` imports this file to spread
+ * sits here beside it. `config-registry.ts` imports this file to spread
  * it; a caller reads the setting off the resolved `RafaConfig`, and
  * `start/run-setup.ts` checks `--retry` against the same two bounds.
  *

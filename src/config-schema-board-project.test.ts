@@ -26,20 +26,16 @@
  */
 import type { ConfigOverrides, ConfigSetting } from './core/config/index.js';
 
-import './config-registry.js';
-
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
-  isCommandLineSetting,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** The label every project-file case parses under. No file is read at it. */
@@ -86,8 +82,6 @@ describe('board.project in the schema', () => {
     expect(SETTINGS.boardProjectNumber.key).toBe('board.project.number');
     expect(SETTINGS.boardProjectTemplate.cli).toBe(false);
     expect(SETTINGS.boardProjectNumber.cli).toBe(false);
-    expect(isCommandLineSetting('boardProjectTemplate')).toBe(false);
-    expect(isCommandLineSetting('boardProjectNumber')).toBe(false);
   });
 
   it('defaults to open-tomato\'s template and no number, in the defaults and a resolution naming nothing', () => {
@@ -365,7 +359,6 @@ describe('board.project limits in the schema', () => {
   it.each(LIMIT_ROWS)('spells %s under board.project, file-only', (name, limit) => {
     expect(SETTINGS[limit.setting].key).toBe(`board.project.${name}`);
     expect(SETTINGS[limit.setting].cli).toBe(false);
-    expect(isCommandLineSetting(limit.setting)).toBe(false);
   });
 
   it.each(LIMIT_ROWS)('defaults %s to the plan\'s value, in the defaults and a resolution naming nothing', (_name, limit) => {

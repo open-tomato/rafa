@@ -42,23 +42,24 @@
  *   - The rules about a KEY sit in three modules. `config-schema.ts`
  *     declares {@link RafaConfig}'s core fields and the setting types,
  *     and exports no value. `core-section.ts` holds core's file keys,
- *     specs and defaults, and {@link CONFIG_FILE}. `config-merged.ts`
- *     spreads core's section and the section files into
- *     {@link CONFIG_DEFAULTS}, the setting specs, and the section and
- *     known-key indexes built off them. This module reads each spec
- *     and default off the registry `section.ts` holds, and only the
- *     section and known-key indexes off `config-merged.ts`. The four readings the spec
- *     leaves to the reader — open tracker kinds, empty prerequisite
- *     tiers, `version: 1` alone, and `loop.settingSources` as an
- *     ordered list — are argued in `core-section.ts`; the readings each
+ *     specs and defaults, and {@link CONFIG_FILE}. `section.ts` holds
+ *     the registry the sections are handed to, and the setting, section
+ *     and known-key indexes it reads off the registered specs. This
+ *     module reads each spec, each default and every index off that
+ *     registry, and names no section. `src/config-registry.ts`, outside
+ *     `src/core/`, lists the sections and exports the merged schema,
+ *     `CONFIG_DEFAULTS` and `SETTINGS` among it. The four readings the
+ *     spec leaves to the reader — open tracker kinds, empty
+ *     prerequisite tiers, `version: 1` alone, and `loop.settingSources`
+ *     as an ordered list — are argued in `core-section.ts`; the readings each
  *     later section's spec leaves are argued in
  *     `config-schema-readings.ts`, a note that exports nothing, except
  *     the `pr` and `release` sections', which sit with their fields in
  *     `config-schema-release.ts`, the `tests` section's, which sit
  *     with theirs in `config-schema-tests.ts`, the `triage`
  *     section's, in `config-schema-triage.ts`, and the `errors`
- *     section's, in `config-schema-errors.ts`, each spread into
- *     `config-merged.ts`.
+ *     section's, in `config-schema-errors.ts`, each handed to core as
+ *     a section by `src/config-registry.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `core-section.ts` reads its settings through. No caller reads a
  *     setting through them but the schema, so nothing here re-exports
@@ -143,9 +144,9 @@
  * one setting in both is refused: they are different YAML keys, so the
  * parser keeps both, and letting one win would be a silent choice.
  *
- * Every key here is looked up in the `Map` and the `Set`
- * `config-merged.ts` builds, never with `in` or an object index; the
- * reason is argued there.
+ * Every key here is looked up in the `Map` and the `Set` `section.ts`
+ * builds off the registered settings, never with `in` or an object
+ * index; the reason is argued there.
  *
  * ## The parser, measured on bun 1.3.14
  *
@@ -190,23 +191,27 @@ import type {
 
 import { join } from 'node:path';
 
-import { knownKeysAbove, SECTIONS, SETTING_BY_KEY } from './config-merged.js';
 import {
   describeValue,
   isMapping,
   messageOf,
 } from './config-sections.js';
 import { CONFIG_FILE } from './core-section.js';
-import { activeChecks, activeDefaults, activeSettings } from './section.js';
+import {
+  activeChecks,
+  activeDefaults,
+  activeKnownKeysAbove,
+  activeSectionPaths,
+  activeSettingByKey,
+  activeSettings,
+} from './section.js';
 
 export type {
   CommandLineSetting,
   ConfigSetting,
   RafaConfig,
 } from './config-schema.js';
-export { CONFIG_DEFAULTS } from './config-merged.js';
 export { CONFIG_FILE } from './core-section.js';
-export type { HubContext, HubTimeout } from '../../config-schema-hub.js';
 export type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -388,11 +393,12 @@ function readLayer(
  * yielded as itself, for the caller to judge.
  */
 function* entriesOf(mapping: Mapping, prefix: string): Generator<ConfigExtra> {
+  const sectionPaths = activeSectionPaths();
   for (const [name, value] of Object.entries(mapping)) {
     const key = prefix === ''
       ? name
       : `${prefix}.${name}`;
-    if (SECTIONS.has(key) && isMapping(value)) yield* entriesOf(value, key);
+    if (sectionPaths.has(key) && isMapping(value)) yield* entriesOf(value, key);
     else yield { key, value };
   }
 }
@@ -413,9 +419,11 @@ function sortKeys(document: Mapping, path: string): SortedKeys {
   const seen = new Set<ConfigSetting>();
   const extras: ConfigExtra[] = [];
   const problems: string[] = [];
+  const settingByKey = activeSettingByKey();
+  const sectionPaths = activeSectionPaths();
 
   for (const entry of entriesOf(document, '')) {
-    const setting = SETTING_BY_KEY.get(entry.key);
+    const setting = settingByKey.get(entry.key);
     if (setting !== undefined) {
       if (seen.has(setting)) {
         problems.push(`${path}: ${entry.key} is given more than once`);
@@ -426,7 +434,7 @@ function sortKeys(document: Mapping, path: string): SortedKeys {
       continue;
     }
 
-    if (!SECTIONS.has(entry.key)) {
+    if (!sectionPaths.has(entry.key)) {
       extras.push(entry);
       continue;
     }
@@ -559,7 +567,7 @@ interface Ranked<K extends ConfigSetting> {
 /** The sentence an operator reads about one retained unknown key. */
 function unknownKeyWarning(key: string, path: string): string {
   const quoted = JSON.stringify(key);
-  const [under, names] = knownKeysAbove(key);
+  const [under, names] = activeKnownKeysAbove(key);
   const where = under === ''
     ? ''
     : ` under ${under}`;

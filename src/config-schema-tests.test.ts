@@ -13,21 +13,18 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
-import './config-registry.js';
-
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 import { flag } from './core/config/sections.js';
 

@@ -5,7 +5,7 @@
  * one `ConfigSection`, package `release`, and the `declare module` below
  * adds {@link PrSettings}, {@link ReleaseSettings} and
  * {@link DangerousReleaseSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below at the places the two sections always sat,
  * and the `dangerous` key right after `dangerous.acceptStaleRefs`, so
  * the order settings are reported in, and the order a warning lists keys
@@ -17,7 +17,7 @@
  * the 800-line cap of `context/source.md` would be paid for by
  * rewrapping prose. The six keys then joined here. Every rule the schema module states about a KEY
  * still holds here, and `config-sections.ts` still holds every rule
- * about a VALUE. `config-merged.ts` imports this file to spread it; a
+ * about a VALUE. `config-registry.ts` imports this file to spread it; a
  * caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The `pr` section

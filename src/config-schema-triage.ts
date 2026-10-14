@@ -5,7 +5,7 @@
  * {@link TRIAGE_SECTION} hands them to core as one `ConfigSection`,
  * package `triage`, and the `declare module` below adds
  * {@link TriageSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `claims` section.
  *
  * The section has its own module, as `config-schema-tests.ts` and
@@ -14,7 +14,7 @@
  * these keys were added: the schema module's own note asks a new
  * section for a sibling, and the readers are rules about a VALUE that
  * only these keys read, so they sit here beside them. Only
- * `config-merged.ts` imports this file; a caller reads the settings off
+ * `config-registry.ts` imports this file; a caller reads the settings off
  * the resolved `RafaConfig`.
  *
  * ## The two keys

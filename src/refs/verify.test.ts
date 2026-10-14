@@ -39,7 +39,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
-import { SETTINGS } from '../core/config/index.js';
+import { SETTINGS } from '../config-registry.js';
 import { createGitRunner } from '../core/git/index.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';

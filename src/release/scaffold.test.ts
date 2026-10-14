@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import {
   DANGEROUS_VERSION_COLLISION_LINE,

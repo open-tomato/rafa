@@ -6,7 +6,7 @@
  * {@link BOARD_PROJECT_SECTION} hands them to core as one
  * `ConfigSection`, package `board-project`, and the `declare module`
  * below adds {@link BoardProjectLimitSettings} to `RafaConfig`.
- * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after `board.project.number`, so the
  * order settings are reported in holds the `board.project` section
  * together.
@@ -18,7 +18,7 @@
  * `config-sections.ts` at 744, measured with `wc -l`, when they were
  * added: five more specs and five readers would have put the readers'
  * module within a page of the 800-line cap of `context/source.md`.
- * `config-merged.ts` imports this file to spread it; a caller reads each
+ * `config-registry.ts` imports this file to spread it; a caller reads each
  * setting off the resolved `RafaConfig`.
  *
  * ## The keys
