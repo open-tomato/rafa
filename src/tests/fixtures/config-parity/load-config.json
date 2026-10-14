@@ -1,0 +1,393 @@
+{
+  "settings": {
+    "allowList": {
+      "value": [],
+      "source": "default"
+    },
+    "boardProjectNumber": {
+      "value": null,
+      "source": "default"
+    },
+    "boardProjectProgressSeconds": {
+      "value": 10,
+      "source": "default"
+    },
+    "boardProjectRetries": {
+      "value": 3,
+      "source": "default"
+    },
+    "boardProjectRetryWaitSeconds": {
+      "value": 2,
+      "source": "default"
+    },
+    "boardProjectTemplate": {
+      "value": "https://github.com/orgs/open-tomato/projects/6",
+      "source": "default"
+    },
+    "boardProjectWriteBatchSize": {
+      "value": 20,
+      "source": "default"
+    },
+    "boardProjectWritePauseMs": {
+      "value": 1000,
+      "source": "default"
+    },
+    "boardRelationships": {
+      "value": "labels",
+      "source": "default"
+    },
+    "boardTrustedAuthors": {
+      "value": [],
+      "source": "default"
+    },
+    "claimsAhead": {
+      "value": "off",
+      "source": "default"
+    },
+    "claimsStaleAfter": {
+      "value": "3d",
+      "source": "default"
+    },
+    "cleanupKeep": {
+      "value": [],
+      "source": "default"
+    },
+    "cleanupStaleDays": {
+      "value": 30,
+      "source": "default"
+    },
+    "cleanupWorktreeIdleDays": {
+      "value": 7,
+      "source": "default"
+    },
+    "dangerousAcceptStaleRefs": {
+      "value": false,
+      "source": "default"
+    },
+    "dangerousAcceptVersionCollision": {
+      "value": false,
+      "source": "default"
+    },
+    "dangerousSelfUpdateDuringLoop": {
+      "value": false,
+      "source": "default"
+    },
+    "effortBusyTimeoutMs": {
+      "value": 5000,
+      "source": "default"
+    },
+    "effortSync": {
+      "value": "local",
+      "source": "default"
+    },
+    "errorsCodes": {
+      "value": [],
+      "source": "default"
+    },
+    "hubTimeout": {
+      "value": "3s",
+      "source": "default"
+    },
+    "hubTokenSecret": {
+      "value": null,
+      "source": "default"
+    },
+    "hubUrl": {
+      "value": null,
+      "source": "default"
+    },
+    "inject": {
+      "value": "stage",
+      "source": "default"
+    },
+    "issuesEnvironments": {
+      "value": [],
+      "source": "default"
+    },
+    "issuesSummaryMax": {
+      "value": 80,
+      "source": "default"
+    },
+    "issuesTitleBug": {
+      "value": "?(${module}?( - ${action}): )${summary}",
+      "source": "default"
+    },
+    "issuesVocabularyActions": {
+      "value": [],
+      "source": "default"
+    },
+    "issuesVocabularyModules": {
+      "value": [],
+      "source": "default"
+    },
+    "learningAdapter": {
+      "value": "local",
+      "source": "default"
+    },
+    "learningBlessMinConfidence": {
+      "value": 0.5,
+      "source": "default"
+    },
+    "learningPromoteAfter": {
+      "value": 3,
+      "source": "default"
+    },
+    "learningPromoteMinConfidence": {
+      "value": 0.7,
+      "source": "default"
+    },
+    "loggerApi": {
+      "value": false,
+      "source": "default"
+    },
+    "loggerCallSite": {
+      "value": false,
+      "source": "default"
+    },
+    "loggerKind": {
+      "value": "console",
+      "source": "default"
+    },
+    "loggerLevel": {
+      "value": "warn",
+      "source": "default"
+    },
+    "loggerModules": {
+      "value": {},
+      "source": "default"
+    },
+    "loggerTheme": {
+      "value": "default",
+      "source": "default"
+    },
+    "loopContinueCriteria": {
+      "value": ".rafa/continue-criteria.md",
+      "source": "default"
+    },
+    "loopContinueCriteriaMode": {
+      "value": "extend",
+      "source": "default"
+    },
+    "loopForceWrapUpMaxNewFailures": {
+      "value": false,
+      "source": "default"
+    },
+    "loopRetries": {
+      "value": 2,
+      "source": "file"
+    },
+    "loopRetriesOnContinue": {
+      "value": 1,
+      "source": "default"
+    },
+    "loopWorktreeDir": {
+      "value": ".rafa/worktrees",
+      "source": "default"
+    },
+    "loopWrapUpRetries": {
+      "value": 1,
+      "source": "default"
+    },
+    "modules": {
+      "value": [],
+      "source": "default"
+    },
+    "outputMode": {
+      "value": "json",
+      "source": "user"
+    },
+    "planDir": {
+      "value": ".rafa/plans",
+      "source": "default"
+    },
+    "prBase": {
+      "value": "trunk",
+      "source": "file"
+    },
+    "prMergeMethod": {
+      "value": "squash",
+      "source": "default"
+    },
+    "prProvider": {
+      "value": null,
+      "source": "default"
+    },
+    "prResolveBudget": {
+      "value": 2,
+      "source": "default"
+    },
+    "prVersionCollision": {
+      "value": "report",
+      "source": "default"
+    },
+    "prerequisitesOptional": {
+      "value": [],
+      "source": "default"
+    },
+    "prerequisitesRequired": {
+      "value": [],
+      "source": "default"
+    },
+    "releaseChangelog": {
+      "value": "CHANGELOG.md",
+      "source": "default"
+    },
+    "releaseEnabled": {
+      "value": "auto",
+      "source": "default"
+    },
+    "releaseFragments": {
+      "value": ".changes",
+      "source": "default"
+    },
+    "releaseHeading": {
+      "value": "## {version} — {date}, {title}",
+      "source": "default"
+    },
+    "releasePublishCommand": {
+      "value": "npm publish",
+      "source": "default"
+    },
+    "releaseSettle": {
+      "value": "push",
+      "source": "default"
+    },
+    "releaseStrategy": {
+      "value": "semver-by-level",
+      "source": "default"
+    },
+    "releaseTag": {
+      "value": "manual",
+      "source": "default"
+    },
+    "releaseVersionFile": {
+      "value": "package.json",
+      "source": "default"
+    },
+    "roadmapIssue": {
+      "value": 42,
+      "source": "file"
+    },
+    "routing": {
+      "value": {},
+      "source": "default"
+    },
+    "settingSources": {
+      "value": [
+        "project",
+        "local"
+      ],
+      "source": "default"
+    },
+    "specsDir": {
+      "value": ".rafa/specs",
+      "source": "default"
+    },
+    "statusNotice": {
+      "value": true,
+      "source": "default"
+    },
+    "store": {
+      "value": "ndjson",
+      "source": "user"
+    },
+    "taskLessons": {
+      "value": "on",
+      "source": "default"
+    },
+    "taskSkills": {
+      "value": "planner",
+      "source": "default"
+    },
+    "testsAlwaysRun": {
+      "value": [
+        "src/**/*.sweep.test.ts"
+      ],
+      "source": "default"
+    },
+    "testsFullSuiteTriggers": {
+      "value": [
+        "bunfig.toml",
+        "tsconfig*.json",
+        "package.json",
+        "bun.lock",
+        "bun.lockb"
+      ],
+      "source": "default"
+    },
+    "testsIntegration": {
+      "value": [
+        "**/*-integration.test.ts",
+        "**/*.integration.test.ts",
+        "**/*-spawned*.test.ts",
+        "**/*-cli.test.ts"
+      ],
+      "source": "default"
+    },
+    "testsRetakeRedAlone": {
+      "value": true,
+      "source": "default"
+    },
+    "tiersAgents": {
+      "value": {},
+      "source": "default"
+    },
+    "tiersRafa": {
+      "value": "on",
+      "source": "default"
+    },
+    "tiersSkills": {
+      "value": {},
+      "source": "file"
+    },
+    "trackerDefault": {
+      "value": "github",
+      "source": "default"
+    },
+    "trackerFallback": {
+      "value": [
+        "local"
+      ],
+      "source": "default"
+    },
+    "trackingAll": {
+      "value": false,
+      "source": "default"
+    },
+    "trackingPlans": {
+      "value": false,
+      "source": "default"
+    },
+    "trackingSpecs": {
+      "value": false,
+      "source": "default"
+    },
+    "triageSimilarityCandidates": {
+      "value": 3,
+      "source": "default"
+    },
+    "triageSimilarityThreshold": {
+      "value": 0.3,
+      "source": "default"
+    },
+    "version": {
+      "value": 1,
+      "source": "file"
+    }
+  },
+  "path": "<project>/.rafa/config.yaml",
+  "userPath": "<home>/.rafa/config.yaml",
+  "warnings": [
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)"
+  ],
+  "extras": [
+    {
+      "key": "unknownParityKey",
+      "value": 1
+    }
+  ],
+  "userExtras": [],
+  "printedWarnings": [
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)"
+  ]
+}

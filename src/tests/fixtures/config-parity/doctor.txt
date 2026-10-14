@@ -1,0 +1,11 @@
+exit 0
+--- stdout
+rafa <version>
+warn: rafa config: unknown key "unknownParityKey" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)
+Preflight with no plan, none being at .rafa/plans/PLAN.md or PLAN.md: nothing to check, no run started.
+Preflight passed: rafa loop start would go on to its first session.
+Skill tiers:
+  note  Claude Code: its version could not be read from claude --version; skill delivery was probed against 2.1.280
+Effort sync: ok, local
+warn: <home>/.rafa/bin is not on PATH; put it ahead of <home>/.bun/bin, so a rafa there runs before one in <home>/.bun/bin: export PATH="<home>/.rafa/bin:$PATH"
+--- stderr
