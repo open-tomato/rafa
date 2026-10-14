@@ -54,8 +54,14 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ConfigError } from '../core/config/index.js';
+import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
+import {
+  ConfigError,
+  ConfigSectionError,
+  CORE_SECTION,
+  registerConfigSections,
+  restoreConfigSections,
+} from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { setActiveStoreSettings } from '../effort/store/settings.js';
 
@@ -1333,5 +1339,59 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
         + 'expected a relative directory path not under .rafa/',
     ]);
+  });
+});
+
+describe('every registered setting, resolved through loadConfig', () => {
+  it('names each registered setting in both files and in the defaults', () => {
+    expect([...Object.keys(PROJECT_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
+    expect([...Object.keys(USER_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
+    expect([...Object.keys(CONFIG_DEFAULTS)].sort()).toEqual([...SETTING_NAMES].sort());
+  });
+
+  it('resolves the project file over the user file over the default, key by key', () => {
+    const project = scopes(PROJECT_TEXT, USER_TEXT);
+    const both = loadConfig(project, {}, quiet);
+    const userOnly = loadConfig({ root: freshDir('no-project'), home: project.home }, {}, quiet);
+    const neither = loadConfig({ root: freshDir('no-project'), home: freshDir('no-home') }, {}, quiet);
+
+    for (const name of SETTING_NAMES) {
+      expect({ name, value: both.config[name], source: both.sources[name] })
+        .toEqual({ name, value: PROJECT_VALUES[name], source: 'file' });
+      expect({ name, value: userOnly.config[name], source: userOnly.sources[name] })
+        .toEqual({ name, value: USER_VALUES[name], source: 'user' });
+      expect({ name, value: neither.config[name], source: neither.sources[name] })
+        .toEqual({ name, value: CONFIG_DEFAULTS[name], source: 'default' });
+    }
+  });
+});
+
+describe('a second section redefining dangerous.acceptStaleRefs', () => {
+  it('is refused at registration, the refusal naming both packages', () => {
+    const rival = {
+      package: '@example/rival',
+      settings: { dangerousAcceptStaleRefs: SETTINGS.dangerousAcceptStaleRefs },
+      defaults: { dangerousAcceptStaleRefs: false },
+    };
+    let registry: ReturnType<typeof registerConfigSections> | null = null;
+    try {
+      let thrown: unknown = null;
+      try {
+        registry = registerConfigSections([rival]);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigSectionError);
+      const message = (thrown as ConfigSectionError).message;
+      expect(message).toContain('dangerous.acceptStaleRefs');
+      expect(message).toContain(`"${CORE_SECTION.package}"`);
+      expect(message).toContain('"@example/rival"');
+    } finally {
+      if (registry !== null) restoreConfigSections(registry);
+    }
+
+    // The refused registration left the registry as it was.
+    const loaded = loadConfig(scopes(null, null), {}, quiet);
+    expect(loaded.config.dangerousAcceptStaleRefs).toBe(false);
   });
 });
