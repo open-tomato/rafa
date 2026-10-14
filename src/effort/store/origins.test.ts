@@ -165,13 +165,14 @@ function appendSession(root: string, session: string): void {
 
 /**
  * The merged tables no module under `src/effort/store/` inserts into:
- * none today. A table whose migration lands ahead of its writer is
- * listed here. The last group below reads the modules' source and fails
- * once one of them inserts into a table listed here, so a table leaves
- * this list for {@link WRITERS} and {@link PLANTED} in the commit that
- * adds its writer, as `stale_docs` did.
+ * `bug_routes`, whose migration lands ahead of its writer. A table whose
+ * migration lands ahead of its writer is listed here. The last group
+ * below reads the modules' source and fails once one of them inserts
+ * into a table listed here, so a table leaves this list for
+ * {@link WRITERS} and {@link PLANTED} in the commit that adds its
+ * writer, as `stale_docs` did.
  */
-const UNWRITTEN_TABLES: readonly OriginTable[] = [];
+const UNWRITTEN_TABLES: readonly OriginTable[] = ['bug_routes'];
 
 /** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
 const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
@@ -323,12 +324,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the thirteen merged tables, a writer filling every one', () => {
+  it('covers each of the fourteen merged tables, a writer filling every one but the unwritten', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
     expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
     expect(WRITTEN_TABLES).toHaveLength(13);
-    expect(UNWRITTEN_TABLES).toEqual([]);
+    expect(UNWRITTEN_TABLES).toEqual(['bug_routes']);
     expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 
@@ -404,11 +405,11 @@ describe('seq across a new mint', () => {
 });
 
 /**
- * One row for each of the thirteen tables with the origin columns left
- * out of its insert: for the twelve tables older than `row-origins`, as
- * a runtime before that migration inserts it, every column it knew
- * named; for `stale_docs`, which no such runtime holds, the same shape
- * of insert. All under task session `old` (its absence under
+ * One row for each of the thirteen {@link WRITTEN_TABLES} with the
+ * origin columns left out of its insert: for the twelve tables older
+ * than `row-origins`, as a runtime before that migration inserts it,
+ * every column it knew named; for `stale_docs`, which no such runtime
+ * holds, the same shape of insert. All under task session `old` (its absence under
  * `old-absent`) and {@link PLAN}, each shaped for the reader of its
  * table to answer it.
  */

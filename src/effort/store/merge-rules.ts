@@ -121,6 +121,7 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   skill_invocations: appendOnly('session_id', 'name', 'sidechain'),
   plan_ci: appendOnly('pr', 'head_sha', 'read_at'),
   stale_docs: appendOnly('id'),
+  bug_routes: appendOnly('id'),
   schema_migrations: { scope: 'local' },
   store_meta: { scope: 'local' },
   store_replaced: { scope: 'local' },

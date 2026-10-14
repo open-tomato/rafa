@@ -57,5 +57,17 @@
     "taskLine",
     "what",
     "where"
+  ],
+  "bugRoutes": [
+    "collectedAt",
+    "entryIndex",
+    "id",
+    "kind",
+    "planStub",
+    "route",
+    "said",
+    "sessionId",
+    "taskLine",
+    "what"
   ]
 }

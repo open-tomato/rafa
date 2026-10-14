@@ -39,8 +39,8 @@
  * name; a commit is one `commits` row whose `minutesSincePrevious` is
  * measured against the commit before it in time in that store, as a
  * collection measures it. A store left at the legacy history holds no
- * `stale_docs` table, so a task written there has no row in it:
- * {@link PAST_LEGACY_TABLES}. So every merged table is exercised, and
+ * `stale_docs` or `bug_routes` table, so a task written there has no
+ * row in either: {@link PAST_LEGACY_TABLES}. So every merged table is exercised, and
  * each builder knows the rows the union of its devices holds from the
  * names it wrote: {@link Scenario.union}.
  *
@@ -159,7 +159,7 @@ const TASK_TABLES = ORIGIN_TABLES.filter((table) => table !== 'commits');
  * left at `plan-ci` holds none of them, so a task written there has no
  * row in any.
  */
-const PAST_LEGACY_TABLES: ReadonlySet<OriginTable> = new Set<OriginTable>(['stale_docs']);
+const PAST_LEGACY_TABLES: ReadonlySet<OriginTable> = new Set<OriginTable>(['stale_docs', 'bug_routes']);
 
 /** A task or commit a device writes: its name, and when, in minutes past {@link EPOCH_MS}. */
 interface Written {
@@ -209,6 +209,10 @@ function taskRows({ key, minute }: Written): readonly PlantedRow[] {
     stale_docs: {
       ...report, id: `stale-${key}`, kind: 'sighting', where_at: `context/${key}.md:12`, what: `stale ${key}`,
       outcome: 'done', collected_at: time,
+    },
+    bug_routes: {
+      ...report, id: `route-${key}`, entry_index: 0, what: `bug ${key}`, said: 'bug', kind: 'bug', route: 'filed',
+      collected_at: time,
     },
   };
   return TASK_TABLES.map((table) => ({ table, values: rows[table] }));
@@ -468,7 +472,8 @@ export function buildRestoredBak(scope: string): Scenario {
  * second device; the first brought through `row-origins` and
  * `store-meta` and minted, the second left at `plan-ci`, both written.
  * The shared rows carry no origin on either side, and only the task the
- * first device wrote after it was brought forward has a `stale_docs` row.
+ * first device wrote after it was brought forward has a `stale_docs` row
+ * and a `bug_routes` row.
  */
 export function buildPlanCiSide(scope: string): Scenario {
   const dir = scenarioDir(scope, 'plan-ci-side');

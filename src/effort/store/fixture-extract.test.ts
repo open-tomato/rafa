@@ -137,6 +137,11 @@ const FIXTURES: Readonly<Record<OriginTable, (key: string) => FixtureRow>> = {
   stale_docs: (key) => ({
     ...reportRow(key), kind: 'sighting', where_at: `SRC context/${key}.md:12`, what: `SRC stale line ${key}`,
   }),
+  bug_routes: (key) => ({
+    id: `SRC-id-${key}`, session_id: sessionOf(key), plan_stub: 'SRC-plan', task_line: `SRC task line ${key}`,
+    entry_index: 0, what: `SRC routed bug ${key}`, said: 'own-gap', kind: 'bug', route: 'follow-up',
+    collected_at: timeOf(key),
+  }),
 };
 
 let base = '';
@@ -325,6 +330,8 @@ describe('extractStores over a copy then divergence', () => {
     expect(new Set(columnOf(a, 'findings', 'kind'))).toEqual(new Set(['gotcha']));
     expect(new Set(columnOf(b, 'report_absences', 'reason'))).toEqual(new Set(['no-block']));
     expect(new Set(columnOf(b, 'plan_ci', 'verdict'))).toEqual(new Set(['red']));
+    expect(new Set(columnOf(a, 'bug_routes', 'said'))).toEqual(new Set(['own-gap']));
+    expect(new Set(columnOf(b, 'bug_routes', 'route'))).toEqual(new Set(['follow-up']));
     expect(parsed(valueAt(a, 'plan_ci', 1, 'failing'))).toHaveLength(1);
     expect(columnOf(a, 'store_meta', 'file_ino')).toEqual([0]);
     expect(columnOf(a, 'schema_migrations', 'id')).toEqual(SQLITE_MIGRATIONS.map(({ id }) => id));
