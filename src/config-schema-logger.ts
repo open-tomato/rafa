@@ -30,9 +30,10 @@
  *
  * ## When they take effect
  *
- * `loadConfig` hands {@link loggerSettingsOf} to the logger as soon as a
- * config is read (`config-load.ts`). A command's logger exists before
- * that, so until a command loads its config the defaults apply.
+ * `loadConfig` (`config-load.ts`) calls core's load hook as soon as a
+ * config is read, and `src/config-registry.ts` sets that hook to hand
+ * {@link loggerSettingsOf} to the logger. A command's logger exists
+ * before that, so until a command loads its config the defaults apply.
  *
  * None of the keys is a `CommandLineSetting`: the verbosity flags are the
  * command line's say over what is written.

@@ -19,6 +19,8 @@
 import type { ConfigSetting } from './config-schema.js';
 import type { ConfigLayer, ConfigOverrides } from './config.js';
 
+import '../../config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import { isCommandLineSetting, SETTINGS } from './config-merged.js';

@@ -58,6 +58,13 @@
  * Two of those, warnings never printed and the command line judged
  * before the file, were mutations of `loadConfig`, which has since
  * moved to `config-load.ts` with the cases that caught them.
+ *
+ * A layer and a resolution read every setting off the sections
+ * registered with `section.ts`, so this file imports
+ * `src/config-registry.ts` for the registration its import makes. The
+ * cases under `the registered sections` register a section of their own
+ * or empty the registry, and each puts the registry it found back in a
+ * `finally`, since bun runs every test file in one process.
  */
 import type {
   ConfigLayer,
@@ -68,6 +75,8 @@ import type {
   RouteTarget,
   TierPin,
 } from './config.js';
+
+import '../../config-registry.js';
 
 import { join } from 'node:path';
 
@@ -81,6 +90,12 @@ import {
   parseConfigText,
   resolveConfig,
 } from './config.js';
+import {
+  activeSettings,
+  EMPTY_CONFIG_REGISTRY,
+  registerConfigSections,
+  restoreConfigSections,
+} from './section.js';
 
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -93,7 +108,7 @@ const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, l
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
   + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)';
 
-/** Every setting, in the order a layer holds them. */
+/** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
   'version',
   'store',
@@ -584,9 +599,13 @@ function sourcesWith(
   return { ...all, ...named } as Record<ConfigSetting, ConfigSource>;
 }
 
-/** Holds a layer to saying nothing, with every setting still present. */
+/**
+ * Holds a layer to saying nothing, with every setting still present, in
+ * the order the sections were registered.
+ */
 function expectSilent(values: ConfigLayer): void {
-  expect(Object.keys(values)).toEqual([...SETTINGS]);
+  expect(Object.keys(values).sort()).toEqual([...SETTINGS].sort());
+  expect(Object.keys(values)).toEqual(Object.keys(activeSettings()));
   expect(Object.values(values).filter((value) => value !== undefined)).toEqual([]);
 }
 
@@ -1602,5 +1621,57 @@ describe('claims', () => {
     const resolved = resolveConfig({ cli });
 
     expect([resolved.config.claimsStaleAfter, resolved.config.claimsAhead]).toEqual(['3d', 'off']);
+  });
+});
+
+describe('the registered sections', () => {
+  /** Runs `run` with the registry emptied, putting the one it found back after. */
+  function withEmptyRegistry(run: () => void): void {
+    const previous = registerConfigSections([]);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      run();
+    } finally {
+      restoreConfigSections(previous);
+    }
+  }
+
+  it('runs every registered section\'s check over the resolution, refusing with every problem they report', () => {
+    const user = fileOf('effort:\n  sync: service\n', USER_PATH);
+    const file = fileOf('store: ndjson\n');
+    const seen: unknown[] = [];
+    const previous = registerConfigSections([{
+      package: 'probe',
+      settings: {},
+      defaults: {},
+      checks: [({ config, sources, path, userPath }) => {
+        seen.push([config.store, sources.store, sources.effortSync, path, userPath]);
+        return [`probe refuses store ${config.store}`];
+      }],
+    }]);
+    try {
+      expect(refusal(() => resolveConfig({ file, user })).problems).toEqual([
+        `${USER_PATH}: effort.sync is "service" and no config file names hub.url;`
+          + ' expected hub.url, the address of the hub, such as https://hub.example.org',
+        'probe refuses store ndjson',
+      ]);
+      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH]]);
+    } finally {
+      restoreConfigSections(previous);
+    }
+  });
+
+  it('resolves with no check refusing when the registered checks report nothing', () => {
+    const resolved = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
+
+    expect([resolved.config.effortSync, resolved.config.hubUrl]).toEqual(['service', 'https://hub.example.org']);
+  });
+
+  it('reads no setting with no section registered, the registry and not a literal naming the settings', () => {
+    withEmptyRegistry(() => {
+      expect(Object.keys(parseConfigText('store: ndjson\n', PATH).values)).toEqual([]);
+      expect(Object.keys(resolveConfig({ cli: { store: 'ndjson' } }).config)).toEqual([]);
+      expect(Object.keys(resolveConfig({ file: fileOf('effort:\n  sync: service\n') }).sources)).toEqual([]);
+    });
   });
 });

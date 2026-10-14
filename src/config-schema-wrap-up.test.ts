@@ -11,6 +11,8 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
+import './config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, wrapUpRetries } from './config-schema-wrap-up.js';

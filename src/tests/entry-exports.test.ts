@@ -6,7 +6,8 @@
  * It also pins `src/config-registry.ts`, the module the merged schema's
  * names moved to from the core config barrel (`SETTINGS`,
  * `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
- * `knownKeysAbove`), with the list of sections it registers. It is no
+ * `knownKeysAbove`), with the list of sections it registers and the
+ * load hook it sets, `handConfigToLogger`. It is no
  * published entry; `src/index.ts` takes `CONFIG_DEFAULTS` from it.
  *
  * Names are read with the TypeScript checker, so type-only exports count.
@@ -226,6 +227,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'SETTINGS',
     'SETTING_BY_KEY',
     'SETTING_NAMES',
+    'handConfigToLogger',
     'knownKeysAbove',
   ],
   'src/plan/index.ts': [

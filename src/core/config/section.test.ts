@@ -25,13 +25,21 @@
  * the section held uncopied (1), `registerConfigSections` leaving the
  * active registry unchanged (2), the package refusal dropped (1), and
  * the merged checks left empty (2).
+ *
+ * The load hook is module state too, apart from the registry. Each case
+ * that sets one reads the hook in place first and puts it back in a
+ * `finally`, so the hook `src/config-registry.ts` set for every later
+ * file survives this one.
  */
 import type {
   ConfigCheck,
   ConfigCheckInput,
+  ConfigLoadHook,
   ConfigSection,
   ConfigSectionRegistry,
 } from './section.js';
+
+import '../../config-registry.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -39,6 +47,7 @@ import { resolveConfig } from './config.js';
 import { CORE_SECTION } from './core-section.js';
 import {
   activeChecks,
+  activeConfigLoadHook,
   activeDefaults,
   activeSettings,
   ConfigSectionError,
@@ -46,6 +55,7 @@ import {
   mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
+  setConfigLoadHook,
 } from './section.js';
 
 /** Core's specs, which the fixture sections borrow. */
@@ -315,5 +325,40 @@ describe('registerConfigSections', () => {
       expect(activeDefaults()).toEqual({});
       expect(activeChecks()).toEqual([]);
     });
+  });
+});
+
+describe('setConfigLoadHook', () => {
+  it('makes the hook activeConfigLoadHook answers, answering the one it replaced, and clears it with null', () => {
+    const held = activeConfigLoadHook();
+    const first: ConfigLoadHook = () => {};
+    const second: ConfigLoadHook = () => {};
+    try {
+      const replaced = [setConfigLoadHook(first), setConfigLoadHook(second)];
+      const active = activeConfigLoadHook();
+      const cleared = setConfigLoadHook(null);
+
+      expect(replaced).toEqual([held, first]);
+      expect(active).toBe(second);
+      expect(cleared).toBe(second);
+      expect(activeConfigLoadHook()).toBeNull();
+    } finally {
+      setConfigLoadHook(held);
+    }
+  });
+
+  it('is left as it was when a registry is restored', () => {
+    const held = activeConfigLoadHook();
+    const hook: ConfigLoadHook = () => {};
+    try {
+      setConfigLoadHook(hook);
+      withEmptyRegistry(() => {
+        restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+      });
+
+      expect(activeConfigLoadHook()).toBe(hook);
+    } finally {
+      setConfigLoadHook(held);
+    }
   });
 });

@@ -13,6 +13,8 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
+import './config-registry.js';
+
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';

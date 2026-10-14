@@ -48,7 +48,7 @@
  * key, beside its field in `config-schema.ts`, or in the section file
  * its key belongs to — its text and value for both the project and the
  * user layer in `src/tests/config-layers.test.ts`, its reader in
- * `config-sections.ts`, one line in `config.ts`'s layer literal and one
+ * `config-sections.ts`, and one
  * commented line in `project/scaffold.ts`'s template, which
  * `scaffold.test.ts` holds it to, and nothing else beyond the readings
  * its spec leaves, which go in `config-schema-readings.ts`. A core key

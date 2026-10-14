@@ -26,6 +26,8 @@
  */
 import type { ConfigOverrides, ConfigSetting } from './core/config/index.js';
 
+import './config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';

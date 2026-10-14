@@ -135,8 +135,9 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file });
 
     expect(resolved.config).toEqual(CONFIG_DEFAULTS);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file'))
-      .toEqual(VALUELESS.map((pair) => [...pair]));
+    const unanswered: (readonly [string, string])[] = Object.entries(resolved.sources)
+      .filter(([, source]) => source !== 'file');
+    expect(unanswered.sort()).toEqual([...VALUELESS].sort());
     expect(file.extras).toEqual([]);
   });
 

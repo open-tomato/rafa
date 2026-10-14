@@ -16,16 +16,23 @@
  * registry answers all of them; the control, the core config barrel
  * alone, answers none, so the probe can tell a registration from its
  * absence.
+ *
+ * The load hook the import sets is held to be {@link handConfigToLogger},
+ * and that function to hand the logger the settings of the config it is
+ * given, each away from its default so a hook that handed the defaults
+ * fails.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting, RafaConfig } from './core/config/index.js';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
 import {
   CONFIG_DEFAULTS,
   CONFIG_SECTIONS,
+  handConfigToLogger,
   knownKeysAbove,
   SECTIONS,
   SETTING_BY_KEY,
@@ -34,6 +41,7 @@ import {
 } from './config-registry.js';
 import {
   activeChecks,
+  activeConfigLoadHook,
   activeDefaults,
   activeSettings,
   ConfigSectionError,
@@ -255,6 +263,37 @@ describe('the registration at import', () => {
         + ' a dangerous. key is a person\'s consent and one package defines it',
     );
     expect(activeSettings()).toBe(before);
+  });
+});
+
+describe('the load hook', () => {
+  it('is set at import to handConfigToLogger', () => {
+    expect(activeConfigLoadHook()).toBe(handConfigToLogger);
+  });
+
+  it('hands the logger the logger settings of the config it is given', () => {
+    const config: RafaConfig = {
+      ...CONFIG_DEFAULTS,
+      loggerLevel: 'error',
+      loggerTheme: 'plain',
+      loggerModules: new Map([['board', 'debug']]),
+      loggerCallSite: true,
+      loggerApi: true,
+    };
+    try {
+      handConfigToLogger(config);
+
+      expect(activeLoggerSettings()).toEqual({
+        kind: 'console',
+        level: 'error',
+        theme: 'plain',
+        modules: new Map([['board', 'debug']]),
+        callSite: true,
+        api: true,
+      });
+    } finally {
+      setActiveLoggerSettings(null);
+    }
   });
 });
 

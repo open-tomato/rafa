@@ -20,6 +20,8 @@ import type { RoutingContext } from './routing.js';
 import type { RouteTarget, ValueAt } from '../core/config/sections.js';
 import type { InventorySource } from '../inventory/record.js';
 
+import '../config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import { BUILT_IN_AGENTS } from '../agents/roster.js';

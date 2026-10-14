@@ -22,6 +22,8 @@ import type {
 } from './core/config/index.js';
 import type { SyncStrategy, ValueAt } from './core/config/sections.js';
 
+import './config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import {

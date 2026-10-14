@@ -14,6 +14,11 @@
  * import, before anything that loads a config; core never imports it.
  * A refused registration throws at import, naming what it refused.
  *
+ * Importing it also sets core's load hook (`setConfigLoadHook` in
+ * `src/core/config/section.ts`) to {@link handConfigToLogger}, so every
+ * config `loadConfig` resolves hands the logger its `logger` settings
+ * without core importing the logger's section file.
+ *
  * ## The order
  *
  * {@link SETTINGS} keeps the order the schema has always reported
@@ -55,6 +60,7 @@ import type {
   SettingSpec,
 } from './core/config/index.js';
 
+import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
@@ -63,7 +69,12 @@ import {
 import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
 import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
 import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
-import { LOGGER_DEFAULTS, LOGGER_SECTION, LOGGER_SETTINGS } from './config-schema-logger.js';
+import {
+  LOGGER_DEFAULTS,
+  LOGGER_SECTION,
+  LOGGER_SETTINGS,
+  loggerSettingsOf,
+} from './config-schema-logger.js';
 import {
   LOOP_CONTINUE_DEFAULTS,
   LOOP_CONTINUE_SECTION,
@@ -86,7 +97,7 @@ import {
 import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
-import { CORE_SECTION, registerConfigSections } from './core/config/index.js';
+import { CORE_SECTION, registerConfigSections, setConfigLoadHook } from './core/config/index.js';
 
 /** The twelve sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
@@ -105,6 +116,18 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
 ]);
 
 registerConfigSections(CONFIG_SECTIONS);
+
+/**
+ * The hook `loadConfig` calls with every config it resolves: it hands
+ * the logger its `logger` settings, read through the logger section's
+ * `loggerSettingsOf`. Set when this module is imported, beside the
+ * registration.
+ */
+export function handConfigToLogger(config: Readonly<RafaConfig>): void {
+  setActiveLoggerSettings(loggerSettingsOf(config));
+}
+
+setConfigLoadHook(handConfigToLogger);
 
 /** Core's settings up to `effort.sync`, before the `hub` section. */
 const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;

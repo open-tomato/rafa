@@ -30,11 +30,13 @@
  * ## Why one barrel can hold all six
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. Three of the six
+ * imports the barrel back by value is a runtime cycle. Two of the six
  * files behind this one import outward by value: `config-merged.ts`
- * reads the eleven section files (`src/config-schema-*.ts`),
- * `core-section.ts` reads `src/tiers/routing.ts`, and `config.ts` reads
- * `src/config-schema-hub.ts`. Each of those twelve files imports this
+ * reads the eleven section files (`src/config-schema-*.ts`), and
+ * `core-section.ts` reads `src/tiers/routing.ts`. `config.ts` once read
+ * `src/config-schema-hub.ts` too, for the hub's refusal; it now runs
+ * every registered section's checks instead, read off `section.ts`, and
+ * keeps only a type re-export of that file. Each of those twelve files imports this
  * barrel with `import type` alone (`SettingSpec`, `ConfigSource`,
  * `ConfigLayers`), which is erased before anything loads. The values a
  * section file reads come from `sections.ts`, which imports none of the
@@ -82,7 +84,7 @@
  * re-exports part of it, and of the runtime names leaves out the
  * schema's indexes, core's section, the item readers and the section
  * registry (`SETTINGS`, `CORE_SECTION`, `moduleSource`,
- * `registerConfigSections` and seventeen more), which
+ * `registerConfigSections` and nineteen more), which
  * `src/index.test.ts` spells under `CONFIG_BARREL_ONLY`. Its
  * `CONFIG_DEFAULTS` is not this file's but `src/config-registry.ts`'s,
  * spelled under `CONFIG_BARREL_SHADOWED` there.
@@ -109,6 +111,7 @@ export type { CoreSection, CoreSetting } from './core-section.js';
 export type {
   ConfigCheck,
   ConfigCheckInput,
+  ConfigLoadHook,
   ConfigSection,
   ConfigSectionRegistry,
   SettingsRecord,
@@ -146,6 +149,7 @@ export {
 export { CONFIG_FILE, CORE_SECTION } from './core-section.js';
 export {
   activeChecks,
+  activeConfigLoadHook,
   activeDefaults,
   activeSettings,
   ConfigSectionError,
@@ -153,6 +157,7 @@ export {
   mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
+  setConfigLoadHook,
 } from './section.js';
 export {
   ConfigError,

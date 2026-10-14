@@ -75,13 +75,12 @@ import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
-import { setActiveLoggerSettings } from '../../adapters/logger/settings.js';
-import { loggerSettingsOf } from '../../config-schema-logger.js';
 import { setActiveStoreSettings } from '../../effort/store/settings.js';
 import { activeOutput } from '../output/active.js';
 
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
+import { activeConfigLoadHook } from './section.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
 export interface ConfigRoots {
@@ -155,10 +154,12 @@ function printWarning(message: string): void {
  * unknown key through `warn`, the active output's `warn` when none is
  * given.
  *
- * The resolved `logger` settings are handed to the logger
- * (`adapters/logger/settings.ts`) before any warning is printed, so a
+ * The resolved config is handed to the load hook (`activeConfigLoadHook`
+ * in `section.ts`) before any warning is printed. The registry,
+ * `src/config-registry.ts`, sets that hook to hand the logger
+ * (`adapters/logger/settings.ts`) its `logger` settings, so a
  * `logger.level` of `error` also quiets the warnings of the load that
- * set it.
+ * set it. With no hook set the logger keeps the settings it had.
  *
  * The resolved `effort.busyTimeoutMs` is handed to the effort store
  * (`effort/store/settings.ts`), so every store open after this call
@@ -176,7 +177,7 @@ export function loadConfig(
   const user = readUserConfigFile(roots);
   const file = readConfigFile(roots.root);
   const resolved = resolveConfig({ cli, file, user });
-  setActiveLoggerSettings(loggerSettingsOf(resolved.config));
+  activeConfigLoadHook()?.(resolved.config);
   for (const warning of resolved.warnings) warn(warning);
   setActiveStoreSettings({ busyTimeoutMs: resolved.config.effortBusyTimeoutMs });
   return resolved;

@@ -59,6 +59,19 @@
  * in one process, so a case that registers puts the previous registry
  * back in a `finally`, or every file bun runs later reads its sections.
  * {@link EMPTY_CONFIG_REGISTRY} is the registry before any registration.
+ *
+ * ## The load hook
+ *
+ * A setting core resolves can be read by a module outside `src/core/`
+ * that core must not import: the logger's settings are read through
+ * `loggerSettingsOf` in `src/config-schema-logger.ts`. So the module that
+ * lists the sections also hands core one {@link ConfigLoadHook} with
+ * {@link setConfigLoadHook}, and `loadConfig` (`config-load.ts`) calls
+ * {@link activeConfigLoadHook} with every config it resolves, before it
+ * prints the config's warnings. The hook is a module-level value of its
+ * own, beside the registry rather than in it: restoring a registry
+ * leaves the hook as it was, and a case that sets one puts the previous
+ * hook back in a `finally`, as a case that registers does.
  */
 import type {
   ConfigSetting,
@@ -284,4 +297,29 @@ export function activeDefaults(): Readonly<Partial<RafaConfig>> {
 /** Every registered section's checks, in registration order. */
 export function activeChecks(): readonly ConfigCheck[] {
   return active.checks;
+}
+
+/**
+ * What `loadConfig` hands every config it resolves to, before printing
+ * its warnings: the reading of settings a module outside `src/core/`
+ * acts on. See the module note.
+ */
+export type ConfigLoadHook = (config: Readonly<RafaConfig>) => void;
+
+/** The module-level hook {@link activeConfigLoadHook} answers. */
+let loadHook: ConfigLoadHook | null = null;
+
+/**
+ * Makes `hook` the one `loadConfig` calls, or clears it with null.
+ * Answers the hook it replaced, for a caller to put back.
+ */
+export function setConfigLoadHook(hook: ConfigLoadHook | null): ConfigLoadHook | null {
+  const previous = loadHook;
+  loadHook = hook;
+  return previous;
+}
+
+/** The hook `loadConfig` calls with every config it resolves, or null when none is set. */
+export function activeConfigLoadHook(): ConfigLoadHook | null {
+  return loadHook;
 }

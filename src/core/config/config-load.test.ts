@@ -42,12 +42,20 @@
  * resolve read as the same directory, reddens the missing-root case,
  * which was added for it.
  *
+ * The settings are the sections `src/config-registry.ts` registers when
+ * it is imported, as this file imports it. That import also sets the
+ * load hook `loadConfig` hands every resolved config to; the cases on
+ * the hook set one of their own, or clear it, and put the one they
+ * found back in a `finally`.
+ *
  * The defaults are read off `CONFIG_DEFAULTS` here, because
  * `config.test.ts` spells them and holds the module to them. Files are
  * planted at the LITERAL `.rafa/config.yaml`.
  */
 import type { ConfigRoots } from './config-load.js';
 import type { ConfigSetting, ConfigSource } from './config.js';
+
+import '../../config-registry.js';
 
 import {
   chmodSync,
@@ -64,12 +72,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '../../adapters/logger/settings.js';
 import { activeStoreSettings, setActiveStoreSettings } from '../../effort/store/settings.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { setActiveOutput } from '../output/active.js';
 
 import { loadConfig, readConfigFile } from './config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from './config.js';
+import { activeConfigLoadHook, setConfigLoadHook } from './section.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file case. */
 const isRoot = process.getuid?.() === 0;
@@ -201,6 +211,36 @@ describe('readConfigFile', () => {
 });
 
 describe('loadConfig', () => {
+  it('hands the load hook the config it resolved, before printing a warning', () => {
+    const held = activeConfigLoadHook();
+    const events: unknown[] = [];
+    try {
+      setConfigLoadHook((config) => events.push(['hook', config.store]));
+      const resolved = loadConfig(scopes('store: ndjson\nnonesuch: 1\n', null), {}, () => events.push('warn'));
+
+      expect(events).toEqual([['hook', 'ndjson'], 'warn']);
+      expect(resolved.config.store).toBe('ndjson');
+    } finally {
+      setConfigLoadHook(held);
+    }
+  });
+
+  it('hands the logger its settings through the hook the registry set, and leaves them with no hook set', () => {
+    const held = activeConfigLoadHook();
+    try {
+      loadConfig(scopes('logger:\n  level: error\n', null), {}, quiet);
+      const throughHook = activeLoggerSettings().level;
+      setActiveLoggerSettings(null);
+      setConfigLoadHook(null);
+      loadConfig(scopes('logger:\n  level: error\n', null), {}, quiet);
+
+      expect([throughHook, activeLoggerSettings().level]).toEqual(['error', 'warn']);
+    } finally {
+      setConfigLoadHook(held);
+      setActiveLoggerSettings(null);
+    }
+  });
+
   it('resolves the defaults silently when neither directory holds a config, creating nothing', () => {
     const roots = scopes(null, null);
     const { lines, warn } = sink();

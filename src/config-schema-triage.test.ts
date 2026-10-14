@@ -12,6 +12,8 @@
  */
 import type { ConfigSetting } from './core/config/index.js';
 
+import './config-registry.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import {

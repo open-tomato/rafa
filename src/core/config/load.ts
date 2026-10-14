@@ -17,20 +17,21 @@
  * because neither of the other two can take it.
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. Two of the files
- * outside `src/core/` that `config-load.ts` imports by value import a
- * config barrel back by value:
- *
- *   - `src/effort/store/settings.ts`, which `loadConfig` hands the
- *     resolved busy timeout, reads `CONFIG_DEFAULTS` from `index.ts` and
- *     the timeout's bounds from `sections.ts`;
- *   - `src/config-schema-logger.ts`, which `loadConfig` reads the logger
- *     settings through, takes its readers from `sections.ts`.
+ * imports the barrel back by value is a runtime cycle. One of the files
+ * outside `src/core/` that `config-load.ts` imports by value imports a
+ * config barrel back by value: `src/effort/store/settings.ts`, which
+ * `loadConfig` hands the resolved busy timeout, reads `CONFIG_DEFAULTS`
+ * from `src/config-registry.ts`, which imports `index.ts` by value, and
+ * the timeout's bounds from `sections.ts`. `config-load.ts` once read
+ * the logger's settings through `src/config-schema-logger.ts`, which
+ * takes its readers from `sections.ts`; it now calls the load hook
+ * `section.ts` holds, which the registry sets, and imports no section
+ * file.
  *
  * So `config-load.ts` behind `index.ts` closes a cycle through the
- * store's settings, and behind `sections.ts` one through both files.
- * Neither file imports `loadConfig`, so a barrel that holds it alone is
- * imported back by neither.
+ * store's settings and the registry, and behind `sections.ts` one
+ * through the store's settings. Neither file imports `loadConfig`, so a
+ * barrel that holds it alone is imported back by neither.
  *
  * Measured when the file moved: the value imports of the non-test files
  * tracked under `src/` and `packages/` held six cycles before the move
@@ -44,6 +45,13 @@
  * setter inside `loadConfig` and never at load. The split holds the
  * rule rather than that reading: a later top-level read on either side
  * would fail in one import order only.
+ *
+ * Measured again when the logger's settings moved to the load hook, on
+ * bun 1.3.14: `load.ts`, `config-load.ts`, `index.ts`, `sections.ts`,
+ * `section.ts`, `config.ts`, the store's settings, the registry, the
+ * logger's and the hub's section files and `adapters/logger/settings.ts`
+ * each loaded first in a fresh `bun` process, the registry then holding
+ * 89 settings, the hook set and one check each time.
  *
  * ## What it exports
  *
