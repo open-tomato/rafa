@@ -299,12 +299,15 @@ a thing to split.
 
 ### Adding a setting
 
-**A new key in `SETTINGS` reaches six files beyond the schema, sections
+**A new key in `SETTINGS` reaches seven files beyond the schema, sections
 and `init` scaffold.** `RafaConfig` literals have to be complete, so the
 layer literal in `src/core/config/config.ts` needs it.
-`src/core/config/config-merged.test.ts` pins the key set as closed
-lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`), and a core key is
-also spelled in `src/core/config/core-section.test.ts`. Both config suites
+`src/core/config/config-merged.test.ts` and `src/config-registry.test.ts`
+pin the key set as closed lists (`KEYS`, `TOP`, `SECTIONS`,
+`knownKeysAbove`), and a core key is also spelled in
+`src/core/config/core-section.test.ts` and takes its place in one of the
+runs of core's names that `config-merged.ts` and `src/config-registry.ts`
+each spell, while the core barrel still exports the merged names. Both config suites
 also check that every setting appears exactly once:
 `src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
 `FULL_VALUES`, its cases and `KNOWN`) and

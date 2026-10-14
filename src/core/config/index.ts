@@ -83,7 +83,9 @@
  * schema's indexes, core's section, the item readers and the section
  * registry (`SETTINGS`, `CORE_SECTION`, `moduleSource`,
  * `registerConfigSections` and seventeen more), which
- * `src/index.test.ts` spells under `CONFIG_BARREL_ONLY`.
+ * `src/index.test.ts` spells under `CONFIG_BARREL_ONLY`. Its
+ * `CONFIG_DEFAULTS` is not this file's but `src/config-registry.ts`'s,
+ * spelled under `CONFIG_BARREL_SHADOWED` there.
  *
  * `index.test.ts` holds the list to the six files: every name any of
  * them exports and `sections.ts` does not is here once, as the same

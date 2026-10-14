@@ -8,11 +8,15 @@
  *
  * `config-schema.ts` declares core's fields of `RafaConfig` and exports
  * nothing merged, and `core-section.ts` holds core's specs and defaults.
- * This module is where the slices meet, with no runtime registration:
- * it imports each section file by value, as `config-schema.ts` did
- * before core's keys moved out, and the order of {@link SETTINGS} is
- * the order that module spelled. The section registry
- * (`registerConfigSections` in `section.ts`) is not read here.
+ * This module is one place the slices meet, with no runtime
+ * registration: it imports each section file by value, as
+ * `config-schema.ts` did before core's keys moved out, and the order of
+ * {@link SETTINGS} is the order that module spelled. The section
+ * registry (`registerConfigSections` in `section.ts`) is not read here.
+ * `src/config-registry.ts`, outside `src/core/`, builds the same six
+ * names in the same order from the same section objects and registers
+ * the sections; this module serves the importers of the core barrel
+ * until they move there.
  *
  * ## Where each slice comes from
  *

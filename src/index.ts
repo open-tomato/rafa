@@ -64,6 +64,13 @@
  * re-exports, and `index.test.ts` holds each value identical to its
  * module's own.
  *
+ * ## The registry loads first
+ *
+ * The first import is `config-registry.ts`, for its effect: it hands
+ * the twelve sections of the config schema to core, so every setting
+ * is registered before any module behind this entry loads or reads a
+ * config. {@link CONFIG_DEFAULTS} is the registry's own.
+ *
  * ## Why the commands carry a `Command` suffix
  *
  * A command is the terminal's contract, not a library call. Each takes
@@ -114,6 +121,8 @@
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
+import './config-registry.js';
+
 export type {
   Adapter,
   AdapterContext,
@@ -254,8 +263,8 @@ export type {
 
 export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
 export { loadConfig, readConfigFile } from './core/config/load.js';
+export { CONFIG_DEFAULTS } from './config-registry.js';
 export {
-  CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,

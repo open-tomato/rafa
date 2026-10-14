@@ -27,11 +27,16 @@
  * the name is added to the root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
  * other barrel, `sections.ts`, and are held by the spelled list alone.
+ * The barrel's `CONFIG_DEFAULTS` is left out of the containment case
+ * too, under {@link CONFIG_BARREL_SHADOWED}: the root publishes the
+ * registry's, `src/config-registry.ts`, a different object of the same
+ * name, and the re-export case holds it to the registry's.
  * The second config module, `config-load.ts`, is read through a barrel
  * of its own, `src/core/config/load.ts`, which holds that module's
  * names and no other, so nothing is left out of its containment case.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
+ * config registry (`src/config-registry.ts`) for its effect, then the
  * dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
@@ -126,10 +131,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
+import { CONFIG_DEFAULTS } from './config-registry.js';
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
 import * as registryModule from './core/adapters/index.js';
 import {
-  CONFIG_DEFAULTS,
   CONFIG_FILE,
   ConfigError,
   configFilePath,
@@ -402,9 +407,18 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'restoreConfigSections',
 ];
 
-/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
+/**
+ * The runtime names the config barrel holds and the root publishes from
+ * `src/config-registry.ts` instead, a different object of the same
+ * name, until the barrel loses them.
+ */
+const CONFIG_BARREL_SHADOWED: readonly string[] = ['CONFIG_DEFAULTS'];
+
+/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY} and {@link CONFIG_BARREL_SHADOWED}. */
 const configModule: Record<string, unknown> = Object.fromEntries(
-  Object.entries(configBarrel).filter(([name]) => !CONFIG_BARREL_ONLY.includes(name)),
+  Object.entries(configBarrel).filter(
+    ([name]) => !CONFIG_BARREL_ONLY.includes(name) && !CONFIG_BARREL_SHADOWED.includes(name),
+  ),
 );
 
 /** The modules whose every runtime name the root also carries. */
@@ -433,8 +447,9 @@ const ENTRY_PATH = join(SRC_DIR, 'index.ts');
  */
 type ImportList = readonly (readonly [string, readonly string[]])[];
 
-/** What `src/rafa.ts` imports, spelled here. */
+/** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
+  ['./config-registry.js', []],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
@@ -1525,11 +1540,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
 ];
 
 /**
- * A static relative import, possibly spanning lines, type-only or not.
- * Its clause holds no `;`, so a match never runs on from an import of a
- * bare module above it, such as `node:fs`, to the next relative one.
+ * A static relative import, possibly spanning lines, type-only or not,
+ * or one taken for its effect alone, with no clause. Its clause holds
+ * no `;`, so a match never runs on from an import of a bare module
+ * above it, such as `node:fs`, to the next relative one.
  */
-const IMPORT_PATTERN = /^import\s+(type\s+)?([^;]+?)\s+from\s+'(\.\.?\/[^']+)';$/gm;
+const IMPORT_PATTERN = /^import\s+(?:(type\s+)?([^;]+?)\s+from\s+)?'(\.\.?\/[^']+)';$/gm;
 
 /** One import's clause read as the bindings it takes. */
 function bindingsOf(clause: string): string[] {
@@ -1553,7 +1569,12 @@ function readImports(path: string): [string, string[]][] {
   const source = readFileSync(path.replace(/\.js$/, '.ts'), 'utf8');
   return [...source.matchAll(IMPORT_PATTERN)]
     .filter((match) => match[1] === undefined)
-    .map((match) => [match[3] ?? '', bindingsOf(match[2] ?? '')]);
+    .map((match) => [
+      match[3] ?? '',
+      match[2] === undefined
+        ? []
+        : bindingsOf(match[2]),
+    ]);
 }
 
 /** An import list spelled here, in the shape {@link readImports} answers. */

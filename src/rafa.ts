@@ -33,9 +33,15 @@
  * `process.exitCode` rather than calling `process.exit`, so nothing a
  * command wrote is truncated mid-flush.
  *
+ * Its first import is `src/config-registry.ts`, for its effect: the
+ * twelve sections of the config schema are handed to core before any
+ * module loaded here reads a config.
+ *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
+import './config-registry.js';
+
 import { homedir } from 'node:os';
 
 import { dispatch } from './cli/dispatch.js';
