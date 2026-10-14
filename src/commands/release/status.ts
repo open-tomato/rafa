@@ -1,5 +1,5 @@
 /**
- * `rafa release status`: the seven readings an operator needs before
+ * `rafa release status`: the eight readings an operator needs before
  * they tag anything — the version the version file declares, the
  * latest release tag the repository holds, the versions the changelog
  * calls released that carry no tag, the change notes waiting for
@@ -21,7 +21,7 @@
  * ## The two halves
  *
  * This file is the command half: the command, its `--plan` flag, the
- * version file and pending notes readings, and the block the seven
+ * version file and pending notes readings, and the block the eight
  * render to. The readers other folders use are its library half,
  * `src/release/status-readings.ts`: `compareVersions`,
  * `changelogVersions`, `readTags`, `readUntagged` and the types they
@@ -55,18 +55,18 @@
  *
  * ## Nothing here refuses for a reading that failed
  *
- * Each of the seven is read on its own and each is allowed to fail:
+ * Each of the eight is read on its own and each is allowed to fail:
  * a missing version file, a git that cannot list tags, an unreadable
  * changelog, a store this rafa cannot open, a tracker the chain cannot
  * land on or list. A cell nothing could be
  * read for renders {@link UNREADABLE} and the reason goes on its own
  * line under the block, which is the convention `pr list` keeps for
  * its per-row probes. Refusing the whole command for one of them
- * would hide the ones that were readable, and every one of the seven
- * is worth having alone. The stale-docs count in particular never
- * changes the exit code: an open line refuses no release. The audit is the one exception to a reason
- * of its own: it reads the changelog the untagged reading reads, so
- * an unreadable changelog is said once, under that reading.
+ * would hide the ones that were readable, and every one of the eight is worth
+ * having alone. The stale-docs count in particular never changes the exit
+ * code: an open line refuses no release. The audit is the one exception to a
+ * reason of its own: it reads the changelog the untagged reading reads, so an
+ * unreadable changelog is said once, under that reading.
  *
  * The refusals left are the line's own: a stray word, and a config
  * `loadConfig` refuses. Both exit 1.
@@ -172,7 +172,7 @@ export interface PendingNotesReading {
   readonly problem: string | null;
 }
 
-/** The seven readings one run of this action answers. */
+/** The eight readings one run of this action answers. */
 export interface ReleaseStatusReading {
   /** The version the version file declares. */
   readonly versionFile: VersionFileReading;
@@ -192,7 +192,7 @@ export interface ReleaseStatusReading {
 
 /** What json mode gives as the terminal result's `data`. */
 export interface ReleaseStatusResult {
-  /** The seven readings. */
+  /** The eight readings. */
   readonly reading: ReleaseStatusReading;
   /** The block text mode writes. */
   readonly text: string;
@@ -369,7 +369,7 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
   ].filter((problem): problem is string => problem !== null);
 }
 
-/** The label of each of the seven lines, in the order the block writes them. */
+/** The label of each of the eight lines, in the order the block writes them. */
 const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'audit', 'stale docs'] as const;
 
 /**
@@ -467,7 +467,7 @@ function expectNoArguments(args: readonly string[]): void {
   );
 }
 
-/** The seven readings for one invocation, and the block they render to. */
+/** The eight readings for one invocation, and the block they render to. */
 export async function readStatus(
   context: RafaContext,
   seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS,
@@ -508,7 +508,7 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
     action: 'status',
     summary: 'show the version, the latest tag, the untagged releases, the pending notes, the waiting fragments'
       + ' and the open stale-docs lines',
-    description: 'Reads seven things about the release state of the project and writes nothing: the version'
+    description: 'Reads eight things about the release state of the project and writes nothing: the version'
       + ' `release.versionFile` declares, the latest release tag of the repository by semantic version'
       + ' precedence, the versions `release.changelog` calls released that carry no tag, the change notes'
       + ' the current plan\'s sessions have stored for its next release, and the change fragments waiting on'
@@ -522,7 +522,7 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
       + ' `--plan=<stub>` names, and otherwise the one the checked-out branch\'s `<type>/<stub>` names,'
       + ' resolved against the plans in `plan.dir`. A reading that could not be made leaves its cell as `?`'
       + ' and says why on a line under the block rather than refusing the others. With `--output=json`'
-      + ' the seven readings and the rendered block are the data of the terminal result event.',
+      + ' the eight readings and the rendered block are the data of the terminal result event.',
     args: [],
     flags: [
       {

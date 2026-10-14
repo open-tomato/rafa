@@ -97,18 +97,18 @@ prints `owner review required` as the halt reason.
 
 **The closing gate** is the verification step `rafa epic close` runs
 before closing an epic. Every member must be closed first. Then rafa
-plans a verification-only run from the epic's acceptance criteria,
-where each criterion is a check against `origin/main`. If a criterion
-cannot be checked (it is prose, not runnable), the close refuses unless
-you pass `--accept-unchecked`. If a check fails, the failure is filed
-as a bug, or added as a line to the release's stale-docs issue when its
-criterion names only documentation, and the close refuses. On success, the epic closes as
-completed. Use "closing gate" in prose and specifications when the
-step between "all members done" and "epic closed" is what you mean.
-Use "verification" when the step itself, without the "gate" framing,
-is the subject. "Acceptance criteria" stays as is (the epic's
-acceptance criteria, not the close's verification); they are input,
-not the close's own thing.
+plans a verification-only run from the epic's acceptance criteria, where
+each criterion is a check against `origin/main`. If a criterion cannot
+be checked (it is prose, not runnable), the close refuses unless you
+pass `--accept-unchecked`. If a check fails, the failure is filed as a
+bug, or added as a line to the release's stale-docs issue when its
+criterion names only documentation, and the close refuses. On success,
+the epic closes as completed. Use "closing gate" in prose and
+specifications when the step between "all members done" and "epic
+closed" is what you mean. Use "verification" when the step itself,
+without the "gate" framing, is the subject. "Acceptance criteria" stays
+as is (the epic's acceptance criteria, not the close's verification);
+they are input, not the close's own thing.
 
 **The trail** is the comment each epic lifecycle command leaves on the
 issue it changes. `rafa epic new` leaves no comment (the issue is new).
