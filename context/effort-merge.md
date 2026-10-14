@@ -16,9 +16,10 @@ its migration entry, or `merge-rules.sweep.test.ts` will fail.
 between stores and their rows combine; local tables stay on their
 machine and are not combined. The `sessions`, `commits`, `findings`,
 `blockers`, `out_of_scope_bugs`, `changes`, `skill_invocations`,
-`preflight`, `dispatches`, `plan_ci`, `report_absences`, and
-`task_reports` tables are merged. The `schema_migrations`, `store_meta`,
-`store_replaced`, `merges` and `merge_conflicts` tables are local.
+`preflight`, `dispatches`, `plan_ci`, `report_absences`, `task_reports`,
+`stale_docs` and `bug_routes` tables are merged. The `schema_migrations`,
+`store_meta`, `store_replaced`, `merges` and `merge_conflicts` tables
+are local.
 
 **A merged table's rule holds:** its identity columns (which match rows
 with NULL origin), the columns that can change after insert (each with

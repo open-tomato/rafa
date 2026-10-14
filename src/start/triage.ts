@@ -1,7 +1,7 @@
 /**
  * Loop-owned triage in `loop start`: what the run does with a task
- * report's blockers and out-of-scope bugs once the report is stored and
- * the task's tracker line is marked.
+ * report's blockers, out-of-scope bugs and stale-doc entries once the
+ * report is stored and the task's tracker line is marked.
  *
  * `start()` makes one {@link StartTriage} per run through
  * {@link createStartTriage}, before its first dispatch, and hands it each
@@ -9,22 +9,42 @@
  * of the task: done, blocked, failed or interrupted. The triage reads the
  * session's output with `parseReport`, as the store did, and hands the
  * report to `triageReport` (`triage/triage.ts`), which writes the blocker
- * text onto the task's line and files, or comments on, each out-of-scope
- * bug. An output with no report, and a report with no blocker text and no
- * out-of-scope bug, are left alone: nothing is resolved, called or printed.
+ * text onto the task's line, routes each out-of-scope entry by its kind
+ * (see below), files, or comments on, each one routed as a bug, and
+ * answers each `stale_docs` entry with nothing filed. An output with no
+ * report, and a report with no blocker text, no out-of-scope bug and no
+ * `stale_docs` entry, are left alone: nothing is resolved, called or
+ * printed.
+ *
+ * ## Kinds, and the route each entry took
+ *
+ * Made with {@link StartTriageOptions.kinds}, as `start()` makes it, the
+ * triage hands `triageReport`, for each report listing an out-of-scope
+ * entry, the readings its kind check takes: the plan's base and files,
+ * the head, `runNamedTestAt` over the run's checkout, and the run's
+ * resolved retry count as the cap on the plan's repair tasks; the
+ * tracker path is the task's own. `start/triage-kinds.ts` reads them
+ * and says what each costs. Left out, every entry is triaged as it was
+ * before kinds existed.
+ *
+ * Whatever became of each entry, its `bug_routes` row is then written
+ * through `writeBugRoutes` (`start/triage-kinds.ts` holds the table of
+ * routes), and a write the store refuses is one warning line.
  *
  * ## The tracker chain, once per run
  *
  * The public tracker is resolved through `resolveTracker`
  * (`adapters/tracker/resolve.ts`) at most once per run: when a report
- * first lists a bug `triageReport` may take to it, one with a `what`
- * and a `security` flag of `false`. A machine-scoped bug carries that
- * shape and reaches no tracker at all (`triage/triage.ts`), so a report
- * whose only such bug is that one resolves a chain it then files
- * nothing to. Every later report of the run files
- * through the tracker that resolution landed on. A chain that landed
- * nowhere is not tried again either: it is warned about once, and each
- * public bug of the run fails on its refusal.
+ * first lists a bug `triageReport` will take to it, one with a `what`
+ * and a `security` flag of `false` that is not machine-scoped and whose
+ * kind the check reads as `bug`. That check is taken here before
+ * `triageReport` takes it again, and both read one answer per test case
+ * (`start/triage-kinds.ts`), so a report whose entries all route to a
+ * repair task, the follow-up issue, the pull request's body, the store
+ * or the machine channel resolves nothing. Every later report of the
+ * run files through the tracker that resolution landed on. A chain that
+ * landed nowhere is not tried again either: it is warned about once, and
+ * each public bug of the run fails on its refusal.
  *
  * It is resolved then, rather than before the first dispatch, because a
  * resolution is not free: `github`'s preflight runs `gh auth status` and
@@ -39,6 +59,22 @@
  * security bug. The same stand-in carries a chain that landed nowhere: each
  * public bug then fails with the chain's own refusal as its problem, while
  * the report's blocker text and security bugs are written as ever.
+ *
+ * ## Stale documentation
+ *
+ * A `stale_docs` entry is no bug and reaches no tracker
+ * (`triage/stale-docs.ts`), so it never counts towards resolving the
+ * chain: a report holding only such entries is triaged, and resolves
+ * nothing. Each entry is printed as one note, through `info`, naming
+ * `stale_docs[<index>]`, where the stale line is and what no longer
+ * matches, as stored with nothing filed.
+ *
+ * "Stored" is the caller's order and not a reading taken here: `start()`
+ * stores the report before it hands the task over, and that write puts
+ * each entry in the store's `stale_docs` table (`report/record.ts`). A
+ * write that refused an entry is warned about by the store step itself;
+ * this module is handed no result of it, so the note is printed either
+ * way.
  *
  * ## Inherited red, read once per run
  *
@@ -92,10 +128,19 @@
  * ## No task for a bug
  *
  * The loop never dispatches a task for an out-of-scope bug; a plan that
- * wants one fixed declares a task. Nothing here adds a line to the tracker
- * file. A bug becomes an issue file or a comment, and a stored reference,
- * unless it is machine-scoped: that one becomes a warned line here and
- * its stored row alone (`triage/triage.ts`).
+ * wants one fixed declares a task. A bug becomes an issue file or a
+ * comment, and a stored reference, unless it is machine-scoped: that one
+ * becomes a warned line here and its stored row alone
+ * (`triage/triage.ts`). A `stale_docs` entry becomes a noted line here
+ * and its stored row alone.
+ *
+ * The one line the triage adds to the tracker file is the repair task of
+ * a leftover of the plan's own, `own-fallout` or `own-gap`, inserted by
+ * `triage/kind-route.ts` while the plan holds fewer such repairs than
+ * the cap, and each is noted here in one line naming its tracker line.
+ * An entry past the cap, a `convention` and a `docs` entry are each
+ * noted in one line too, as held for the follow-up issue, held for the
+ * pull request's body, or stored as a stale-doc sighting.
  * A blocker's text goes onto its own task's line, escaped
  * (`writeTrackerBlocker` in `utils/tracker.ts`), so no text a session wrote
  * opens a line `findNextTask` could answer as a task.
@@ -105,6 +150,7 @@
  * that was not through `warn`.
  */
 import type { TaskDispatch } from './dispatch.js';
+import type { KindReader, StartKindOptions } from './triage-kinds.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RafaConfig } from '../core/config/index.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
@@ -112,6 +158,7 @@ import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { InheritedTriage } from '../triage/inherited.js';
+import type { KindRouteOptions } from '../triage/kind-route.js';
 import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triage.js';
 
 import { homedir } from 'node:os';
@@ -124,7 +171,9 @@ import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';
 import { inheritedFailureOf } from '../triage/inherited.js';
 import { scoreText } from '../triage/issue-text.js';
+import { checkedKindOf } from '../triage/kind-route.js';
 import { localPathRedactor } from '../triage/local-paths.js';
+import { isMachineFault } from '../triage/machine-fault.js';
 import {
   blockerTextOf,
   namedSecrets,
@@ -133,6 +182,12 @@ import {
 } from '../triage/triage.js';
 
 import { emitLoopEvent } from './loop-events.js';
+import {
+  bugRouteEntriesOf,
+  createKindReader,
+  saidKindsOf,
+  storeBugRoutes,
+} from './triage-kinds.js';
 
 /** Why the stand-in handed to a report with no public bug refuses. */
 export const NOT_RESOLVED_REASON = 'start triage: no public tracker is resolved for a report with no public bug';
@@ -182,8 +237,15 @@ export interface StartTriageOptions {
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Where security bugs go. `triageReport`'s own, under the repo root, when left out. */
   readonly privateTracker?: Tracker;
-  /** Seams for the reference write. */
+  /** Seams for the reference write and the `bug_routes` write. */
   readonly seams?: FindingsWriterSeams;
+  /**
+   * The run's checkout, `pr.base` and resolved retry count, which every
+   * entry is routed by its kind with (`start/triage-kinds.ts`). Left out,
+   * no entry is routed by its kind, and each is triaged as before kinds
+   * existed.
+   */
+  readonly kinds?: StartKindOptions;
 }
 
 /** One task whose report `start()` has just stored. */
@@ -233,19 +295,35 @@ export function unresolvedTracker(kind: TrackerKind, reason: string): Tracker {
   });
 }
 
-/**
- * True for a bug that may reach the public tracker: a `what`, and a flag
- * of `false`. Not every one of them does, since `triageReport` keeps a
- * machine-scoped bug off every tracker (`triage/triage.ts`); the reading
- * is the module note's, and is not taken again here.
- */
+/** True for a bug that may reach the public tracker: a `what`, and a flag of `false`. */
 function filesPublicly(bug: ReportBug): boolean {
   return bug.security === false && typeof bug.what === 'string' && bug.what.trim().length > 0;
 }
 
-/** True for a report holding a blocker text or an out-of-scope bug. */
+/**
+ * True for a bug `triageReport` will take to the public tracker: one
+ * that {@link filesPublicly}, is not machine-scoped, and, with `kinds`
+ * given, whose kind the check reads as `bug`. See the module note.
+ */
+async function routesPublicly(bug: ReportBug, kinds: KindRouteOptions | undefined): Promise<boolean> {
+  if (!filesPublicly(bug) || isMachineFault(bug)) return false;
+  if (kinds === undefined) return true;
+  return (await checkedKindOf(bug, kinds)).kind === 'bug';
+}
+
+/** True when any of `bugs` {@link routesPublicly}, checking them one at a time. */
+async function anyRoutesPublicly(bugs: readonly ReportBug[], kinds: KindRouteOptions | undefined): Promise<boolean> {
+  for (const bug of bugs) {
+    if (await routesPublicly(bug, kinds)) return true;
+  }
+  return false;
+}
+
+/** True for a report holding a blocker text, an out-of-scope bug or a `stale_docs` entry. */
 function hasTriage(report: TaskReport): boolean {
-  return blockerTextOf(report.blockers) !== null || report.outOfScopeBugs.length > 0;
+  return blockerTextOf(report.blockers) !== null
+    || report.outOfScopeBugs.length > 0
+    || report.staleDocs.length > 0;
 }
 
 /** How a line names an issue: its URL, or its kind and id when it has none. */
@@ -260,8 +338,11 @@ function failureName(failure: SuiteFailure): string {
 
 /** The note for a bug the run inherited from `failure`, naming the issue commented on, if any. */
 function inheritedNote(bug: BugTriage, name: string, where: string, failure: SuiteFailure | undefined): string {
-  const test = failure === undefined
+  const unnamed = bug.kind === undefined
     ? 'a red test the run started with'
+    : 'a test red on the plan\'s base as on its head';
+  const test = failure === undefined
+    ? unnamed
     : `the run-start failure ${failureName(failure)}`;
   const comment = bug.ref === null
     ? ''
@@ -269,14 +350,55 @@ function inheritedNote(bug: BugTriage, name: string, where: string, failure: Sui
   return `${name}: inherited: ${test}; nothing was filed${comment}.`;
 }
 
+/** What a note says became of an entry its kind routed away from every tracker. */
+function settledText(bug: BugTriage): string | null {
+  switch (bug.action) {
+    case 'repair':
+      return bug.repairLine === undefined
+        ? 'a repair task was added above the next plan task'
+        : `a repair task was added at tracker line ${bug.repairLine + 1}, above the next plan task`;
+    case 'follow-up':
+      return bug.problem === null
+        ? 'held for this plan\'s follow-up issue, past its cap on repair tasks'
+        : 'held for this plan\'s follow-up issue';
+    case 'pr-body':
+      return 'held for the pull request\'s body';
+    case 'docs':
+      return 'stored as a stale-doc sighting';
+    default:
+      return null;
+  }
+}
+
 /**
- * The lines for one bug: a note for an issue it reached or a failure it
- * inherited, and a warning for everything else.
+ * The lines for one entry its kind routed away from every tracker: one
+ * note, and its problem as a warning, which names the entry itself
+ * (`triage/kind-route.ts`). Null for any other entry.
+ */
+function settledLines(bug: BugTriage, name: string): StartTriageLines | null {
+  const text = settledText(bug);
+  if (text === null) return null;
+  const kind = bug.kind === undefined
+    ? ''
+    : ` ${bug.kind}:`;
+  return {
+    notes: [`${name}:${kind} ${text}; nothing was filed.`],
+    warnings: bug.problem === null
+      ? []
+      : [bug.problem],
+  };
+}
+
+/**
+ * The lines for one bug: a note for an issue it reached, a failure it
+ * inherited, or a route its kind took, and a warning for everything else.
  */
 function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTriageLines {
   const name = `out_of_scope_bugs[${bug.index}]`;
   const where = `the ${bug.channel} tracker`;
 
+  const settled = settledLines(bug, name);
+  if (settled !== null) return settled;
   if (bug.action === 'skipped') {
     return { notes: [], warnings: [`${bug.problem}; nothing was filed.`] };
   }
@@ -306,9 +428,22 @@ function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTri
 }
 
 /**
+ * The note for one `stale_docs` entry: its problem line, which names
+ * `stale_docs[<index>]`, where the stale line is and what no longer
+ * matches, already redacted and on one line (`triage/stale-docs.ts`),
+ * then that it is stored and nothing was filed. See the module note for
+ * what "stored" rests on.
+ */
+function staleDocNote(entry: BugTriage): string {
+  const named = entry.problem ?? `stale_docs[${entry.index}] is stale documentation`;
+  return `${named}; stored as a stale-doc row, and nothing was filed.`;
+}
+
+/**
  * What the operator is told about one triage, each line opening
- * `Triage: `: a note for the blocker text written and for each bug filed,
- * commented on or inherited, and a warning for everything that was not.
+ * `Triage: `: a note for the blocker text written, for each bug filed,
+ * commented on or inherited, and for each `stale_docs` entry, after the
+ * bugs' notes, and a warning for everything that was not.
  * `inherited` holds, by a bug's index, the run-start failure an inherited
  * bug is, which its note names. Pure, so the lines are tested beside what
  * triage did.
@@ -327,7 +462,11 @@ export function describeStartTriage(
   const bugs = result.bugs.map((bug) => bugLines(bug, inherited.get(bug.index)));
   const prefixed = (lines: readonly string[]): string[] => lines.map((line) => `${LINE_PREFIX}${line}`);
   return {
-    notes: prefixed([...blockerNotes, ...bugs.flatMap((lines) => lines.notes)]),
+    notes: prefixed([
+      ...blockerNotes,
+      ...bugs.flatMap((lines) => lines.notes),
+      ...result.staleDocs.map(staleDocNote),
+    ]),
     warnings: prefixed([...blockerWarnings, ...bugs.flatMap((lines) => lines.warnings)]),
   };
 }
@@ -421,6 +560,9 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
   const secrets = namedSecrets(options.config, options.env ?? process.env);
   const redact = (text: string): string => redactSecrets(text, secrets);
   const local = localPathRedactor(options.repoRoot, homedir());
+  const kindReader: KindReader | null = options.kinds === undefined
+    ? null
+    : createKindReader(options.kinds);
   let publicTracker: Promise<Tracker> | null = null;
   let inherited: InheritedTriage | null = null;
 
@@ -429,13 +571,19 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
     return inherited;
   };
 
-  const trackerFor = (report: TaskReport): Promise<Tracker> => {
-    if (!report.outOfScopeBugs.some(filesPublicly)) {
-      return Promise.resolve(unresolvedTracker(options.config.trackerDefault, NOT_RESOLVED_REASON));
+  const trackerFor = async (report: TaskReport, kinds: KindRouteOptions | undefined): Promise<Tracker> => {
+    if (!await anyRoutesPublicly(report.outOfScopeBugs, kinds)) {
+      return unresolvedTracker(options.config.trackerDefault, NOT_RESOLVED_REASON);
     }
     publicTracker ??= resolvePublicTracker(options, redact);
     return publicTracker;
   };
+
+  const dispatchOf = (input: TaskTriageInput) => ({
+    sessionId: input.dispatch.sessionId,
+    planStub: input.planStub,
+    taskLine: input.dispatch.taskText,
+  });
 
   const triageTask = async (input: TaskTriageInput): Promise<TriageResult | null> => {
     const reading = parseReport(input.dispatch.output);
@@ -443,29 +591,33 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
 
     const { report } = reading;
     const run = inheritedFor(input.trackerPath);
+    const kinds = kindReader === null || report.outOfScopeBugs.length === 0
+      ? undefined
+      : kindReader();
+    const dispatch = dispatchOf(input);
     const result = await triageReport({
       repoRoot: options.repoRoot,
       trackerPath: input.trackerPath,
       lineNum: input.lineNum,
-      dispatch: {
-        sessionId: input.dispatch.sessionId,
-        planStub: input.planStub,
-        taskLine: input.dispatch.taskText,
-      },
+      dispatch,
       outcome: input.outcome,
       report,
-      tracker: await trackerFor(report),
+      tracker: await trackerFor(report, kinds),
       privateTracker: options.privateTracker,
       secrets,
       seams: options.seams,
       inherited: run,
       similarity: options.config,
+      kinds,
     });
 
+    const routes = bugRouteEntriesOf(result, report, saidKindsOf(reading.block.body));
+    const unstored = storeBugRoutes(options.repoRoot, dispatch, routes, options.seams);
     const named = inheritedByIndex(result, report, run.failures, local, redact);
     const { notes, warnings } = describeStartTriage(result, named);
     for (const note of notes) activeOutput().info(`${INDENT}${note}`);
     for (const warning of warnings) activeOutput().warn(`${INDENT}${warning}`);
+    for (const warning of unstored) activeOutput().warn(`${INDENT}${LINE_PREFIX}${redact(warning)}`);
     for (const failure of named.values()) emitLoopEvent({ kind: 'inherited', file: failure.file, name: failure.name });
     return result;
   };

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-eight registered so far wrap a
+ * of each is its command. Four of the ninety-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -92,7 +92,9 @@
  * and `pr merge` as child processes, nor `stretch end`, which opens its
  * pull request through `pr open`'s `openPull` and puts `pr.base` back
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
- * codes of `src/errors/` beside the project's `errors.codes`.
+ * codes of `src/errors/` beside the project's `errors.codes`, nor
+ * `docs plan`, which writes a plan from the open lines of the
+ * stale-docs issues through `src/docs/open-lines.ts`.
  *
  * ## What is registered
  *
@@ -360,6 +362,12 @@
  *     cause in words, and `--check` exits 1 when two codes of one family
  *     read alike, the two refused together (`./bug/codes.ts`). It
  *     writes nothing and starts no session.
+ *   - `docs plan`: `<plan.dir>/PLAN-rafa-<n>-doc-update.md`, titled
+ *     `chore(doc-update)`, written from every open line of the open
+ *     stale-docs issues, one `{agent=doc-updater}` task each, every line
+ *     escaped; refused with exit code 1, writing nothing, when the plan
+ *     file exists, when no line is open and when no tracker can be read
+ *     (`./docs/plan.ts`). It starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -411,6 +419,7 @@ import claimTake from './claim/take.js';
 import cleanup from './cleanup.js';
 import configSet from './config/set.js';
 import describe from './describe.js';
+import docsPlan from './docs/plan.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortCopy from './effort/copy.js';
@@ -515,6 +524,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
   { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
   { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' },
+  { name: 'docs', summary: 'write a plan repairing the open lines of the stale-docs issues' },
 ]);
 
 /** The core commands, in roster order. */
@@ -608,6 +618,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   stretchItem,
   stretchEnd,
   bugCodes,
+  docsPlan,
   status,
   next,
   roadmap,

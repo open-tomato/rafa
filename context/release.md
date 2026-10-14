@@ -212,6 +212,12 @@ last fetched) and prints:
 - An audit of released history: versions two headings name, gaps (a version not
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary
+- The `stale docs` row: how many unticked lines the open stale-docs issues hold
+  on the tracker the chain lands on (`readOpenStaleDocLines`, read in
+  `src/commands/release/status-stale-docs.ts`), `none` at zero, and `?` with
+  the reason under the block when the chain lands nowhere or the listing
+  fails. It is the one reading that can reach the network, and no count
+  changes the exit code
 
 Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
 readers other folders import (`compareVersions`, `changelogVersions`,

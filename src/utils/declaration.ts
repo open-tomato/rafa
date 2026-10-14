@@ -78,20 +78,24 @@
  * {@link ResolvedFlags.suppressed} names exactly the granular ones an
  * agent took.
  *
- * `skills` and `tests` are the two recognised keys that map to no flag
- * under any block. There is no CLI flag for a skill, and what a plan
- * names there is a hint for whoever reads the dispatch record rather
+ * `skills`, `tests` and `docs` are the three recognised keys that map to
+ * no flag under any block. There is no CLI flag for a skill, and what a
+ * plan names there is a hint for whoever reads the dispatch record rather
  * than something the spawn can pass on. `tests` is read by the RUNNER,
  * not the session: it names how much of the suite the loop runs after
  * the task commits (`affected`, `module` or `full`, {@link TEST_SCOPES}),
  * and {@link readTestScope} answers it with the `affected` default when
- * the block is absent or its value unusable. Both are recognised all the
- * same, because that is what makes `{skills=bun-testing}` or
- * `{tests=full}` a declaration on its own and what gets a misspelled
- * value into {@link TaskDeclaration.issues} instead of through to the
- * agent's prompt as task text. Neither is ever named in
- * {@link ResolvedFlags.suppressed}, which says what an AGENT outranked,
- * and nothing outranks a key that was never a flag.
+ * the block is absent or its value unusable. `docs` marks the task's ROLE
+ * in its plan: its one value, `repair` ({@link DOCS_ROLES}), names the
+ * closing task that repairs the docs of what the plan changed, and
+ * {@link readDocsRole} answers it, with null for every other task. All
+ * three are recognised all the same, because that is what makes
+ * `{skills=bun-testing}`, `{tests=full}` or `{docs=repair}` a declaration
+ * on its own and what gets a misspelled value into
+ * {@link TaskDeclaration.issues} instead of through to the agent's prompt
+ * as task text. None is ever named in {@link ResolvedFlags.suppressed},
+ * which says what an AGENT outranked, and nothing outranks a key that
+ * was never a flag.
  *
  * Nothing here throws. A recognised key whose value this module cannot
  * use lands in {@link TaskDeclaration.issues} and maps to no flag, so
@@ -104,8 +108,8 @@
 /**
  * Keys this module answers to, in the order flags are emitted. `budget`
  * sits ahead of `tools` because `--tools` is variadic and has to end the
- * argument list (`core/loop/claude.ts`). `skills` and `tests` come last
- * because they emit no flag at all: each is recognised so that its value
+ * argument list (`core/loop/claude.ts`). `skills`, `tests` and `docs` come
+ * last because they emit no flag at all: each is recognised so that its value
  * is PARSED and lands on the record, and a value the parser cannot use
  * lands in {@link TaskDeclaration.issues} rather than passing silently.
  */
@@ -117,6 +121,7 @@ export const DECLARATION_KEYS = [
   'tools',
   'skills',
   'tests',
+  'docs',
 ] as const;
 
 /** One of the keys the grammar recognises. */
@@ -177,6 +182,16 @@ export type TestScope = (typeof TEST_SCOPES)[number];
  * more is the one its plan marks.
  */
 export const DEFAULT_TEST_SCOPE: TestScope = 'affected';
+
+/**
+ * The roles a `docs=` value names. There is one: `repair` marks the task
+ * that repairs the docs of what its plan changed. A task declaring none
+ * has no docs role, so the key has no default value.
+ */
+export const DOCS_ROLES = ['repair'] as const;
+
+/** The one role a `docs=` value names. */
+export type DocsRole = (typeof DOCS_ROLES)[number];
 
 /**
  * The trailing block, anchored at end of text and holding no brace of
@@ -291,6 +306,12 @@ export interface TaskDeclaration {
    * no flag; {@link readTestScope} answers the default for null.
    */
   tests: TestScope | null;
+  /**
+   * The task's docs role, or null when the block names none or names one
+   * outside {@link DOCS_ROLES}. Maps to no flag; {@link readDocsRole}
+   * answers it.
+   */
+  docs: DocsRole | null;
 }
 
 /** A task text split from the declaration it carried. */
@@ -333,6 +354,21 @@ export function isTestScope(value: string): value is TestScope {
  */
 export function readTestScope(declaration: TaskDeclaration | null): TestScope {
   return declaration?.tests ?? DEFAULT_TEST_SCOPE;
+}
+
+/** True when `value` is one of the {@link DOCS_ROLES}. */
+export function isDocsRole(value: string): value is DocsRole {
+  return (DOCS_ROLES as readonly string[]).includes(value);
+}
+
+/**
+ * The docs role a task's declaration yields: the one it declared, or null
+ * when there is no block, the block carries no `docs=`, or its value was
+ * unusable (and so recorded in {@link TaskDeclaration.issues} rather than
+ * on the record).
+ */
+export function readDocsRole(declaration: TaskDeclaration | null): DocsRole | null {
+  return declaration?.docs ?? null;
 }
 
 /**
@@ -429,6 +465,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
   let tools: readonly string[] | null = null;
   let skills: readonly string[] | null = null;
   let tests: TestScope | null = null;
+  let docs: DocsRole | null = null;
 
   for (const token of tokenise(body)) {
     const match = token.match(ENTRY_TOKEN);
@@ -487,6 +524,12 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
       continue;
     }
 
+    if (key === 'docs') {
+      if (isDocsRole(value)) docs = value;
+      else issues.push(unusableValue(key, token));
+      continue;
+    }
+
     const named = parseSkillList(value);
     if (named === null) issues.push(unusableValue(key, token));
     else skills = named;
@@ -506,6 +549,7 @@ function readBlock(raw: string, body: string): TaskDeclaration | null {
     tools,
     skills,
     tests,
+    docs,
   };
 }
 
@@ -573,9 +617,9 @@ export type AgentEffortLookup = (agent: string) => boolean;
  *
  * Granular keys an agent outranked are named in
  * {@link ResolvedFlags.suppressed} rather than dropped, which is what
- * lets the dispatch say what it left to the agent. `skills` and
- * `tests` are not among them: they map to no flag under any block, so
- * no agent ever took them.
+ * lets the dispatch say what it left to the agent. `skills`, `tests`
+ * and `docs` are not among them: they map to no flag under any block,
+ * so no agent ever took them.
  *
  * `budget` passes {@link BUDGET_FLAG} whatever else the block holds, an
  * agent included, since a definition supplies no budget, and is never

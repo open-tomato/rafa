@@ -79,12 +79,14 @@ function reportOf(bug: ReportBug): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [bug],
+    staleDocs: [],
+    changes: [],
     extras: [],
   };
 }
 
 function testBug(what: string, artifact: string): ReportBug {
-  return { what, artifact, security: false, extras: [] };
+  return { what, artifact, security: false, kind: 'bug', extras: [] };
 }
 
 function triagePlan(

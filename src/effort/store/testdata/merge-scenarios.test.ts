@@ -68,8 +68,9 @@ function identityOf(table: OriginTable): readonly string[] {
     : [];
 }
 
-/** Each row of `table` on `device`, keyed by its identity. */
+/** Each row of `table` on `device`, keyed by its identity; none where the store has no such table. */
 function byIdentity(device: ScenarioDevice, table: OriginTable): ReadonlyMap<string, Row> {
+  if (!hasTable(device, table)) return new Map();
   return new Map(read(device, `SELECT * FROM ${table}`)
     .map((row) => [JSON.stringify(identityOf(table).map((column) => row[column])), row]));
 }
@@ -193,6 +194,10 @@ describe('the scenarios, read back', () => {
       { id: 'finding-a1', origin_store: 'store-a' },
     ]);
     expect(shared(a, old, 'findings')).toEqual(['["finding-s1"]', '["finding-s2"]']);
+    expect(hasTable(old, 'stale_docs')).toBe(false);
+    expect([...byIdentity(a, 'stale_docs').keys()]).toEqual(['["stale-a1"]']);
+    expect(hasTable(old, 'bug_routes')).toBe(false);
+    expect([...byIdentity(a, 'bug_routes').keys()]).toEqual(['["route-a1"]']);
   });
 
   it('7: the two stores name different projects', () => {

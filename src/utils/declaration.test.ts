@@ -77,6 +77,14 @@
  * `tests` out of `DECLARATION_KEYS` reddens seven of them, and letting
  * {@link isTestScope} accept any non-empty value reddens the scope
  * constants case and the unusable-value case.
+ *
+ * The `docs` key's cases (the eight-key roster, the block carrying all
+ * eight, `docs=` alone and beside an agent, its unusable and duplicated
+ * values, and {@link readDocsRole}) were given one control: taking `docs`
+ * out of `DECLARATION_KEYS` reddens seven of them, the module restored
+ * byte-identical (sha256 checked) and green after. The roles case and
+ * {@link readDocsRole}'s null case stay green under it, since neither
+ * reads a block carrying the key.
  */
 import type { AgentEffortLookup, TaskDeclaration } from './declaration.js';
 
@@ -85,9 +93,11 @@ import { describe, expect, it } from 'bun:test';
 import {
   AGENT_OWNED_KEYS,
   DECLARATION_KEYS,
+  DOCS_ROLES,
   EFFORT_LEVELS,
   GRANULAR_KEYS,
   DEFAULT_TEST_SCOPE,
+  isDocsRole,
   isEffortLevel,
   isModelValue,
   isTestScope,
@@ -96,6 +106,7 @@ import {
   parseSkillList,
   parseTaskDeclaration,
   parseToolList,
+  readDocsRole,
   readTestScope,
   resolveDeclarationFlags,
   stripTaskDeclaration,
@@ -147,7 +158,7 @@ function declarationOf(taskText: string): TaskDeclaration {
 }
 
 describe('the recognised grammar', () => {
-  it('recognises exactly seven keys, the budget ahead of the tools, skills and tests last', () => {
+  it('recognises exactly eight keys, the budget ahead of the tools, the three flagless keys last', () => {
     expect([...DECLARATION_KEYS]).toEqual([
       'agent',
       'model',
@@ -156,7 +167,16 @@ describe('the recognised grammar', () => {
       'tools',
       'skills',
       'tests',
+      'docs',
     ]);
+  });
+
+  it('carries the one docs role, spelled exactly', () => {
+    expect([...DOCS_ROLES]).toEqual(['repair']);
+    expect(isDocsRole('repair')).toBe(true);
+    expect(isDocsRole('Repair')).toBe(false);
+    expect(isDocsRole('update')).toBe(false);
+    expect(isDocsRole('')).toBe(false);
   });
 
   it('carries the three test scopes, narrowest first, defaulting to the narrowest', () => {
@@ -218,6 +238,18 @@ describe('readTestScope', () => {
   });
 });
 
+describe('readDocsRole', () => {
+  it('answers the role a block declared', () => {
+    expect(readDocsRole(declarationOf('Do it  {agent=doc-updater docs=repair}'))).toBe('repair');
+  });
+
+  it('answers null for no block and for a block with no `docs=`', () => {
+    expect(readDocsRole(parseTaskDeclaration('Do it').declaration)).toBeNull();
+    expect(readDocsRole(null)).toBeNull();
+    expect(readDocsRole(declarationOf('Do it  {agent=doc-updater}'))).toBeNull();
+  });
+});
+
 describe('parseTaskDeclaration', () => {
   it('answers the task text with the block removed', () => {
     const parsed = parseTaskDeclaration(HYGIENE_LINE);
@@ -240,9 +272,9 @@ describe('parseTaskDeclaration', () => {
     expect(parsed.text).toBe('Do the thing');
   });
 
-  it('reads all seven keys off one block', () => {
+  it('reads all eight keys off one block', () => {
     const declaration = declarationOf(
-      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash skills=bun-testing tests=module}',
+      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash skills=bun-testing tests=module docs=repair}',
     );
 
     expect(declaration.agent).toBe('tdd-guide');
@@ -252,6 +284,7 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.tools).toEqual(['Read', 'Bash']);
     expect(declaration.skills).toEqual(['bun-testing']);
     expect(declaration.tests).toBe('module');
+    expect(declaration.docs).toBe('repair');
     expect(declaration.issues).toEqual([]);
   });
 
@@ -408,6 +441,51 @@ describe('parseTaskDeclaration', () => {
     expect(readTestScope(declaration)).toBe('full');
     expect(declaration.issues).toEqual([
       { reason: 'duplicate-key', key: 'tests', text: 'tests=affected' },
+    ]);
+  });
+
+  it('declares on `docs=` alone, mapping to no flag and leaving the text clean', () => {
+    const line = 'Repair the docs of what this plan changed  {docs=repair}';
+    const parsed = parseTaskDeclaration(line);
+    const declaration = declarationOf(line);
+
+    expect(parsed.text).toBe('Repair the docs of what this plan changed');
+    expect(declaration.docs).toBe('repair');
+    expect(declaration.extras).toEqual([]);
+    expect(declaration.issues).toEqual([]);
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT)).toEqual({ args: [], suppressed: [] });
+  });
+
+  it('keeps `docs=` off the flags and the suppressed list beside an agent', () => {
+    const declaration = declarationOf('Do it  {agent=doc-updater effort=medium docs=repair}');
+
+    expect(declaration.docs).toBe('repair');
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT)).toEqual({
+      args: ['--agent', 'doc-updater', '--effort', 'medium'],
+      suppressed: [],
+    });
+  });
+
+  it('records any other `docs=` value as an issue and reads it as absent', () => {
+    for (const value of ['update', 'Repair', 'repair,repair', 'true', '']) {
+      const declaration = declarationOf(`Do it  {agent=doc-updater docs=${value}}`);
+
+      expect(declaration.docs).toBeNull();
+      expect(declaration.agent).toBe('doc-updater');
+      expect(declaration.extras).toEqual([]);
+      expect(declaration.issues).toEqual([
+        { reason: 'unusable-value', key: 'docs', text: `docs=${value}` },
+      ]);
+      expect(readDocsRole(declaration)).toBeNull();
+    }
+  });
+
+  it('takes the first of a duplicated `docs=` and says so', () => {
+    const declaration = declarationOf('Do it  {docs=repair docs=update}');
+
+    expect(readDocsRole(declaration)).toBe('repair');
+    expect(declaration.issues).toEqual([
+      { reason: 'duplicate-key', key: 'docs', text: 'docs=update' },
     ]);
   });
 

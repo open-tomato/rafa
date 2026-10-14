@@ -58,8 +58,9 @@ only after reading the run's last `rafa·` lines.
    happens twice, when the hook rule fires, or when the fix would touch
    anything outside the integration branch.
 
-Anything else you find is filed, not fixed: one issue, after a search for
-an existing one, and the stretch goes on.
+A stale doc line you find is added to the release's stale-docs issue as one
+line, and no issue is filed for it. Every other finding is filed, not fixed:
+one issue, after a search for an existing one, and the stretch goes on.
 
 ## The entry
 

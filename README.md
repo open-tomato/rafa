@@ -265,8 +265,11 @@ rafa effort import <file>  # merge another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
-outcome), the task report tallies, and any runs whose preflight halted. To
-see which skills earned their place and which are ignored:
+outcome), the task report tallies, any runs whose preflight halted,
+how many of the filed bugs name only documentation, and per plan its
+out-of-scope entries by the kind the loop routed them under, with the
+share filed. To see which skills earned their place and which are
+ignored:
 
 ```bash
 rafa effort report --skills

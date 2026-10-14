@@ -284,6 +284,7 @@ describe('rafa release status, dispatched', () => {
     const command: RafaCommand = createReleaseStatusCommand({
       git: () => createGitRunner(w.caller),
       readNotes: () => [],
+      readStaleDocs: async () => ({ count: 0, problem: null }),
     });
 
     const run = await dispatchInProject(['release', 'status', '--plan=rafa-9'], [{ name: 'release', summary: 'releases' }], [command], project);

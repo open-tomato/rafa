@@ -84,8 +84,10 @@
  * `file` (absolute), the number of `stages`, the task counts under
  * `tasks`, an empty `issues`, an empty `missingAgents`, an empty
  * `skillCollisions`, an empty `unresolvedSkills` and an empty
- * `storeProblems`. Text mode
- * writes one line naming the file as typed, its stages and its counts.
+ * `storeProblems`, with the `warnings` `validatePlan` answered, which
+ * end nothing. Text mode
+ * writes one line naming the file as typed, its stages and its counts,
+ * and does not write the warnings.
  *
  * With issues, each is written at `error`, in line order, as
  * `<file>:<line>: <reason>: <text>`, with the file as typed and the line

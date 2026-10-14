@@ -329,6 +329,7 @@ describe('the note for an inherited bug', () => {
         },
         { ...unset, index: 2, channel: 'public', action: 'inherited' },
       ],
+      staleDocs: [],
     } as const;
 
     expect(describeStartTriage(result, new Map([[0, FAILURE], [1, FAILURE]])).notes).toEqual([
