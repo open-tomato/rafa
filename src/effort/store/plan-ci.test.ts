@@ -12,8 +12,8 @@
  * Each refusal sits beside the write it was varied from, which the store
  * takes, so a writer refusing everything reddens.
  */
+import type { CheckRow } from './check-rows.js';
 import type { PlanCiPullRequest, PlanCiRow } from './plan-ci.js';
-import type { CheckRow } from '../../pr/checks.js';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

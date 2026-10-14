@@ -288,7 +288,7 @@
     "src/board/spec-source-roadmap.test.ts": 0,
     "src/board/spec-source-roadmap.ts": 616.811147,
     "src/board/spec-source.test.ts": 0,
-    "src/board/spec-source.ts": 1534.155369,
+    "src/board/spec-source.ts": 1534.160382,
     "src/board/status.test.ts": 0,
     "src/board/status.ts": 126.921647,
     "src/board/trust.test.ts": 0,
@@ -323,7 +323,7 @@
     "src/ci/status-reading.test.ts": 0,
     "src/ci/status-reading.ts": 3.333333,
     "src/claims/ahead.test.ts": 0,
-    "src/claims/ahead.ts": 473.021717,
+    "src/claims/ahead.ts": 473.02673,
     "src/claims/device.test.ts": 0,
     "src/claims/device.ts": 1550.223591,
     "src/claims/drift.test.ts": 0,
@@ -391,7 +391,7 @@
     "src/cli/prompt/text.test.ts": 0,
     "src/cli/prompt/text.ts": 0,
     "src/cli/registry.test.ts": 0,
-    "src/cli/registry.ts": 305.133095,
+    "src/cli/registry.ts": 305.540051,
     "src/cli/route.test.ts": 0,
     "src/cli/route.ts": 7.861472,
     "src/cli/running.test.ts": 0,
@@ -422,13 +422,13 @@
     "src/commands/claim/hand.ts": 57.795693,
     "src/commands/claim/release-after-merge.test.ts": 0,
     "src/commands/claim/release.test.ts": 0,
-    "src/commands/claim/release.ts": 379.85643,
+    "src/commands/claim/release.ts": 379.966455,
     "src/commands/claim/take.test.ts": 0,
     "src/commands/claim/take.ts": 157.45653,
     "src/commands/cleanup-render.test.ts": 0,
     "src/commands/cleanup-render.ts": 46.475,
     "src/commands/cleanup.test.ts": 0,
-    "src/commands/cleanup.ts": 1479.642279,
+    "src/commands/cleanup.ts": 1479.878996,
     "src/commands/config/set-agent-integration.test.ts": 0,
     "src/commands/config/set.test.ts": 0,
     "src/commands/config/set.ts": 45.619181,
@@ -493,7 +493,7 @@
     "src/commands/effort/copy.test.ts": 0,
     "src/commands/effort/copy.ts": 82.75113,
     "src/commands/effort/dashboard.test.ts": 0,
-    "src/commands/effort/dashboard.ts": 330.629964,
+    "src/commands/effort/dashboard.ts": 329.810356,
     "src/commands/effort/fix-schema.test.ts": 0,
     "src/commands/effort/fix-schema.ts": 79.886809,
     "src/commands/effort/identity-after-rebuild.test.ts": 0,
@@ -539,7 +539,7 @@
     "src/commands/epic/show.ts": 435.872739,
     "src/commands/index.roster.sweep.test.ts": 0,
     "src/commands/index.test.ts": 0,
-    "src/commands/index.ts": 13810.000764,
+    "src/commands/index.ts": 13810.024073,
     "src/commands/init-board-move.test.ts": 0,
     "src/commands/init-board-native.test.ts": 0,
     "src/commands/init-board-project-setting.test.ts": 0,
@@ -592,7 +592,7 @@
     "src/commands/issue/ready-native.test.ts": 0,
     "src/commands/issue/ready-refresh.test.ts": 0,
     "src/commands/issue/ready.test.ts": 0,
-    "src/commands/issue/ready.ts": 4477.3677,
+    "src/commands/issue/ready.ts": 4477.372713,
     "src/commands/issue/roadmap-check.test.ts": 0,
     "src/commands/issue/roadmap-check.ts": 1,
     "src/commands/issue/roadmap-epic-table-native.test.ts": 0,
@@ -662,15 +662,15 @@
     "src/commands/plan/validate.test.ts": 0,
     "src/commands/plan/validate.ts": 220.251998,
     "src/commands/pr/close.test.ts": 0,
-    "src/commands/pr/close.ts": 51.358476,
+    "src/commands/pr/close.ts": 51.468501,
     "src/commands/pr/current.test.ts": 0,
-    "src/commands/pr/current.ts": 579.073174,
+    "src/commands/pr/current.ts": 579.183199,
     "src/commands/pr/last-triage.test.ts": 0,
     "src/commands/pr/last-triage.ts": 71.666667,
     "src/commands/pr/list-forecast.test.ts": 0,
     "src/commands/pr/list-forecast.ts": 102.675,
     "src/commands/pr/list.test.ts": 0,
-    "src/commands/pr/list.ts": 175.784682,
+    "src/commands/pr/list.ts": 175.894707,
     "src/commands/pr/merge-cleanup.test.ts": 0,
     "src/commands/pr/merge-cleanup.ts": 1023.110714,
     "src/commands/pr/merge-driven.test.ts": 0,
@@ -697,9 +697,9 @@
     "src/commands/pr/merge-unchecked.ts": 65.765682,
     "src/commands/pr/merge-untracked.test.ts": 0,
     "src/commands/pr/merge.test.ts": 0,
-    "src/commands/pr/merge.ts": 3513.855704,
+    "src/commands/pr/merge.ts": 3512.347403,
     "src/commands/pr/open.test.ts": 0,
-    "src/commands/pr/open.ts": 83.875742,
+    "src/commands/pr/open.ts": 83.985767,
     "src/commands/pr/pr-context.test.ts": 0,
     "src/commands/pr/pr-context.ts": 3687.903437,
     "src/commands/pr/pr-spawn.test.ts": 0,
@@ -708,7 +708,7 @@
     "src/commands/pr/retarget.test.ts": 0,
     "src/commands/pr/retarget.ts": 63.865069,
     "src/commands/pr/show.test.ts": 0,
-    "src/commands/pr/show.ts": 172.431507,
+    "src/commands/pr/show.ts": 172.541532,
     "src/commands/pr/triage-convert.test.ts": 0,
     "src/commands/pr/triage-convert.ts": 36.333722,
     "src/commands/pr/triage-fixtures.test.ts": 0,
@@ -725,19 +725,19 @@
     "src/commands/pr/triage-trust.test.ts": 0,
     "src/commands/pr/triage-trust.ts": 82.666667,
     "src/commands/pr/triage.test.ts": 0,
-    "src/commands/pr/triage.ts": 1470.768941,
+    "src/commands/pr/triage.ts": 1470.179319,
     "src/commands/pr/version-collision-incident-spawn.test.ts": 0,
     "src/commands/pr/view.test.ts": 0,
     "src/commands/pr/view.ts": 3.588402,
     "src/commands/pr/wait-grace-driven.test.ts": 0,
     "src/commands/pr/wait.test.ts": 0,
-    "src/commands/pr/wait.ts": 276.020267,
+    "src/commands/pr/wait.ts": 276.26597,
     "src/commands/release/release-commit.test.ts": 0,
     "src/commands/release/release-commit.ts": 9.316667,
     "src/commands/release/settle-project.test.ts": 0,
     "src/commands/release/settle-project.ts": 132.004216,
     "src/commands/release/settle.test.ts": 0,
-    "src/commands/release/settle.ts": 586.606946,
+    "src/commands/release/settle.ts": 586.77884,
     "src/commands/release/status-audit.test.ts": 0,
     "src/commands/release/status-fragments.test.ts": 0,
     "src/commands/release/status-fragments.ts": 344.773196,
@@ -745,10 +745,10 @@
     "src/commands/release/status-stale-docs.ts": 660.611111,
     "src/commands/release/status-worktree-spawned.test.ts": 0,
     "src/commands/release/status.test.ts": 0,
-    "src/commands/release/status.ts": 986.195394,
+    "src/commands/release/status.ts": 986.305419,
     "src/commands/release/tag-receipt.test.ts": 0,
     "src/commands/release/tag.test.ts": 0,
-    "src/commands/release/tag.ts": 326.239343,
+    "src/commands/release/tag.ts": 326.349368,
     "src/commands/roadmap-native.test.ts": 0,
     "src/commands/roadmap.test.ts": 0,
     "src/commands/roadmap.ts": 31.794524,
@@ -766,9 +766,9 @@
     "src/commands/skill/show.test.ts": 0,
     "src/commands/skill/show.ts": 75.52468,
     "src/commands/status.test.ts": 0,
-    "src/commands/status.ts": 188.899166,
+    "src/commands/status.ts": 189.009191,
     "src/commands/stretch/end.test.ts": 0,
-    "src/commands/stretch/end.ts": 241.243506,
+    "src/commands/stretch/end.ts": 241.370198,
     "src/commands/stretch/item-merge.test.ts": 0,
     "src/commands/stretch/item-merge.ts": 356.871861,
     "src/commands/stretch/item.test.ts": 0,
@@ -823,32 +823,32 @@
     "src/core/adapters/registry.test.ts": 0,
     "src/core/adapters/registry.ts": 13614.926486,
     "src/core/command/command.test.ts": 0,
-    "src/core/command/command.ts": 13902.99218,
+    "src/core/command/command.ts": 13907.475614,
     "src/core/command/confirm.test.ts": 0,
     "src/core/command/confirm.ts": 0,
     "src/core/command/index.test.ts": 0,
-    "src/core/command/index.ts": 17374.339985,
+    "src/core/command/index.ts": 17378.823419,
     "src/core/command/version.test.ts": 0,
     "src/core/command/version.ts": 0,
     "src/core/config/config-items.test.ts": 0,
-    "src/core/config/config-items.ts": 151.781992,
+    "src/core/config/config-items.ts": 156.162093,
     "src/core/config/config-load.test.ts": 0,
-    "src/core/config/config-load.ts": 3064.338837,
+    "src/core/config/config-load.ts": 3067.923252,
     "src/core/config/config-readers.test.ts": 0,
     "src/core/config/config-readers.ts": 0,
     "src/core/config/config-schema-board.test.ts": 0,
     "src/core/config/config-schema.test.ts": 0,
-    "src/core/config/config-schema.ts": 52765.093968,
+    "src/core/config/config-schema.ts": 52769.47407,
     "src/core/config/config-sections.test.ts": 0,
-    "src/core/config/config-sections.ts": 6286.441881,
+    "src/core/config/config-sections.ts": 6366.115084,
     "src/core/config/config.test.ts": 0,
-    "src/core/config/config.ts": 1279.049762,
+    "src/core/config/config.ts": 1283.429863,
     "src/core/config/index.test.ts": 0,
-    "src/core/config/index.ts": 56984.962174,
+    "src/core/config/index.ts": 56998.102479,
     "src/core/config/load.test.ts": 0,
-    "src/core/config/load.ts": 4453.338837,
+    "src/core/config/load.ts": 4456.923252,
     "src/core/config/sections.test.ts": 0,
-    "src/core/config/sections.ts": 7477.981521,
+    "src/core/config/sections.ts": 7529.524339,
     "src/core/git/commit.test.ts": 0,
     "src/core/git/commit.ts": 0,
     "src/core/git/git.test.ts": 0,
@@ -856,23 +856,23 @@
     "src/core/git/index.test.ts": 0,
     "src/core/git/index.ts": 3546.080825,
     "src/core/loop/claude.test.ts": 0,
-    "src/core/loop/claude.ts": 6630.749473,
+    "src/core/loop/claude.ts": 6631.639856,
     "src/core/loop/index.test.ts": 0,
-    "src/core/loop/index.ts": 20421.642515,
+    "src/core/loop/index.ts": 20423.423281,
     "src/core/loop/readings.test.ts": 0,
-    "src/core/loop/readings.ts": 1161.939881,
-    "src/core/loop/session-readings.ts": 1083.939881,
+    "src/core/loop/readings.ts": 1164.830264,
+    "src/core/loop/session-readings.ts": 1086.830264,
     "src/core/loop/sessions-decisions.test.ts": 0,
     "src/core/loop/sessions-hop.test.ts": 0,
     "src/core/loop/sessions-phase.test.ts": 0,
     "src/core/loop/sessions-steps.test.ts": 0,
     "src/core/loop/sessions-worktree.test.ts": 0,
     "src/core/loop/sessions.test.ts": 0,
-    "src/core/loop/sessions.ts": 12478.086534,
+    "src/core/loop/sessions.ts": 12478.976917,
     "src/core/output/active.test.ts": 0,
-    "src/core/output/active.ts": 5727.654059,
+    "src/core/output/active.ts": 5729.905141,
     "src/core/output/index.test.ts": 0,
-    "src/core/output/index.ts": 3168.399131,
+    "src/core/output/index.ts": 3170.650213,
     "src/core/plan/block-reader.test.ts": 0,
     "src/core/plan/block-reader.ts": 1216.391595,
     "src/core/plan/blocks.test.ts": 0,
@@ -910,15 +910,15 @@
     "src/effort/collect-skills.test.ts": 0,
     "src/effort/collect-skills.ts": 1010.183333,
     "src/effort/collect.test.ts": 0,
-    "src/effort/collect.ts": 6032.603933,
+    "src/effort/collect.ts": 6035.001594,
     "src/effort/commits.test.ts": 0,
     "src/effort/commits.ts": 31.02619,
     "src/effort/dashboard-format.test.ts": 0,
-    "src/effort/dashboard-format.ts": 147.130149,
+    "src/effort/dashboard-format.ts": 145.571325,
     "src/effort/dashboard-status.test.ts": 0,
-    "src/effort/dashboard-status.ts": 88.135134,
+    "src/effort/dashboard-status.ts": 89.658944,
     "src/effort/dashboard.test.ts": 0,
-    "src/effort/dashboard.ts": 367.686423,
+    "src/effort/dashboard.ts": 365.794267,
     "src/effort/epic-cost.test.ts": 0,
     "src/effort/epic-cost.ts": 684.995238,
     "src/effort/file-stamp.test.ts": 0,
@@ -928,32 +928,32 @@
     "src/effort/report-args.test.ts": 0,
     "src/effort/report-args.ts": 306.487335,
     "src/effort/report-budgets.test.ts": 0,
-    "src/effort/report-budgets.ts": 6.30396,
+    "src/effort/report-budgets.ts": 6.650627,
     "src/effort/report-doc-bugs.test.ts": 0,
     "src/effort/report-doc-bugs.ts": 63.688111,
     "src/effort/report-format.test.ts": 0,
-    "src/effort/report-format.ts": 1117.558406,
+    "src/effort/report-format.ts": 1117.091739,
     "src/effort/report-kinds.test.ts": 0,
     "src/effort/report-kinds.ts": 90.764301,
     "src/effort/report-skills-format.test.ts": 0,
-    "src/effort/report-skills-format.ts": 208.061111,
+    "src/effort/report-skills-format.ts": 189.45,
     "src/effort/report-skills-read.ts": 271.680153,
     "src/effort/report-skills.test.ts": 0,
-    "src/effort/report-skills.ts": 816.092764,
+    "src/effort/report-skills.ts": 800.623714,
     "src/effort/report-trend-format.test.ts": 0,
     "src/effort/report-trend-format.ts": 99.417649,
     "src/effort/report-trend-read.test.ts": 0,
     "src/effort/report-trend-read.ts": 292.344718,
     "src/effort/report-trend.test.ts": 0,
-    "src/effort/report-trend.ts": 878.005721,
+    "src/effort/report-trend.ts": 875.650165,
     "src/effort/report.test.ts": 0,
-    "src/effort/report.ts": 4007.30498,
+    "src/effort/report.ts": 3993.3465,
     "src/effort/session-log-dirs.test.ts": 0,
     "src/effort/session-log-dirs.ts": 3.833333,
     "src/effort/session-log.test.ts": 0,
     "src/effort/session-log.ts": 65.853571,
     "src/effort/skill-facts.test.ts": 0,
-    "src/effort/skill-facts.ts": 491.733597,
+    "src/effort/skill-facts.ts": 501.06693,
     "src/effort/skill-signals.test.ts": 0,
     "src/effort/skill-signals.ts": 10.566667,
     "src/effort/skill-use.test.ts": 0,
@@ -972,11 +972,11 @@
     "src/effort/store/contract.test.ts": 0,
     "src/effort/store/copy-origins.test.ts": 0,
     "src/effort/store/copy.test.ts": 0,
-    "src/effort/store/copy.ts": 3846.120463,
+    "src/effort/store/copy.ts": 3847.120463,
     "src/effort/store/development-build.test.ts": 0,
     "src/effort/store/development-build.ts": 15700.55275,
     "src/effort/store/dispatches.test.ts": 0,
-    "src/effort/store/dispatches.ts": 190.944926,
+    "src/effort/store/dispatches.ts": 199.3263,
     "src/effort/store/findings.test.ts": 0,
     "src/effort/store/findings.ts": 869.233784,
     "src/effort/store/fix-schema.test.ts": 0,
@@ -985,7 +985,7 @@
     "src/effort/store/fixture-extract.ts": 103.683333,
     "src/effort/store/forward-compat.test.ts": 0,
     "src/effort/store/index.test.ts": 0,
-    "src/effort/store/index.ts": 7497.897588,
+    "src/effort/store/index.ts": 7500.482004,
     "src/effort/store/legacy.test.ts": 0,
     "src/effort/store/legacy.ts": 94.714624,
     "src/effort/store/location.test.ts": 0,
@@ -1016,10 +1016,10 @@
     "src/effort/store/origins.test.ts": 0,
     "src/effort/store/origins.ts": 0,
     "src/effort/store/plan-ci.test.ts": 0,
-    "src/effort/store/plan-ci.ts": 558.633795,
+    "src/effort/store/plan-ci.ts": 477.24306,
     "src/effort/store/plan-stubs.ts": 0,
     "src/effort/store/preflight.test.ts": 0,
-    "src/effort/store/preflight.ts": 235.772363,
+    "src/effort/store/preflight.ts": 237.15903,
     "src/effort/store/rebuild-aside.test.ts": 0,
     "src/effort/store/rebuild-aside.ts": 1044.535997,
     "src/effort/store/rebuild-identity.test.ts": 0,
@@ -1034,11 +1034,11 @@
     "src/effort/store/session-row-types.ts": 0,
     "src/effort/store/session-worktree.test.ts": 0,
     "src/effort/store/settings.test.ts": 0,
-    "src/effort/store/settings.ts": 3795.827157,
+    "src/effort/store/settings.ts": 3802.00693,
     "src/effort/store/skill-invocations.test.ts": 0,
     "src/effort/store/skill-invocations.ts": 399.278474,
     "src/effort/store/sqlite.test.ts": 0,
-    "src/effort/store/sqlite.ts": 10458.598657,
+    "src/effort/store/sqlite.ts": 10463.77843,
     "src/effort/store/stale-docs-migration.test.ts": 0,
     "src/effort/store/stale-docs.test.ts": 0,
     "src/effort/store/stale-docs.ts": 431.133824,
@@ -1067,7 +1067,7 @@
     "src/effort/store/wire.test.ts": 0,
     "src/effort/store/wire.ts": 527.234174,
     "src/effort/sync/contact.test.ts": 0,
-    "src/effort/sync/contact.ts": 1959.582447,
+    "src/effort/sync/contact.ts": 1961.808529,
     "src/effort/sync/doctor-reading.test.ts": 0,
     "src/effort/sync/doctor-reading.ts": 541.019781,
     "src/effort/sync/file-round-trip.test.ts": 0,
@@ -1157,7 +1157,7 @@
     "src/next/ending.test.ts": 0,
     "src/next/ending.ts": 2565.532049,
     "src/next/epic-end.test.ts": 0,
-    "src/next/epic-end.ts": 179.732973,
+    "src/next/epic-end.ts": 179.866306,
     "src/next/hint.test.ts": 0,
     "src/next/hint.ts": 3020.114025,
     "src/next/hop-action.test.ts": 0,
@@ -1179,7 +1179,7 @@
     "src/next/owner-gate.ts": 1034.195274,
     "src/next/preconditions.ts": 1.916667,
     "src/next/readings.test.ts": 0,
-    "src/next/readings.ts": 3220.269913,
+    "src/next/readings.ts": 3220.453246,
     "src/next/relation-readings-native.test.ts": 0,
     "src/next/relation-readings.test.ts": 0,
     "src/next/relation-readings.ts": 775.571244,
@@ -1248,7 +1248,7 @@
     "src/pr/gh.test.ts": 0,
     "src/pr/gh.ts": 4266.8975,
     "src/pr/index.test.ts": 0,
-    "src/pr/index.ts": 14096.183571,
+    "src/pr/index.ts": 14099.599968,
     "src/pr/merge-unchecked.test.ts": 0,
     "src/pr/merge.test.ts": 0,
     "src/pr/merge.ts": 311.637302,
@@ -1256,7 +1256,7 @@
     "src/pr/none.ts": 283.928197,
     "src/pr/owner-approval.integration.test.ts": 0,
     "src/pr/owner-approval.test.ts": 0,
-    "src/pr/owner-approval.ts": 588.507151,
+    "src/pr/owner-approval.ts": 588.557151,
     "src/pr/plans/budget.test.ts": 0,
     "src/pr/plans/budget.ts": 4.7,
     "src/pr/plans/load.test.ts": 0,
@@ -1275,23 +1275,23 @@
     "src/pr/triage/classes.test.ts": 0,
     "src/pr/triage/classes.ts": 10.725,
     "src/pr/triage/classify.test.ts": 0,
-    "src/pr/triage/classify.ts": 2110.796195,
+    "src/pr/triage/classify.ts": 2111.149042,
     "src/pr/triage/comment.test.ts": 0,
-    "src/pr/triage/comment.ts": 885.949762,
+    "src/pr/triage/comment.ts": 886.010441,
     "src/pr/triage/conflict.test.ts": 0,
     "src/pr/triage/conflict.ts": 2.5,
     "src/pr/triage/evidence.test.ts": 0,
     "src/pr/triage/evidence.ts": 59.5,
     "src/pr/triage/follow-up.test.ts": 0,
-    "src/pr/triage/follow-up.ts": 293.857576,
+    "src/pr/triage/follow-up.ts": 293.918254,
     "src/pr/triage/rerun.test.ts": 0,
-    "src/pr/triage/rerun.ts": 72.763528,
+    "src/pr/triage/rerun.ts": 73.116374,
     "src/pr/triage/select.test.ts": 0,
-    "src/pr/triage/select.ts": 0.3171,
+    "src/pr/triage/select.ts": 0.377778,
     "src/pr/triage/version-convert.test.ts": 0,
     "src/pr/triage/version-convert.ts": 39.314277,
     "src/pr/types.test.ts": 0,
-    "src/pr/types.ts": 1174.317463,
+    "src/pr/types.ts": 1217.137513,
     "src/pr/unchecked.test.ts": 0,
     "src/pr/unchecked.ts": 0,
     "src/pr/workflow-triggers.test.ts": 0,
@@ -1305,7 +1305,7 @@
     "src/preflight/prerequisites-md.test.ts": 0,
     "src/preflight/prerequisites-md.ts": 447.227778,
     "src/preflight/run.test.ts": 0,
-    "src/preflight/run.ts": 940.876986,
+    "src/preflight/run.ts": 941.556986,
     "src/project/bin-path.test.ts": 0,
     "src/project/bin-path.ts": 155.15,
     "src/project/gitignore.test.ts": 0,
@@ -1324,7 +1324,7 @@
     "src/project/roots.test.ts": 0,
     "src/project/roots.ts": 411.882814,
     "src/project/scaffold.test.ts": 0,
-    "src/project/scaffold.ts": 4570.326395,
+    "src/project/scaffold.ts": 4570.484239,
     "src/project/scope-fallback.test.ts": 0,
     "src/project/scope.test.ts": 0,
     "src/project/scope.ts": 13346.096633,
@@ -1439,7 +1439,7 @@
     "src/start/background-wait.ts": 3.5,
     "src/start/base-prompts.sweep.test.ts": 0,
     "src/start/branch-decision.test.ts": 0,
-    "src/start/branch-decision.ts": 1204.30419,
+    "src/start/branch-decision.ts": 1204.309203,
     "src/start/branch.test.ts": 0,
     "src/start/branch.ts": 16.166667,
     "src/start/budget.test.ts": 0,
@@ -1620,7 +1620,7 @@
     "src/status/place-line.test.ts": 0,
     "src/status/place-line.ts": 139.333333,
     "src/status/render.test.ts": 0,
-    "src/status/render.ts": 165.289253,
+    "src/status/render.ts": 165.399278,
     "src/status/sections-waiting.test.ts": 0,
     "src/status/sections.test.ts": 0,
     "src/status/sections.ts": 2583.310652,
@@ -1680,7 +1680,7 @@
     "src/tests/cleanup-past-head-integration.test.ts": 0,
     "src/tests/cleanup-runs-integration.test.ts": 0,
     "src/tests/cli-capture.test.ts": 0,
-    "src/tests/cli-capture.ts": 26527.913095,
+    "src/tests/cli-capture.ts": 26528.860154,
     "src/tests/cli-surface.test.ts": 0,
     "src/tests/command-output.test.ts": 0,
     "src/tests/commands-direction.sweep.test.ts": 0,
@@ -1748,7 +1748,7 @@
     "src/tests/loop-events-output.test.ts": 0,
     "src/tests/loop-output.test.ts": 0,
     "src/tests/loop-scratch.ts": 49.735714,
-    "src/tests/loop-session-fixtures.ts": 369.250954,
+    "src/tests/loop-session-fixtures.ts": 370.247406,
     "src/tests/loop-sessions.test.ts": 0,
     "src/tests/loop-start-claim-spawned.test.ts": 0,
     "src/tests/loop-start-effort-store.test.ts": 0,
@@ -2627,225 +2627,106 @@
     },
     {
       "folders": {
-        "src/board": 1,
-        "src/cleanup": 20,
-        "src/cli/prompt": 10,
-        "src/commands": 12,
-        "src/commands/pr": 59,
-        "src/commands/release": 10,
-        "src/inventory": 2,
-        "src/next": 23,
-        "src/pr": 30,
-        "src/pr/plans": 5,
-        "src/pr/triage": 20,
-        "src/release": 32,
+        "src": 3,
+        "src/cleanup": 1,
+        "src/commands": 5,
+        "src/commands/bug": 1,
+        "src/commands/config": 1,
+        "src/commands/effort": 1,
+        "src/commands/loop": 7,
+        "src/commands/pr": 9,
+        "src/commands/release": 13,
+        "src/commands/skill": 1,
+        "src/commands/stretch": 1,
+        "src/core/loop": 1,
+        "src/loop": 6,
+        "src/next": 2,
+        "src/notices": 1,
+        "src/pr": 2,
+        "src/pr/triage": 2,
+        "src/project": 3,
+        "src/release": 38,
         "src/release/strategies": 2,
-        "src/start": 8,
-        "src/status": 2,
-        "src/tests": 9
+        "src/runtime": 4,
+        "src/start": 17,
+        "src/tests": 89,
+        "src/utils": 3
       },
-      "hub": "src/pr/index.ts",
+      "hub": "src/tests/cli-capture.ts",
       "members": [
-        "src/board/owner-resolve.test.ts",
-        "src/cleanup/branches.ts",
-        "src/cleanup/groups.test.ts",
-        "src/cleanup/groups.ts",
-        "src/cleanup/held-stale-branch.test.ts",
-        "src/cleanup/index.test.ts",
-        "src/cleanup/index.ts",
-        "src/cleanup/past-head.test.ts",
-        "src/cleanup/past-head.ts",
-        "src/cleanup/remote-only-integration.test.ts",
-        "src/cleanup/remote-only.test.ts",
-        "src/cleanup/remote-only.ts",
-        "src/cleanup/runs.test.ts",
-        "src/cleanup/runs.ts",
-        "src/cleanup/scratch-repository.test.ts",
-        "src/cleanup/scratch-repository.ts",
-        "src/cleanup/settings.test.ts",
-        "src/cleanup/settings.ts",
-        "src/cleanup/steps.test.ts",
-        "src/cleanup/steps.ts",
-        "src/cleanup/worktrees.ts",
-        "src/cli/prompt/multi-select.test.ts",
-        "src/cli/prompt/multi-select.ts",
-        "src/cli/prompt/page.test.ts",
-        "src/cli/prompt/page.ts",
-        "src/cli/prompt/select.test.ts",
-        "src/cli/prompt/select.ts",
-        "src/cli/prompt/terminal.test.ts",
-        "src/cli/prompt/terminal.ts",
-        "src/cli/prompt/text.test.ts",
-        "src/cli/prompt/text.ts",
-        "src/commands/cleanup-render.test.ts",
-        "src/commands/cleanup-render.ts",
-        "src/commands/cleanup.test.ts",
-        "src/commands/cleanup.ts",
-        "src/commands/doctor-cleanup.test.ts",
-        "src/commands/doctor-cleanup.ts",
+        "src/cleanup/worktrees.test.ts",
+        "src/commands/bug/codes.test.ts",
+        "src/commands/config/set.test.ts",
+        "src/commands/doctor-cleanup-row.test.ts",
+        "src/commands/doctor-release.test.ts",
         "src/commands/doctor-release.ts",
-        "src/commands/next-handed-over.test.ts",
-        "src/commands/next-roadmap.test.ts",
-        "src/commands/next-settle.test.ts",
-        "src/commands/next.test.ts",
-        "src/commands/next.ts",
-        "src/commands/pr/close.test.ts",
-        "src/commands/pr/close.ts",
-        "src/commands/pr/current.test.ts",
-        "src/commands/pr/current.ts",
-        "src/commands/pr/last-triage.test.ts",
-        "src/commands/pr/last-triage.ts",
-        "src/commands/pr/list-forecast.test.ts",
-        "src/commands/pr/list-forecast.ts",
-        "src/commands/pr/list.test.ts",
-        "src/commands/pr/list.ts",
+        "src/commands/effort/dashboard.test.ts",
+        "src/commands/init-scratch.test.ts",
+        "src/commands/loop/list.test.ts",
+        "src/commands/loop/loop-sessions.test.ts",
+        "src/commands/loop/pause.test.ts",
+        "src/commands/loop/resume.test.ts",
+        "src/commands/loop/status.test.ts",
+        "src/commands/loop/stop.test.ts",
+        "src/commands/loop/wait.test.ts",
         "src/commands/pr/merge-cleanup.test.ts",
         "src/commands/pr/merge-cleanup.ts",
-        "src/commands/pr/merge-driven.test.ts",
         "src/commands/pr/merge-followups.test.ts",
         "src/commands/pr/merge-followups.ts",
-        "src/commands/pr/merge-guard.test.ts",
         "src/commands/pr/merge-guard.ts",
-        "src/commands/pr/merge-loop-holder.test.ts",
-        "src/commands/pr/merge-loop-worktree.test.ts",
-        "src/commands/pr/merge-loop-worktree.ts",
-        "src/commands/pr/merge-plan-ci.test.ts",
-        "src/commands/pr/merge-refuse.ts",
-        "src/commands/pr/merge-settle.test.ts",
-        "src/commands/pr/merge-skip-checks-driven.test.ts",
-        "src/commands/pr/merge-skip-checks.test.ts",
-        "src/commands/pr/merge-unchecked.test.ts",
-        "src/commands/pr/merge-unchecked.ts",
-        "src/commands/pr/merge-untracked.test.ts",
-        "src/commands/pr/merge.ts",
-        "src/commands/pr/open.test.ts",
-        "src/commands/pr/open.ts",
-        "src/commands/pr/pr-context.test.ts",
-        "src/commands/pr/pr-context.ts",
-        "src/commands/pr/resolve-loop.test.ts",
-        "src/commands/pr/resolve-loop.ts",
-        "src/commands/pr/retarget.test.ts",
-        "src/commands/pr/retarget.ts",
-        "src/commands/pr/show.test.ts",
-        "src/commands/pr/show.ts",
-        "src/commands/pr/triage-convert.test.ts",
-        "src/commands/pr/triage-convert.ts",
-        "src/commands/pr/triage-fixtures.test.ts",
+        "src/commands/pr/pr-spawn.test.ts",
         "src/commands/pr/triage-guard.test.ts",
         "src/commands/pr/triage-guard.ts",
-        "src/commands/pr/triage-plan-ci.test.ts",
-        "src/commands/pr/triage-read.test.ts",
-        "src/commands/pr/triage-read.ts",
-        "src/commands/pr/triage-report.test.ts",
-        "src/commands/pr/triage-report.ts",
-        "src/commands/pr/triage-resolve-driven.test.ts",
-        "src/commands/pr/triage-resolve.test.ts",
-        "src/commands/pr/triage-resolve.ts",
-        "src/commands/pr/triage-trust.test.ts",
-        "src/commands/pr/triage-trust.ts",
-        "src/commands/pr/triage.test.ts",
-        "src/commands/pr/triage.ts",
-        "src/commands/pr/view.test.ts",
-        "src/commands/pr/view.ts",
-        "src/commands/pr/wait-grace-driven.test.ts",
+        "src/commands/pr/version-collision-incident-spawn.test.ts",
         "src/commands/release/release-commit.test.ts",
         "src/commands/release/release-commit.ts",
+        "src/commands/release/settle.test.ts",
         "src/commands/release/settle.ts",
         "src/commands/release/status-audit.test.ts",
+        "src/commands/release/status-fragments.test.ts",
         "src/commands/release/status-fragments.ts",
+        "src/commands/release/status-worktree-spawned.test.ts",
         "src/commands/release/status.test.ts",
         "src/commands/release/status.ts",
         "src/commands/release/tag-receipt.test.ts",
         "src/commands/release/tag.test.ts",
         "src/commands/release/tag.ts",
-        "src/inventory/browse.test.ts",
-        "src/inventory/browse.ts",
-        "src/next/actions.ts",
-        "src/next/ceiling.test.ts",
-        "src/next/ceiling.ts",
-        "src/next/epic-end.test.ts",
-        "src/next/epic-end.ts",
-        "src/next/hint.test.ts",
-        "src/next/hint.ts",
-        "src/next/lines.test.ts",
-        "src/next/lines.ts",
-        "src/next/preconditions.ts",
-        "src/next/readings.test.ts",
-        "src/next/relations-mode.test.ts",
-        "src/next/settle-step.test.ts",
-        "src/next/settle-step.ts",
-        "src/next/sources-cancelled.test.ts",
-        "src/next/sources-roadmap-open.test.ts",
-        "src/next/state-live-run.test.ts",
-        "src/next/state-native.test.ts",
-        "src/next/state-no-checks.test.ts",
-        "src/next/state.test.ts",
-        "src/next/state.ts",
-        "src/next/sync.test.ts",
-        "src/next/sync.ts",
-        "src/pr/checks.test.ts",
-        "src/pr/checks.ts",
-        "src/pr/gh-close.test.ts",
-        "src/pr/gh-close.ts",
-        "src/pr/gh-closing-issues.test.ts",
-        "src/pr/gh-closing-issues.ts",
-        "src/pr/gh-create.test.ts",
-        "src/pr/gh-fake-shapes.test.ts",
-        "src/pr/gh-fake-shapes.ts",
-        "src/pr/gh-fake.test.ts",
-        "src/pr/gh-fake.ts",
-        "src/pr/gh-files-reviews.test.ts",
-        "src/pr/gh.test.ts",
-        "src/pr/gh.ts",
-        "src/pr/index.ts",
-        "src/pr/merge-unchecked.test.ts",
-        "src/pr/merge.test.ts",
-        "src/pr/merge.ts",
-        "src/pr/plans/budget.test.ts",
-        "src/pr/plans/budget.ts",
-        "src/pr/plans/load.test.ts",
-        "src/pr/plans/load.ts",
-        "src/pr/plans/validate.test.ts",
-        "src/pr/pull-requests-double.test.ts",
-        "src/pr/pull-requests-double.ts",
+        "src/commands/self-update.test.ts",
+        "src/commands/skill/search.test.ts",
+        "src/commands/stretch/item.test.ts",
+        "src/config-schema-logger.test.ts",
+        "src/core/loop/index.ts",
+        "src/loop/awake-clock.test.ts",
+        "src/loop/awake-clock.ts",
+        "src/loop/events-file.test.ts",
+        "src/loop/events-file.ts",
+        "src/loop/wait-reasons.test.ts",
+        "src/loop/wait-reasons.ts",
+        "src/next/hop-record.integration.test.ts",
+        "src/next/loop-worktree-tree-driven.test.ts",
+        "src/notices/notices.ts",
+        "src/plan.test.ts",
         "src/pr/settle-waiting.test.ts",
         "src/pr/settle-waiting.ts",
-        "src/pr/triage/attempts.test.ts",
-        "src/pr/triage/attempts.ts",
-        "src/pr/triage/classes.test.ts",
-        "src/pr/triage/classes.ts",
-        "src/pr/triage/classify.test.ts",
-        "src/pr/triage/classify.ts",
-        "src/pr/triage/comment.test.ts",
-        "src/pr/triage/comment.ts",
-        "src/pr/triage/conflict.test.ts",
-        "src/pr/triage/conflict.ts",
-        "src/pr/triage/evidence.test.ts",
-        "src/pr/triage/evidence.ts",
-        "src/pr/triage/follow-up.test.ts",
-        "src/pr/triage/follow-up.ts",
-        "src/pr/triage/rerun.test.ts",
-        "src/pr/triage/rerun.ts",
-        "src/pr/triage/select.test.ts",
-        "src/pr/triage/select.ts",
         "src/pr/triage/version-convert.test.ts",
         "src/pr/triage/version-convert.ts",
-        "src/pr/types.test.ts",
-        "src/pr/types.ts",
-        "src/pr/unchecked.test.ts",
-        "src/pr/unchecked.ts",
-        "src/pr/workflow-triggers.test.ts",
-        "src/pr/workflow-triggers.ts",
-        "src/pr/worktree.test.ts",
-        "src/pr/worktree.ts",
+        "src/project/gitignore.ts",
+        "src/project/position.integration.test.ts",
+        "src/project/scaffold.ts",
         "src/release/audit.test.ts",
         "src/release/audit.ts",
         "src/release/body-forecast.test.ts",
         "src/release/body-forecast.ts",
+        "src/release/fold-spawned.test.ts",
         "src/release/forecast.test.ts",
         "src/release/forecast.ts",
+        "src/release/fragment-tree.test.ts",
+        "src/release/fragment-tree.ts",
+        "src/release/fragment.test.ts",
+        "src/release/fragment.ts",
         "src/release/guard-merge.test.ts",
         "src/release/guard-merge.ts",
+        "src/release/guard.test.ts",
         "src/release/guard.ts",
         "src/release/receipt.test.ts",
         "src/release/receipt.ts",
@@ -2872,28 +2753,123 @@
         "src/release/version-tag.ts",
         "src/release/version.test.ts",
         "src/release/version.ts",
-        "src/start/branch-decision.test.ts",
-        "src/start/claim-catch-up.test.ts",
-        "src/start/convention-body.test.ts",
-        "src/start/pr-retarget.test.ts",
-        "src/start/pr-retarget.ts",
-        "src/start/worktree-dir.test.ts",
-        "src/start/worktree-dir.ts",
-        "src/start/worktree-upstream.test.ts",
-        "src/status/sections.test.ts",
-        "src/status/seen.test.ts",
-        "src/tests/blocked-issues-integration.test.ts",
-        "src/tests/cleanup-held-not-pushed-integration.test.ts",
-        "src/tests/cleanup-integration.test.ts",
-        "src/tests/cleanup-past-head-integration.test.ts",
-        "src/tests/cleanup-runs-integration.test.ts",
-        "src/tests/hint-tool-names.test.ts",
-        "src/tests/inventory-browse.test.ts",
-        "src/tests/pr-show-closes-integration.test.ts",
-        "src/tests/prompt-restore.test.ts"
+        "src/runtime/install.test.ts",
+        "src/runtime/install.ts",
+        "src/runtime/live-loops.test.ts",
+        "src/runtime/live-loops.ts",
+        "src/start.test.ts",
+        "src/start/checkout-guard-before-spawn-integration.test.ts",
+        "src/start/checkout-guard-commits-integration.test.ts",
+        "src/start/checkout-guard-incident-integration.test.ts",
+        "src/start/checkout-guard-worktree-branch-switch-integration.test.ts",
+        "src/start/checkout-guard-worktree-integration.test.ts",
+        "src/start/continue-exits.test.ts",
+        "src/start/detached-head-integration.test.ts",
+        "src/start/doc-task-integration.test.ts",
+        "src/start/inherited-red-integration.test.ts",
+        "src/start/suite-step-known-baseline-failure-integration.test.ts",
+        "src/start/suite-step-no-owns-full-suite-tally-integration.test.ts",
+        "src/start/suite-step-pre-wrap-up-repair-integration.test.ts",
+        "src/start/suite-step-stage-blocker-integration.test.ts",
+        "src/start/suite-step-stage-owns-folders-integration.test.ts",
+        "src/start/suite-step-task-scope-integration.test.ts",
+        "src/start/wrap-up-delivered-integration.test.ts",
+        "src/start/wrap-up-late-pr-integration.test.ts",
+        "src/tests/agent-roster-preflight.test.ts",
+        "src/tests/board-switch-status-cli.test.ts",
+        "src/tests/checker-fixtures.test.ts",
+        "src/tests/claim-commands-spawned.test.ts",
+        "src/tests/cleanup-base-worktree-spawned.test.ts",
+        "src/tests/cli-capture.test.ts",
+        "src/tests/cli-capture.ts",
+        "src/tests/command-output.test.ts",
+        "src/tests/core-barrel-load-spawned.test.ts",
+        "src/tests/detached-head-start-integration.test.ts",
+        "src/tests/doctor-deep-spawned.test.ts",
+        "src/tests/doctor-preflight-parity.test.ts",
+        "src/tests/effort-report-backends.test.ts",
+        "src/tests/effort-skills-collect-integration.test.ts",
+        "src/tests/epic-end-merge-tick-spawn.test.ts",
+        "src/tests/epic-lifecycle-spawn.test.ts",
+        "src/tests/epic-show-cli.test.ts",
+        "src/tests/git-identity-spawn.test.ts",
+        "src/tests/git-identity.test.ts",
+        "src/tests/git-identity.ts",
+        "src/tests/init-scope.test.ts",
+        "src/tests/inventory-cli.test.ts",
+        "src/tests/inventory-search.test.ts",
+        "src/tests/issue-edit-spawned.test.ts",
+        "src/tests/lesson-push-e2e.test.ts",
+        "src/tests/loop-continue-spawned.test.ts",
+        "src/tests/loop-events-file-integration.test.ts",
+        "src/tests/loop-events-output.test.ts",
+        "src/tests/loop-output.test.ts",
+        "src/tests/loop-scratch.ts",
+        "src/tests/loop-session-fixtures.ts",
+        "src/tests/loop-sessions.test.ts",
+        "src/tests/loop-start-claim-spawned.test.ts",
+        "src/tests/loop-start-effort-store.test.ts",
+        "src/tests/loop-suite-sigint-spawned.test.ts",
+        "src/tests/loop-sync-pull-spawned.test.ts",
+        "src/tests/loop-wait-spawned.test.ts",
+        "src/tests/loop-wrap-up-claim-lost-spawned.test.ts",
+        "src/tests/loop-wrap-up-phase.test.ts",
+        "src/tests/next-beside-loop-cli.test.ts",
+        "src/tests/next-chain-fixtures.ts",
+        "src/tests/next-chain-integration.test.ts",
+        "src/tests/next-chain-zero-checks-integration.test.ts",
+        "src/tests/next-merge-settle-spawned-cli.test.ts",
+        "src/tests/next-roadmap-continue-cli.test.ts",
+        "src/tests/next-roadmap-halt-cli.test.ts",
+        "src/tests/next-roadmap-hop-cli.test.ts",
+        "src/tests/next-roadmap-loop-cli.test.ts",
+        "src/tests/next-roadmap-owner-gate-cli.test.ts",
+        "src/tests/next-roadmap-status-waiting-cli.test.ts",
+        "src/tests/package-build.test.ts",
+        "src/tests/plan-create-store-rules-integration.test.ts",
+        "src/tests/plan-needs.test.ts",
+        "src/tests/plan-worktree-integration.test.ts",
+        "src/tests/pr-event-text-mode-integration.test.ts",
+        "src/tests/rafa-prompt-phase.test.ts",
+        "src/tests/refs-gate-integration.test.ts",
+        "src/tests/relations-labels-baseline.test.ts",
+        "src/tests/relations-native-cli.test.ts",
+        "src/tests/release-delivery-spawned-cli.test.ts",
+        "src/tests/release-mechanics.test.ts",
+        "src/tests/release-settle-doctor-button-merge-spawned-cli.test.ts",
+        "src/tests/release-settle-parallel-branches-spawned-cli.test.ts",
+        "src/tests/release-settle-race-spawned-cli.test.ts",
+        "src/tests/release-settle-spawned-cli.test.ts",
+        "src/tests/release-settle-squash-merge-spawned-cli.test.ts",
+        "src/tests/roadmap-cli.test.ts",
+        "src/tests/scratch-home-env.test.ts",
+        "src/tests/scratch-home-env.ts",
+        "src/tests/self-update-live-loop-integration.test.ts",
+        "src/tests/serve-spawned.test.ts",
+        "src/tests/skill-name-refusal.test.ts",
+        "src/tests/source-uses.ts",
+        "src/tests/stand-in-gh.ts",
+        "src/tests/status-notice-spawned.test.ts",
+        "src/tests/status-spawned.test.ts",
+        "src/tests/store-version-guard.test.ts",
+        "src/tests/stretch-dry-run-spawned.test.ts",
+        "src/tests/stretch-lines-spawned.test.ts",
+        "src/tests/switch-drift-spawned.test.ts",
+        "src/tests/sync-contact-spawned.test.ts",
+        "src/tests/sync-local-default-spawned.test.ts",
+        "src/tests/sync-module-missing-spawned.test.ts",
+        "src/tests/task-gate-spawned.test.ts",
+        "src/tests/task-report.test.ts",
+        "src/tests/worktree-restart-integration.test.ts",
+        "src/tests/worktree-shared-store-integration.test.ts",
+        "src/tests/worktree-start-integration.test.ts",
+        "src/tests/worktree-start-refusals-integration.test.ts",
+        "src/utils/agent-shell.test.ts",
+        "src/utils/agent-shell.ts",
+        "src/utils/git.test.ts"
       ],
-      "name": "c03-index",
-      "size": 245
+      "name": "c03-cli-capture",
+      "size": 213
     },
     {
       "folders": {
@@ -3361,6 +3337,217 @@
     },
     {
       "folders": {
+        "src/board": 1,
+        "src/cleanup": 20,
+        "src/cli/prompt": 10,
+        "src/commands": 11,
+        "src/commands/pr": 52,
+        "src/inventory": 2,
+        "src/next": 23,
+        "src/pr": 28,
+        "src/pr/plans": 5,
+        "src/pr/triage": 18,
+        "src/start": 8,
+        "src/status": 2,
+        "src/tests": 9
+      },
+      "hub": "src/pr/index.ts",
+      "members": [
+        "src/board/owner-resolve.test.ts",
+        "src/cleanup/branches.ts",
+        "src/cleanup/groups.test.ts",
+        "src/cleanup/groups.ts",
+        "src/cleanup/held-stale-branch.test.ts",
+        "src/cleanup/index.test.ts",
+        "src/cleanup/index.ts",
+        "src/cleanup/past-head.test.ts",
+        "src/cleanup/past-head.ts",
+        "src/cleanup/remote-only-integration.test.ts",
+        "src/cleanup/remote-only.test.ts",
+        "src/cleanup/remote-only.ts",
+        "src/cleanup/runs.test.ts",
+        "src/cleanup/runs.ts",
+        "src/cleanup/scratch-repository.test.ts",
+        "src/cleanup/scratch-repository.ts",
+        "src/cleanup/settings.test.ts",
+        "src/cleanup/settings.ts",
+        "src/cleanup/steps.test.ts",
+        "src/cleanup/steps.ts",
+        "src/cleanup/worktrees.ts",
+        "src/cli/prompt/multi-select.test.ts",
+        "src/cli/prompt/multi-select.ts",
+        "src/cli/prompt/page.test.ts",
+        "src/cli/prompt/page.ts",
+        "src/cli/prompt/select.test.ts",
+        "src/cli/prompt/select.ts",
+        "src/cli/prompt/terminal.test.ts",
+        "src/cli/prompt/terminal.ts",
+        "src/cli/prompt/text.test.ts",
+        "src/cli/prompt/text.ts",
+        "src/commands/cleanup-render.test.ts",
+        "src/commands/cleanup-render.ts",
+        "src/commands/cleanup.test.ts",
+        "src/commands/cleanup.ts",
+        "src/commands/doctor-cleanup.test.ts",
+        "src/commands/doctor-cleanup.ts",
+        "src/commands/next-handed-over.test.ts",
+        "src/commands/next-roadmap.test.ts",
+        "src/commands/next-settle.test.ts",
+        "src/commands/next.test.ts",
+        "src/commands/next.ts",
+        "src/commands/pr/close.test.ts",
+        "src/commands/pr/close.ts",
+        "src/commands/pr/current.test.ts",
+        "src/commands/pr/current.ts",
+        "src/commands/pr/last-triage.test.ts",
+        "src/commands/pr/last-triage.ts",
+        "src/commands/pr/list-forecast.test.ts",
+        "src/commands/pr/list-forecast.ts",
+        "src/commands/pr/list.test.ts",
+        "src/commands/pr/list.ts",
+        "src/commands/pr/merge-driven.test.ts",
+        "src/commands/pr/merge-guard.test.ts",
+        "src/commands/pr/merge-loop-holder.test.ts",
+        "src/commands/pr/merge-loop-worktree.test.ts",
+        "src/commands/pr/merge-loop-worktree.ts",
+        "src/commands/pr/merge-plan-ci.test.ts",
+        "src/commands/pr/merge-refuse.ts",
+        "src/commands/pr/merge-settle.test.ts",
+        "src/commands/pr/merge-skip-checks-driven.test.ts",
+        "src/commands/pr/merge-skip-checks.test.ts",
+        "src/commands/pr/merge-unchecked.test.ts",
+        "src/commands/pr/merge-unchecked.ts",
+        "src/commands/pr/merge-untracked.test.ts",
+        "src/commands/pr/merge.ts",
+        "src/commands/pr/open.test.ts",
+        "src/commands/pr/open.ts",
+        "src/commands/pr/pr-context.test.ts",
+        "src/commands/pr/pr-context.ts",
+        "src/commands/pr/resolve-loop.test.ts",
+        "src/commands/pr/resolve-loop.ts",
+        "src/commands/pr/retarget.test.ts",
+        "src/commands/pr/retarget.ts",
+        "src/commands/pr/show.test.ts",
+        "src/commands/pr/show.ts",
+        "src/commands/pr/triage-convert.test.ts",
+        "src/commands/pr/triage-convert.ts",
+        "src/commands/pr/triage-fixtures.test.ts",
+        "src/commands/pr/triage-plan-ci.test.ts",
+        "src/commands/pr/triage-read.test.ts",
+        "src/commands/pr/triage-read.ts",
+        "src/commands/pr/triage-report.test.ts",
+        "src/commands/pr/triage-report.ts",
+        "src/commands/pr/triage-resolve-driven.test.ts",
+        "src/commands/pr/triage-resolve.test.ts",
+        "src/commands/pr/triage-resolve.ts",
+        "src/commands/pr/triage-trust.test.ts",
+        "src/commands/pr/triage-trust.ts",
+        "src/commands/pr/triage.test.ts",
+        "src/commands/pr/triage.ts",
+        "src/commands/pr/view.test.ts",
+        "src/commands/pr/view.ts",
+        "src/commands/pr/wait-grace-driven.test.ts",
+        "src/inventory/browse.test.ts",
+        "src/inventory/browse.ts",
+        "src/next/actions.ts",
+        "src/next/ceiling.test.ts",
+        "src/next/ceiling.ts",
+        "src/next/epic-end.test.ts",
+        "src/next/epic-end.ts",
+        "src/next/hint.test.ts",
+        "src/next/hint.ts",
+        "src/next/lines.test.ts",
+        "src/next/lines.ts",
+        "src/next/preconditions.ts",
+        "src/next/readings.test.ts",
+        "src/next/relations-mode.test.ts",
+        "src/next/settle-step.test.ts",
+        "src/next/settle-step.ts",
+        "src/next/sources-cancelled.test.ts",
+        "src/next/sources-roadmap-open.test.ts",
+        "src/next/state-live-run.test.ts",
+        "src/next/state-native.test.ts",
+        "src/next/state-no-checks.test.ts",
+        "src/next/state.test.ts",
+        "src/next/state.ts",
+        "src/next/sync.test.ts",
+        "src/next/sync.ts",
+        "src/pr/checks.test.ts",
+        "src/pr/checks.ts",
+        "src/pr/gh-close.test.ts",
+        "src/pr/gh-close.ts",
+        "src/pr/gh-closing-issues.test.ts",
+        "src/pr/gh-closing-issues.ts",
+        "src/pr/gh-create.test.ts",
+        "src/pr/gh-fake-shapes.test.ts",
+        "src/pr/gh-fake-shapes.ts",
+        "src/pr/gh-fake.test.ts",
+        "src/pr/gh-fake.ts",
+        "src/pr/gh-files-reviews.test.ts",
+        "src/pr/gh.test.ts",
+        "src/pr/gh.ts",
+        "src/pr/index.ts",
+        "src/pr/merge-unchecked.test.ts",
+        "src/pr/merge.test.ts",
+        "src/pr/merge.ts",
+        "src/pr/plans/budget.test.ts",
+        "src/pr/plans/budget.ts",
+        "src/pr/plans/load.test.ts",
+        "src/pr/plans/load.ts",
+        "src/pr/plans/validate.test.ts",
+        "src/pr/pull-requests-double.test.ts",
+        "src/pr/pull-requests-double.ts",
+        "src/pr/triage/attempts.test.ts",
+        "src/pr/triage/attempts.ts",
+        "src/pr/triage/classes.test.ts",
+        "src/pr/triage/classes.ts",
+        "src/pr/triage/classify.test.ts",
+        "src/pr/triage/classify.ts",
+        "src/pr/triage/comment.test.ts",
+        "src/pr/triage/comment.ts",
+        "src/pr/triage/conflict.test.ts",
+        "src/pr/triage/conflict.ts",
+        "src/pr/triage/evidence.test.ts",
+        "src/pr/triage/evidence.ts",
+        "src/pr/triage/follow-up.test.ts",
+        "src/pr/triage/follow-up.ts",
+        "src/pr/triage/rerun.test.ts",
+        "src/pr/triage/rerun.ts",
+        "src/pr/triage/select.test.ts",
+        "src/pr/triage/select.ts",
+        "src/pr/types.test.ts",
+        "src/pr/types.ts",
+        "src/pr/unchecked.test.ts",
+        "src/pr/unchecked.ts",
+        "src/pr/workflow-triggers.test.ts",
+        "src/pr/workflow-triggers.ts",
+        "src/pr/worktree.test.ts",
+        "src/pr/worktree.ts",
+        "src/start/branch-decision.test.ts",
+        "src/start/claim-catch-up.test.ts",
+        "src/start/convention-body.test.ts",
+        "src/start/pr-retarget.test.ts",
+        "src/start/pr-retarget.ts",
+        "src/start/worktree-dir.test.ts",
+        "src/start/worktree-dir.ts",
+        "src/start/worktree-upstream.test.ts",
+        "src/status/sections.test.ts",
+        "src/status/seen.test.ts",
+        "src/tests/blocked-issues-integration.test.ts",
+        "src/tests/cleanup-held-not-pushed-integration.test.ts",
+        "src/tests/cleanup-integration.test.ts",
+        "src/tests/cleanup-past-head-integration.test.ts",
+        "src/tests/cleanup-runs-integration.test.ts",
+        "src/tests/hint-tool-names.test.ts",
+        "src/tests/inventory-browse.test.ts",
+        "src/tests/pr-show-closes-integration.test.ts",
+        "src/tests/prompt-restore.test.ts"
+      ],
+      "name": "c06-index",
+      "size": 189
+    },
+    {
+      "folders": {
         "src": 1,
         "src/adapters/output": 5,
         "src/board": 8,
@@ -3582,195 +3769,8 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/utils/git.ts"
       ],
-      "name": "c06-index",
+      "name": "c07-index",
       "size": 183
-    },
-    {
-      "folders": {
-        "src": 3,
-        "src/cleanup": 1,
-        "src/commands": 4,
-        "src/commands/bug": 1,
-        "src/commands/config": 1,
-        "src/commands/effort": 1,
-        "src/commands/loop": 7,
-        "src/commands/pr": 2,
-        "src/commands/release": 3,
-        "src/commands/skill": 1,
-        "src/commands/stretch": 1,
-        "src/core/loop": 1,
-        "src/loop": 6,
-        "src/next": 2,
-        "src/notices": 1,
-        "src/project": 3,
-        "src/release": 6,
-        "src/runtime": 4,
-        "src/start": 17,
-        "src/tests": 89,
-        "src/utils": 3
-      },
-      "hub": "src/tests/cli-capture.ts",
-      "members": [
-        "src/cleanup/worktrees.test.ts",
-        "src/commands/bug/codes.test.ts",
-        "src/commands/config/set.test.ts",
-        "src/commands/doctor-cleanup-row.test.ts",
-        "src/commands/doctor-release.test.ts",
-        "src/commands/effort/dashboard.test.ts",
-        "src/commands/init-scratch.test.ts",
-        "src/commands/loop/list.test.ts",
-        "src/commands/loop/loop-sessions.test.ts",
-        "src/commands/loop/pause.test.ts",
-        "src/commands/loop/resume.test.ts",
-        "src/commands/loop/status.test.ts",
-        "src/commands/loop/stop.test.ts",
-        "src/commands/loop/wait.test.ts",
-        "src/commands/pr/pr-spawn.test.ts",
-        "src/commands/pr/version-collision-incident-spawn.test.ts",
-        "src/commands/release/settle.test.ts",
-        "src/commands/release/status-fragments.test.ts",
-        "src/commands/release/status-worktree-spawned.test.ts",
-        "src/commands/self-update.test.ts",
-        "src/commands/skill/search.test.ts",
-        "src/commands/stretch/item.test.ts",
-        "src/config-schema-logger.test.ts",
-        "src/core/loop/index.ts",
-        "src/loop/awake-clock.test.ts",
-        "src/loop/awake-clock.ts",
-        "src/loop/events-file.test.ts",
-        "src/loop/events-file.ts",
-        "src/loop/wait-reasons.test.ts",
-        "src/loop/wait-reasons.ts",
-        "src/next/hop-record.integration.test.ts",
-        "src/next/loop-worktree-tree-driven.test.ts",
-        "src/notices/notices.ts",
-        "src/plan.test.ts",
-        "src/project/gitignore.ts",
-        "src/project/position.integration.test.ts",
-        "src/project/scaffold.ts",
-        "src/release/fold-spawned.test.ts",
-        "src/release/fragment-tree.test.ts",
-        "src/release/fragment-tree.ts",
-        "src/release/fragment.test.ts",
-        "src/release/fragment.ts",
-        "src/release/guard.test.ts",
-        "src/runtime/install.test.ts",
-        "src/runtime/install.ts",
-        "src/runtime/live-loops.test.ts",
-        "src/runtime/live-loops.ts",
-        "src/start.test.ts",
-        "src/start/checkout-guard-before-spawn-integration.test.ts",
-        "src/start/checkout-guard-commits-integration.test.ts",
-        "src/start/checkout-guard-incident-integration.test.ts",
-        "src/start/checkout-guard-worktree-branch-switch-integration.test.ts",
-        "src/start/checkout-guard-worktree-integration.test.ts",
-        "src/start/continue-exits.test.ts",
-        "src/start/detached-head-integration.test.ts",
-        "src/start/doc-task-integration.test.ts",
-        "src/start/inherited-red-integration.test.ts",
-        "src/start/suite-step-known-baseline-failure-integration.test.ts",
-        "src/start/suite-step-no-owns-full-suite-tally-integration.test.ts",
-        "src/start/suite-step-pre-wrap-up-repair-integration.test.ts",
-        "src/start/suite-step-stage-blocker-integration.test.ts",
-        "src/start/suite-step-stage-owns-folders-integration.test.ts",
-        "src/start/suite-step-task-scope-integration.test.ts",
-        "src/start/wrap-up-delivered-integration.test.ts",
-        "src/start/wrap-up-late-pr-integration.test.ts",
-        "src/tests/agent-roster-preflight.test.ts",
-        "src/tests/board-switch-status-cli.test.ts",
-        "src/tests/checker-fixtures.test.ts",
-        "src/tests/claim-commands-spawned.test.ts",
-        "src/tests/cleanup-base-worktree-spawned.test.ts",
-        "src/tests/cli-capture.test.ts",
-        "src/tests/cli-capture.ts",
-        "src/tests/command-output.test.ts",
-        "src/tests/core-barrel-load-spawned.test.ts",
-        "src/tests/detached-head-start-integration.test.ts",
-        "src/tests/doctor-deep-spawned.test.ts",
-        "src/tests/doctor-preflight-parity.test.ts",
-        "src/tests/effort-report-backends.test.ts",
-        "src/tests/effort-skills-collect-integration.test.ts",
-        "src/tests/epic-end-merge-tick-spawn.test.ts",
-        "src/tests/epic-lifecycle-spawn.test.ts",
-        "src/tests/epic-show-cli.test.ts",
-        "src/tests/git-identity-spawn.test.ts",
-        "src/tests/git-identity.test.ts",
-        "src/tests/git-identity.ts",
-        "src/tests/init-scope.test.ts",
-        "src/tests/inventory-cli.test.ts",
-        "src/tests/inventory-search.test.ts",
-        "src/tests/issue-edit-spawned.test.ts",
-        "src/tests/lesson-push-e2e.test.ts",
-        "src/tests/loop-continue-spawned.test.ts",
-        "src/tests/loop-events-file-integration.test.ts",
-        "src/tests/loop-events-output.test.ts",
-        "src/tests/loop-output.test.ts",
-        "src/tests/loop-scratch.ts",
-        "src/tests/loop-session-fixtures.ts",
-        "src/tests/loop-sessions.test.ts",
-        "src/tests/loop-start-claim-spawned.test.ts",
-        "src/tests/loop-start-effort-store.test.ts",
-        "src/tests/loop-suite-sigint-spawned.test.ts",
-        "src/tests/loop-sync-pull-spawned.test.ts",
-        "src/tests/loop-wait-spawned.test.ts",
-        "src/tests/loop-wrap-up-claim-lost-spawned.test.ts",
-        "src/tests/loop-wrap-up-phase.test.ts",
-        "src/tests/next-beside-loop-cli.test.ts",
-        "src/tests/next-chain-fixtures.ts",
-        "src/tests/next-chain-integration.test.ts",
-        "src/tests/next-chain-zero-checks-integration.test.ts",
-        "src/tests/next-merge-settle-spawned-cli.test.ts",
-        "src/tests/next-roadmap-continue-cli.test.ts",
-        "src/tests/next-roadmap-halt-cli.test.ts",
-        "src/tests/next-roadmap-hop-cli.test.ts",
-        "src/tests/next-roadmap-loop-cli.test.ts",
-        "src/tests/next-roadmap-owner-gate-cli.test.ts",
-        "src/tests/next-roadmap-status-waiting-cli.test.ts",
-        "src/tests/package-build.test.ts",
-        "src/tests/plan-create-store-rules-integration.test.ts",
-        "src/tests/plan-needs.test.ts",
-        "src/tests/plan-worktree-integration.test.ts",
-        "src/tests/pr-event-text-mode-integration.test.ts",
-        "src/tests/rafa-prompt-phase.test.ts",
-        "src/tests/refs-gate-integration.test.ts",
-        "src/tests/relations-labels-baseline.test.ts",
-        "src/tests/relations-native-cli.test.ts",
-        "src/tests/release-delivery-spawned-cli.test.ts",
-        "src/tests/release-mechanics.test.ts",
-        "src/tests/release-settle-doctor-button-merge-spawned-cli.test.ts",
-        "src/tests/release-settle-parallel-branches-spawned-cli.test.ts",
-        "src/tests/release-settle-race-spawned-cli.test.ts",
-        "src/tests/release-settle-spawned-cli.test.ts",
-        "src/tests/release-settle-squash-merge-spawned-cli.test.ts",
-        "src/tests/roadmap-cli.test.ts",
-        "src/tests/scratch-home-env.test.ts",
-        "src/tests/scratch-home-env.ts",
-        "src/tests/self-update-live-loop-integration.test.ts",
-        "src/tests/serve-spawned.test.ts",
-        "src/tests/skill-name-refusal.test.ts",
-        "src/tests/source-uses.ts",
-        "src/tests/stand-in-gh.ts",
-        "src/tests/status-notice-spawned.test.ts",
-        "src/tests/status-spawned.test.ts",
-        "src/tests/store-version-guard.test.ts",
-        "src/tests/stretch-dry-run-spawned.test.ts",
-        "src/tests/stretch-lines-spawned.test.ts",
-        "src/tests/switch-drift-spawned.test.ts",
-        "src/tests/sync-contact-spawned.test.ts",
-        "src/tests/sync-local-default-spawned.test.ts",
-        "src/tests/sync-module-missing-spawned.test.ts",
-        "src/tests/task-gate-spawned.test.ts",
-        "src/tests/task-report.test.ts",
-        "src/tests/worktree-restart-integration.test.ts",
-        "src/tests/worktree-shared-store-integration.test.ts",
-        "src/tests/worktree-start-integration.test.ts",
-        "src/tests/worktree-start-refusals-integration.test.ts",
-        "src/utils/agent-shell.test.ts",
-        "src/utils/agent-shell.ts",
-        "src/utils/git.test.ts"
-      ],
-      "name": "c07-cli-capture",
-      "size": 157
     },
     {
       "folders": {
@@ -32382,11 +32382,6 @@
       "to": "src/effort/store/sqlite.ts"
     },
     {
-      "from": "src/effort/store/plan-ci.test.ts",
-      "kind": "type",
-      "to": "src/pr/checks.ts"
-    },
-    {
       "from": "src/effort/store/plan-ci.ts",
       "kind": "value",
       "to": "src/effort/store/findings.ts"
@@ -32405,16 +32400,6 @@
       "from": "src/effort/store/plan-ci.ts",
       "kind": "value",
       "to": "src/effort/store/sqlite.ts"
-    },
-    {
-      "from": "src/effort/store/plan-ci.ts",
-      "kind": "value",
-      "to": "src/pr/checks.ts"
-    },
-    {
-      "from": "src/effort/store/plan-ci.ts",
-      "kind": "type",
-      "to": "src/pr/types.ts"
     },
     {
       "from": "src/effort/store/preflight.test.ts",
@@ -54349,27 +54334,27 @@
       "path": "src/adapters/logger/settings.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/adapters/output/events.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/adapters/output/events.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/adapters/output/json.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/adapters/output/json.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/adapters/output/stream.ts"
     },
@@ -54864,12 +54849,12 @@
       "path": "src/board/gate.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/issue-board.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/board/issue-board.ts"
     },
@@ -54919,7 +54904,7 @@
       "path": "src/board/issue.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/leak.test.ts"
     },
@@ -54954,7 +54939,7 @@
       "path": "src/board/now-epic.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/board/owner-resolve.test.ts"
     },
@@ -55219,7 +55204,7 @@
       "path": "src/board/project/writes.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/readiness.test.ts"
     },
@@ -55379,17 +55364,17 @@
       "path": "src/board/roadmap-board.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/roadmap-claims-remote.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/roadmap-claims.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/board/roadmap-claims.ts"
     },
@@ -55434,7 +55419,7 @@
       "path": "src/board/roadmap-tick.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/board/roadmap.test.ts"
     },
@@ -55689,7 +55674,7 @@
       "path": "src/claims/device.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/device.ts"
     },
@@ -55704,62 +55689,62 @@
       "path": "src/claims/drift.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/git.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/git.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/labels.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/labels.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/lost.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/lost.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/plan-claim.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/plan-claim.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/record.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/record.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/claims/stale.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/claims/stale.ts"
     },
@@ -55769,127 +55754,127 @@
       "path": "src/cleanup/branches.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/branches.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/groups.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/groups.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/held-stale-branch.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/index.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/index.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/past-head.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/past-head.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/remote-only-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/remote-only.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/remote-only.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/runs.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/runs.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/scratch-repository.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/scratch-repository.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/settings.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/settings.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cleanup/steps.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/steps.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/cleanup/worktrees.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cleanup/worktrees.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/core/assembleContext.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/core/assembleContext.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/core/parseArgs.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/core/parseArgs.ts"
     },
@@ -55899,12 +55884,12 @@
       "path": "src/cli/core/types.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/core/types.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/describe.test.ts"
     },
@@ -55914,7 +55899,7 @@
       "path": "src/cli/describe.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/dispatch-hook.test.ts"
     },
@@ -55924,137 +55909,137 @@
       "path": "src/cli/dispatch-logger-scope.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/dispatch-logger.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/dispatch-scope.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/dispatch.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/dispatch.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/help.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/help.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/modules.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/modules.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cli/prompt/multi-select.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/prompt/multi-select.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cli/prompt/page.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/prompt/page.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cli/prompt/select.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/prompt/select.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cli/prompt/terminal.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/prompt/terminal.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/cli/prompt/text.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/prompt/text.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/registry.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/registry.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/route.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/route.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/running.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/running.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/spends-roster.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/cli/spends.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/cli/spends.ts"
     },
@@ -56064,22 +56049,22 @@
       "path": "src/commands/agent/list.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/agent/list.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/agent/search.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/agent/show.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/agent/show.ts"
     },
@@ -56114,7 +56099,7 @@
       "path": "src/commands/board/sync.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/bug/codes.test.ts"
     },
@@ -56144,22 +56129,22 @@
       "path": "src/commands/ci/status.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/claim/accept.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/claim/accept.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/claim/hand.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/claim/hand.ts"
     },
@@ -56169,42 +56154,42 @@
       "path": "src/commands/claim/release-after-merge.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/claim/release.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/claim/release.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/claim/take.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/claim/take.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/cleanup-render.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/cleanup-render.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/cleanup.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/cleanup.ts"
     },
@@ -56214,22 +56199,22 @@
       "path": "src/commands/config/set-agent-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/config/set.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/config/set.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/describe.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/describe.ts"
     },
@@ -56279,17 +56264,17 @@
       "path": "src/commands/doctor-boards.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/doctor-cleanup-row.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/doctor-cleanup.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/doctor-cleanup.ts"
     },
@@ -56399,7 +56384,7 @@
       "path": "src/commands/doctor-install.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/doctor-install.ts"
     },
@@ -56459,12 +56444,12 @@
       "path": "src/commands/doctor-relations.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/doctor-release.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/doctor-release.ts"
     },
@@ -56509,7 +56494,7 @@
       "path": "src/commands/doctor.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/effort/collect.ts"
     },
@@ -56524,12 +56509,12 @@
       "path": "src/commands/effort/copy.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/effort/dashboard.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/effort/dashboard.ts"
     },
@@ -56589,7 +56574,7 @@
       "path": "src/commands/effort/move.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/effort/report.ts"
     },
@@ -56654,12 +56639,12 @@
       "path": "src/commands/epic/close.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/epic/defer.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/epic/defer.ts"
     },
@@ -56754,12 +56739,12 @@
       "path": "src/commands/index.roster.sweep.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/index.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/index.ts"
     },
@@ -56819,17 +56804,17 @@
       "path": "src/commands/init-release.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/init-scratch.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/init.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/init.ts"
     },
@@ -56844,7 +56829,7 @@
       "path": "src/commands/instinct/flag.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/instinct/flag.ts"
     },
@@ -57094,122 +57079,122 @@
       "path": "src/commands/issue/unblock.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/list.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/list.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/loop-sessions.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/loop-sessions.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/pause.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/pause.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/resume.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/resume.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/start.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/status.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/status.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/stop.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/stop.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/loop/wait.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/loop/wait.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/module/exec.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/module/exec.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/module/list.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/module/list.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/next-handed-over.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/next-roadmap.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/next-settle.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/next.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/next.ts"
     },
@@ -57234,7 +57219,7 @@
       "path": "src/commands/plan/claim-route.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/plan/create.ts"
     },
@@ -57249,22 +57234,22 @@
       "path": "src/commands/plan/list.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/plan/needs.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/plan/needs.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/plan/plan-files.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/plan/plan-files.ts"
     },
@@ -57319,12 +57304,12 @@
       "path": "src/commands/plan/review-gate.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/plan/risk.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/plan/risk.ts"
     },
@@ -57369,77 +57354,77 @@
       "path": "src/commands/plan/validate.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/close.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/close.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/current.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/current.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/last-triage.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/last-triage.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/list-forecast.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/list-forecast.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/list.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/list.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/pr/merge-cleanup.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/pr/merge-cleanup.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-driven.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/pr/merge-followups.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/pr/merge-followups.ts"
     },
@@ -57454,27 +57439,27 @@
       "path": "src/commands/pr/merge-freed.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-guard.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/pr/merge-guard.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-loop-holder.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-loop-worktree.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/merge-loop-worktree.ts"
     },
@@ -57484,7 +57469,7 @@
       "path": "src/commands/pr/merge-native.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-plan-ci.test.ts"
     },
@@ -57499,22 +57484,22 @@
       "path": "src/commands/pr/merge-project.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/merge-refuse.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-settle.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-skip-checks-driven.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-skip-checks.test.ts"
     },
@@ -57529,17 +57514,17 @@
       "path": "src/commands/pr/merge-tick.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-unchecked.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/merge-unchecked.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/merge-untracked.test.ts"
     },
@@ -57549,187 +57534,187 @@
       "path": "src/commands/pr/merge.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/merge.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/open.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/open.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/pr-context.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/pr-context.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/pr/pr-spawn.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/resolve-loop.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/resolve-loop.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/retarget.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/retarget.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/show.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/show.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-convert.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage-convert.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-fixtures.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/pr/triage-guard.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/pr/triage-guard.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-plan-ci.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-read.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage-read.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-report.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage-report.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-resolve-driven.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-resolve.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage-resolve.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage-trust.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage-trust.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/triage.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/triage.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/pr/version-collision-incident-spawn.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/view.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/commands/pr/view.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/commands/pr/wait-grace-driven.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/pr/wait.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/pr/wait.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/release-commit.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/release/release-commit.ts"
     },
@@ -57744,27 +57729,27 @@
       "path": "src/commands/release/settle-project.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/settle.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/release/settle.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/status-audit.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/status-fragments.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/release/status-fragments.ts"
     },
@@ -57779,32 +57764,32 @@
       "path": "src/commands/release/status-stale-docs.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/status-worktree-spawned.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/status.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/release/status.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/tag-receipt.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/release/tag.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/commands/release/tag.ts"
     },
@@ -57824,12 +57809,12 @@
       "path": "src/commands/roadmap.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/self-update.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/self-update.ts"
     },
@@ -57864,37 +57849,37 @@
       "path": "src/commands/skill/list.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/skill/list.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/skill/search.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/skill/search.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/skill/show.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/skill/show.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/status.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/status.ts"
     },
@@ -57919,7 +57904,7 @@
       "path": "src/commands/stretch/item-merge.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/commands/stretch/item.test.ts"
     },
@@ -57959,62 +57944,62 @@
       "path": "src/commands/tiers-scratch.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/board.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/update/current.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/current.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/latest.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/next.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/port.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/project.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/rafa.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/self.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/update/stub.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/commands/wrap.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/commands/wrap.ts"
     },
@@ -58069,7 +58054,7 @@
       "path": "src/config-schema-issues.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/config-schema-logger.test.ts"
     },
@@ -58174,42 +58159,42 @@
       "path": "src/core/adapters/registry.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/command/command.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/command/command.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/command/confirm.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/command/confirm.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/command/index.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/command/index.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/command/version.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/command/version.ts"
     },
@@ -58294,7 +58279,7 @@
       "path": "src/core/config/load.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/config/load.ts"
     },
@@ -58339,12 +58324,12 @@
       "path": "src/core/git/index.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/loop/claude.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/loop/claude.ts"
     },
@@ -58354,7 +58339,7 @@
       "path": "src/core/loop/index.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/core/loop/index.ts"
     },
@@ -58364,7 +58349,7 @@
       "path": "src/core/loop/readings.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/loop/readings.ts"
     },
@@ -58409,17 +58394,17 @@
       "path": "src/core/loop/sessions.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/output/active.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/core/output/active.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/core/output/index.test.ts"
     },
@@ -59394,12 +59379,12 @@
       "path": "src/effort/store/wire.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/effort/sync/contact.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/effort/sync/contact.ts"
     },
@@ -59534,12 +59519,12 @@
       "path": "src/index.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/inventory/browse.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/inventory/browse.ts"
     },
@@ -59659,7 +59644,7 @@
       "path": "src/inventory/show.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/inventory/show.ts"
     },
@@ -59724,32 +59709,32 @@
       "path": "src/learning/types.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/loop/awake-clock.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/loop/awake-clock.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/loop/blocked-tasks.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/loop/blocked-tasks.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/loop/events-file.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/loop/events-file.ts"
     },
@@ -59764,12 +59749,12 @@
       "path": "src/loop/session-record-parse.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/loop/wait-reasons.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/loop/wait-reasons.ts"
     },
@@ -59779,7 +59764,7 @@
       "path": "src/modules/load.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/modules/load.ts"
     },
@@ -59804,7 +59789,7 @@
       "path": "src/modules/testdata/pull-merge-sync/sync.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test-support",
       "path": "src/modules/testdata/seam-fixture/commands.ts"
     },
@@ -59814,52 +59799,52 @@
       "path": "src/modules/testdata/sync-fixture/sync.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/next/actions.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/actions.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/ceiling.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/ceiling.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/next/ending.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/next/ending.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/epic-end.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/epic-end.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/hint.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/hint.ts"
     },
@@ -59899,7 +59884,7 @@
       "path": "src/next/hop-chain.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/next/hop-record.integration.test.ts"
     },
@@ -59924,17 +59909,17 @@
       "path": "src/next/hop-rows.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/lines.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/lines.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/next/loop-worktree-tree-driven.test.ts"
     },
@@ -59949,12 +59934,12 @@
       "path": "src/next/owner-gate.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/preconditions.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/readings.test.ts"
     },
@@ -59979,7 +59964,7 @@
       "path": "src/next/relation-readings.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/relations-mode.test.ts"
     },
@@ -59989,17 +59974,17 @@
       "path": "src/next/relations-mode.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/settle-step.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/settle-step.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/sources-cancelled.test.ts"
     },
@@ -60014,7 +59999,7 @@
       "path": "src/next/sources-native.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/sources-roadmap-open.test.ts"
     },
@@ -60029,37 +60014,37 @@
       "path": "src/next/sources.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/state-live-run.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/state-native.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/state-no-checks.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/state.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/state.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/next/sync.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/next/sync.ts"
     },
@@ -60069,7 +60054,7 @@
       "path": "src/notices/notices.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/notices/notices.ts"
     },
@@ -60079,7 +60064,7 @@
       "path": "src/notices/run.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/plan.test.ts"
     },
@@ -60219,12 +60204,12 @@
       "path": "src/ports/index.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/checks.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/checks.ts"
     },
@@ -60239,62 +60224,62 @@
       "path": "src/pr/conflict-sentence.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-close.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/gh-close.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-closing-issues.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/gh-closing-issues.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-create.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-fake-shapes.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test-support",
       "path": "src/pr/gh-fake-shapes.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-fake.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test-support",
       "path": "src/pr/gh-fake.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh-files-reviews.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/gh.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/gh.ts"
     },
@@ -60304,22 +60289,22 @@
       "path": "src/pr/index.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/index.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/merge-unchecked.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/merge.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/merge.ts"
     },
@@ -60349,27 +60334,27 @@
       "path": "src/pr/owner-approval.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/plans/budget.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/plans/budget.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/plans/load.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/plans/load.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/plans/validate.test.ts"
     },
@@ -60394,162 +60379,162 @@
       "path": "src/pr/provider.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/pull-requests-double.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/pull-requests-double.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/pr/settle-waiting.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/pr/settle-waiting.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/attempts.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/attempts.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/classes.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/classes.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/classify.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/classify.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/comment.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/comment.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/conflict.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/conflict.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/evidence.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/evidence.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/follow-up.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/follow-up.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/rerun.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/rerun.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/triage/select.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/triage/select.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/pr/triage/version-convert.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/pr/triage/version-convert.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/types.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/types.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/unchecked.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/unchecked.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/workflow-triggers.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/workflow-triggers.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/pr/worktree.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/pr/worktree.ts"
     },
@@ -60594,12 +60579,12 @@
       "path": "src/preflight/run.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/bin-path.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/bin-path.ts"
     },
@@ -60609,17 +60594,17 @@
       "path": "src/project/gitignore.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/project/gitignore.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/lock.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/lock.ts"
     },
@@ -60634,7 +60619,7 @@
       "path": "src/project/package-of.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/project/position.integration.test.ts"
     },
@@ -60659,22 +60644,22 @@
       "path": "src/project/pre-init-dirs.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/root-choice.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/root-choice.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/roots.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/roots.ts"
     },
@@ -60684,52 +60669,52 @@
       "path": "src/project/scaffold.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/project/scaffold.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/scope-fallback.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/scope.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/scope.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/update-current.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/update-range.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/update-range.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/project/worktree-root.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/project/worktree-root.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/rafa.ts"
     },
@@ -60799,22 +60784,22 @@
       "path": "src/refs/verify.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/audit.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/audit.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/body-forecast.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/body-forecast.ts"
     },
@@ -60849,57 +60834,57 @@
       "path": "src/release/enabled.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/fold-spawned.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/forecast.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/forecast.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/fragment-tree.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/fragment-tree.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/fragment.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/fragment.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/guard-merge.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/guard-merge.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/guard.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/guard.ts"
     },
@@ -60924,22 +60909,22 @@
       "path": "src/release/prepare.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/receipt.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/receipt.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/release-delivery.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/release-delivery.ts"
     },
@@ -60964,87 +60949,87 @@
       "path": "src/release/setting.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/settle-pr.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/settle-pr.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/settle-push.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/settle-push.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/settle-tag.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/settle-tag.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/settle-worktree.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/settle-worktree.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/settle.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/settle.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/status-readings.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/strategies/semver-by-level.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/strategies/semver-by-level.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/strategy.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/strategy.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/tag-push.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/tag-push.ts"
     },
@@ -61059,22 +61044,22 @@
       "path": "src/release/verify.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/version-tag.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/version-tag.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/release/version.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/release/version.ts"
     },
@@ -61114,22 +61099,22 @@
       "path": "src/runtime/identity.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/runtime/install.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/runtime/install.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/runtime/live-loops.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/runtime/live-loops.ts"
     },
@@ -61229,7 +61214,7 @@
       "path": "src/schema/tiers.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start.test.ts"
     },
@@ -61254,12 +61239,12 @@
       "path": "src/start/base-prompts.sweep.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/branch-decision.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/branch-decision.ts"
     },
@@ -61284,27 +61269,27 @@
       "path": "src/start/budget.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/checkout-guard-before-spawn-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/checkout-guard-commits-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/checkout-guard-incident-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/checkout-guard-worktree-branch-switch-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/checkout-guard-worktree-integration.test.ts"
     },
@@ -61344,12 +61329,12 @@
       "path": "src/start/claim-catch-up-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/claim-catch-up.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/claim-catch-up.ts"
     },
@@ -61374,7 +61359,7 @@
       "path": "src/start/continue-args.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/continue-exits.test.ts"
     },
@@ -61394,7 +61379,7 @@
       "path": "src/start/continue-run.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/convention-body.test.ts"
     },
@@ -61434,7 +61419,7 @@
       "path": "src/start/decision-session.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/detached-head-integration.test.ts"
     },
@@ -61449,7 +61434,7 @@
       "path": "src/start/dispatch.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/doc-task-integration.test.ts"
     },
@@ -61509,7 +61494,7 @@
       "path": "src/start/inherited-notice.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/inherited-red-integration.test.ts"
     },
@@ -61559,42 +61544,42 @@
       "path": "src/start/pause.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/start/plan-path.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/plan-path.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/start/pr-lifecycle.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/pr-lifecycle.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/pr-retarget.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/start/pr-retarget.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/start/preflight-claim.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/preflight-claim.ts"
     },
@@ -61869,12 +61854,12 @@
       "path": "src/start/suite-stage-step.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-known-baseline-failure-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-no-owns-full-suite-tally-integration.test.ts"
     },
@@ -61884,7 +61869,7 @@
       "path": "src/start/suite-step-outside-case-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-pre-wrap-up-repair-integration.test.ts"
     },
@@ -61894,17 +61879,17 @@
       "path": "src/start/suite-step-retake-alone-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-stage-blocker-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-stage-owns-folders-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/suite-step-task-scope-integration.test.ts"
     },
@@ -62024,42 +62009,42 @@
       "path": "src/start/type-step.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/worktree-dir.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "source",
       "path": "src/start/worktree-dir.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/start/worktree-upstream-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/start/worktree-upstream.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/worktree-upstream.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/start/worktree.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/start/worktree.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/wrap-up-delivered-integration.test.ts"
     },
@@ -62069,7 +62054,7 @@
       "path": "src/start/wrap-up-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/start/wrap-up-late-pr-integration.test.ts"
     },
@@ -62114,32 +62099,32 @@
       "path": "src/status/blocked-count.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/status/claims.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/status/claims.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/status/hook.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/status/hook.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/status/notice.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/status/notice.ts"
     },
@@ -62174,7 +62159,7 @@
       "path": "src/status/sections-waiting.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/status/sections.test.ts"
     },
@@ -62184,12 +62169,12 @@
       "path": "src/status/sections.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/status/seen.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/status/seen.ts"
     },
@@ -62379,7 +62364,7 @@
       "path": "src/tests/agent-gates.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/agent-roster-preflight.test.ts"
     },
@@ -62394,12 +62379,12 @@
       "path": "src/tests/backfill-pipeline.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/blocked-issues-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/board-switch-status-cli.test.ts"
     },
@@ -62424,47 +62409,47 @@
       "path": "src/tests/bundled-tier.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/checker-fixtures.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/claim-commands-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/cleanup-base-worktree-spawned.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/cleanup-held-not-pushed-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/cleanup-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/cleanup-past-head-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/cleanup-runs-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/cli-capture.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/cli-capture.ts"
     },
@@ -62474,7 +62459,7 @@
       "path": "src/tests/cli-surface.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/command-output.test.ts"
     },
@@ -62499,7 +62484,7 @@
       "path": "src/tests/context-page-imports.sweep.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/core-barrel-load-spawned.test.ts"
     },
@@ -62544,7 +62529,7 @@
       "path": "src/tests/demotion-pass.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/detached-head-start-integration.test.ts"
     },
@@ -62564,12 +62549,12 @@
       "path": "src/tests/doctor-deep-env-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/doctor-deep-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/doctor-preflight-parity.test.ts"
     },
@@ -62594,17 +62579,17 @@
       "path": "src/tests/effort-pipeline.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/effort-report-backends.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/effort-skills-collect-integration.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test-support",
       "path": "src/tests/ending-probe.ts"
     },
@@ -62629,7 +62614,7 @@
       "path": "src/tests/epic-descent-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/epic-end-merge-tick-spawn.test.ts"
     },
@@ -62644,12 +62629,12 @@
       "path": "src/tests/epic-labels-cross-command-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/epic-lifecycle-spawn.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/epic-show-cli.test.ts"
     },
@@ -62674,7 +62659,7 @@
       "path": "src/tests/finished-task.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/git-identity-spawn.test.ts"
     },
@@ -62684,17 +62669,17 @@
       "path": "src/tests/git-identity.sweep.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/git-identity.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/git-identity.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/hint-tool-names.test.ts"
     },
@@ -62709,7 +62694,7 @@
       "path": "src/tests/init-board-project-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/init-scope.test.ts"
     },
@@ -62719,12 +62704,12 @@
       "path": "src/tests/instinct-list-cli.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/inventory-browse.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/inventory-cli.test.ts"
     },
@@ -62734,7 +62719,7 @@
       "path": "src/tests/inventory-live.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/inventory-search.test.ts"
     },
@@ -62749,7 +62734,7 @@
       "path": "src/tests/issue-create-spec-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/issue-edit-spawned.test.ts"
     },
@@ -62769,7 +62754,7 @@
       "path": "src/tests/learning-boundary.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/lesson-push-e2e.test.ts"
     },
@@ -62779,72 +62764,72 @@
       "path": "src/tests/logger-harness.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-continue-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-events-file-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-events-output.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-output.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/loop-scratch.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/loop-session-fixtures.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-sessions.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-start-claim-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-start-effort-store.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-suite-sigint-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-sync-pull-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-wait-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-wrap-up-claim-lost-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/loop-wrap-up-phase.test.ts"
     },
@@ -62854,7 +62839,7 @@
       "path": "src/tests/merged-stores.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/tests/module-seams.test.ts"
     },
@@ -62864,27 +62849,27 @@
       "path": "src/tests/native-relations-spawn.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-beside-loop-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/next-chain-fixtures.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-chain-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-chain-zero-checks-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-merge-settle-spawned-cli.test.ts"
     },
@@ -62894,32 +62879,32 @@
       "path": "src/tests/next-rereads-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-continue-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-halt-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-hop-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-loop-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-owner-gate-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/next-roadmap-status-waiting-cli.test.ts"
     },
@@ -62939,7 +62924,7 @@
       "path": "src/tests/output-sinks.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/package-build.test.ts"
     },
@@ -62989,7 +62974,7 @@
       "path": "src/tests/plan-create-refs-gate-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/plan-create-store-rules-integration.test.ts"
     },
@@ -63004,7 +62989,7 @@
       "path": "src/tests/plan-injection.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/plan-needs.test.ts"
     },
@@ -63019,17 +63004,17 @@
       "path": "src/tests/plan-stamp.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/plan-worktree-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/pr-event-text-mode-integration.test.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/pr-show-closes-integration.test.ts"
     },
@@ -63049,7 +63034,7 @@
       "path": "src/tests/project-stand-in-spawn.ts"
     },
     {
-      "cluster": "c03-index",
+      "cluster": "c06-index",
       "kind": "test",
       "path": "src/tests/prompt-restore.test.ts"
     },
@@ -63059,7 +63044,7 @@
       "path": "src/tests/rafa-block-strip.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/rafa-prompt-phase.test.ts"
     },
@@ -63069,7 +63054,7 @@
       "path": "src/tests/readiness-gate-integration.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/tests/readme-spenders.test.ts"
     },
@@ -63079,7 +63064,7 @@
       "path": "src/tests/real-node-modules.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/refs-gate-integration.test.ts"
     },
@@ -63099,7 +63084,7 @@
       "path": "src/tests/relations-import-boundary.sweep.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/relations-labels-baseline.test.ts"
     },
@@ -63109,42 +63094,42 @@
       "path": "src/tests/relations-move-round-trip.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/relations-native-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-delivery-spawned-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-mechanics.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-settle-doctor-button-merge-spawned-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-settle-parallel-branches-spawned-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-settle-race-spawned-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-settle-spawned-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/release-settle-squash-merge-spawned-cli.test.ts"
     },
@@ -63179,7 +63164,7 @@
       "path": "src/tests/report-status-marks.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/roadmap-cli.test.ts"
     },
@@ -63209,22 +63194,22 @@
       "path": "src/tests/schema-records.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/scratch-home-env.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/scratch-home-env.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/self-update-live-loop-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/serve-spawned.test.ts"
     },
@@ -63234,7 +63219,7 @@
       "path": "src/tests/skill-gap-section.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/skill-name-refusal.test.ts"
     },
@@ -63244,7 +63229,7 @@
       "path": "src/tests/skills-declaration-strip.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/source-uses.ts"
     },
@@ -63269,7 +63254,7 @@
       "path": "src/tests/spec-template-source.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/tests/spend-guard-dispatch.test.ts"
     },
@@ -63284,32 +63269,32 @@
       "path": "src/tests/stage-green-without-live-parity.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test-support",
       "path": "src/tests/stand-in-gh.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/status-notice-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/status-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/store-version-guard.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/stretch-dry-run-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/stretch-lines-spawned.test.ts"
     },
@@ -63324,7 +63309,7 @@
       "path": "src/tests/sweep-timeout.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/switch-drift-spawned.test.ts"
     },
@@ -63334,17 +63319,17 @@
       "path": "src/tests/switch-next-plan-cli.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/sync-contact-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/sync-local-default-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/sync-module-missing-spawned.test.ts"
     },
@@ -63354,12 +63339,12 @@
       "path": "src/tests/sync-service-package-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/task-gate-spawned.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/task-report.test.ts"
     },
@@ -63374,7 +63359,7 @@
       "path": "src/tests/triage-local.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/tests/user-facing-spelling.sweep.test.ts"
     },
@@ -63389,22 +63374,22 @@
       "path": "src/tests/workflow-permission-section.sweep.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/worktree-restart-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/worktree-shared-store-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/worktree-start-integration.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/tests/worktree-start-refusals-integration.test.ts"
     },
@@ -63689,12 +63674,12 @@
       "path": "src/utils/agent-definition.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/utils/agent-shell.test.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "source",
       "path": "src/utils/agent-shell.ts"
     },
@@ -63709,12 +63694,12 @@
       "path": "src/utils/declaration.ts"
     },
     {
-      "cluster": "c07-cli-capture",
+      "cluster": "c03-cli-capture",
       "kind": "test",
       "path": "src/utils/git.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/utils/git.ts"
     },

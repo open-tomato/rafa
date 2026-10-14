@@ -75,14 +75,12 @@
  * its bookkeeping: whatever goes wrong, from the plans directory to the
  * store, is handed to `warn` and answered as the record's `problem`.
  */
-import type { CheckRow } from '../../pr/checks.js';
-import type { PullRequestDetail } from '../../pr/types.js';
+import type { CheckRow } from './check-rows.js';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { failingRows, verdictOf } from '../../pr/checks.js';
-
+import { failingRows, verdictOf } from './check-rows.js';
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from './plan-stubs.js';
@@ -94,8 +92,19 @@ export type PlanCiVerdict = 'green' | 'red' | 'none';
 /** The verdicts the table admits, in the order its CHECK lists them. */
 export const PLAN_CI_VERDICTS: readonly PlanCiVerdict[] = ['green', 'red', 'none'];
 
-/** What of a pull request a reading needs. */
-export type PlanCiPullRequest = Pick<PullRequestDetail, 'number' | 'headRefName' | 'headRefOid'>;
+/**
+ * What of a pull request a reading needs: the three fields of
+ * `PullRequestDetail` (`src/pr/types.ts`) it reads, spelled here so the
+ * store imports nothing of the `pr` module.
+ */
+export interface PlanCiPullRequest {
+  /** The pull request's number. */
+  readonly number: number;
+  /** The branch the pull request is FROM, read for the plan stub. */
+  readonly headRefName: string;
+  /** The head commit the checks ran on. */
+  readonly headRefOid: string;
+}
 
 /** One reading of a pull request's checks, as it is stored and read back. */
 export interface PlanCiRow {

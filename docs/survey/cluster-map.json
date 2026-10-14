@@ -347,6 +347,7 @@
     "src/effort/store/absences.ts": "c5",
     "src/effort/store/bring-forward.ts": "c5",
     "src/effort/store/changes.ts": "c5",
+    "src/effort/store/check-rows.ts": "c1",
     "src/effort/store/commit-stats.ts": "c7",
     "src/effort/store/copy.ts": "c5",
     "src/effort/store/development-build.ts": "c5",

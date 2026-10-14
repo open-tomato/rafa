@@ -3981,20 +3981,6 @@
           "toPackage": "rafa-board"
         },
         {
-          "from": "src/effort/store/plan-ci.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/pr/checks.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
-          "from": "src/effort/store/plan-ci.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/pr/types.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
           "from": "src/effort/store/preflight.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4226,8 +4212,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 41,
-      "upwardEdges": 54
+      "remaining": 39,
+      "upwardEdges": 52
     },
     {
       "clearedByIssue118": 0,
@@ -7936,10 +7922,10 @@
     "clearedByIssue118": 13,
     "files": 1940,
     "leftToPlace": 700,
-    "nonTestEdges": 4326,
+    "nonTestEdges": 4324,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 297
+    "upwardEdges": 295
   },
   "unassigned": [
     {

@@ -1124,11 +1124,13 @@ the plan stub the head branch resolves to, the verdict (`green`, `red` or
 no row. `readPlanCi` reads every row, or one plan's, in append order.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
-`verdictOf` answers the settled verdict over every check, and the `failing`
-list is the failing checks' names; a CHECK keeps `failing` non-empty
-exactly when the verdict is `red`. The key is `(pr, head_sha, read_at)`:
-the same head read twice at two times is two rows, and the same reading
-written twice is stored once (the second counted as skipped).
+`verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all
+re-exported by `src/pr/checks.ts`) answers the settled verdict over every
+check, and the `failing` list is the failing checks' names; a CHECK keeps
+`failing` non-empty exactly when the verdict is `red`. The key is
+`(pr, head_sha, read_at)`: the same head read twice at two times is two
+rows, and the same reading written twice is stored once (the second
+counted as skipped).
 **The plan stub.** The head branch is read as `<type>/<stub>` by
 `attributeBranch`, and the stub resolved against the plan roster by
 `resolvePlanStub`, as `effort collect` resolves a session's branch. A stub
