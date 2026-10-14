@@ -7,7 +7,14 @@ import { dirname, join, posix } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { deepImportLine, importLine, isCodeFile, readCoreImports, subjectBarrels } from './core-barrels';
+import {
+  augmentedModules,
+  deepImportLine,
+  importLine,
+  isCodeFile,
+  readCoreImports,
+  subjectBarrels,
+} from './core-barrels';
 import { barrelPaths, CORE_FOLDER } from './core-moves';
 import { bunResolver } from './import-graph';
 
@@ -96,6 +103,27 @@ describe('readCoreImports', () => {
     ]);
   });
 
+  it('answers a module augmentation under augment, never as a deep import, and still reads an import of the same file', () => {
+    const augmenting = [
+      'import type { HubSettings } from \'./hub.js\';',
+      'declare module \'./core/config/config-schema.js\' {',
+      '  interface RafaConfig extends HubSettings {}',
+      '}',
+      '',
+    ].join('\n');
+    const reading = readingOf({
+      'src/both.ts': `import type { RafaConfig } from './core/config/config-schema.js';\n${augmenting}`,
+      'src/hub.ts': augmenting,
+    });
+
+    expect(reading.augment.map(importLine)).toEqual([
+      'src/both.ts -> src/core/config/config-schema.ts',
+      'src/hub.ts -> src/core/config/config-schema.ts',
+    ]);
+    expect(reading.deep.map(importLine)).toEqual(['src/both.ts -> src/core/config/config-schema.ts']);
+    expect(reading.barrel).toEqual([]);
+  });
+
   it('reads a test file, a sweep, a test-support file, a script, a package file and a root config alike', () => {
     const importing = (prefix: string): string => `import { parsePlan } from '${prefix}core/plan/parse.js';\n`;
 
@@ -131,6 +159,7 @@ describe('readCoreImports', () => {
     expect(reading).toEqual({
       barrel: [],
       deep: [],
+      augment: [],
       inside: [
         'src/core/config/config-load.test.ts',
         'src/core/config/config-load.ts',
@@ -149,7 +178,7 @@ describe('readCoreImports', () => {
       sources: new Map([['src/board/place.ts', '']]),
     });
 
-    expect(reading).toEqual({ barrel: [], deep: [], inside: [], missing: [], read: ['src/board/place.ts'] });
+    expect(reading).toEqual({ barrel: [], deep: [], augment: [], inside: [], missing: [], read: ['src/board/place.ts'] });
   });
 
   it('answers an index.ts below a subject folder, and one directly in src/core/, as deep: neither is a listed barrel', () => {
@@ -338,6 +367,26 @@ describe('readCoreImports', () => {
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
+  });
+});
+
+describe('augmentedModules', () => {
+  it('answers each top-level declare module named by a string, in source order', () => {
+    const text = [
+      'declare module \'./b.js\' {}',
+      'import { x } from \'./c.js\';',
+      'declare module \'./a.js\' { interface A {} }',
+      'declare global { interface Window {} }',
+      'declare namespace Named {}',
+      'const spelled = \'declare module "./d.js" {}\';',
+      '',
+    ].join('\n');
+
+    expect(augmentedModules('src/x.ts', text)).toEqual(['./b.js', './a.js']);
+  });
+
+  it('answers none for a file with imports alone', () => {
+    expect(augmentedModules('src/x.ts', 'import type { A } from \'./core/config/config-schema.js\';\n')).toEqual([]);
   });
 });
 

@@ -25,10 +25,13 @@ import {
   DANGEROUS_RELEASE_DEFAULTS,
   PR_DEFAULTS,
   RELEASE_DEFAULTS,
+  RELEASE_SECTION,
 } from './config-schema-release.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
   SETTINGS,
@@ -305,5 +308,66 @@ describe('an unusable value of the six', () => {
 
   it.each(UNUSABLE)('reports %s in a file the way every unusable value is', (_setting, _raw, text, problem) => {
     expect(refusal(() => parseConfigText(`${text}\n`, PATH)).problems).toEqual([`${PATH}: ${problem}`]);
+  });
+});
+
+describe('the section', () => {
+  it('is package release, defining its keys in this order with these defaults, with no check', () => {
+    expect(RELEASE_SECTION.package).toBe('release');
+    expect(Object.entries(RELEASE_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['prProvider', 'pr.provider'],
+      ['prMergeMethod', 'pr.mergeMethod'],
+      ['prBase', 'pr.base'],
+      ['prResolveBudget', 'pr.resolveBudget'],
+      ['prVersionCollision', 'pr.versionCollision'],
+      ['releaseEnabled', 'release.enabled'],
+      ['releaseVersionFile', 'release.versionFile'],
+      ['releaseChangelog', 'release.changelog'],
+      ['releaseHeading', 'release.heading'],
+      ['releaseFragments', 'release.fragments'],
+      ['releaseStrategy', 'release.strategy'],
+      ['releaseSettle', 'release.settle'],
+      ['releaseTag', 'release.tag'],
+      ['releasePublishCommand', 'release.publishCommand'],
+      ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
+    ]);
+    expect(RELEASE_SECTION.defaults).toEqual({
+      prProvider: null,
+      prMergeMethod: 'squash',
+      prBase: null,
+      prResolveBudget: 2,
+      prVersionCollision: 'report',
+      releaseEnabled: 'auto',
+      releaseVersionFile: 'package.json',
+      releaseChangelog: 'CHANGELOG.md',
+      releaseHeading: '## {version} — {date}, {title}',
+      releaseFragments: '.changes',
+      releaseStrategy: 'semver-by-level',
+      releaseSettle: 'push',
+      releaseTag: 'manual',
+      releasePublishCommand: 'npm publish',
+      dangerousAcceptVersionCollision: false,
+    });
+    expect(RELEASE_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(RELEASE_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(RELEASE_SECTION)).toBe(true);
+    expect(Object.isFrozen(RELEASE_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(RELEASE_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [RELEASE_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['release']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(RELEASE_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(RELEASE_SECTION.settings).sort());
   });
 });

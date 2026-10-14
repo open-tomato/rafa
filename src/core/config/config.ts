@@ -684,13 +684,13 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     return { value: CONFIG_DEFAULTS[setting], source: 'default' };
   };
   const ranked = SETTING_NAMES.map((setting) => [setting, rank(setting)] as const);
-  const effortSync = rank('effortSync');
-  const hubProblems = hubUrlProblems({
-    effortSync: effortSync.value,
-    hubUrl: rank('hubUrl').value,
-    effortSyncSource: effortSync.source,
-    paths: { file: file?.path ?? null, user: user?.path ?? null },
-  });
+  const config = Object.fromEntries(ranked.map(([setting, { value }]) => [setting, value])) as unknown as RafaConfig;
+  const sources = Object.fromEntries(
+    ranked.map(([setting, { source }]) => [setting, source]),
+  ) as Record<ConfigSetting, ConfigSource>;
+  const path = file?.path ?? null;
+  const userPath = user?.path ?? null;
+  const hubProblems = hubUrlProblems({ config, sources, path, userPath });
   if (hubProblems.length > 0) throw new ConfigError(hubProblems);
   const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
   const warnings = [user, file].flatMap((layer) => layer === null
@@ -703,14 +703,10 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     ]);
 
   return {
-    config: Object.fromEntries(
-      ranked.map(([setting, { value }]) => [setting, value]),
-    ) as unknown as RafaConfig,
-    sources: Object.fromEntries(
-      ranked.map(([setting, { source }]) => [setting, source]),
-    ) as Record<ConfigSetting, ConfigSource>,
-    path: file?.path ?? null,
-    userPath: user?.path ?? null,
+    config,
+    sources,
+    path,
+    userPath,
     extras: file?.extras ?? [],
     userExtras: user?.extras ?? [],
     warnings,

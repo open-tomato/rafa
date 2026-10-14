@@ -10,14 +10,36 @@
  * SPELLED, never built from the module's own text. The refusal across
  * two settings is driven through `parseConfigText` and `resolveConfig`,
  * the path every command's config takes, with the project and user
- * files each naming one half.
+ * files each naming one half, and again through `hubUrlProblems` alone,
+ * the `hub` section's check, over a check input built by hand. The
+ * section itself is held last: its package, its keys in order, its
+ * defaults and its one check, all spelled.
  */
-import type { ValueAt } from './core/config/sections.js';
+import type {
+  ConfigCheckInput,
+  ConfigSetting,
+  ConfigSource,
+} from './core/config/index.js';
+import type { SyncStrategy, ValueAt } from './core/config/sections.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { hubContextOf, hubTimeout, hubTimeoutMs, hubUrl } from './config-schema-hub.js';
-import { ConfigError, parseConfigText, resolveConfig } from './core/config/index.js';
+import {
+  HUB_SECTION,
+  hubContextOf,
+  hubTimeout,
+  hubTimeoutMs,
+  hubUrl,
+  hubUrlProblems,
+} from './config-schema-hub.js';
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+  SETTINGS,
+} from './core/config/index.js';
 
 /** Where every reader case reads its value. */
 const AT: ValueAt = { label: 'F: hub.x', key: 'hub.x' };
@@ -165,6 +187,39 @@ describe('effort.sync: service with no hub.url', () => {
   });
 });
 
+describe('hubUrlProblems, the section check', () => {
+  /** A check input over the defaults: `effort.sync` and `hub.url` as given, both files named. */
+  function checkInput(
+    effortSync: SyncStrategy,
+    url: string | null,
+    source: ConfigSource,
+    path: string | null = PROJECT,
+  ): ConfigCheckInput {
+    const resolved = resolveConfig();
+    return {
+      config: { ...resolved.config, effortSync, hubUrl: url },
+      sources: { ...resolved.sources, effortSync: source },
+      path,
+      userPath: USER,
+    };
+  }
+
+  it('refuses service with no url, naming the file of the layer that chose it', () => {
+    expect(hubUrlProblems(checkInput('service', null, 'file'))).toEqual([missingUrl(PROJECT)]);
+    expect(hubUrlProblems(checkInput('service', null, 'user'))).toEqual([missingUrl(USER)]);
+  });
+
+  it('names the layer itself when no file of it was read', () => {
+    expect(hubUrlProblems(checkInput('service', null, 'file', null))).toEqual([missingUrl('file')]);
+    expect(hubUrlProblems(checkInput('service', null, 'default', null))).toEqual([missingUrl('default')]);
+  });
+
+  it('refuses nothing with a url, or under any other strategy, the controls', () => {
+    expect(hubUrlProblems(checkInput('service', 'https://hub.example.org', 'file'))).toEqual([]);
+    expect(hubUrlProblems(checkInput('local', null, 'file'))).toEqual([]);
+  });
+});
+
 describe('hubContextOf', () => {
   it('answers the url, the secret name and the timeout in milliseconds, frozen', () => {
     const context = hubContextOf({ hubUrl: 'https://hub.example.org', hubTokenSecret: 'rafa-hub-token', hubTimeout: '7s' });
@@ -187,5 +242,42 @@ describe('hubContextOf', () => {
     const attempt = (): unknown => hubContextOf({ hubUrl: 'https://hub.example.org', hubTimeout: '0s' });
 
     expect(attempt).toThrow(new TypeError('hub.timeout is "0s", which no config accepts'));
+  });
+});
+
+describe('the section', () => {
+  it('is package hub, defining its keys in this order with these defaults, with hubUrlProblems as its one check', () => {
+    expect(HUB_SECTION.package).toBe('hub');
+    expect(Object.entries(HUB_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['hubUrl', 'hub.url'],
+      ['hubTokenSecret', 'hub.tokenSecret'],
+      ['hubTimeout', 'hub.timeout'],
+    ]);
+    expect(HUB_SECTION.defaults).toEqual({
+      hubUrl: null,
+      hubTokenSecret: null,
+      hubTimeout: '3s',
+    });
+    expect(HUB_SECTION.checks).toEqual([hubUrlProblems]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(HUB_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(HUB_SECTION)).toBe(true);
+    expect(Object.isFrozen(HUB_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(HUB_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [HUB_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['hub']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(HUB_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(HUB_SECTION.settings).sort());
   });
 });

@@ -2,9 +2,11 @@
  * The `triage` section of the config schema: the two settings triage
  * reads when it looks for the nearest open bug a report repeats, each
  * one's field, its default, its spec and its reader.
- * `core/config/config-merged.ts` adds {@link TriageSettings} to `RafaConfig`, and
- * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after the `claims` section.
+ * {@link TRIAGE_SECTION} hands them to core as one `ConfigSection`,
+ * package `triage`, and the `declare module` below adds
+ * {@link TriageSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after the `claims` section.
  *
  * The section has its own module, as `config-schema-tests.ts` and
  * `config-schema-wrap-up.ts` do, because `config-schema.ts` stood at 592
@@ -40,10 +42,15 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `triage` section's fields, added to core's. */
+  interface RafaConfig extends TriageSettings {}
+}
 
 /** The most `triage.similarity.threshold` accepts. */
 export const SIMILARITY_THRESHOLD_MAX = 1;
@@ -124,3 +131,10 @@ export const TRIAGE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `triage` section: the two `triage` keys, with their defaults and no check. */
+export const TRIAGE_SECTION: ConfigSection = Object.freeze({
+  package: 'triage',
+  settings: Object.freeze(TRIAGE_SETTINGS),
+  defaults: TRIAGE_DEFAULTS,
+});

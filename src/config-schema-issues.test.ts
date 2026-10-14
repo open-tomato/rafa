@@ -13,8 +13,15 @@ import type { ConfigSetting } from './core/config/index.js';
 import { describe, expect, it } from 'bun:test';
 
 import { templateProblem } from './bugs/title.js';
-import { bugRulesOf } from './config-schema-issues.js';
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig, SETTINGS } from './core/config/index.js';
+import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
+import {
+  CONFIG_DEFAULTS,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+  SETTINGS,
+} from './core/config/index.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 import { projectConfigText } from './project/scaffold.js';
 
@@ -145,5 +152,46 @@ describe('the rules a bug record is checked against', () => {
       actions: ['login'],
     });
     expect(rules.codes.at(-1)?.code).toBe('billing:card-declined');
+  });
+});
+
+describe('the section', () => {
+  it('is package issues, defining its keys in this order with these defaults, with no check', () => {
+    expect(ISSUES_SECTION.package).toBe('issues');
+    expect(Object.entries(ISSUES_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['issuesTitleBug', 'issues.titles.bug'],
+      ['issuesSummaryMax', 'issues.titles.summaryMax'],
+      ['issuesEnvironments', 'issues.environments'],
+      ['issuesVocabularyModules', 'issues.vocabulary.modules'],
+      ['issuesVocabularyActions', 'issues.vocabulary.actions'],
+    ]);
+    expect(ISSUES_SECTION.defaults).toEqual({
+      issuesTitleBug: '?(${module}?( - ${action}): )${summary}',
+      issuesSummaryMax: 80,
+      issuesEnvironments: [],
+      issuesVocabularyModules: [],
+      issuesVocabularyActions: [],
+    });
+    expect(ISSUES_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(ISSUES_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(ISSUES_SECTION)).toBe(true);
+    expect(Object.isFrozen(ISSUES_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(ISSUES_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [ISSUES_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['issues']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(ISSUES_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(ISSUES_SECTION.settings).sort());
   });
 });

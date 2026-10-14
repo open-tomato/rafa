@@ -6,11 +6,13 @@
  * beside an accepting control, and every key and message is SPELLED,
  * never read off the module.
  */
+import type { ConfigSetting } from './core/config/index.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SETTINGS } from './core/config/index.js';
+import { ERRORS_SECTION } from './config-schema-errors.js';
+import { EMPTY_CONFIG_REGISTRY, mergeConfigSections, SETTINGS } from './core/config/index.js';
 
 /** Where every case reads the key. */
 const AT = { label: 'F: errors.codes', key: 'errors.codes' };
@@ -79,5 +81,38 @@ describe('errors.codes', () => {
 
   it('refuses a value that is not a list', () => {
     expect(read('git:x').problems).toEqual(['F: errors.codes is "git:x", expected a list of error code entries']);
+  });
+});
+
+describe('the section', () => {
+  it('is package errors, defining its keys in this order with these defaults, with no check', () => {
+    expect(ERRORS_SECTION.package).toBe('errors');
+    expect(Object.entries(ERRORS_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['errorsCodes', 'errors.codes'],
+    ]);
+    expect(ERRORS_SECTION.defaults).toEqual({
+      errorsCodes: [],
+    });
+    expect(ERRORS_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(ERRORS_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(ERRORS_SECTION)).toBe(true);
+    expect(Object.isFrozen(ERRORS_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(ERRORS_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [ERRORS_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['errors']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(ERRORS_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(ERRORS_SECTION.settings).sort());
   });
 });

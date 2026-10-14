@@ -1,10 +1,12 @@
 /**
  * The `logger` section of the config schema: the six keys the logger
  * reads (#950), each one's field, its default, its spec and its reader.
- * `core/config/config-merged.ts` adds {@link LoggerConfigSettings} to
- * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after the `errors` section. It has its own module for the reason
- * `config-schema-errors.ts` gives.
+ * {@link LOGGER_SECTION} hands them to core as one `ConfigSection`,
+ * package `logger`, and the `declare module` below adds
+ * {@link LoggerConfigSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after the `errors` section. It has its
+ * own module for the reason `config-schema-errors.ts` gives.
  *
  * ## The keys
  *
@@ -36,12 +38,17 @@
  * command line's say over what is written.
  */
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 import type { LogLevel } from './ports/index.js';
 
 import { DEFAULT_LOGGER_KIND, LOG_LEVELS, LOGGER_THEMES } from './adapters/logger/settings.js';
 import { below, flag, isMapping, mapOf, oneOf, refused, text } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `logger` section's fields, added to core's. */
+  interface RafaConfig extends LoggerConfigSettings {}
+}
 
 /** The `logger` settings. */
 export interface LoggerConfigSettings {
@@ -94,6 +101,13 @@ export const LOGGER_SETTINGS: { readonly [K in keyof LoggerConfigSettings]: Sett
   loggerCallSite: { key: 'logger.callSite', read: flag, cli: false },
   loggerApi: { key: 'logger.api', read: flag, cli: false },
 };
+
+/** The `logger` section: the six `logger` keys, with their defaults and no check. */
+export const LOGGER_SECTION: ConfigSection = Object.freeze({
+  package: 'logger',
+  settings: Object.freeze(LOGGER_SETTINGS),
+  defaults: LOGGER_DEFAULTS,
+});
 
 /** The settings a logger reads, from a resolved config's `logger` fields. */
 export function loggerSettingsOf(config: LoggerConfigSettings): LoggerSettings {

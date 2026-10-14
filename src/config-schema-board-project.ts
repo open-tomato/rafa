@@ -2,11 +2,14 @@
  * The five limits of the `board.project` section: how a call to the
  * GitHub project is retried, how often a long refresh says where it is,
  * and how its field writes are batched and spaced. Each has its field,
- * its default, its reader and its spec here. `core/config/config-merged.ts`
- * adds {@link BoardProjectLimitSettings} to `RafaConfig`, and its
- * `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right after
- * `board.project.number`, so the order settings are reported in holds the
- * `board.project` section together.
+ * its default, its reader and its spec here.
+ * {@link BOARD_PROJECT_SECTION} hands them to core as one
+ * `ConfigSection`, package `board-project`, and the `declare module`
+ * below adds {@link BoardProjectLimitSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `board.project.number`, so the
+ * order settings are reported in holds the `board.project` section
+ * together.
  *
  * `board.project.template` and `board.project.number` are core's, in
  * `core/config/core-section.ts`; `config-schema-readings.ts` argues
@@ -63,10 +66,15 @@
  * gives in `config-schema-readings.ts`: every command that refreshes the
  * project must write it the same way, which one run's flag would split.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `board-project` section's fields, added to core's. */
+  interface RafaConfig extends BoardProjectLimitSettings {}
+}
 
 /** The fewest tries after a failure `board.project.retries` accepts as a number. */
 export const BOARD_PROJECT_RETRIES_MIN = 1;
@@ -222,3 +230,10 @@ export const BOARD_PROJECT_LIMIT_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `board-project` section: the five `board.project` limits, with their defaults and no check. */
+export const BOARD_PROJECT_SECTION: ConfigSection = Object.freeze({
+  package: 'board-project',
+  settings: Object.freeze(BOARD_PROJECT_LIMIT_SETTINGS),
+  defaults: BOARD_PROJECT_LIMIT_DEFAULTS,
+});

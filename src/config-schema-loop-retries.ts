@@ -1,11 +1,14 @@
 /**
- * `loop.retries`, the loop's own retry count: how many times in a row one
- * run re-enters its task loop after a stop a blind re-run is known to pass,
- * with its field, its default, its spec and its reader.
- * `core/config/config-merged.ts` adds {@link LoopRetriesSettings} to
- * `RafaConfig`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after `loop.worktreeDir` and ahead of `loop.wrapUp`, so the order
- * settings are reported in holds the `loop` section together.
+ * `loop.retries`, the loop's own retry count: how many times in a row
+ * one run re-enters its task loop after a stop a blind re-run is known
+ * to pass, with its field, its default, its spec and its reader.
+ * {@link LOOP_RETRIES_SECTION} hands it to core as one `ConfigSection`,
+ * package `loop-retries`, and the `declare module` below adds
+ * {@link LoopRetriesSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `loop.worktreeDir` and ahead of
+ * `loop.wrapUp`, so the order settings are reported in holds the `loop`
+ * section together.
  *
  * The key has its own module, as `config-schema-wrap-up.ts` has, because
  * `config-schema.ts`'s own note asks a new section for a sibling, and
@@ -43,10 +46,15 @@
  * flag that outranks it for one run is `loop start --retry=<n>`, read
  * by `start/run-setup.ts`.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `loop-retries` section's fields, added to core's. */
+  interface RafaConfig extends LoopRetriesSettings {}
+}
 
 /** The fewest retries `loop.retries` accepts as a number. */
 export const LOOP_RETRIES_MIN = 1;
@@ -93,3 +101,10 @@ export const LOOP_RETRIES_SETTINGS: {
 } = {
   loopRetries: { key: 'loop.retries', read: loopRetries, cli: false },
 };
+
+/** The `loop-retries` section: `loop.retries`, with their defaults and no check. */
+export const LOOP_RETRIES_SECTION: ConfigSection = Object.freeze({
+  package: 'loop-retries',
+  settings: Object.freeze(LOOP_RETRIES_SETTINGS),
+  defaults: LOOP_RETRIES_DEFAULTS,
+});

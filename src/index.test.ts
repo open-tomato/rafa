@@ -20,9 +20,9 @@
  * The first config module is read through its barrel,
  * `src/core/config/index.ts`, the one path a file outside `src/core/`
  * may import it by. The barrel is wider than the root: it also holds
- * the schema's indexes, core's section and the item readers, which the
- * tree reads and the package does not publish. Those thirteen names are
- * spelled under {@link CONFIG_BARREL_ONLY} and left out of the
+ * the schema's indexes, core's section, the item readers and the section
+ * registry, which the tree reads and the package does not publish. Those
+ * twenty-one names are spelled under {@link CONFIG_BARREL_ONLY} and left out of the
  * containment case, so a name added to the barrel still reds it until
  * the name is added to the root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
@@ -375,10 +375,13 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 
 /**
  * The runtime names the config barrel holds and the root does not
- * publish: the schema's indexes, core's section and the item readers.
+ * publish: the schema's indexes, core's section, the item readers and
+ * the section registry.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
   'CORE_SECTION',
+  'ConfigSectionError',
+  'EMPTY_CONFIG_REGISTRY',
   'MODULE_SOURCE_KEYS',
   'OPTIONAL_ITEM_KEYS',
   'REQUIRED_ITEM_KEYS',
@@ -386,11 +389,17 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'SETTINGS',
   'SETTING_BY_KEY',
   'SETTING_NAMES',
+  'activeChecks',
+  'activeDefaults',
+  'activeSettings',
   'isCommandLineSetting',
   'knownKeysAbove',
+  'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
+  'registerConfigSections',
   'requiredPrerequisite',
+  'restoreConfigSections',
 ];
 
 /** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */

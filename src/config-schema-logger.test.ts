@@ -16,8 +16,13 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
-import { loggerSettingsOf } from './config-schema-logger.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './core/config/index.js';
+import { LOGGER_SECTION, loggerSettingsOf } from './config-schema-logger.js';
+import {
+  CONFIG_DEFAULTS,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  SETTINGS,
+} from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';
 import { projectConfigText } from './project/scaffold.js';
 import { plantProject } from './tests/cli-capture.js';
@@ -143,5 +148,48 @@ describe('loadConfig', () => {
     });
 
     expect(levels).toEqual(['error']);
+  });
+});
+
+describe('the section', () => {
+  it('is package logger, defining its keys in this order with these defaults, with no check', () => {
+    expect(LOGGER_SECTION.package).toBe('logger');
+    expect(Object.entries(LOGGER_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['loggerKind', 'logger.kind'],
+      ['loggerLevel', 'logger.level'],
+      ['loggerTheme', 'logger.theme'],
+      ['loggerModules', 'logger.modules'],
+      ['loggerCallSite', 'logger.callSite'],
+      ['loggerApi', 'logger.api'],
+    ]);
+    expect(LOGGER_SECTION.defaults).toEqual({
+      loggerKind: 'console',
+      loggerLevel: 'warn',
+      loggerTheme: 'default',
+      loggerModules: new Map(),
+      loggerCallSite: false,
+      loggerApi: false,
+    });
+    expect(LOGGER_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(LOGGER_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(LOGGER_SECTION)).toBe(true);
+    expect(Object.isFrozen(LOGGER_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(LOGGER_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [LOGGER_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['logger']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(LOGGER_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(LOGGER_SECTION.settings).sort());
   });
 });

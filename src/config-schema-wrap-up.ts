@@ -1,11 +1,13 @@
 /**
  * The `loop.wrapUp` section of the config schema: the one setting the
- * wrap-up reads when its session ends without an open pull request,
- * with its field, its default, its spec and its reader.
- * `core/config/config-merged.ts` adds {@link WrapUpSettings} to `RafaConfig`, and
- * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after `loop.worktreeDir`, so the order settings are reported in holds
- * the `loop` section together.
+ * wrap-up reads when its session ends without an open pull request, with
+ * its field, its default, its spec and its reader.
+ * {@link WRAP_UP_SECTION} hands it to core as one `ConfigSection`,
+ * package `wrap-up`, and the `declare module` below adds
+ * {@link WrapUpSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `loop.worktreeDir`, so the order
+ * settings are reported in holds the `loop` section together.
  *
  * The section has its own module, as `config-schema-release.ts` and
  * `config-schema-tests.ts` do, because `config-schema.ts` stood at 578
@@ -43,10 +45,15 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `wrap-up` section's fields, added to core's. */
+  interface RafaConfig extends WrapUpSettings {}
+}
 
 /** The fewest retry sessions `loop.wrapUp.retries` accepts as a number. */
 export const WRAP_UP_RETRIES_MIN = 1;
@@ -96,3 +103,10 @@ export const WRAP_UP_SETTINGS: {
 } = {
   loopWrapUpRetries: { key: 'loop.wrapUp.retries', read: wrapUpRetries, cli: false },
 };
+
+/** The `wrap-up` section: `loop.wrapUp.retries`, with their defaults and no check. */
+export const WRAP_UP_SECTION: ConfigSection = Object.freeze({
+  package: 'wrap-up',
+  settings: Object.freeze(WRAP_UP_SETTINGS),
+  defaults: WRAP_UP_DEFAULTS,
+});

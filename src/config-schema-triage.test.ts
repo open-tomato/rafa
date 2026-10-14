@@ -10,16 +10,21 @@
  * module that renames a key or moves a default fails rather than
  * agreeing with itself.
  */
+import type { ConfigSetting } from './core/config/index.js';
+
 import { describe, expect, it } from 'bun:test';
 
 import {
   similarityCandidates,
   similarityThreshold,
   TRIAGE_DEFAULTS,
+  TRIAGE_SECTION,
 } from './config-schema-triage.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
   SETTINGS,
@@ -157,5 +162,40 @@ describe('through a file', () => {
     const error = refusal(() => parseConfigText(`triage:\n  similarity:\n    candidates: ${spelled}\n`, PATH));
 
     expect(error.message).toContain(`${CANDIDATES} is ${spelled}, ${EXPECTED_CANDIDATES}`);
+  });
+});
+
+describe('the section', () => {
+  it('is package triage, defining its keys in this order with these defaults, with no check', () => {
+    expect(TRIAGE_SECTION.package).toBe('triage');
+    expect(Object.entries(TRIAGE_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['triageSimilarityThreshold', 'triage.similarity.threshold'],
+      ['triageSimilarityCandidates', 'triage.similarity.candidates'],
+    ]);
+    expect(TRIAGE_SECTION.defaults).toEqual({
+      triageSimilarityThreshold: 0.3,
+      triageSimilarityCandidates: 3,
+    });
+    expect(TRIAGE_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(TRIAGE_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(TRIAGE_SECTION)).toBe(true);
+    expect(Object.isFrozen(TRIAGE_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(TRIAGE_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [TRIAGE_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['triage']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(TRIAGE_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(TRIAGE_SECTION.settings).sort());
   });
 });

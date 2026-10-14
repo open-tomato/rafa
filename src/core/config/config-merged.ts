@@ -28,9 +28,11 @@
  * reads, `config-schema-board-project.ts` the `board.project` limits,
  * spread in after `board.project.number`, and `config-schema-hub.ts` the
  * `hub` section, spread in after `effort.sync`. Each file exports its
- * fields as an interface of its own; the `declare module` block below
- * adds all eleven to `RafaConfig`. Core's settings are taken in the runs
- * the section files sit between, so a key keeps its place.
+ * fields as an interface of its own and adds it to `RafaConfig` with a
+ * `declare module` on `config-schema.ts`, beside the `ConfigSection` it
+ * exports; this module names none of those interfaces. Core's settings
+ * are taken in the runs the section files sit between, so a key keeps
+ * its place.
  *
  * ## The closed set
  *
@@ -66,21 +68,6 @@ import type {
   SettingSpec,
 } from './config-schema.js';
 import type { CoreSection, CoreSetting } from './core-section.js';
-import type { BoardProjectLimitSettings } from '../../config-schema-board-project.js';
-import type { ErrorsSettings } from '../../config-schema-errors.js';
-import type { HubSettings } from '../../config-schema-hub.js';
-import type { IssuesConfigSettings } from '../../config-schema-issues.js';
-import type { LoggerConfigSettings } from '../../config-schema-logger.js';
-import type { LoopContinueSettings } from '../../config-schema-loop-continue.js';
-import type { LoopRetriesSettings } from '../../config-schema-loop-retries.js';
-import type {
-  DangerousReleaseSettings,
-  PrSettings,
-  ReleaseSettings,
-} from '../../config-schema-release.js';
-import type { TestsSettings } from '../../config-schema-tests.js';
-import type { TriageSettings } from '../../config-schema-triage.js';
-import type { WrapUpSettings } from '../../config-schema-wrap-up.js';
 
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
@@ -105,14 +92,6 @@ import { TRIAGE_DEFAULTS, TRIAGE_SETTINGS } from '../../config-schema-triage.js'
 import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from '../../config-schema-wrap-up.js';
 
 import { CORE_SECTION } from './core-section.js';
-
-declare module './config-schema.js' {
-  /** The section files' fields, added to core's. */
-  interface RafaConfig
-    extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
-    TestsSettings, TriageSettings, LoopRetriesSettings, LoopContinueSettings,
-    WrapUpSettings, BoardProjectLimitSettings, ErrorsSettings, LoggerConfigSettings, IssuesConfigSettings {}
-}
 
 /** Core's settings up to `effort.sync`, before the `hub` section. */
 const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;

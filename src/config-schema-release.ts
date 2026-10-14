@@ -1,13 +1,15 @@
 /**
  * The `pr` and `release` sections of the config schema, and the one
  * `dangerous` key the release plan adds: each setting's field, its
- * default and its spec. `core/config/config-merged.ts` adds
- * {@link PrSettings}, {@link ReleaseSettings} and
- * {@link DangerousReleaseSettings} to `RafaConfig`, and its `CONFIG_DEFAULTS` and
- * `SETTINGS` spread the objects below at the places the two sections
- * always sat, and the `dangerous` key right after
- * `dangerous.acceptStaleRefs`, so the order settings are reported in,
- * and the order a warning lists keys in, holds each key's section.
+ * default and its spec. {@link RELEASE_SECTION} hands them to core as
+ * one `ConfigSection`, package `release`, and the `declare module` below
+ * adds {@link PrSettings}, {@link ReleaseSettings} and
+ * {@link DangerousReleaseSettings} to `RafaConfig`.
+ * `core/config/config-merged.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below at the places the two sections always sat,
+ * and the `dangerous` key right after `dangerous.acceptStaleRefs`, so
+ * the order settings are reported in, and the order a warning lists keys
+ * in, holds each key's section.
  *
  * They moved out of `config-schema.ts` when that module stood at 780
  * lines, measured with `wc -l`, before the release plan's six keys
@@ -131,7 +133,7 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type {
   MergeMethod,
   PrProvider,
@@ -158,6 +160,11 @@ import {
   usdAmount,
   versionCollisionMode,
 } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `release` section's fields, added to core's. */
+  interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
+}
 
 /** The `pr` section's settings, resolved. */
 export interface PrSettings {
@@ -311,3 +318,10 @@ export const DANGEROUS_RELEASE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `release` section: the `pr` and `release` keys and `dangerous.acceptVersionCollision`, with their defaults and no check. */
+export const RELEASE_SECTION: ConfigSection = Object.freeze({
+  package: 'release',
+  settings: Object.freeze({ ...PR_SETTINGS, ...RELEASE_SETTINGS, ...DANGEROUS_RELEASE_SETTINGS }),
+  defaults: Object.freeze({ ...PR_DEFAULTS, ...RELEASE_DEFAULTS, ...DANGEROUS_RELEASE_DEFAULTS }),
+});

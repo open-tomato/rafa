@@ -1,17 +1,18 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name
  * `config-items.ts`, `config-schema.ts`, `config-merged.ts`,
- * `core-section.ts` and `config.ts` export and the `sections.ts` barrel
- * does not, each once, as the same binding, and no other name.
+ * `core-section.ts`, `section.ts` and `config.ts` export and the
+ * `sections.ts` barrel does not, each once, as the same binding, and no
+ * other name.
  *
- * The barrel spells its names, so a name added to one of the five files
+ * The barrel spells its names, so a name added to one of the six files
  * and not to the barrel is a name no file outside `src/core/` can import.
  * Nothing here is spelled a second time: both sides are read off the
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `sections.test.ts` reads its barrel.
  *
- * `config.ts` re-exports names of the other four files and of
- * `config-sections.ts`, so the expected list is the union of the five
+ * `config.ts` re-exports names of three of the other files and of
+ * `config-sections.ts`, so the expected list is the union of the six
  * files' names, each counted once, less the names of `sections.ts`. The
  * last case holds the two barrels apart on its own: no name is on both.
  *
@@ -19,14 +20,16 @@
  * its namespace carries no runtime name, and the merged names come from
  * `config-merged.ts`.
  *
- * Six names are held by name, so a reading that came back empty, or one
+ * Eight names are held by name, so a reading that came back empty, or one
  * that saw runtime names alone, fails rather than agreeing with itself:
  * `SettingSpec`, a type of `config-schema.ts` that `config.ts` does not
  * re-export; `ConfigLayers`, a type of `config.ts`; `HubContext`, the
  * type `config.ts` re-exports from `src/config-schema-hub.ts` and none
- * of the five declares; `moduleSource`, a reader of `config-items.ts`
+ * of the six declares; `moduleSource`, a reader of `config-items.ts`
  * that `config.ts` does not re-export; `CORE_SECTION`, a value of
- * `core-section.ts` that `config.ts` does not re-export; and
+ * `core-section.ts` that `config.ts` does not re-export;
+ * `registerConfigSections` and `ConfigSection`, a value and a type of
+ * `section.ts`, which `config.ts` does not re-export; and
  * `InjectMode`, a type `config.ts` re-exports from `config-sections.ts`,
  * which is the control that the subtraction removes something.
  */
@@ -40,6 +43,7 @@ import * as merged from './config-merged.js';
 import * as schema from './config-schema.js';
 import * as config from './config.js';
 import * as coreSection from './core-section.js';
+import * as section from './section.js';
 import * as sectionsBarrel from './sections.js';
 
 import * as barrel from './index.js';
@@ -52,6 +56,7 @@ const ITEMS = 'src/core/config/config-items.ts';
 const SCHEMA = 'src/core/config/config-schema.ts';
 const MERGED = 'src/core/config/config-merged.ts';
 const CORE = 'src/core/config/core-section.ts';
+const SECTION = 'src/core/config/section.ts';
 const CONFIG = 'src/core/config/config.ts';
 
 /**
@@ -99,13 +104,27 @@ function unionLess(lists: readonly (readonly string[])[], less: readonly string[
     .sort();
 }
 
-/** The runtime bindings of the five files, a name two of them export counted once. */
-const BEHIND: Readonly<Record<string, unknown>> = { ...items, ...schema, ...merged, ...coreSection, ...config };
+/** The runtime bindings of the six files, a name two of them export counted once. */
+const BEHIND: Readonly<Record<string, unknown>> = {
+  ...items,
+  ...schema,
+  ...merged,
+  ...coreSection,
+  ...section,
+  ...config,
+};
 
 describe('the config barrel', () => {
-  it('exports the runtime names of the five files the sections barrel does not hold, each once, and no other', () => {
+  it('exports the runtime names of the six files the sections barrel does not hold, each once, and no other', () => {
     const expected = unionLess(
-      [Object.keys(items), Object.keys(schema), Object.keys(merged), Object.keys(coreSection), Object.keys(config)],
+      [
+        Object.keys(items),
+        Object.keys(schema),
+        Object.keys(merged),
+        Object.keys(coreSection),
+        Object.keys(section),
+        Object.keys(config),
+      ],
       Object.keys(sectionsBarrel),
     );
 
@@ -116,6 +135,8 @@ describe('the config barrel', () => {
     expect(Object.keys(config).length).toBeGreaterThan(0);
     expect(Object.keys(config)).not.toContain('CORE_SECTION');
     expect(expected).toContain('CORE_SECTION');
+    expect(Object.keys(config)).not.toContain('registerConfigSections');
+    expect(expected).toContain('registerConfigSections');
     expect(expected).toContain('moduleSource');
     expect(Object.keys(config)).toContain('INJECT_MODES');
     expect(expected).not.toContain('INJECT_MODES');
@@ -128,26 +149,36 @@ describe('the config barrel', () => {
     for (const name of Object.keys(barrel)) {
       expect([name, exported[name] === BEHIND[name]]).toEqual([name, true]);
     }
-    // A name two of the five export is one binding, so the spread above lost none.
+    // A name two of the six export is one binding, so the spread above lost none.
     for (const [name, value] of [
       ...Object.entries(items),
       ...Object.entries(schema),
       ...Object.entries(merged),
       ...Object.entries(coreSection),
+      ...Object.entries(section),
     ]) {
       expect([name, BEHIND[name] === value]).toEqual([name, true]);
     }
   });
 
-  it('exports the type names of the five files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, SECTIONS_BARREL, ITEMS, SCHEMA, MERGED, CORE, CONFIG]);
+  it('exports the type names of the six files with the runtime ones, each once, and no other', () => {
+    const names = readExportNames([BARREL, SECTIONS_BARREL, ITEMS, SCHEMA, MERGED, CORE, SECTION, CONFIG]);
     const expected = unionLess(
-      [names[ITEMS] ?? [], names[SCHEMA] ?? [], names[MERGED] ?? [], names[CORE] ?? [], names[CONFIG] ?? []],
+      [
+        names[ITEMS] ?? [],
+        names[SCHEMA] ?? [],
+        names[MERGED] ?? [],
+        names[CORE] ?? [],
+        names[SECTION] ?? [],
+        names[CONFIG] ?? [],
+      ],
       names[SECTIONS_BARREL] ?? [],
     );
 
     expect(names[SCHEMA]).toEqual(['CommandLineSetting', 'ConfigSetting', 'RafaConfig', 'SettingSpec']);
     expect(names[CORE]).toContain('CoreSetting');
+    expect(names[SECTION]).toContain('ConfigSection');
+    expect(names[CONFIG]).not.toContain('ConfigSection');
     expect(names[CONFIG]).not.toContain('SettingSpec');
     expect(names[CONFIG]).toContain('ConfigLayers');
     expect(names[CONFIG]).toContain('HubContext');

@@ -17,10 +17,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { globList, TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
+import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
   SETTINGS,
@@ -232,5 +234,44 @@ describe('the tests section through a file', () => {
 
     expect(file.extras).toEqual([]);
     expect(resolveConfig({ file }).warnings).toEqual([]);
+  });
+});
+
+describe('the section', () => {
+  it('is package tests, defining its keys in this order with these defaults, with no check', () => {
+    expect(TESTS_SECTION.package).toBe('tests');
+    expect(Object.entries(TESTS_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
+      ['testsIntegration', 'tests.integration'],
+      ['testsAlwaysRun', 'tests.alwaysRun'],
+      ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
+    ]);
+    expect(TESTS_SECTION.defaults).toEqual({
+      testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+      testsIntegration: ['**/*-integration.test.ts', '**/*.integration.test.ts', '**/*-spawned*.test.ts', '**/*-cli.test.ts'],
+      testsAlwaysRun: ['src/**/*.sweep.test.ts'],
+      testsRetakeRedAlone: true,
+    });
+    expect(TESTS_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(TESTS_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(TESTS_SECTION)).toBe(true);
+    expect(Object.isFrozen(TESTS_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(TESTS_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [TESTS_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['tests']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(TESTS_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(TESTS_SECTION.settings).sort());
   });
 });

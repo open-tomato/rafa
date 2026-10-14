@@ -10,9 +10,9 @@
  * Their file keys, readers and defaults are `core-section.ts`'s, which
  * hands them in as `CORE_SECTION`. The other fields are the eleven
  * section files' (`src/config-schema-*.ts`), each declaring its own
- * interface; `config-merged.ts` adds them to {@link RafaConfig} by
- * declaration merging, so this module names no section file and
- * {@link ConfigSetting} still names every setting. Nothing merged —
+ * interface and adding it to {@link RafaConfig} by declaration merging,
+ * a `declare module` on this file, so this module names no section file
+ * and {@link ConfigSetting} still names every setting. Nothing merged —
  * the settings record, the defaults, the key indexes — is exported
  * here: `config-merged.ts` builds them.
  *
