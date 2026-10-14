@@ -489,8 +489,8 @@ const DEFAULT_PLAN_DIR = '.rafa/plans';
 const PLAN_MODULE = join(SRC_DIR, 'plan.ts');
 
 /** The skill index the command reads for `scratch`, under the config it resolves there. */
-function scratchSkillIndex(scratch: Scratch): string {
-  const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+async function scratchSkillIndex(scratch: Scratch): Promise<string> {
+  const { config } = await loadConfig({ root: scratch.repo, home: scratch.home });
   return readPlanSkillIndex(scratch.repo, scratch.home, config, PLAN_MODULE);
 }
 
@@ -501,11 +501,11 @@ function scratchSkillIndex(scratch: Scratch): string {
  * planner hands it to the command's builder and as the `claude` planner
  * does (`src/adapters/planner/claude.ts`, "Paths").
  */
-function expectedPrompt(
+async function expectedPrompt(
   scratch: Scratch,
   progress: string | undefined,
   planDir: string = DEFAULT_PLAN_DIR,
-): string {
+): Promise<string> {
   const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
   return buildPlanPrompt(
     template,
@@ -515,7 +515,7 @@ function expectedPrompt(
     join(realpathSync(scratch.repo), planDir),
     progress,
     undefined,
-    scratchSkillIndex(scratch),
+    await scratchSkillIndex(scratch),
   );
 }
 
@@ -733,11 +733,11 @@ describe('the skill index the command reads', () => {
     return { root, home };
   }
 
-  it('lists a project skill ahead of the rafa tier, and not one the config switches off', () => {
+  it('lists a project skill ahead of the rafa tier, and not one the config switches off', async () => {
     const { root, home } = plantRoots();
     plantProjectSkill(root, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray', 'tags: [probe]']);
     plantProjectSkill(root, 'zz-off', ['description: "Use when never"', 'prevents: nothing at all']);
-    const settings = loadConfig({ root, home }).config;
+    const settings = (await loadConfig({ root, home })).config;
     const off = { ...settings, tiersSkills: new Map([['zz-off', false as const]]) };
 
     const shown = readPlanSkillIndex(root, home, settings, PLAN_MODULE).split('\n');
@@ -751,10 +751,10 @@ describe('the skill index the command reads', () => {
     expect(index.some((line) => line.startsWith('dev-planner — '))).toBe(true);
   });
 
-  it('leaves the user tier out while loop.settingSources does not name user', () => {
+  it('leaves the user tier out while loop.settingSources does not name user', async () => {
     const { root, home } = plantRoots();
     plantProjectSkill(home, 'user-probe', ['description: "Use when probing"', 'prevents: a user probe']);
-    const settings = loadConfig({ root, home }).config;
+    const settings = (await loadConfig({ root, home })).config;
 
     const index = readPlanSkillIndex(root, home, settings, PLAN_MODULE);
     const withUser = readPlanSkillIndex(root, home, { ...settings, settingSources: ['user', 'project', 'local'] }, PLAN_MODULE);
@@ -766,7 +766,7 @@ describe('the skill index the command reads', () => {
 });
 
 describe('rafa plan through the adapter registry', () => {
-  it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
+  it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', async () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
@@ -777,7 +777,7 @@ describe('rafa plan through the adapter registry', () => {
       planDir: DEFAULT_PLAN_DIR,
       settingSources: ['project', 'local'],
       request: { specPath: 'spec.md', stub: 'spec' },
-      prompt: expectedPrompt(scratch, undefined),
+      prompt: await expectedPrompt(scratch, undefined),
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
@@ -791,29 +791,29 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('hands the planner the plan.dir a config names, and names the plan in it', () => {
+  it('hands the planner the plan.dir a config names, and names the plan in it', async () => {
     // Deliberate custom-directory fixture: configures `plan.dir` to `.plans` to verify the planner reads the custom setting.
     const scratch = plantScratch();
     plantProjectConfig(scratch.repo, 'version: 1\nplan:\n  dir: .plans\n');
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
-    expect(expectedPrompt(scratch, undefined, '.plans')).not.toBe(expectedPrompt(scratch, undefined));
+    expect(await expectedPrompt(scratch, undefined, '.plans')).not.toBe(await expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: expectedPrompt(scratch, undefined, '.plans') });
+    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: await expectedPrompt(scratch, undefined, '.plans') });
     expect(run.stdout).toContain('📝 Generating .plans/PLAN-spec.md from spec.md...');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('renders the routing the config resolves into the prompt, not rafa\'s defaults alone', () => {
+  it('renders the routing the config resolves into the prompt, not rafa\'s defaults alone', async () => {
     const scratch = plantScratch({ config: 'routing:\n  cleanup: refactor-cleaner\n  tests: false\n' });
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
     // The control: the defaults' prompt routes `tests` and not `cleanup`,
     // so the two readings below are the config's doing.
-    expect(expectedPrompt(scratch, undefined)).toContain('| `tests` | `tdd-guide` |');
-    expect(expectedPrompt(scratch, undefined)).not.toContain('`cleanup`');
+    expect(await expectedPrompt(scratch, undefined)).toContain('| `tests` | `tdd-guide` |');
+    expect(await expectedPrompt(scratch, undefined)).not.toContain('`cleanup`');
     expect(run.exitCode).toBe(0);
     const prompt = String(readRecord(scratch)['prompt']);
     expect(prompt).toContain('| `cleanup` | `refactor-cleaner` |');
@@ -822,7 +822,7 @@ describe('rafa plan through the adapter registry', () => {
     expect(prompt).not.toContain('{ROUTING}');
   }, 30_000);
 
-  it('renders the skill index the tiers resolve into the prompt, a project skill included', () => {
+  it('renders the skill index the tiers resolve into the prompt, a project skill included', async () => {
     const scratch = plantScratch();
     plantProjectSkill(scratch.repo, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray']);
 
@@ -830,7 +830,7 @@ describe('rafa plan through the adapter registry', () => {
 
     expect(run.exitCode).toBe(0);
     const prompt = String(readRecord(scratch)['prompt']);
-    expect(prompt).toBe(expectedPrompt(scratch, undefined));
+    expect(prompt).toBe(await expectedPrompt(scratch, undefined));
     expect(prompt).toContain(`${SKILL_INDEX_HEADING}\n`);
     expect(prompt).toContain('\naa-probe — a probe gone astray\n');
     expect(prompt).not.toContain('{SKILL_INDEX}');
@@ -976,14 +976,14 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('hands the planner a prompt holding progress.txt when --no-progress is not given', () => {
+  it('hands the planner a prompt holding progress.txt when --no-progress is not given', async () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md']);
 
-    expect(expectedPrompt(scratch, PROGRESS)).not.toBe(expectedPrompt(scratch, undefined));
+    expect(await expectedPrompt(scratch, PROGRESS)).not.toBe(await expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)['prompt']).toBe(expectedPrompt(scratch, PROGRESS));
+    expect(readRecord(scratch)['prompt']).toBe(await expectedPrompt(scratch, PROGRESS));
     expect(run.stdout).toContain('📎 Including findings from progress.txt (disable with --no-progress).');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);

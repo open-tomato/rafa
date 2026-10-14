@@ -203,7 +203,7 @@ export async function refreshProjectAfterEpic(
   let warnings: readonly string[];
   try {
     // Its warnings dropped: the action wrote them for the same file, or reads no config of its own.
-    const config = issueSubjectConfig(project, () => undefined);
+    const config = await issueSubjectConfig(project, () => undefined);
     if (config.boardProjectNumber === null) return null;
     const retry = commandRetrySeams(context.output, context.outputMode, seams.sleep);
     const openGh = (): GhRunner => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, retry);

@@ -422,11 +422,11 @@ describe('pullBeforeRead', () => {
     expect(service.contexts[0]?.repoRoot).toBe(root);
   });
 
-  it('while the same file read with a sink writes the config warning it kept back, the control', () => {
+  it('while the same file read with a sink writes the config warning it kept back, the control', async () => {
     const root = projectHolding(`${SERVICE}${UNKNOWN_KEY}`);
     const warnings: string[] = [];
 
-    loadConfig({ root, home: HOME }, {}, (line) => warnings.push(line));
+    await loadConfig({ root, home: HOME }, {}, (line) => warnings.push(line));
 
     expect(warnings).toHaveLength(1);
   });

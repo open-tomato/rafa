@@ -54,9 +54,9 @@ afterAll(() => {
 });
 
 /** What `run` threw, as its exit code and message for a `CommandExit`, or undefined when it returned. */
-function exitOf(run: () => unknown): unknown {
+async function exitOf(run: () => unknown): Promise<unknown> {
   try {
-    run();
+    await run();
   } catch (error) {
     return error instanceof CommandExit
       ? { exitCode: error.exitCode, message: error.message }
@@ -81,40 +81,40 @@ function warningsOf(): { warn: (message: string) => void; lines: string[] } {
 }
 
 describe('where plans sit', () => {
-  it('resolves the default directory for a project whose config sets no plan.dir', () => {
+  it('resolves the default directory for a project whose config sets no plan.dir', async () => {
     const project = plantProject();
     const warnings = warningsOf();
 
     expect(CONFIG_DEFAULTS.planDir).toBe(join('.rafa', 'plans'));
-    expect(resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
+    expect(await resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
       label: join('.rafa', 'plans'),
       path: join(project.root, '.rafa', 'plans'),
     });
     expect(warnings.lines).toEqual([]);
   });
 
-  it('resolves the directory a config names, which is where the default case would have read none', () => {
+  it('resolves the directory a config names, which is where the default case would have read none', async () => {
     const project = plantProject('plan:\n  dir: docs/plans\n');
     const warnings = warningsOf();
 
-    expect(resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
+    expect(await resolvePlansDir(project, 'rafa plan list', warnings.warn)).toEqual({
       label: 'docs/plans',
       path: join(project.root, 'docs', 'plans'),
     });
     expect(warnings.lines).toEqual([]);
   });
 
-  it('resolves an absolute plan.dir as itself, the project root unread', () => {
+  it('resolves an absolute plan.dir as itself, the project root unread', async () => {
     const project = plantProject('plan:\n  dir: /tmp/rafa-plans-elsewhere\n');
 
-    expect(resolvePlansDir(project, 'rafa plan list', () => undefined))
+    expect(await resolvePlansDir(project, 'rafa plan list', () => undefined))
       .toEqual({ label: '/tmp/rafa-plans-elsewhere', path: '/tmp/rafa-plans-elsewhere' });
   });
 
-  it('refuses a config the loader will not give with exit code 1, naming the command and the problem', () => {
+  it('refuses a config the loader will not give with exit code 1, naming the command and the problem', async () => {
     const project = plantProject('plan:\n  dir: ""\n');
 
-    expect(exitOf(() => resolvePlansDir(project, 'rafa plan show', () => undefined))).toEqual({
+    expect(await exitOf(() => resolvePlansDir(project, 'rafa plan show', () => undefined))).toEqual({
       exitCode: 1,
       message: [
         '❌ rafa plan show: the config cannot be used:',
@@ -123,12 +123,12 @@ describe('where plans sit', () => {
     });
   });
 
-  it('resolves the whole config for a project, and refuses one the loader will not give as the directory reading does', () => {
+  it('resolves the whole config for a project, and refuses one the loader will not give as the directory reading does', async () => {
     const named = plantProject('plan:\n  dir: docs/plans\n');
     const refused = plantProject('plan:\n  dir: ""\n');
 
-    expect(resolveProjectConfig(named, 'rafa plan risk', () => undefined).planDir).toBe('docs/plans');
-    expect(exitOf(() => resolveProjectConfig(refused, 'rafa plan risk', () => undefined))).toEqual({
+    expect((await resolveProjectConfig(named, 'rafa plan risk', () => undefined)).planDir).toBe('docs/plans');
+    expect(await exitOf(() => resolveProjectConfig(refused, 'rafa plan risk', () => undefined))).toEqual({
       exitCode: 1,
       message: [
         '❌ rafa plan risk: the config cannot be used:',
@@ -210,30 +210,30 @@ describe('issues and counts in prose', () => {
 });
 
 describe('the argument refusals', () => {
-  it('passes a command reading no argument a line handing none, and refuses one handing any', () => {
-    expect(exitOf(() => expectNoArgument([], 'rafa plan list'))).toBeUndefined();
-    expect(exitOf(() => expectNoArgument(['a', 'b'], 'rafa plan list'))).toEqual({
+  it('passes a command reading no argument a line handing none, and refuses one handing any', async () => {
+    expect(await exitOf(() => expectNoArgument([], 'rafa plan list'))).toBeUndefined();
+    expect(await exitOf(() => expectNoArgument(['a', 'b'], 'rafa plan list'))).toEqual({
       exitCode: 1,
       message: '❌ Expected no argument, got 2: a b\nUsage: rafa plan list',
     });
   });
 
-  it('answers the one argument of a line handing exactly one, and refuses a line handing none or two', () => {
+  it('answers the one argument of a line handing exactly one, and refuses a line handing none or two', async () => {
     expect(expectOneArgument(['my-plan'], 'rafa plan show <stub>')).toBe('my-plan');
-    expect(exitOf(() => expectOneArgument([], 'rafa plan show <stub>'))).toEqual({
+    expect(await exitOf(() => expectOneArgument([], 'rafa plan show <stub>'))).toEqual({
       exitCode: 1,
       message: '❌ Expected one argument, got none\nUsage: rafa plan show <stub>',
     });
-    expect(exitOf(() => expectOneArgument(['a', 'b'], 'rafa plan show <stub>'))).toEqual({
+    expect(await exitOf(() => expectOneArgument(['a', 'b'], 'rafa plan show <stub>'))).toEqual({
       exitCode: 1,
       message: '❌ Expected one argument, got 2: a b\nUsage: rafa plan show <stub>',
     });
   });
 
-  it('answers the argument of a line handing one, null for none, and refuses a line handing two', () => {
+  it('answers the argument of a line handing one, null for none, and refuses a line handing two', async () => {
     expect(expectAtMostOneArgument(['plan.md'], 'rafa plan risk [<plan>]')).toBe('plan.md');
     expect(expectAtMostOneArgument([], 'rafa plan risk [<plan>]')).toBeNull();
-    expect(exitOf(() => expectAtMostOneArgument(['a', 'b'], 'rafa plan risk [<plan>]'))).toEqual({
+    expect(await exitOf(() => expectAtMostOneArgument(['a', 'b'], 'rafa plan risk [<plan>]'))).toEqual({
       exitCode: 1,
       message: '❌ Expected at most one argument, got 2: a b\nUsage: rafa plan risk [<plan>]',
     });
@@ -246,8 +246,8 @@ describe('a flag taking no value', () => {
     expect([true, 'true'].map((value) => readSwitch('strict', value, 'hint'))).toEqual([true, true]);
   });
 
-  it('refuses a word the parser read as its value, naming the flag, the word and the hint', () => {
-    expect(exitOf(() => readSwitch('strict', 'plan.md', 'Type the plan first.'))).toEqual({
+  it('refuses a word the parser read as its value, naming the flag, the word and the hint', async () => {
+    expect(await exitOf(() => readSwitch('strict', 'plan.md', 'Type the plan first.'))).toEqual({
       exitCode: 1,
       message: '❌ --strict takes no value, and read "plan.md" as one. Type the plan first.',
     });

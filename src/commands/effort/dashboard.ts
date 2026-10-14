@@ -59,14 +59,14 @@ function trendOptionsOf(context: RafaContext): NonNullable<ReturnType<typeof par
 }
 
 /** Runs one invocation. See the module note. */
-export function runDashboard(context: RafaContext, seams: DashboardCommandSeams): void {
+export async function runDashboard(context: RafaContext, seams: DashboardCommandSeams): Promise<void> {
   expectNoArgument(context.args, USAGE);
   const root = requireProject(context, COMMAND_NAME).root;
   const trend = trendOptionsOf(context);
 
   let dashboard: Dashboard;
   try {
-    dashboard = readDashboard({
+    dashboard = await readDashboard({
       repoRoot: root,
       home: seams.home ?? homedir(),
       trend,

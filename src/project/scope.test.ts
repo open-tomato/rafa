@@ -299,7 +299,7 @@ describe('resolveScope on disk', () => {
     });
   });
 
-  it('answers the roots loadConfig reads the project and user files from', () => {
+  it('answers the roots loadConfig reads the project and user files from', async () => {
     const project = freshDir();
     plantConfig(project, 'version: 1\nstore: ndjson\n');
     const home = makeDir(join(freshDir(), 'home'));
@@ -307,7 +307,7 @@ describe('resolveScope on disk', () => {
 
     const resolution = resolveScope(makeDir(join(project, 'src')), { home });
     if (!resolution.found) throw new Error(resolution.hint);
-    const loaded = loadConfig(resolution, {}, () => {});
+    const loaded = await loadConfig(resolution, {}, () => {});
 
     expect(loaded.config.store).toBe('ndjson');
     expect(loaded.sources.store).toBe('file');

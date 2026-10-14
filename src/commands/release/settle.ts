@@ -320,7 +320,7 @@ export async function runSettle(
   expectNoArgument(context.args, RELEASE_SETTLE_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${RELEASE_SETTLE_USAGE}`);
   const project = projectOf(context);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const settings = settleSettings(config);

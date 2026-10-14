@@ -163,12 +163,12 @@ describe('a skills= name no tier holds, over a scratch plan and project', () => 
 });
 
 describe('buildPlanPrompt over a fixture spec and a scratch skill tree', () => {
-  it('carries the index of the scratch skills after the routing section and before the spec', () => {
+  it('carries the index of the scratch skills after the routing section and before the spec', async () => {
     const root = join(tempRoot, 'prompt-repo');
     const home = join(tempRoot, 'prompt-home');
     for (const dir of [root, home]) mkdirSync(dir, { recursive: true });
     plantSkill(root, KNOWN);
-    const { config } = loadConfig({ root, home });
+    const { config } = await loadConfig({ root, home });
     const index = readPlanSkillIndex(root, home, config, join(SRC_DIR, 'plan.ts'));
     const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
 

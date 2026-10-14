@@ -825,11 +825,11 @@ function filesUnder(directory: string): string[] {
  * (`/var` for `/private/var`): `rafa plan` runs on {@link dispatchedRoot},
  * and `planCommand` on the root its caller hands it.
  */
-function expectedPlanPrompt(scratch: PlanScratch, root: string): string {
+async function expectedPlanPrompt(scratch: PlanScratch, root: string): Promise<string> {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
   const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
   const home = scratch.env['HOME'] ?? '';
-  const { config } = loadConfig({ root: scratch.repo, home });
+  const { config } = await loadConfig({ root: scratch.repo, home });
   const index = readPlanSkillIndex(scratch.repo, home, config, join(REPO_ROOT, 'src', 'plan.ts'));
   const planDir = join(root, '.rafa', 'plans');
   return buildPlanPrompt(template, skill, SPEC, 'spec', planDir, undefined, undefined, index);
@@ -1168,22 +1168,22 @@ describe('the prompt templates in the build', () => {
     expect(readBundledFile(name, DIST)).toBe(source);
   });
 
-  it('hands rafa plan the template beside dist/cli.js', () => {
+  it('hands rafa plan the template beside dist/cli.js', async () => {
     const scratch = plantPlanScratch('cli');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
-  it('spawns rafa plan under the setting sources a user config names', () => {
+  it('spawns rafa plan under the setting sources a user config names', async () => {
     const scratch = plantPlanScratch('sources');
     plantUserConfig(scratch, 'loop:\n  settingSources: local,user\n');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
@@ -1199,7 +1199,7 @@ describe('the prompt templates in the build', () => {
     expect(existsSync(scratch.args)).toBe(false);
   }, 30_000);
 
-  it('hands planCommand the template beside dist/index.js', () => {
+  it('hands planCommand the template beside dist/index.js', async () => {
     const scratch = plantPlanScratch('library');
     const probe = join(scratch.root, 'probe.ts');
     writeFileSync(probe, [
@@ -1209,11 +1209,11 @@ describe('the prompt templates in the build', () => {
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, scratch.repo));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, scratch.repo));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
-  it('names the plan under the root planCommand is handed through a link, as that root is spelled', () => {
+  it('names the plan under the root planCommand is handed through a link, as that root is spelled', async () => {
     const scratch = plantPlanScratch('library-link');
     const link = join(scratch.root, 'link');
     symlinkSync(scratch.repo, link, 'dir');
@@ -1226,18 +1226,18 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, probe], link, scratch.env);
 
     expect(realpathSync(link)).not.toBe(link);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, link));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, link));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
-  it('hands rafa plan the format from a copy of the build outside the package', () => {
+  it('hands rafa plan the format from a copy of the build outside the package', async () => {
     const scratch = plantPlanScratch('outside');
     const copy = copyBuildOutsidePackage(scratch, null);
     const plan = run([process.execPath, join(copy, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
     expect(existsSync(join(copy, '..', 'src'))).toBe(false);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(await expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 

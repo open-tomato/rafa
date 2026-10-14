@@ -566,16 +566,16 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
  * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
-function resolveSources(
+async function resolveSources(
   options: CollectOptions,
   log: (line: string) => void,
-): Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string } {
+): Promise<Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string }> {
   const { repoRoot: root, store, plansDir } = options;
   if (store !== undefined && plansDir !== undefined) {
     return { store, plansDir, worktreeDir: options.worktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir };
   }
 
-  const { config } = loadConfig({ root, home: options.home }, {}, log);
+  const { config } = await loadConfig({ root, home: options.home }, {}, log);
   return {
     store: store ?? selectEffortStore(root, config),
     plansDir: plansDir ?? resolve(root, config.planDir),
@@ -609,7 +609,7 @@ export async function collectEffort(
   const { repoRoot } = options;
   const verbose = options.verbose ?? false;
   const log = options.log ?? ((line: string) => activeOutput().info(line));
-  const { worktreeDir, ...sources } = resolveSources(options, log);
+  const { worktreeDir, ...sources } = await resolveSources(options, log);
   const context: HalfContext = {
     repoRoot,
     logDirs: logDirsOf(options, worktreeDir),
@@ -733,7 +733,7 @@ export default async function collect(args: string[], repoRoot: string): Promise
       verbose: parsed.verbose,
     });
     // Read again for the contact, silently: `collectEffort` warned about it once.
-    resolved = loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
+    resolved = await loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);

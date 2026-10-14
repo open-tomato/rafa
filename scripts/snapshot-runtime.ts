@@ -80,13 +80,13 @@ export function readOptions(argv: readonly string[]): InstallOptions {
  * or could not run and the `PATH` warning to `error`, and answers the
  * exit code.
  */
-export function runSnapshot(
+export async function runSnapshot(
   seams: InstallSeams,
   error: (line: string) => void,
   pathValue: string | undefined,
   options: InstallOptions = {},
-): number {
-  const outcome = installRuntime(seams, options);
+): Promise<number> {
+  const outcome = await installRuntime(seams, options);
   const problem = outcomeProblem(outcome, seams.repoRoot);
   for (const line of problem ?? []) error(`${TAG} ${line}`);
   if (outcome.kind === 'done') {
@@ -100,7 +100,7 @@ if (import.meta.main) {
   let code = EXIT_COULD_NOT_RUN;
   try {
     const options = readOptions(process.argv.slice(2));
-    code = runSnapshot(defaultSeams(), (line) => console.error(line), process.env['PATH'], options);
+    code = await runSnapshot(defaultSeams(), (line) => console.error(line), process.env['PATH'], options);
   } catch (err) {
     console.error(`${TAG} FAIL — ${messageOf(err)}`);
   }

@@ -537,7 +537,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const skipChecks = readBooleanFlag(context.flags, 'skip-checks', USAGE);
   const wanted = readMethodFlag(context.flags, USAGE);
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const git = (seams.git ?? createGitRunner)(pr.project.root);
   const method = wanted ?? pr.mergeMethod;
 

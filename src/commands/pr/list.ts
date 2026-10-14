@@ -297,7 +297,7 @@ async function rowOf(pulls: PullRequests, pull: PullRequestSummary, readBaseOf: 
 /** Lists the open pull requests and probes each one; see the module note. */
 export async function readList(context: RafaContext, seams: PrListSeams, now: number): Promise<PrListResult> {
   expectNoArguments(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const open = await onProvider('list the open pull requests', () => pr.pulls.list());
   const root = pr.project.root;
   const readBaseOf = resolveReleaseEnabled(pr.versionGuard, root).enabled

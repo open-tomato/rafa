@@ -839,7 +839,7 @@ describe('refreshProjectItems: paced by board.project.writeBatchSize and writePa
         '',
       ].join('\n'));
 
-      const resolved = loadConfig({ root, home: join(root, 'no-such-home') }, {}, () => {});
+      const resolved = await loadConfig({ root, home: join(root, 'no-such-home') }, {}, () => {});
       expect(resolved.config.boardProjectNumber).toBe(NUMBER);
       expect(resolved.config.boardProjectWriteBatchSize).toBe(7);
       expect(resolved.config.boardProjectWritePauseMs).toBe(0);

@@ -584,9 +584,9 @@ export function runBranchLine(planPath: string): string | null {
  * named, as `rafa start` refuses one, before any session starts: a
  * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
-function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
+async function resolvePlanConfig(repoRoot: string, home: string): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: repoRoot, home }).config;
+    return (await loadConfig({ root: repoRoot, home })).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -601,7 +601,7 @@ export default async function plan(
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const home = homedir();
-  const config = resolvePlanConfig(repoRoot, home);
+  const config = await resolvePlanConfig(repoRoot, home);
   const {
     settingSources,
     routing,

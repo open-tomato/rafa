@@ -371,7 +371,7 @@ async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<S
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const { relations, listing } = await readBoard(config, gh);
   const defaultBoard = defaultBoardOnce(config, gh, listing);

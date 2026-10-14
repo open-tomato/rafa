@@ -541,16 +541,16 @@ function textLines(bytes: Uint8Array | undefined): string[] {
  * refusing it, and installs beside a tracker with a task left under a
  * live loop rather than refusing that.
  */
-export function installRuntime(seams: InstallSeams, options: InstallOptions = {}): InstallOutcome {
+export async function installRuntime(seams: InstallSeams, options: InstallOptions = {}): Promise<InstallOutcome> {
   try {
-    return runInstall(seams, options);
+    return await runInstall(seams, options);
   } catch (err) {
     if (!(err instanceof StageFailure)) throw err;
     return { kind: 'failed', stage: err.stage, message: err.message };
   }
 }
 
-function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcome {
+async function runInstall(seams: InstallSeams, options: InstallOptions): Promise<InstallOutcome> {
   const { repoRoot, home, log } = seams;
   const runtimeRoot = join(home, RUNTIME_SUBDIR);
   const linkPath = join(home, RAFA_BIN_DIR, LINK_NAME);
@@ -559,7 +559,7 @@ function runInstall(seams: InstallSeams, options: InstallOptions): InstallOutcom
   log(`link: ${linkPath}`);
 
   const version = inStage('manifest', () => readManifestVersion(repoRoot));
-  const planDir = inStage('config', () => resolve(repoRoot, loadConfig({ root: repoRoot, home }, {}, seams.warn).config.planDir));
+  const planDir = await inStageAsync('config', async () => resolve(repoRoot, (await loadConfig({ root: repoRoot, home }, {}, seams.warn)).config.planDir));
   log(`plan dir: ${planDir}`);
 
   const open = inStage('trackers', () => openTrackers(repoRoot, planDir));
@@ -603,6 +603,16 @@ function loopIsLive(seams: InstallSeams): boolean {
 function inStage<T>(stage: InstallStage, run: () => T): T {
   try {
     return run();
+  } catch (err) {
+    if (err instanceof StageFailure) throw err;
+    throw new StageFailure(stage, messageOf(err));
+  }
+}
+
+/** {@link inStage} for a step that awaits. */
+async function inStageAsync<T>(stage: InstallStage, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
   } catch (err) {
     if (err instanceof StageFailure) throw err;
     throw new StageFailure(stage, messageOf(err));

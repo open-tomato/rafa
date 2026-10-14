@@ -352,7 +352,7 @@ function headTimeOf(detail: PullRequestDetail | null): number | null {
 export async function runWait(context: RafaContext, seams: PrWaitSeams): Promise<PrWaitResult> {
   const minutes = readTimeoutMinutes(context.flags, USAGE);
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   const timeoutMs = minutes * MS_PER_MIN;
   const readDetail = (): Promise<PullRequestDetail | null> => onProvider(

@@ -406,7 +406,7 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
   const project = requireProject(context, COMMAND_NAME);
   const { root } = project;
   const warn = (text: string): void => context.output.warn(text);
-  const config = resolveProjectConfig(project, COMMAND_NAME, warn);
+  const config = await resolveProjectConfig(project, COMMAND_NAME, warn);
   const n = requireStretchBase(config.prBase);
   const plans = plansDirAt(root, config.planDir);
   const kept = existingPlan(plans, line.issue);

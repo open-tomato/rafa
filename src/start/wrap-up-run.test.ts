@@ -1133,8 +1133,8 @@ describe('runWrapUp over the spawn seam', () => {
   type Scratch = ReturnType<typeof plantScratchRepo>;
 
   /** The input of the one `runWrapUp` call every case makes. */
-  function wrapUpInput(scratch: Scratch, head: string): Parameters<typeof runWrapUp>[0] {
-    const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+  async function wrapUpInput(scratch: Scratch, head: string): Promise<Parameters<typeof runWrapUp>[0]> {
+    const { config } = await loadConfig({ root: scratch.repo, home: scratch.home });
     const noop = (): void => {};
     return {
       session: { id: 'run-1', wrapUpStarted: noop, pullRequestStarted: noop, ciStarted: noop, repairStarted: noop, finished: noop },
@@ -1157,7 +1157,7 @@ describe('runWrapUp over the spawn seam', () => {
   /** Runs the wrap-up in this process; answers no warnings, as the output is silent. */
   async function wrapUpInProcess(scratch: Scratch, head: string): Promise<readonly string[]> {
     try {
-      await runWrapUp(wrapUpInput(scratch, head));
+      await runWrapUp(await wrapUpInput(scratch, head));
     } catch {
       // Under `gh` the stand-in refuses every call, so the delivery after
       // the session may end the run; only the first prompt is read.
@@ -1172,7 +1172,7 @@ describe('runWrapUp over the spawn seam', () => {
    * started with, which a `process.env.PATH` set here does not move.
    */
   async function wrapUpInChild(scratch: Scratch, head: string): Promise<readonly string[]> {
-    const input = wrapUpInput(scratch, head);
+    const input = await wrapUpInput(scratch, head);
     const warningsFile = join(scratch.bin, 'warnings.json');
     const here = import.meta.dir;
     const driver = join(scratch.bin, 'driver.ts');

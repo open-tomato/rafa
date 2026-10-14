@@ -221,7 +221,7 @@ function closedLine(result: PrCloseResult): string {
  */
 export async function closePull(context: RafaContext, seams: CloseSeams): Promise<PrCloseResult> {
   const line = readCloseLine(context.args, context.flags);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
 
   const detail = await onProvider(`read pull request #${String(line.number)}`, () => pr.pulls.get(line.number));
   if (detail === null) {

@@ -341,9 +341,9 @@ async function readMachine(
   project: ProjectFound,
   context: RafaContext,
   seams: PlanNeedsSeams,
-): Promise<{ readonly config: ReturnType<typeof loadConfig>['config']; readonly needs: NeedsSeams }> {
+): Promise<{ readonly config: Awaited<ReturnType<typeof loadConfig>>['config']; readonly needs: NeedsSeams }> {
   try {
-    const resolved = loadConfig({ root: project.root, home: project.home }, {}, (message) => {
+    const resolved = await loadConfig({ root: project.root, home: project.home }, {}, (message) => {
       context.output.warn(message);
     });
     const loaded = await loadModules(moduleSettings(resolved, project), seams.modules);

@@ -183,7 +183,7 @@ function alikeMessage(pairs: number): string {
 }
 
 /** Runs `rafa bug codes`; see the module note. */
-export function runCodes(context: RafaContext): void {
+export async function runCodes(context: RafaContext): Promise<void> {
   expectNoArgument(context.args, CODES_USAGE);
   const check = readSwitch(CHECK_FLAG, context.flags[CHECK_FLAG], `Usage: ${CODES_USAGE}`);
   const suggest = readNonBlankFlag(context.flags, SUGGEST_FLAG, CODES_USAGE);
@@ -192,7 +192,7 @@ export function runCodes(context: RafaContext): void {
     throw lineRefusal(`--${SUGGEST_FLAG} and --${CHECK_FLAG} answer two questions: give one`, CODES_USAGE);
   }
   const project = requireProject(context, COMMAND_NAME);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
 
@@ -267,7 +267,7 @@ export function createCodesCommand(): RafaCommand {
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      runCodes(context);
+      await runCodes(context);
       await Promise.resolve();
     },
   };

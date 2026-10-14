@@ -92,7 +92,7 @@ function expectNoWord(args: readonly string[]): void {
 export async function runStatus(context: RafaContext, seams: StatusCommandSeams): Promise<void> {
   expectNoWord(context.args);
   const project = projectOf(context);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const warn = (message: string): void => {

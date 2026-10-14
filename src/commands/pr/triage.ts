@@ -263,7 +263,7 @@ export interface PrTriageResult {
 /** What one pull request's assessment runs with. */
 interface AssessOptions {
   /** The provider, the project and the config, as `openPrContext` answered them. */
-  readonly pr: ReturnType<typeof openPrContext>;
+  readonly pr: Awaited<ReturnType<typeof openPrContext>>;
   /** The git runner the conflict is read through. */
   readonly git: GitRunner;
   /** The pull request number. */
@@ -532,7 +532,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
   const maxAttempts = readMaxAttempts(context.flags, USAGE);
   refuseResolveWithoutComment(wantsResolve, wantsComment);
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const git = (seams.git ?? createGitRunner)(pr.project.root);
   const permissions = (seams.permissions ?? ghPermissionsIn)(pr.project.root);
   const now = seams.now ?? ((): string => new Date().toISOString());

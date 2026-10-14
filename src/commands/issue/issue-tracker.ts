@@ -240,9 +240,9 @@ export function issueProject(context: RafaContext): ProjectFound {
  * `./ready.ts` takes `board.trustedAuthors`. One reader is what keeps
  * the refusal spelled once for the subject.
  */
-export function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+export async function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, ['❌ The config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)].join('\n'));
@@ -262,7 +262,7 @@ export async function resolveIssueTracker(context: RafaContext, seams: IssueSeam
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
 
   let resolution: TrackerResolution;
   try {

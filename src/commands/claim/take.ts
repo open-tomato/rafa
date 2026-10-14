@@ -295,7 +295,7 @@ export async function takeClaim(context: RafaContext, makeSeams: ClaimTakeSeamsF
   const stale = readStaleFlag(context.flags);
   const issue = readIssueArgument(context.args, USAGE);
   const project = requireProject(context, COMMAND);
-  const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
+  const config = await resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;

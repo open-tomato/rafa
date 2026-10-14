@@ -269,7 +269,7 @@ export function renderBlessed(result: InstinctBlessedResult): readonly string[] 
 /** The adapter's blessed set; see the module note. */
 async function blessedLessons(context: RafaContext, seams: InstinctPromoteSeams): Promise<InstinctBlessedResult> {
   const project = instinctProject(context, NAME);
-  const config = resolveProjectConfig(project, NAME, (message) => {
+  const config = await resolveProjectConfig(project, NAME, (message) => {
     context.output.warn(message);
   });
   const kind = config.learningAdapter;

@@ -585,7 +585,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const dryRun = dryRunOf(flagged, ceiling, isTerminal());
   const relations = await openNextRelations(context, seams);
-  const sources = openNextSources(context, seams, {
+  const sources = await openNextSources(context, seams, {
     ...roadmap
       ? { roadmap }
       : {},

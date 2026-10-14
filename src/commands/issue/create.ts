@@ -290,7 +290,7 @@ export async function createIssue(context: RafaContext, seams: IssueSeams): Prom
     ? (message: string): void => context.output.warn(message)
     : (): void => undefined;
   const read = base.type === BUG_TYPE
-    ? readBugLine(context, seams, base, { usage: USAGE, warn }).draft
+    ? (await readBugLine(context, seams, base, { usage: USAGE, warn })).draft
     : base;
   const blockedLine = readSpecLine(read);
   if (dryRun) return { dryRun: true, draft: read };
@@ -331,7 +331,7 @@ export async function addCreatedToProject(context: RafaContext, seams: IssueSeam
   if (issue === null) return;
   const project = issueProject(context);
   // Its warnings dropped: `resolveIssueTracker` already wrote them for the same config.
-  const config = issueSubjectConfig(project, () => undefined);
+  const config = await issueSubjectConfig(project, () => undefined);
   const lines = await addAndRefreshIssue({
     config,
     openGh: () => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep)),

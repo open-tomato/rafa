@@ -142,7 +142,7 @@ const planListCommand: RafaCommand = {
   run: async (context) => {
     const openOnly = readSwitch('open', context.flags['open'], OPEN_HINT);
     expectNoArgument(context.args, USAGE);
-    const plans = resolvePlansDir(requireProject(context, USAGE), USAGE, (message) => {
+    const plans = await resolvePlansDir(requireProject(context, USAGE), USAGE, (message) => {
       context.output.warn(message);
     });
     const all = listPlans(plans);

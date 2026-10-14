@@ -155,8 +155,8 @@ function probe(action: string, run: RafaCommand['run']): RafaCommand {
 
 /** A probe opening the context and giving what it read. */
 function contextProbe(seams: PrSeams): RafaCommand {
-  return probe('context', (context) => {
-    const pr = openPrContext(context, seams);
+  return probe('context', async (context) => {
+    const pr = await openPrContext(context, seams);
     context.output.result({
       provider: pr.reading.provider,
       source: pr.reading.source,
@@ -172,7 +172,7 @@ function contextProbe(seams: PrSeams): RafaCommand {
 function pickProbe(seams: PrSeams): RafaCommand {
   return probe('pick', async (context) => {
     const asked = readPullArgument(context.args, USAGE);
-    const pr = openPrContext(context, seams);
+    const pr = await openPrContext(context, seams);
     const pick = await pickPullRequest(pr, asked, USAGE);
     context.output.result({
       number: pick.number,

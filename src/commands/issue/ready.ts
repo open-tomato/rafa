@@ -533,7 +533,7 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
     );
   }
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message: string) => {
+  const config = await issueSubjectConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));

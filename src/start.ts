@@ -466,7 +466,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // config then has lost the night, where refusing now costs one command.
   let runConfig: ResolvedConfig;
   try {
-    runConfig = loadRunConfig({ root: repoRoot, home: homedir() }, args);
+    runConfig = await loadRunConfig({ root: repoRoot, home: homedir() }, args);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);

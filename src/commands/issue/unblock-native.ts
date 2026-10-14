@@ -83,8 +83,8 @@ export function nativeUnblockReport(): NativeUnblockReport {
  * dropped; a refusal with exit code 1 for a config `loadConfig` refuses.
  * See the module note.
  */
-export function unblockRelationshipsMode(project: ProjectFound): BoardRelationshipMode {
-  return issueSubjectConfig(project, () => undefined).boardRelationships;
+export async function unblockRelationshipsMode(project: ProjectFound): Promise<BoardRelationshipMode> {
+  return (await issueSubjectConfig(project, () => undefined)).boardRelationships;
 }
 
 /** What {@link refreshNativeUnblock} reads and writes through. */

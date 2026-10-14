@@ -463,9 +463,9 @@ export function readDeepFlag(value: string | boolean | undefined): boolean {
 }
 
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
-function resolvedConfig(project: ProjectFound, warn: (message: string) => void): ResolvedConfig {
+async function resolvedConfig(project: ProjectFound, warn: (message: string) => void): Promise<ResolvedConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn);
+    return await loadConfig({ root: project.root, home: project.home }, {}, warn);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw refusal(['rafa doctor: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)]);
@@ -585,7 +585,7 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const resolved = resolvedConfig(project, warn);
+  const resolved = await resolvedConfig(project, warn);
   const { config } = resolved;
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
@@ -707,7 +707,7 @@ async function announceRisk(context: RafaContext, preflight: DoctorPreflight, se
 async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void> {
   const project = projectOf(context);
   if (context.outputMode !== 'json') context.output.info(versionLine());
-  const install = readInstall(context, project);
+  const install = await readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);
     const gh = boardRunner(preflight.provider, preflight.root, seams);

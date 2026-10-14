@@ -620,13 +620,13 @@ export function summariseSessions(
  *
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
-function resolveStore(
+async function resolveStore(
   store: EffortStore | undefined,
   roots: ConfigRoots,
-): EffortStore {
+): Promise<EffortStore> {
   if (store !== undefined) return store;
 
-  const resolved = loadConfig(roots);
+  const resolved = await loadConfig(roots);
   return selectEffortStore(roots.root, resolved.config);
 }
 
@@ -644,9 +644,9 @@ function resolveStore(
  * and a config file under the repo root or the home is one the loop
  * cannot run on.
  */
-export function buildReport(options: ReportOptions): EffortReport {
+export async function buildReport(options: ReportOptions): Promise<EffortReport> {
   const { repoRoot } = options;
-  const store = resolveStore(options.store, { root: repoRoot, home: options.home });
+  const store = await resolveStore(options.store, { root: repoRoot, home: options.home });
 
   return summariseSessions(
     asReportRows(store.read('sessions')),
@@ -673,10 +673,10 @@ function refuse(problems: readonly string[]): never {
  * `report-skills-format.ts`'s lines otherwise. A config the loop cannot
  * run on is refused as {@link report} refuses it.
  */
-function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoRoot: string): void {
+async function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoRoot: string): Promise<void> {
   let built: SkillsReport;
   try {
-    built = readSkillsReport({ repoRoot, home: homedir(), plans });
+    built = await readSkillsReport({ repoRoot, home: homedir(), plans });
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
@@ -729,17 +729,17 @@ export default async function report(args: string[], repoRoot: string): Promise<
   if (parsed.errors.length > 0) refuse(parsed.errors);
   await pullBeforeRead({ roots: { root: repoRoot, home: homedir() }, warn: (line) => activeOutput().warn(line) });
   if (parsed.skills) {
-    writeSkillsReport(parsed.plans, parsed.json, repoRoot);
+    await writeSkillsReport(parsed.plans, parsed.json, repoRoot);
     return;
   }
   if (parsed.trend !== null) {
-    writeTrendReport(parsed.trend, parsed.json, repoRoot);
+    await writeTrendReport(parsed.trend, parsed.json, repoRoot);
     return;
   }
 
   let built: EffortReport;
   try {
-    built = buildReport({
+    built = await buildReport({
       repoRoot,
       home: homedir(),
       kinds: parsed.kinds,

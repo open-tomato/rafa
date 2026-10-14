@@ -183,7 +183,7 @@ describe('rafa next\'s own sources', () => {
 
   it('build the board with the notice on', async () => {
     const { gh } = fakeGh(board('horizon:now', 'NOT_PLANNED'), ROADMAP_BODY);
-    const sources = openNextSources(context(), {
+    const sources = await openNextSources(context(), {
       readRemote: () => 'git@github.com:open-tomato/rafa.git',
       openGh: () => gh,
       openGit: () => git,

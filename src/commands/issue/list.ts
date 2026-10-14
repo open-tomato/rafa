@@ -528,7 +528,7 @@ export async function listRoadmap(
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const relations = await refusingRoadmap(() => readConfiguredRelations(config, gh));
   const plans = plansDirAt(project.root, config.planDir);
@@ -606,8 +606,8 @@ const BUG_TYPE: IssueType = 'bug';
  * config's warnings are dropped: `resolveIssueTracker` already wrote them
  * for the same config.
  */
-function bugTemplate(context: RafaContext): string {
-  return issueSubjectConfig(issueProject(context), () => undefined).issuesTitleBug;
+async function bugTemplate(context: RafaContext): Promise<string> {
+  return (await issueSubjectConfig(issueProject(context), () => undefined)).issuesTitleBug;
 }
 
 /** Runs one `issue list` line with `seams`, either listing, writing it in the line's output mode. */
@@ -620,7 +620,7 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
       return;
     }
     const lines = listed.query.type === BUG_TYPE
-      ? renderBugList(listed.tracker.kind, listed.issues, bugTemplate(context))
+      ? renderBugList(listed.tracker.kind, listed.issues, await bugTemplate(context))
       : renderIssueList(listed.tracker.kind, listed.issues);
     for (const text of lines) context.output.info(text);
     return;

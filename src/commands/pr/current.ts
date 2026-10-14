@@ -165,7 +165,7 @@ async function probeChecks(pulls: PullRequests, number: number): Promise<ChecksP
 /** Reads the open pull request of the branch, and everything the line carries; see the module note. */
 export async function readCurrent(context: RafaContext, seams: PrSeams): Promise<PrCurrentResult> {
   expectNoArguments(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, null, USAGE);
   const summary = pick.summary;
   const probe = await probeChecks(pr.pulls, pick.number);

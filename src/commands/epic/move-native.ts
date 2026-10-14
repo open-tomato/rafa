@@ -103,7 +103,7 @@ export async function configuredMoveRelations(
   gh: GhRunner,
   readRepository: () => Promise<string>,
 ): Promise<BoardRelations> {
-  const config = issueSubjectConfig(project, () => undefined);
+  const config = await issueSubjectConfig(project, () => undefined);
   const repository = config.boardRelationships === 'native'
     ? await readRepository()
     : '';

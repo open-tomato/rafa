@@ -220,7 +220,7 @@ const planShowCommand: RafaCommand = {
   run: async (context) => {
     const tracker = readTrackerFlag(context.flags.tracker);
     const stub = expectOneArgument(context.args, USAGE);
-    const plans = resolvePlansDir(requireProject(context, COMMAND), COMMAND, (message) => {
+    const plans = await resolvePlansDir(requireProject(context, COMMAND), COMMAND, (message) => {
       context.output.warn(message);
     });
     const shown = showPlan(plans, stub, tracker);

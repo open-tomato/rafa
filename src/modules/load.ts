@@ -438,7 +438,7 @@ export async function loadInvocationModules(place: InvocationPlace, seams: Modul
   try {
     const scope = resolveScope(place.cwd, { home: place.home });
     if (!scope.found) return noModules();
-    const resolved = loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
+    const resolved = await loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
     return await loadModules(moduleSettings(resolved, scope), seams);
   } catch (error) {
     if (error instanceof ConfigError || error instanceof ScopeError) return noModules();

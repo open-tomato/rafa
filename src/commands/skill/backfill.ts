@@ -364,11 +364,11 @@ async function runPropose(
   seams: SkillBackfillSeams,
 ): Promise<void> {
   const project = projectOf(context);
-  const config = loadConfig(
+  const { config } = await loadConfig(
     { root: project.root, home: project.home },
     {},
     (message) => { context.output.warn(message); },
-  ).config;
+  );
   const pass = await runProposalPass({
     root: scope.dir,
     backfillDir,

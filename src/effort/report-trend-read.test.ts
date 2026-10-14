@@ -78,17 +78,17 @@ function storeAgent(root: string, sessionId: string, agent: string): void {
 }
 
 describe('readTrendInputs', () => {
-  it('answers no rows, outcomes or agents for a project with no store', () => {
+  it('answers no rows, outcomes or agents for a project with no store', async () => {
     const { root, home } = plant();
 
-    const inputs = readTrendInputs(root, home);
+    const inputs = await readTrendInputs(root, home);
 
     expect([...inputs.rows]).toEqual([]);
     expect(inputs.outcomes.size).toBe(0);
     expect(inputs.agents.size).toBe(0);
   });
 
-  it('reads the stored session rows, each session\'s reported outcome and its dispatched agent by session id', () => {
+  it('reads the stored session rows, each session\'s reported outcome and its dispatched agent by session id', async () => {
     const { root, home } = plant();
     storeRows(root, [row('s-1', 'demo'), row('s-2', 'demo')]);
     writeTaskReport(root, {
@@ -98,7 +98,7 @@ describe('readTrendInputs', () => {
     });
     storeAgent(root, 's-2', 'tdd-guide');
 
-    const inputs = readTrendInputs(root, home);
+    const inputs = await readTrendInputs(root, home);
 
     expect(inputs.rows.map((stored) => stored.sessionId)).toEqual(['s-1', 's-2']);
     expect(inputs.outcomes.get('s-1')).toBe('blocked');

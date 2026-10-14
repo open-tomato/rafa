@@ -135,22 +135,22 @@ function noWarning(message: string): void {
 }
 
 describe('loadRunConfig and --skills-resolver', () => {
-  it('resolves task.skills from --skills-resolver=tag, naming the command line as its source', () => {
-    const resolved = loadRunConfig(bareRoots(), ['--skills-resolver=tag'], noWarning);
+  it('resolves task.skills from --skills-resolver=tag, naming the command line as its source', async () => {
+    const resolved = await loadRunConfig(bareRoots(), ['--skills-resolver=tag'], noWarning);
 
     expect(resolved.config.taskSkills).toBe('tag');
     expect(resolved.sources.taskSkills).toBe('cli');
   });
 
-  it('leaves task.skills at the default planner without the flag', () => {
-    const resolved = loadRunConfig(bareRoots(), ['--plan=.plans/PLAN-a.md'], noWarning);
+  it('leaves task.skills at the default planner without the flag', async () => {
+    const resolved = await loadRunConfig(bareRoots(), ['--plan=.plans/PLAN-a.md'], noWarning);
 
     expect(resolved.config.taskSkills).toBe('planner');
     expect(resolved.sources.taskSkills).toBe('default');
   });
 
-  it('reads --inject and --skills-resolver each into its own setting', () => {
-    const resolved = loadRunConfig(bareRoots(), ['--inject=task', '--skills-resolver=none'], noWarning);
+  it('reads --inject and --skills-resolver each into its own setting', async () => {
+    const resolved = await loadRunConfig(bareRoots(), ['--inject=task', '--skills-resolver=none'], noWarning);
 
     expect(resolved.config.inject).toBe('task');
     expect(resolved.config.taskSkills).toBe('none');
@@ -158,11 +158,11 @@ describe('loadRunConfig and --skills-resolver', () => {
     expect(resolved.sources.taskSkills).toBe('cli');
   });
 
-  it('refuses a bare --skills-resolver as an empty value, where the valued control resolves', () => {
+  it('refuses a bare --skills-resolver as an empty value, where the valued control resolves', async () => {
     const roots = bareRoots();
     let thrown: unknown;
     try {
-      loadRunConfig(roots, ['--skills-resolver'], noWarning);
+      await loadRunConfig(roots, ['--skills-resolver'], noWarning);
     } catch (error) {
       thrown = error;
     }
@@ -171,7 +171,7 @@ describe('loadRunConfig and --skills-resolver', () => {
     expect((thrown as ConfigError).problems).toEqual([
       'command line: taskSkills is "", expected one of: planner, tag, none',
     ]);
-    expect(loadRunConfig(roots, ['--skills-resolver=planner'], noWarning).config.taskSkills).toBe('planner');
+    expect((await loadRunConfig(roots, ['--skills-resolver=planner'], noWarning)).config.taskSkills).toBe('planner');
   });
 });
 
@@ -182,9 +182,9 @@ function plantConfig(dir: string, body: string): void {
 }
 
 /** The problems a load refuses with, or fails if it loads. */
-function refusal(roots: { root: string; home: string }, args: string[]): readonly string[] {
+async function refusal(roots: { root: string; home: string }, args: string[]): Promise<readonly string[]> {
   try {
-    loadRunConfig(roots, args, noWarning);
+    await loadRunConfig(roots, args, noWarning);
   } catch (error) {
     expect(error).toBeInstanceOf(ConfigError);
     return (error as ConfigError).problems;
@@ -193,34 +193,34 @@ function refusal(roots: { root: string; home: string }, args: string[]): readonl
 }
 
 describe('loadRunConfig refusals and layers for the task keys', () => {
-  it('refuses task.skills: model in the project file, naming the file', () => {
+  it('refuses task.skills: model in the project file, naming the file', async () => {
     const roots = bareRoots();
     plantConfig(roots.root, 'task:\n  skills: model\n');
 
-    const problems = refusal(roots, []);
+    const problems = await refusal(roots, []);
 
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain('task.skills is "model", expected one of: planner, tag, none');
   });
 
-  it('refuses --skills-resolver=bogus, naming the command line', () => {
-    expect(refusal(bareRoots(), ['--skills-resolver=bogus'])).toEqual([
+  it('refuses --skills-resolver=bogus, naming the command line', async () => {
+    expect(await refusal(bareRoots(), ['--skills-resolver=bogus'])).toEqual([
       'command line: taskSkills is "bogus", expected one of: planner, tag, none',
     ]);
   });
 
-  it('holds --skills-resolver=tag over a project task.skills: none, and the user layer lessons: off under a silent project', () => {
+  it('holds --skills-resolver=tag over a project task.skills: none, and the user layer lessons: off under a silent project', async () => {
     const roots = bareRoots();
     plantConfig(roots.root, 'task:\n  skills: none\n');
-    const over = loadRunConfig(roots, ['--skills-resolver=tag'], noWarning);
+    const over = await loadRunConfig(roots, ['--skills-resolver=tag'], noWarning);
     expect(over.config.taskSkills).toBe('tag');
     expect(over.sources.taskSkills).toBe('cli');
-    expect(loadRunConfig(roots, [], noWarning).config.taskSkills).toBe('none');
+    expect((await loadRunConfig(roots, [], noWarning)).config.taskSkills).toBe('none');
 
     const silent = bareRoots();
     plantConfig(silent.root, '# nothing set\n');
     plantConfig(silent.home, 'task:\n  lessons: off\n');
-    const layered = loadRunConfig(silent, ['--skills-resolver=tag'], noWarning);
+    const layered = await loadRunConfig(silent, ['--skills-resolver=tag'], noWarning);
     expect(layered.config.taskSkills).toBe('tag');
     expect(layered.config.taskLessons).toBe('off');
     expect(layered.sources.taskLessons).toBe('user');

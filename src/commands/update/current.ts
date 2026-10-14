@@ -133,10 +133,10 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** The board the plan reads: `gh` when the project resolves to it. */
-function boardAccess(project: ProjectFound, seams: UpdateCurrentSeams): BoardAccess {
+async function boardAccess(project: ProjectFound, seams: UpdateCurrentSeams): Promise<BoardAccess> {
   let configured;
   try {
-    configured = loadConfig({ root: project.root, home: project.home }, {}, () => {}).config.prProvider;
+    configured = (await loadConfig({ root: project.root, home: project.home }, {}, () => {})).config.prProvider;
   } catch (error) {
     throw couldNotRun(`config: ${messageOf(error)}`);
   }
@@ -275,7 +275,7 @@ async function runUpdateCurrent(context: RafaContext, seams: UpdateCurrentSeams)
   const lockRoot = seams.lockRootOf(project.root);
   const range = readRange(lockRoot, seams.installed);
   refuseConflicts(project);
-  const access = boardAccess(project, seams);
+  const access = await boardAccess(project, seams);
   const plan = await readUpdatePlan({ root: project.root, lockRoot }, range, access);
   for (const line of planLines(plan)) context.output.info(line);
 
