@@ -1184,8 +1184,9 @@ step routed.** Migration `bug-routes` creates it, shaped as
 `entry_index` in the report's parsed list (from 0, CHECK `>= 0`) and
 its `what` (`NOT NULL`, non-empty), and the origin pair with
 `bug_routes_by_origin`. `said` is the kind the session wrote, NULL for
-a report with no `kind` key; `kind` is the kind the loop routed it
-under; `route` is where it went. The CHECKs admit the six `BUG_KINDS`
+an entry with no `kind` key or a value none of the six; `kind` is the
+kind the loop routed it under; `route` is where it went, as
+`start/triage-kinds.ts` maps a triage's answer to it. The CHECKs admit the six `BUG_KINDS`
 (`src/report/parse.ts`) in `said` and `kind` and the eight `BUG_ROUTES`
 in `route`, and nothing else. `plan_stub` is NULL for a row written
 under no plan. `bug_routes_by_entry` is unique over `session_id`,

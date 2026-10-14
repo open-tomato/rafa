@@ -275,7 +275,17 @@ export async function routeByKind(entry: KindRouteEntry, context: KindRouteConte
   const options = context.kinds;
   if (options === undefined) return KINDS_OFF;
   if (entry.bug.security !== false) return { settled: false, kind: entry.bug.kind, inherited: false };
-  const readings = await readingsOf(entry.bug, options);
-  const check = checkKind({ entry: entry.bug, readings, planFiles: options.planFiles });
-  return routeChecked(entry, check, context, options);
+  return routeChecked(entry, await checkedKindOf(entry.bug, options), context, options);
+}
+
+/**
+ * The kind check's answer for one entry: its named test read on the head
+ * and the plan's base as {@link routeByKind} reads it, then `checkKind`.
+ * Exported so `start/triage.ts` can tell, before `triageReport`, whether
+ * a report routes anything to the public tracker; the security rule is
+ * the caller's. Never rejects.
+ */
+export async function checkedKindOf(bug: ReportBug, options: KindRouteOptions): Promise<KindCheck> {
+  const readings = await readingsOf(bug, options);
+  return checkKind({ entry: bug, readings, planFiles: options.planFiles });
 }
