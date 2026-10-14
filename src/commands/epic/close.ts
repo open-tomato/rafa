@@ -493,6 +493,13 @@ export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly te
     case 'failed': {
       return { text: `${which}: not filed on the ${bug.channel} tracker: ${bug.problem ?? 'no reason given'}`, warn: true };
     }
+    case 'repair':
+    case 'follow-up':
+    case 'pr-body':
+    case 'docs': {
+      // Answered only by kind routing, which this run never turns on.
+      return { text: `${which}: not filed: routed to ${bug.action} by its kind.`, warn: true };
+    }
   }
 }
 

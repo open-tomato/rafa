@@ -66,6 +66,7 @@ import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-captu
 import { bugKeyOf } from '../../triage/triage.js';
 
 import closeCommand, {
+  bugLine,
   closeTriageFile,
   createEpicCloseCommand,
   EPIC_CLOSE_REFUSAL_EXIT,
@@ -433,6 +434,19 @@ describe('failedCheckReport', () => {
     expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
     expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
     expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic # acceptance criterion: ${CRITERION_2}`);
+  });
+});
+
+describe('bugLine', () => {
+  it('warns that a row routed by its kind was not filed, and notes a filed one', () => {
+    const criterion = criterionOf(CRITERION_2);
+    const row = { index: 0, channel: 'public', ref: null, foundBy: null, stored: null, problem: null } as const;
+
+    const routed = bugLine(criterion, { ...row, action: 'pr-body' });
+    const filed = bugLine(criterion, { ...row, action: 'filed' });
+
+    expect(routed).toEqual({ text: 'Criterion 2: not filed: routed to pr-body by its kind.', warn: true });
+    expect(filed).toEqual({ text: 'Criterion 2: filed on the public tracker as an issue.', warn: false });
   });
 });
 

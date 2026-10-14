@@ -63,7 +63,7 @@ import { pathsNamedIn } from './doc-only.js';
 import { testFailureOf } from './test-failure.js';
 
 /** The kinds the check reads down its table; any other is taken as said. */
-const CHECKED_KINDS: readonly BugKind[] = ['bug', 'own-fallout', 'own-gap'];
+export const CHECKED_KINDS: readonly BugKind[] = ['bug', 'own-fallout', 'own-gap'];
 
 /** The entry's fields the check reads. */
 export type KindCheckEntry = Pick<ReportBug, 'what' | 'artifact' | 'kind'>;
