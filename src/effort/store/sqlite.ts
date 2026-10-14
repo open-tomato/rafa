@@ -6,7 +6,7 @@
  *
  * One file, `effort.sqlite`, in the directory the NDJSON backend's
  * files live in, which `effortStoreDir` (`location.ts`) spells once for
- * both: `.rafa/effort/` (`EFFORT_STORE_DIR` in `effort/store.ts`),
+ * both: `.rafa/effort/` (`EFFORT_STORE_DIR` in `ndjson-files.ts`),
  * ignored by the project's `.gitignore` entry for `.rafa/`, or the
  * directory `RAFA_EFFORT_DIR` names, which moves both backends together.
  * The two backends can therefore hold a store side by side, and

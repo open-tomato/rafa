@@ -20,7 +20,7 @@
  *     `copy.ts`, `schema-report.ts`, `migrate.ts`, `merge-store.ts`,
  *     `store-meta.ts`, `fixture-extract.ts`,
  *     `testdata/merge-scenarios.ts`, `testdata/store-rows.ts` and
- *     `src/effort/sync/wire.ts`.
+ *     `wire.ts`.
  *     Every other opener of a SQLite
  *     handle is expected to go through `withSqliteStore` (`sqlite.ts`)
  *     so every open runs the test guard, the busy timeout and
@@ -55,7 +55,7 @@
  *     `testdata/store-rows.ts` reads every table of a store file a test
  *     names `{ readonly: true }`, so two files compare by rows, and an
  *     open through `withSqliteStore` would bring that file forward.
- *     `src/effort/sync/wire.ts` opens the store it exports
+ *     `wire.ts` opens the store it exports
  *     `{ readonly: true, safeIntegers: true }`, so a sync read never
  *     brings a store forward and never rounds an integer, and builds a
  *     payload's scratch store at exactly the migrations the payload
@@ -138,7 +138,7 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/fixture-extract.ts',
   'src/effort/store/testdata/merge-scenarios.ts',
   'src/effort/store/testdata/store-rows.ts',
-  'src/effort/sync/wire.ts',
+  'src/effort/store/wire.ts',
 ]);
 
 /** An `import … from 'bun:sqlite'` or from a `sqlite.{js,ts}` module. */

@@ -99,11 +99,7 @@
  * is stored as the integer 7 and `'abc'` or `1.5` is refused.
  */
 import type { FindingsWriterSeams } from './findings.js';
-import type {
-  CheckOutcome,
-  PreflightCheck,
-  PreflightTier,
-} from '../../preflight/run.js';
+import type { CheckOutcome, PreflightCheck, PreflightTier } from './preflight-check.js';
 import type { Database } from 'bun:sqlite';
 
 import { existsSync } from 'node:fs';

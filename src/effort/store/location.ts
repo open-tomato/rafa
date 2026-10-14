@@ -6,7 +6,7 @@
  *
  * {@link effortStoreDir} answers the directory the SQLite file and the
  * NDJSON files sit in. It is `<root>/.rafa/effort/` (`EFFORT_STORE_DIR`
- * in `effort/store.ts`) unless `RAFA_EFFORT_DIR` names another. Both
+ * in `ndjson-files.ts`) unless `RAFA_EFFORT_DIR` names another. Both
  * backends resolve their files under it, so the variable moves the
  * SQLite and the NDJSON files together, and a store cannot end up half
  * in one directory and half in another.
@@ -55,7 +55,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { EFFORT_STORE_DIR } from '../store.js';
+import { EFFORT_STORE_DIR } from './ndjson-files.js';
 
 /** The variable that moves the store of one command line. */
 export const EFFORT_DIR_VARIABLE = 'RAFA_EFFORT_DIR';

@@ -26,7 +26,7 @@
 import type { BringForwardOptions } from './bring-forward.js';
 import type { SqliteMigration } from './migrations.js';
 import type { StoreIdentitySeams, StoreMeta } from './store-meta.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

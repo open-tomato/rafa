@@ -125,7 +125,7 @@ import { dirname, join } from 'node:path';
 
 import { Database, SQLiteError } from 'bun:sqlite';
 
-import { readRuntimeIdentity } from '../../runtime/identity.js';
+import { readRuntimeIdentity } from '../../core/runtime/index.js';
 
 import { bringForward, writeNames } from './bring-forward.js';
 import { vacuumInto } from './copy.js';

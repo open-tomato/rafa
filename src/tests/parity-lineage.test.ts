@@ -130,7 +130,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { collectEffort } from '../effort/collect.js';
 import { openNdjsonStore } from '../effort/store/index.js';
-import { readStoreRows } from '../effort/store.js';
+import { readStoreRows } from '../effort/store/ndjson-files.js';
 
 import { resolveLiveParity } from './parity-fixture.js';
 

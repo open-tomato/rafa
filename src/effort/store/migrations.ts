@@ -328,7 +328,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   },
   // Version 9: what an out-of-scope bug is a bug OF, added to the table
   // version 3 created. `triage.ts` writes it from the reading in
-  // `triage/machine-fault.ts` and says why it is nullable and why it is
+  // `./machine-fault.ts` and says why it is nullable and why it is
   // outside the table's dedupe key. Measured on SQLite 3.51.0, this
   // `ADD COLUMN` keeps the rows a version-8 store holds, reading NULL on
   // each, and leaves `out_of_scope_bugs_by_entry` in force.

@@ -42,7 +42,7 @@
 import type { MergeOptions, MergeRefusalReason } from './merge-store.js';
 import type { OriginTable } from './origins.js';
 import type { OriginCollision, Scenario, ScenarioDevice } from './testdata/merge-scenarios.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
 import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

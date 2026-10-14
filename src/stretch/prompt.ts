@@ -14,8 +14,8 @@
  *     other project is handed rafa's carried work.
  *   - **The rafa checkout** ({@link isRafaCheckout}) is a root whose
  *     `package.json` is named `@open-tomato/rafa` and which holds
- *     `src/rafa.ts`, the test `src/runtime/identity.ts` makes of a
- *     checkout. The script asked instead whether the project was the
+ *     `src/rafa.ts`, the test `src/core/runtime/identity.ts` makes of
+ *     a checkout. The script asked instead whether the project was the
  *     checkout it sat in; a command runs from an installed package that
  *     sits in no checkout, so the project is asked what it is.
  *   - **The default** ({@link bundledPromptPath}) is

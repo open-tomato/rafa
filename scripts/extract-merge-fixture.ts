@@ -33,6 +33,7 @@ import { resolve } from 'node:path';
 
 import { messageOf } from '../src/core/config/sections.js';
 import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE, extractStores, writeExtract } from '../src/effort/store/fixture-extract.js';
+import { fixtureScrubber, machineScrubContext } from '../src/fixtures/scrub.js';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[extract]';
@@ -121,10 +122,14 @@ export function summaryLines(extract: Extract): string[] {
   ));
 }
 
-/** Runs one extract over `args`, writing its lines to `log`, and answers the exit code. */
+/**
+ * Runs one extract over `args`, writing its lines to `log`, and answers
+ * the exit code. The files go through the running machine's fixture
+ * scrub, which this script builds and hands to the store.
+ */
 export function runExtract(args: ExtractArgs, log: (line: string) => void): number {
   const extract = extractStores(args.pathA, args.pathB, args.perSide, args.overlap);
-  const written = writeExtract(extract, args.outDir);
+  const written = writeExtract(extract, args.outDir, fixtureScrubber(machineScrubContext(process.cwd())));
   for (const line of summaryLines(extract)) log(line);
   for (const path of written) log(`${TAG} wrote ${path}`);
   return EXIT_WRITTEN;

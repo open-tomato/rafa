@@ -48,6 +48,12 @@ import { ORIGIN_TABLES } from './origins.js';
 /** A planted row's columns other than `seq` and its origin pair. */
 type FixtureRow = Readonly<Record<string, SQLQueryBindings>>;
 
+/**
+ * The scrub the cases not about the scrub hand `writeExtract`: every
+ * text kept as it is, so what they read is the extract's own work.
+ */
+const KEEP_TEXT = (text: string): string => text;
+
 /** The origins of the two stores. */
 const ORIGIN_A = 'SRC-store-a-7f3a';
 const ORIGIN_B = 'SRC-store-b-91c2';
@@ -352,7 +358,7 @@ describe('extractStores over a copy then divergence', () => {
     const { pathA, pathB } = plantScenario();
     const outDir = join(base, 'out');
 
-    writeExtract(extractStores(pathA, pathB), outDir);
+    writeExtract(extractStores(pathA, pathB), outDir, KEEP_TEXT);
 
     const written = readdirSync(outDir)
       .map((name) => readFileSync(join(outDir, name), 'utf8'))
@@ -461,13 +467,13 @@ describe('writeExtract and readExtractSide', () => {
     const extract = extractScenario();
     const outDir = join(base, 'nested', 'out');
 
-    const paths = writeExtract(extract, outDir);
+    const paths = writeExtract(extract, outDir, KEEP_TEXT);
 
     expect(readdirSync(join(base, 'nested'))).toEqual(['out']);
     expect(readdirSync(outDir).sort((x, y) => x.localeCompare(y))).toEqual(['a.json', 'b.json', 'summary.json']);
     expect(paths).toEqual(['a.json', 'b.json', 'summary.json'].map((name) => join(outDir, name)));
     const before = readFileSync(join(outDir, EXTRACT_FILE_NAMES.a), 'utf8');
-    expect(() => writeExtract(extract, outDir)).toThrow('the extract would replace');
+    expect(() => writeExtract(extract, outDir, KEEP_TEXT)).toThrow('the extract would replace');
     expect(readFileSync(join(outDir, EXTRACT_FILE_NAMES.a), 'utf8')).toBe(before);
     expect(readExtractSide(join(outDir, EXTRACT_FILE_NAMES.b))).toEqual(extract.b);
   });

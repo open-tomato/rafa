@@ -41,9 +41,10 @@
  *     `sessions.ndjson` and `commits.ndjson`.
  *
  * The stored rows' layout is the sibling's, and it is spelled here
- * rather than taken from `effort/store.ts`. That module's directory is
- * rafa's own store, which phase 1 is set to move under `.rafa/`, while
- * the sibling's rows stay where the sibling's collector wrote them.
+ * rather than taken from `effort/store/ndjson-files.ts`. That module's
+ * directory is rafa's own store, which phase 1 is set to move under
+ * `.rafa/`, while the sibling's rows stay where the sibling's collector
+ * wrote them.
  *
  * An override is taken as given, never resolved against the working
  * directory, which is wherever `bun test` happened to start; a relative

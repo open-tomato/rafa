@@ -22,7 +22,7 @@
  * installed runtime with no live loop and no git read. The devices'
  * own files are only read.
  */
-import type { RuntimeIdentity } from '../runtime/identity.js';
+import type { RuntimeIdentity } from '../core/runtime/index.js';
 
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';

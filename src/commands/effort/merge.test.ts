@@ -15,7 +15,7 @@
  * same project beside it, which merges with 0.
  */
 import type { MergeCommandSeams } from './merge.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
