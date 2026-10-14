@@ -27,7 +27,7 @@
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
- *   - The five library entries are built together with `--splitting`.
+ *   - The six library entries are built together with `--splitting`.
  *     Without it each entry is a bundle of its own, and `parsePlan`,
  *     `parseReport`, `openSqliteStore` and `EFFORT_KEY_PROJECTIONS` were
  *     each a different value from `dist/index.js` than from their
@@ -36,6 +36,9 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
+ *   - `tsc -p tsconfig.config-types.json` follows them and writes the
+ *     declarations of the `./config` subpath, the one entry whose types
+ *     the manifest publishes; see "The config subpath's declarations".
  *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
  *     are copied into `dist/`. `start.ts` and `plan.ts` find the first two
  *     beside themselves through `import.meta.url`, and a bundle inlining
@@ -199,8 +202,9 @@
  * from `package.json` as `describe` does, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
- * `README.md` says only `./plan`, `./ports` and `./learning` load under
- * node; `./learning` is read below, in its own section. The
+ * `README.md` says only `./plan`, `./ports`, `./learning` and `./config`
+ * load under node; `./learning` is read below, in its own section, and
+ * `./config` in the config subpath's cases. The
  * preflight brought `Bun.spawn`, `Bun.which` and `Bun.file` calls into
  * `./plan`, so one case imports `dist/plan/index.js` under node and holds
  * its names to its source's. It imports `dist/index.js` the same way as
@@ -313,6 +317,50 @@
  * `--version` copy sits beside the package, not under it, so no
  * `node_modules` is at or above it still.
  *
+ * ## The config subpath's declarations
+ *
+ * `./config` is the one exports entry carrying conditions: `types` at
+ * `dist/config/index.d.ts`, and `import` at `dist/config/index.js`, which
+ * the `--splitting` build writes beside the other entries. The
+ * declarations come from `tsc -p tsconfig.config-types.json`, a config
+ * extending `tsconfig.base.json` with `noEmit` off, `emitDeclarationOnly`
+ * and `declarationDir: dist`, including `src/config/index.ts` alone.
+ *
+ * `tsc` writes a declaration for every file of its program, and the
+ * program is every file the entry reaches in source, value imports
+ * included: through `src/config-registry.ts` that is the sections, core
+ * and the effort store, 121 files measured on 2026-10-14 with
+ * typescript 5.9.3. Eleven of them import a specifier outside rafa:
+ * nine `bun:sqlite` (the store's modules), `core/command/confirm.d.ts`
+ * `node:stream`, and `core/config/standard-schema.d.ts`
+ * `@open-tomato/define-config`. None of the eleven is reached from
+ * `dist/config/index.d.ts`, whose own reach was 16 files, so a consumer
+ * type-checking a `rafa.config.ts` loads none of them. The case reads
+ * that reach: it follows every relative specifier from the types target
+ * through the emitted files (`ts.preProcessFile`, so a specifier inside a
+ * comment is not read as one) and holds every other specifier, a
+ * `node:` or `bun:` builtin and `@open-tomato/define-config` alike, to
+ * none. Its control plants a static `import type` of the library and an
+ * `import('bun:sqlite')` type into a copy of two reached declarations,
+ * one two hops from the entry, and reads both back.
+ *
+ * The scratch package links `typescript`, `@types/bun` and `@types/node`
+ * as the repository installed them, and `node_modules/.bin/tsc`, which
+ * `bun run` puts on the script's PATH. Without the `tsc` link the build
+ * exited 127 on `tsc: command not found`, and with it but without the
+ * two `@types` links it exited 2 on 151 errors, the first
+ * `Cannot find module 'node:async_hooks'`, both measured on 2026-10-14.
+ *
+ * Three mutations of `package.json` were driven on 2026-10-14, one run
+ * of this file each, with the manifest restored byte-identical (sha256).
+ * Dropping the `./config` exports entry reddened the exports map case
+ * alone, 1 of 72, before the node case joined. With it, 73 pass before
+ * and after: dropping the `tsc` step reddened 4 of 73, the
+ * exports-target case and the three declaration cases, and dropping
+ * `src/config/index.ts` from the entry list reddened 5 of 73, the
+ * exports-target case, the two computed `dist/config/index.js` cases,
+ * the defaults case and the node case.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -368,12 +416,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import ts from 'typescript';
 
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
+import * as configSource from '../config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import * as storeSource from '../effort/store/index.js';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
@@ -407,7 +457,14 @@ const EXPORTS = {
   './store': './dist/effort/store/index.js',
   './ports': './dist/ports/index.js',
   './learning': './dist/learning/index.js',
+  './config': {
+    types: './dist/config/index.d.ts',
+    import: './dist/config/index.js',
+  },
 };
+
+/** The declaration the `./config` subpath publishes, under `dist/`. */
+const CONFIG_TYPES = 'config/index.d.ts';
 
 /** What the manifest publishes: the build, and the NOTICE the licence asks to travel with it (npm adds LICENSE and README by itself). */
 const FILES = ['dist', 'NOTICE'];
@@ -485,7 +542,10 @@ const PLAN_FORMAT_IN_TIER = 'bundled/skills/dev-planner/SKILL.md';
 const SKILL = `src/${PLAN_FORMAT_IN_TIER}`;
 
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'README.md'];
+const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'tsconfig.config-types.json', 'README.md'];
+
+/** The installed packages the declaration step reads, linked into the scratch package; see the module note. */
+const TYPESCRIPT_PACKAGES = ['typescript', '@types/bun', '@types/node'];
 
 /** Each library entry: its path under `dist/`, and its source module. */
 const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
@@ -494,6 +554,7 @@ const LIBRARY_ENTRIES: [string, Record<string, unknown>][] = [
   ['effort/store/index.js', storeSource],
   ['ports/index.js', portsSource],
   ['learning/index.js', learningSource],
+  ['config/index.js', configSource],
 ];
 
 /** The subpath bundles whose every name the root bundle carries too. */
@@ -632,6 +693,7 @@ beforeAll(() => {
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
   linkDefineConfig(PACKAGE_DIR);
+  linkTypeScript(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
   mkdirSync(boardTemplates, { recursive: true });
   writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
@@ -654,11 +716,70 @@ function defineConfigLoads(text: string): string[] {
   return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
 }
 
+/** Links the package `name` as the repository installed it into `dir`'s `node_modules`. */
+function linkInstalled(dir: string, name: string): void {
+  mkdirSync(dirname(join(dir, 'node_modules', name)), { recursive: true });
+  const installed = realpathSync(join(REPO_ROOT, 'node_modules', name));
+  symlinkSync(installed, join(dir, 'node_modules', name), 'dir');
+}
+
 /** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
 function linkDefineConfig(dir: string): void {
-  mkdirSync(join(dir, 'node_modules', '@open-tomato'), { recursive: true });
-  const installed = realpathSync(join(REPO_ROOT, 'node_modules', DEFINE_CONFIG));
-  symlinkSync(installed, join(dir, 'node_modules', DEFINE_CONFIG), 'dir');
+  linkInstalled(dir, DEFINE_CONFIG);
+}
+
+/** Links {@link TYPESCRIPT_PACKAGES} into `dir`'s `node_modules`, and `tsc` into its `.bin`. */
+function linkTypeScript(dir: string): void {
+  for (const name of TYPESCRIPT_PACKAGES) linkInstalled(dir, name);
+  mkdirSync(join(dir, 'node_modules', '.bin'), { recursive: true });
+  symlinkSync(join('..', 'typescript', 'bin', 'tsc'), join(dir, 'node_modules', '.bin', 'tsc'));
+}
+
+/** What {@link declarationReach} found from one declaration. */
+interface DeclarationReach {
+  /** Every declaration reached, relative to the root it was read under, sorted. */
+  readonly reached: string[];
+  /** Each specifier outside rafa, as `<declaration>: <specifier>`, sorted. */
+  readonly outside: string[];
+  /** Each relative specifier naming no emitted declaration, as `<declaration>: <specifier>`, sorted. */
+  readonly missing: string[];
+}
+
+/**
+ * Follows every relative specifier from `entry`, a declaration under
+ * `root`, through the declarations beside it, and names every specifier
+ * that is not relative: a package, a builtin, or a `/// <reference
+ * types>`. See the module note.
+ */
+function declarationReach(root: string, entry: string): DeclarationReach {
+  const reached = new Set<string>();
+  const outside: string[] = [];
+  const missing: string[] = [];
+  const queue = [entry];
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (reached.has(file)) continue;
+    reached.add(file);
+    const read = ts.preProcessFile(readFileSync(join(root, file), 'utf8'), true, false);
+    for (const { fileName } of read.typeReferenceDirectives) outside.push(`${file}: types ${fileName}`);
+    for (const { fileName } of read.importedFiles) {
+      if (!fileName.startsWith('.')) {
+        outside.push(`${file}: ${fileName}`);
+        continue;
+      }
+      const target = relative(root, join(root, dirname(file), fileName.replace(/\.js$/, '.d.ts')));
+      if (existsSync(join(root, target))) queue.push(target);
+      else missing.push(`${file}: ${fileName}`);
+    }
+  }
+  return { reached: [...reached].sort(), outside: outside.sort(), missing: missing.sort() };
+}
+
+/** Every target the binary and the exports map name, a condition's target included. */
+function manifestTargets(): string[] {
+  return [...Object.values(BIN), ...Object.values(EXPORTS)]
+    .flatMap((target) => typeof target === 'string'
+      ? [target]
+      : Object.values(target));
 }
 
 /**
@@ -849,7 +970,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the five subpaths to their builds, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -945,11 +1066,10 @@ describe('the build script, run in a copy of the package', () => {
   });
 
   it('writes every file the binary and the exports map name', () => {
-    const named = [...Object.values(BIN), ...Object.values(EXPORTS)];
-    const targets = [...new Set(named.map((target) => join(PACKAGE_DIR, target)))];
+    const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(6);
+    expect(targets).toHaveLength(8);
     expect(missing).toEqual([]);
   });
 
@@ -1137,6 +1257,70 @@ describe('the learning subpath, imported by the package name', () => {
       stderr: '',
     });
   }, 30_000);
+});
+
+describe('the config subpath in the build', () => {
+  it('gives dist/config/index.js the defaults and the defineConfig its source does', async () => {
+    const built = await importBuilt('config/index.js');
+    const defineConfig = built['defineConfig'] as (config: unknown) => unknown;
+    const entries = [{ plan: { inject: 'stage' } }];
+
+    expect(built['defaults']).toEqual(configSource.defaults);
+    expect(defineConfig(entries)).toBe(entries);
+  });
+
+  it('loads dist/config/index.js under node with the names its source exports', () => {
+    const node = Bun.which('node');
+    if (node === null) throw new Error('node is not on the PATH this suite runs under');
+    const href = pathToFileURL(join(DIST, 'config', 'index.js')).href;
+    const load = run([
+      node,
+      '--input-type=module',
+      '-e',
+      `console.log(JSON.stringify(Object.keys(await import(${JSON.stringify(href)})).sort()));`,
+    ], tempRoot, process.env);
+
+    expect(load).toEqual({
+      exitCode: 0,
+      stdout: `${JSON.stringify(Object.keys(configSource).sort())}\n`,
+      stderr: '',
+    });
+  }, 30_000);
+
+  it('writes the declaration the types condition of ./config names, carrying the entry\'s names', () => {
+    const declaration = readFileSync(join(DIST, CONFIG_TYPES), 'utf8');
+
+    expect(EXPORTS['./config'].types).toBe(`./dist/${CONFIG_TYPES}`);
+    expect(declaration).toContain('export { defineConfig } from \'./entry.js\';');
+    expect(declaration).toContain('export declare const defaults: ConfigEntry;');
+    expect(declaration).toContain('export type { Config, ConfigEntry } from \'./entry.js\';');
+  });
+
+  it('reaches no specifier outside rafa from dist/config/index.d.ts, and no declaration that is not there', () => {
+    const reach = declarationReach(DIST, CONFIG_TYPES);
+
+    expect(reach.reached).toContain('config/shape.d.ts');
+    expect(reach.reached).toContain('core/config/index.d.ts');
+    expect(reach.missing).toEqual([]);
+    expect(reach.outside).toEqual([]);
+  });
+
+  it('sees a specifier outside rafa planted two hops from the entry, as a static and as a type import', () => {
+    const copy = mkdtempSync(join(tempRoot, 'declarations-'));
+    cpSync(DIST, copy, { recursive: true });
+    const plant = (file: string, line: string) => writeFileSync(
+      join(copy, file),
+      `${line}\n${readFileSync(join(copy, file), 'utf8')}`,
+      'utf8',
+    );
+    plant('config/shape.d.ts', 'export type Planted = import(\'bun:sqlite\').Database;');
+    plant('core/config/index.d.ts', `import type { StandardSchemaV1 } from '${DEFINE_CONFIG}';`);
+
+    expect(declarationReach(copy, CONFIG_TYPES).outside).toEqual([
+      'config/shape.d.ts: bun:sqlite',
+      `core/config/index.d.ts: ${DEFINE_CONFIG}`,
+    ]);
+  });
 });
 
 describe('the prompt templates in the build', () => {

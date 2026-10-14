@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Declarations of the ./config subpath, written into dist by the build",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declarationDir": "dist"
+  },
+  "include": ["src/config/index.ts"]
+}

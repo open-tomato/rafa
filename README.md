@@ -871,11 +871,12 @@ takes `--yes`. The rest of `rafa update` (`self`, `project`, `board`,
 The build targets bun, and `engines` names `bun` alone: there is no
 `engines.node`, because no node version runs the binary. The package
 root, `./cli` and `./store` import `bun:sqlite`, which node's ESM loader
-refuses before any module code runs, so only `./plan`, `./ports` and
-`./learning` load under node at all. `module` points at
-`./dist/index.js`, the same build the root of `exports` names. The package ships no type declarations:
-`exports` names no `types`, and a TypeScript consumer gets TS7016 under
-`strict`.
+refuses before any module code runs, so only `./plan`, `./ports`,
+`./learning` and `./config` load under node at all. `module` points at
+`./dist/index.js`, the same build the root of `exports` names. Only
+`./config` ships type declarations, at `./dist/config/index.d.ts`, which
+its `exports` entry names as `types`. No other entry names `types`, and
+a TypeScript consumer importing one gets TS7016 under `strict`.
 
 ## Roadmap
 
