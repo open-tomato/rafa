@@ -152,6 +152,7 @@ import { openNdjsonStore, openSqliteStore } from './store/index.js';
 import { writePreflightChecks } from './store/preflight.js';
 import { writeTaskReport } from './store/reports.js';
 import { writeSkillInvocations } from './store/skill-invocations.js';
+import { writeTriage } from './store/triage.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
@@ -988,6 +989,37 @@ describe('the budgets a report carries', () => {
   });
 });
 
+/**
+ * Stores one session's out-of-scope bugs under a root, as the loop stores
+ * a report's: a stale page written as a bug, and a bug about code.
+ */
+function plantBugs(root: string, sessionId: string): void {
+  writeTriage(root, {
+    dispatch: { sessionId, planStub: 'q19-loop-economics', taskLine: 'A task' },
+    outcome: 'done',
+    blockers: [],
+    outOfScopeBugs: [
+      { what: 'context/triage.md still says three channels', artifact: null, security: false, extras: [] },
+      { what: 'src/triage/triage.ts drops the last entry', artifact: null, security: false, extras: [] },
+    ],
+  });
+}
+
+describe('the doc-only bug count a report carries', () => {
+  it('carries the count under the root, unfiltered, and zeroes from a root that stores no bug', () => {
+    const root = plantStore(ROWS);
+    plantBugs(root, 'q19-a');
+
+    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+
+    expect(filtered.totals.sessions).toBe(2);
+    expect(filtered.docOnlyBugs).toEqual({ bugs: 2, docOnly: 1 });
+
+    // The control: the same session rows with no bug stored.
+    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).docOnlyBugs).toEqual({ bugs: 0, docOnly: 0 });
+  });
+});
+
 /** A config holding a problem in each of two settings, `store` and `plan.inject`. */
 const TWO_PROBLEM_CONFIG = 'store: postgres\nplan:\n  inject: bogus\n';
 
@@ -1124,6 +1156,24 @@ describe('the report command', () => {
       'preflight halts: 1 run, by run and failed required item',
       'run         at                        item                outcome  ms  failure',
       'run-halted  2026-09-15T10:00:00.000Z  env "GITHUB_TOKEN"  fail      0  presence check: GITHUB_TOKEN is not set',
+      '',
+    ]);
+  });
+
+  it('prints the doc-only bug count when no session row is stored yet', () => {
+    const root = realpathSync(freshRoot());
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    writeConfig(root, '');
+    plantBugs(root, 'aaaa-1111');
+    const noRows = 'effort report: no session rows stored yet (run `rafa effort collect` first)';
+
+    const run = runReport(root, []);
+
+    expectExit(run, 0, { root });
+    expect(run.stdout.split('\n')).toEqual([
+      noRows,
+      '',
+      'filed bugs naming only documentation: 1 of 2',
       '',
     ]);
   });
