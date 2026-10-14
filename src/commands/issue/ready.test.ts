@@ -1,7 +1,7 @@
 /**
  * Tests for `rafa issue ready` (`ready.ts`): the two readings it
  * prints, the order they run in, the question it puts, the one label
- * swap, the run without a terminal, `--yes`, the line refusals, the
+ * swap, the run without a terminal, `--yes`, `--dry-run`, the line refusals, the
  * declared flags and the `describe` entry.
  *
  * Every case drives a fake of its own — a recorded `gh` runner, a
@@ -22,7 +22,7 @@
  *
  * ## The controls
  *
- * Seven readings here could pass while wrong, and each is paired:
+ * Eight readings here could pass while wrong, and each is paired:
  *
  *  - The swap case runs one issue twice, answering the question yes and
  *    then no, and holds the write against no write. Without the pair, a
@@ -52,6 +52,11 @@
  *    recording board, so "nothing written under `--yes`" cannot pass on
  *    a run that never writes. Those refusals passed before `--yes`
  *    existed; the passing halves were what failed first.
+ *  - The `--dry-run` passing case runs one issue with the flag and
+ *    without it over the same scripted yes and recording board, so "no
+ *    ask, no write" is held against the run that asks and writes; its
+ *    template-gap and prompter cases hold the same silence beside a
+ *    control that writes.
  */
 import type { ReadyAsk, ReadySeams } from './ready.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -560,6 +565,96 @@ describe('yes, which marks with no question once both checks pass', () => {
   });
 });
 
+describe('dry-run, which checks and writes nothing', () => {
+  it('reports checked, asking nothing and writing nothing, against the same run without it', async () => {
+    const ask = scriptedAsk(true);
+    const board = recordingBoard();
+    const options = {
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: ask.ask,
+      board: board.board,
+      readIssue: fakeReader().read,
+    };
+
+    const checked = await runIssueReady({ ...options, dryRun: true });
+
+    expect(checked).toMatchObject({
+      status: 'checked',
+      trust: `#57 was opened by maintainer, who has write access to ${REPO}`,
+      checked: completeLine(57),
+      message: '#57 is ready to mark; --dry-run wrote nothing.',
+    });
+    expect([ask.asked(), board.swapped()]).toEqual([[], []]);
+
+    const marked = await runIssueReady(options);
+
+    expect([marked.status, ask.asked(), board.swapped()])
+      .toEqual(['marked', [readyQuestion(57)], ['#57 -spec:needs-work +spec:ready']]);
+  });
+
+  it('refuses a body with gaps with exit 2 naming every gap, writing nothing, and checks the complete body', async () => {
+    const board = recordingBoard();
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, ask: null, board: board.board, dryRun: true };
+
+    const exit = await refusal(() => runIssueReady({ ...options, readIssue: fakeReader({ body: THIN }).read }));
+    const plain = await refusal(() => runIssueReady({
+      ...options,
+      dryRun: false,
+      readIssue: fakeReader({ body: THIN }).read,
+    }));
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toContain('"Tasks the plan must carry" is missing');
+    expect(exit.message).toBe(plain.message);
+    expect(board.swapped()).toEqual([]);
+
+    const passed = await runIssueReady({ ...options, readIssue: fakeReader().read });
+
+    expect([passed.status, board.swapped()]).toEqual(['checked', []]);
+  });
+
+  it('reports already for an issue carrying spec:ready, writing nothing', async () => {
+    const board = recordingBoard();
+
+    const report = await runIssueReady({
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: null,
+      board: board.board,
+      readIssue: fakeReader({ labels: [SPEC_LABEL, SPEC_READY_LABEL] }).read,
+      dryRun: true,
+    });
+
+    expect(report).toMatchObject({ status: 'already', message: '#57 is already marked spec:ready' });
+    expect(board.swapped()).toEqual([]);
+  });
+
+  it('never calls a prompter that is there, under yes too, which writes without the flag', async () => {
+    const ask = scriptedAsk(true);
+    const board = recordingBoard();
+    const options = {
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: ask.ask,
+      board: board.board,
+      readIssue: fakeReader().read,
+      yes: true,
+    };
+
+    const checked = await runIssueReady({ ...options, dryRun: true });
+
+    expect([checked.status, ask.asked(), board.swapped()]).toEqual(['checked', [], []]);
+
+    const marked = await runIssueReady(options);
+
+    expect([marked.status, board.swapped()]).toEqual(['marked', ['#57 -spec:needs-work +spec:ready']]);
+  });
+});
+
 /** Two `epic:` labels on one spec, the fault the epic label check refuses. */
 const TWO_EPICS = [SPEC_LABEL, 'epic:board', 'epic:views'];
 
@@ -992,7 +1087,7 @@ describe('the ending it names the next step with', () => {
     const command = createIssueReadyCommand();
 
     expect(command.flags.map((flag) => [flag.name, flag.type, flag.default]))
-      .toEqual([['yes', 'boolean', undefined], ['hint', 'boolean', true]]);
+      .toEqual([['yes', 'boolean', undefined], ['dry-run', 'boolean', undefined], ['hint', 'boolean', true]]);
   });
 });
 
