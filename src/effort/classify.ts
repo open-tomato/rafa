@@ -56,16 +56,11 @@
  * needs it — that is a deliberate seam and the reason the two are
  * separate functions.
  */
+import type { SessionKind } from './store/session-row-types.js';
+
 import { readLines } from './session-log.js';
 
-/** What a session was dispatched to do. */
-export type SessionKind =
-  | 'task'
-  | 'plan-generation'
-  | 'wrap-up'
-  | 'ci-repair'
-  | 'search'
-  | 'other';
+export type { SessionKind } from './store/session-row-types.js';
 
 /**
  * The kinds rafa itself dispatches, each with a prompt shape: the loop's

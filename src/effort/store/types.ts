@@ -55,9 +55,11 @@
  * promises, measured on bun 1.3.14.
  */
 import type { PlanStubMatch } from '../attribution.js';
-import type { SessionKind } from '../classify.js';
 import type { CommitStats } from './commit-stats.js';
-import type { SessionStats } from '../session-log.js';
+import type {
+  SessionKind,
+  SessionStats,
+} from './session-row-types.js';
 
 /**
  * Where a session ran, as its row records it.

@@ -374,6 +374,7 @@
     "src/effort/store/reports.ts": "c5",
     "src/effort/store/schema-plan.ts": "c5",
     "src/effort/store/schema-report.ts": "c5",
+    "src/effort/store/session-row-types.ts": "c7",
     "src/effort/store/settings.ts": "c5",
     "src/effort/store/skill-invocations.ts": "c5",
     "src/effort/store/sqlite.ts": "c5",

@@ -4032,20 +4032,6 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/effort/store/types.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/effort/classify.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/types.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/effort/session-log.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4264,8 +4250,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 48,
-      "upwardEdges": 61
+      "remaining": 46,
+      "upwardEdges": 59
     },
     {
       "clearedByIssue118": 0,
@@ -7983,10 +7969,10 @@
     "clearedByIssue118": 13,
     "files": 1936,
     "leftToPlace": 699,
-    "nonTestEdges": 4323,
+    "nonTestEdges": 4321,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 305
+    "upwardEdges": 303
   },
   "unassigned": [
     {
