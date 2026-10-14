@@ -44,7 +44,7 @@
  */
 import type { Database } from 'bun:sqlite';
 
-import { minutesBetween } from '../commits.js';
+import { minutesBetween } from './commit-stats.js';
 
 /** The key of `commits.row_json` a merge recomputes. */
 export const GAP_FIELD = 'minutesSincePrevious';

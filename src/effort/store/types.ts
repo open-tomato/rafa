@@ -56,7 +56,7 @@
  */
 import type { PlanStubMatch } from '../attribution.js';
 import type { SessionKind } from '../classify.js';
-import type { CommitStats } from '../commits.js';
+import type { CommitStats } from './commit-stats.js';
 import type { SessionStats } from '../session-log.js';
 
 /**

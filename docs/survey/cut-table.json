@@ -3990,13 +3990,6 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/effort/store/merge-commit-gaps.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/commits.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/effort/store/plan-ci.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -4025,13 +4018,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/effort/store/testdata/merge-scenarios.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/commits.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/effort/store/triage.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -4050,13 +4036,6 @@
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
           "to": "src/effort/classify.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/effort/store/types.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/effort/commits.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -4082,7 +4061,7 @@
         }
       ],
       "fileCounts": {
-        "source": 80,
+        "source": 81,
         "test": 96,
         "testSupport": 2
       },
@@ -4164,6 +4143,7 @@
         "src/effort/store/bug-routes.ts",
         "src/effort/store/changes.test.ts",
         "src/effort/store/changes.ts",
+        "src/effort/store/commit-stats.ts",
         "src/effort/store/contract.test.ts",
         "src/effort/store/copy-origins.test.ts",
         "src/effort/store/copy.test.ts",
@@ -4268,7 +4248,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 100,
+        "src/effort/store/": 101,
         "src/ports/": 2
       },
       "folders": [
@@ -4284,8 +4264,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 51,
-      "upwardEdges": 64
+      "remaining": 48,
+      "upwardEdges": 61
     },
     {
       "clearedByIssue118": 0,
@@ -7054,7 +7034,7 @@
         }
       ],
       "fileCounts": {
-        "source": 36,
+        "source": 37,
         "test": 35,
         "testSupport": 0
       },
@@ -7115,6 +7095,7 @@
         "src/effort/skill-signals.ts",
         "src/effort/skill-use.test.ts",
         "src/effort/skill-use.ts",
+        "src/effort/store.ts",
         "src/effort/sync/contact.test.ts",
         "src/effort/sync/contact.ts",
         "src/effort/sync/doctor-reading.test.ts",
@@ -7132,7 +7113,7 @@
         "src/schema/frontmatter.ts"
       ],
       "filesByFolder": {
-        "src/effort/": 69
+        "src/effort/": 70
       },
       "folders": [
         "src/effort/"
@@ -8000,12 +7981,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1934,
+    "files": 1936,
     "leftToPlace": 699,
-    "nonTestEdges": 4320,
+    "nonTestEdges": 4323,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 308
+    "upwardEdges": 305
   },
   "unassigned": [
     {

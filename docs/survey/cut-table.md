@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 1934 files, 1906 of them in 10 packages (699 left to place) and 28 in 3 unassigned folders. Of the 4320 edges between two files neither of which is a test, value and type alike, 308 point upward, 13 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 1936 files, 1908 of them in 10 packages (699 left to place) and 28 in 3 unassigned folders. Of the 4323 edges between two files neither of which is a test, value and type alike, 305 point upward, 13 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -10,13 +10,13 @@ An upward edge leaves a package for one further down this table. A file left to 
 
 | Rank | Package | Files | Source | Test | Test support | Upward edges | Cleared by #118 | Remaining |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `@open-tomato/rafa` | 178 | 80 | 96 | 2 | 64 | 13 | 51 |
+| 1 | `@open-tomato/rafa` | 179 | 81 | 96 | 2 | 61 | 13 | 48 |
 | 2 | `rafa-inventory` | 102 | 51 | 51 | 0 | 25 | 0 | 25 |
 | 3 | `rafa-board` | 303 | 136 | 160 | 7 | 67 | 0 | 67 |
 | 4 | `rafa-pr` | 176 | 75 | 99 | 2 | 48 | 0 | 48 |
 | 5 | `rafa-run` | 221 | 92 | 129 | 0 | 91 | 0 | 91 |
 | 6 | `rafa-release` | 73 | 35 | 38 | 0 | 8 | 0 | 8 |
-| 7 | `rafa-effort` | 71 | 36 | 35 | 0 | 5 | 0 | 5 |
+| 7 | `rafa-effort` | 72 | 37 | 35 | 0 | 5 | 0 | 5 |
 | 8 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 9 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
 | 10 | `@open-tomato/rafa-cli` | 741 | 257 | 458 | 26 | 0 | 0 | 0 |
@@ -27,13 +27,13 @@ A folder is followed by the files of the graph it placed. A named file is placed
 
 | Package | Folders | Named files |
 | --- | --- | --- |
-| `@open-tomato/rafa` | `src/effort/store/` (100), `src/core/` (68), `src/ports/` (2) | `src/report/parse.ts`, `src/report/record.ts`, `src/schema/project-id.ts`, `src/schema/tiers.ts` |
+| `@open-tomato/rafa` | `src/effort/store/` (101), `src/core/` (68), `src/ports/` (2) | `src/report/parse.ts`, `src/report/record.ts`, `src/schema/project-id.ts`, `src/schema/tiers.ts` |
 | `rafa-inventory` | `src/inventory/` (28), `src/tiers/` (13), `src/schema/` (11), `src/backfill/` (10), `src/demote/` (10), `src/learning/` (10), `src/check/` (8), `src/task/` (8), `src/agents/` (4), `src/bundled/` (0) | - |
 | `rafa-board` | `src/board/` (129), `src/board/project/` (41), `src/commands/issue/` (41), `src/commands/epic/` (29), `src/adapters/tracker/` (17), `src/refs/` (13), `src/commands/board/` (4) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/naming.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts` |
 | `rafa-pr` | `src/commands/pr/` (71), `src/pr/` (65), `src/triage/` (38) | `src/pr/index.ts` |
 | `rafa-run` | `src/start/` (171), `src/claims/` (18), `src/suite/` (13), `src/commands/claim/` (9), `src/preflight/` (8) | `src/start/branch-decision.ts` |
 | `rafa-release` | `src/release/` (56), `src/commands/release/` (17) | - |
-| `rafa-effort` | `src/effort/` (69) | `src/schema/frontmatter.ts` |
+| `rafa-effort` | `src/effort/` (70) | `src/schema/frontmatter.ts` |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
 | `@open-tomato/rafa-cli` | `src/cli/` (37) | `src/commands/index.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
@@ -46,7 +46,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `@open-tomato/rafa` | `rafa-board` | 4 |
 | `@open-tomato/rafa` | `rafa-pr` | 4 |
 | `@open-tomato/rafa` | `rafa-run` | 2 |
-| `@open-tomato/rafa` | `rafa-effort` | 10 |
+| `@open-tomato/rafa` | `rafa-effort` | 7 |
 | `@open-tomato/rafa` | `@open-tomato/rafa-cli` | 41 |
 | `rafa-inventory` | `rafa-run` | 1 |
 | `rafa-inventory` | `rafa-effort` | 16 |
