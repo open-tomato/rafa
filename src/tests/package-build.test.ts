@@ -1326,6 +1326,93 @@ describe('the config subpath in the build', () => {
   });
 });
 
+describe('the config subpath, installed from the packed tarball', () => {
+  /** The entries both config files hold; `plan.inject` is a setting the defaults entry names. */
+  const ENTRIES = '[{ plan: { inject: \'stage\' } }]';
+
+  /** A scratch project with the tarball of the built copy installed into it, and nothing else. */
+  function installFromTarball(): string {
+    const destination = mkdtempSync(join(tempRoot, 'tarball-'));
+    const pack = run(
+      [process.execPath, 'pm', 'pack', '--ignore-scripts', '--quiet', '--destination', destination],
+      PACKAGE_DIR,
+      withBunOnPath(),
+    );
+    expectExit(pack, 0, { cwd: PACKAGE_DIR });
+    const tarball = readdirSync(destination).find((file) => file.endsWith('.tgz')) ?? '';
+    expect(tarball).not.toBe('');
+
+    const project = mkdtempSync(join(tempRoot, 'consumer-'));
+    writeFileSync(join(project, 'package.json'), '{"name":"consumer","private":true,"type":"module"}\n', 'utf8');
+    const add = run(
+      [process.execPath, 'add', join(destination, tarball), '--no-progress'],
+      project,
+      { ...withBunOnPath(), TMPDIR: tmpdir(), ...scratchHomeEnv(join(project, 'home')) },
+    );
+    expectExit(add, 0, { cwd: project });
+    return project;
+  }
+
+  it('type-checks both rafa.config.ts forms with tsc --noEmit, and imports the first under bun', () => {
+    const project = installFromTarball();
+    writeFileSync(join(project, 'rafa.config.ts'), [
+      'import { defineConfig } from \'@open-tomato/rafa/config\';',
+      '',
+      `export default defineConfig(${ENTRIES});`,
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'typed.config.ts'), [
+      'import type { Config } from \'@open-tomato/rafa/config\';',
+      '',
+      `export default ${ENTRIES} satisfies Config;`,
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        strict: true,
+        noEmit: true,
+        skipLibCheck: true,
+        types: [],
+      },
+      files: ['rafa.config.ts', 'typed.config.ts'],
+    }), 'utf8');
+    const env = withBunOnPath();
+
+    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, env);
+    const load = run([
+      process.execPath,
+      '-e',
+      'console.log(JSON.stringify((await import(\'./rafa.config.ts\')).default));',
+    ], project, env);
+
+    expectExit(check, 0, { cwd: project });
+    expectExit(load, 0, { cwd: project });
+    expect(load.stdout).toBe(`${JSON.stringify([{ plan: { inject: 'stage' } }])}\n`);
+  }, 120_000);
+
+  it('refuses a config entry the type does not allow, so the check can fail', () => {
+    const project = installFromTarball();
+    writeFileSync(join(project, 'bad.config.ts'), [
+      'import type { Config } from \'@open-tomato/rafa/config\';',
+      '',
+      'export default [{ plan: { inject: 42 } }] satisfies Config;',
+      '',
+    ].join('\n'), 'utf8');
+    writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, types: [] },
+      files: ['bad.config.ts'],
+    }), 'utf8');
+
+    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
+
+    expect(check.exitCode).not.toBe(0);
+    expect(check.stdout).toContain('bad.config.ts');
+  }, 120_000);
+});
+
 describe('the prompt templates in the build', () => {
   it.each(TEMPLATES)('copies %s into dist as %s, unchanged', (source, name) => {
     const built = join(DIST, name);
