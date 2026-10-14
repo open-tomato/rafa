@@ -80,6 +80,7 @@ function reportOf(bug: ReportBug): TaskReport {
     blockers: [],
     outOfScopeBugs: [bug],
     staleDocs: [],
+    changes: [],
     extras: [],
   };
 }
