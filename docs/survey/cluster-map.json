@@ -390,6 +390,7 @@
     "src/effort/store/testdata/merge-scenarios.ts": "c5",
     "src/effort/store/tracker-refs.ts": "c5",
     "src/effort/store/triage.ts": "c5",
+    "src/effort/store/trusted-permissions.ts": "c6",
     "src/effort/store/types.ts": "c5",
     "src/effort/store/wire.ts": "c5",
     "src/effort/sync/contact.ts": "c7",

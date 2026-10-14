@@ -3967,13 +3967,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/effort/store/index.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/board/trust.ts",
-          "toPackage": "rafa-board"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3989,8 +3982,8 @@
         }
       ],
       "fileCounts": {
-        "source": 87,
-        "test": 100,
+        "source": 88,
+        "test": 101,
         "testSupport": 2
       },
       "files": [
@@ -4125,6 +4118,8 @@
         "src/effort/store/plan-ci.test.ts",
         "src/effort/store/plan-ci.ts",
         "src/effort/store/plan-stubs.ts",
+        "src/effort/store/preflight-check.test.ts",
+        "src/effort/store/preflight-check.ts",
         "src/effort/store/preflight.test.ts",
         "src/effort/store/preflight.ts",
         "src/effort/store/rebuild-aside.test.ts",
@@ -4186,7 +4181,7 @@
       ],
       "filesByFolder": {
         "src/core/": 68,
-        "src/effort/store/": 111,
+        "src/effort/store/": 113,
         "src/ports/": 2
       },
       "folders": [
@@ -4202,8 +4197,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 37,
-      "upwardEdges": 50
+      "remaining": 36,
+      "upwardEdges": 49
     },
     {
       "clearedByIssue118": 0,
@@ -7910,12 +7905,12 @@
   ],
   "totals": {
     "clearedByIssue118": 13,
-    "files": 1944,
+    "files": 1946,
     "leftToPlace": 700,
-    "nonTestEdges": 4326,
+    "nonTestEdges": 4328,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 293
+    "upwardEdges": 292
   },
   "unassigned": [
     {

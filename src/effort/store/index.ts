@@ -75,7 +75,7 @@
  *     are merged, with its options and its result, the latter as
  *     `StoreMergeResult`, the name `./ports` gives it beside the
  *     learning library's own `MergeResult`;
- *   - `TRUSTED_PERMISSIONS` (`src/board/trust.ts`), the repository
+ *   - `TRUSTED_PERMISSIONS` (`trusted-permissions.ts`), the repository
  *     permissions that are write access, so a hub checking a token's
  *     login spells them as core does.
  *
@@ -97,7 +97,6 @@ import type { RafaConfig } from '../../core/config/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
 
-export type { TrustedPermission } from '../../board/trust.js';
 export type { StoreBackend } from '../../core/config/sections.js';
 export type {
   MaterialisedWire,
@@ -126,8 +125,8 @@ export type {
   SessionEffortRow,
   SessionMode,
 } from './types.js';
+export type { TrustedPermission } from './trusted-permissions.js';
 
-export { TRUSTED_PERMISSIONS } from '../../board/trust.js';
 export { STORE_BACKENDS } from '../../core/config/sections.js';
 export {
   decodeWirePayload,
@@ -143,6 +142,7 @@ export { mergeStore } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';
 export { EFFORT_KEY_PROJECTIONS } from './types.js';
+export { TRUSTED_PERMISSIONS } from './trusted-permissions.js';
 
 /**
  * What {@link selectEffortStore} answers: the port, plus the one

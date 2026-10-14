@@ -319,7 +319,8 @@ store and no project: the merge records no other store in `merges`, and its
 other-project refusal has nothing to compare. The cursor for the next push
 advances only after a successful push; after a successful pull, the next pull
 starts from the new rows the merge brought in. The codec, `mergeStore` and
-`TRUSTED_PERMISSIONS` are exported from the `./store` subpath for the
+`TRUSTED_PERMISSIONS` (`store/trusted-permissions.ts`, re-exported by
+`src/board/trust.ts`) are exported from the `./store` subpath for the
 packages under `packages/`.
 
 **The `service` strategy makes one contact per command through
