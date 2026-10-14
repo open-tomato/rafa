@@ -94,9 +94,10 @@
  *
  * The published surface is narrower than this file. `src/index.ts`
  * re-exports part of it, and of the runtime names leaves out core's
- * section, the item readers and the section registry with its key
+ * section, the item readers, `config.ts`'s two document readers the
+ * loader reads a scope through, and the section registry with its key
  * indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
- * `activeSettingByKey` and sixteen more), which `src/index.test.ts`
+ * `activeSettingByKey` and nineteen more), which `src/index.test.ts`
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
@@ -153,6 +154,7 @@ export {
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
+  activeSections,
   activeSettingByKey,
   activeSettings,
   ConfigSectionError,
@@ -165,6 +167,8 @@ export {
 export {
   ConfigError,
   configFilePath,
+  parseConfigDocument,
   parseConfigText,
+  readConfigDocument,
   resolveConfig,
 } from './config.js';

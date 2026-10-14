@@ -10,9 +10,13 @@
  * optional, and two more forms the merge reads:
  *
  * - `false` at an id of a keyed map (`routing`, `tiers.skills`,
- *   `tiers.agents`, `logger.modules`) removes that id, so
- *   `{ logger: { modules: { board: false } } }` drops what an earlier
- *   entry gave `board`. A named key takes `false` only where its own
+ *   `tiers.agents`, `logger.modules`) overrides what an earlier entry
+ *   gave that id, so `{ logger: { modules: { board: false } } }` drops
+ *   what an earlier entry gave `board`. Where the map takes `false` as a
+ *   value (`routing`, the `tiers` pins) the loader keeps it as one, so it
+ *   also shadows a lower layer's row, as in a YAML file; where it does
+ *   not (`logger.modules`) the id is removed (`config-load.ts` in
+ *   `src/core/config/`). A named key takes `false` only where its own
  *   value does (`loop.retries`), never to remove it.
  * - `{ $replace: true, …rest }` at any mapping below the top replaces
  *   that mapping whole with `rest`, discarding what earlier entries put

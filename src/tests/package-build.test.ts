@@ -305,6 +305,14 @@
  * 55 of 66: the scratch package copies no `node_modules`, so its build
  * cannot resolve the library until it is given one.
  *
+ * It is given one now. `src/core/config/config-load.ts` imports
+ * `createLoader` by value, so the scratch package's `node_modules` links
+ * the library the repository installed, as the probe's directory does;
+ * without the link the build exits 1 on `Could not resolve:
+ * "@open-tomato/define-config"`, measured when that import landed. The
+ * `--version` copy sits beside the package, not under it, so no
+ * `node_modules` is at or above it still.
+ *
  * ## How the cases were shown to fail
  *
  * Eight mutations of `package.json` were driven against this file, one
@@ -623,6 +631,7 @@ beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
+  linkDefineConfig(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
   mkdirSync(boardTemplates, { recursive: true });
   writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
@@ -645,6 +654,13 @@ function defineConfigLoads(text: string): string[] {
   return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
 }
 
+/** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
+function linkDefineConfig(dir: string): void {
+  mkdirSync(join(dir, 'node_modules', '@open-tomato'), { recursive: true });
+  const installed = realpathSync(join(REPO_ROOT, 'node_modules', DEFINE_CONFIG));
+  symlinkSync(installed, join(dir, 'node_modules', DEFINE_CONFIG), 'dir');
+}
+
 /**
  * Builds a probe calling `defineConfig` to `out.js` under its own scratch
  * directory, whose `node_modules` links the package the repository
@@ -653,9 +669,8 @@ function defineConfigLoads(text: string): string[] {
  */
 function buildDefineConfigProbe(name: string, external: readonly string[]): string {
   const dir = join(tempRoot, `define-config-${name}`);
-  mkdirSync(join(dir, 'node_modules', '@open-tomato'), { recursive: true });
-  const installed = realpathSync(join(REPO_ROOT, 'node_modules', DEFINE_CONFIG));
-  symlinkSync(installed, join(dir, 'node_modules', DEFINE_CONFIG), 'dir');
+  mkdirSync(dir, { recursive: true });
+  linkDefineConfig(dir);
   writeFileSync(join(dir, 'probe.ts'), [
     `import { defineConfig } from '${DEFINE_CONFIG}';`,
     'console.log(typeof defineConfig);',

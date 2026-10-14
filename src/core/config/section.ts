@@ -305,6 +305,11 @@ export function restoreConfigSections(registry: ConfigSectionRegistry): void {
   active = registry;
 }
 
+/** Every registered section, in registration order. */
+export function activeSections(): readonly ConfigSection[] {
+  return active.sections;
+}
+
 /** Every registered setting's spec, in registration order. */
 export function activeSettings(): Readonly<Partial<SettingsRecord>> {
   return active.settings;

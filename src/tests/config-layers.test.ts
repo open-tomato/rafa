@@ -117,15 +117,15 @@ function sink(): { lines: string[]; warn: (line: string) => void } {
 /** A warning sink that keeps nothing. */
 function quiet(): void {}
 
-/** The {@link ConfigError} `run` throws. Fails when it throws none. */
-function refusal(run: () => unknown): ConfigError {
+/** The {@link ConfigError} `run` rejects with. Fails when it settles otherwise. */
+async function refusal(run: () => Promise<unknown>): Promise<ConfigError> {
   try {
-    run();
+    await run();
   } catch (error) {
     if (error instanceof ConfigError) return error;
     throw error;
   }
-  throw new Error('expected a ConfigError, and nothing was thrown');
+  throw new Error('expected a ConfigError, and the load resolved');
 }
 
 /** Every setting name, read off {@link CONFIG_DEFAULTS}; see the module note. */
@@ -647,9 +647,9 @@ const CLI_OVERRIDES: ConfigOverrides = {
 };
 
 describe('loadConfig across the whole schema', () => {
-  it('lets the project file outrank the user file, setting by setting', () => {
+  it('lets the project file outrank the user file, setting by setting', async () => {
     const roots = scopes(PROJECT_TEXT, USER_TEXT);
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual(PROJECT_VALUES);
     expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
@@ -657,14 +657,14 @@ describe('loadConfig across the whole schema', () => {
     // The control: the same home with no project file to outrank it
     // answers the user's own values, so the project's above was a real
     // override and not an accident of the defaults.
-    const userAlone = loadConfig({ root: freshDir('no-project'), home: roots.home }, {}, quiet);
+    const userAlone = await loadConfig({ root: freshDir('no-project'), home: roots.home }, {}, quiet);
     expect(userAlone.config).toEqual(USER_VALUES);
     expect(userAlone.sources).toEqual(sourcesWith({}, 'user'));
   });
 
-  it('lets a command-line value outrank both files', () => {
+  it('lets a command-line value outrank both files', async () => {
     const roots = scopes(PROJECT_TEXT, USER_TEXT);
-    const flagged = loadConfig(roots, CLI_OVERRIDES, quiet);
+    const flagged = await loadConfig(roots, CLI_OVERRIDES, quiet);
 
     expect(flagged.config).toEqual({
       ...PROJECT_VALUES,
@@ -692,17 +692,17 @@ describe('loadConfig across the whole schema', () => {
 
     // The control: the same roots with no flag answer the project's
     // values for every setting the flag named above.
-    const unflagged = loadConfig(roots, {}, quiet);
+    const unflagged = await loadConfig(roots, {}, quiet);
     expect(unflagged.config).toEqual(PROJECT_VALUES);
     expect(unflagged.sources).toEqual(sourcesWith({}, 'file'));
   });
 });
 
 describe('an unknown key nested under a section', () => {
-  it('is retained in extras, with exactly one warning naming it', () => {
+  it('is retained in extras, with exactly one warning naming it', async () => {
     const roots = scopes('tracker:\n  default: linear\n  kind: legacy\n', null);
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.trackerDefault).toBe('linear');
     expect(resolved.extras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
@@ -715,7 +715,7 @@ describe('an unknown key nested under a section', () => {
     // nothing, so the single warning above was earned by `kind` alone.
     const clean = scopes('tracker:\n  default: linear\n', null);
     const cleanSink = sink();
-    loadConfig(clean, {}, cleanSink.warn);
+    await loadConfig(clean, {}, cleanSink.warn);
     expect(cleanSink.lines).toEqual([]);
   });
 });
@@ -1175,10 +1175,10 @@ describe('each section, an unusable value refused by name beside an accepting co
 
   it.each(SECTION_CASES)(
     'refuses an unusable %s through loadConfig, naming the real file',
-    (_label, unusable, problem) => {
+    async (_label, unusable, problem) => {
       const roots = scopes(`${unusable}\n`, null);
 
-      expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+      expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
         `${literalPath(roots.root)}: ${problem}`,
       ]);
     },
@@ -1186,9 +1186,9 @@ describe('each section, an unusable value refused by name beside an accepting co
 
   it.each(SECTION_CASES)(
     'accepts a usable %s into the config, sourced from the file',
-    (_label, _unusable, _problem, usable, setting, expected) => {
+    async (_label, _unusable, _problem, usable, setting, expected) => {
       const roots = scopes(`${usable}\n`, null);
-      const resolved = loadConfig(roots, {}, quiet);
+      const resolved = await loadConfig(roots, {}, quiet);
 
       expect<unknown>(resolved.config[setting]).toEqual(expected);
       expect(resolved.sources[setting]).toBe('file');
@@ -1197,12 +1197,12 @@ describe('each section, an unusable value refused by name beside an accepting co
 });
 
 describe('maps merged across the user and project layers', () => {
-  it('merges tiers.skills by key, the project outranking the user on a shared name', () => {
+  it('merges tiers.skills by key, the project outranking the user on a shared name', async () => {
     const roots = scopes(
       'tiers:\n  skills: { documentation: project, lint: rafa }\n',
       'tiers:\n  skills: { documentation: user, react-query: user }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.tiersSkills).toEqual(new Map<string, TierPin>([
       ['documentation', 'project'],
@@ -1212,12 +1212,12 @@ describe('maps merged across the user and project layers', () => {
     expect(resolved.sources.tiersSkills).toBe('file');
   });
 
-  it('merges routing by key over the defaults, user rows then project rows', () => {
+  it('merges routing by key over the defaults, user rows then project rows', async () => {
     const roots = scopes(
       'routing: { cleanup: refactor-cleaner }\n',
       'routing: { review: typescript-reviewer, cleanup: user-cleaner }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.routing).toEqual(new Map<string, RouteTarget>([
       ...CONFIG_DEFAULTS.routing,
@@ -1226,12 +1226,12 @@ describe('maps merged across the user and project layers', () => {
     ]));
   });
 
-  it('lets a project false shadow the user pin and a user false shadow a default row', () => {
+  it('lets a project false shadow the user pin and a user false shadow a default row', async () => {
     const roots = scopes(
       'tiers:\n  skills: { documentation: false }\n',
       'tiers:\n  skills: { documentation: user }\nrouting: { tests: false }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.tiersSkills.get('documentation')).toBe(false);
     expect(resolved.config.routing.get('tests')).toBe(false);
@@ -1242,10 +1242,10 @@ describe('maps merged across the user and project layers', () => {
 describe('a user-level pin naming an unloaded tier', () => {
   const USER_PIN = 'tiers:\n  rafa: off\n  skills: { documentation: rafa }\n';
 
-  it('warns naming the pin and the file, and still loads the config', () => {
+  it('warns naming the pin and the file, and still loads the config', async () => {
     const roots = scopes(null, USER_PIN);
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.tiersSkills.get('documentation')).toBe('rafa');
     expect(lines).toEqual([
@@ -1254,10 +1254,10 @@ describe('a user-level pin naming an unloaded tier', () => {
     ]);
   });
 
-  it('does not warn while the rafa tier is loaded', () => {
+  it('does not warn while the rafa tier is loaded', async () => {
     const roots = scopes(null, 'tiers:\n  skills: { documentation: rafa }\n');
     const { lines, warn } = sink();
-    loadConfig(roots, {}, warn);
+    await loadConfig(roots, {}, warn);
 
     expect(lines).toEqual([]);
   });
@@ -1274,7 +1274,7 @@ describe('a user-level pin naming an unloaded tier', () => {
  * covers only with an absolute path.
  */
 describe('the release plan\'s six keys, through loadConfig', () => {
-  it('reads all six from .rafa/config.yaml, sourced from the file', () => {
+  it('reads all six from .rafa/config.yaml, sourced from the file', async () => {
     const roots = scopes(
       [
         'pr:',
@@ -1290,7 +1290,7 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       ].join('\n'),
       null,
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toMatchObject({
       prVersionCollision: 'ask',
@@ -1310,9 +1310,9 @@ describe('the release plan\'s six keys, through loadConfig', () => {
     });
   });
 
-  it('falls back to defaults, together, when no config file names them', () => {
+  it('falls back to defaults, together, when no config file names them', async () => {
     const roots = scopes(null, null);
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toMatchObject({
       prVersionCollision: CONFIG_DEFAULTS.prVersionCollision,
@@ -1332,10 +1332,10 @@ describe('the release plan\'s six keys, through loadConfig', () => {
     });
   });
 
-  it('reports a release.fragments planted under .rafa/, naming the real file', () => {
+  it('reports a release.fragments planted under .rafa/, naming the real file', async () => {
     const roots = scopes('release:\n  fragments: .rafa/changes\n', null);
 
-    expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
       `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
         + 'expected a relative directory path not under .rafa/',
     ]);
@@ -1349,11 +1349,11 @@ describe('every registered setting, resolved through loadConfig', () => {
     expect([...Object.keys(CONFIG_DEFAULTS)].sort()).toEqual([...SETTING_NAMES].sort());
   });
 
-  it('resolves the project file over the user file over the default, key by key', () => {
+  it('resolves the project file over the user file over the default, key by key', async () => {
     const project = scopes(PROJECT_TEXT, USER_TEXT);
-    const both = loadConfig(project, {}, quiet);
-    const userOnly = loadConfig({ root: freshDir('no-project'), home: project.home }, {}, quiet);
-    const neither = loadConfig({ root: freshDir('no-project'), home: freshDir('no-home') }, {}, quiet);
+    const both = await loadConfig(project, {}, quiet);
+    const userOnly = await loadConfig({ root: freshDir('no-project'), home: project.home }, {}, quiet);
+    const neither = await loadConfig({ root: freshDir('no-project'), home: freshDir('no-home') }, {}, quiet);
 
     for (const name of SETTING_NAMES) {
       expect({ name, value: both.config[name], source: both.sources[name] })
@@ -1367,7 +1367,7 @@ describe('every registered setting, resolved through loadConfig', () => {
 });
 
 describe('a second section redefining dangerous.acceptStaleRefs', () => {
-  it('is refused at registration, the refusal naming both packages', () => {
+  it('is refused at registration, the refusal naming both packages', async () => {
     const rival = {
       package: '@example/rival',
       settings: { dangerousAcceptStaleRefs: SETTINGS.dangerousAcceptStaleRefs },
@@ -1391,7 +1391,7 @@ describe('a second section redefining dangerous.acceptStaleRefs', () => {
     }
 
     // The refused registration left the registry as it was.
-    const loaded = loadConfig(scopes(null, null), {}, quiet);
+    const loaded = await loadConfig(scopes(null, null), {}, quiet);
     expect(loaded.config.dangerousAcceptStaleRefs).toBe(false);
   });
 });

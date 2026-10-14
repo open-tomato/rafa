@@ -88,7 +88,9 @@ import {
   CONFIG_FILE,
   ConfigError,
   configFilePath,
+  parseConfigDocument,
   parseConfigText,
+  readConfigDocument,
   resolveConfig,
 } from './config.js';
 import {
@@ -1310,7 +1312,45 @@ describe('parseConfigText', () => {
   });
 });
 
+describe('parseConfigDocument and readConfigDocument', () => {
+  it('are parseConfigText in two halves: the document, then the layer read off it', () => {
+    const text = 'store: ndjson\nplan:\n  inject: task\nnonesuch: 1\n';
+    const document = parseConfigDocument(text, PATH);
+
+    expect(document).toEqual({ store: 'ndjson', plan: { inject: 'task' }, nonesuch: 1 });
+    expect(readConfigDocument(document, PATH)).toEqual(parseConfigText(text, PATH));
+  });
+
+  it('parses without judging a key, and refuses a tab before the parser', () => {
+    expect(parseConfigDocument('store: postgres\n', PATH)).toEqual({ store: 'postgres' });
+    expect(() => parseConfigDocument('plan:\n\tinject: full\n', PATH)).toThrow(ConfigError);
+    expect(() => readConfigDocument({ store: 'postgres' }, PATH)).toThrow(ConfigError);
+  });
+
+  it('reads null as a file that says nothing, and refuses anything else that is not a mapping', () => {
+    expect(readConfigDocument(null, PATH).extras).toEqual([]);
+    expect(() => readConfigDocument([{ store: 'ndjson' }], PATH)).toThrow(
+      `${PATH}: expected a mapping at the top level, found a list`,
+    );
+  });
+});
+
 describe('resolveConfig', () => {
+  it('names the file and entry of each setting a file answered, and none for the command line or a default', () => {
+    const file = { ...parseConfigText('store: ndjson\nplan:\n  dir: p\n', PATH), entries: new Map<ConfigSetting, number>([['planDir', 3]]) };
+    const user = parseConfigText('plan:\n  inject: task\n', USER_PATH);
+    const resolved = resolveConfig({ cli: { specsDir: 'cli-specs' }, file, user });
+
+    expect([
+      resolved.provenance.store,
+      resolved.provenance.planDir,
+      resolved.provenance.inject,
+      resolved.provenance.specsDir,
+      resolved.provenance.trackingAll,
+    ]).toEqual([{ file: PATH, entry: 0 }, { file: PATH, entry: 3 }, { file: USER_PATH, entry: 0 }, null, null]);
+    expect(resolved.shadowed).toEqual([]);
+  });
+
   it('merges a file\'s routing rows by key over the five defaults', () => {
     const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
 
@@ -1329,6 +1369,8 @@ describe('resolveConfig', () => {
       extras: [],
       userExtras: [],
       warnings: [],
+      provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
+      shadowed: [],
     });
   });
 

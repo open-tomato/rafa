@@ -13,9 +13,12 @@
  * skipped. `file` names the project's file, as it did when that was the
  * only file read, and `user` names the user scope's.
  *
- * This module is the pure half: text into a layer, layers into one
- * resolution. Finding and reading the two files, behind a home seam, is
- * `config-load.ts`. Scope resolution and `rafa init` are not here.
+ * This module is the pure half: text, or a document already parsed,
+ * into a layer, and layers into one resolution. Finding and reading each
+ * scope's file, behind a home seam, is `config-load.ts`, which reads a
+ * module file's merged entries through the same {@link readConfigDocument}
+ * a YAML file's document goes through. Scope resolution and `rafa init`
+ * are not here.
  *
  * ## Where the rules live
  *
@@ -177,6 +180,7 @@
  *     boolean. So a `tracking` flag spelled `yes` is refused rather
  *     than read as true.
  */
+import type { SettingOrigin, ShadowedFile } from './config-origins.js';
 import type {
   CommandLineSetting,
   ConfigSetting,
@@ -191,6 +195,7 @@ import type {
 
 import { join } from 'node:path';
 
+import { originOf } from './config-origins.js';
 import {
   describeValue,
   isMapping,
@@ -289,6 +294,12 @@ export interface ConfigFile {
   values: ConfigLayer;
   /** Every key that names no setting and opens no section. */
   extras: readonly ConfigExtra[];
+  /**
+   * The zero-based entry that last set each setting, for a file of
+   * several entries. Absent for a file of one, a YAML file, whose every
+   * setting is entry 0.
+   */
+  entries?: ReadonlyMap<ConfigSetting, number>;
 }
 
 /** The layers {@link resolveConfig} ranks, highest first. */
@@ -317,6 +328,13 @@ export interface ResolvedConfig {
   userExtras: readonly ConfigExtra[];
   /** One sentence per retained unknown key, the user file's first. */
   warnings: readonly string[];
+  /**
+   * The file and entry that answered each setting, or null where the
+   * command line or a default did (`config-origins.ts`).
+   */
+  provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
+  /** The YAML files a module file of their scope left unread. Empty here; `config-load.ts` fills it. */
+  shadowed: readonly ShadowedFile[];
 }
 
 /**
@@ -466,11 +484,12 @@ function tabIndentProblems(text: string, path: string): string[] {
 }
 
 /**
- * Parses YAML, refusing text that is not YAML with the file named. A
- * tab in a line's indentation is refused before the parser sees the
- * text, because bun's parser answers it differently by version.
+ * Parses YAML into its document, refusing text that is not YAML with
+ * the file named. A tab in a line's indentation is refused before the
+ * parser sees the text, because bun's parser answers it differently by
+ * version. Judges no key: {@link readConfigDocument} does.
  */
-function parseYaml(text: string, path: string): unknown {
+export function parseConfigDocument(text: string, path: string): unknown {
   const tabProblems = tabIndentProblems(text, path);
   if (tabProblems.length > 0) throw new ConfigError(tabProblems);
   try {
@@ -497,7 +516,16 @@ export function configFilePath(root: string): string {
  * the keys an item carried after the keys of the document.
  */
 export function parseConfigText(text: string, path: string): ConfigFile {
-  const document = parseYaml(text, path) ?? {};
+  return readConfigDocument(parseConfigDocument(text, path), path);
+}
+
+/**
+ * Reads a parsed document into one file layer, as {@link parseConfigText}
+ * reads the text it parses: null says nothing, anything but a mapping at
+ * the top is refused, and every key is judged. Pure; `path` only labels.
+ */
+export function readConfigDocument(parsed: unknown, path: string): ConfigFile {
+  const document = parsed ?? {};
   if (!isMapping(document)) {
     const found = describeValue(document);
     throw new ConfigError([
@@ -628,6 +656,9 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
   const sources = Object.fromEntries(
     ranked.map(([setting, { source }]) => [setting, source]),
   ) as Record<ConfigSetting, ConfigSource>;
+  const provenance = Object.fromEntries(
+    ranked.map(([setting, { source }]) => [setting, originOf(source, setting, file, user)]),
+  ) as Record<ConfigSetting, SettingOrigin | null>;
   const path = file?.path ?? null;
   const userPath = user?.path ?? null;
   const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath }));
@@ -650,5 +681,7 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     extras: file?.extras ?? [],
     userExtras: user?.extras ?? [],
     warnings,
+    provenance,
+    shadowed: [],
   };
 }

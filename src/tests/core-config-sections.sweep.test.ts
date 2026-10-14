@@ -63,11 +63,11 @@ describe('loadConfig with no section registered', () => {
     for (const dir of scratch.splice(0)) rmSync(dir, { force: true, recursive: true });
   });
 
-  it('throws naming src/config-registry.ts', () => {
+  it('rejects naming src/config-registry.ts', async () => {
     const root = mkdtempSync(join(tmpdir(), 'core-sections-'));
     scratch.push(root);
     restoreConfigSections(EMPTY_CONFIG_REGISTRY);
     expect(Object.keys(activeSettings())).toEqual([]);
-    expect(() => loadConfig({ home: root, root } as never)).toThrow('src/config-registry.ts');
+    await expect(loadConfig({ home: root, root } as never)).rejects.toThrow('src/config-registry.ts');
   });
 });

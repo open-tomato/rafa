@@ -121,11 +121,11 @@ describe('the logger defaults', () => {
 });
 
 describe('loadConfig', () => {
-  it('hands the file\'s logger settings to the logger', () => {
+  it('hands the file\'s logger settings to the logger', async () => {
     const text = `${projectConfigText()}\nlogger:\n  level: error\n  api: true\n  modules:\n    board: { level: debug }\n`;
     const project = plantProject(mkdtempSync(join(tempBase, 'case-')), text);
 
-    loadConfig({ root: project.root, home: project.home }, {}, () => {});
+    await loadConfig({ root: project.root, home: project.home }, {}, () => {});
 
     expect(activeLoggerSettings()).toEqual({
       kind: 'console',
@@ -137,12 +137,12 @@ describe('loadConfig', () => {
     });
   });
 
-  it('sets them before it prints the load\'s own warnings', () => {
+  it('sets them before it prints the load\'s own warnings', async () => {
     const text = `${projectConfigText()}\nlogger:\n  level: error\nnonesuch: 1\n`;
     const project = plantProject(mkdtempSync(join(tempBase, 'case-')), text);
     const levels: string[] = [];
 
-    loadConfig({ root: project.root, home: project.home }, {}, () => {
+    await loadConfig({ root: project.root, home: project.home }, {}, () => {
       levels.push(activeLoggerSettings().level);
     });
 

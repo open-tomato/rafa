@@ -58,6 +58,7 @@ import {
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
+  activeSections,
   activeSettingByKey,
   activeSettings,
   ConfigSectionError,
@@ -308,6 +309,7 @@ describe('registerConfigSections', () => {
         dangerousAcceptStaleRefs: false,
       });
       expect(activeChecks().flatMap((check) => check(CHECK_INPUT))).toEqual(['alpha refuses store sqlite from default']);
+      expect(activeSections().map((section) => section.package)).toEqual(['alpha', 'beta']);
     });
   });
 
@@ -334,6 +336,7 @@ describe('registerConfigSections', () => {
       expect(activeSettings()).toEqual({});
       expect(activeDefaults()).toEqual({});
       expect(activeChecks()).toEqual([]);
+      expect(activeSections()).toEqual([]);
     });
   });
 });

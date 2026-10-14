@@ -81,9 +81,9 @@ function scrubbed(text: string): string {
 }
 
 /** The loader's result over the scratch project, as the fixture's text. */
-function loadedJson(): string {
+async function loadedJson(): Promise<string> {
   const warnings: string[] = [];
-  const resolved = loadConfig({ root, home }, {}, (message) => {
+  const resolved = await loadConfig({ root, home }, {}, (message) => {
     warnings.push(message);
   });
   const settings = Object.fromEntries(
