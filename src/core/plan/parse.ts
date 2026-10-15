@@ -164,10 +164,10 @@ import type { RafaBlock } from './blocks.js';
 import type { TaskDeclaration } from '../../utils/declaration.js';
 
 import { parseTaskDeclaration } from '../../utils/declaration.js';
-import { isStampableStub } from '../../utils/plan-stamp.js';
 import { splitBlockerComment } from '../../utils/tracker.js';
 
 import { readRafaBlocks } from './blocks.js';
+import { isStampableStub } from './plan-stamp.js';
 
 /** The block kinds a plan is read from. Every other kind is ignored. */
 export const PLAN_BLOCK_KINDS = ['plan', 'context', 'stage-context'] as const;

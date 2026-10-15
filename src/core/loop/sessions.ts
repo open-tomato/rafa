@@ -14,7 +14,7 @@
  *
  *   - `sessionId`: the run's id, the file's name before `.json`.
  *   - `planStub`: the plan's stub, or null for a plan whose file name
- *     carries none, as `PLAN.md` does (`utils/plan-stamp.ts`).
+ *     carries none, as `PLAN.md` does (`core/plan/plan-stamp.ts`).
  *   - `plan`: the plan's path relative to the project root. The spec lists
  *     the stub alone; the path is what tells two stubless plans apart.
  *   - `branch`: the branch the run was started on.

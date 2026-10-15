@@ -5,7 +5,7 @@
  *
  * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the twenty-five files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty-six files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
@@ -72,7 +72,7 @@ export interface Collision {
 }
 
 /**
- * The twenty-five files that move, sorted by their path today: the
+ * The twenty-six files that move, sorted by their path today: the
  * nineteen of #905, `src/runtime/identity.ts`, which #1088 moved so the
  * effort store imports nothing above core for it, the `text` output
  * adapter with the `OutputStream` it writes to, which #1089 moved so
@@ -242,6 +242,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
     tests: ['src/utils/commit.test.ts'],
     to: 'src/core/git/commit.ts',
   },
+  {
+    from: 'src/utils/plan-stamp.ts',
+    subject: 'plan',
+    tests: [],
+    to: 'src/core/plan/plan-stamp.ts',
+  },
 ];
 
 /**
@@ -258,6 +264,7 @@ export const CORE_REEXPORTS: readonly string[] = [
   'src/cli/running.ts',
   'src/cli/spends.ts',
   'src/runtime/identity.ts',
+  'src/utils/plan-stamp.ts',
 ];
 
 /**

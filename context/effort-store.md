@@ -1306,7 +1306,7 @@ over rafa-63: 210 rows under the stub, 12 of them null-`kind`.
 
 ### Attribution
 
-**`planStubFromPrompt` (`src/utils/plan-stamp.ts`) answers the FIRST
+**`planStubFromPrompt` (`src/core/plan/plan-stamp.ts`) answers the FIRST
 `ralph:plan=` stamp in a prompt.** Task and wrap-up prompts carry plan
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.

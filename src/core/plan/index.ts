@@ -1,11 +1,12 @@
 /**
- * The barrel over the plan parser and the plan-file helpers: every name
- * `parse.ts` and `plan-files.ts` export, and nothing else.
+ * The barrel over the plan parser and the plan-file helpers and the plan stamp:
+ * every name `parse.ts`, `plan-files.ts` and `plan-stamp.ts` export, and
+ * nothing else.
  *
  * A file outside `src/core/` imports this file and never the two behind
- * it (`scripts/survey/core-barrels.ts` measures that, and
+ * them (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the two directly and never this file.
+ * file inside `src/core/` imports the three directly and never this file.
  * None outside this folder does today.
  *
  * ## What sits behind it
@@ -15,7 +16,9 @@
  *     the header fields and the release levels it reads;
  *   - `plan-files.ts`: where plans are kept and how their files are
  *     named, counted and worded: the plans directory, the file a stub
- *     names, the task counts, and the lines the plan commands print.
+ *     names, the task counts, and the lines the plan commands print;
+ *   - `plan-stamp.ts`: the plan marker the loop appends to every prompt
+ *     it dispatches, and the readers of a stub from a prompt or a path.
  *
  * ## Why the block reader is not here
  *
@@ -52,9 +55,10 @@
  * `docs/survey/cluster-map.json`, and the three files of the seventh
  * were all placed in cluster c3.
  *
- * The other two files outside `src/core/` that the files behind this
- * barrel import by value, `src/utils/declaration.ts` and
- * `src/utils/plan-stamp.ts`, import no file by value.
+ * The other file outside `src/core/` that the files behind this barrel
+ * import by value, `src/utils/declaration.ts`, imports no file by value.
+ * `plan-stamp.ts` imports none either; it moved here from `src/utils/`,
+ * where a re-export of its names stays for the importers outside core.
  *
  * ## What it exports
  *
@@ -65,10 +69,10 @@
  * `src/plan/index.ts`, the `./plan` entry, re-exports `parsePlan`,
  * `PLAN_BLOCK_KINDS`, `PLAN_HEADER_FIELDS` and ten types of `parse.ts`
  * from here. It leaves out `PLAN_RELEASE_LEVELS`, `PlanReleaseLevel` and
- * every name of `plan-files.ts`, as it did before the move.
+ * every name of `plan-files.ts` and `plan-stamp.ts`, as it did before the move.
  * `src/tests/entry-exports.test.ts` pins that entry's names.
  *
- * `index.test.ts` holds the list to the two files: every name either
+ * `index.test.ts` holds the list to the three files: every name either
  * exports is here once, as the same binding, no other name is here, and
  * no name here is on the other plan barrel.
  */
@@ -101,3 +105,4 @@ export {
   rejectedPath,
   stubOfPlanFile,
 } from './plan-files.js';
+export { isStampableStub, planStampLine, planStubFromPath, planStubFromPrompt, stampPrompt } from './plan-stamp.js';
