@@ -1,9 +1,11 @@
 /**
  * Tests for `rafa epic close` (`close.ts`): the line, the epic read off
- * the listing and its refusals, the planning step, the report a failed
- * check is filed as, and the command dispatched over a planted `gh`, a
- * planted `git`, a planted Claude spawner, a planted effort store and a
- * public tracker that is a `local` one under the case's own project.
+ * the listing and its refusals, the planning step, and the command
+ * dispatched over a planted `gh`, a planted `git`, a planted Claude
+ * spawner, a planted effort store and a public tracker that is a `local`
+ * one under the case's own project. The report a failed check is filed
+ * as, and the line each filed bug is reported with, are tested in
+ * `./close-triage.test.ts`.
  *
  * The board: epic #40 on `epic:auth`, open, with two criteria and an
  * estimate, whose members #12 and #13 are closed. Epic #41 on
@@ -41,8 +43,6 @@ import type { RafaCommand } from '../../core/command/index.js';
 import type { GitResult, GitRunner } from '../../core/git/index.js';
 import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore } from '../../effort/store/types.js';
-import type { EpicCriterion } from '../../epic/verify-plan.js';
-import type { CheckAnswered } from '../../epic/verify-run.js';
 import type { Tracker } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { TriageOptions, TriageResult } from '../../triage/triage.js';
@@ -66,15 +66,11 @@ import { readStaleDocsForPlan } from '../../effort/store/stale-docs.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { bugKeyOf, triageReport } from '../../triage/triage.js';
+import { triageReport } from '../../triage/triage.js';
 
 import closeCommand, {
-  bugLine,
-  closeTriageFile,
   createEpicCloseCommand,
   EPIC_CLOSE_REFUSAL_EXIT,
-  failedCheckArtifact,
-  failedCheckReport,
   planFlags,
   planVerification,
   readCloseLine,
@@ -331,13 +327,6 @@ function closesOf(calls: readonly (readonly string[])[]): readonly (readonly str
   return calls.filter((call) => call[0] === 'issue' && call[1] === 'close');
 }
 
-/** One criterion by its text, as `splitCriteria` cuts #40's section. */
-function criterionOf(text: string): EpicCriterion {
-  const found = splitCriteria(`${CRITERION_1}\n${CRITERION_2}`).find((each) => each.text === text);
-  if (found === undefined) throw new Error(`no criterion ${text}`);
-  return found;
-}
-
 describe('readCloseLine', () => {
   it('reads one epic number and the flag', () => {
     expect(readCloseLine({ args: ['40'], flags: {} })).toEqual({ epic: 40, acceptUnchecked: false });
@@ -425,46 +414,6 @@ describe('planVerification', () => {
 
     expect(claude.spawned).toHaveLength(0);
     expect(planning.status === 'planned' && planning.verdicts.map((verdict) => verdict.kind === 'uncheckable' && verdict.reason)).toEqual([PLACEHOLDER_REASON]);
-  });
-});
-
-describe('failedCheckReport', () => {
-  it('is one public bug and no blocker, its artifact the epic and criterion on one line', () => {
-    const criterion = criterionOf(CRITERION_2);
-    const failure: CheckAnswered = {
-      kind: 'answered',
-      check: { kind: 'check', criterion, check: 'Run rafa epics' },
-      sessionId: 's',
-      result: 'fail',
-      evidence: 'it printed nothing',
-    };
-
-    const report = failedCheckReport(40, failure, COMMIT);
-
-    expect(report.blockers).toEqual([]);
-    expect(report.outOfScopeBugs).toHaveLength(1);
-    expect(report.outOfScopeBugs[0]?.security).toBe(false);
-    expect(report.outOfScopeBugs[0]?.module).toBe('epic');
-    expect(report.outOfScopeBugs[0]?.action).toBe('close');
-    expect(report.outOfScopeBugs[0]?.reproduce).toBe('rafa epic close 40');
-    expect(report.outOfScopeBugs[0]?.cause).toBeNull();
-    expect(report.outOfScopeBugs[0]?.what).toBe(`Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`);
-    expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
-    expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
-    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic # acceptance criterion: ${CRITERION_2}`);
-  });
-});
-
-describe('bugLine', () => {
-  it('warns that a row routed by its kind was not filed, and notes a filed one', () => {
-    const criterion = criterionOf(CRITERION_2);
-    const row = { index: 0, channel: 'public', ref: null, foundBy: null, stored: null, problem: null } as const;
-
-    const routed = bugLine(criterion, { ...row, action: 'pr-body' });
-    const filed = bugLine(criterion, { ...row, action: 'filed' });
-
-    expect(routed).toEqual({ text: 'Criterion 2: not filed: routed to pr-body by its kind.', warn: true });
-    expect(filed).toEqual({ text: 'Criterion 2: filed on the public tracker as an issue.', warn: false });
   });
 });
 

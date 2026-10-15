@@ -5,7 +5,7 @@ and each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
 `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
 `bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
 from `src/start/triage.ts` and `rafa epic close` from
-`src/commands/epic/close.ts`. The triage writer stores every bug and its
+`src/commands/epic/close-triage.ts`. The triage writer stores every bug and its
 action in the effort store, keyed by the bug's recurrence key, not the
 artifact the report's findings use, and each routed entry leaves one row in
 the `bug_routes` table (`src/effort/store/bug-routes.ts`) naming the kind the
