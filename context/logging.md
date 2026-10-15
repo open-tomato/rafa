@@ -27,8 +27,8 @@ leaf `src/ports/log-level.ts`:
 - `enabled(level, module)` says whether an entry would be written.
 
 `logger` is the seventh port type of the adapter registry
-(`src/core/adapters/registry.ts`), at version 1, and core registers
-`logger/console`.
+(`src/core/adapters/registry.ts`), at version 1, and the composition root
+`src/adapter-registry.ts` registers `logger/console`.
 
 ### Which entries are written
 

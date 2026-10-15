@@ -273,9 +273,10 @@ to `30s`, as `3s`). `selectSync` hands the three to the adapter as
 `AdapterContext.hub` (`src/config-schema-hub.ts`). A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
-**Core registers two adapters in `CORE_ADAPTER_REGISTRY`
-(`src/core/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
-(copy exchange).** The `git`, `service` and `p2p` adapters come from
+**Core's two sync adapters are registered in `CORE_ADAPTER_REGISTRY`
+(`src/core/adapters/registry.ts`) by the composition root
+`src/adapter-registry.ts`: `sync/local` (no action) and `sync/file` (copy
+exchange).** The `git`, `service` and `p2p` adapters come from
 modules loaded under `src/modules/load.ts`; core ships no code for them.
 When `rafa doctor`, the loop preflight and `describe` read the config,
 a strategy with no adapter and no module to implement it is named with

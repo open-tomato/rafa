@@ -169,6 +169,18 @@ defines under another setting name, which names both setting names too, or a
 `dangerous.*` key a second section defines under the same setting name, each
 naming both packages.
 
+**The adapters are handed in, never imported.** Core declares the adapter
+registry in `src/core/adapters/registry.ts`, and that file imports no
+adapter: core's adapters sit under `src/adapters/`, `src/effort/store/` and
+`src/effort/sync/`, above core. `src/adapter-registry.ts`, outside
+`src/core/`, lists them and hands them to `registerAdapters` as it is
+imported. `src/rafa.ts` and `src/index.ts` import it right after
+`src/config-registry.ts`, before anything resolves an adapter, so the two
+composition roots are the two entries' imports. Until the root is imported,
+every member of `CORE_ADAPTER_REGISTRY` refuses, naming it. A test that
+reads core's adapters off the registry imports the root for its effect, as
+the entries do.
+
 **A section adds its keys to `RafaConfig` by `declare module`.**
 `RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
 keys. Each section file adds its own by a `declare module` naming that file,
@@ -446,15 +458,19 @@ file's package, but this sweep does not read it: its own note names the
 table as the input it is meant to take later. Until then, a cycle that
 crosses two packages but sits in one cluster passes it.
 
-**A cycle through a barrel can stay inside one cluster.**
-`src/core/adapters/index.ts` is one: `registry.ts` imports
-`src/effort/sync/select.ts` by value, and `select.ts` imports the registry
-back through the barrel. Both sit in cluster c7, so the sweep passes them,
-and a barrel over one file cannot be split to step round the cycle. A
-barrel's cycles are counted by `stronglyConnected` in
+**A cycle through a barrel can stay inside one cluster, and the adapters
+barrel's was retired by the registry seam.** Until then
+`src/core/adapters/index.ts` was one: `registry.ts` imported
+`src/effort/sync/select.ts` by value, and `select.ts` imported the registry
+back through the barrel. Both sat in cluster c7, so the sweep passed them,
+and a barrel over one file could not be split to step round the cycle. The
+composition root `src/adapter-registry.ts` now lists `sync/local` from
+`select.ts`, so `registry.ts` imports nothing above core and the cycle is
+gone. A barrel's cycles are still counted by `stronglyConnected` in
 `scripts/survey/graph-algorithms.ts`, a full read whatever the cluster.
-Its load order is checked by `src/tests/core-barrel-load-spawned.test.ts`,
-which loads each barrel first in a fresh `bun` process and expects exit 0.
+Its load order is still checked by
+`src/tests/core-barrel-load-spawned.test.ts`, which loads each barrel first
+in a fresh `bun` process and expects exit 0.
 
 ### The library boundary
 
