@@ -53,8 +53,8 @@
  */
 import type { DispatchOutcome } from './dispatch.js';
 import type { CommandRegistry } from './registry.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';

@@ -30,9 +30,9 @@
  *     hands it the reason the attempt before it failed with, which
  *     `local` then writes into the issue it captures on disk.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { AdapterContext, AnyAdapter } from '../core/adapters/index.js';
 import type { ClaudeSpawner } from '../core/loop/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { Tracker } from '../ports/index.js';
 
 import {

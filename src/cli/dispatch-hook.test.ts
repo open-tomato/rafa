@@ -29,8 +29,8 @@
  */
 import type { CommandHook, DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { CommandRoute } from './route.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

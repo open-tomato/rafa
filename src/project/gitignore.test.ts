@@ -79,8 +79,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createTextOutput } from '../adapters/output/text.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { createTextOutput, setActiveOutput } from '../core/output/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {

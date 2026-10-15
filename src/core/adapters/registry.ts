@@ -60,8 +60,9 @@
  *
  * The two store backends, `store/sqlite` and `store/ndjson`, which
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
- * the three outputs under `src/adapters/output/`, `output/text`,
- * `output/json` and `output/events`, the logger under
+ * the three outputs, `output/text` from `src/core/output/` and
+ * `output/json` and `output/events` under `src/adapters/output/`, the
+ * logger under
  * `src/adapters/logger/`, `logger/console`, the two trackers under `src/adapters/tracker/`,
  * `tracker/local` and `tracker/github`, the learning adapter under
  * `src/adapters/learning/`, `learning/local`, and the planner under
@@ -106,7 +107,6 @@
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { OutputStream } from '../../adapters/output/stream.js';
 import type { PlanPromptBuilder } from '../../adapters/planner/claude.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { SelectedEffortStore } from '../../effort/store/index.js';
@@ -122,6 +122,7 @@ import type {
 } from '../../ports/index.js';
 import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
 import type { CapturingSpawner } from '../loop/claude.js';
+import type { OutputStream } from '../output/stream.js';
 
 import { homedir } from 'node:os';
 
@@ -129,7 +130,6 @@ import { createLocalLearning, localInstinctsDir } from '../../adapters/learning/
 import { createConsoleLogger } from '../../adapters/logger/console.js';
 import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
-import { createTextOutput } from '../../adapters/output/text.js';
 import { createClaudePlanner } from '../../adapters/planner/claude.js';
 import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
@@ -139,6 +139,7 @@ import { createFileSync } from '../../effort/sync/file.js';
 import { createLocalSync } from '../../effort/sync/select.js';
 import { describeValue, STORE_BACKENDS } from '../config/config-sections.js';
 import { activeDefaults } from '../config/section.js';
+import { createTextOutput } from '../output/text.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';

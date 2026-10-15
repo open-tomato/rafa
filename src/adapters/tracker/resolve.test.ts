@@ -45,9 +45,8 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createAdapterRegistry } from '../../core/adapters/index.js';
-import { setActiveOutput } from '../../core/output/index.js';
+import { createTextOutput, setActiveOutput } from '../../core/output/index.js';
 import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../logger/settings.js';
-import { createTextOutput } from '../output/text.js';
 
 import { draftFixture } from './contract.js';
 import { createFakeGh } from './github-fake.js';

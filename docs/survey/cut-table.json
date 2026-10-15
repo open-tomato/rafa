@@ -105,17 +105,12 @@
     {
       "kind": "source",
       "path": "src/adapters/output/stream.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/adapters/output/text.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "source",
       "path": "src/adapters/output/text.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -3630,20 +3625,6 @@
         {
           "from": "src/core/adapters/registry.ts",
           "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/adapters/output/stream.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/output/text.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
           "kind": "value",
           "to": "src/adapters/planner/claude.ts",
           "toPackage": "@open-tomato/rafa-cli"
@@ -3789,13 +3770,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/core/output/active.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/output/text.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/plan/parse.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3839,8 +3813,8 @@
         }
       ],
       "fileCounts": {
-        "source": 95,
-        "test": 105,
+        "source": 97,
+        "test": 106,
         "testSupport": 2
       },
       "files": [
@@ -3908,6 +3882,9 @@
         "src/core/output/active.ts",
         "src/core/output/index.test.ts",
         "src/core/output/index.ts",
+        "src/core/output/stream.ts",
+        "src/core/output/text.test.ts",
+        "src/core/output/text.ts",
         "src/core/plan/block-reader.test.ts",
         "src/core/plan/block-reader.ts",
         "src/core/plan/blocks.test.ts",
@@ -4048,7 +4025,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 77,
+        "src/core/": 80,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -4065,8 +4042,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 34,
-      "upwardEdges": 34
+      "remaining": 31,
+      "upwardEdges": 31
     },
     {
       "clearedByIssue118": 0,
@@ -7072,7 +7049,7 @@
       "edges": [],
       "fileCounts": {
         "source": 263,
-        "test": 468,
+        "test": 467,
         "testSupport": 27
       },
       "files": [
@@ -7097,7 +7074,6 @@
         "src/adapters/output/json.test.ts",
         "src/adapters/output/json.ts",
         "src/adapters/output/stream.ts",
-        "src/adapters/output/text.test.ts",
         "src/adapters/output/text.ts",
         "src/adapters/planner/claude.test.ts",
         "src/adapters/planner/claude.ts",
@@ -7854,12 +7830,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1975,
-    "leftToPlace": 716,
-    "nonTestEdges": 4410,
+    "files": 1977,
+    "leftToPlace": 715,
+    "nonTestEdges": 4414,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 286
+    "upwardEdges": 283
   },
   "unassigned": [
     {

@@ -103,9 +103,9 @@ import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { RunningCommand } from './running.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { DangerousPhrases } from '../core/config/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

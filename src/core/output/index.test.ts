@@ -1,35 +1,42 @@
 /**
- * Tests for the `index.ts` barrel: it exports every name `active.ts`
- * exports, each once, as the same binding, and no other name.
+ * Tests for the `index.ts` barrel: it exports every name `active.ts`,
+ * `text.ts` and `stream.ts` export, each once, as the same binding, and
+ * no other name.
  *
- * The barrel spells its names, so a name added to `active.ts` and not to
- * the barrel is a name no file outside `src/core/` can import. Nothing
- * here is spelled a second time: both sides are read off the modules,
- * the runtime names off their namespaces and the type names with the
- * TypeScript checker, as `src/core/config/load.test.ts` reads its
- * barrel.
+ * The barrel spells its names, so a name added to one of the three and
+ * not to the barrel is a name no file outside `src/core/` can import.
+ * Nothing here is spelled a second time: both sides are read off the
+ * modules, the runtime names off their namespaces and the type names
+ * with the TypeScript checker, as `src/core/config/load.test.ts` reads
+ * its barrel.
  *
- * `active.ts` exports no type today, so the checker's list and the
- * namespace's are the same four names. The last case holds both lists
- * all the same: a type added to `active.ts` shows on the checker's list
- * alone, and the barrel must then spell it. `src/core/config/load.ts`,
- * which exports the type `ConfigRoots`, is read beside the two as the
+ * `active.ts` exports no type, `text.ts` exports one, the interface
+ * `CreateTextOutputOptions`, and `stream.ts` exports one and nothing
+ * else, the interface `OutputStream`. So the checker's list is the
+ * namespaces' five runtime names and those two. `src/core/config/load.ts`,
+ * which exports the type `ConfigRoots`, is read beside them as the
  * control that the checker's reading sees a type name at all.
  *
- * Two names are held by name, so a reading that came back empty fails
+ * Four names are held by name, so a reading that came back empty fails
  * rather than agreeing with itself: `activeOutput`, the reader every
- * printing function calls, and `runWithActiveOutput`, the scope the
- * dispatcher runs each command in.
+ * printing function calls, `runWithActiveOutput`, the scope the
+ * dispatcher runs each command in, `createTextOutput`, the default
+ * output's maker, and `OutputStream`, the one name `stream.ts` exports.
  *
  * The binding case is what a barrel over module state has to hold: a
  * second copy of `active.ts` would have a module-level output of its
  * own. An output set through the barrel is read back through the file,
  * and the reverse, with the default put back after each.
  *
- * Two mutations were driven against this file on 2026-10-12, one run
- * each, with both files restored sha256-identical: the barrel spelling
- * three of the four names reddened all four cases, and `active.ts`
- * exporting its `ScopedOutput` interface reddened the last case alone.
+ * Two mutations were driven against this file on 2026-10-12, when the
+ * barrel held `active.ts` alone, one run each, with both files restored
+ * sha256-identical: the barrel spelling three of the four names
+ * reddened all four cases, and `active.ts` exporting its `ScopedOutput`
+ * interface reddened the last case alone. Two more were driven on
+ * 2026-10-15, once the barrel held all three files, with the barrel
+ * restored sha256-identical: dropping `createTextOutput` reddened three
+ * cases, the binding-sharing one aside, and dropping `OutputStream`
+ * reddened the last case alone.
  */
 import { resolve } from 'node:path';
 
@@ -39,6 +46,7 @@ import ts from 'typescript';
 import { createJsonOutput } from '../../adapters/output/json.js';
 
 import * as active from './active.js';
+import * as text from './text.js';
 
 import * as barrel from './index.js';
 
@@ -46,6 +54,8 @@ const ROOT = resolve(import.meta.dir, '../../..');
 
 const BARREL = 'src/core/output/index.ts';
 const ACTIVE = 'src/core/output/active.ts';
+const TEXT = 'src/core/output/text.ts';
+const STREAM = 'src/core/output/stream.ts';
 const LOAD_BARREL = 'src/core/config/load.ts';
 
 /**
@@ -84,19 +94,21 @@ describe('the output barrel', () => {
     active.setActiveOutput(null);
   });
 
-  it('exports the runtime names of active.ts, each once, and no other', () => {
-    const expected = Object.keys(active).sort();
+  it('exports the runtime names of active.ts and text.ts, each once, and no other', () => {
+    const expected = [...Object.keys(active), ...Object.keys(text)].sort();
 
     expect(expected).toContain('activeOutput');
     expect(expected).toContain('runWithActiveOutput');
+    expect(expected).toContain('createTextOutput');
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
-  it('exports each runtime name as the binding active.ts declares', () => {
+  it('exports each runtime name as the binding its file declares', () => {
     const exported: Readonly<Record<string, unknown>> = barrel;
+    const declared = [...Object.entries(active), ...Object.entries(text)];
 
-    expect(Object.keys(active).length).toBeGreaterThan(0);
-    for (const [name, value] of Object.entries(active)) {
+    expect(declared.length).toBeGreaterThan(0);
+    for (const [name, value] of declared) {
       expect([name, exported[name] === value]).toEqual([name, true]);
     }
   });
@@ -116,12 +128,15 @@ describe('the output barrel', () => {
     expect(readThroughBarrel[1]).toBe('events');
   });
 
-  it('exports the type names of active.ts with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, ACTIVE, LOAD_BARREL]);
+  it('exports the type names of the three files with the runtime ones, each once, and no other', () => {
+    const names = readExportNames([BARREL, ACTIVE, TEXT, STREAM, LOAD_BARREL]);
+    const expected = [...(names[ACTIVE] ?? []), ...(names[TEXT] ?? []), ...(names[STREAM] ?? [])].sort();
 
     expect(names[ACTIVE]).toContain('activeOutput');
     expect(names[ACTIVE]).toContain('runWithActiveOutput');
+    expect(names[TEXT]).toContain('CreateTextOutputOptions');
+    expect(names[STREAM]).toEqual(['OutputStream']);
     expect(names[LOAD_BARREL]).toContain('ConfigRoots');
-    expect(names[BARREL]).toEqual(names[ACTIVE] ?? []);
+    expect(names[BARREL]).toEqual(expected);
   });
 });

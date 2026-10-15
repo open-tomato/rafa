@@ -24,9 +24,9 @@
  * home — and dispatches through it, so no case reads another's config and
  * nothing here touches the real home.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { DescribeDocument } from '../cli/describe.js';
 import type { ModuleListing } from '../commands/module/list.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, CliEventLog, CliEventResult } from '../ports/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

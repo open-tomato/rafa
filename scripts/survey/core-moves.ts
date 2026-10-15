@@ -5,7 +5,7 @@
  *
  * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the twenty files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty-two files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
@@ -72,9 +72,12 @@ export interface Collision {
 }
 
 /**
- * The twenty files that move, sorted by their path today: the nineteen
- * of #905, and `src/runtime/identity.ts`, which #1088 moved so the
- * effort store imports nothing above core for it.
+ * The twenty-two files that move, sorted by their path today: the
+ * nineteen of #905, `src/runtime/identity.ts`, which #1088 moved so the
+ * effort store imports nothing above core for it, and the `text` output
+ * adapter with the `OutputStream` it writes to, which #1089 moved so
+ * `src/core/output/active.ts` and `src/core/adapters/registry.ts` import
+ * nothing above core for them.
  */
 export const CORE_MOVES: readonly CoreMove[] = [
   {
@@ -82,6 +85,18 @@ export const CORE_MOVES: readonly CoreMove[] = [
     subject: 'output',
     tests: ['src/adapters/output/active.test.ts'],
     to: 'src/core/output/active.ts',
+  },
+  {
+    from: 'src/adapters/output/stream.ts',
+    subject: 'output',
+    tests: [],
+    to: 'src/core/output/stream.ts',
+  },
+  {
+    from: 'src/adapters/output/text.ts',
+    subject: 'output',
+    tests: ['src/adapters/output/text.test.ts'],
+    to: 'src/core/output/text.ts',
   },
   {
     from: 'src/adapters/registry.ts',
@@ -213,7 +228,11 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * {@link CORE_MOVES}. The third step of core's move into its package
  * (#1090) removes them.
  */
-export const CORE_REEXPORTS: readonly string[] = ['src/runtime/identity.ts'];
+export const CORE_REEXPORTS: readonly string[] = [
+  'src/adapters/output/stream.ts',
+  'src/adapters/output/text.ts',
+  'src/runtime/identity.ts',
+];
 
 /**
  * The barrel files of each subject, sorted. `config` has three. The

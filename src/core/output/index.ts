@@ -1,53 +1,47 @@
 /**
- * The barrel over the active output: every name `active.ts` exports, and
- * nothing else.
+ * The barrel over core's output: every name `active.ts`, `text.ts` and
+ * `stream.ts` export, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the one behind
+ * A file outside `src/core/` imports this file and never the ones behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports `active.ts` directly and never this
- * file: `src/core/config/config-load.ts` does, for the output its
- * warnings go through.
+ * file inside `src/core/` imports the file it needs directly and never
+ * this file: `src/core/config/config-load.ts` imports `active.ts`, for
+ * the output its warnings go through, and
+ * `src/core/adapters/registry.ts` imports `text.ts` and `stream.ts`.
  *
  * ## What sits behind it
  *
- * `active.ts` alone: the output this process writes through and the mode
- * it renders in, the scope a run holds them in, and the module-level
- * value a test sets. The output adapters (`text.ts`, `json.ts`,
- * `events.ts`) and the `OutputStream` they write to stay in
- * `src/adapters/output/`, and the `Output` port in `src/ports/index.ts`.
+ * `active.ts`: the output this process writes through and the mode it
+ * renders in, the scope a run holds them in, and the module-level value
+ * a test sets. `text.ts`: the `text` Output adapter, which `active.ts`
+ * makes its default output with. `stream.ts`: the `OutputStream` every
+ * output adapter writes to. The `json` and `events` adapters stay in
+ * `src/adapters/output/`, where `text.ts` and `stream.ts` keep a
+ * re-export each for their importers outside core, and the `Output`
+ * port stays in `src/ports/index.ts`.
  *
  * ## Why the barrel closes no cycle
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. `active.ts`
- * imports one file outside `src/core/` by value:
- * `src/adapters/output/text.ts`, for the default output it makes at
- * load. That file imports nothing by value: `stream.ts` beside it and
- * the `Output` port, each with `import type`, which is erased before
- * anything loads. So it imports this barrel back by no route.
- *
- * Measured when the file moved: the value imports of the non-test files
- * under `src/` and `packages/` held six cycles before the move and the
- * same six after it, none through a file of this folder. The control,
- * the same tree with `src/adapters/output/text.ts` taking one value
- * (`activeOutputMode`) from this barrel, held a seventh: that file,
- * `active.ts` and this one. That seventh loaded in the three orders
- * tried (`text.ts`, this file and `active.ts` each imported first in a
- * fresh `bun` process), because both names crossing it are function
- * declarations, which exist before their module runs. The barrel holds
- * the rule rather than that reading: `active.ts` calls
- * `createTextOutput` at load, not inside a function, so a `const` on
- * either side of such a cycle would fail in one import order only.
+ * imports the barrel back by value is a runtime cycle. No file behind
+ * this barrel imports a file outside `src/core/` by value: `active.ts`
+ * imports `text.ts` beside it, for the default output it makes at load,
+ * and `text.ts` and `stream.ts` import nothing by value, only the
+ * `Output` port and `OutputStream` with `import type`, which is erased
+ * before anything loads. So nothing behind it reaches this barrel back.
  *
  * ## What it exports
  *
- * Each name is spelled, as the other core barrels spell theirs.
- * `active.ts` exports no type, so there is no `export type` line. No
- * name here is part of the published surface: `src/index.ts` re-exports
+ * Each name is spelled, as the other core barrels spell theirs. No name
+ * here is part of the published surface: `src/index.ts` re-exports
  * nothing from this file.
  *
- * `index.test.ts` holds the list to the file: every name `active.ts`
- * exports is here once, as the same binding, and no other name is here.
+ * `index.test.ts` holds the list to the files: every name the three
+ * export is here once, as the same binding, and no other name is here.
  */
+export type { OutputStream } from './stream.js';
+export type { CreateTextOutputOptions } from './text.js';
+
 export { activeOutput, activeOutputMode, runWithActiveOutput, setActiveOutput } from './active.js';
+export { createTextOutput } from './text.js';
