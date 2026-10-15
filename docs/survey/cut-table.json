@@ -3615,7 +3615,7 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 114,
+        "source": 115,
         "test": 116,
         "testSupport": 2
       },
@@ -3844,6 +3844,7 @@
         "src/ports/index.ts",
         "src/ports/learning.ts",
         "src/ports/log-level.ts",
+        "src/ports/spec-review.ts",
         "src/report/parse.test.ts",
         "src/report/parse.ts",
         "src/report/record.test.ts",
@@ -3856,7 +3857,7 @@
       "filesByFolder": {
         "src/core/": 106,
         "src/effort/store/": 114,
-        "src/ports/": 4
+        "src/ports/": 5
       },
       "folders": [
         "src/core/",
@@ -7660,9 +7661,9 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2005,
+    "files": 2006,
     "leftToPlace": 719,
-    "nonTestEdges": 4449,
+    "nonTestEdges": 4452,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
     "upwardEdges": 252
