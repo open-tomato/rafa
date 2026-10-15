@@ -54,13 +54,27 @@
  * The reading is pure but for the disk it reads under `repoRoot`; the
  * plan's text is the caller's. It refuses nothing: editing a bundled
  * item is legitimate work, so a caller prints a note and writes the pin
- * as a `[human]` prerequisite. No command calls it yet; `rafa plan
- * validate` and `rafa plan create` are the callers the spec names.
+ * as a `[human]` prerequisite.
+ *
+ * ## What it writes
+ *
+ * {@link writeTierPins} writes those pins into the plan's
+ * `PREREQUISITES-<stub>.md`, one `[human]` item per edit under
+ * `## Tier pins [human]`, each naming the item, the plan, the removal
+ * condition and, as the span that ends it, the pin. The file is created
+ * with its `# Prerequisites` heading when absent, the section added at
+ * its end when missing, and every other line is left as it was. An item
+ * whose pin span the file already holds is skipped, so a second run
+ * writes no second copy. `parsePrerequisites` reads each item as `human`,
+ * with no probe: the pin is a line a person sets, never a check.
+ *
+ * No command calls either yet; `rafa plan validate` and `rafa plan
+ * create` are the callers the spec names.
  */
 import type { InventoryKind } from '../../inventory/record.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
 
-import { readdirSync, realpathSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
@@ -241,4 +255,90 @@ export function findBundledEdits(markdown: string, seams: BundledSeams): readonl
     lines: [...lines],
     pinLine: pinLine(item.kind, item.name, 'project'),
   }));
+}
+
+/** The heading lines a prerequisites file this module creates opens with. */
+const PREREQUISITES_HEADING = '# Prerequisites';
+
+/** The section the pins are written under, a `[human]` one. */
+export const TIER_PINS_HEADING = '## Tier pins [human]';
+
+/** {@link TIER_PINS_HEADING} as a line of a file, any case and trailing space. */
+const TIER_PINS_HEADING_RE = /^##\s+Tier pins \[human\]\s*$/iu;
+
+/** Any markdown heading line. */
+const HEADING_RE = /^#/u;
+
+/**
+ * The prerequisite item pinning `edit`: a `[human]` reminder naming the
+ * item, the plan whose tasks edit it, the removal condition, and the pin
+ * as the span that ends it.
+ */
+export function tierPinItem(edit: BundledEdit, planFileName: string): string {
+  return `- [ ] Pin the bundled ${edit.kind} \`${edit.name}\` to the project tier in each clone that merges`
+    + ` \`${planFileName}\`, and drop the pin once the installed rafa carries the new text: \`${edit.pinLine}\``;
+}
+
+/** The text of the file at `path`, or null when nothing is there. */
+function readOrNull(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    const isAbsent = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+    if (isAbsent) return null;
+    throw error;
+  }
+}
+
+/** `lines` with `items` written at the end of the {@link TIER_PINS_HEADING} section, which it gains when missing. */
+function withItems(lines: readonly string[], items: readonly string[]): readonly string[] {
+  const heading = lines.findIndex((line) => TIER_PINS_HEADING_RE.test(line));
+  if (heading === -1) {
+    const body = [...lines];
+    while (body.length > 0 && body.at(-1)?.trim() === '') body.pop();
+    return [...body, '', TIER_PINS_HEADING, ...items];
+  }
+
+  const next = lines.findIndex((line, index) => index > heading && HEADING_RE.test(line));
+  let end = next === -1
+    ? lines.length
+    : next;
+  while (end > heading + 1 && lines[end - 1]?.trim() === '') end -= 1;
+  return [...lines.slice(0, end), ...items, ...lines.slice(end)];
+}
+
+/**
+ * Writes one `[human]` prerequisite per edit into the prerequisites file
+ * at `prerequisitesPath`, under {@link TIER_PINS_HEADING}, and answers
+ * the edits it wrote an item for.
+ *
+ * The file is created with its `# Prerequisites` heading when absent, and
+ * the section is added at its end when missing; every other line is kept
+ * as it was, an `[auto]` section included. An edit whose pin span, the
+ * backticked `pinLine`, the file already holds anywhere is skipped, so a
+ * second call over the same edits writes nothing and leaves the file
+ * byte for byte. No edits to write writes nothing, and creates no file.
+ * `planFileName` is the plan's file name, which each item names.
+ */
+export function writeTierPins(
+  prerequisitesPath: string,
+  planFileName: string,
+  edits: readonly BundledEdit[],
+): readonly BundledEdit[] {
+  const existing = readOrNull(prerequisitesPath);
+  const written: BundledEdit[] = [];
+  const items: string[] = [];
+  for (const edit of edits) {
+    const span = `\`${edit.pinLine}\``;
+    if (existing?.includes(span) === true || items.some((item) => item.includes(span))) continue;
+    written.push(edit);
+    items.push(tierPinItem(edit, planFileName));
+  }
+  if (items.length === 0) return [];
+
+  const lines = existing === null
+    ? [PREREQUISITES_HEADING]
+    : existing.replace(/\n$/u, '').split('\n');
+  writeFileSync(prerequisitesPath, `${withItems(lines, items).join('\n')}\n`);
+  return written;
 }

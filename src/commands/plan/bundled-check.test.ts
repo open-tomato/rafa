@@ -8,13 +8,17 @@
  * same project, a path that does answer, so a reading that never looked
  * cannot pass for one that looked and found nothing.
  */
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import type { BundledEdit } from './bundled-check.js';
+
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { findBundledEdits } from './bundled-check.js';
+import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
+
+import { findBundledEdits, writeTierPins } from './bundled-check.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-bundled-check-'));
 
@@ -180,5 +184,123 @@ describe('findBundledEdits over a planted project', () => {
 
     expect(findBundledEdits(plan, { repoRoot: bare })).toEqual([]);
     expect(findBundledEdits(plan, { repoRoot: project })).toHaveLength(1);
+  });
+});
+
+/** A pin edit for `name`, as {@link findBundledEdits} answers one. */
+function pinEdit(kind: 'agent' | 'skill', name: string): BundledEdit {
+  return {
+    kind,
+    name,
+    path: `src/bundled/${kind}s/${name}`,
+    lines: [FIRST_TASK],
+    pinLine: `tiers.${kind}s: { ${name}: project }`,
+  };
+}
+
+const PLAN_FILE = 'PLAN-rafa-1101-spec-plan-validate-names.md';
+
+const EDITS = [pinEdit('agent', 'doc-updater'), pinEdit('skill', 'dev-planner')];
+
+/** A fresh path in its own folder where no prerequisites file sits yet. */
+function freshPrerequisitesPath(): string {
+  return join(mkdtempSync(join(tempBase, 'prereq-')), 'PREREQUISITES-x.md');
+}
+
+describe('writeTierPins', () => {
+  it('creates the file with its heading lines and one human item per edit, each with no probe', () => {
+    const path = freshPrerequisitesPath();
+    expect(existsSync(path)).toBe(false);
+
+    expect(writeTierPins(path, PLAN_FILE, EDITS)).toEqual(EDITS);
+
+    const text = readFileSync(path, 'utf8');
+    expect(text.split('\n').slice(0, 3)).toEqual(['# Prerequisites', '', '## Tier pins [human]']);
+    const items = parsePrerequisites(text);
+    expect(items.map(({ tag, probe }) => ({ tag, probe }))).toEqual([
+      { tag: 'human', probe: null },
+      { tag: 'human', probe: null },
+    ]);
+    expect(items[0]?.description).toContain('`tiers.agents: { doc-updater: project }`');
+    expect(items[0]?.description).toContain(PLAN_FILE);
+    expect(items[1]?.description).toContain('`tiers.skills: { dev-planner: project }`');
+  });
+
+  it('changes nothing on a second call over the same edits, where a new edit is still written', () => {
+    const path = freshPrerequisitesPath();
+    writeTierPins(path, PLAN_FILE, EDITS);
+    const first = readFileSync(path, 'utf8');
+
+    expect(writeTierPins(path, PLAN_FILE, EDITS)).toEqual([]);
+    expect(readFileSync(path, 'utf8')).toBe(first);
+
+    const added = pinEdit('agent', 'loop-implementer');
+    expect(writeTierPins(path, PLAN_FILE, [...EDITS, added])).toEqual([added]);
+    const items = parsePrerequisites(readFileSync(path, 'utf8'));
+    expect(items).toHaveLength(3);
+    expect(items[2]?.description).toContain('`tiers.agents: { loop-implementer: project }`');
+  });
+
+  it('writes one item for one pin handed twice in a call', () => {
+    const path = freshPrerequisitesPath();
+    const edit = pinEdit('agent', 'doc-updater');
+
+    expect(writeTierPins(path, PLAN_FILE, [edit, edit])).toEqual([edit]);
+    expect(parsePrerequisites(readFileSync(path, 'utf8'))).toHaveLength(1);
+  });
+
+  it('leaves an existing [auto] section untouched and adds the human section after it', () => {
+    const path = freshPrerequisitesPath();
+    const autoSection = [
+      '# Prerequisites',
+      '',
+      '## Effort store [auto]',
+      '- [ ] The installed rafa can read the live store: `rafa effort schema --check`',
+      '',
+    ].join('\n');
+    writeFileSync(path, autoSection);
+
+    writeTierPins(path, PLAN_FILE, EDITS);
+
+    const text = readFileSync(path, 'utf8');
+    expect(text.startsWith(autoSection)).toBe(true);
+    const items = parsePrerequisites(text);
+    expect(items.map(({ tag, probe }) => ({ tag, probe }))).toEqual([
+      { tag: 'auto', probe: 'rafa effort schema --check' },
+      { tag: 'human', probe: null },
+      { tag: 'human', probe: null },
+    ]);
+  });
+
+  it('writes under an existing Tier pins section, ahead of the section after it', () => {
+    const path = freshPrerequisitesPath();
+    writeFileSync(path, [
+      '# Prerequisites',
+      '',
+      '## Tier pins [human]',
+      '- [ ] Pin it: `tiers.agents: { doc-updater: project }`',
+      '',
+      '## Checks [auto]',
+      '- [ ] Bun is installed: `bun --version`',
+      '',
+    ].join('\n'));
+
+    expect(writeTierPins(path, PLAN_FILE, EDITS).map(({ name }) => name)).toEqual(['dev-planner']);
+
+    const text = readFileSync(path, 'utf8');
+    expect(text.match(/## Tier pins \[human\]/gu)).toHaveLength(1);
+    expect(parsePrerequisites(text).map(({ tag, probe, description }) => ({ tag, probe, pin: description.includes('dev-planner') })))
+      .toEqual([
+        { tag: 'human', probe: null, pin: false },
+        { tag: 'human', probe: null, pin: true },
+        { tag: 'auto', probe: 'bun --version', pin: false },
+      ]);
+  });
+
+  it('creates no file when there is nothing to write', () => {
+    const path = freshPrerequisitesPath();
+
+    expect(writeTierPins(path, PLAN_FILE, [])).toEqual([]);
+    expect(existsSync(path)).toBe(false);
   });
 });
