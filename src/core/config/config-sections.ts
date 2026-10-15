@@ -145,7 +145,7 @@
  *
  * ## The lists this module does not own
  *
- * Every other closed list here is declared here. Three are not, and
+ * Every other closed list here is declared here. Two are not, and
  * neither is one range, because another module is already their
  * authority and a second spelling could disagree with it:
  *
@@ -153,12 +153,6 @@
  *     {@link SKILL_TIERS}, the order a listing reads them in. That
  *     module imports `node:fs` and `node:path` alone, so reaching it
  *     here is no cycle.
- *   - {@link MergeMethod} and the three methods behind
- *     {@link mergeMethod} are the pull request port's
- *     (`pr/types.ts`), which spells them to match what `gh pr merge`
- *     takes. The type is re-exported so `config-schema-release.ts` names a
- *     field with it without reaching past this module, and nothing
- *     more: a caller acting on a merge reads the port.
  *   - The shape {@link usdAmount} accepts is `parseBudgetUsd`'s
  *     (`core/plan/declaration.ts`), which is what a plan's `budget=` goes
  *     through and therefore what `--max-budget-usd` has been measured
@@ -174,31 +168,20 @@
  *     one every lesson meets, so the reader asks the library's bounds
  *     rather than spell its own.
  *
- * `learning/identity.ts` imports `node:crypto` alone, and neither of the
- * other two imports is a cycle. `pr/types.ts` imports
- * types alone and `core/plan/declaration.ts` imports only the store's
- * `effort-levels.ts`, which imports nothing, so this module reaches
- * both without either reaching back. The port is reached at `../../pr/types.js`
- * and not through the `../../pr/index.js` barrel a caller outside `src/pr/`
- * would normally use, because the barrel carries `pr/gh.ts`, which
- * imports THIS module and the `gh` spawner behind it: importing it here
- * would make the graph cyclic and put the CLI adapter behind every
- * config read. That cycle was measured, not assumed, and it does not
- * break: with the barrel imported instead, on bun 1.3.14, `MERGE_METHODS`
- * read as its three values and `CONFIG_DEFAULTS.prMergeMethod` as
- * `squash` with `config.js`, `pr/index.js` and `pr/gh.js` each imported
- * first, and the config and `src/pr/` suites passed. The narrower import
- * is the graph this module wants, not a fix for an observed failure.
+ * `learning/identity.ts` imports `node:crypto` alone, and
+ * `core/plan/declaration.ts` imports only the store's `effort-levels.ts`,
+ * which imports nothing, so this module reaches both without either
+ * reaching back.
+ *
+ * The reader of `pr.mergeMethod`, over the pull request port's three
+ * methods, is not here: it sits with the setting it reads, in
+ * `config-schema-release.ts`, so no core file imports `pr/types.ts`.
  */
-import type { MergeMethod } from '../../pr/types.js';
 import type { SkillTier } from '../../schema/tiers.js';
 
 import { CONFIDENCE_MAX, CONFIDENCE_MIN } from '../../learning/identity.js';
-import { MERGE_METHODS } from '../../pr/types.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';
 import { parseBudgetUsd } from '../plan/declaration.js';
-
-export type { MergeMethod } from '../../pr/types.js';
 
 /** One key a file carried that names nothing this version reads. */
 export interface ConfigExtra {
@@ -446,12 +429,6 @@ export function text(expected: string): Reader<string> {
 export const flag: Reader<boolean> = (raw, at) => typeof raw === 'boolean'
   ? accepted(raw)
   : refused(at, raw, 'true or false');
-
-/**
- * Accepts one of the pull request port's three merge methods. The list
- * is the port's, for the reason in the module note.
- */
-export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
 
 /**
  * Accepts a number of US dollars a session can be handed as a budget:

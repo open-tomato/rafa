@@ -26,10 +26,7 @@
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the entries
- * `src/index.ts` and `src/plan/index.ts` spell theirs. `MergeMethod` is
- * the one name here neither file declares: `config-sections.ts`
- * re-exports it from `pr/types.ts` so `config-schema-release.ts` can type
- * a field with it, and it passes through unchanged.
+ * `src/index.ts` and `src/plan/index.ts` spell theirs.
  *
  * `sections.test.ts` holds the list to the two files: every name either
  * exports is here once, as the same binding, and no name is here that
@@ -52,7 +49,6 @@ export type {
   InjectMode,
   LessonSwitch,
   Mapping,
-  MergeMethod,
   OutputMode,
   PrProvider,
   Reader,
@@ -119,7 +115,6 @@ export {
   lessonSwitch,
   listOf,
   mapReading,
-  mergeMethod,
   messageOf,
   oneOf,
   OUTPUT_MODES,

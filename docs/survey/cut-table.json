@@ -3617,13 +3617,6 @@
           "toPackage": "rafa-inventory"
         },
         {
-          "from": "src/core/config/config-sections.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/pr/types.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3639,7 +3632,7 @@
         }
       ],
       "fileCounts": {
-        "source": 112,
+        "source": 113,
         "test": 116,
         "testSupport": 2
       },
@@ -3681,6 +3674,7 @@
         "src/core/config/core-section.ts",
         "src/core/config/dangerous.test.ts",
         "src/core/config/dangerous.ts",
+        "src/core/config/default-routing.ts",
         "src/core/config/index.test.ts",
         "src/core/config/index.ts",
         "src/core/config/load.test.ts",
@@ -3876,7 +3870,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 105,
+        "src/core/": 106,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3893,8 +3887,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 4,
-      "upwardEdges": 4
+      "remaining": 3,
+      "upwardEdges": 3
     },
     {
       "clearedByIssue118": 0,
@@ -7681,12 +7675,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2002,
+    "files": 2003,
     "leftToPlace": 718,
-    "nonTestEdges": 4448,
+    "nonTestEdges": 4451,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 256
+    "upwardEdges": 255
   },
   "unassigned": [
     {
