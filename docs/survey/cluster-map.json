@@ -650,7 +650,7 @@
     "src/core/plan/plan-stamp.ts": "c3",
     "src/utils/progress.ts": "c3",
     "src/utils/schedule.ts": "c3",
-    "src/utils/session-env.ts": "c4",
+    "src/core/loop/session-env.ts": "c4",
     "src/utils/tracker.ts": "c3"
   },
   "outside": [

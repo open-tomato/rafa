@@ -14,7 +14,7 @@ import { delimiter } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { bundledBinDirectory } from '../schema/tiers.js';
+import { bundledBinDirectory } from '../../schema/tiers.js';
 
 import { sessionPath, sessionSpawnEnv } from './session-env.js';
 

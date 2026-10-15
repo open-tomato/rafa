@@ -177,7 +177,6 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:te
 
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../../utils/declaration.js';
-import { sessionSpawnEnv } from '../../utils/session-env.js';
 import { restoreRunningCommand, setRunningCommand } from '../command/running.js';
 import { setActiveOutput } from '../output/active.js';
 
@@ -192,6 +191,7 @@ import {
   spawnClaude,
   spawnClaudeCaptured,
 } from './claude.js';
+import { sessionSpawnEnv } from './session-env.js';
 
 /** No agent definition here declares an effort of its own. */
 const NO_OWN_EFFORT: AgentEffortLookup = () => false;

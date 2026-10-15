@@ -125,7 +125,7 @@
  * and the inherited stderr are the same in both modes.
  *
  * The environment is `sessionSpawnEnv(process.env)` at both doors
- * (`utils/session-env.ts`), the one function a reading of the session's
+ * (`session-env.ts`), the one function a reading of the session's
  * environment calls too, so neither door spells an entry of its own.
  * That puts the running entry's `bundled/bin` at the front of every
  * session's `PATH`.
@@ -184,10 +184,11 @@
 import type { RunningCommand } from '../command/running.js';
 import type { ClaudeSettingSource } from '../config/config-sections.js';
 
-import { sessionSpawnEnv } from '../../utils/session-env.js';
 import { commandSpelling } from '../command/command.js';
 import { runningCommand } from '../command/running.js';
 import { activeOutput, activeOutputMode } from '../output/active.js';
+
+import { sessionSpawnEnv } from './session-env.js';
 
 /**
  * The executable every session is spawned as.

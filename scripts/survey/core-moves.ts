@@ -5,7 +5,7 @@
  *
  * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the twenty-seven files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty-eight files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
@@ -72,7 +72,7 @@ export interface Collision {
 }
 
 /**
- * The twenty-seven files that move, sorted by their path today: the
+ * The twenty-eight files that move, sorted by their path today: the
  * nineteen of #905, `src/runtime/identity.ts`, which #1088 moved so the
  * effort store imports nothing above core for it, the `text` output
  * adapter with the `OutputStream` it writes to, which #1089 moved so
@@ -84,7 +84,9 @@ export interface Collision {
  * of `src/cli/running.ts`, which #1089 moved so
  * `src/core/loop/claude.ts` imports nothing above core for it, and the
  * plan stamp and the task declaration parser of `src/utils/`, which
- * #1089 moved so `src/core/plan/` imports nothing above core for them.
+ * #1089 moved so `src/core/plan/` imports nothing above core for them,
+ * and the session environment of `src/utils/session-env.ts`, which #1089
+ * moved so `src/core/loop/claude.ts` imports nothing above core for it.
  */
 export const CORE_MOVES: readonly CoreMove[] = [
   {
@@ -256,6 +258,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
     tests: [],
     to: 'src/core/plan/plan-stamp.ts',
   },
+  {
+    from: 'src/utils/session-env.ts',
+    subject: 'loop',
+    tests: ['src/utils/session-env.test.ts'],
+    to: 'src/core/loop/session-env.ts',
+  },
 ];
 
 /**
@@ -274,6 +282,7 @@ export const CORE_REEXPORTS: readonly string[] = [
   'src/runtime/identity.ts',
   'src/utils/declaration.ts',
   'src/utils/plan-stamp.ts',
+  'src/utils/session-env.ts',
 ];
 
 /**

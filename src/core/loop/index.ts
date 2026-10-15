@@ -1,7 +1,7 @@
 /**
  * The barrel over the loop's session records and its doors onto the
- * Claude CLI: every name `sessions.ts` and `claude.ts` export, and
- * nothing else.
+ * Claude CLI: every name `sessions.ts`, `claude.ts` and `session-env.ts`
+ * export, and nothing else.
  *
  * A file outside `src/core/` imports this file and never the two behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
@@ -21,9 +21,11 @@
  *   - `claude.ts`: the two doors a Claude session is spawned through,
  *     the argument list both build, the spawners behind them, the
  *     interrupt of the sessions still running, and the spend guard's
- *     sentence.
+ *     sentence;
+ *   - `session-env.ts`: the environment a Claude session is spawned
+ *     with, which `claude.ts` imports by path.
  *
- * The two files share no name, and neither imports the other. One
+ * The three files share no name, and neither imports the other. One
  * import of this barrel loads both: a file that takes `isPidAlive`
  * alone loads `claude.ts` with it.
  *
@@ -101,7 +103,8 @@
  * `src/core/command/command.ts` for `commandSpelling`,
  * `src/core/command/running.ts` for the running command and
  * `src/core/output/active.ts` for the active output, and one outside
- * it, `src/utils/session-env.ts`. When it moved, `running.ts` was still
+ * it, `src/utils/session-env.ts`, which has since moved here as
+ * `session-env.ts`. When it moved, `running.ts` was still
  * `src/cli/running.ts`; through the four it reached 13 files by value, and none of the 13
  * imported this barrel or `claude.ts` by value. None of the 38 files
  * `sessions.ts` reached did either. Eleven non-test files imported
@@ -136,8 +139,8 @@
  * barrels spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the two files: every name either
- * exports is here once, as the same binding, the two share no name, the
+ * `index.test.ts` holds the list to the three files: every name each
+ * exports is here once, as the same binding, the three share no name, the
  * names `sessions.ts` re-exports are the bindings
  * `src/loop/session-record-parse.ts` declares, and no other name is
  * here.
@@ -161,6 +164,7 @@ export type {
   SessionTaskRef,
 } from './sessions.js';
 export type { CapturedSession, CapturedSpawnOptions, CapturingSpawner, ClaudeSpawner } from './claude.js';
+export type { SpawnEnv } from './session-env.js';
 
 export {
   beginSession,
@@ -202,3 +206,4 @@ export {
   spawnClaudeCaptured,
   spendWarning,
 } from './claude.js';
+export { sessionPath, sessionSpawnEnv } from './session-env.js';

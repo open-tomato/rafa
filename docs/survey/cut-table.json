@@ -3089,6 +3089,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/plan-reexport-bindings.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/plan-risk.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3569,16 +3574,6 @@
     },
     {
       "kind": "test",
-      "path": "src/utils/session-env.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/utils/session-env.ts",
-      "upwardEdgesIn": 3
-    },
-    {
-      "kind": "test",
       "path": "src/utils/tracker-open-tasks.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3631,13 +3626,6 @@
           "toPackage": "rafa-inventory"
         },
         {
-          "from": "src/core/loop/claude.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/utils/session-env.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/loop/sessions.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3674,8 +3662,8 @@
         }
       ],
       "fileCounts": {
-        "source": 105,
-        "test": 110,
+        "source": 108,
+        "test": 113,
         "testSupport": 2
       },
       "files": [
@@ -3740,6 +3728,8 @@
         "src/core/loop/index.ts",
         "src/core/loop/readings.test.ts",
         "src/core/loop/readings.ts",
+        "src/core/loop/session-env.test.ts",
+        "src/core/loop/session-env.ts",
         "src/core/loop/session-readings.ts",
         "src/core/loop/sessions-decisions.test.ts",
         "src/core/loop/sessions-hop.test.ts",
@@ -3757,6 +3747,8 @@
         "src/core/output/text.ts",
         "src/core/plan/block-reader.test.ts",
         "src/core/plan/block-reader.ts",
+        "src/core/plan/blocker-comment.test.ts",
+        "src/core/plan/blocker-comment.ts",
         "src/core/plan/blocks.test.ts",
         "src/core/plan/blocks.ts",
         "src/core/plan/declaration.test.ts",
@@ -3767,6 +3759,8 @@
         "src/core/plan/parse.ts",
         "src/core/plan/plan-files.ts",
         "src/core/plan/plan-stamp.ts",
+        "src/core/plan/tracker-path.test.ts",
+        "src/core/plan/tracker-path.ts",
         "src/core/runtime/identity.test.ts",
         "src/core/runtime/identity.ts",
         "src/core/runtime/index.test.ts",
@@ -3898,7 +3892,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 92,
+        "src/core/": 98,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3915,8 +3909,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 9,
-      "upwardEdges": 9
+      "remaining": 8,
+      "upwardEdges": 8
     },
     {
       "clearedByIssue118": 0,
@@ -5378,13 +5372,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/triage/base-run.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/utils/session-env.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
@@ -5633,8 +5620,8 @@
         "src/pr/index.ts"
       ],
       "rank": 4,
-      "remaining": 48,
-      "upwardEdges": 48
+      "remaining": 47,
+      "upwardEdges": 47
     },
     {
       "clearedByIssue118": 0,
@@ -6277,13 +6264,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/suite/run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/utils/session-env.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/suite/scope.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
@@ -6538,8 +6518,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 93,
-      "upwardEdges": 93
+      "remaining": 92,
+      "upwardEdges": 92
     },
     {
       "clearedByIssue118": 0,
@@ -6921,7 +6901,7 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 264,
+        "source": 263,
         "test": 466,
         "testSupport": 27
       },
@@ -7582,6 +7562,7 @@
         "src/tests/plan-format-source.test.ts",
         "src/tests/plan-injection.test.ts",
         "src/tests/plan-needs.test.ts",
+        "src/tests/plan-reexport-bindings.test.ts",
         "src/tests/plan-risk.test.ts",
         "src/tests/plan-stamp.test.ts",
         "src/tests/plan-worktree-integration.test.ts",
@@ -7678,8 +7659,6 @@
         "src/utils/progress.test.ts",
         "src/utils/progress.ts",
         "src/utils/schedule.ts",
-        "src/utils/session-env.test.ts",
-        "src/utils/session-env.ts",
         "src/utils/tracker-open-tasks.test.ts",
         "src/utils/tracker.test.ts",
         "src/utils/tracker.ts"
@@ -7703,12 +7682,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1989,
-    "leftToPlace": 718,
-    "nonTestEdges": 4437,
+    "files": 1994,
+    "leftToPlace": 717,
+    "nonTestEdges": 4438,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 261
+    "upwardEdges": 258
   },
   "unassigned": [
     {
