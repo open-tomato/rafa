@@ -89,6 +89,7 @@ export function mergeGuardSettings(config: MergeGuardSettings): MergeGuardSettin
     releaseFragments: config.releaseFragments,
     releaseStrategy: config.releaseStrategy,
     releaseHeading: config.releaseHeading,
+    releaseMoveLock: config.releaseMoveLock,
     prVersionCollision: config.prVersionCollision,
     dangerousAcceptVersionCollision: config.dangerousAcceptVersionCollision,
   };

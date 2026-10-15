@@ -40,6 +40,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** When every reading runs. */
@@ -111,7 +112,7 @@ describe('the reaction', () => {
 });
 
 describe('the settings it carries', () => {
-  it('copies the guard\'s eight settings and nothing more off a wider config', () => {
+  it('copies the guard\'s nine settings and nothing more off a wider config', () => {
     const wider: MergeGuardSettings & { readonly planDir: string } = {
       ...SETTINGS,
       releaseEnabled: 'auto',
@@ -129,6 +130,7 @@ describe('the settings it carries', () => {
       'releaseEnabled',
       'releaseFragments',
       'releaseHeading',
+      'releaseMoveLock',
       'releaseStrategy',
       'releaseVersionFile',
     ]);

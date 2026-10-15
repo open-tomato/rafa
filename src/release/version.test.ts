@@ -83,6 +83,7 @@ import {
   nextVersion,
   parseSemanticVersion,
   readBaseVersion,
+  readManifestName,
   readManifestVersion,
   replaceManifestVersion,
   writeManifestVersion,
@@ -254,6 +255,34 @@ describe('readManifestVersion', () => {
   it('reads a version it could never bump, and leaves the judgement to nextVersion', () => {
     expect(readManifestVersion('{"version":"nightly"}')).toBe('nightly');
     expect(nextVersion('nightly', 'patch')).toBeNull();
+  });
+});
+
+describe('readManifestName', () => {
+  it('reads the name a manifest declares, trimmed', () => {
+    expect(readManifestName('{"name":"@open-tomato/rafa","version":"0.4.0"}')).toBe('@open-tomato/rafa');
+    expect(readManifestName('{"name":"  demo  "}')).toBe('demo');
+  });
+
+  it('reads this repository manifest as the name rafa publishes under', () => {
+    expect(readManifestName(readFileSync(OWN_MANIFEST, 'utf8'))).toBe('@open-tomato/rafa');
+  });
+
+  it('answers null for a text that is no JSON object', () => {
+    expect(readManifestName('not json at all')).toBeNull();
+    expect(readManifestName('["demo"]')).toBeNull();
+    expect(readManifestName('')).toBeNull();
+  });
+
+  it('answers null when the name is absent, blank or not a string', () => {
+    expect(readManifestName('{"version":"0.4.0"}')).toBeNull();
+    expect(readManifestName('{"name":""}')).toBeNull();
+    expect(readManifestName('{"name":"   "}')).toBeNull();
+    expect(readManifestName('{"name":4}')).toBeNull();
+  });
+
+  it('reads the top-level name and not a nested one', () => {
+    expect(readManifestName('{"tool":{"name":"inner"},"name":"outer"}')).toBe('outer');
   });
 });
 

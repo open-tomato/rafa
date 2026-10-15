@@ -26,7 +26,10 @@
  *
  *   - `unread`: the tree or the base version could not be read, or —
  *     after a fold that answered — the tree could not be listed for
- *     `release.changelog`. Nothing is written.
+ *     `release.changelog`, or, under `release.moveLock`, the lock step
+ *     refused (`readSettleLock`, `./settle-lock.ts`): the manifest names
+ *     a package other than rafa's, or `rafa.lock` at that commit does
+ *     not read as a lock. Nothing is written.
  *   - `malformed`: a fragment on the base does not parse. Settle REFUSES
  *     the whole batch rather than folding the rest: a fragment left out
  *     would release later, out of the order the base received it, and
@@ -43,7 +46,9 @@
  *     base version and the fragments in fold order, and whether
  *     `release.changelog` is missing from that commit's tree
  *     ({@link SettleFolded.changelogMissing}), so a dry run can say the
- *     settle will create it.
+ *     settle will create it; and, under `release.moveLock`, how the
+ *     release commit moves `rafa.lock` ({@link SettleFolded.lock}),
+ *     read as blobs at that same commit, null when the key is off.
  *
  * ## The build
  *
@@ -63,9 +68,14 @@
  *      `unbuilt`. The parent directory is not made, so a
  *      `release.changelog` under a directory the base lacks is a
  *      problem too;
- *   3. stages both files and `git rm`s every folded fragment, `none`
- *      ones included, since the receipt names them all;
- *   4. commits `chore: release <version>` ({@link releaseCommitSubject}),
+ *   3. under `release.moveLock` ({@link SettleFolded.lock} set), writes
+ *      `rafa.lock` at the worktree root recording the version
+ *      (`writeSettleLock`, `./settle-lock.ts`), creating it when the
+ *      base holds none; with the key off the lock is never touched;
+ *   4. stages both files, and `rafa.lock` when step 3 wrote it, and
+ *      `git rm`s every folded fragment, `none` ones included, since the
+ *      receipt names them all;
+ *   5. commits `chore: release <version>` ({@link releaseCommitSubject}),
  *      with the repository's hooks running as they would for any commit.
  *
  * Delivery — the push, a retry, the release pull request — is the
@@ -81,6 +91,7 @@
  */
 import type { BranchForecastSettings } from './branch-forecast.js';
 import type { ChangelogInsertPoint } from './changelog.js';
+import type { SettleLockPlan } from './settle-lock.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { FoldFragment } from './strategy.js';
 import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
@@ -95,6 +106,7 @@ import { errorCode } from '@open-tomato/rafa/core/loop';
 
 import { insertChangelogEntry } from './changelog.js';
 import { readFragmentTree } from './fragment-tree.js';
+import { readSettleLock, writeSettleLock } from './settle-lock.js';
 import { foldWithStrategy, releaseStrategyFor } from './strategy.js';
 import { gitPathOf, readManifestVersion, writeManifestVersion } from './version.js';
 
@@ -104,6 +116,8 @@ export interface SettleSettings extends BranchForecastSettings {
   readonly releaseChangelog: string;
   /** `release.fragments`, the directory the waiting fragments sit in. */
   readonly releaseFragments: string;
+  /** `release.moveLock`, whether the release commit moves `rafa.lock` to the version it settles. */
+  readonly releaseMoveLock: boolean;
 }
 
 /** One fragment a settle folds: the fold's view of it, and where it sits. */
@@ -169,6 +183,12 @@ export interface SettleFolded extends SettleBasis {
    * insert into it.
    */
   readonly changelogMissing: boolean;
+  /**
+   * How the release commit moves `rafa.lock`, read at
+   * {@link SettleBasis.commit}; null when `release.moveLock` is off,
+   * so the build leaves the lock alone.
+   */
+  readonly lock: SettleLockPlan | null;
 }
 
 /** What {@link readSettle} answers; see the module note. */
@@ -181,7 +201,11 @@ export interface SettleUnbuilt extends Omit<SettleFolded, 'outcome'> {
   readonly problem: string;
 }
 
-/** A folded batch committed in the worktree. */
+/**
+ * A folded batch committed in the worktree. Its `lock`, passed through
+ * from the reading, is what the commit wrote into `rafa.lock`: null
+ * when the commit left the lock alone.
+ */
 export interface SettleBuilt extends Omit<SettleFolded, 'outcome'> {
   readonly outcome: 'built';
   /** The full hash of the release commit; its parent is {@link SettleBasis.commit}. */
@@ -257,7 +281,11 @@ export function readSettle(git: GitRunner, tree: string, settings: SettleSetting
 
   const changelog = changelogMissingAt(git, commit, settings.releaseChangelog);
   if (typeof changelog === 'object') return { outcome: 'unread', strategy: strategy.name, problem: changelog.problem };
-  return { ...basis, outcome: 'folded', version: folded.result.version, section: folded.result.section, changelogMissing: changelog };
+  const lock = settings.releaseMoveLock
+    ? readSettleLock(git, commit, settings.releaseVersionFile, folded.result.version)
+    : null;
+  if (lock !== null && 'problem' in lock) return { outcome: 'unread', strategy: strategy.name, problem: lock.problem };
+  return { ...basis, outcome: 'folded', version: folded.result.version, section: folded.result.section, changelogMissing: changelog, lock };
 }
 
 /**
@@ -322,13 +350,30 @@ function writeChangelog(root: string, reading: SettleFolded, changelog: string):
   return { point: inserted.point, created };
 }
 
-/** Stages the two files, deletes the fragments and commits; answers the release hash or the problem. */
+/** Writes `rafa.lock` at `root` as the plan says; answers the problem, or null when written. */
+function writeLock(root: string, lock: SettleLockPlan): string | null {
+  try {
+    writeSettleLock(root, lock.to);
+  } catch (error) {
+    return `${lock.path} could not be written: ${messageOf(error)}`;
+  }
+  return null;
+}
+
+/**
+ * Stages the two files, and `rafa.lock` when the reading moves it,
+ * deletes the fragments and commits; answers the release hash or the
+ * problem.
+ */
 function commitRelease(
   git: GitRunner,
   reading: SettleFolded,
   settings: SettleSettings,
 ): { readonly release: string } | { readonly problem: string } {
-  const files = [gitPathOf(settings.releaseVersionFile), gitPathOf(settings.releaseChangelog)];
+  const lockFiles = reading.lock === null
+    ? []
+    : [reading.lock.path];
+  const files = [gitPathOf(settings.releaseVersionFile), gitPathOf(settings.releaseChangelog), ...lockFiles];
   const added = git(['add', '--', ...files]);
   if (!added.ok) return { problem: `${files.join(' and ')} could not be staged: ${gitSaid(added)}` };
 
@@ -364,6 +409,11 @@ export function buildSettle(
 
   const changelog = writeChangelog(worktree.path, reading, settings.releaseChangelog);
   if ('problem' in changelog) return unbuilt(reading, changelog.problem);
+
+  const lockProblem = reading.lock === null
+    ? null
+    : writeLock(worktree.path, reading.lock);
+  if (lockProblem !== null) return unbuilt(reading, lockProblem);
 
   const committed = commitRelease(worktree.git, reading, settings);
   if ('problem' in committed) return unbuilt(reading, committed.problem);
