@@ -81,7 +81,7 @@
  * `cjs` extension, outside `node_modules` and outside any folder whose
  * name opens with a dot. The walk does not follow symbolic links.
  */
-import type { TestScope } from '../utils/declaration.js';
+import type { TestScope } from '@open-tomato/rafa/core/plan';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';

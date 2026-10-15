@@ -6,11 +6,11 @@
  * Neither side may import the other. `src/learning/` imports nothing
  * from the rest of `src/` (`learning-boundary.test.ts`), and core
  * imports nothing above it, so core declares the six types in
- * `src/ports/learning.ts` and the two bounds in
- * `src/core/config/config-sections.ts`, and the library keeps its own in
+ * `packages/rafa/src/ports/learning.ts` and the two bounds in
+ * `packages/rafa/src/core/config/config-sections.ts`, and the library keeps its own in
  * `src/learning/types.ts` and `src/learning/identity.ts`. This file
  * imports both sides, which is why it sits outside core: core through
- * `src/ports/index.ts` and the sections barrel, the library through
+ * `packages/rafa/src/ports/index.ts` and the sections barrel, the library through
  * `src/learning/index.ts`.
  *
  * ## What holds the types
@@ -44,14 +44,15 @@ import type {
   MergeResult as CoreMergeResult,
   MergeRule as CoreMergeRule,
   SyncPayload as CoreSyncPayload,
-} from '../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
 import { describe, expect, test } from 'bun:test';
 
 import {
   CONFIDENCE_MAX as CORE_CONFIDENCE_MAX,
   CONFIDENCE_MIN as CORE_CONFIDENCE_MIN,
-} from '../core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
+
 import {
   CONFIDENCE_MAX as LIBRARY_CONFIDENCE_MAX,
   CONFIDENCE_MIN as LIBRARY_CONFIDENCE_MIN,

@@ -88,7 +88,7 @@
  * cases and two here.
  */
 import type { LocalIssueRecord, LocalTrackerOptions } from './local.js';
-import type { IssueEdit, IssueRef, IssueState, IssueType, Output, Tracker } from '../../ports/index.js';
+import type { IssueEdit, IssueRef, IssueState, IssueType, Output, Tracker } from '@open-tomato/rafa/ports';
 
 import {
   existsSync,
@@ -105,7 +105,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { draftFixture, runTrackerContract } from './contract.js';
 import {

@@ -14,7 +14,7 @@
 
 import type { RiskFinding, RiskPlan, RiskReport, RiskSeams } from './risk.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 import {
   agentTools,

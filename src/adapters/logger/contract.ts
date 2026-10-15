@@ -29,7 +29,7 @@
  * control that each of those cases can fail.
  */
 import type { LoggerSettings } from './settings.js';
-import type { LogEntry, Logger, LogLevel } from '../../ports/index.js';
+import type { LogEntry, Logger, LogLevel } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

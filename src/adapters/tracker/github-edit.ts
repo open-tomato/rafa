@@ -82,9 +82,9 @@
  * each refusal and `github.ts`, which imports this module, is imported
  * by it for types alone.
  */
-import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '../../ports/index.js';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
-import { describeValue, isMapping } from '../../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
 import { ISSUE_PRIORITIES } from './issue-values.js';
 

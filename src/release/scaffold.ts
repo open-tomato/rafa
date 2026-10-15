@@ -3,7 +3,7 @@
  * settings the release-settle plan adds: four under `release`, then
  * `pr.versionCollision` and `dangerous.acceptVersionCollision`, each
  * spelled at its schema default (`CONFIG_DEFAULTS` of
- * `src/core/config/config.ts`).
+ * `packages/rafa/src/core/config/config.ts`).
  * `src/project/scaffold.ts` places them, each under its own section.
  *
  * This is the library half of the release step of `rafa init`; its

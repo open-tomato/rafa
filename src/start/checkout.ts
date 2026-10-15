@@ -47,9 +47,10 @@
  */
 import type { GitToplevelProbe } from '../project/roots.js';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { gitToplevel } from '../project/roots.js';
 import { mainCheckoutOf } from '../project/worktree-root.js';
 

@@ -32,7 +32,7 @@
  * `--accept-refs` on the line, and `dangerous.acceptStaleRefs: true` in
  * the config, each re-stamp every reference and plan
  * (`refsAcceptance`, the flag winning). The setting is told once, by
- * the loader's pass line for the key (`src/core/config/dangerous.ts`),
+ * the loader's pass line for the key (`packages/rafa/src/core/config/dangerous.ts`),
  * written when `src/plan.ts` loads its config and so before any board
  * read: `plan create` declares {@link CREATE_DANGEROUS_PHRASES} as its
  * `RafaCommand.dangerous` (`./create.ts`), so the line ends with what
@@ -90,7 +90,7 @@
  * A caller builds it with {@link registryRoster} from the registry its
  * line was routed through, `RafaContext.registry`
 
- * (`src/core/command/command.ts`): `./create.ts`, which hands it to
+ * (`packages/rafa/src/core/command/command.ts`): `./create.ts`, which hands it to
  * `src/plan.ts` and so to check 4, `../issue/check.ts`, and the three
  * commands that read `../doctor-refs.ts`'s row, `../doctor.ts`,
  * `../epic/show.ts` and `../issue/list.ts`. It is `describeRegistry`
@@ -145,20 +145,21 @@ import type { RefsGateAnswer } from '../../board/refs-gate.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { DescribeDocument } from '../../cli/describe.js';
 import type { CommandRegistry } from '../../cli/registry.js';
-import type { DangerousPhrases } from '../../core/config/index.js';
-import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 import path from 'path';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { version } from '../../../package.json';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ACCEPT_STALE_REFS_KEY, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
 import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../../core/git/index.js';
-import { activeOutput } from '../../core/output/index.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
 /** The `name` in `package.json` of a project root that is rafa itself. */

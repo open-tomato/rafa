@@ -60,12 +60,13 @@
  * and answered {@link PastHeadNotDescended}, like a head that is there
  * and not an ancestor. Any other failure is {@link PastHeadUnread}.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { MergedPullRequest } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { posix } from 'node:path';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+
 import { directoryPrefix, fragmentIdOf } from '../release/fragment-tree.js';
 import { changelogSections } from '../release/receipt.js';
 

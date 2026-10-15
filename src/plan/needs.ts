@@ -67,7 +67,7 @@
  *     rule), or, for a program rafa ships, when the rafa tier's
  *     `bundled/bin` holds one first (see Stack tools). The loop's
  *     sessions inherit that `PATH`, with `sessionSpawnEnv`
- *     (`src/core/loop/session-env.ts`) putting the running entry's
+ *     (`packages/rafa/src/core/loop/session-env.ts`) putting the running entry's
  *     `bundled/bin` in front, the order this reading looks in, so a
  *     program has no separate visibility.
  *
@@ -130,15 +130,16 @@ import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
+
 import { checkReferences } from '../check/references.js';
 import { toolOf } from '../check/shell-lines.js';
-import { messageOf } from '../core/config/sections.js';
-import { parsePlan } from '../core/plan/index.js';
 import { buildInventory } from '../inventory/index.js';
 import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
 import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 import { readFrontmatterDocument } from '../schema/frontmatter.js';
-import { bundledBinDirectory } from '../schema/tiers.js';
 
 /** What a need is for. */
 export type NeedKind = InventoryKind | 'mcp' | 'program';

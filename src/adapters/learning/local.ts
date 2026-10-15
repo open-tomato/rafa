@@ -135,7 +135,7 @@
  *
  *   - A `.md` file the schema refuses, in either scope, is skipped and
  *     reported through `warn`, which defaults to the active output's
- *     `warn` (`src/core/output/active.ts`), read when the report is
+ *     `warn` (`packages/rafa/src/core/output/active.ts`), read when the report is
  *     made. The other files are read, and a push never writes over it.
  *   - A flag line that cannot be read rejects the pull, naming the file
  *     and the line, because a bundle skipping it could hold an instinct
@@ -146,6 +146,7 @@
  * one unreadable line and the new lines are read.
  */
 import type { HeldDescription } from './held.js';
+import type { Instinct } from '../../schema/instinct.js';
 import type {
   BlessedBundle,
   InstinctRecord,
@@ -153,15 +154,16 @@ import type {
   MergeResult,
   MergeRule,
   SyncPayload,
-} from '../../ports/index.js';
-import type { Instinct } from '../../schema/instinct.js';
-import type { InstinctScope } from '../../schema/tiers.js';
+} from '@open-tomato/rafa/ports';
+import type { InstinctScope } from '@open-tomato/rafa/schema/tiers';
 
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { RAFA_INSTINCTS_PATH } from '@open-tomato/rafa/schema/tiers';
+
 import { actionHash, bless, merge, triggerKey } from '../../learning/index.js';
 import {
   INSTINCT_DOMAINS,
@@ -172,7 +174,6 @@ import {
   writeInstinct,
 } from '../../schema/instinct.js';
 import { readScope } from '../../schema/scope-records.js';
-import { RAFA_INSTINCTS_PATH } from '../../schema/tiers.js';
 
 import { toHeldInstinct, toHeldRecords } from './held.js';
 

@@ -82,15 +82,16 @@
  * the copies that were made, and the caller merges nothing after
  * either. Nothing here passes `--force`.
  */
-import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../../pr/index.js';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { copyFileSync, mkdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+
 import { countChanges, WORKTREE_STATUS } from '../../cleanup/worktrees.js';
-import { messageOf } from '../../core/config/sections.js';
-import { readSessions } from '../../core/loop/index.js';
 import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
 import { shellQuote } from '../../pr/preflight-items.js';
 import { worktreeDirAt } from '../../start/worktree-dir.js';

@@ -8,7 +8,7 @@
  * case that answers none is known to be able to answer one.
  */
 import type { SkillFact, SkillFactEntry, SkillFactFinding } from './skill-facts.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { describe, expect, it } from 'bun:test';
 

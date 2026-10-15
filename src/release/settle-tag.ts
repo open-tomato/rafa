@@ -67,9 +67,9 @@
 import type { SettlePrOutcome } from './settle-pr.js';
 import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
-import type { ReleaseTagMode } from '../core/config/sections.js';
+import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { pushSaid } from './settle-push.js';
 import { versionTag } from './version-tag.js';

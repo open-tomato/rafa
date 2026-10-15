@@ -91,8 +91,13 @@ import type { Epic } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { applyHorizonChange, EPIC_HORIZON_REFUSAL_EXIT, readHorizonChange } from '../../board/epic-horizon.js';
@@ -108,10 +113,6 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';

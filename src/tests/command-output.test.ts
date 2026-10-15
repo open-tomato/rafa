@@ -7,7 +7,7 @@
  * ## The source cases
  *
  * `src/plan.ts`, `src/effort/collect.ts`, `src/effort/report.ts`,
- * `src/core/config/config.ts` and `src/core/config/config-load.ts` hold
+ * `packages/rafa/src/core/config/config.ts` and `packages/rafa/src/core/config/config-load.ts` hold
  * no `console` member and no `process.exit` in their code, read with
  * the walk in `source-uses.ts`, whose control is `loop-output.test.ts`'s.
  * Each but `config.ts` calls `activeOutput()`; `config.ts` writes nothing,
@@ -52,7 +52,7 @@
  * (2 each, a source case among them), and config warnings back on
  * `console.warn` (1, the source case).
  */
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -75,13 +75,13 @@ const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 /** How long a case spawning the CLI may run. */
 const RUN_TIMEOUT = 30_000;
 
-/** Each module held to the active output, from `src/`, and whether it writes at all. */
+/** Each module held to the active output, from `src/` (core's through `../packages/rafa/src/`), and whether it writes at all. */
 const ROUTED_MODULES: readonly (readonly [string, boolean])[] = [
   ['plan.ts', true],
   ['effort/collect.ts', true],
   ['effort/report.ts', true],
-  ['core/config/config.ts', false],
-  ['core/config/config-load.ts', true],
+  ['../packages/rafa/src/core/config/config.ts', false],
+  ['../packages/rafa/src/core/config/config-load.ts', true],
 ];
 
 describe('the modules the other phase 0 commands write through', () => {

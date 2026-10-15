@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { runLintStep } from './lint-step.js';
@@ -67,8 +68,8 @@ beforeEach(() => {
   for (const name of CONFIG_FILES) cpSync(join(ROOT, name), join(repo, name));
   cpSync(join(ROOT, 'scripts', 'unsafeUnicode.mjs'), join(repo, 'scripts', 'unsafeUnicode.mjs'));
   write('packages/scratch-pkg/tsconfig.json', '{ "extends": "../../tsconfig.packages.json", "include": ["src"] }\n');
-  write('src/effort/store/index.ts', 'export const STORE_STUB = 1;\n');
-  write('src/ports/index.ts', 'export const PORTS_STUB = 1;\n');
+  write('packages/rafa/src/effort/store/index.ts', 'export const STORE_STUB = 1;\n');
+  write('packages/rafa/src/ports/index.ts', 'export const PORTS_STUB = 1;\n');
   git(['init', '-q']);
   printed = [];
   setActiveOutput(sinkOutput({ info: (message) => printed.push(message) }));

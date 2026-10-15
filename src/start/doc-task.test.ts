@@ -12,17 +12,18 @@
  */
 import type { TaskSessionRunner } from './dispatch.js';
 import type { DocTaskPlace } from './doc-task.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { StaleDocRow } from '../effort/store/stale-docs.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { StaleDocRow } from '@open-tomato/rafa/store/stale-docs';
 
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+
 import { DOC_TASK_HEADING, NO_SIGHTINGS_LINE } from '../docs/task-reading.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { parseTaskDeclaration } from '../utils/declaration.js';
 
 import { dispatchTask } from './dispatch.js';
 import { docTaskBaseRef, docTaskPrompt } from './doc-task.js';

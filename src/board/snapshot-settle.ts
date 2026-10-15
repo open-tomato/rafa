@@ -57,13 +57,13 @@
  * temporary directory.
  */
 import type { SnapshotChange, SpecIssue, SpecSnapshot } from './issue.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import {
   ISSUE_REFUSAL_EXIT,

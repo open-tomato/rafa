@@ -29,8 +29,9 @@
 import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BlockedReading } from '../board/blocked.js';
 
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { plural } from '../core/plan/index.js';
 
 /** The heading the blocked lines sit under, as `GitHub board:` heads the rows. */
 export const BLOCKED_HEADING = 'Blocked issues:';

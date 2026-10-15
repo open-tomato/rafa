@@ -82,8 +82,8 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -91,8 +91,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
 import { formatClaimMessage } from '../claims/record.js';
-import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {

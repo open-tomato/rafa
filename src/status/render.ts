@@ -77,11 +77,12 @@ import type {
 import type { ChecksVerdict } from '../pr/checks.js';
 import type { Mergeability } from '../pr/index.js';
 
+import { planLabel, sessionLine } from '@open-tomato/rafa/core/loop/readings';
+import { formatCounts } from '@open-tomato/rafa/core/plan';
+
 import { blockedLineSentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { idleText } from '../board/roadmap-claims.js';
-import { planLabel, sessionLine } from '../core/loop/readings.js';
-import { formatCounts } from '../core/plan/index.js';
 
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 

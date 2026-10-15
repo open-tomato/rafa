@@ -36,9 +36,9 @@
 import type { EpicCancelResult, EpicCancelSeams } from './cancel.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { DependentOutcome, MembershipChange } from '../../board/epic-trail.js';
-import type { RafaCommand , Prompter } from '../../core/command/index.js';
-import type { GitResult, GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../../adapter-registry.js';
 

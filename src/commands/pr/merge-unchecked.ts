@@ -97,12 +97,13 @@
  * `./merge.ts` should post it straight after the merge rather than
  * behind the local clean-up, which can fail and would silently drop it.
  */
-import type { Prompter } from '../../core/command/index.js';
 import type { GitRunner, PullRequestComment, PullRequests } from '../../pr/index.js';
 import type { BaseWorkflowReading, UncheckedCase, UncheckedReading } from '../../pr/unchecked.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { readUnchecked } from '../../pr/unchecked.js';
 import { workflowsRunOnPullRequestsInto } from '../../pr/workflow-triggers.js';
 

@@ -17,8 +17,9 @@
  * Every root is a path under this file's temporary directory that is
  * never made.
  */
-import type { ResolvedConfig } from '../../core/config/index.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
+import '../../config-registry.js';
 import '../../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -28,9 +29,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
-import { parseConfigText, resolveConfig } from '../../core/config/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { EFFORT_SYNC_ROW, readDoctorEffortSync } from './doctor-reading.js';
 import { selectSync } from './select.js';

@@ -8,7 +8,7 @@
  * are checked ahead of the configured tiers, and both are required, so
  * a machine without the CLI halts in preflight rather than finishing
  * every task and failing at the pull request. A `none` provider
- * contributes nothing, which is why `src/core/config/config.ts` can go
+ * contributes nothing, which is why `packages/rafa/src/core/config/config.ts` can go
  * on requiring nothing by default: a `local`-tracker machine never sees
  * these items.
  *
@@ -55,7 +55,7 @@
  * line stays readable.
  */
 import type { PrProviderReading } from './provider.js';
-import type { PrerequisiteItem } from '../core/config/index.js';
+import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 
 /** The host asked about when a reading names none; see the module note. */
 export const DEFAULT_GH_HOST = 'github.com';

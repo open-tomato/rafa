@@ -57,10 +57,10 @@
  * every retry session ended without one, carries the release fragment's
  * notes and not this list; the run's end still prints it.
  */
-import type { SessionStep, SessionStepKind, SessionStepOnly } from '../core/loop/index.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly } from '@open-tomato/rafa/core/loop';
 
-import { readSession, sessionSteps } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { readSession, sessionSteps } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 /** The heading the list goes under, in the prompt and in the pull request body. */
 export const STEP_ONLY_HEADING = 'Test files red only in a suite step';

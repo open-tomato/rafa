@@ -20,7 +20,7 @@
  *
  *   - A folder is the unit a package cut moves: a file under
  *     `packages/<name>/src/` counts as its package, `packages/<name>`; any
- *     other file as the folder it lies in (`src/effort/store`). Only files
+ *     other file as the folder it lies in (`packages/rafa/src/effort/store`). Only files
  *     of kind `source` (see `files.ts`) count their folder.
  *   - The imports are the edges of the survey's import graph
  *     (`import-graph.ts`), of either kind: a type-only import ties a test
@@ -51,22 +51,27 @@
  *
  * The comparison
  *
- * `--against=<baseline>` holds the move of #905 to the baseline, and reads
- * the tree by two rules of its own (`coreRules`), both of which leave the
- * index of a tree with no `src/core/` as the survey counts it:
+ * `--against=<baseline>` holds the moves of #905 and #1090 to the
+ * baseline, and reads the tree by two rules of its own (`coreRules`), both
+ * of which leave the index of a tree with no `packages/rafa/src/core/` and no core
+ * package as the survey counts it:
  *
- *   - every file under `src/core/` counts as one folder, `src/core`, as a
+ *   - every file under `packages/rafa/src/core/` counts as one folder, `packages/rafa/src/core`, as a
  *     package's files count as their package: the folder is the core
- *     package after the cut (#808);
+ *     package after the cut (#808). Every file under `CORE_SOURCE`
+ *     (`packages/rafa/src/`) counts as the package's one folder,
+ *     `packages/rafa`, and so does a file under `packages/rafa/src/core/` once that
+ *     folder lies in the package: a test that counted `packages/rafa/src/core`,
+ *     `packages/rafa/src/effort/store` and `packages/rafa/src/ports` counts `packages/rafa` once;
  *   - a core barrel, one of the files `core-moves.ts` lists as the only
- *     ones a file outside `src/core/` may import, is read as a support
+ *     ones a file outside `packages/rafa/src/core/` may import, is read as a support
  *     file is: reached, not counted, not walked past. The folders behind
  *     it are listed under `supportFolders` and the barrel under `support`.
  *     A barrel's own text is never read for a spawning call.
  *
- * So a test outside `src/core/` counts nothing for what it imports through
+ * So a test outside `packages/rafa/src/core/` counts nothing for what it imports through
  * a barrel, and a test inside it, which imports its sibling files directly,
- * counts `src/core` once and every folder those files reach.
+ * counts `packages/rafa/src/core` once and every folder those files reach.
  *
  * The files read are the ones `git add -A` would commit: tracked, or
  * untracked and covered by no ignore rule, and present on disk. A barrel
@@ -78,9 +83,14 @@
  * Each test file of the tree is one of:
  *
  *   - `risen`, `equal` or `fallen`: it has an index now and the baseline
- *     holds one for it. A test file at a path `core-moves.ts` moves a test
- *     to is compared with the entry under the path it moved from, when the
- *     baseline holds one; any other with the entry under its own path;
+ *     holds one for it. A test file under `CORE_SOURCE` or under
+ *     `CORE_PARKED_TESTS` (`src/tests/core-coupled/`) is first brought back
+ *     to its path with that prefix replaced by `src/`. A test file whose
+ *     path, so brought back, is one `core-moves.ts` moves a test to (its
+ *     target brought back the same way) is
+ *     compared with the entry under the path it moved from, when the
+ *     baseline holds one; any other with the entry under its path brought
+ *     back, and last under its own path;
  *   - `added`: the baseline holds no index for it. It is new, and held to
  *     nothing;
  *   - `unread`: the baseline holds an index for it and `bun build` reached
@@ -89,7 +99,8 @@
  * A baseline entry no test file answers is `gone`. The mode exits 1 when a
  * test file is `risen` or `unread`, and 0 otherwise: `added` and `gone`
  * are printed and fail nothing. A test file renamed by hand, outside
- * `core-moves.ts`, therefore shows as one `added` and one `gone`.
+ * `core-moves.ts` and the two prefixes, therefore shows as one `added` and
+ * one `gone`.
  */
 
 import type { CoreMove } from './core-moves';
@@ -101,7 +112,15 @@ import { isAbsolute, join, posix } from 'node:path';
 
 import ts from 'typescript';
 
-import { CORE_FOLDER, CORE_MOVES, barrelPaths, movedPaths } from './core-moves';
+import {
+  CORE_FOLDER,
+  CORE_MOVES,
+  CORE_PACKAGE,
+  CORE_PARKED_TESTS,
+  CORE_SOURCE,
+  barrelPaths,
+  movedPaths,
+} from './core-moves';
 import { classifyFile, coverageLine, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
   OUTPUT_DIR,
@@ -201,7 +220,7 @@ export interface TestIndexBaseline {
 export interface IndexChange {
   /** The test file's path now. */
   readonly test: string;
-  /** The path the baseline holds it under: its own, or the one it moved from. */
+  /** The path the baseline holds it under: its own, its path brought back to `src/`, or the one it moved from. */
   readonly baselineTest: string;
   /** Its index in the baseline. */
   readonly before: number;
@@ -227,7 +246,7 @@ export interface BaselineComparison {
   readonly fallen: readonly IndexChange[];
   /** The test files the baseline holds no index for: new, held to nothing. */
   readonly added: readonly string[];
-  /** The baseline's entries no test file answers, at their path or the one they move to. */
+  /** The baseline's entries no test file answers, at their path or any path a test file is brought back from. */
   readonly gone: readonly string[];
   /** The test files the baseline holds an index for and that have none now. */
   readonly unread: readonly string[];
@@ -251,8 +270,14 @@ export const BASELINE_FLAG = '--baseline';
 /** The flag that picks the comparing mode, up to the baseline's path. */
 export const AGAINST_FLAG = '--against=';
 
-/** The one folder every file under `src/core/` counts as under `coreRules`. */
+/** The one folder every file under `packages/rafa/src/core/` counts as under `coreRules`, while that folder lies outside the package. */
 export const CORE_UNIT: string = CORE_FOLDER.replace(/\/$/, '');
+
+/** The one folder every file under `CORE_SOURCE` counts as under `coreRules`: the core package. */
+export const CORE_PACKAGE_UNIT: string = CORE_PACKAGE.replace(/\/$/, '');
+
+/** The prefixes a test file is brought back to `src/` from before it is compared, each with its closing `/`. */
+export const CORE_TEST_PREFIXES: readonly string[] = [CORE_SOURCE, CORE_PARKED_TESTS];
 
 /** The baseline's path, relative to the repository root. */
 export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
@@ -282,20 +307,43 @@ export function indexFolder(path: string): string {
 export const SURVEY_RULES: IndexRules = { folderOf: indexFolder, setsAside: () => false };
 
 /**
- * The rules the comparison reads the tree by: `src/core/` is one folder,
- * and a core barrel is set aside.
+ * The rules the comparison reads the tree by: every file under
+ * `CORE_SOURCE` is the package's one folder, `packages/rafa/src/core/` is one folder,
+ * and a core barrel is set aside. The package is read first, so a
+ * `packages/rafa/src/core/` folder moved under `CORE_SOURCE` counts as the package.
  *
  * @param barrels - The core barrels; those of `core-moves.ts` unless a test plants its own.
+ * @param coreFolder - The `packages/rafa/src/core/` folder, with its closing `/`; `CORE_FOLDER` unless a test plants its own.
  * @returns The rules.
  */
-export function coreRules(barrels: readonly string[] = barrelPaths()): IndexRules {
+export function coreRules(barrels: readonly string[] = barrelPaths(), coreFolder: string = CORE_FOLDER): IndexRules {
   const aside = new Set(barrels);
-  return {
-    folderOf: (path) => (path.startsWith(CORE_FOLDER)
-      ? CORE_UNIT
-      : indexFolder(path)),
-    setsAside: (path) => aside.has(path),
+  const coreUnit = coreFolder.replace(/\/$/, '');
+  const folderOf = (path: string): string => {
+    if (path.startsWith(CORE_SOURCE)) {
+      return CORE_PACKAGE_UNIT;
+    }
+    if (path.startsWith(coreFolder)) {
+      return coreUnit;
+    }
+    return indexFolder(path);
   };
+  return { folderOf, setsAside: (path) => aside.has(path) };
+}
+
+/**
+ * A test file's path brought back to `src/`: under `CORE_SOURCE` or under
+ * `CORE_PARKED_TESTS`, that prefix replaced by `src/`; any other path as
+ * it is.
+ *
+ * @param path - A repository-relative path.
+ * @returns The path the test file had before core became its package.
+ */
+export function pathBeforePackage(path: string): string {
+  const prefix = CORE_TEST_PREFIXES.find((candidate) => path.startsWith(candidate));
+  return prefix === undefined
+    ? path
+    : `src/${path.slice(prefix.length)}`;
 }
 
 /**
@@ -775,9 +823,11 @@ function indexChange(entry: TestIndexEntry, baselineTest: string, before: Baseli
  * @returns Each test file under what it is, and the baseline's entries left unanswered.
  */
 export function compareToBaseline(index: TestIndex, baseline: TestIndexBaseline, moves: readonly CoreMove[] = CORE_MOVES): BaselineComparison {
-  const movedFrom = new Map(movedPaths(moves).map((moved) => [moved.to, moved.from]));
-  const heldUnder = (test: string): string | undefined => [movedFrom.get(test), test]
-    .find((path) => path !== undefined && baseline.tests.has(path));
+  const movedFrom = new Map(movedPaths(moves).map((moved) => [pathBeforePackage(moved.to), moved.from]));
+  const heldUnder = (test: string): string | undefined => {
+    const back = pathBeforePackage(test);
+    return [movedFrom.get(back), back, test].find((path) => path !== undefined && baseline.tests.has(path));
+  };
   const answered = new Set<string>();
   const risen: IndexChange[] = [];
   const equal: IndexChange[] = [];

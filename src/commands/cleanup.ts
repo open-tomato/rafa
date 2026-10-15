@@ -114,10 +114,12 @@ import type {
 } from '../cleanup/index.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import {
   cleanupSteps,
@@ -129,7 +131,6 @@ import {
 } from '../cleanup/index.js';
 import { multiSelect } from '../cli/prompt/multi-select.js';
 import { processTerminal } from '../cli/prompt/terminal.js';
-import { CommandExit , createLinePrompter } from '../core/command/index.js';
 import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import {

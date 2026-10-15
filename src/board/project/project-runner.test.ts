@@ -18,11 +18,12 @@
  *    mode alone picks the line or the event.
  */
 import type { RetryNotice } from './retry.js';
-import type { CliEvent } from '../../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import {

@@ -22,11 +22,11 @@
  * a bare `exec` action refused 2.
  */
 import type { HelpRequest, Route } from './route.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
-import { commandSpelling } from '../core/command/index.js';
+import { commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';

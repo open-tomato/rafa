@@ -18,9 +18,9 @@
  */
 import type { StaleDocsTaskInput, StartStaleDocsConfig, StartStaleDocsOptions } from './stale-docs.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { FindingOutcome } from '../effort/store/findings.js';
-import type { OpenIssue, Tracker } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,10 +36,12 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { renderDocUpdatePlan } from '../commands/docs/plan.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan } from '../core/plan/index.js';
 import {
   addStaleDocLine,
   NEXT_VERSION,
@@ -47,11 +49,9 @@ import {
   STALE_DOCS_MARKER,
   staleDocsTitle,
 } from '../docs/release-issue.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { parseTaskDeclaration } from '../utils/declaration.js';
 
 import { createStartStaleDocs, readStaleDocsVersion } from './stale-docs.js';
 

@@ -27,12 +27,12 @@
  * The directory is the {@link PlansDir} the caller hands over, already
  * resolved; reading `plan.dir` off a config is the caller's.
  */
-import type { PlansDir, TaskCounts } from '../core/plan/index.js';
+import type { PlansDir, TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { countTasks, isFile, planFileName, stubOfPlanFile } from '../core/plan/index.js';
+import { countTasks, isFile, planFileName, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
 
 import { parsePlan } from './index.js';
 

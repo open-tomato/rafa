@@ -13,7 +13,7 @@
  * its blocker text (`start/budget.ts`). Each of those stops the run.
  * Re-running resumes: blocked tasks are retried first.
  *
- * A task line may carry a trailing routing declaration (`utils/declaration.ts`).
+ * A task line may carry a trailing routing declaration (`core/plan/declaration.ts`).
  * The loop reads it, dispatches that task under the flags it names, and keeps
  * the block out of everything downstream — the prompt, the operator's log and
  * the commit message all see the task sentence alone. A `rafa:*` block is kept
@@ -357,23 +357,25 @@
  * `interrupted`, no task is marked, and the run returns, its record
  * `stopped`, as it does when a pause's hold ends on the signal.
  */
-import type { ResolvedConfig } from './core/config/index.js';
-import type { FindingOutcome } from './effort/store/findings.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { TaskHandout } from './start/handout.js';
 import type { SessionServing } from './start/serving.js';
 import type { WrapUpLearning } from './start/wrap-up.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { CommandExit } from './core/command/index.js';
-import { ConfigError } from './core/config/index.js';
-import { messageOf } from './core/config/sections.js';
-import { interruptClaudeSessions } from './core/loop/index.js';
-import { activeOutput } from './core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { interruptClaudeSessions } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-tomato/rafa/core/plan';
+
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';
@@ -435,10 +437,8 @@ import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
-import { parseTaskDeclaration } from './utils/declaration.js';
-import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
-import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
+import { findNextTask, updateTrackerLine } from './utils/tracker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

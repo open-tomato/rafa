@@ -33,9 +33,6 @@
  */
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand , Prompter } from '../../core/command/index.js';
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
   GitResult,
@@ -46,6 +43,9 @@ import type {
 } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

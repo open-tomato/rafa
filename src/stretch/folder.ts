@@ -31,14 +31,13 @@
  * `src/commands/stretch/` and `src/commands/doctor-stretch.ts` imports
  * this module, so the stretch logic can move into its own package.
  */
-import type { PidProbe } from '../core/loop/index.js';
+import type { PidProbe } from '@open-tomato/rafa/core/loop';
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { errorCode, isPidAlive } from '../core/loop/index.js';
-import { isPositiveWhole } from '../loop/session-record-parse.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { errorCode, isPidAlive , isPositiveWhole } from '@open-tomato/rafa/core/loop';
 
 /** The folder every stretch writes under, relative to the project root. */
 export const STRETCH_DIR: string = join('.rafa', 'stretch');

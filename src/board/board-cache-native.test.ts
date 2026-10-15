@@ -15,7 +15,7 @@
  * temporary project root; nothing spawns.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

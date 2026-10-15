@@ -113,8 +113,8 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { BlockedLine } from '../board/blocked-line.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -122,8 +122,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
 import { formatClaimMessage } from '../claims/record.js';
-import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { isPrecondition, NEXT_PRECONDITIONS, NEXT_STATES, readNextState } from './state.js';

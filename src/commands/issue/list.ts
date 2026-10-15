@@ -204,9 +204,14 @@ import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../core/command/index.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
-import type { Issue, IssueQuery, IssueType, TrackerKind } from '../../ports/index.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { Issue, IssueQuery, IssueType, TrackerKind } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
@@ -219,10 +224,6 @@ import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { parseTitle } from '../../bugs/title.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';

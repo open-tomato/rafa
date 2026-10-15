@@ -30,9 +30,9 @@
  * checked with `cmp`: every probed stretch read as held reddened 6; the
  * row call dropped from `./doctor.ts` reddened 2.
  */
-import type { RafaCommand } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
 import type { StretchFolderSeams, StretchFs } from '../stretch/folder.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 

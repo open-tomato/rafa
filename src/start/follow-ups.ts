@@ -66,20 +66,21 @@
  * `warn`.
  */
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { BugRouteRow } from '../effort/store/bug-routes.js';
-import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '../ports/index.js';
 import type { SecretEnvironment } from '../triage/triage.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 
 import { homedir } from 'node:os';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
 import { localPathRedactor } from '../triage/local-paths.js';
 import { namedSecrets, redactSecrets, TRIAGE_MODULE } from '../triage/triage.js';
-import { escapeBlockerText } from '../utils/tracker.js';
 
 /** What every line this module prints opens with, after its indent. */
 const LINE_PREFIX = 'Follow-ups: ';

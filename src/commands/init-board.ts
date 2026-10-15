@@ -138,10 +138,12 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
-import type { Prompter } from '../core/command/index.js';
-import type { BoardRelationshipMode, PrProvider } from '../core/config/sections.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { BoardRelationshipMode, PrProvider } from '@open-tomato/rafa/core/config/sections';
 
 import { join } from 'node:path';
+
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { invalidateRows } from '../board/board-cache.js';
 import { EPIC_GUARD_PATH, writeEpicGuard } from '../board/epic-guard.js';
@@ -151,7 +153,6 @@ import { createNativeRelations } from '../board/relations/native.js';
 import { readBoardRepository } from '../board/repository.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 export const YES_ANSWERS: readonly string[] = ['y', 'yes'];

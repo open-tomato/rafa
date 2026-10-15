@@ -23,12 +23,12 @@
  * printed: the session's own stdout reaches the operator through the
  * door's tee, and the caller (`./continue-run.ts`) says what was decided.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { randomUUID } from 'node:crypto';
 
-import { runClaudeCaptured } from '../core/loop/index.js';
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
 
 import { SESSION_ID_FLAG } from './dispatch.js';
 import { withStamp } from './stamp.js';

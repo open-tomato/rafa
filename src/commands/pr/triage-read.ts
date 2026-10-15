@@ -101,7 +101,8 @@ import type { CheckRow, GitRunner, PullRequests } from '../../pr/index.js';
 import type { ConflictReading } from '../../pr/triage/conflict.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { failingRows, verdictOf } from '../../pr/index.js';
 import { readConflict } from '../../pr/triage/conflict.js';
 import { readFailedLog } from '../../pr/triage/evidence.js';

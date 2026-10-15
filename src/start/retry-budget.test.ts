@@ -23,11 +23,12 @@
  * would fail the pair, and the repair chain is read to the cap, so one
  * that reset on every done would fail it too.
  */
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

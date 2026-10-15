@@ -8,19 +8,20 @@
  * refusal sits beside an accepting control, and every key and message is
  * SPELLED, never read off the module.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
-import { templateProblem } from './bugs/title.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
 import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { templateProblem } from './bugs/title.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 import { projectConfigText } from './project/scaffold.js';
 

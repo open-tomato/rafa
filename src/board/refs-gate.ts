@@ -50,7 +50,7 @@
  *
  * The flag wins when both are on, since it is what was typed for this
  * run. The config's own line is the loader's pass line for the key
- * (`src/core/config/dangerous.ts`), written when the config is loaded
+ * (`packages/rafa/src/core/config/dangerous.ts`), written when the config is loaded
  * and so before any board read, ending with the phrase `plan create`
  * declares for it (`src/commands/plan/refs-check.ts`): an operator who
  * forgot the setting is told before anything is spent, and not only
@@ -74,17 +74,18 @@
  * a copy of, and `issue ready` does not run it: `rafa issue check` is
  * the reading on demand.
  */
-import type { Output } from '../ports/index.js';
 import type { RefRow, RefsReading } from '../refs/reading.js';
 import type { LiveReading } from '../refs/stamp.js';
 import type { RefVerifier } from '../refs/verify.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { SETTINGS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js';
 import { RefsBlockError } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';

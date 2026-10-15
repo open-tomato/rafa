@@ -47,9 +47,9 @@
  * code, and nothing is written.
  */
 import type { WaitingReading } from './release/status-fragments.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { GitRunner } from '../pr/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

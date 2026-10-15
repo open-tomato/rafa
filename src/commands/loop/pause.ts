@@ -29,15 +29,16 @@
  * Exit code 1: the refusals `loop-sessions.ts` names, and a session that
  * reads `stopped` or `done`.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams } from '../../core/loop/readings.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import {
   isLive,
   refusal,
   resolveLoopSeams,
-} from '../../core/loop/readings.js';
+} from '@open-tomato/rafa/core/loop/readings';
+
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

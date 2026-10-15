@@ -41,14 +41,15 @@
  * command line's say over what is written.
  */
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
-import type { LogLevel } from './ports/log-level.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
+import type { LogLevel } from '@open-tomato/rafa/ports/log-level';
+
+import { below, flag, isMapping, mapOf, oneOf, refused, text } from '@open-tomato/rafa/core/config/sections';
 
 import { DEFAULT_LOGGER_KIND, LOG_LEVELS, LOGGER_THEMES } from './adapters/logger/settings.js';
-import { below, flag, isMapping, mapOf, oneOf, refused, text } from './core/config/sections.js';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `logger` section's fields, added to core's. */
   interface RafaConfig extends LoggerConfigSettings {}
 }

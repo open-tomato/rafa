@@ -40,8 +40,8 @@
  *    here, each of the three a case that reads the setting back out of
  *    a config the step had written.
  */
-import type { Prompter } from '../core/command/index.js';
 import type { ReleaseFileSettings } from '../release/enabled.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -49,8 +49,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,

@@ -44,12 +44,12 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
-import { refused } from './core/config/sections.js';
+import { refused } from '@open-tomato/rafa/core/config/sections';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `triage` section's fields, added to core's. */
   interface RafaConfig extends TriageSettings {}
 }

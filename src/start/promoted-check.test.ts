@@ -25,9 +25,9 @@
  */
 import type { PromotedCheck } from './promoted-check.js';
 import type { InstinctRecord } from '../learning/index.js';
-import type { Learning, SyncPayload } from '../ports/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { Instinct } from '../schema/instinct.js';
+import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,8 +35,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/index.js';

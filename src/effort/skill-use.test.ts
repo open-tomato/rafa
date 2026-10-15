@@ -17,13 +17,14 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
+
 import {
   collectSkillUse,
   readSkillUse,
   SKILL_USE_CLI_VERSION,
   subagentLogPaths,
 } from './skill-use.js';
-import { UNKNOWN_SKILL_COUNT } from './store/skill-invocations.js';
 
 /** The recorded session's id, its main log's basename. */
 const FIXTURE_ID = 'ac7aeff1-84f2-46c9-bb9c-b9ceb994599f';

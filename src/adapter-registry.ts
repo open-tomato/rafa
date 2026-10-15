@@ -2,11 +2,11 @@
  * The composition root of the adapter registry: core's adapters, listed
  * here and handed to core when this module is imported.
  *
- * Core declares the registry (`src/core/adapters/registry.ts`) and
+ * Core declares the registry (`packages/rafa/src/core/adapters/registry.ts`) and
  * imports no adapter: the adapters sit under `src/adapters/`,
- * `src/effort/store/` and `src/effort/sync/`, above core, and a core
+ * `packages/rafa/src/effort/store/` and `src/effort/sync/`, above core, and a core
  * file importing them would be an upward edge. This module, outside
- * `src/core/`, is the one place they are listed, {@link CORE_ADAPTERS}.
+ * `packages/rafa/src/core/`, is the one place they are listed, {@link CORE_ADAPTERS}.
  * Importing it calls `registerAdapters` once with that list, so
  * `CORE_ADAPTER_REGISTRY` answers every core kind; a registration core
  * refuses throws at import, naming what it refused. `src/rafa.ts` and
@@ -37,11 +37,18 @@
  * `adapter registry:`, as the registry's own do, so a caller reads the
  * same sentence it read when core listed these adapters itself.
  */
-import type { AnyAdapter } from './core/adapters/index.js';
-import type { StoreBackend } from './core/config/sections.js';
-import type { SelectedEffortStore } from './effort/store/index.js';
+import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { StoreBackend } from '@open-tomato/rafa/core/config/sections';
+import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 
 import { homedir } from 'node:os';
+
+import { PORT_VERSIONS, registerAdapters } from '@open-tomato/rafa/core/adapters';
+import { activeDefaults } from '@open-tomato/rafa/core/config';
+import { describeValue, STORE_BACKENDS } from '@open-tomato/rafa/core/config/sections';
+import { createTextOutput } from '@open-tomato/rafa/core/output';
+import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
+import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 import { createLocalLearning, localInstinctsDir } from './adapters/learning/local.js';
 import { createConsoleLogger } from './adapters/logger/console.js';
@@ -50,12 +57,6 @@ import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
 import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from './adapters/tracker/local.js';
-import { PORT_VERSIONS, registerAdapters } from './core/adapters/index.js';
-import { activeDefaults } from './core/config/index.js';
-import { describeValue, STORE_BACKENDS } from './core/config/sections.js';
-import { createTextOutput } from './core/output/index.js';
-import { openNdjsonStore } from './effort/store/ndjson.js';
-import { openSqliteStore } from './effort/store/sqlite.js';
 import { createFileSync } from './effort/sync/file.js';
 import { createLocalSync } from './effort/sync/select.js';
 

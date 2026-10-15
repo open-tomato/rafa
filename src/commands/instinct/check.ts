@@ -28,8 +28,8 @@
  * refusal: no directory on the line, a second word, or a path that is
  * no directory.
  */
-import type { RafaCommand } from '../../core/command/index.js';
 import type { CheckCommandSeams } from '../check-report.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { checkCommandRun, DEFAULT_CHECK_SEAMS, INSTINCT_CHECK_USAGE } from '../check-report.js';
 

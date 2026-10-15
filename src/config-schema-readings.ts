@@ -4,7 +4,7 @@
  * to the reader — which default, why null or never null, and why a key
  * is or is not a `CommandLineSetting` — argued once.
  *
- * `src/core/config/` holds the settings these readings are about:
+ * `packages/rafa/src/core/config/` holds the settings these readings are about:
  * `RafaConfig` and `CommandLineSetting` in `config-schema.ts`, core's
  * specs and defaults in `core-section.ts` with the four readings the
  * phase-1 spec leaves to the reader (open tracker kinds, empty

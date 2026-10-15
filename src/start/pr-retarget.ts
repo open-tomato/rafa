@@ -29,10 +29,10 @@
  * provider through the recorded `gh` fake and reads the lines without
  * the process-wide active output.
  */
-import type { Output } from '../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** The effects {@link retargetPullRequest} reaches through. */
 export interface PrRetargetSeams {

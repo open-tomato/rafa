@@ -37,8 +37,9 @@ import type { BoardPart } from '../board/setup.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { listBoardLabels, missingBoardLabels, setUpLabels } from '../board/setup.js';
-import { messageOf } from '../core/config/sections.js';
 
 import { writeProjectLock } from './lock.js';
 import { PROJECT_TREE, writeProjectScope } from './scaffold.js';

@@ -17,7 +17,7 @@
 import type { PitSeams } from './pit-readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeRun } from '../ci/runs-fake.js';
-import type { OpenIssue, Tracker } from '../ports/index.js';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

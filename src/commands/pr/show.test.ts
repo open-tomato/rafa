@@ -27,8 +27,6 @@
  */
 import type { PrSeams } from './pr-context.js';
 import type { PrShowReading } from './show.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
   PullRequestComment,
@@ -36,6 +34,8 @@ import type {
   PullRequests,
 } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

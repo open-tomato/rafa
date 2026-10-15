@@ -73,15 +73,16 @@
  * same fold over line sources a caller supplies, so a test drives it
  * without touching disk.
  */
-import type { SkillUse, SkillUseReading } from './store/skill-invocations.js';
+import type { SkillUse, SkillUseReading } from '@open-tomato/rafa/store/skill-invocations';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
+
 import { bareSkillName } from '../tiers/skill-names.js';
 
 import { readLines, sessionIdFromPath } from './session-log.js';
-import { UNKNOWN_SKILL_COUNT } from './store/skill-invocations.js';
 
 /** The Claude Code version whose log format this collector was written against. */
 export const SKILL_USE_CLI_VERSION = '2.1.280';

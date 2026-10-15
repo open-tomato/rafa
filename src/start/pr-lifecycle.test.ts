@@ -99,7 +99,6 @@
 import type { PrLifecyclePhases, PrLifecycleSeams } from './pr-lifecycle.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type {
   ChecksReading,
   PrProviderReading,
@@ -108,6 +107,7 @@ import type {
   GitRunner,
   PushOutcome,
 } from '../pr/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -116,18 +116,19 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { runClaude } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { CommandExit } from '../core/command/index.js';
-import { runClaude } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
-import { planStubFromPrompt } from '../utils/plan-stamp.js';
 
 import {
   CI_POLL_INTERVAL_MS,

@@ -106,9 +106,10 @@ import type { ManifestProvides, ManifestSeams } from '../modules/manifest.js';
 import { readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from '../modules/manifest.js';
 
 import { byName, skillItem, sourceItem } from './trees.js';

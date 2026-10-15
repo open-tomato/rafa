@@ -1,14 +1,14 @@
 ## Triage
 
-`src/triage/` routes each out-of-scope entry of a task report by its kind,
-and each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
+`src/triage/` routes each out-of-scope entry of a task report by its kind, and
+each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
 `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
 `bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
 from `src/start/triage.ts` and `rafa epic close` from
-`src/commands/epic/close.ts`. The triage writer stores every bug and its
-action in the effort store, keyed by the bug's recurrence key, not the
-artifact the report's findings use, and each routed entry leaves one row in
-the `bug_routes` table (`src/effort/store/bug-routes.ts`) naming the kind the
+`src/commands/epic/close.ts`. The triage writer stores every bug and its action
+in the effort store, keyed by the bug's recurrence key, not the artifact the
+report's findings use, and each routed entry leaves one row in the `bug_routes`
+table (`packages/rafa/src/effort/store/bug-routes.ts`) naming the kind the
 session said, the kind the loop routed it under and the route it took.
 
 ### The kinds and their routes
@@ -99,18 +99,17 @@ no create, no comment, no reference stored. A recurrence is found by the
 private tracker's own find, which reads files locally, and is commented on
 there. The GitHub advisory channel stays one a human opens.
 
-**Machine.** A bug whose `what` and `artifact` name a system toolchain, an
-SDK path, or a package-manager build failure: a fault of the MACHINE the
-session ran on and not of rafa. `src/effort/store/machine-fault.ts`, which
-`./machine-fault.ts` re-exports, reads the families and is the whole of
-that reading. Such a bug goes to a channel with no tracker at all:
-neither tracker is asked anything, no reference is stored, and its action
-is `skipped`. Its problem says the family and the text that matched,
-redacted as every problem here is, so a run says why nothing was filed. The
-bug is not lost — `writeTriage` stores every out-of-scope bug and its scope
-column, so the row says `machine`. An entry of kind `machine` takes the same
-channel with the same action, its problem saying it is machine-scoped as its
-kind says.
+**Machine.** A bug whose `what` and `artifact` name a system toolchain, an SDK
+path, or a package-manager build failure: a fault of the MACHINE the session ran
+on and not of rafa. `packages/rafa/src/effort/store/machine-fault.ts`, which
+`./machine-fault.ts` re-exports, reads the families and is the whole of that
+reading. Such a bug goes to a channel with no tracker at all: neither tracker is
+asked anything, no reference is stored, and its action is `skipped`. Its problem
+says the family and the text that matched, redacted as every problem here is, so
+a run says why nothing was filed. The bug is not lost — `writeTriage` stores
+every out-of-scope bug and its scope column, so the row says `machine`. An entry
+of kind `machine` takes the same channel with the same action, its problem
+saying it is machine-scoped as its kind says.
 
 **Docs.** A `stale_docs` entry, which is no bug. It is the `machine`
 channel's twin: no find, no create, no comment on either tracker, no
@@ -125,13 +124,13 @@ page naming a toolchain is still a page. A report whose only content is
 `stale_docs` entries resolves no public tracker (`src/start/triage.ts`),
 since resolving runs `gh auth status` and `gh repo view`.
 
-The entries are kept, but not by this channel. The loop stores the report
-before it is triaged, and `storeTaskReport` (`src/report/record.ts`) writes
-each entry to the store's `stale_docs` table as a `sighting` row
-(`src/effort/store/stale-docs.ts`). The docs row says the entry reached no
-tracker; it says nothing of whether its store row was written. A `docs` kind
-entry of `out_of_scope_bugs` is the other route to that table: it is stored
-as a `sighting` row whose `where` is the first path its `what`, then its
+The entries are kept, but not by this channel. The loop stores the report before
+it is triaged, and `storeTaskReport` (`packages/rafa/src/report/record.ts`)
+writes each entry to the store's `stale_docs` table as a `sighting` row
+(`packages/rafa/src/effort/store/stale-docs.ts`). The docs row says the entry
+reached no tracker; it says nothing of whether its store row was written. A
+`docs` kind entry of `out_of_scope_bugs` is the other route to that table: it is
+stored as a `sighting` row whose `where` is the first path its `what`, then its
 `artifact`, names, or null, and its `bug_routes` row says `docs`.
 
 ### The repair task and its cap

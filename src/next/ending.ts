@@ -72,10 +72,11 @@
  * the chain ends once, with the chain's reading, rather than twice.
  */
 import type { NextHintSeams, NextStepHint } from './hint.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec , Prompter } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec , Prompter } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { createLinePrompter } from '../core/command/index.js';
+import { createLinePrompter } from '@open-tomato/rafa/core/command';
+
 import { answeredYes } from '../start/branch-decision.js';
 
 import { runAction } from './actions.js';

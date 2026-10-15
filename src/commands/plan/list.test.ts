@@ -37,7 +37,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../../core/plan/index.js';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
 import { parsePlan } from '../../plan/index.js';
 import { listPlans } from '../../plan/list.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';

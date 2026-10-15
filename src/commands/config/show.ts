@@ -23,7 +23,7 @@
  * With `--sources`, every setting on a line of its own by its dotted key,
  * with its value, the layer that answered it and, for a file, the file
  * and the zero-based entry of it that last set it, as
- * `ResolvedConfig.provenance` (`src/core/config/config-origins.ts`)
+ * `ResolvedConfig.provenance` (`packages/rafa/src/core/config/config-origins.ts`)
  * records them. A YAML file is one entry, so its every setting is entry
  * 0. A setting no file answers names the layer `default` and no file.
  *
@@ -49,13 +49,14 @@
  * The config's own warnings go through the active output's `warn`, as
  * every command loading the config writes them.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { ConfigSetting, ConfigSource, ResolvedConfig } from '../../core/config/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ConfigSetting, ConfigSource, ResolvedConfig } from '@open-tomato/rafa/core/config';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { SETTING_BY_KEY, SETTING_NAMES, SETTINGS } from '../../config-registry.js';
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
 import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

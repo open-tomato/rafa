@@ -28,7 +28,7 @@
  */
 import type { PlanModel, PlanTask } from './index.js';
 
-import { readDocsRole } from '../utils/declaration.js';
+import { readDocsRole } from '@open-tomato/rafa/core/plan';
 
 /** The agent a prose task is declared under. */
 export const DOC_AGENT = 'doc-updater';

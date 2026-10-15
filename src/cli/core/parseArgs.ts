@@ -47,7 +47,7 @@
  * promise a behaviour nothing gives. An alias spelled as its own flag's
  * name, and an empty alias list, are no refusal.
  */
-import type { ArgSpec, FlagSpec } from './types.js';
+import type { ArgSpec, FlagSpec } from '@open-tomato/rafa/core/command';
 
 /** What every refusal opens with. */
 const REFUSAL = 'parseArgs';

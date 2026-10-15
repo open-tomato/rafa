@@ -63,8 +63,8 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../../adapter-registry.js';
 
@@ -74,11 +74,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { describeRegistry } from '../../cli/describe.js';
-import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, endingProbe } from '../../tests/ending-probe.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';

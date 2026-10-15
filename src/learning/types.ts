@@ -4,7 +4,7 @@
  * The library keeps its own declaration of each. Like the rest of
  * `src/learning/`, this module imports nothing from the rest of `src/`,
  * and core imports nothing above it, so the `Learning` port declares
- * the same six again in `src/ports/learning.ts`.
+ * the same six again in `packages/rafa/src/ports/learning.ts`.
  * `src/tests/learning-contract.test.ts` holds every pair mutually
  * assignable, so the port passes exactly what the library takes and
  * answers.

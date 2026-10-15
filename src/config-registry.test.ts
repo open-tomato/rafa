@@ -27,7 +27,7 @@
  *
  * The cases on the item keys, the command-line settings and the
  * known-key index of every section came here from
- * `src/core/config/config-merged.test.ts` when that module was retired:
+ * `packages/rafa/src/core/config/config-merged.test.ts` when that module was retired:
  * this module is the one that builds the merged schema in schema order.
  * Core reads the same key indexes off the registered sections
  * (`activeSettingByKey`, `activeSectionPaths` and `activeKnownKeysAbove`
@@ -36,23 +36,12 @@
  * this module's, order included, under every path; registering the list
  * whole is their control, which puts the top level's `hub` after `task`.
  */
-import type { ConfigSetting, RafaConfig } from './core/config/index.js';
+import type { ConfigSetting, RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
-import {
-  CONFIG_DEFAULTS,
-  CONFIG_SECTIONS,
-  handConfigToLogger,
-  knownKeysAbove,
-  SECTIONS,
-  SETTING_BY_KEY,
-  SETTING_NAMES,
-  SETTINGS,
-} from './config-registry.js';
 import {
   activeChecks,
   activeConfigLoadHook,
@@ -66,7 +55,19 @@ import {
   mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
+import {
+  CONFIG_DEFAULTS,
+  CONFIG_SECTIONS,
+  handConfigToLogger,
+  knownKeysAbove,
+  SECTIONS,
+  SETTING_BY_KEY,
+  SETTING_NAMES,
+  SETTINGS,
+} from './config-registry.js';
 
 /** The twelve packages, in the order the registry lists their sections. */
 const PACKAGES = [
@@ -230,7 +231,7 @@ const COMMAND_LINE: readonly ConfigSetting[] = [
 
 /** The settings and defaults core's registry answers once `module` is imported first, in a fresh process. */
 function probeRegistered(module: string): { settings: number; defaults: number } {
-  const barrel = join(import.meta.dir, 'core', 'config', 'index.ts');
+  const barrel = join(import.meta.dir, '..', 'packages', 'rafa', 'src', 'core', 'config', 'index.ts');
   const script = [
     `await import(${JSON.stringify(module)});`,
     `const core = await import(${JSON.stringify(barrel)});`,
@@ -385,7 +386,7 @@ describe('the registration in a fresh process', () => {
   });
 
   it('answers none when the core barrel alone is imported, the control', () => {
-    expect(probeRegistered(join(import.meta.dir, 'core', 'config', 'index.ts'))).toEqual({
+    expect(probeRegistered(join(import.meta.dir, '..', 'packages', 'rafa', 'src', 'core', 'config', 'index.ts'))).toEqual({
       settings: 0,
       defaults: 0,
     });

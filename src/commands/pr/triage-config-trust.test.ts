@@ -15,8 +15,8 @@
  * warning line under `--allow-local-config`.
  */
 import type { TriageSeams } from './triage.js';
-import type { GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../../adapter-registry.js';
 
@@ -26,8 +26,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createGhPermissions } from '../../board/trust.js';
-import { CommandExit } from '../../core/command/index.js';
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';

@@ -15,7 +15,7 @@
  * ## The session
  *
  * The session is spawned through the capturing door
- * (`src/core/loop/claude.ts`), under the run's `loop.settingSources`, with
+ * (`packages/rafa/src/core/loop/claude.ts`), under the run's `loop.settingSources`, with
  * the argument list {@link searchFlags} builds: `--session-id` with an
  * id the runner picks, `--model` {@link SEARCH_MODEL}, and `--tools`
  * naming {@link SEARCH_TOOLS} and nothing else. `--tools` is variadic,
@@ -86,16 +86,17 @@
 import type { SearchBlockIssue, SearchMatch } from './block.js';
 import type { RankedCandidate } from './rank.js';
 import type { ScratchCopy } from './scratch.js';
-import type { ClaudeSettingSource } from '../../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
-import type { EffortStore, SessionEffortRow } from '../../effort/store/types.js';
 import type { InventoryKind, InventoryRecord } from '../record.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
+import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+
 import { collectSessionRow, sessionLogDir } from '../../effort/collect.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
 

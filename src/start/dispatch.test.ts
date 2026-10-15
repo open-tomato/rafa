@@ -61,11 +61,11 @@ import type { CheckoutExpectation } from './checkout-guard.js';
 import type { DispatchGuard, TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
-import type { AdapterContext } from '../core/adapters/index.js';
-import type { TierPin } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
-import type { Learning, SyncPayload } from '../ports/index.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { TierPin } from '@open-tomato/rafa/core/config/sections';
+import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -75,12 +75,13 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED, haltHeadline } from './checkout-guard.js';

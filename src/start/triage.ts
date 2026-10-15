@@ -152,28 +152,29 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
-import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { InheritedTriage } from '../triage/inherited.js';
 import type { KindRouteOptions } from '../triage/kind-route.js';
 import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triage.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 
 import { homedir } from 'node:os';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
+
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';
 import { inheritedFailureOf } from '../triage/inherited.js';
 import { scoreText } from '../triage/issue-text.js';
 import { checkedKindOf } from '../triage/kind-route.js';
 import { localPathRedactor } from '../triage/local-paths.js';
-import { isMachineFault } from '../triage/machine-fault.js';
 import {
   blockerTextOf,
   namedSecrets,

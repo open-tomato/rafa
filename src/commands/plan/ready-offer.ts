@@ -52,11 +52,12 @@
  * waits on an answer.
  */
 import type { ReadyOffer, ReadyOfferRequest } from '../../board/plan-spec.js';
-import type { Prompter } from '../../core/command/index.js';
 import type { ReadyReport } from '../issue/ready.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import { createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { createLinePrompter } from '../../core/command/index.js';
 import { lazyPrompter, runIssueReady } from '../issue/ready.js';
 
 /** What the offer is: one run of `rafa issue ready` over an issue already read. */

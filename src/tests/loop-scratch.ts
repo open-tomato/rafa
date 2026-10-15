@@ -10,7 +10,7 @@
  *
  * @module tests/loop-scratch
  */
-import type { OutputMode } from '../core/config/sections.js';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

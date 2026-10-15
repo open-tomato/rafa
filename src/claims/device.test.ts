@@ -34,9 +34,10 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
-import { recordReplacedStoreId } from '../effort/store/store-replaced.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { recordReplacedStoreId } from '@open-tomato/rafa/store/store-replaced';
+
 import { freshDevice } from '../tests/merged-stores.js';
 
 import { holdsClaim, readDeviceStoreId } from './device.js';

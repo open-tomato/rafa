@@ -56,18 +56,19 @@
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
-import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js';
-import type { CapturingSpawner } from '../core/loop/index.js';
 import type { InstinctRecord } from '../learning/index.js';
-import type { Learning } from '../ports/index.js';
 import type { PullRequests } from '../pr/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
+import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { Learning } from '@open-tomato/rafa/ports';
 
 import { posix } from 'node:path';
 
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { runClaudeCaptured } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';

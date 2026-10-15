@@ -51,7 +51,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DoctorSeams } from '../commands/doctor.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 
@@ -61,12 +61,13 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { readDoctorBoard, renderDoctorBoard } from '../commands/doctor-board.js';
 import { markMessage, MARKS_HEADING } from '../commands/doctor-marks.js';
 import { createDoctorCommand } from '../commands/doctor.js';
 import { MOVE_FIX } from '../commands/init-board.js';
 import { createInitCommand, DEFAULT_INIT_SEAMS } from '../commands/init.js';
-import { plural } from '../core/plan/index.js';
 
 import { dispatchInProject, eventsOf, plantProject } from './cli-capture.js';
 

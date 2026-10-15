@@ -90,9 +90,9 @@
  * the whole stream ends with a trailing NUL, which leaves an empty
  * final record that the group walk stops on.
  */
-import type { GitResult, GitRunner } from '../../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 /**
  * What one reading concluded, and the reason the three are named apart:

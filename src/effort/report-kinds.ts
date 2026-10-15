@@ -15,7 +15,7 @@
  *
  * Every `bug_routes` row, grouped by its `plan_stub`, NULL for the rows
  * written under no plan. Within a plan, one count per kind of
- * `BUG_KINDS` (`src/report/parse.ts`), taken on the row's routed `kind`
+ * `BUG_KINDS` (`packages/rafa/src/report/parse.ts`), taken on the row's routed `kind`
  * and never on the `said` kind the session wrote, and the rows whose
  * `route` is `filed`. A row is counted once per session that routed it,
  * as the table stores it: a triage repeated on a resumed run writes its
@@ -37,14 +37,13 @@
  * the whole report. {@link countBugKinds} is the count alone, pure over
  * the rows.
  */
-import type { BugRoute } from './store/bug-routes.js';
-import type { BugKind } from '../report/parse.js';
+import type { BugKind } from '@open-tomato/rafa/report/parse';
+import type { BugRoute } from '@open-tomato/rafa/store/bug-routes';
 
 import { existsSync } from 'node:fs';
 
-import { BUG_KINDS } from '../report/parse.js';
-
-import { sqliteStorePath, withSqliteStore } from './store/sqlite.js';
+import { BUG_KINDS } from '@open-tomato/rafa/report/parse';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 /** One plan's routed entries, counted by kind. */
 export interface PlanBugKinds {

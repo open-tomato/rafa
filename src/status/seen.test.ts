@@ -16,7 +16,7 @@
 import type { SeenInput, SeenSeams, SeenSnapshot } from './seen.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { WorktreeSeams } from '../cleanup/worktrees.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,9 +24,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { runsDir } from '@open-tomato/rafa/core/loop';
+
 import { defaultWorktreeSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
-import { runsDir } from '../core/loop/index.js';
 import { plantDemoProject, plantSession, sessionRecord } from '../tests/loop-session-fixtures.js';
 
 import {

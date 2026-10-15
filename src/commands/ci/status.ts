@@ -48,14 +48,15 @@
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { CiStatusReading } from '../../ci/status-reading.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readFailedCases } from '../../ci/failed-cases.js';
 import { readNewestRun } from '../../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../../ci/status-reading.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { readNonBlankFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { requireProject } from '../plan/plan-files.js';
 

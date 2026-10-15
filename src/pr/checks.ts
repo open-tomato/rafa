@@ -46,16 +46,16 @@
  * those rows, and the `gh` adapter is its only caller.
  *
  * The row type, the verdict type, {@link verdictOf} and `failingRows`
- * are core's (`src/effort/store/check-rows.ts`), where the store's plan
+ * are core's (`packages/rafa/src/effort/store/check-rows.ts`), where the store's plan
  * CI writer reads them; this file re-exports them under the same names.
  */
 
-import type { CheckOutcome, CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
+import type { CheckOutcome, CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows';
 
-import { verdictOf } from '../effort/store/check-rows.js';
+import { verdictOf } from '@open-tomato/rafa/store/check-rows';
 
-export type { CheckOutcome, CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
-export { failingRows, verdictOf } from '../effort/store/check-rows.js';
+export type { CheckOutcome, CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows';
+export { failingRows, verdictOf } from '@open-tomato/rafa/store/check-rows';
 
 const PASSING_STATES = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
 

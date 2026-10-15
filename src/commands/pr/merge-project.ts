@@ -71,6 +71,8 @@ import type { BlockersReading } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { UnblockReport } from '../../board/unblock.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
@@ -78,7 +80,6 @@ import { selectBoardRelations } from '../../board/relations/select.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../core/config/sections.js';
 
 /** What {@link refreshProjectAfterMerge} is made with. */
 export interface MergeProjectOptions {

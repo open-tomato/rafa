@@ -74,7 +74,7 @@
  */
 import type { Readable } from 'node:stream';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** The keys a prompt reads that carry no character. */
 export const NAMED_KEYS = ['up', 'down', 'enter', 'escape', 'backspace', 'ctrl-c'] as const;

@@ -23,7 +23,7 @@
  *   - presence: each kind beside the same check failing, the environment
  *     read being the one handed in and not this process's.
  */
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,8 @@ import { delimiter, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 

@@ -23,12 +23,12 @@
  */
 import type { ReleaseSettleSeams } from './settle.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../core/command/index.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { Fragment } from '../../release/fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleBuilt } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import '../../adapter-registry.js';
 

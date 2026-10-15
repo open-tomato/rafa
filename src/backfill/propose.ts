@@ -106,14 +106,15 @@
  */
 import type { ProposalAnswer, ProposalCandidate } from './proposal-batch.js';
 import type { ProposalFile, ProposalNeed, ProposalRow } from './proposal-file.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+
 import { checkFile } from '../check/run.js';
-import { runClaudeCaptured } from '../core/loop/index.js';
 import { sourceHash } from '../demote/report.js';
 import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT, SKILL_SIGNALS } from '../schema/skill.js';

@@ -50,18 +50,19 @@
  * in the store, so the next wrap-up of the plan writes them again.
  */
 import type { BodyAnnouncer, ReleaseBodySeams, ReleaseBodyWrite } from './release-body.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { BugRouteRow } from '../effort/store/bug-routes.js';
 import type { SecretEnvironment } from '../triage/triage.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 
 import { homedir } from 'node:os';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+
 import { localPathRedactor } from '../triage/local-paths.js';
 import { namedSecrets, redactSecrets } from '../triage/triage.js';
-import { escapeBlockerText } from '../utils/tracker.js';
 
 import { RELEASE_BODY_SEAMS, writeBodyWith } from './release-body.js';
 

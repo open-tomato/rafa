@@ -1,7 +1,7 @@
 /**
  * Reading the run records `rafa cleanup` may list: the session records
  * `loop start` leaves under `<root>/.rafa/runs/`
- * (`src/core/loop/sessions.ts`), each with its events file,
+ * (`packages/rafa/src/core/loop/sessions.ts`), each with its events file,
  * `<session-id>.events.ndjson`, when one sits beside it
  * (`src/start/loop-events.ts`).
  *
@@ -38,14 +38,14 @@
  * not listed: its plan cannot be read, so whether it is the newest of
  * its plan cannot be either.
  */
-import type { PidProbe, SessionRecord } from '../core/loop/index.js';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { errorCode, isPidAlive, parseSessionRecord, readState, runsDir } from '../core/loop/index.js';
-import { RECORD_EXTENSION } from '../loop/session-record-parse.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { errorCode, isPidAlive, parseSessionRecord, readState, runsDir , RECORD_EXTENSION } from '@open-tomato/rafa/core/loop';
+
 import { EVENTS_EXTENSION } from '../start/loop-events.js';
 
 /** The states a live loop's record reads as. */

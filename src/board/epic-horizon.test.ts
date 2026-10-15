@@ -27,12 +27,13 @@ import type { EpicState } from './epics.js';
 import type { BoardComment, IssueBoard } from './issue-board.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { RoadmapPullRequest } from './roadmap.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, test } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { CommandExit } from '../core/command/index.js';
 
 import {
   applyHorizonChange,

@@ -21,7 +21,8 @@ import type { PullRequestComment } from '../../pr/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
 
 import {

@@ -33,11 +33,11 @@
  */
 import type { StaleDocsReading } from './status-stale-docs.js';
 import type { ReleaseSeams, ReleaseStatusReading, ReleaseStatusResult } from './status.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { PlanChange } from '../../effort/store/changes.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PlanChange } from '@open-tomato/rafa/store/changes';
 
 import '../../adapter-registry.js';
 
@@ -47,7 +47,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { writeChanges } from '../../effort/store/changes.js';
+import { writeChanges } from '@open-tomato/rafa/store/changes';
+
 import {
   changelogVersions,
   compareReleaseTags,

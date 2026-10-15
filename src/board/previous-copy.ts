@@ -58,7 +58,7 @@
 import { linkSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board previous copy';

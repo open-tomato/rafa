@@ -40,15 +40,16 @@
  * shared assertion made vacuous (the control alone, each), and the plan
  * text replaced by `PROMPT.md` (the control and the literal-choice case).
  */
-import type { ReportPresent } from '../report/parse.js';
+import type { ReportPresent } from '@open-tomato/rafa/report/parse';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readRafaBlocks } from '../core/plan/block-reader.js';
-import { parseReport } from '../report/parse.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+
 import { buildTaskPrompt } from '../start/dispatch.js';
 
 /** `src/PROMPT.md`, the file the build copies and the loop reads. */

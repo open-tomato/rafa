@@ -105,12 +105,12 @@
  * be a change to the merge command in a commit that is about worktrees.
  */
 import type { WorktreeEntry } from './merge.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { parseWorktrees } from './merge.js';
 import { shellQuote } from './preflight-items.js';

@@ -41,12 +41,13 @@
  *   that could only be printed while everything answered would be no use
  *   when something does not.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { readStatusSections } from '../status/sections.js';

@@ -65,10 +65,11 @@
  * {@link PrCloseResult} is the data of the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { Prompter, RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ClosingIssue, PullRequestDetail } from '../../pr/index.js';
+import type { Prompter, RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit, createLinePrompter } from '../../core/command/index.js';
+import { CommandExit, createLinePrompter } from '@open-tomato/rafa/core/command';
+
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
 import {

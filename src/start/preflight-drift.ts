@@ -37,18 +37,19 @@
  */
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { DriftBranches } from '../claims/drift.js';
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { readdirSync } from 'node:fs';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { errorCode, isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
-import { errorCode, isSessionId, runsDir } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { resolvePrProvider } from '../pr/provider.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */

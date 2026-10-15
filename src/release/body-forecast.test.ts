@@ -11,7 +11,7 @@
  */
 import type { BranchForecast } from './branch-forecast.js';
 import type { FoldFragment } from './strategy.js';
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { describe, expect, it } from 'bun:test';
 

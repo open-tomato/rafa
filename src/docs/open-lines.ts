@@ -25,9 +25,9 @@
  * zero is a reading, and a failed listing is none. `problem` is null on
  * every listing that answered.
  */
-import type { IssueRef, OpenIssue, Tracker } from '../ports/index.js';
+import type { IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { STALE_DOCS_MARKER } from './release-issue.js';
 

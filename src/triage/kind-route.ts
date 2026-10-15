@@ -79,10 +79,10 @@ import type { KindCheck, NamedTestReadings } from './own-check.js';
 import type { PlanBaseReading, PlanFilesReading } from './plan-commits.js';
 import type { BugTriage, BugTriageAction, TriageOptions } from './triage.js';
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { BugKind, ReportBug } from '../report/parse.js';
+import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
-import { messageOf } from '../core/config/sections.js';
-import { writeStaleDocs } from '../effort/store/stale-docs.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
 
 import { artifactOf } from './bug-key.js';
 import { pathsNamedIn } from './doc-only.js';

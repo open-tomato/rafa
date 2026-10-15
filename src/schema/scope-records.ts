@@ -51,15 +51,16 @@
  * project that has learned nothing yet.
  */
 import type { Instinct, InstinctIssue } from './instinct.js';
-import type { InstinctScope, TierSeams } from './tiers.js';
+import type { InstinctScope, TierSeams } from '@open-tomato/rafa/schema/tiers';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { resolveInstinctScopes, tierExists } from '@open-tomato/rafa/schema/tiers';
+
 import { MARKDOWN_EXTENSION } from '../check/layout.js';
 
 import { parseInstinct } from './instinct.js';
-import { resolveInstinctScopes, tierExists } from './tiers.js';
 
 /** One file under a scope, read as a record. */
 export interface InstinctRecordEntry {

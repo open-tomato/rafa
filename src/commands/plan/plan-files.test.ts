@@ -20,8 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../../config-registry.js';
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 import {
   checkbox,
   countTasks,
@@ -33,7 +32,9 @@ import {
   plural,
   rejectedPath,
   stubOfPlanFile,
-} from '../../core/plan/index.js';
+} from '@open-tomato/rafa/core/plan';
+
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
 import { scopeAt } from '../../project/scope.js';
 import { plantProjectConfig } from '../../tests/cli-capture.js';
 

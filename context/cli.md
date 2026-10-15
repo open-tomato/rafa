@@ -12,17 +12,17 @@ module's note is the long form.
 | Module | Holds |
 | --- | --- |
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
-| `src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
+| `packages/rafa/src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
-| `src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, re-exported by `src/cli/registry.ts` |
+| `packages/rafa/src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, re-exported by `src/cli/registry.ts` |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`packages/rafa/src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
-| `src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
+| `packages/rafa/src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help` and `rafa release tag --help` |
-| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `src/core/command/confirm.ts` |
+| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `packages/rafa/src/core/command/confirm.ts` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
@@ -37,13 +37,13 @@ module's note is the long form.
 | `src/board/relations/labels.ts` | the `labels` adapter, delivering `labels` mode: membership from `epic:<slug>` labels, order from the epic's checklist, waiting from `spec:blocked` labels and `Blocked by:` lines with the four faults, and `readUnblockableIssues` read by the unblock step of `pr merge` |
 | `src/board/relations/native.ts` | the `native` adapter, delivering `native` mode: membership from the `parent` field, order from the `subIssues` array if `gh` answers it (the checklist otherwise), waiting from `blockedBy` nodes each with their state, and `readFreedIssues` read by `pr merge` to print what a merge freed |
 | `src/board/relations/select.ts` | `selectBoardRelations(config)`, shaped like `selectEffortStore`, a module-local table keyed by `board.relationships` kind (`labels` or `native`), a `TypeError` naming the kinds when the value is none of them, registered as no port type |
-| `src/board/relations/contract.ts` | a test helper, not a test file, shaped like `src/adapters/tracker/contract.ts`: `relationsContractCases` answered as a list and `runRelationsContract` registering it, run by `labels.test.ts` and `native.test.ts` over fixture listings describing the same board, never adding to `src/core/adapters/registry.ts` |
+| `src/board/relations/contract.ts` | a test helper, not a test file, shaped like `src/adapters/tracker/contract.ts`: `relationsContractCases` answered as a list and `runRelationsContract` registering it, run by `labels.test.ts` and `native.test.ts` over fixture listings describing the same board, never adding to `packages/rafa/src/core/adapters/registry.ts` |
 | `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's issue from the epic template, its line on the current board and, in `labels` mode only, its `epic:<slug>` label; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic through the relationships port's `setParent` and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`, with `move-native.ts` reading the mode off the config and the epic a native issue leaves off its parent; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, a failed criterion naming only documentation going instead to the `docs` channel through `close-docs.ts`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned, with `cancel-unblock.ts` reading what an unblocked dependent still waits on in each relationships mode; and `epic-project.ts`, the project refresh each of the six actions runs once its writes landed, over the epic, its members and every item whose Rank shifted, the new epic added to the project first, each line a warning that keeps the exit code |
 | `src/commands/claim/` | `claim release <n>`, which releases a claim the store owns, leaving the issue claimable by other devices; `claim hand <n> --to=<store id>`, which hands over a claim to another device for acceptance; `claim accept <n>`, which accepts a handed-over claim from another device; and `claim take <n> [--stale]`, which takes a claim held too long, failing if the claimed issue was written in this run or if `--stale` is not named and the claim is not stale by `claims.staleAfter` |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share that reads a command's context, arguments or flags: the project it was handed, the config that project resolves (`resolveProjectConfig`), the plans directory by that config (`resolvePlansDir`), the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value. The task counts, the file names, an issue as a line and `rejectedPath` are its library half, `src/core/plan/plan-files.ts`, which imports nothing under `src/commands/` |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share that reads a command's context, arguments or flags: the project it was handed, the config that project resolves (`resolveProjectConfig`), the plans directory by that config (`resolvePlansDir`), the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value. The task counts, the file names, an issue as a line and `rejectedPath` are its library half, `packages/rafa/src/core/plan/plan-files.ts`, which imports nothing under `src/commands/` |
 | `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design. An open task's sentence that asks its session for a whole-suite run (the phrase "full suite" or "whole suite", or a code span running `bun test` with no path; `bun test src/plan/` and `bun test --changed=<base>` are not one) is a `long-run` `note` from `src/plan/risk/long-runs.ts`, naming the line and the fix, `tests=full` on the task; a `note`, so `--strict` exits 0 on it |
 | `src/commands/plan/needs.ts` | `rafa plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing] [--source=<source>]`: the reading of `src/plan/needs.ts` over one plan or one spec, in code and starting no session, so it declares no `spends`. A plan resolves as `plan risk` resolves its own, the default plan when none is named. `--spec` and `--issue` go through `resolveCreateSpec` (`spec-route.ts`) handed no offer, so a spec is found and an issue checked and snapshotted under `specs.dir` exactly as `plan create` does, and an issue `plan create` refuses is refused with the same code. The inventory is built as `skill list` builds it, `PATH` read off `RafaContext.env`. `--missing` keeps what `isUnmet` reports and the stacks not met, prints nothing at all when nothing is kept, and exits 1 when anything is, json mode writing each kept row as an `error` log event first; `--source` keeps the agents and skills one source holds, so it drops every MCP server, program, missing item and stack row, and refuses only a value written as no source. A plan beside `--spec` or `--issue`, `--spec` beside `--issue`, `--missing` typed ahead of the plan, a plan that is no file, no default plan and a config `loadConfig` refuses are exit code 1. Exit code 0 otherwise, whatever it finds |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
@@ -51,14 +51,14 @@ module's note is the long form.
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/plan/claim-route.ts` | the claim `plan create` makes on its issue before its session: `resolveAndClaim` resolves the spec, runs the cheap refusals, claims through `src/claims/plan-claim.ts` and prints the answer; a refused `--issue` or `--spec` exits 1 naming the owner, a refused `--next` pick is passed over and the walk resolved again, and an unclaimed run warns and plans; a claim ahead report (`src/claims/ahead.ts`) is printed after the claim. `createPlanClaimContext` builds the seams: `git`, the `gh` issue board or none, the store id, `claims.staleAfter`, `claims.ahead` |
 | `src/commands/plan/store-check.ts` | the effort-store rules of `src/plan/store-rules.ts` read over one plan and the `PREREQUISITES-<stub>.md` beside it (`checkStoreRules`), the one reading `plan validate` and `plan create` share; `enforceStoreRules` runs it on `plan create` straight after the planner answers and before the readiness gate settles, and on any problem moves both files into `rejected/` beside them and exits 1 with one `<file>:<line>: <rule>: <text>` line per problem, under `--skip-review` too |
-| `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: `CREATE_DANGEROUS_PHRASES`, the `dangerous` field of `plan create`, so the loader's one pass line for `dangerous.acceptStaleRefs` (`src/core/config/dangerous.ts`) ends `; check 4 re-stamps every reference of the spec as reviewed and refuses none on this run`, on every `plan create` run with the key on, `--spec` and `--dry-run` included, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, verifying every reference and refusing on drift, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and a roster (`planRoster`): flags extracted only from code spans whose first word is `rafa`, symbols read at their declaration position in the source, the checkout's own roster read by running `bun src/rafa.ts describe --output=json` when the project root is `@open-tomato/rafa` with `src/rafa.ts` tracked, otherwise the core roster its caller hands in, built with `registryRoster` from `RafaContext.registry` (a parameter since a static import of `src/commands/index.ts` is a load-order cycle through `src/plan.ts`), with one warning line printed when the checkout's roster cannot be read; never under `--dry-run` or `--spec` |
+| `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: `CREATE_DANGEROUS_PHRASES`, the `dangerous` field of `plan create`, so the loader's one pass line for `dangerous.acceptStaleRefs` (`packages/rafa/src/core/config/dangerous.ts`) ends `; check 4 re-stamps every reference of the spec as reviewed and refuses none on this run`, on every `plan create` run with the key on, `--spec` and `--dry-run` included, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, verifying every reference and refusing on drift, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and a roster (`planRoster`): flags extracted only from code spans whose first word is `rafa`, symbols read at their declaration position in the source, the checkout's own roster read by running `bun src/rafa.ts describe --output=json` when the project root is `@open-tomato/rafa` with `src/rafa.ts` tracked, otherwise the core roster its caller hands in, built with `registryRoster` from `RafaContext.registry` (a parameter since a static import of `src/commands/index.ts` is a load-order cycle through `src/plan.ts`), with one warning line printed when the checkout's roster cannot be read; never under `--dry-run` or `--spec` |
 | `src/commands/issue/ready.ts` | `rafa issue ready <n> [--yes \| --dry-run]`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), made under `board.relationships: labels` only (in `native` mode an epic is the one sub-issue parent, and the check is skipped), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes, or under `--yes` with no question once every check has passed, terminal or not. Exit code 0 for the normal completion; 1 for an unusable config, a value given to `--yes` or `--dry-run`, `--yes` with `--dry-run` (they ask for opposite things, refused before anything is opened) or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The five status values are `marked` (a typed yes or `--yes`), `declined` (question answered no), `unasked` (no terminal and no `--yes`), `already` (label already on), and `checked` (every check passed under `--dry-run`, message `#<n> is ready to mark; --dry-run wrote nothing.`). `--yes` answers the question alone: the write-access, template and `epic:` checks refuse under it as they do without it, writing nothing. `rafa next` never passes it, and its ceiling still refuses `--yes=ready`. `--dry-run` makes every check and prints both readings, asking nothing and writing nothing whatever the terminal, exit 0 for `checked` and `already` and 2 for a check that refuses, and runs no ending; it reads the template only, not `spec:blocked`, so a blocked issue with a complete body still reads as ready to mark (#1093). The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. With `board.relationships: native` it reads the line, then prints that GitHub clears a blocker when the blocking issue closes, reads no board, refreshes the named issue on the project when `board.project.number` is set (no issue under `--all`), and exits 0 (`src/commands/issue/unblock-native.ts`). |
 | `src/commands/issue/check.ts` | `rafa issue check <n> [--stamp]`: the references issue `<n>`'s saved copy names, each with its state, read by the verifier check 4 builds (`createPlanRefsVerifier`) and starting no session, so it declares no `spends`. The copy is found by number, the one `rafa-<n>-<slug>.md` under `specs.dir` beside the notes file; none is refused naming `rafa plan create --issue=<n>`, two naming both, each with exit code 1, as are a line it refuses, a config refused, a board issue `gh` could not read and a refs block the codec will not read. A plain check is `readCopyRefs`, which writes the first stamps of a reference it has none for; `--stamp` prints the rows read against the old stamps and verifies each for drift, then re-stamps every reference (`restampCopyRefs`) over one memoised verifier. Exit code 0 whatever the states are. Json mode gives the issue, the copy's path, `stamped` and every reference with its `kind`, `text`, `line`, `state`, `fingerprint` and `stamp` as one word each |
 | `src/commands/issue/edit.ts` | `rafa issue edit <n>`: one issue on the tracker the chain lands on appended to (`--append-file=<file>` or `--append=<text>`, with `--reason`, `--while-in-development` allowed), its body replaced (`--replace-file=<file>`, `--title` allowed beside it), its title changed (`--title` alone) or its priority set (`--priority=<urgent\|high\|medium\|low>`, `--title` allowed beside it, refused beside an append or `--replace-file`), the run being `editIssue` in `./edit-run.ts`. A priority runs the same four gates, weighed as a title change, and answers `replaced`, or `already` when the issue holds it alone. The command prints `renderEditReport`'s lines in text mode, each gate's reading and the added part first under `--dry-run`, the added part of a priority being the swap `priority: needs-triage → high`, and gives the report with its tracker as the data of a json-mode terminal result. Exit code 0 for `appended`, `replaced`, `already` and `stale-copy`, the last naming `rafa plan create --issue=<n> --refresh`, which it never runs; 2 for a gate's refusal, `--dry-run` included; 1 for a line refusal, a tracker read or write rejected, and `conflict`, whose report is the message of the `CommandExit`, as `pr wait` carries a non-zero ending, so both `.rafa/scratch/` paths reach the person in either mode. It starts no session, so it declares no `spends` |
 | `src/commands/issue/edit-priority.ts` | what `--priority` adds to `rafa issue edit`, kept out of `./edit-run.ts`, which sits at the 800-line cap: `readPriorityFlag` (a value outside `ISSUE_PRIORITIES` and the flag beside `--append-file`, `--append` or `--replace-file` refused with exit code 1, before anything is opened), `planPriorityEdit` (the one write, `{ priority }` or `{ title, priority }`, refused with exit code 1 on a tracker whose `editable` reads no priority), `holdsPriorityAlone` (the `already` answer), `swapLine` (the `--dry-run` line) and `priorityMessage`. `./edit-run.ts` calls them from `readEditLine`, `planEdit` and its outcome sentence, and its `writeHeld` reads the priority back, a priority the tracker did not keep answering `conflict`. It imports nothing from `./edit-run.ts` |
 | `src/commands/issue/issue-tracker.ts` | what the nine `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
-| `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status`, `list` and `wait` share that reads a context or flags: the `--session-id` flag, the session a line picks, the write to its record, a phase and an ETA as written, and the refusals, the two finding no session a `NoSessionRefusal`. Its library half is `src/core/loop/session-readings.ts`: the records under a root, a session's checklist and rough ETA, a session as a line and the seams, which any folder may import |
+| `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status`, `list` and `wait` share that reads a context or flags: the `--session-id` flag, the session a line picks, the write to its record, a phase and an ETA as written, and the refusals, the two finding no session a `NoSessionRefusal`. Its library half is `packages/rafa/src/core/loop/session-readings.ts`: the records under a root, a session's checklist and rough ETA, a session as a line and the seams, which any folder may import |
 | `src/commands/loop/wait.ts` | `rafa loop wait [--session-id=<id>] [--until=<reasons>] [--timeout=<minutes>]`: follows one run until a reason `--until` asks for happens, in code and starting no session, so it declares no `spends`. The session is picked as `loop status` picks it; the two refusals finding none exit 2, every other refusal of the pick 1. `--until` is read by `src/loop/wait-reasons.ts`, whose `WAIT_REASONS` table the help, the json result and the exit code all read: `pr` 0, `no-pr` 10, `halt` 11, `error` 12, `blocked` (event `task-blocked`) 13, `exit` (the record's pid not alive, or the record reading `stopped` or `done`) 14, `quiet:<minutes>` 15; left out it is `pr,no-pr,halt,error,exit`. An entry it refuses, a `--timeout` that is no whole number from 1 and a stray word exit 1. Every `WAIT_POLL_MS` (5 s) a poll reads the events file from the last offset (`src/loop/events-file.ts`, from byte 0 so a run that already ended answers), then the record and its pid, reading the events once more before answering `exit`, then the awake clock (`src/loop/awake-clock.ts`) for `quiet`, counted from the last event read, and `--timeout`, counted from the wait's start, exit 16; both count awake minutes, and on macOS, where the clock counts through sleep, a long sleep can raise a false `quiet`, which the help says. A run with no events file is noted once as a warning and the wait goes on. It prints one `rafa·` line: the event's summary, or a line naming `exit`, `quiet` or `timeout`, the last two adding the minutes suspended. In json mode the result (reason, exit code, line, event, session id, state, pid and liveness, awake and suspended minutes) is a named `wait` event, and the terminal result's `data` for `pr` alone, since the dispatcher drops a payload on a non-zero exit; for any other reason the terminal error's message is the line. The branch reader, pid probe, record read, clock, sleep and poll length are seams |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class, or for `conflict-version` converted in code with no session; and `pr wait`, its checks polled until they settle, the deadline passes or it turns out to have none, exiting 0 green, 1 red and on no checks at all, and 3 at the deadline |
 | `src/commands/pr/wait.ts` | `rafa pr wait [<n>] [--timeout=<minutes>]`: polls one pull request's checks until they settle or the deadline passes, reading and writing nothing else. Exit code 0 for green (every check passed); 1 for red (a check failed) or none (no check registered yet); 3 for a deadline that passed with checks still running or pending. The `--timeout` flag takes a minute count from 1, defaulting to `DEFAULT_CI_TIMEOUT_MIN`; the number is read from the line, so `rafa pr wait --timeout 41` is a 41-minute wait on the branch's own PR, not a wait on #41. The verdict state values are `green`, `red`, `none`, `pending`, and `timeout`. A green run ends with the one step that follows; the other four each carry their report as the message of their `CommandExit`. The poll is the `waitForChecks` the loop's own CI gate uses, so one wait and the loop agree about what green means and how often a pull request is asked. This command alone hands it the head's committed time (`PullRequestDetail.headCommittedAt`, read through `get`): zero checks on a head younger than `FIRST_CHECK_GRACE_MS` (120 s, `src/pr/checks.ts`) are polled again, so a wait typed just after a push holds until the first check registers. A null time, or a head past the grace, gets none, and the gate and `pr triage --resolve` pass no time at all. A `none` ending reads the detail once more and prints the does-not-merge-cleanly line only when it reads `conflicting`; otherwise it names `rafa pr wait <n>` to ask again and `rafa pr show <n>`. The report is the data of a json-mode terminal result when green, or its error message when not. See `--no-hint` under the ending hint. |
@@ -88,12 +88,12 @@ module's note is the long form.
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the config rows over `src/commands/doctor-config.ts` once the config is loaded, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the project rows over `src/commands/doctor-project.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-config.ts` | the config rows of `rafa doctor`, written as soon as the config is loaded: one `warn` line per config warning in the load's words, first one per YAML file a `rafa.config.ts` or `rafa.config.mjs` of its scope leaves unread, naming the fix (move its keys, remove the file), then in text mode one `note` row under `Config:` per `dangerous.*` key set off its default, read off the load's sink so a pass is never also a warning; json mode keeps every line a `warn` event, so a YAML project reads `doctor` as before (`src/tests/fixtures/config-parity/doctor.txt`) |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
-| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/core/loop/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
+| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `packages/rafa/src/core/loop/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
 | `src/commands/doctor-deep-providers.ts` | the Providers reading of `--deep`: the configured tracker and pull request provider, and — when either goes through `gh` — whether `gh` answers under the environment it is handed |
 | `src/commands/doctor-deep-needs.ts` | the Stack tools and Plan needs readings of `--deep`: every unmet stack tool and, for a plan `--plan` names alone, its unmet needs over `src/plan/needs.ts` |
 | `src/commands/doctor-deep-row.ts` | the row every deep section is read into, the section holding them, and the text lines both render to; each status is `ok`, `warn` or `note`, never a failure or a `PreflightCheck` |
-| `src/core/loop/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, `PATH` with the running entry's `bundled/bin` in front, and every other entry handed on as it is |
+| `packages/rafa/src/core/loop/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, `PATH` with the running entry's `bundled/bin` in front, and every other entry handed on as it is |
 | `src/utils/agent-shell.ts` | `isAgentShell(env)` and `AGENT_SHELL_ENV` (`CLAUDECODE`): true when the environment handed in holds that variable with a non-empty value, the reading a command takes of whether an agent runs its shell. Its one caller is `rafa config set`, which asks it of `context.env` for the `dangerous` section; a test decides the answer by the environment it builds, never by `process.env` |
 | `src/cleanup/index.ts` | the main cleanup reading module: `readCleanup` over the settings and seams reads and groups the merged, stale, not-pushed, worktree and remote-only rows (the groups read with the settings' `release` paths, the config's defaults when left out, as `rafa doctor` and `rafa status` leave them; the worktrees read after the groups, which name the merged branches a clean worktree is ticked for, then `holdBranchRows` over each branch group, unticking a branch an untickable worktree holds and naming that worktree), then the unmerged branches only on `origin` as `CleanupRead.remoteOnly` (`readRemoteOnly` of `./remote-only.ts`, over the base the groups were read against, `cleanup.keep`, the provider's open pull requests and `CleanupSettings.device`, this device's store ids, which no caller hands in yet, so every held claim branch reads as another store's; a remote listing git refuses fails the reading, and `rafa doctor` and `rafa status` pay for the reading too), then the run records `./runs.ts` lists (the notes are the fetch's, then the groups', then the remote-only reading's, then the run records'); `cleanupSteps` renders the ticked rows into deletion steps; `runCleanupSteps` and `dryRunLines` run them or show what they would do; `defaultCleanupSeams` wires the git runner, the branch and worktree readers, and the pull request provider; and `cleanupCounts` counts the merged, stale, not-pushed and worktree rows for `rafa doctor` and `rafa status`, never the remote-only branches nor the run records; `readRemoteOnly`, `remoteOnlyReason` and the reading's types are re-exported |
 | `src/cleanup/branches.ts` | reading merged, stale and not-pushed branches: over the config's `pr.base`, `cleanup.keep` and `cleanup.staleDays`; the current branch, the base, the branch `origin/HEAD` names whenever it resolves (beside a `pr.base` naming another) and every `cleanup.keep` match are never listed; merged rows are reachable from the base; stale rows have an upstream, are not merged and have no commit in the day count; not-pushed rows have no upstream or commits ahead of it; the provider tells merged from stale when the upstream is gone, and squash-merged rows are marked for `-D` instead of `-d` |
@@ -120,7 +120,7 @@ module's note is the long form.
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with the settings of `src/cleanup/settings.ts`: `fetch: false`, git in the project root, `loop.worktreeDir` from the config or `.rafa/worktrees` when the config handed in lacks it, as `rafa status`'s does; the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
 | `src/commands/doctor-refs.ts` | the references row of `rafa doctor`: the drift and unknown references of every saved copy `rafa-<n>-<slug>.md` directly under `specs.dir` (notes file and `previous/` aside), verified through `src/refs/` and one memoised issue reader read by repository and number over the board's `gh` runner; a board issue `gh` cannot read, or any issue with no runner, reads `unknown` rather than failing the row, and a copy that cannot be read fails alone. One head line when there is any copy, and a line per copy holding a drift reference naming `rafa issue check <n>` |
 | `src/commands/doctor-release.ts` | the release row of `rafa doctor`, read only where `resolveReleaseEnabled` says the release is on: the version `origin/<pr.base>` declares as last fetched, the waiting fragments and their forecast (`readWaiting`, `src/commands/release/status-fragments.ts`), the latest release tag (`readTags`) and the version of the changelog's top heading (`changelogVersions`), all through `rafa release status`'s readers, the last two in its library half `src/release/status-readings.ts`; one `Release:` line, a warning in both modes naming `rafa release settle` while any fragment waits, `info` in text mode otherwise, and a `?` with an indented reason for a part it could not read |
-| `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
+| `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`packages/rafa/src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
 | `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`, over the reading of `src/effort/sync/doctor-reading.ts`: `renderDoctorEffortSync` gives `Effort sync: ok, <strategy>`, ` (module)` added for a strategy a module serves, or `Effort sync: fail, <strategy>` with each line of the problem indented under it, and `effortSyncRefusal` the text `doctor` exits 1 with for a failing row, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
 | `src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind the composition root registers and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
 | `src/commands/doctor-description.ts` | the help description of `rafa doctor`, moved out of `src/commands/doctor.ts` to keep that module under the 800-line cap; text alone |
@@ -138,7 +138,7 @@ module's note is the long form.
 | `src/commands/update/current.ts` | `rafa update current [--dry-run] [--yes]` (#714): the project brought to the installed rafa when `rafa.lock` at the root records the same major and minor, or any older minor while both are below 1.0.0, or adopted when there is no lock; the missing `.rafa/` folders, the missing board labels on a `gh` board, the deprecations step (#718, empty) and the lock, read by `src/project/update-current.ts`, printed, then applied after one question or `--yes`; refusing with exit code 1 with no terminal and no `--yes`, for a newer minor or major or an older installed rafa (semver precedence, so a release candidate over its release is older), and for a label `gh` would not create once the rest is applied; exit code 2 for a `.rafa/` path holding something else, checked before asking, and for a folder or lock write that fails, naming the step and what stays written. The lock is the checkout's the command runs in (`checkoutLockRoot`), so in a linked worktree it lands on that branch, while `.rafa/` stays the main checkout's |
 | `src/commands/update/stub.ts` | `createUpdateStub`, the other `update` actions until their specs land (#713): `self`, `project`, `board`, `next` and `latest`, with `rafa` and `port` hidden spellings of `project`, each refusing with exit code 1 in one line naming its issue |
 | `src/commands/config/set.ts` | `rafa config set <key>=<value>`: refused first with exit code 1, before the argument is split, in a project whose config is `rafa.config.ts` or `rafa.config.mjs` (the first that is a file), the refusal naming the file and #893 as the issue that gives it a file to write; otherwise the one word split at its first `=`, the project's `.rafa/config.yaml` edited through `withConfigSetting` (`src/config-set.ts`) with every comment kept and read back before it is written, and the key's old and new values printed, `(not set)` for a key the file did not set; a file already reading the value left byte-identical; exit code 1 with nothing written for a malformed argument and each `ConfigSetRefusal`, and, before the file is read, for the key `dangerous` and every `dangerous.*` key where `isAgentShell(context.env)` (`src/utils/agent-shell.ts`, `CLAUDECODE` non-empty) holds, the refusal naming the variable and the line to run in a terminal. Starts no session and declares no `spends` |
-| `src/commands/config/show.ts` | `rafa config show [--resolved \| --sources]`: every setting the registry holds (`SETTING_NAMES`, `src/config-registry.ts`), read through `loadConfig` as every command reads it. With no flag or `--resolved`, every setting's merged value nested as a config file spells it, printed as YAML with each leaf written as JSON, a map setting one leaf; the merged value is not always the file's spelling (`loop.settingSources` resolves to a list a file spells as a comma-separated string), so the text is not always a file the reader accepts back. With `--sources`, one line per setting by its dotted key with its value, its layer (`project`, `user` or `default`, `cli` for a command-line value) and, for a file, the file and the zero-based entry `provenance` records (`src/core/config/config-origins.ts`); a default names no file. Json mode gives `{ view: 'resolved', config }` or `{ view: 'sources', settings }`, each row its `key`, `value`, `layer`, `file` and `entry`, as the terminal result's data. Exit code 1 for an argument, both flags at once, a flag given a value and a config `loadConfig` refuses. Starts no session and declares no `spends` |
+| `src/commands/config/show.ts` | `rafa config show [--resolved \| --sources]`: every setting the registry holds (`SETTING_NAMES`, `src/config-registry.ts`), read through `loadConfig` as every command reads it. With no flag or `--resolved`, every setting's merged value nested as a config file spells it, printed as YAML with each leaf written as JSON, a map setting one leaf; the merged value is not always the file's spelling (`loop.settingSources` resolves to a list a file spells as a comma-separated string), so the text is not always a file the reader accepts back. With `--sources`, one line per setting by its dotted key with its value, its layer (`project`, `user` or `default`, `cli` for a command-line value) and, for a file, the file and the zero-based entry `provenance` records (`packages/rafa/src/core/config/config-origins.ts`); a default names no file. Json mode gives `{ view: 'resolved', config }` or `{ view: 'sources', settings }`, each row its `key`, `value`, `layer`, `file` and `entry`, as the terminal result's data. Exit code 1 for an argument, both flags at once, a flag given a value and a config `loadConfig` refuses. Starts no session and declares no `spends` |
 | `src/commands/ci/status.ts` | `rafa ci status --branch=<branch> [--workflow=<name>]`: the newest run on the branch read by `readNewestRun` (`src/ci/runs.ts`), and for a finished run whose conclusion is not `success` its `gh run view <id> --log-failed` read by `readFailedCases` (`src/ci/failed-cases.ts`), both through one `GhRunner` made at the project root, the seam its tests replace; prints the state, the 7-character commit and the failed cases by file and case, a dropped log (`log not found`) still red with its cases null. Exit code 0 green, 1 red, 2 no run, 3 not finished, and 4 for a line it refuses and for every `gh` failure, a workflow `gh` does not know included, so no failure to read passes for red. Json mode writes the reading as a `ci-status` event on every verdict and as the terminal result's data when green. Starts no session and declares no `spends` |
 | `src/commands/stretch/start.ts` | `rafa stretch start [--n=<n>] [--remote-control] [--role=<role>] [--dry-run]` (#816): opens stretch `--n`, else the next one (`nextStretch`, `src/stretch/folder.ts`). Refused with exit code 1, before any step, while a stretch of the project is live (`liveStretches`) or a loop of it runs (`readSessions`, `running` or `paused`), for a package with no operators (`findOperators`), for `claude` not on PATH outside `--dry-run`, and for a `pr.base` edit `withConfigSetting` refuses. Then, each printed as the line it runs: `git fetch origin <default>` (`origin/HEAD`'s target, else `main`); `git push origin origin/<default>:refs/heads/stretch/<n>` unless `git ls-remote` finds the branch there; the `pr.base` the project file held recorded in `.rafa/stretch/<n>/stretch.json` (`StretchRecord`, kept when one is there); `rafa config set pr.base=stretch/<n>`; the operators copied once (`copyOperators`, printed as `cp -R`) and the version line; the tmux lines of `src/stretch/launch.ts`, then `tmux switch-client` inside tmux, `tmux attach` on a terminal, or the attach line. Without tmux it prints the two `--role` lines for other terminals and starts the engineer here. `--role` starts that one operator session in this terminal with none of the refusals, the watchtower and analyst first waiting for the engineer's `agent.json`; `claude`'s exit code is the command's. `--dry-run` prints every step in order and runs none, the readings that decide them still read. Exit code 2 for a reading or step that failed, naming the steps already done. Every effect is a `StretchStartSeams` field. Declares `spends` unless `--dry-run` |
 | `src/commands/stretch/item.ts` | `rafa stretch item <issue> [--wait] [--dry-run]`: plans and runs a loop on the integration branch the `pr.base` names, which must be a `stretch/*` branch. Refused with exit code 1 if `pr.base` names the default branch. Runs `plan create --issue` without `--accept-refs`, then starts the loop as a detached child with `--as-worktree --no-ci-wait` and `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`. With `--wait`, waits on the loop through `rafa loop wait`. Once the loop has a pull request, merges it with the `pr merge` logic and checks skipped, that merge allowed only into a `stretch/*` base, then waits for the run on the integration branch's new head and prints the pit-stop readings. With `--dry-run` prints every step and runs none. Exit code 0 for all steps successful; 1 for a refused base or a loop that ended with no pull request; 2 for other refusals. The pit stop's `Filed since <time>: <n>.` line dates each open bug by the `createdAt` its `OpenIssue` carries, from the one `openIssues('bug')` listing (`src/stretch/pit-readings.ts`), so no `gh issue view` is sent per bug. A bug whose time is null makes that line `Filed since the last item: not read: no filing time for #<n>`. Every effect is a `StretchItemSeams` field. Declares `spends` unless `--dry-run` |
@@ -221,19 +221,18 @@ that rafa prints omit the proposal words `hop` and `home` unless the run was
 typed with `--roadmap`.
 
 The hop record (`.rafa/hop.json`): Where a hop is under way, this per-project
-file holds the one record `src/core/loop/hop-record.ts` defines and
-`src/next/hop-record.ts` reads and writes. It names the kind
-(`blocker` for a hop to C's epic, `dry` for a hop to the next `now` epic),
-the places the hop comes back to (the position's `home`) and leaves from,
-the issue numbers H and C (null on a dry hop), the epic and board the hop
-goes to, the state (`away` while working, `waiting` with C's pull request
-open, `merged` with C closed, `halted` from a halt), C's open pull request
-number or null, and the hop's start time. A person switched by hand
-(`rafa switch <n>`), and the position's `home` no longer equals the record's,
-when the record is `staleAgainst` the position. Every turn reads the position
-and the record afresh; a stale record is dropped and no hop is away that
-turn. The `home` action writes the record's `state`, `pullRequest` and
-nothing else; every later write keeps the record.
+file holds the one record `packages/rafa/src/core/loop/hop-record.ts` defines
+and `src/next/hop-record.ts` reads and writes. It names the kind (`blocker` for
+a hop to C's epic, `dry` for a hop to the next `now` epic), the places the hop
+comes back to (the position's `home`) and leaves from, the issue numbers H and C
+(null on a dry hop), the epic and board the hop goes to, the state (`away` while
+working, `waiting` with C's pull request open, `merged` with C closed, `halted`
+from a halt), C's open pull request number or null, and the hop's start time. A
+person switched by hand (`rafa switch <n>`), and the position's `home` no longer
+equals the record's, when the record is `staleAgainst` the position. Every turn
+reads the position and the record afresh; a stale record is dropped and no hop
+is away that turn. The `home` action writes the record's `state`, `pullRequest`
+and nothing else; every later write keeps the record.
 
 The owner gate reading: The gate (`src/next/owner-gate.ts`, read once per
 turn by `pr-owner-review`) composes `readOwnerApproval` (`src/pr/owner-approval.ts`)
@@ -764,27 +763,24 @@ New; it replaces no earlier text. What a row or an action added to
   `self-update`, each plan reader, each `loop` session action, each `issue` action, each remaining
   `effort` command, `module list`, `module exec`, each `agent`, `skill`, `instinct`, `release`, `epic`,
   `claim`, `update` and `pr` action, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan`, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
-- **Where a wrapped command writes**: through the active output, in every
-  module it prints from. For `loop start` those are `src/start.ts`,
-  `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
-  `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
-  `start/wrap-up.ts`, `start/wrap-up-run.ts`,
-  `start/follow-ups.ts`, `start/convention-body.ts`,
-  `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
-  `start/retry-budget.ts`, `start/continue-run.ts`,
+- **Where a wrapped command writes**: through the active output, in every module
+  it prints from. For `loop start` those are `src/start.ts`,
+  `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
+  `start/pause.ts`, `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
+  `start/wrap-up.ts`, `start/wrap-up-run.ts`, `start/follow-ups.ts`,
+  `start/convention-body.ts`, `start/dispatch.ts`, `start/triage.ts`,
+  `start/release-stage.ts`, `start/retry-budget.ts`, `start/continue-run.ts`,
   `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `core/loop/claude.ts`
-  and `utils/schedule.ts`.
-  For the others they are `src/plan.ts`,
-  `commands/plan/plan-record.ts`,
-  `effort/collect.ts` and `effort/report.ts`, and for
-  every command `loadConfig`'s default warning sink in
-  `src/core/config/config-load.ts`. `console.log`'s and `console.info`'s lines
-  go at `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
-  each message as it was. In text mode an `info` line is the bytes
-  `console.log` wrote, and a warning or an error goes to stdout after
-  `warn: ` or `error: `, where `console` wrote it bare on stderr. So
-  `plan create` and `effort report` warn about an unknown config key on
+  and `utils/schedule.ts`. For the others they are `src/plan.ts`,
+  `commands/plan/plan-record.ts`, `effort/collect.ts` and `effort/report.ts`,
+  and for every command `loadConfig`'s default warning sink in
+  `packages/rafa/src/core/config/config-load.ts`. `console.log`'s and
+  `console.info`'s lines go at `info`, `console.warn`'s at `warn` and
+  `console.error`'s at `error`, each message as it was. In text mode an `info`
+  line is the bytes `console.log` wrote, and a warning or an error goes to
+  stdout after `warn: ` or `error: `, where `console` wrote it bare on stderr.
+  So `plan create` and `effort report` warn about an unknown config key on
   stdout in text mode.
 - **What json mode adds for `loop start`**: each dispatched task first
   emits one `step` event named by its sentence, and a session's stdout,
@@ -1095,16 +1091,17 @@ New; it replaces no earlier text. What a row or an action added to
   0 runs on the ROADMAP issue too, through `inspectRoadmapIssue` and
   before a line is parsed out of its body, so a `--next` run checks two
   authors and spends one lookup per login.
-- **Check 4, the references, runs in `src/plan.ts` once the resolution
-  has answered a spec** (`src/commands/plan/refs-check.ts` over
+- **Check 4, the references, runs in `src/plan.ts` once the resolution has
+  answered a spec** (`src/commands/plan/refs-check.ts` over
   `src/board/refs-gate.ts`): after the snapshot settles and the
-  plan-already-there refusal passes, and before the `progress.txt`
-  read, the notices and the session, on `--issue` and `--next` alone. A dangling
-  or suspect reference refuses with exit 2; `--accept-refs`, or
-  `dangerous.acceptStaleRefs: true`, re-stamps them all and plans. The
-  setting's one line is the pass line `loadConfig` writes for the key
-  (`src/core/config/dangerous.ts`), ending with the phrase `plan create`
-  declares for it, before the resolution's first read. `context/pull-requests.md` holds the rules.
+  plan-already-there refusal passes, and before the `progress.txt` read, the
+  notices and the session, on `--issue` and `--next` alone. A dangling or
+  suspect reference refuses with exit 2; `--accept-refs`, or
+  `dangerous.acceptStaleRefs: true`, re-stamps them all and plans. The setting's
+  one line is the pass line `loadConfig` writes for the key
+  (`packages/rafa/src/core/config/dangerous.ts`), ending with the phrase `plan
+  create` declares for it, before the resolution's first read.
+  `context/pull-requests.md` holds the rules.
 - **The claim runs in `src/plan.ts` right after check 4**
   (`src/commands/plan/claim-route.ts` over `src/claims/plan-claim.ts`),
   before the `progress.txt` read, the notices and the session, on a run
@@ -1278,192 +1275,170 @@ New; it replaces no earlier text. What a row or an action added to
   mode carries it as `project`. `--project=<value>` is refused at the
   top of the run.
 - **`doctor` checks what `loop start` would, and starts no run**
-  (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
-  first, before anything is checked, so the build that answered is read
-  whatever the preflight then does; json mode prints no such line. It
-  resolves the config as `loop start`
-  does, then the plan `--plan=<file>` names against the project root, or
-  the default plan; a plan named that is no file is refused, and with no
-  default plan there the config's items are checked alone. `PLAN.md`
-  carries no stub, so a plan's `PREREQUISITES-<stub>.md` is merged in
-  through `--plan` only. The two automatic items a `gh` pull request
-  provider contributes go ahead of the configured required tier, as
-  `runStartPreflight` puts them, and a configured `pr.provider: none`
-  reads no `origin` at all (`src/pr/preflight-items.ts`). Every item goes
-  through `runPreflight` in the project root with the context's
-  environment, an optional failure warned about as `loop start` warns. A
-  plan's start-only `[start]` items are checked between the provider's
-  items and the configured required tier, where `runStartPreflight` puts
-  them, on a FIRST DISPATCH alone: this command reads that one bit the way
-  a run does, `isFirstDispatch` off the `PLAN_TRACKER-<stub>.md` beside
-  the plan (`src/preflight/first-dispatch.ts`), which starts no run and
-  writes nothing. A resume checks none of them, and prints one line
-  saying how many of the plan's it passed over and which tracker decided
-  it. It generates no run id and writes no
-  `preflight` row, so `rafa effort report` lists the halts of `loop start`
-  runs alone. It exits 1 when a required item fails, the halt being the
-  refusal, when its `effort store schema` row fails, and when its
-  `effort sync` row fails (both below), and 0
-  otherwise. For a plan `--plan` names, halt or not, it
-  then prints the one risk-total line `loop start` prints before its
-  notices (`src/start/risk-total.ts`), at `info`, a `log` event in json
-  mode, or a warning when the reading throws; the default plan gets
-  none, and neither changes the exit code. Then, on a repository whose provider is
-  `gh`, it reads the board `rafa init --board` sets up
-  (`src/board/status.ts`) with one `gh label list` and, only when the
-  config names no `roadmap.issue`, one `gh issue list`, and prints
-  `  <outcome>  <name>` under `GitHub board:` for each of the six
-  labels, the spec issue template, the Roadmap issue and
-  `roadmap.issue`: `present`, `missing`, or `unknown` for a reading
-  that failed or found two open Roadmap issues, with the sentence
-  behind every outcome but `present`. A run with any row that is not
-  present ends them with `Run rafa init --board to set up <n> parts of
-  the board this run did not find.` The provider is the one reading the
-  automatic items resolved, so `pr.provider: none` opens no runner and
-  prints no row; nothing on the board is written, a row never changes
-  the exit code, and a halt prints its rows before the refusal. In
-  `labels` mode (`board.relationships`, the default), through that same
-  runner it then reads the blocked issues
-  (`src/board/blocked-issues.ts`): one
-  `gh issue list --state open --label spec:blocked --limit 100 --json number,body`,
-  and, only when a `Blocked by:` line actually named ids, one
-  `gh issue list --state all --limit 500 --json number` for the board's
-  own numbers. Under `Blocked issues:` it names every labelled issue
-  whose line is missing, names no issue, names itself, or names an id
-  the board has no issue for, each with what an author does about it
-  (`src/board/blocked.ts`, printed by `src/commands/doctor-blocked.ts`);
-  a board whose lines all read is one line
-  counting them, and a board carrying no such issue prints nothing at
-  all. An id is called unknown only when the whole board was read: a
-  numbers listing that failed or came back full leaves every id
-  unchecked and says so in a line of its own. That reading writes
-  nothing and never changes the exit code either. Through that same
-  runner it then reads the epic labels (`src/commands/doctor-epics.ts`):
-  one `gh issue list --state all --limit 1000 --json
-  number,title,body,state,stateReason,labels`, the board listing the
-  roadmap views read. Under `Epic labels:` it names every issue
-  carrying two `epic:` labels and every `epic:` label no `type:epic`
-  issue carries, in the words and order of `readEpicProblems`
-  (`src/board/epic-problems.ts`), the only reader of either; the horizon
-  and checklist faults are left to the board views. A board whose labels
-  all read is one line counting them, a board carrying no `epic:` label
-  prints nothing, and a failed listing is the heading and one line
-  naming why. An orphan is reported only when the whole board was read:
-  a listing that came back full reports none and says so in a line of
-  its own. In `native` mode neither of those two rows runs, their json
-  keys read null, and the relationships row
-  (`src/commands/doctor-relations.ts`) runs in their place: the listing
-  asked for the native fields and one `gh repo view --json
-  nameWithOwner`, then under `Relationships:` every open issue whose
-  `blockedBy` list and every epic whose `subIssues` list `gh` answered
-  short of GitHub's `totalCount`, one line each, carried in the json
-  result as `relations`, a key `labels` mode leaves out. A board whose
-  lists all read whole is one line counting them, one with no blocker
-  and no sub-issue prints nothing, and a failed read is the heading and
-  one line naming why. Off that same listing, sent once per run for both
-  rows, it then reads the boards (`src/commands/doctor-boards.ts`). Under
-  `Boards:` it names every open `type:roadmap` board whose `Owner:`
-  handle GitHub answers 404 for (`src/board/owner-resolve.ts`, one
-  `gh api` per distinct handle), in one line each; every open issue
-  titled "Roadmap" that lacks `type:roadmap` while labelled boards exist,
-  in `unlabelledRoadmapMessage`'s one sentence (`src/board/boards.ts`,
-  one `gh issue list --search "Roadmap in:title"`); and, when
-  `.rafa/position.json` is set, each `lost` notice `resolvePlace`
+  (`src/commands/doctor.ts`). In text mode it prints `rafa <version>` first,
+  before anything is checked, so the build that answered is read whatever the
+  preflight then does; json mode prints no such line. It resolves the config as
+  `loop start` does, then the plan `--plan=<file>` names against the project
+  root, or the default plan; a plan named that is no file is refused, and with
+  no default plan there the config's items are checked alone. `PLAN.md` carries
+  no stub, so a plan's `PREREQUISITES-<stub>.md` is merged in through `--plan`
+  only. The two automatic items a `gh` pull request provider contributes go
+  ahead of the configured required tier, as `runStartPreflight` puts them, and a
+  configured `pr.provider: none` reads no `origin` at all
+  (`src/pr/preflight-items.ts`). Every item goes through `runPreflight` in the
+  project root with the context's environment, an optional failure warned about
+  as `loop start` warns. A plan's start-only `[start]` items are checked between
+  the provider's items and the configured required tier, where
+  `runStartPreflight` puts them, on a FIRST DISPATCH alone: this command reads
+  that one bit the way a run does, `isFirstDispatch` off the
+  `PLAN_TRACKER-<stub>.md` beside the plan (`src/preflight/first-dispatch.ts`),
+  which starts no run and writes nothing. A resume checks none of them, and
+  prints one line saying how many of the plan's it passed over and which tracker
+  decided it. It generates no run id and writes no `preflight` row, so `rafa
+  effort report` lists the halts of `loop start` runs alone. It exits 1 when a
+  required item fails, the halt being the refusal, when its `effort store
+  schema` row fails, and when its `effort sync` row fails (both below), and 0
+  otherwise. For a plan `--plan` names, halt or not, it then prints the one
+  risk-total line `loop start` prints before its notices
+  (`src/start/risk-total.ts`), at `info`, a `log` event in json mode, or a
+  warning when the reading throws; the default plan gets none, and neither
+  changes the exit code. Then, on a repository whose provider is `gh`, it reads
+  the board `rafa init --board` sets up (`src/board/status.ts`) with one `gh
+  label list` and, only when the config names no `roadmap.issue`, one `gh issue
+  list`, and prints ` <outcome> <name>` under `GitHub board:` for each of the
+  six labels, the spec issue template, the Roadmap issue and `roadmap.issue`:
+  `present`, `missing`, or `unknown` for a reading that failed or found two open
+  Roadmap issues, with the sentence behind every outcome but `present`. A run
+  with any row that is not present ends them with `Run rafa init --board to set
+  up <n> parts of the board this run did not find.` The provider is the one
+  reading the automatic items resolved, so `pr.provider: none` opens no runner
+  and prints no row; nothing on the board is written, a row never changes the
+  exit code, and a halt prints its rows before the refusal. In `labels` mode
+  (`board.relationships`, the default), through that same runner it then reads
+  the blocked issues (`src/board/blocked-issues.ts`): one `gh issue list --state
+  open --label spec:blocked --limit 100 --json number,body`, and, only when a
+  `Blocked by:` line actually named ids, one `gh issue list --state all --limit
+  500 --json number` for the board's own numbers. Under `Blocked issues:` it
+  names every labelled issue whose line is missing, names no issue, names
+  itself, or names an id the board has no issue for, each with what an author
+  does about it (`src/board/blocked.ts`, printed by
+  `src/commands/doctor-blocked.ts`); a board whose lines all read is one line
+  counting them, and a board carrying no such issue prints nothing at all. An id
+  is called unknown only when the whole board was read: a numbers listing that
+  failed or came back full leaves every id unchecked and says so in a line of
+  its own. That reading writes nothing and never changes the exit code either.
+  Through that same runner it then reads the epic labels
+  (`src/commands/doctor-epics.ts`): one `gh issue list --state all --limit 1000
+  --json number,title,body,state,stateReason,labels`, the board listing the
+  roadmap views read. Under `Epic labels:` it names every issue carrying two
+  `epic:` labels and every `epic:` label no `type:epic` issue carries, in the
+  words and order of `readEpicProblems` (`src/board/epic-problems.ts`), the only
+  reader of either; the horizon and checklist faults are left to the board
+  views. A board whose labels all read is one line counting them, a board
+  carrying no `epic:` label prints nothing, and a failed listing is the heading
+  and one line naming why. An orphan is reported only when the whole board was
+  read: a listing that came back full reports none and says so in a line of its
+  own. In `native` mode neither of those two rows runs, their json keys read
+  null, and the relationships row (`src/commands/doctor-relations.ts`) runs in
+  their place: the listing asked for the native fields and one `gh repo view
+  --json nameWithOwner`, then under `Relationships:` every open issue whose
+  `blockedBy` list and every epic whose `subIssues` list `gh` answered short of
+  GitHub's `totalCount`, one line each, carried in the json result as
+  `relations`, a key `labels` mode leaves out. A board whose lists all read
+  whole is one line counting them, one with no blocker and no sub-issue prints
+  nothing, and a failed read is the heading and one line naming why. Off that
+  same listing, sent once per run for both rows, it then reads the boards
+  (`src/commands/doctor-boards.ts`). Under `Boards:` it names every open
+  `type:roadmap` board whose `Owner:` handle GitHub answers 404 for
+  (`src/board/owner-resolve.ts`, one `gh api` per distinct handle), in one line
+  each; every open issue titled "Roadmap" that lacks `type:roadmap` while
+  labelled boards exist, in `unlabelledRoadmapMessage`'s one sentence
+  (`src/board/boards.ts`, one `gh issue list --search "Roadmap in:title"`); and,
+  when `.rafa/position.json` is set, each `lost` notice `resolvePlace`
   (`src/board/place.ts`) raises for `current` and `home`: a board closed,
   without `type:roadmap` or not on the listing, an epic closed, without
-  `type:epic` or not on the listing, with the fallback. An owner lookup
-  that failed other than with a 404, a title search that failed and a
-  position that could not be checked are each a line saying why. A
-  project with no open `type:roadmap` board and no position file sends
-  nothing past the listing and prints no `Boards:` row, nor does one
-  with boards and none of those faults; a failed listing prints nothing
-  there either, since `Epic labels:` (or `Relationships:`) names it.
-  The board readings live in `src/commands/doctor-board.ts`, which
-  opens the runner, makes the one listing in the configured mode and
-  joins their lines; that row writes nothing and
-  never changes the exit code either. A repository whose
-  `board.project.number` is set then gets `GitHub project:` with three
-  rows, the `project` scope, the project at that number and its five
-  fields, each `present`, `missing` naming its fix (`gh auth refresh -s
-  project`, `rafa init --board --project`, or the fields of
-  `board.project.template`) or `unknown` saying why, and with all three
-  present the line naming `rafa board sync --dry-run`
-  (`src/commands/doctor-project.ts`); it reads no item, sends nothing
-  where the number is unset, is json's `project`, and never changes the
-  exit code. Every repository
-  then gets one row counting the branches and worktrees `rafa cleanup`
-  would list, `Cleanup: <n> merged, <n> stale, <n> not pushed, <n>
+  `type:epic` or not on the listing, with the fallback. An owner lookup that
+  failed other than with a 404, a title search that failed and a position that
+  could not be checked are each a line saying why. A project with no open
+  `type:roadmap` board and no position file sends nothing past the listing and
+  prints no `Boards:` row, nor does one with boards and none of those faults; a
+  failed listing prints nothing there either, since `Epic labels:` (or
+  `Relationships:`) names it. The board readings live in
+  `src/commands/doctor-board.ts`, which opens the runner, makes the one listing
+  in the configured mode and joins their lines; that row writes nothing and
+  never changes the exit code either. A repository whose `board.project.number`
+  is set then gets `GitHub project:` with three rows, the `project` scope, the
+  project at that number and its five fields, each `present`, `missing` naming
+  its fix (`gh auth refresh -s project`, `rafa init --board --project`, or the
+  fields of `board.project.template`) or `unknown` saying why, and with all
+  three present the line naming `rafa board sync --dry-run`
+  (`src/commands/doctor-project.ts`); it reads no item, sends nothing where the
+  number is unset, is json's `project`, and never changes the exit code. Every
+  repository then gets one row counting the branches and worktrees `rafa
+  cleanup` would list, `Cleanup: <n> merged, <n> stale, <n> not pushed, <n>
   worktrees; run rafa cleanup to review and remove them.`
-  (`src/commands/doctor-cleanup.ts`), read with no `git fetch`, git
-  run in the project root, and the provider's merged listing sent only
-  through the board's `gh` runner; it prints only when any count is
-  above zero, prints nothing for a repository git cannot read, and
-  never changes the exit code. Every repository with a saved copy under
-  `specs.dir` then gets `References:` counting the suspect, dangling
-  and unknown references of every copy, and a line per copy holding a
-  suspect or dangling one naming `rafa issue check <n>`
-  (`src/commands/doctor-refs.ts`); it writes no stamp, reads each issue
-  once per run, reads an issue the board cannot answer as `unknown`,
-  and never changes the exit code. A repository whose release is on
-  (`src/release/enabled.ts`) then gets one row naming the version
-  `origin/<pr.base>` declares as last fetched, the latest release tag,
-  the version the changelog's top heading names and the fragments
-  waiting on the base, `Release: origin/main at 0.25.0, latest tag
-  v0.25.0, CHANGELOG.md tops at 0.25.0, no fragment waits.`
-  (`src/commands/doctor-release.ts`); while any fragment waits, one
-  that does not parse included, it names them and the release settle
-  would fold them into, and goes out as a warning naming
-  `rafa release settle`, in json mode too. It fetches nothing, marks a
-  part it could not read `?` with the reason on an indented line, and
-  never changes the exit code. Every run then prints the
-  `Skill tiers` rows (`src/commands/doctor-tiers.ts`), when there is
-  any, as json's `tiers`; they never change the exit code. Every run then
-  prints the `effort store schema` row (`src/commands/doctor-effort-schema.ts`),
-  `Effort store schema: <ok|warn|fail>, <status> (<path>)`, read
-  read-only as `rafa effort schema --check` reads the store, under
-  `RAFA_EFFORT_DIR` when it is set: it fails where that check fails,
-  and `doctor` then exits 1 with `rafa doctor: effort store schema:
-  this rafa refuses <path> (<status>): <why> Next safe step: <command>`,
-  after a halt's text when both happen, and json mode gives no `data`;
-  it warns, never changing the exit code, on each unknown additive
-  migration in the preflight's words and, for the project's own store
-  alone, on each migration whose `applied_by` names a development
-  build. A project with no store yet prints no line. json mode gives
-  the row as `effortSchema`. Every run then prints the `effort sync`
-  row (`src/commands/doctor-effort-sync.ts`), `Effort sync: ok,
-  <strategy>`, ` (module)` added for a strategy a loaded module serves,
-  or `Effort sync: fail, <strategy>` with the problem indented under
-  it: `selectSync` resolves `effort.sync` (`local` when unset) through
-  core's registry for `local` and `file` and through the modules the
-  config loads for any other kind, touching nothing on disk. A kind no
-  adapter serves fails it, and `doctor` then exits 1 with
-  `rafa doctor: effort sync: effort.sync is "<kind>", ...`, which for
-  `git`, `service` and `p2p` names the `modules:` and `allowList:`
-  lines that load a module providing it, after a halt's text and the
-  schema row's refusal when those happen, and json mode gives no
-  `data`. json mode gives the row as `effortSync`. Under the boolean
-  `--deep` it then reads and prints the Environment, Settings,
-  Providers and Stack tools sections, and Plan needs for a plan
-  `--plan` names (`src/commands/doctor-deep.ts`), a halt's included,
-  so they come before its refusal; they start no session and never
-  change the exit code. After
-  the report, whatever the preflight did,
-  it warns when `.ralph/effort/` holds a store file and `.rafa/effort/`
-  none (`src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
-  ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text
-  mode says so in an `info` line when the order holds. In json mode a
-  preflight that did not halt gives the checks, the `known-missing:`
-  lines, the reminders, both readings, those rows, those blocked
-  issues, those epic labels (`epics`: `labelled`, `faults`,
-  `problem`, `unchecked`) and those boards (`boards`: `boards`,
-  `faults`, `problems`, `listing`) as the result's `data`, the rows, the
-  issues, the labels and the boards null for a project with no GitHub board, the cleanup counts as its `cleanup`
-  (`{ ok: false, detail }` for a repository git cannot read), the
-  references counts as its `refs` (`{ ok: false, detail }` for a
-  `specs.dir` that cannot be listed), the release row's reading as its
-  `release` (`{ enabled: false }` where the release is off), the `--deep` sections as its `deep`,
-  null without the flag, and a
-  halt gives the `command_exit` error and no `data`.
+  (`src/commands/doctor-cleanup.ts`), read with no `git fetch`, git run in the
+  project root, and the provider's merged listing sent only through the board's
+  `gh` runner; it prints only when any count is above zero, prints nothing for a
+  repository git cannot read, and never changes the exit code. Every repository
+  with a saved copy under `specs.dir` then gets `References:` counting the
+  suspect, dangling and unknown references of every copy, and a line per copy
+  holding a suspect or dangling one naming `rafa issue check <n>`
+  (`src/commands/doctor-refs.ts`); it writes no stamp, reads each issue once per
+  run, reads an issue the board cannot answer as `unknown`, and never changes
+  the exit code. A repository whose release is on (`src/release/enabled.ts`)
+  then gets one row naming the version `origin/<pr.base>` declares as last
+  fetched, the latest release tag, the version the changelog's top heading names
+  and the fragments waiting on the base, `Release: origin/main at 0.25.0, latest
+  tag v0.25.0, CHANGELOG.md tops at 0.25.0, no fragment waits.`
+  (`src/commands/doctor-release.ts`); while any fragment waits, one that does
+  not parse included, it names them and the release settle would fold them into,
+  and goes out as a warning naming `rafa release settle`, in json mode too. It
+  fetches nothing, marks a part it could not read `?` with the reason on an
+  indented line, and never changes the exit code. Every run then prints the
+  `Skill tiers` rows (`src/commands/doctor-tiers.ts`), when there is any, as
+  json's `tiers`; they never change the exit code. Every run then prints the
+  `effort store schema` row (`src/commands/doctor-effort-schema.ts`), `Effort
+  store schema: <ok|warn|fail>, <status> (<path>)`, read read-only as `rafa
+  effort schema --check` reads the store, under `RAFA_EFFORT_DIR` when it is
+  set: it fails where that check fails, and `doctor` then exits 1 with `rafa
+  doctor: effort store schema: this rafa refuses <path> (<status>): <why> Next
+  safe step: <command>`, after a halt's text when both happen, and json mode
+  gives no `data`; it warns, never changing the exit code, on each unknown
+  additive migration in the preflight's words and, for the project's own store
+  alone, on each migration whose `applied_by` names a development build. A
+  project with no store yet prints no line. json mode gives the row as
+  `effortSchema`. Every run then prints the `effort sync` row
+  (`src/commands/doctor-effort-sync.ts`), `Effort sync: ok, <strategy>`, `
+  (module)` added for a strategy a loaded module serves, or `Effort sync: fail,
+  <strategy>` with the problem indented under it: `selectSync` resolves
+  `effort.sync` (`local` when unset) through core's registry for `local` and
+  `file` and through the modules the config loads for any other kind, touching
+  nothing on disk. A kind no adapter serves fails it, and `doctor` then exits 1
+  with `rafa doctor: effort sync: effort.sync is "<kind>", ...`, which for
+  `git`, `service` and `p2p` names the `modules:` and `allowList:` lines that
+  load a module providing it, after a halt's text and the schema row's refusal
+  when those happen, and json mode gives no `data`. json mode gives the row as
+  `effortSync`. Under the boolean `--deep` it then reads and prints the
+  Environment, Settings, Providers and Stack tools sections, and Plan needs for
+  a plan `--plan` names (`src/commands/doctor-deep.ts`), a halt's included, so
+  they come before its refusal; they start no session and never change the exit
+  code. After the report, whatever the preflight did, it warns when
+  `.ralph/effort/` holds a store file and `.rafa/effort/` none
+  (`packages/rafa/src/effort/store/legacy.ts`), and when `~/.rafa/bin` is not
+  ahead of `~/.bun/bin` on the context's `PATH` (`readBinPath`); text mode says
+  so in an `info` line when the order holds. In json mode a preflight that did
+  not halt gives the checks, the `known-missing:` lines, the reminders, both
+  readings, those rows, those blocked issues, those epic labels (`epics`:
+  `labelled`, `faults`, `problem`, `unchecked`) and those boards (`boards`:
+  `boards`, `faults`, `problems`, `listing`) as the result's `data`, the rows,
+  the issues, the labels and the boards null for a project with no GitHub board,
+  the cleanup counts as its `cleanup` (`{ ok: false, detail }` for a repository
+  git cannot read), the references counts as its `refs` (`{ ok: false, detail }`
+  for a `specs.dir` that cannot be listed), the release row's reading as its
+  `release` (`{ enabled: false }` where the release is off), the `--deep`
+  sections as its `deep`, null without the flag, and a halt gives the
+  `command_exit` error and no `data`.
 - **`status` reads where the project stands in six sections**
   (`src/commands/status.ts`, `src/status/sections.ts`, `src/status/render.ts`).
   Each section is read in order: branch and plan (git at the project root,
@@ -1839,7 +1814,7 @@ New; it replaces no earlier text. What a row or an action added to
   a session would be asked about, and NOTHING is written.
   With `--propose` it runs `runProposalPass` (`src/backfill/propose.ts`):
   one `claude -p` session per batch of twenty through the capturing
-  spawner of `src/core/loop/claude.ts`, the setting sources
+  spawner of `packages/rafa/src/core/loop/claude.ts`, the setting sources
   `loop.settingSources` resolves to, and one
   `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each
   `status: draft` and each row of a session that answered nothing
@@ -1866,7 +1841,7 @@ New; it replaces no earlier text. What a row or an action added to
   `src/commands/instinct/show.ts`, sharing
   `src/commands/instinct/instinct-records.ts` and reading the scopes
   through `src/schema/scope-records.ts`). The scopes are
-  `src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
+  `packages/rafa/src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
   `~/.rafa/instincts`, nearest the work first — and both commands run
   INSIDE a project, reading the home and the root off the project the
   dispatcher resolved; `show` declares no flag or seam of its own, and
@@ -2480,7 +2455,7 @@ New; it replaces no earlier text. What a row or an action added to
   reads no branch; a row names each session's branch and end with the
   `worktree` column, built by `checkoutColumn`
   (`src/commands/loop/list.ts`) from the record's `worktree` key
-  (`src/core/loop/sessions.ts`, set for a run started with
+  (`packages/rafa/src/core/loop/sessions.ts`, set for a run started with
   `--as-worktree`, `start/session.ts`): the path to the worktree, or
   `in the main checkout` when the record carries none. In json mode each
   gives its reading as the result's `data`; text mode writes lines.
@@ -2691,18 +2666,17 @@ New; it replaces no earlier text. What a row or an action added to
   so a command that sets it and returns ends as a success.
 - **`hidden` keeps an action out of every roster and every refusal's
   list of actions**, and it still dispatches.
-- **`dangerous` names what the command does under a `dangerous.*`
-  key**: a mapping of key to phrase, `{ 'dangerous.acceptStaleRefs':
-  '<phrase>' }`. The dispatcher runs the command inside
-  `runWithDangerousPhrases` (`src/core/config/dangerous.ts`) beside the
-  running command's record, in the same kind of async scope, so a pass
-  line the loader writes during the run for a declared key reads
-  `dangerous.<key>: <value> (<file>, entry <n>); <phrase>`, and one for
-  an undeclared key keeps its bare form. `setDangerousPhrases` and
-  `restoreDangerousPhrases` set and put back the module-level phrases
-  for a test. `commandProblem` refuses a `dangerous` that is no mapping,
-  a key not opening with `dangerous.` and a phrase that is no non-empty
-  string.
+- **`dangerous` names what the command does under a `dangerous.*` key**: a
+  mapping of key to phrase, `{ 'dangerous.acceptStaleRefs': '<phrase>' }`. The
+  dispatcher runs the command inside `runWithDangerousPhrases`
+  (`packages/rafa/src/core/config/dangerous.ts`) beside the running command's
+  record, in the same kind of async scope, so a pass line the loader writes
+  during the run for a declared key reads `dangerous.<key>: <value> (<file>,
+  entry <n>); <phrase>`, and one for an undeclared key keeps its bare form.
+  `setDangerousPhrases` and `restoreDangerousPhrases` set and put back the
+  module-level phrases for a test. `commandProblem` refuses a `dangerous` that
+  is no mapping, a key not opening with `dangerous.` and a phrase that is no
+  non-empty string.
 
 ### Routing
 
@@ -2868,17 +2842,17 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
-  (`src/core/output/active.ts`), in the invocation's output mode,
-  which `activeOutputMode()` answers. Both are held in an async scope of
-  the invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`),
-  beside the running command (`runAsRunningCommand`,
-  `src/core/command/running.ts`): they are read inside the command's `run` and
-  everything it awaits, and nothing is left once it ends, when the
-  command throws too. The dispatcher sets no module-level value, so two
-  invocations dispatched in one process and awaited with `Promise.all`
-  each read their own whichever ends first, and one dispatched from
-  inside a command reads the inner ones inside and the outer ones after
-  (#927; `src/cli/dispatch-scope.test.ts`).
+  (`packages/rafa/src/core/output/active.ts`), in the invocation's output mode,
+  which `activeOutputMode()` answers. Both are held in an async scope of the
+  invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`), beside the
+  running command (`runAsRunningCommand`,
+  `packages/rafa/src/core/command/running.ts`): they are read inside the
+  command's `run` and everything it awaits, and nothing is left once it ends,
+  when the command throws too. The dispatcher sets no module-level value, so two
+  invocations dispatched in one process and awaited with `Promise.all` each read
+  their own whichever ends first, and one dispatched from inside a command reads
+  the inner ones inside and the outer ones after (#927;
+  `src/cli/dispatch-scope.test.ts`).
 - **The module-level output and record are a test's to set**
   (`setActiveOutput`, `setRunningCommand`). A reader outside every
   invocation answers them, the default output and no record until one is
@@ -2934,33 +2908,32 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   writes one line to stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
   request writes none, nor does a command refused outside a project.
-- **A flag declaring `deprecated` is read as its `use`** when typed bare
-  ahead of a `--`, as `--<name>` or `-<name>` or as one of its aliases:
-  the words of `use` take its place in the line the context is assembled
-  from, and `argv` keeps it as typed. It writes one line to stderr after
-  the command's own, however often it is typed:
-  `rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"`.
-  `effort report`'s `--json` is the one such flag, so it runs in json
-  mode. `deprecated` sits on `RafaFlagSpec` (`src/core/command/command.ts`), not
-  on the copied `FlagSpec`, and `commandProblem` refuses one naming no
-  `use`.
+- **A flag declaring `deprecated` is read as its `use`** when typed bare ahead
+  of a `--`, as `--<name>` or `-<name>` or as one of its aliases: the words of
+  `use` take its place in the line the context is assembled from, and `argv`
+  keeps it as typed. It writes one line to stderr after the command's own,
+  however often it is typed: `rafa: "rafa effort report --json" is deprecated;
+  use "rafa effort report --output=json"`. `effort report`'s `--json` is the one
+  such flag, so it runs in json mode. `deprecated` sits on `RafaFlagSpec`
+  (`packages/rafa/src/core/command/command.ts`), not on the copied `FlagSpec`,
+  and `commandProblem` refuses one naming no `use`.
 - **The result error codes** are the five routing refusals, `invalid_spec` (a
   spec `parseArgs` refuses), `no_project` (a command run outside a
   project), `command_exit`, `command_error` and `result_unwritable`.
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 - **So is the version.** A version route writes `rafa <version>`
-  (`src/core/command/version.ts`) to stdout and ends 0; json mode writes its two
-  events and no text, where `rafa describe` gives the same version as
-  data.
+  (`packages/rafa/src/core/command/version.ts`) to stdout and ends 0; json mode
+  writes its two events and no text, where `rafa describe` gives the same
+  version as data.
 
 ### The spends declaration
 
-A command that can start a Claude session declares it with a `spends` field
-of type `CommandSpend` (`src/core/command/spends.ts`, exported by the
-command barrel; `src/cli/spends.ts` re-exports it for `describe.ts` and
-`help.ts`). The declaration has four forms, each named by `when` and
-carrying `what`, a short phrase describing what the session does:
+A command that can start a Claude session declares it with a `spends` field of
+type `CommandSpend` (`packages/rafa/src/core/command/spends.ts`, exported by the
+command barrel that `describe.ts` and `help.ts` import). The declaration has
+four forms, each named by `when` and carrying `what`, a short phrase describing
+what the session does:
 
 - `always`: the command may start a session on any run (`plan create`,
   `loop start`, `epic close`).
@@ -2980,14 +2953,13 @@ carrying `what`, a short phrase describing what the session does:
 
 A command without a `spends` declaration declares nothing.
 
-The spend guard in `src/core/loop/claude.ts` warns when the running command's
-`spends` declaration does not cover the session it starts, and starts the
-session anyway: usage is at most a warning, never a gate. The running
+The spend guard in `packages/rafa/src/core/loop/claude.ts` warns when the
+running command's `spends` declaration does not cover the session it starts, and
+starts the session anyway: usage is at most a warning, never a gate. The running
 command is the one the dispatcher recorded with its parsed flags
-(`src/core/command/running.ts`, exported by the command barrel;
-`src/cli/running.ts` re-exports it for `dispatch.ts`), in the async scope
-of the invocation the session is started from, checked once per session
-before `Bun.spawn`:
+(`packages/rafa/src/core/command/running.ts`, exported by the command barrel
+that `dispatch.ts` imports), in the async scope of the invocation the session is
+started from, checked once per session before `Bun.spawn`:
 
 - A command declaring `always` or `through` covers every run.
 - A command declaring `with <flag>` covers only a run carrying that `flag`,

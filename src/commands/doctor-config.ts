@@ -24,7 +24,7 @@
  *   - One `note` row per `dangerous.*` key set off its default, under
  *     the `Config:` title as the `Skill tiers` notes sit under theirs
  *     (`./doctor-deep-row.ts`): the key, then its value, file and entry,
- *     the pass line `src/core/config/dangerous.ts` words. It is a note
+ *     the pass line `packages/rafa/src/core/config/dangerous.ts` words. It is a note
  *     and not a warning: the key is a person's consent, given once in a
  *     file, and nothing is wrong with it.
  *
@@ -35,7 +35,7 @@
  *
  * ## Where the rows come from
  *
- * `loadConfig` (`src/core/config/config-load.ts`) writes every warning,
+ * `loadConfig` (`packages/rafa/src/core/config/config-load.ts`) writes every warning,
  * then every pass line, through the sink its caller hands it, and
  * nowhere else. In text mode {@link loadDoctorConfig} hands a sink that
  * holds them, and once the load resolved writes each as its row, so a
@@ -43,7 +43,7 @@
  * `rafa config:` and every pass line with `dangerous.`, which is how
  * {@link doctorConfigRows} tells them apart. Reading the passes off the
  * sink keeps the one listing of dangerous keys in core, behind no
- * barrel a file outside `src/core/` may import.
+ * barrel a file outside `packages/rafa/src/core/` may import.
  *
  * In json mode the sink is the output's `warn`, as before these rows:
  * every warning and pass line is a `log` event at `warn`, and the
@@ -52,8 +52,8 @@
  * written: the load writes through its sink only once it resolved.
  */
 import type { DeepRow } from './doctor-deep-row.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { ResolvedConfig } from '../core/config/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { renderDeepRow } from './doctor-deep-row.js';
 

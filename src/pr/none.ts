@@ -59,7 +59,7 @@
  */
 import { spawnSync } from 'node:child_process';
 
-import { normalizeRemote } from '../schema/project-id.js';
+import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 
 import { remoteHost } from './provider.js';
 

@@ -78,7 +78,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 /** The rendered findings file, at the top of a repo root. */
 export const PROGRESS_FILE_NAME = 'progress.txt';

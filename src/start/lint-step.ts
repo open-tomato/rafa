@@ -94,8 +94,9 @@ import type { GitRunner } from '../pr/index.js';
 import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { gitSaid } from '../pr/index.js';
 
 /** The command the step runs, before its report flags and the files; the blocker hands the session this. */

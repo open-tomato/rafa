@@ -17,7 +17,7 @@
  * beside one that fails.
  */
 import type { ClaimBranchReading } from '../claims/git.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 

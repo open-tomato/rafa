@@ -1,10 +1,10 @@
 /**
  * The deep-import reading behind the core-barrels sweep: which files
- * outside `src/core/` import a file inside it that is not a barrel.
+ * outside `packages/rafa/src/core/` import a file inside it that is not a barrel.
  *
- * The rule it measures: a file outside `src/core/` imports a subject's
+ * The rule it measures: a file outside `packages/rafa/src/core/` imports a subject's
  * barrel and nothing deeper. The barrels are the ones
- * `scripts/survey/core-moves.ts` lists (`CORE_BARRELS`), so `src/core/`
+ * `scripts/survey/core-moves.ts` lists (`CORE_BARRELS`), so `packages/rafa/src/core/`
  * can become the core package by one `git mv` (#808) with every importer
  * already on a path the package will export. The move of #905 is held to
  * this from its first file on, so there is no allow-list: one deep import
@@ -18,12 +18,14 @@
  *     source file, a test file, a sweep, a test-support file, a script
  *     under `scripts/`, a package file, a config file at the root. Unlike
  *     the commands-direction reading, a test file is covered: a test
- *     outside `src/core/` reaches it through a barrel too;
- *   - less the files under `src/core/` themselves, which import their
- *     sibling files directly. They are named under `inside` and their
- *     imports are not read. That a file inside never imports a barrel is
- *     the other half of the move's import rule, and this reading does not
- *     measure it.
+ *     outside `packages/rafa/src/core/` reaches it through a barrel too;
+ *   - less core's own files and its parked tests, which import their
+ *     sibling files directly: every path `isCoreRead` of `core-moves.ts`
+ *     holds, the files under `packages/rafa/src/core/` and under the other core folders,
+ *     the named core files, and the tests under `CORE_PARKED_TESTS`. They
+ *     are named under `inside` and their imports are not read. That a file
+ *     inside never imports a barrel is the other half of the move's import
+ *     rule, and this reading does not measure it.
  *
  * Which imports count: every specifier `ts.preProcessFile` finds in the
  * source text (`textImports`, `scripts/survey/import-graph.ts`), so a
@@ -49,15 +51,15 @@
  * has the import read as any other.
  *
  * Each specifier is resolved by the resolver handed in. A target under
- * `src/core/` that is a listed barrel is answered under `barrel`, any
- * other target under `src/core/` under `deep`, and a target outside it
+ * `packages/rafa/src/core/` that is a listed barrel is answered under `barrel`, any
+ * other target under `packages/rafa/src/core/` under `deep`, and a target outside it
  * adds nothing. A specifier that resolves to nothing adds no edge and is
  * not reported here: `tsc` is the gate for an import that reaches no
  * file. Only the listed paths are barrels: an `index.ts` below a subject
- * folder, or one directly in `src/core/`, is a deep import like any other
+ * folder, or one directly in `packages/rafa/src/core/`, is a deep import like any other
  * file.
  *
- * An edge is spelled `<importer path> -> <path under src/core/>`, both
+ * An edge is spelled `<importer path> -> <path under packages/rafa/src/core/>`, both
  * paths repository-relative with their extension ({@link importLine}).
  * Two imports of one file from one importer are one edge.
  */
@@ -66,7 +68,7 @@ import type { ResolveImport } from './import-graph';
 
 import ts from 'typescript';
 
-import { barrelPaths, CORE_FOLDER } from './core-moves';
+import { barrelPaths, CORE_FOLDER, isCoreRead } from './core-moves';
 import { textImports } from './import-graph';
 
 const CODE_EXTENSION = /\.(?:[cm]?[jt]s|[jt]sx)$/;
@@ -75,11 +77,11 @@ const EDGE_ARROW = ' -> ';
 /** Where the barrels are listed, as the line of a deep import names it. */
 const BARRELS_SOURCE = 'scripts/survey/core-moves.ts';
 
-/** One import from a file outside `src/core/` to a file inside it. */
+/** One import from a file outside `packages/rafa/src/core/` to a file inside it. */
 export interface CoreImport {
   /** The importing file, repository-relative. */
   readonly from: string;
-  /** The imported file under `src/core/`, repository-relative. */
+  /** The imported file under `packages/rafa/src/core/`, repository-relative. */
   readonly to: string;
 }
 
@@ -91,7 +93,7 @@ export interface CoreImportsInput {
   readonly sources: ReadonlyMap<string, string>;
   /** The resolver for each specifier a file imports. */
   readonly resolve: ResolveImport;
-  /** The files under `src/core/` a file outside may import; those of `core-moves.ts` unless a test plants its own. */
+  /** The files under `packages/rafa/src/core/` a file outside may import; those of `core-moves.ts` unless a test plants its own. */
   readonly barrels?: readonly string[];
 }
 
@@ -101,9 +103,9 @@ export interface CoreImports {
   readonly barrel: readonly CoreImport[];
   /** Every import that reaches past the barrels, sorted by line, free of duplicates. */
   readonly deep: readonly CoreImport[];
-  /** Every module augmentation that names a file under `src/core/`, sorted by line, free of duplicates. */
+  /** Every module augmentation that names a file under `packages/rafa/src/core/`, sorted by line, free of duplicates. */
   readonly augment: readonly CoreImport[];
-  /** The code files under `src/core/` that were handed in and left unread, sorted. */
+  /** The code files `isCoreRead` holds that were handed in and left unread, sorted. */
   readonly inside: readonly string[];
   /** The files that should have been read and had no source text, sorted. */
   readonly missing: readonly string[];
@@ -124,7 +126,7 @@ export function isCodeFile(path: string): boolean {
 
 /**
  * The line an import is spelled as: `<importer path> -> <path under
- * src/core/>`.
+ * packages/rafa/src/core/>`.
  *
  * @param edge - The import.
  * @returns Its line.
@@ -134,13 +136,13 @@ export function importLine(edge: CoreImport): string {
 }
 
 /**
- * The barrels of the subject a path under `src/core/` lies in: those in
- * the folder its first segment below `src/core/` names.
+ * The barrels of the subject a path under `packages/rafa/src/core/` lies in: those in
+ * the folder its first segment below `packages/rafa/src/core/` names.
  *
  * @param path - A repository-relative path.
  * @param barrels - The listed barrels; those of `core-moves.ts` unless a test plants its own.
  * @returns The barrels of its subject, sorted; empty for a path directly
- *   in `src/core/`, in a folder with no barrel, or outside `src/core/`.
+ *   in `packages/rafa/src/core/`, in a folder with no barrel, or outside `packages/rafa/src/core/`.
  */
 export function subjectBarrels(path: string, barrels: readonly string[] = barrelPaths()): readonly string[] {
   if (!path.startsWith(CORE_FOLDER)) {
@@ -213,21 +215,21 @@ function withoutAugments(imports: readonly string[], augments: readonly string[]
 }
 
 /**
- * Reads every import from a code file outside `src/core/` into it, and
+ * Reads every import from a code file outside core into `packages/rafa/src/core/`, and
  * splits them into those that reach a barrel and those that reach deeper
  * (see the module note for which files and which imports). Pure: the
  * caller lists the files, reads their text and supplies the resolver.
  *
  * @param input - The files, their texts, a resolver, and the barrels when a test plants its own.
  * @returns The barrel imports, the deep imports, the augmentations, the
- *   files read, the files inside `src/core/` left unread, and the files
+ *   files read, core's files and parked tests left unread, and the files
  *   with no text.
  */
 export function readCoreImports(input: CoreImportsInput): CoreImports {
   const barrels = new Set(input.barrels ?? barrelPaths());
   const code = [...new Set(input.files)].filter(isCodeFile).sort();
-  const inside = code.filter((path) => path.startsWith(CORE_FOLDER));
-  const covered = code.filter((path) => !path.startsWith(CORE_FOLDER));
+  const inside = code.filter((path) => isCoreRead(path));
+  const covered = code.filter((path) => !isCoreRead(path));
   const read = covered.filter((path) => input.sources.has(path));
   const missing = covered.filter((path) => !input.sources.has(path));
   const barrel = new Map<string, CoreImport>();

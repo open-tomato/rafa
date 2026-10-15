@@ -85,21 +85,22 @@
  * GitHub.
  */
 import type { StretchRecord } from './start.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
 import type { MergedPullRequest } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { PrSeams } from '../pr/pr-context.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { CommandExit } from '../../core/command/index.js';
-import { configFilePath } from '../../core/config/index.js';
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';

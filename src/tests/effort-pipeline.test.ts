@@ -133,6 +133,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { readStoreRows } from '@open-tomato/rafa/store/ndjson-files';
+
 import { PROMPT_SHAPES } from '../effort/classify.js';
 import { collectEffort } from '../effort/collect.js';
 import { formatReport } from '../effort/report-format.js';
@@ -140,7 +142,6 @@ import {
   SESSION_KINDS,
   buildReport,
 } from '../effort/report.js';
-import { readStoreRows } from '../effort/store/ndjson-files.js';
 
 /** Per-turn usage. One distinct decimal magnitude per column. */
 const TURN_INPUT = 100;

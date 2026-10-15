@@ -112,7 +112,7 @@
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
  * registered command: it runs through the `GitRunner` seam of
- * `src/core/git/git.ts`, and the spec's table says so. `./sync.ts` holds
+ * `packages/rafa/src/core/git/git.ts`, and the spec's table says so. `./sync.ts` holds
  * that step and its refusals. {@link actionInvocation} answers null for it,
  * as it does for `none`, and {@link runAction} refuses it as the
  * caller's mistake.
@@ -164,11 +164,12 @@
  */
 import type { HopActionWorld } from './hop-action.js';
 import type { NextActionId, NextState } from './state.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+
+import { CommandExit, commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { parseArgs } from '../cli/core/parseArgs.js';
-import { CommandExit, commandSpelling } from '../core/command/index.js';
 
 import { HINT_FLAG } from './hint.js';
 import { runHome, runHop } from './hop-action.js';

@@ -69,7 +69,7 @@ import type { BlockerChange, ParentChange, ParentRemoval, RelatedIssue, Relation
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks } from '../roadmap-board.js';
 
-import { describeValue } from '../../core/config/sections.js';
+import { describeValue } from '@open-tomato/rafa/core/config/sections';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board relations native';

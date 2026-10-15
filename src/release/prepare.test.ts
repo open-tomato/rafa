@@ -52,7 +52,7 @@
  */
 import type { ChangelogNote } from './changelog.js';
 import type { ReleasePreparationInput, ReleaseSettings } from './prepare.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -61,7 +61,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RELEASE_AUTO } from '../core/config/sections.js';
+import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

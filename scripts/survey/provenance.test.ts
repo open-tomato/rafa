@@ -123,14 +123,14 @@ function commit(root: string, subject: string, files: Record<string, string>): v
   git(root, ['commit', '--quiet', '--no-verify', '-m', subject]);
 }
 
-const IMPORTED = 'src/core/imported.ts';
-const RENAMED = 'src/core/renamed.ts';
+const IMPORTED = 'packages/rafa/src/core/imported.ts';
+const RENAMED = 'packages/rafa/src/core/renamed.ts';
 const DESIGNED = 'src/plan/designed.ts';
 const SPIKE = 'src/plan/spike.ts';
-const PATCHED = 'src/core/patched.ts';
-const PLAIN = 'src/core/plain.ts';
-const FIXED_LATER = 'src/core/fixed-later.ts';
-const STAGED = 'src/core/staged.ts';
+const PATCHED = 'packages/rafa/src/core/patched.ts';
+const PLAIN = 'packages/rafa/src/core/plain.ts';
+const FIXED_LATER = 'packages/rafa/src/core/fixed-later.ts';
+const STAGED = 'packages/rafa/src/core/staged.ts';
 
 describe('a scratch repository with one commit of each class', () => {
   let root = '';
@@ -143,7 +143,7 @@ describe('a scratch repository with one commit of each class', () => {
     commit(root, 'initial commit', { 'README.md': '# scratch\n' });
     commit(root, 'Phase 0 — import the loop (#1)', {
       [IMPORTED]: 'export const imported = 1;\n',
-      'src/core/old-name.ts': 'export const renamed = \'a file long enough for rename detection to follow\';\n',
+      'packages/rafa/src/core/old-name.ts': 'export const renamed = \'a file long enough for rename detection to follow\';\n',
     });
     commit(root, 'rafa-10: plan from a spec (#11)', { [DESIGNED]: 'export const designed = 1;\n' });
     commit(root, 'rafa-20: a stretch reader (#21)', { [SPIKE]: 'export const spike = 1;\n' });
@@ -155,12 +155,12 @@ describe('a scratch repository with one commit of each class', () => {
       [FIXED_LATER]: 'export const later = 1;\n',
       [PLAIN]: 'export const plain = 1;\n',
     });
-    git(root, ['mv', 'src/core/old-name.ts', RENAMED]);
+    git(root, ['mv', 'packages/rafa/src/core/old-name.ts', RENAMED]);
     git(root, ['commit', '--quiet', '--no-verify', '-m', 'refactor: rename a module (#98)']);
     commit(root, 'fix: guard the helper', { [FIXED_LATER]: 'export const later = 2;\n' });
     plant(root, STAGED, 'export const staged = 1;\n');
     git(root, ['add', '--', STAGED]);
-    plant(root, 'src/core/untracked.ts', 'export const untracked = 1;\n');
+    plant(root, 'packages/rafa/src/core/untracked.ts', 'export const untracked = 1;\n');
     const files = [IMPORTED, RENAMED, DESIGNED, SPIKE, PATCHED, PLAIN, FIXED_LATER, STAGED];
     const clusterOf = new Map(files.map((path) => [path, path.startsWith('src/plan/')
       ? 'c02-designed'

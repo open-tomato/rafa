@@ -24,8 +24,8 @@
  * case; a `console.log` in `expectExit` on a match reddened its quiet
  * case alone, and a stderr write in `expectEvent` on a match its own.
  */
-import type { RafaCommand } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 
@@ -36,7 +36,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { configFilePath } from '../core/config/index.js';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

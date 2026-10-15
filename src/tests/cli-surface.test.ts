@@ -42,7 +42,7 @@
  * scratch repository planting no config reddened nine cases over this
  * file and the spawned cases of the plan readers.
  */
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

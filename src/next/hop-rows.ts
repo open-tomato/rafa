@@ -93,9 +93,10 @@ import type { NextNowEpic } from '../board/epic-walk.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { Place } from '../project/position.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { samePlace } from '../board/place.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { messageOf } from '../core/config/sections.js';
 
 import { hopDecisionSentence, oneHopAllows } from './hop-chain.js';
 import { onBase } from './readings.js';

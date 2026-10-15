@@ -45,10 +45,10 @@
  * `dangerous` is `./refs-check.ts`'s {@link CREATE_DANGEROUS_PHRASES}:
  * the loader's pass line for `dangerous.acceptStaleRefs` ends with what
  * check 4 does under it, and that line is the one a run with the
- * setting on prints for it (`src/core/config/dangerous.ts`).
+ * setting on prints for it (`packages/rafa/src/core/config/dangerous.ts`).
  */
-import type { RafaCommand } from '../../core/command/index.js';
 import type { CommandDeclaration } from '../wrap.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import plan from '../../plan.js';

@@ -36,13 +36,14 @@
  * flag does. With `--output=json`, {@link InstinctFlagResult} is the
  * data of the terminal result event.
  */
-import type { AdapterRegistry } from '../../core/adapters/index.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { Learning } from '../../ports/index.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Learning } from '@open-tomato/rafa/ports';
 
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { expectTwoArguments } from '../issue/issue-tracker.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 

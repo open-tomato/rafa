@@ -159,15 +159,16 @@ import type { IssueBoard } from './issue-board.js';
 import type { ReviewStamp } from './review-stamp.js';
 import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
 import type { BoardTrust } from './trust.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { issueLine, rejectedPath } from '../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { issueLine, rejectedPath } from '@open-tomato/rafa/core/plan';
+
 import { validatePlan } from '../plan/validate.js';
 
 import { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG } from './flags.js';

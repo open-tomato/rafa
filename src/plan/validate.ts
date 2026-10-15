@@ -32,12 +32,12 @@
  */
 import type { PlanWarning } from './doc-task.js';
 import type { PlanIssue } from './index.js';
-import type { TaskCounts } from '../core/plan/index.js';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { readFileSync } from 'node:fs';
 
-import { CommandExit } from '../core/command/index.js';
-import { countTasks, isFile } from '../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { countTasks, isFile } from '@open-tomato/rafa/core/plan';
 
 import { docTaskWarnings } from './doc-task.js';
 

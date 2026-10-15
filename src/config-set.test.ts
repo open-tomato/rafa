@@ -19,8 +19,9 @@ import type { ConfigSetRefusalReason } from './config-set.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { parseConfigText } from '@open-tomato/rafa/core/config';
+
 import { ConfigSetRefusal, withConfigSetting } from './config-set.js';
-import { parseConfigText } from './core/config/index.js';
 import { projectConfigText } from './project/scaffold.js';
 
 /** The path refusals are labelled with. */

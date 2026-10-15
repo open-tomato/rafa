@@ -28,9 +28,9 @@
  * and the caller ends it as a run that did not fix what it was asked
  * about.
  */
-import type { Output } from '../../ports/index.js';
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { SettleSettings } from '../../release/settle.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { conversionLines, convertStampedVersion } from '../../pr/triage/version-convert.js';
 import { pushResolved } from '../../pr/worktree.js';

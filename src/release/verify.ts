@@ -78,12 +78,13 @@
  */
 import type { Fragment } from './fragment.js';
 import type { ReleaseFileEdit, ReleasePrepared, ReleaseSettings } from './prepare.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
 
 import { parseFragment } from './fragment.js';

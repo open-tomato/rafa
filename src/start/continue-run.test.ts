@@ -17,8 +17,8 @@ import type { PassedOverTask } from './loop-events.js';
 import type { PassOverEntry, PassOverList } from './pass-over.js';
 import type { RetryRefusal } from './retry-budget.js';
 import type { StepOutcome } from './suite-step.js';
-import type { CliEvent } from '../ports/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,8 +26,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 

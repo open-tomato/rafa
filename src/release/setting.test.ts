@@ -34,7 +34,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../core/config/index.js';
+import { parseConfigText } from '@open-tomato/rafa/core/config';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { readReleaseSetting, RELEASE_ENABLED_SETTING, releaseEnabledIn, withReleaseEnabled } from './setting.js';

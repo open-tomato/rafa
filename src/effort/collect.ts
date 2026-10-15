@@ -171,22 +171,24 @@ import type {
   CommitStats,
 } from './commits.js';
 import type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type {
   EffortStore,
   SessionEffortRow,
   SessionMode,
-} from './store/types.js';
-import type { ResolvedConfig } from '../core/config/index.js';
+} from '@open-tomato/rafa/store/types';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput } from '../core/output/index.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -195,7 +197,6 @@ import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { readCommitLog } from './commits.js';
 import { listProjectSessionLogs, projectLogDirs } from './session-log-dirs.js';
 import { readLines, readSessionLog } from './session-log.js';
-import { selectEffortStore } from './store/index.js';
 import { createHubContact } from './sync/contact.js';
 
 /**
@@ -209,7 +210,7 @@ const SESSION_MODE: SessionMode = 'local';
  * is appended through, which depends on nothing in this module, and is
  * re-exported here so the collector still names what it builds.
  */
-export type { SessionEffortRow } from './store/types.js';
+export type { SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 /* The argv parser moved to its own module; re-exported so callers keep one import. */
 export type { CollectArgs } from './collect-args.js';

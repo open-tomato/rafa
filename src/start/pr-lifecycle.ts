@@ -113,8 +113,6 @@
 import type { RunSession } from './session.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { ClaudeSpawner } from '../core/loop/index.js';
 import type {
   CheckRow,
   PrProviderReading,
@@ -124,15 +122,18 @@ import type {
   WaitOptions,
   WaitResult,
 } from '../pr/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { runClaude, spawnClaude } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { runClaude, spawnClaude } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
 import {
   compareUrl,
   createGitRunner,

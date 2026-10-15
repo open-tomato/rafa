@@ -1,7 +1,7 @@
 /**
  * Tests for the `plan_ci` row `rafa pr merge` leaves behind each time it
  * reads a pull request's checks (`merge.ts`, through `recordPlanCi` in
- * `src/effort/store/plan-ci.ts`).
+ * `packages/rafa/src/effort/store/plan-ci.ts`).
  *
  * Each case dispatches the command from a project of its own under this
  * file's temporary directory, over the recorded fake (`pr/gh-fake.ts`)
@@ -42,7 +42,8 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sqliteStorePath } from '../../effort/store/sqlite.js';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

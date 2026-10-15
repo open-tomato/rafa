@@ -4,7 +4,7 @@
  * record at all.
  *
  * The scopes are `<root>/.rafa/instincts` and `~/.rafa/instincts`
- * (`src/schema/tiers.ts`), nearest the work first, and what counts as
+ * (`packages/rafa/src/schema/tiers.ts`), nearest the work first, and what counts as
  * a record there is `src/schema/scope-records.ts`'s: a top-level `.md`, with
  * the Learning adapter's `instincts.ndjson` and `flags.ndjson` passed
  * over without a word. So the count this prints is a count of records,
@@ -71,15 +71,16 @@
  * value.
  */
 import type { InstinctPromoteSeams } from './promote.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { InstinctRecord } from '../../ports/index.js';
 import type { Instinct, InstinctScope } from '../../schema/instinct.js';
 import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { InstinctRecord } from '@open-tomato/rafa/ports';
+
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { toHeldRecords } from '../../adapters/learning/held.js';
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { triggerKey } from '../../learning/index.js';
 import { readScopes } from '../../schema/scope-records.js';
 import { expectNoArgument, resolveProjectConfig } from '../plan/plan-files.js';

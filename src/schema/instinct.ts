@@ -57,16 +57,17 @@
  * which spawns git and answers null rather than throwing.
  */
 
-import type { InstinctRecord } from '../ports/index.js';
-import type { FindingKind, FindingSignal } from '../report/parse.js';
+import type { InstinctRecord } from '@open-tomato/rafa/ports';
+import type { FindingKind, FindingSignal } from '@open-tomato/rafa/report/parse';
+
+import { FINDING_DOMAINS, FINDING_KINDS, FINDING_SIGNALS } from '@open-tomato/rafa/report/parse';
+import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from '@open-tomato/rafa/schema/project-id';
 
 import { actionHash } from '../learning/identity.js';
-import { FINDING_DOMAINS, FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
 
 import { readFrontmatterDocument, renderFrontmatter } from './frontmatter.js';
-import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from './project-id.js';
 
-export type { ProjectIdSeams } from './project-id.js';
+export type { ProjectIdSeams } from '@open-tomato/rafa/schema/project-id';
 
 export { actionHash } from '../learning/identity.js';
 
@@ -77,7 +78,7 @@ export {
   normalizeRemote,
   projectId,
   projectIdFromRemote,
-} from './project-id.js';
+} from '@open-tomato/rafa/schema/project-id';
 
 /**
  * What an instinct is about. The same closed set a task report's

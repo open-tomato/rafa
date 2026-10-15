@@ -34,13 +34,14 @@ import type { BoardListing } from '../board/roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { Place, Position } from '../project/position.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { blockingOf } from '../board/blocked-line.js';
 import { descendRoadmap, epicLines, nextNowEpic } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
 import { samePlace } from '../board/place.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
 import { parseRoadmapBody, pickNextRoadmapLine } from '../board/roadmap.js';
-import { messageOf } from '../core/config/sections.js';
 import { readPositionFile } from '../project/position.js';
 
 import { decideHop, takenBy } from './hop-chain.js';

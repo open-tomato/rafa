@@ -7,7 +7,7 @@
  *
  * ## Read through the store's own open
  *
- * The id is read by `readStoreMeta` (`src/effort/store/store-meta.ts`)
+ * The id is read by `readStoreMeta` (`packages/rafa/src/effort/store/store-meta.ts`)
  * inside `withSqliteStore` for a `read`, the path every store reader
  * takes, so the open runs the test guard, the busy timeout and
  * `bringForward` as any other does. A read open never mints, so asking
@@ -21,7 +21,7 @@
  *
  * A store file that gets a new device or inode under the same host and
  * path mints a new id on its next write, and keeps the outgoing one in
- * `store_replaced` (`src/effort/store/store-replaced.ts`). A claim made
+ * `store_replaced` (`packages/rafa/src/effort/store/store-replaced.ts`). A claim made
  * under such an id is still this device's, so {@link readDeviceStoreId}
  * answers them as `replacedIds`, the earliest replaced first, read by
  * `readReplacedStoreIds` inside the same read open as the id. A store
@@ -65,14 +65,14 @@
  * why `absent` does not name the move: it would not help, and the store
  * is made, and its id minted, by its first write that adds a row.
  */
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { existsSync } from 'node:fs';
 
-import { MOVE_TO_SQLITE } from '../effort/store/merge-store.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
-import { readStoreMeta } from '../effort/store/store-meta.js';
-import { readReplacedStoreIds } from '../effort/store/store-replaced.js';
+import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+import { readReplacedStoreIds } from '@open-tomato/rafa/store/store-replaced';
 
 /** Why this device has no store id to claim under. */
 export type NoStoreIdCause = 'ndjson' | 'absent' | 'unminted';

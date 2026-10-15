@@ -42,7 +42,7 @@
  * @module loop/wait-reasons
  */
 import type { EventLine } from './events-file.js';
-import type { SessionState } from '../core/loop/index.js';
+import type { SessionState } from '@open-tomato/rafa/core/loop';
 
 /** A reason one event line matches. */
 export type EventWaitReason = 'pr' | 'no-pr' | 'halt' | 'error' | 'blocked';

@@ -45,10 +45,10 @@
  * with no `origin/<base>` at all holds no base copy, so a head config
  * there is read as absent from the base and refused.
  */
-import type { GitRunner } from '../../core/git/index.js';
-import type { Output } from '../../ports/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** The flag that lets a head's own config through; declared on `pr triage`. */
 export const ALLOW_LOCAL_CONFIG_FLAG = 'allow-local-config';
@@ -58,7 +58,7 @@ export const CONFIG_TRUST_REFUSE_EXIT = 1;
 
 /**
  * The config files that are code, in the loader's order
- * (`src/core/config/config-load.ts`). `.rafa/config.yaml` is data and
+ * (`packages/rafa/src/core/config/config-load.ts`). `.rafa/config.yaml` is data and
  * is not one of them.
  */
 export const CONFIG_CODE_FILES: readonly string[] = Object.freeze(['rafa.config.ts', 'rafa.config.mjs']);

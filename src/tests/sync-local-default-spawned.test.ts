@@ -36,7 +36,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { bringForward } from '../effort/store/bring-forward.js';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

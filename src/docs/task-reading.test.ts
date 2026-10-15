@@ -12,8 +12,8 @@
  * succeeds, so a reader that always fails, or never does, reddens.
  */
 import type { DocTaskInput } from './task-reading.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { StaleDocKind } from '../effort/store/stale-docs.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { StaleDocKind } from '@open-tomato/rafa/store/stale-docs';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,8 +21,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
-import { writeStaleDocs } from '../effort/store/stale-docs.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
 
 import {
   DOC_TASK_FILE_CAP,

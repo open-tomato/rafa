@@ -5,7 +5,7 @@
  * Copied from `createJsonOutput` in open-tomato's
  * `packages/shared/cli-core/src/output.ts` at commit
  * `18f94c843fff1bce65ed2245f8712ed9b64a2d51` (2026-06-25), and retyped
- * against rafa's `Output` port, which `src/ports/index.ts` copies from
+ * against rafa's `Output` port, which `packages/rafa/src/ports/index.ts` copies from
  * the same file's `CliOutput`.
  *
  * ## One terminal result
@@ -31,11 +31,11 @@
  * `now`, which defaults to the system clock; the source reads the clock
  * itself, and the seam lets a test hold a line to its exact bytes. An
  * event handed to `emit` is written as it is, its own `ts` included. The
- * stream's `write` is a property, as `src/core/output/stream.ts` says,
+ * stream's `write` is a property, as `packages/rafa/src/core/output/stream.ts` says,
  * and the output answered is frozen.
  */
-import type { OutputStream } from './stream.js';
-import type { CliEvent, CliEventLog, Output } from '../../ports/index.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventLog, Output } from '@open-tomato/rafa/ports';
 
 /** What a second terminal result is refused with. */
 const SECOND_RESULT_REFUSAL

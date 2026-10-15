@@ -115,14 +115,15 @@
  * that rejects is refused as any other tracker call.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueDraft, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
-import { messageOf } from '../../core/config/sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
