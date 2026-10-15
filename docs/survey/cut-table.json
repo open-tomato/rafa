@@ -3813,7 +3813,7 @@
         }
       ],
       "fileCounts": {
-        "source": 97,
+        "source": 98,
         "test": 106,
         "testSupport": 2
       },
@@ -3860,6 +3860,7 @@
         "src/core/config/standard-schema.ts",
         "src/core/git/commit.test.ts",
         "src/core/git/commit.ts",
+        "src/core/git/gh-runner.ts",
         "src/core/git/git.test.ts",
         "src/core/git/git.ts",
         "src/core/git/index.test.ts",
@@ -4025,7 +4026,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 80,
+        "src/core/": 81,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -7830,9 +7831,9 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1977,
+    "files": 1978,
     "leftToPlace": 715,
-    "nonTestEdges": 4415,
+    "nonTestEdges": 4418,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
     "upwardEdges": 283

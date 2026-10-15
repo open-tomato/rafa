@@ -53,8 +53,10 @@
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the other core
- * barrels spell theirs. All eight names are part of the published
- * surface: `src/index.ts` re-exports every one from this file.
+ * barrels spell theirs. Eight of the nine names are part of the
+ * published surface: `src/index.ts` re-exports them from this file. The
+ * ninth, `PlanPromptBuilder`, is read by the `claude` planner, which
+ * re-exports it under the same name.
  *
  * `index.test.ts` holds the list to the file: every name `registry.ts`
  * exports is here once, as the same binding, and no other name is here.
@@ -64,6 +66,7 @@ export type {
   AdapterContext,
   AdapterRegistry,
   AnyAdapter,
+  PlanPromptBuilder,
   PortImplementations,
 } from './registry.js';
 

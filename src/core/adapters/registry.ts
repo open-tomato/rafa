@@ -107,7 +107,6 @@
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { PlanPromptBuilder } from '../../adapters/planner/claude.js';
 import type { SelectedEffortStore } from '../../effort/store/index.js';
 import type {
   Learning,
@@ -195,6 +194,13 @@ export interface PortImplementations {
   sync: Sync;
   logger: Logger;
 }
+
+/**
+ * Builds one session's prompt from the spec's content, the plan's stub
+ * and `planDir`, the plans directory as an absolute path: the files the
+ * prompt tells the session to write are named in it.
+ */
+export type PlanPromptBuilder = (specContent: string, stub: string, planDir: string) => string;
 
 /** What every adapter is made with. */
 export interface AdapterContext {

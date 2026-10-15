@@ -145,6 +145,7 @@
  * `rafa loop start --plan=` takes them against the root.
  */
 import type { SpecReviewReading } from '../../board/spec-review.js';
+import type { PlanPromptBuilder } from '../../core/adapters/index.js';
 import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
@@ -155,6 +156,8 @@ import { posix, resolve } from 'node:path';
 
 import { parseSpecReview } from '../../board/spec-review.js';
 import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
+
+export type { PlanPromptBuilder } from '../../core/adapters/index.js';
 
 /** The exit code of a rejection no session exit code stands behind. */
 const FAILURE_EXIT_CODE = 1;
@@ -167,13 +170,6 @@ const FAILURE_EXIT_CODE = 1;
 export function planFilePath(planDir: string, fileName: string): string {
   return posix.join(planDir, fileName);
 }
-
-/**
- * Builds one session's prompt from the spec's content, the plan's stub
- * and `planDir`, the plans directory as an absolute path: the files the
- * prompt tells the session to write are named in it.
- */
-export type PlanPromptBuilder = (specContent: string, stub: string, planDir: string) => string;
 
 /** What {@link createClaudePlanner} makes a planner with. */
 export interface ClaudePlannerOptions {
