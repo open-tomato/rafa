@@ -357,7 +357,7 @@ function plantPlanned(text: string): string {
 }
 
 /** The `CommandExit` a run refused with; fails the case when it let the review through. */
-async function refusalOf(run: Promise<void>): Promise<CommandExit> {
+async function refusalOf(run: Promise<unknown>): Promise<CommandExit> {
   try {
     await run;
   } catch (error) {

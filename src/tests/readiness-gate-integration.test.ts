@@ -151,7 +151,7 @@ function thrownBy(run: () => void): CommandExit {
 }
 
 /** What an asynchronous refusal throws; fails the case when it resolves. */
-async function asyncThrownBy(run: Promise<void>): Promise<CommandExit> {
+async function asyncThrownBy(run: Promise<unknown>): Promise<CommandExit> {
   try {
     await run;
   } catch (error) {
