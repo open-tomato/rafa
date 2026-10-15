@@ -28,9 +28,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
+import { LOCK_FILE, projectLockText } from '../project/lock.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
+import { RAFA_PACKAGE_NAME } from './settle-lock.js';
 import { withSettleWorktree } from './settle-worktree.js';
 import { buildSettle, CHANGELOG_TITLE, readSettle, releaseCommitSubject } from './settle.js';
 
@@ -56,6 +58,18 @@ const SETTINGS: SettleSettings = {
 
 /** The manifest on `main`: tab-indented and with no trailing newline, so a byte-unsafe write would show. */
 const MANIFEST = '{\n\t"name": "demo",\n\t"version": "0.4.0",\n\t"tool": { "version": "9.9.9" }\n}';
+
+/** The settings a case under `release.moveLock` settles with. */
+const LOCK_SETTINGS: SettleSettings = { ...SETTINGS, releaseMoveLock: true };
+
+/** The manifest on `main` when the project is rafa itself, otherwise {@link MANIFEST} byte for byte. */
+const RAFA_MANIFEST = MANIFEST.replace('"demo"', JSON.stringify(RAFA_PACKAGE_NAME));
+
+/** The lock on `main` when a case seeds one: rafa at the base version. */
+const LOCK_AT_BASE = projectLockText('0.4.0');
+
+/** A lock in a format this rafa does not read, as a newer rafa would write it. */
+const UNKNOWN_LOCK = '{\n  "lockfileVersion": 99,\n  "rafa": "0.4.0"\n}\n';
 
 /** The changelog on `main`: a preamble, then the last release. */
 const CHANGELOG = '# Changelog\n\nEvery release.\n\n## 0.4.0 — 2026-08-01, older\n\n- Loop: old line\n';
@@ -189,7 +203,7 @@ async function buildIn(
       before,
       head: worktree.git(['rev-parse', 'HEAD']).stdout.trim(),
       status: worktree.git(['status', '--porcelain']).stdout.trim(),
-      files: Object.fromEntries(['package.json', 'CHANGELOG.md', '.changes/rafa-1.md', '.changes/rafa-9.md'].map((path) => [path, read(path)])),
+      files: Object.fromEntries(['package.json', 'CHANGELOG.md', LOCK_FILE, '.changes/rafa-1.md', '.changes/rafa-9.md'].map((path) => [path, read(path)])),
     };
   });
   if (!outcome.ok) throw new Error(outcome.problem);
@@ -565,5 +579,111 @@ describe('buildSettle, the release commit', () => {
     if (built.build.outcome !== 'unbuilt') return;
     expect(built.build.problem).toBe('the folded fragments could not be deleted: planted failure of git rm');
     expect(built.head).toBe(built.before);
+  });
+});
+
+describe('readSettle and buildSettle under release.moveLock', () => {
+  it('refuses a lock in a format it does not read as unread, writing nothing', async () => {
+    const w = world({ 'package.json': RAFA_MANIFEST, [LOCK_FILE]: UNKNOWN_LOCK });
+    landTwo(w);
+
+    const built = await buildIn(w, LOCK_SETTINGS);
+
+    expect(built.build.outcome).toBe('unread');
+    if (built.build.outcome !== 'unread') return;
+    expect(built.build.problem).toBe('rafa.lock is in lockfileVersion 99, and this rafa reads 1: a newer rafa wrote it');
+    expect(built.head).toBe(built.before);
+    expect(built.status).toBe('');
+    expect(built.files[LOCK_FILE]).toBe(UNKNOWN_LOCK);
+    expect(built.files['package.json']).toBe(RAFA_MANIFEST);
+    expect(built.files['CHANGELOG.md']).toBe(CHANGELOG);
+  });
+
+  it('refuses a manifest that is not rafa\'s as unread, naming release.moveLock and the name found', async () => {
+    const w = world({ [LOCK_FILE]: LOCK_AT_BASE });
+    landTwo(w);
+
+    const built = await buildIn(w, LOCK_SETTINGS);
+
+    expect(built.build.outcome).toBe('unread');
+    if (built.build.outcome !== 'unread') return;
+    expect(built.build.problem).toContain('release.moveLock');
+    expect(built.build.problem).toContain('"demo"');
+    expect(built.head).toBe(built.before);
+    expect(built.status).toBe('');
+    expect(built.files[LOCK_FILE]).toBe(LOCK_AT_BASE);
+    expect(built.files['package.json']).toBe(MANIFEST);
+    expect(built.files['CHANGELOG.md']).toBe(CHANGELOG);
+  });
+
+  it('leaves the lock byte-identical with the key off, in rafa\'s own project', async () => {
+    const w = world({ 'package.json': RAFA_MANIFEST, [LOCK_FILE]: LOCK_AT_BASE });
+    const { second } = landTwo(w);
+
+    const built = await buildIn(w, SETTINGS);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.build.lock).toBeNull();
+    expect(built.files[LOCK_FILE]).toBe(LOCK_AT_BASE);
+    expect(w.git(w.caller, ['diff', '--name-only', second, built.head]).split('\n')).not.toContain(LOCK_FILE);
+    // The control: the same build moved the version file, so a lock left alone is the key's doing.
+    expect(built.files['package.json']).toBe(RAFA_MANIFEST.replace('"version": "0.4.0"', '"version": "0.5.0"'));
+  });
+
+  it('moves the lock to the folded version in the same commit as the version file and the changelog', async () => {
+    const w = world({ 'package.json': RAFA_MANIFEST, [LOCK_FILE]: LOCK_AT_BASE });
+    const { second } = landTwo(w);
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', LOCK_SETTINGS);
+    const built = await buildIn(w, LOCK_SETTINGS);
+
+    expect(reading.outcome).toBe('folded');
+    if (reading.outcome !== 'folded') return;
+    expect(reading.lock).toEqual({ path: LOCK_FILE, from: '0.4.0', to: '0.5.0' });
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.build.lock).toEqual({ path: LOCK_FILE, from: '0.4.0', to: '0.5.0' });
+    expect(built.files[LOCK_FILE]).toBe(projectLockText('0.5.0'));
+    expect(built.status).toBe('');
+    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`${releaseCommitSubject('0.5.0')}\n${second}`);
+    expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toEqual([
+      'D\t.changes/rafa-1.md',
+      'D\t.changes/rafa-9.md',
+      'M\tCHANGELOG.md',
+      'M\tpackage.json',
+      `M\t${LOCK_FILE}`,
+    ]);
+  });
+
+  it('creates a missing lock at the folded version in the release commit', async () => {
+    const w = world({ 'package.json': RAFA_MANIFEST });
+    const { second } = landTwo(w);
+
+    const built = await buildIn(w, LOCK_SETTINGS);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.build.lock).toEqual({ path: LOCK_FILE, from: null, to: '0.5.0' });
+    expect(built.files[LOCK_FILE]).toBe(projectLockText('0.5.0'));
+    expect(built.status).toBe('');
+    expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toContain(`A\t${LOCK_FILE}`);
+  });
+
+  it('stages the lock beside the two files, which the status probe sees when the commit is refused', async () => {
+    // The control for the refusals above: an empty status there is not a probe that misses a lock write.
+    const w = world({ 'package.json': RAFA_MANIFEST, [LOCK_FILE]: LOCK_AT_BASE });
+    landTwo(w);
+    const hook = join(w.git(w.caller, ['config', '--get', 'core.hooksPath']), 'pre-commit');
+    writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+    chmodSync(hook, 0o755);
+
+    const built = await buildIn(w, LOCK_SETTINGS);
+
+    expect(built.build.outcome).toBe('unbuilt');
+    expect(built.head).toBe(built.before);
+    expect(built.status.split('\n')).toContain(`M  ${LOCK_FILE}`);
+    expect(built.files[LOCK_FILE]).toBe(projectLockText('0.5.0'));
   });
 });
