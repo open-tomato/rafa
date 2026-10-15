@@ -70,7 +70,7 @@
  * redacted when a body is rendered, with the key and the `Refs` section
  * the caller built from them.
  */
-import type { BugValues } from './issue-text.js';
+import type { BugValues, ReportedWords } from './issue-text.js';
 import type { BugRecord, BugRules } from '../bugs/record.js';
 import type { GitRunner } from '../core/git/index.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
@@ -90,6 +90,8 @@ import { packageOf, rootPackageOf } from '../project/package-of.js';
 
 import { artifactOf, hasText } from './bug-key.js';
 import { testFailureOf } from './test-failure.js';
+
+export type { ReportedWords };
 
 /** The rules a record is built under when triage is handed none; see the module note. */
 export const DEFAULT_BUG_RULES: BugRules = bugRulesOf({ ...ISSUES_DEFAULTS, ...ERRORS_DEFAULTS });
@@ -130,12 +132,6 @@ export interface BugFilingInput {
   readonly local: (text: string) => string;
   /** Takes local paths, then named secrets, out of a text. */
   readonly redact: (text: string) => string;
-}
-
-/** The session's own words beside an `unknown` module or action, redacted; null where none was set aside. */
-export interface ReportedWords {
-  readonly module: string | null;
-  readonly action: string | null;
 }
 
 /** What {@link bugFilingOf} answers. */
