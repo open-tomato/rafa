@@ -260,9 +260,14 @@ function plantedStore(): EffortStore {
  * makes them; with `github`, one of kind `github` whose every create
  * answers that ref instead.
  */
-function spiedTracker(inner: Tracker, github?: IssueRef): { tracker: Tracker; calls: string[]; bodies: string[] } {
+function spiedTracker(inner: Tracker, githubRefs?: IssueRef | readonly IssueRef[]): { tracker: Tracker; calls: string[]; bodies: string[] } {
   const calls: string[] = [];
   const bodies: string[] = [];
+  const refs = githubRefs === undefined || Array.isArray(githubRefs)
+    ? githubRefs as readonly IssueRef[] | undefined
+    : [githubRefs as IssueRef];
+  const github = refs?.[0];
+  let created = 0;
   return {
     calls,
     bodies,
@@ -274,9 +279,12 @@ function spiedTracker(inner: Tracker, github?: IssueRef): { tracker: Tracker; ca
       create: (draft) => {
         calls.push(`create ${draft.title}`);
         bodies.push(draft.body);
-        return github === undefined
+        // The nth create answers the nth ref, the last one thereafter.
+        const ref = refs?.[Math.min(created, (refs.length) - 1)];
+        created += 1;
+        return ref === undefined
           ? inner.create(draft)
-          : Promise.resolve(github);
+          : Promise.resolve(ref);
       },
       comment: (issue, body) => {
         calls.push(`comment ${issue.externalId}`);
@@ -300,8 +308,8 @@ interface CaseSetup {
   readonly projectRefresh?: EpicCloseSeams['projectRefresh'];
   /** Triages each failed check; the system's own when left out. */
   readonly triageReport?: EpicCloseSeams['triageReport'];
-  /** The ref every create answers, on a public tracker of kind `github`; a `local` one's own when left out. */
-  readonly github?: IssueRef;
+  /** The ref each create answers in turn (the last one repeating), on a public tracker of kind `github`; a `local` one's own when left out. */
+  readonly github?: IssueRef | readonly IssueRef[];
   /** Answers the `gh` calls the planted `gh` was not planted for; refused when left out. */
   readonly route?: GhRunner;
 }
@@ -765,6 +773,25 @@ const PROJECT_OWNER = 'open-tomato';
 /** The issue the `github` public tracker files each bug as: one the fake repository holds, on no epic. */
 const FILED_ISSUE = 70;
 
+/** The issue the second failed check's bug is filed as. */
+const SECOND_FILED_ISSUE = 71;
+
+/** The ref the `github` public tracker answers for the second bug it files. */
+const SECOND_FILED_REF: IssueRef = {
+  opt: 0,
+  kind: 'github',
+  externalId: String(SECOND_FILED_ISSUE),
+  url: `https://github.com/${FAKE_PROJECT_REPOSITORY}/issues/${String(SECOND_FILED_ISSUE)}`,
+};
+
+/** Both criteria's checks failing. */
+const FAIL_BOTH: Script = {
+  checks: {
+    'Run rafa roadmap': { exitCode: 0, stdout: verdictOutput('fail', 'it showed no epic') },
+    'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') },
+  },
+};
+
 /** The roadmap issue the scene's listing and facts hold. */
 const ROADMAP_ISSUE = 1;
 
@@ -798,12 +825,13 @@ function projectScene(): ProjectScene {
   const project = createFakeProjectGh({
     projects: [{ owner: PROJECT_OWNER, number: EPIC_PROJECT_NUMBER, items: [] }],
     owners: [PROJECT_OWNER],
-    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [FILED_ISSUE] }],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [FILED_ISSUE, SECOND_FILED_ISSUE] }],
   });
   const facts = createFakeFactsGh({
     issues: [
       { number: ROADMAP_ISSUE, state: 'OPEN', labels: ['type:roadmap'] },
       { number: FILED_ISSUE, state: 'OPEN', labels: ['type:bug'] },
+      { number: SECOND_FILED_ISSUE, state: 'OPEN', labels: ['type:bug'] },
     ],
   });
   const answered = (value: unknown): Promise<GhResult> => Promise.resolve({ ok: true, stdout: JSON.stringify(value), stderr: '' });
@@ -820,16 +848,21 @@ function projectScene(): ProjectScene {
 
 /** The Stage each issue's item on the project holds, by issue number, read through the project port. */
 async function projectStages(gh: GhRunner): Promise<Readonly<Record<number, string | null>>> {
+  return Object.fromEntries(await projectItems(gh));
+}
+
+/** The issues on the project with their Stage, in the order its items were added, read through the project port. */
+async function projectItems(gh: GhRunner): Promise<readonly (readonly [number, string | null])[]> {
   const port = createGhProjectPort(gh);
   const found = await port.find({ owner: PROJECT_OWNER, number: EPIC_PROJECT_NUMBER });
   const items = await port.items(found?.id ?? '');
-  return Object.fromEntries(items.flatMap(({ content, values }) => {
+  return items.flatMap(({ content, values }) => {
     if (content.kind !== 'issue') return [];
     const stage = values.get('Stage');
     return [[content.number, stage?.kind === 'option'
       ? stage.name
       : null] as const];
-  }));
+  });
 }
 
 /** The lines of a text run's stdout, each as written. */
@@ -872,5 +905,41 @@ describe('rafa epic close, a failed check\'s bug onto the project', () => {
     expect(linesOf(control.stdout)).not.toContain(scope);
     expect(lines.indexOf(scope)).toBeGreaterThan(lines.indexOf(FILED_LINE));
     expect(await projectStages(refused.project.gh)).toEqual({});
+  });
+
+  it('records no project call for a bug filed on a local public tracker, beside the same close with board.project.number unset on a github tracker', async () => {
+    const local = projectScene();
+    const outcome = await run(['40'], { script: FAIL_2, project: plantCase(withProjectNumber(LOCAL_CONFIG)), route: local.route });
+
+    const unset = projectScene();
+    const control = await run(['40'], { script: FAIL_2, github: FILED_REF, route: unset.route });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(control.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.trackerCalls).toHaveLength(1);
+    expect(local.project.calls()).toEqual([]);
+    expect(linesOf(control.stdout)).toContain(FILED_LINE);
+    expect(unset.project.calls()).toEqual([]);
+  });
+
+  it('adds the bugs of two failed checks in criterion order, each add warning a warn event in json mode', async () => {
+    const scene = projectScene();
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const outcome = await run(['40', '--output=json'], {
+      script: FAIL_BOTH,
+      project: plantCase(withProjectNumber(LOCAL_CONFIG)),
+      github: [FILED_REF, SECOND_FILED_REF],
+      route: scene.route,
+      projectRefresh: recorded.refresh,
+    });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(await projectItems(scene.project.gh)).toEqual([[FILED_ISSUE, null], [SECOND_FILED_ISSUE, null]]);
+    const warnings = eventsOf(outcome.stdout)
+      .filter((event) => event.type === 'log' && event.level === 'warn')
+      .map((event) => (event as { message: string }).message)
+      .filter((message) => message.includes('a project warning'));
+    expect(warnings).toHaveLength(2);
   });
 });
