@@ -149,6 +149,7 @@ import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { parseLocalIssue } from '../../adapters/tracker/local.js';
 import { parseSpecReview } from '../../board/spec-review.js';
 import { actionHash } from '../../learning/index.js';
+import '../../config-registry.js';
 import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 import {
   EMPTY_CONFIG_REGISTRY,
@@ -164,6 +165,9 @@ import {
 
 /** The repository root, whose tsconfig the compiler reads under. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+
+/** The module that registers the config defaults, as a child process imports it. */
+const CONFIG_REGISTRY_ENTRY = fileURLToPath(new URL('../../config-registry.ts', import.meta.url));
 
 /** The registry itself, as a child process imports it. */
 const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
@@ -568,6 +572,7 @@ describe('the core adapter registry', () => {
     });
     // bun's homedir() keeps the HOME the process started with, so each reading is a child of its own.
     const script = [
+      `await import(${JSON.stringify(CONFIG_REGISTRY_ENTRY)});`,
       `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(REGISTRY_ENTRY)});`,
       `const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: ${JSON.stringify(root)} });`,
       'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',
