@@ -16,6 +16,7 @@
  * | `src/commands/board/sync.ts` | `rafa board sync` |
  * | `src/commands/issue/create.ts` | the `openGh` `rafa issue create` hands `./add-issue.ts` |
  * | `src/commands/epic/epic-project.ts` | the `rafa epic` actions, the add of `epic new` included |
+ * | `src/commands/epic/close-triage.ts` | the `openGh` the gate of `rafa epic close` hands `./add-filed.ts` for the bugs its failed checks filed |
  * | `src/commands/pr/merge-project.ts` | `rafa pr merge` |
  * | `src/commands/release/settle-project.ts` | `rafa release settle` |
  * | `./issue-board-refresh.ts` | the refreshing issue board's refresh, and every caller of `refreshIssueItems` |

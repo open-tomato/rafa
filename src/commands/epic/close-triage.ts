@@ -43,6 +43,34 @@
  * that threw are each a `warn` line, and the next criterion is filed all
  * the same.
  *
+ * ## A filed bug, onto the project
+ *
+ * Once a failure's {@link bugLine} lines are written, the bug it filed on
+ * the public `github` tracker is added to the repository's project and
+ * filled, through `addFiledBugs` (`src/board/project/add-filed.ts`), and
+ * every line that add answers is written at `warn`, after those lines and
+ * before the next criterion is filed. Nothing is sent with
+ * `board.project.number` unset, nor for a bug commented on, inherited,
+ * failed, skipped, routed elsewhere or filed on a tracker of another
+ * kind; a docs-only failure files no bug, so it sends nothing either.
+ *
+ * The runner every project call goes through is the close's `gh` seam,
+ * or a `gh` runner in the project root when left out, opened retrying as
+ * `./epic-project.ts` opens it (`openProjectRunner` with
+ * `commandRetrySeams` over the command's output, its mode and the
+ * `sleep` seam), at most once per run and only once a bug is to be
+ * added. The `sleep` seam is also the add's pause between writes. A
+ * planted `projectRefresh` seam is the refresh of each added issue,
+ * handed the issues and the widening the add asks for and not the
+ * add's known item, which an epic action's refresh does not take; left
+ * out, the add's own refresh fills the issue from that item.
+ *
+ * The add never rejects: a token without the `project` scope, a number
+ * naming no project, or a refresh that failed is each a warning line,
+ * and the close's exit code and its own lines stand as without it. A
+ * throw from it all the same is one `warn` line,
+ * `Criterion <n>: filed, but not added to the project: <message>`.
+ *
  * A failed check whose criterion's text names only documentation
  * (`namesOnlyDocs`, `src/triage/doc-only.ts`) is no bug: in place of the
  * report it is one `unsettled` stale-docs row with no plan stub and one
@@ -51,17 +79,22 @@
  * `./close-docs.ts` says what is stored and written.
  */
 import type { EpicCloseSeams } from './close.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { AddIssueOptions, RefreshAddedItems } from '../../board/project/add-issue.js';
 import type { RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
 import type { IssueRef, Tracker } from '../../ports/index.js';
 import type { TaskReport } from '../../report/parse.js';
-import type { BugTriage, NamedSecret } from '../../triage/triage.js';
+import type { BugTriage, NamedSecret, TriageResult } from '../../triage/triage.js';
 
 import { join } from 'node:path';
 
+import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
+import { addFiledBugs } from '../../board/project/add-filed.js';
+import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { bugRulesOf } from '../../config-schema-issues.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
@@ -73,11 +106,14 @@ import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.j
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 
 /** The seams the filing reads off the close's. */
-export type FilingSeams = Pick<EpicCloseSeams, 'findings' | 'git' | 'privateTracker' | 'resolve' | 'staleDocsVersion' | 'triageReport'>;
+export type FilingSeams = Pick<
+  EpicCloseSeams,
+  'findings' | 'gh' | 'git' | 'privateTracker' | 'projectRefresh' | 'resolve' | 'sleep' | 'staleDocsVersion' | 'triageReport'
+>;
 
 /** The part of the close's run the filing reads. */
 export interface FilingRun {
-  readonly context: Pick<RafaContext, 'env' | 'output'>;
+  readonly context: Pick<RafaContext, 'env' | 'output' | 'outputMode'>;
   readonly root: string;
   readonly home: string;
   readonly config: RafaConfig;
@@ -186,6 +222,48 @@ function write(run: FilingRun, line: { readonly text: string; readonly warn: boo
   else run.context.output.info(line.text);
 }
 
+/**
+ * What the add of each filed bug is made with: the runner opened retrying
+ * at most once per run, and the `projectRefresh` seam, when planted, as
+ * the refresh; see the module note.
+ */
+function addOptionsOf(run: FilingRun): AddIssueOptions {
+  const { seams } = run;
+  let gh: GhRunner | null = null;
+  const openGh = (): GhRunner => {
+    gh ??= openProjectRunner(
+      seams.gh ?? createGhRunner({ cwd: run.root }),
+      run.config,
+      commandRetrySeams(run.context.output, run.context.outputMode, seams.sleep),
+    );
+    return gh;
+  };
+  const planted = seams.projectRefresh;
+  // The epic actions' refresh takes no known items, so the add's is dropped.
+  const refresh: RefreshAddedItems | undefined = planted === undefined
+    ? undefined
+    : (options, issues, widening) => planted(options, issues, widening);
+  return {
+    config: run.config,
+    openGh,
+    ...(refresh === undefined
+      ? {}
+      : { refresh }),
+    ...(seams.sleep === undefined
+      ? {}
+      : { sleep: seams.sleep }),
+  };
+}
+
+/** Adds the bugs `result` filed on the public `github` tracker to the project, each line at `warn`; never rejects. */
+async function addToProject(run: FilingRun, add: AddIssueOptions, criterion: EpicCriterion, result: TriageResult): Promise<void> {
+  try {
+    for (const line of await addFiledBugs(add, result)) run.context.output.warn(line);
+  } catch (error) {
+    run.context.output.warn(`Criterion ${String(criterion.number)}: filed, but not added to the project: ${messageOf(error)}`);
+  }
+}
+
 /** Files each failed check through `triageReport`, the public tracker resolved once; see the module note. */
 export async function fileFailures(run: FilingRun, epic: number, failures: readonly CheckAnswered[], commit: string): Promise<void> {
   const secrets: readonly NamedSecret[] = namedSecrets(run.config, run.context.env);
@@ -201,6 +279,7 @@ export async function fileFailures(run: FilingRun, epic: number, failures: reado
   const git = run.seams.git ?? createGitRunner(run.root);
   const bugRules = bugRulesOf(run.config);
   const triage = run.seams.triageReport ?? triageReport;
+  const add = addOptionsOf(run);
   let version: string | null = null;
   const docs = {
     repoRoot: run.root, epic, tracker, seams: run.seams.findings,
@@ -232,6 +311,7 @@ export async function fileFailures(run: FilingRun, epic: number, failures: reado
         bugRules,
       });
       for (const bug of result.bugs) write(run, bugLine(criterion, bug));
+      await addToProject(run, add, criterion, result);
     } catch (error) {
       run.context.output.warn(`Criterion ${String(criterion.number)}: not filed: ${messageOf(error)}`);
     }

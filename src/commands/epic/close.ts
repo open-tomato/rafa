@@ -88,7 +88,13 @@
  * `./close-triage.ts` files each failed check, as a bug through
  * `triageReport` or as a line on the release's stale-docs issue
  * (`./close-docs.ts`), and its module note says how: the report, the
- * recurrence key, the tracker and the lines it writes.
+ * recurrence key, the tracker and the lines it writes. With
+ * `board.project.number` set, each bug it filed on the public `github`
+ * tracker is then added to the repository's project and filled
+ * (`addFiledBugs`), every line of that add a warning after the bug's own
+ * line, through the same `gh`, `projectRefresh` and `sleep` seams the
+ * project refresh below takes. The close is refused all the same, with
+ * {@link EPIC_CLOSE_REFUSAL_EXIT}.
  *
  * ## The project refresh
  *

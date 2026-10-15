@@ -226,6 +226,10 @@ Commands that call the refresh outside the label wrapper:
   call since fragments are still on the base)
 - `rafa epic new`, `promote`, `defer`, `move`, `cancel`, `close` — refresh
   the epic, its members and every item whose Rank shifted
+- `rafa epic close` (the gate) — add each bug a failed check filed on the
+  public `github` tracker, then refresh it the way `rafa issue create`
+  does, every line a warning after the failure's own (`addFiledBugs`,
+  called from `src/commands/epic/close-triage.ts`)
 
 ### Per-issue refusal and its line
 
