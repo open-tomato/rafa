@@ -227,10 +227,12 @@ alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
 from which `development-build.ts` imports `loop/index.ts` back.
-`loop/hops.ts` stands alone over `hop-record.ts`, because
-`src/next/hop-record.ts` imports it back by value and
-`src/loop/session-record-parse.ts`, which `sessions.ts` imports by
-value, imports that file by value.
+`loop/hops.ts` stands alone over `hop-record.ts`, split while
+`src/next/hop-record.ts` imported it back by value and the session record
+parser, which `sessions.ts` imports by value, imported that file by
+value; the parser now sits beside `sessions.ts` as
+`loop/session-record-parse.ts` and imports `hop-record.ts` by path, so
+the split stands as it was made.
 `plan/block-reader.ts` stands alone, split while `parse.ts` imported
 `src/utils/tracker.ts`, which imports `blocks.ts` back; `parse.ts` now
 reads `plan/blocker-comment.ts` instead and no core file imports the

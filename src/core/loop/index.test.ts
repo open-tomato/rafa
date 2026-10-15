@@ -15,7 +15,7 @@
  * both files would be lost from one of them, and the joined lists of
  * the other cases would not say which.
  *
- * `sessions.ts` re-exports part of `src/loop/session-record-parse.ts`,
+ * `sessions.ts` re-exports part of `session-record-parse.ts`,
  * and the barrel carries those names two files away from where they are
  * declared. The fourth case holds each of them to the binding that file
  * declares. `SessionRecordError` is why it matters: a caller catches,
@@ -50,10 +50,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import * as parser from '../../loop/session-record-parse.js';
-
 import * as claude from './claude.js';
 import * as sessionEnv from './session-env.js';
+import * as parser from './session-record-parse.js';
 import * as sessions from './sessions.js';
 
 import * as barrel from './index.js';

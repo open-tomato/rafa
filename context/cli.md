@@ -257,7 +257,7 @@ The session record's `hop` field: When `loop start --roadmap` runs while a hop
 is `away`, its run record (`.rafa/runs/<session-id>.json`) carries the hop record
 itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
 none, and no position file stamp nothing. `parseSessionRecord`
-(`loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
+(`core/loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
 record, and every later write keeps it whole.
 
 ### `rafa next` row order
@@ -492,7 +492,7 @@ New; it replaces no earlier text. What a row or an action added to
   home, a stale one, none, and no position file stamp nothing; a file
   that is no hop record is warned about in one line and stamps nothing.
   Without the flag neither file is read and the record carries no `hop`
-  key; `parseSessionRecord` (`loop/session-record-parse.ts`) refuses a
+  key; `parseSessionRecord` (`core/loop/session-record-parse.ts`) refuses a
   `hop` key holding anything but a hop record, and every later write keeps
   it.
 - **`loop start --as-worktree` creates a new git worktree for the loop to run
@@ -736,7 +736,7 @@ New; it replaces no earlier text. What a row or an action added to
   a retry is left and the second with none: a retry-safe stop is decided
   only once its retries are spent, so its prompt offers no `retry`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
-  (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
+  (`start/session.ts`, `core/loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
   The header shows `🍅 #<n> <task>/<total>` in `task` and `🍅 #<n> <phase>`
   otherwise, never counting past the total, and `rafa loop status` and

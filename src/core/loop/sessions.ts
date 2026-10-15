@@ -208,18 +208,20 @@
  * ## Reading a record
  *
  * The record's field readers and {@link parseSessionRecord} live in
- * `loop/session-record-parse.ts`, whose note lists what is refused on
- * read. This module re-exports what a caller reads from there, so
- * `./sessions.js` stays the one import a record's reader needs.
+ * `session-record-parse.ts`, beside this file, whose note lists what is
+ * refused on read. This module re-exports what a caller reads from
+ * there, so `./sessions.js` stays the one import a record's reader
+ * needs: `isPositiveWhole` and `RECORD_EXTENSION` among them, which
+ * `src/stretch/folder.ts` and `src/cleanup/runs.ts` read.
  */
 import type { HopRecord } from './hop-record.js';
-import type { SuiteFailure } from './suite-failure.js';
 import type {
   SessionPhase,
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from '../../loop/session-record-parse.js';
+} from './session-record-parse.js';
+import type { SuiteFailure } from './suite-failure.js';
 import type { TestScope } from '../plan/declaration.js';
 
 import {
@@ -233,6 +235,9 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { messageOf } from '../config/config-sections.js';
+import { scopeAt } from '../config/scope.js';
+
 import {
   freezeRecord,
   isPositiveWhole,
@@ -244,19 +249,19 @@ import {
   sessionDecisions,
   sessionSteps,
   stepProblems,
-} from '../../loop/session-record-parse.js';
-import { messageOf } from '../config/config-sections.js';
-import { scopeAt } from '../config/scope.js';
+} from './session-record-parse.js';
 
 export type {
   SessionPhase,
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from '../../loop/session-record-parse.js';
+} from './session-record-parse.js';
 export {
+  isPositiveWhole,
   isSessionId,
   parseSessionRecord,
+  RECORD_EXTENSION,
   SESSION_DECISION_STRATEGIES,
   SESSION_PHASES,
   SESSION_STATES,
@@ -266,7 +271,7 @@ export {
   sessionDecisions,
   sessionPhase,
   sessionSteps,
-} from '../../loop/session-record-parse.js';
+} from './session-record-parse.js';
 
 /** The directory the records are kept in, under a project's `.rafa/`. */
 export const RUNS_DIR = 'runs';

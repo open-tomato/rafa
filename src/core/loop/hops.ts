@@ -17,7 +17,9 @@
  * A barrel that groups a file with a file outside `src/core/` that
  * imports the barrel back by value is a runtime cycle. `src/next/hop-record.ts`
  * imports `asHopRecord` by value to re-export it, and
- * `src/loop/session-record-parse.ts` imports it from there by value.
+ * `src/loop/session-record-parse.ts` imported it from there by value
+ * when the split was made (the parser has since moved beside
+ * `sessions.ts` and imports `hop-record.ts` by path).
  * `sessions.ts`, behind `index.ts`, imports that parser by value. So
  * `hop-record.ts` behind `index.ts` closed a cycle of four files:
  * `index.ts`, `sessions.ts`, `src/loop/session-record-parse.ts` and

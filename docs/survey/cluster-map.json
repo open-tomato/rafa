@@ -430,7 +430,7 @@
     "src/learning/merge.ts": "c4",
     "src/loop/awake-clock.ts": "c2",
     "src/loop/events-file.ts": "c2",
-    "src/loop/session-record-parse.ts": "c3",
+    "src/core/loop/session-record-parse.ts": "c3",
     "src/loop/wait-reasons.ts": "c2",
     "src/modules/load.ts": "c2",
     "src/modules/manifest.ts": "c7",

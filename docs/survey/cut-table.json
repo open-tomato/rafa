@@ -1693,14 +1693,9 @@
       "upwardEdgesIn": 1
     },
     {
-      "kind": "test",
-      "path": "src/loop/session-record-parse.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "source",
       "path": "src/loop/session-record-parse.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -3631,13 +3626,6 @@
           "toPackage": "rafa-inventory"
         },
         {
-          "from": "src/core/loop/sessions.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/loop/session-record-parse.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3653,8 +3641,8 @@
         }
       ],
       "fileCounts": {
-        "source": 109,
-        "test": 113,
+        "source": 112,
+        "test": 116,
         "testSupport": 2
       },
       "files": [
@@ -3715,6 +3703,10 @@
         "src/core/git/index.ts",
         "src/core/loop/claude.test.ts",
         "src/core/loop/claude.ts",
+        "src/core/loop/hop-record.test.ts",
+        "src/core/loop/hop-record.ts",
+        "src/core/loop/hops.test.ts",
+        "src/core/loop/hops.ts",
         "src/core/loop/index.test.ts",
         "src/core/loop/index.ts",
         "src/core/loop/readings.test.ts",
@@ -3722,6 +3714,8 @@
         "src/core/loop/session-env.test.ts",
         "src/core/loop/session-env.ts",
         "src/core/loop/session-readings.ts",
+        "src/core/loop/session-record-parse.test.ts",
+        "src/core/loop/session-record-parse.ts",
         "src/core/loop/sessions-decisions.test.ts",
         "src/core/loop/sessions-hop.test.ts",
         "src/core/loop/sessions-phase.test.ts",
@@ -3884,7 +3878,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 99,
+        "src/core/": 105,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3901,8 +3895,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 6,
-      "upwardEdges": 6
+      "remaining": 5,
+      "upwardEdges": 5
     },
     {
       "clearedByIssue118": 0,
@@ -6908,7 +6902,7 @@
       "edges": [],
       "fileCounts": {
         "source": 264,
-        "test": 466,
+        "test": 465,
         "testSupport": 27
       },
       "files": [
@@ -7286,7 +7280,6 @@
         "src/loop/blocked-tasks.ts",
         "src/loop/events-file.test.ts",
         "src/loop/events-file.ts",
-        "src/loop/session-record-parse.test.ts",
         "src/loop/session-record-parse.ts",
         "src/loop/wait-reasons.test.ts",
         "src/loop/wait-reasons.ts",
@@ -7689,12 +7682,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1996,
-    "leftToPlace": 718,
-    "nonTestEdges": 4444,
+    "files": 2001,
+    "leftToPlace": 717,
+    "nonTestEdges": 4449,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 258
+    "upwardEdges": 257
   },
   "unassigned": [
     {

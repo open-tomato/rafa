@@ -47,11 +47,11 @@ function plant(from: string, to: string, tests: readonly string[] = []): CoreMov
 }
 
 describe('CORE_MOVES', () => {
-  it('lists twenty-eight files, each once, sorted by the path it has today', () => {
+  it('lists twenty-nine files, each once, sorted by the path it has today', () => {
     const from = CORE_MOVES.map((move) => move.from);
 
-    expect(from).toHaveLength(28);
-    expect(new Set(from).size).toBe(28);
+    expect(from).toHaveLength(29);
+    expect(new Set(from).size).toBe(29);
     expect(from).toEqual([...from].sort());
   });
 
@@ -81,10 +81,10 @@ describe('CORE_MOVES', () => {
     }
   });
 
-  it('holds 29 test files, with none for stream.ts, plan-files.ts, session-readings.ts and plan-stamp.ts', () => {
+  it('holds 30 test files, with none for stream.ts, plan-files.ts, session-readings.ts and plan-stamp.ts', () => {
     const without = CORE_MOVES.filter((move) => move.tests.length === 0).map((move) => move.from);
 
-    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(29);
+    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(30);
     expect(without).toEqual(['src/adapters/output/stream.ts', 'src/loop/session-readings.ts', 'src/plan/plan-files.ts', 'src/utils/plan-stamp.ts']);
   });
 
@@ -144,10 +144,10 @@ describe('CORE_BARRELS', () => {
 });
 
 describe('movedPaths and movedTo', () => {
-  it('spreads the moves into 57 paths, a file first and its test files after it', () => {
+  it('spreads the moves into 59 paths, a file first and its test files after it', () => {
     const paths = movedPaths();
 
-    expect(paths).toHaveLength(57);
+    expect(paths).toHaveLength(59);
     expect(paths.slice(0, 2)).toEqual([
       { from: 'src/adapters/output/active.ts', to: 'src/core/output/active.ts' },
       { from: 'src/adapters/output/active.test.ts', to: 'src/core/output/active.test.ts' },
@@ -164,7 +164,7 @@ describe('movedPaths and movedTo', () => {
 });
 
 describe('findCollisions', () => {
-  it('finds none across the twenty-eight moves, their test files and the barrels', () => {
+  it('finds none across the twenty-nine moves, their test files and the barrels', () => {
     expect(findCollisions(CORE_MOVES, CORE_BARRELS)).toEqual([]);
   });
 
@@ -232,6 +232,7 @@ describe('CORE_REEXPORTS', () => {
       'src/cli/core/types.ts',
       'src/cli/running.ts',
       'src/cli/spends.ts',
+      'src/loop/session-record-parse.ts',
       'src/runtime/identity.ts',
       'src/utils/declaration.ts',
       'src/utils/plan-stamp.ts',
