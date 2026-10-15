@@ -53,6 +53,9 @@
  */
 import type { ScopeFileSystem, ScopeResolution } from './scope.js';
 
+import '../config-registry.js';
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';

@@ -24,6 +24,7 @@
 import type { LoadedModules } from '../modules/load.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
+import '../config-registry.js';
 import '../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

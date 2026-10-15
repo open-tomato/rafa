@@ -15,6 +15,7 @@
 import type { ModuleSettings } from './load.js';
 import type { ModuleSource } from '@open-tomato/rafa/core/config';
 
+import '../config-registry.js';
 import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

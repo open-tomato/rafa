@@ -38,6 +38,7 @@ import type { AdapterContext, Adapter } from '@open-tomato/rafa/core/adapters';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { Sync } from '@open-tomato/rafa/ports';
 
+import '../../config-registry.js';
 import '../../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

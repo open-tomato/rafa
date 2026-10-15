@@ -59,6 +59,7 @@ import type { StoreBackend } from '@open-tomato/rafa/core/config/sections';
 import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 import type { CommitEffortRow, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
+import '../../../../config-registry.js';
 import '../../../../adapter-registry.js';
 
 import {
