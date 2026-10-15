@@ -45,6 +45,7 @@ import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
 import type { Tracker } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { TriageOptions, TriageResult } from '../../triage/triage.js';
 
 import '../../adapter-registry.js';
 
@@ -65,7 +66,7 @@ import { readStaleDocsForPlan } from '../../effort/store/stale-docs.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { bugKeyOf } from '../../triage/triage.js';
+import { bugKeyOf, triageReport } from '../../triage/triage.js';
 
 import closeCommand, {
   bugLine,
@@ -240,14 +241,17 @@ function plantedStore(): EffortStore {
 }
 
 /** A tracker that records every create and comment before a `local` tracker makes them. */
-function spiedTracker(inner: Tracker): { tracker: Tracker; calls: string[] } {
+function spiedTracker(inner: Tracker): { tracker: Tracker; calls: string[]; bodies: string[] } {
   const calls: string[] = [];
+  const bodies: string[] = [];
   return {
     calls,
+    bodies,
     tracker: {
       ...inner,
       create: (draft) => {
         calls.push(`create ${draft.title}`);
+        bodies.push(draft.body);
         return inner.create(draft);
       },
       comment: (issue, body) => {
@@ -270,6 +274,8 @@ interface CaseSetup {
   readonly env?: Readonly<Record<string, string>>;
   /** The project refresh; the system's own when left out. */
   readonly projectRefresh?: EpicCloseSeams['projectRefresh'];
+  /** Triages each failed check; the system's own when left out. */
+  readonly triageReport?: EpicCloseSeams['triageReport'];
 }
 
 /** The version every case's stale-docs issue is titled for. */
@@ -308,10 +314,16 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     ...setup.projectRefresh === undefined
       ? {}
       : { projectRefresh: setup.projectRefresh },
+    ...setup.triageReport === undefined
+      ? {}
+      : { triageReport: setup.triageReport },
   };
   const commands: RafaCommand[] = [createEpicCloseCommand(seams)];
   const outcome = await dispatchInProject(['epic', 'close', ...words], [EPIC_SUBJECT], commands, project, setup.env);
-  return { ...outcome, project, ghCalls: gh.calls, gitCalls: git.calls, spawned: claude.spawned, trackerCalls: publicTracker.calls };
+  return {
+    ...outcome, project, git: git.git, ghCalls: gh.calls, gitCalls: git.calls, spawned: claude.spawned, trackerCalls: publicTracker.calls,
+    trackerBodies: publicTracker.bodies,
+  };
 }
 
 /** The `gh issue close` calls a run made. */
@@ -432,6 +444,10 @@ describe('failedCheckReport', () => {
     expect(report.blockers).toEqual([]);
     expect(report.outOfScopeBugs).toHaveLength(1);
     expect(report.outOfScopeBugs[0]?.security).toBe(false);
+    expect(report.outOfScopeBugs[0]?.module).toBe('epic');
+    expect(report.outOfScopeBugs[0]?.action).toBe('close');
+    expect(report.outOfScopeBugs[0]?.reproduce).toBe('rafa epic close 40');
+    expect(report.outOfScopeBugs[0]?.cause).toBeNull();
     expect(report.outOfScopeBugs[0]?.what).toBe(`Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`);
     expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
     expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
@@ -494,7 +510,9 @@ describe('rafa epic close, dispatched', () => {
 
     expect(first.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(first.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
-    expect(first.trackerCalls).toEqual([`create Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`]);
+    // The title is rendered from the record: the epic's module and action
+    // ahead of the summary, which is cut to the default 80 code points.
+    expect(first.trackerCalls).toEqual(['create epic - close: Epic #40 acceptance criterion 2 fails against main: - `rafa epics` shows one...']);
     expect(first.stdout).toContain('Criterion 2: filed on the public tracker as local issue');
     expect(closesOf(first.ghCalls)).toEqual([]);
 
@@ -503,6 +521,37 @@ describe('rafa epic close, dispatched', () => {
     expect(second.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(second.trackerCalls.map((call) => call.split(' ')[0])).toEqual(['comment']);
     expect(second.stdout).toContain('Criterion 2: recurs in local issue');
+  });
+
+  it('hands triage the root as the checkout, the run\'s git, its environment and its config, and the bug its module, action and reproduce', async () => {
+    const script: Script = {
+      checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
+    };
+    const handed: TriageOptions[] = [];
+    const spy = (options: TriageOptions): Promise<TriageResult> => {
+      handed.push(options);
+      return triageReport(options);
+    };
+    const env = { RAFA_CLOSE_PROBE: 'on' };
+
+    const project = plantCase(`${LOCAL_CONFIG}issues:\n  vocabulary:\n    modules: [epic, triage]\n`);
+
+    const outcome = await run(['40'], { script, env, project, triageReport: spy });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(handed).toHaveLength(1);
+    const [options] = handed;
+    expect(options?.checkout).toBe(outcome.project.root);
+    expect(options?.repoRoot).toBe(outcome.project.root);
+    expect(options?.git).toBe(outcome.git);
+    expect(options?.env?.RAFA_CLOSE_PROBE).toBe('on');
+    expect(options?.bugRules?.modules).toEqual(['epic', 'triage']);
+    const bug = options?.report.outOfScopeBugs[0];
+    expect([bug?.module, bug?.action, bug?.reproduce, bug?.cause]).toEqual(['epic', 'close', 'rafa epic close 40', null]);
+    expect(outcome.trackerBodies).toHaveLength(1);
+    const body = outcome.trackerBodies[0] ?? '';
+    expect(body).toContain(`## What\n\n\`\`\`\n${bug?.what ?? 'no what'}\n\`\`\``);
+    expect(body).toContain('## Task\n\n```\nrafa epic close 40\n```');
   });
 
   it('sends a failed page-only criterion to the docs channel and still files one naming a source file as a bug', async () => {
@@ -519,7 +568,7 @@ describe('rafa epic close, dispatched', () => {
     expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(outcome.trackerCalls).toHaveLength(2);
     expect(outcome.trackerCalls[0]).toBe(`create ${staleDocsTitle(STALE_DOCS_VERSION)}`);
-    expect(outcome.trackerCalls[1]).toStartWith('create Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
+    expect(outcome.trackerCalls[1]).toStartWith('create epic - close: Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
     expect(outcome.stdout).toContain(`Criterion 1: names only documentation, so no bug is filed; opened local issue 1, ${staleDocsTitle(STALE_DOCS_VERSION)}, with the line.`);
     expect(outcome.stdout).toContain('Criterion 2: filed on the public tracker as local issue 2.');
     expect(outcome.stderr).toContain('1 criterion failed its check, each filed as a bug, and 1 criterion naming only documentation failed,'

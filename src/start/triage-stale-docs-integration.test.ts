@@ -25,6 +25,7 @@ import {
 } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { readStaleDocsForPlan } from '../effort/store/stale-docs.js';
 import { recordTaskReport } from '../report/record.js';
@@ -55,6 +56,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const OUTPUT = [

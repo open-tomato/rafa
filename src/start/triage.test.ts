@@ -60,9 +60,10 @@ import type {
   TaskTriageInput,
 } from './triage.js';
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { IssueRef, Tracker } from '../ports/index.js';
-import type { TriageResult } from '../triage/triage.js';
+import type { TriageOptions, TriageResult } from '../triage/triage.js';
 
 import '../adapter-registry.js';
 
@@ -89,10 +90,12 @@ import {
 
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
+import { RAFA_VERSION } from '../core/command/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { bugKeyOf, createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
+import { bugKeyOf, createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
@@ -143,6 +146,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
@@ -964,5 +969,132 @@ describe('the run\'s similarity settings', () => {
 
     expect(second?.bugs.map((bug) => [bug.action, bug.foundBy])).toEqual([['filed', null]]);
     expect(issueNames(f.publicDir)).toEqual(['1.md', '2.md']);
+  });
+});
+
+describe('what each triageReport is handed', () => {
+  /** A git runner that spawns nothing: it records each call and answers `abc1234` to every one. */
+  function fakeGit(): { readonly git: GitRunner; readonly calls: (readonly string[])[] } {
+    const calls: (readonly string[])[] = [];
+    return {
+      calls,
+      git: (args) => {
+        calls.push(args);
+        return { ok: true, stdout: 'abc1234\n', stderr: '' };
+      },
+    };
+  }
+
+  /** A `triageReport` that records the options it is handed, then triages through the real one. */
+  function capturing(): { readonly seen: TriageOptions[]; readonly report: (options: TriageOptions) => Promise<TriageResult> } {
+    const seen: TriageOptions[] = [];
+    return {
+      seen,
+      report: (options) => {
+        seen.push(options);
+        return triageReport(options);
+      },
+    };
+  }
+
+  const oneBug = sessionOutput({ bugs: [['The parser drops a line', 'ERR_ONE', false]] });
+
+  it('carries the checkout, the fake git runner, the environment and the bug rules read from the config', async () => {
+    captureLines();
+    const f = fixture();
+    const checkout = mkdtempSync(join(tempBase, 'checkout-'));
+    const { git, calls } = fakeGit();
+    const env = { CI: 'true' };
+    const config: StartTriageOptions['config'] = {
+      ...CONFIG,
+      issuesEnvironments: ['staging'],
+      issuesVocabularyModules: ['parser'],
+      errorsCodes: [{ code: 'parse:dropped-line', description: 'a line is dropped', hint: 'keep the line', level: 'error' }],
+    };
+    const { seen, report } = capturing();
+
+    await triageFor(f, chainLanding(f.publicSpy.tracker), { checkout, git, env, config, triageReport: report })(taskInput(f, oneBug));
+
+    expect(seen).toHaveLength(1);
+    const [handed] = seen;
+    expect(handed?.repoRoot).toBe(f.root);
+    expect(handed?.checkout).toBe(checkout);
+    expect(handed?.git).toBe(git);
+    expect(handed?.env).toBe(env);
+    expect(handed?.bugRules).toEqual(bugRulesOf(config));
+    expect(handed?.bugRules?.environments).toContain('staging');
+    expect(handed?.bugRules?.modules).toEqual(['parser']);
+    expect(handed?.bugRules?.codes.map((entry) => entry.code)).toContain('parse:dropped-line');
+    // The record reads the code version through the runner handed, and the
+    // place through the environment handed: the fake's answer to the status
+    // read is a changed file, so the commit reads dirty. The store and the
+    // issue stay at the repo root all the same.
+    expect(calls).toEqual([['rev-parse', '--short', 'HEAD'], ['status', '--porcelain', '--untracked-files=no']]);
+    expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    const [filed] = issueFiles(f.publicDir);
+    expect(filed?.contents).toContain('## Environment\n\nci\n');
+    expect(filed?.contents).toContain(`## Versions\n\n\`\`\`\nrafa: ${RAFA_VERSION}\ncode: abc1234-dirty\n\`\`\`\n`);
+  });
+
+  it('left without a checkout, a git runner or an environment, hands the repo root, a runner of its own and the process environment', async () => {
+    captureLines();
+    const f = fixture();
+    const { git } = fakeGit();
+    const { seen, report } = capturing();
+
+    await createStartTriage({
+      repoRoot: f.root,
+      config: CONFIG,
+      resolve: chainLanding(f.publicSpy.tracker).resolve,
+      privateTracker: f.privateSpy.tracker,
+      triageReport: report,
+    })(taskInput(f, oneBug));
+
+    const [handed] = seen;
+    expect(handed?.checkout).toBe(f.root);
+    expect(typeof handed?.git).toBe('function');
+    expect(handed?.git).not.toBe(git);
+    expect(handed?.env).toBe(process.env);
+    expect(handed?.bugRules).toEqual(bugRulesOf(CONFIG));
+  });
+
+  it('takes a worktree path outside the project out of the filed body, where a triage without the checkout leaves it in', async () => {
+    captureLines();
+    const outside = mkdtempSync(join(tempBase, 'outside-worktree-'));
+    const what = `The parser drops a line in ${join(outside, 'src', 'parse.ts')}`;
+    const output = sessionOutput({ bugs: [[what, 'ERR_OUTSIDE', false]] });
+
+    const handed = fixture();
+    await triageFor(handed, chainLanding(handed.publicSpy.tracker), { checkout: outside, git: fakeGit().git })(taskInput(handed, output));
+    const plain = fixture();
+    await triageFor(plain, chainLanding(plain.publicSpy.tracker))(taskInput(plain, output));
+
+    const [filed] = issueFiles(handed.publicDir);
+    expect(filed?.contents).toContain('The parser drops a line in src/parse.ts');
+    expect(filed?.contents).not.toContain(outside);
+    const [control] = issueFiles(plain.publicDir);
+    expect(control?.contents).toContain(outside);
+  });
+
+  it('takes the default worktree\'s .rafa/worktrees/<stub>/ prefix out of the filed body, where a triage without the checkout leaves it in', async () => {
+    captureLines();
+    const stubPath = (root: string): string => join(root, '.rafa', 'worktrees', 'demo-stub');
+    const output = (root: string): string => sessionOutput({
+      bugs: [[`The parser drops a line in ${join(stubPath(root), 'src', 'parse.ts')}`, 'ERR_WORKTREE', false]],
+    });
+
+    const handed = fixture();
+    mkdirSync(stubPath(handed.root), { recursive: true });
+    await triageFor(handed, chainLanding(handed.publicSpy.tracker), { checkout: stubPath(handed.root), git: fakeGit().git })(
+      taskInput(handed, output(handed.root)),
+    );
+    const plain = fixture();
+    await triageFor(plain, chainLanding(plain.publicSpy.tracker))(taskInput(plain, output(plain.root)));
+
+    const [filed] = issueFiles(handed.publicDir);
+    expect(filed?.contents).toContain('The parser drops a line in src/parse.ts');
+    expect(filed?.contents).not.toContain('.rafa/worktrees/demo-stub');
+    const [control] = issueFiles(plain.publicDir);
+    expect(control?.contents).toContain('.rafa/worktrees/demo-stub/src/parse.ts');
   });
 });

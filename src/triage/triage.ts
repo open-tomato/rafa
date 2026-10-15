@@ -213,20 +213,40 @@
  * The draft is a `bug` with `opt: 0`, since rafa keeps no OPT ledger and
  * each adapter numbers its own issues, `priority: null`, which the port
  * spells as the adapter applying `needs-triage`, no project and no
- * blocking issue. Its `module` is {@link TRIAGE_MODULE}, `unassigned`,
- * the module the GitHub adapter's `get` answers for an issue with no
- * module label, since a report names no module.
+ * blocking issue.
  *
- * The title and the body, its sections and the comment a recurrence
- * gets are `./issue-text.ts`'s, whose note holds what each shows. The
- * `Refs` section among them is built here, from the redacted artifact,
- * by {@link TriageOptions.verifyRefs}.
+ * Each bug is filed with its bug record (#991), built by
+ * `./bug-filing.ts` from the report, the dispatch and the checkout, git
+ * runner, environment and rules this module is handed; its note holds
+ * each fill. The title is `bugTitle` over the record and the rules'
+ * template (`../bugs/record.ts`), the summary already cut and redacted.
+ * The draft's `module` is the record's, or {@link TRIAGE_MODULE},
+ * `unassigned`, for `unknown`: the module the GitHub adapter's `get`
+ * answers for an issue with no module label. Its `cause` is the
+ * record's, which the `github` adapter files as a label and the `local`
+ * adapter keeps in its file. The private tracker's issue carries the
+ * same record, and a machine fault is skipped before any is built.
+ *
+ * The body, its sections and the comment a recurrence gets are
+ * `./issue-text.ts`'s, whose note holds what each shows: the body
+ * carries the record's sections after `Feedback`, and the comment the
+ * record's `Versions` alone. The `Refs` section among them is built
+ * here, from the redacted artifact, by {@link TriageOptions.verifyRefs}.
  *
  * ## Local paths and named secrets
  *
  * Every value a session or the plan supplied, and every problem this
  * module answers, has its local paths taken out first, as the key does
  * ({@link TriageOptions.home} names the home), then its secrets.
+ *
+ * The paths are taken out over two roots in one pass, the checkout the
+ * task ran in ({@link TriageOptions.checkout}) and the project root, the
+ * longer first (`./local-paths.ts`). A loop in a worktree outside the
+ * project then leaves no folder between the home and the worktree, and
+ * the default worktree under the root leaves no `.rafa/worktrees/<stub>/`
+ * ahead of a path. Two passes would leave either one. The `Refs` section
+ * is read in the checkout too, so a path a filed body names is stamped
+ * against the tree the session saw.
  *
  * {@link namedSecrets} answers the value of every `env` item under
  * `prerequisites`, both tiers, and of each of {@link SECRET_ENV_NAMES}
@@ -251,13 +271,16 @@
  * reference then cannot be stored keeps its action and names the store's
  * problem.
  */
+import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
 import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
+import type { BugRecord, BugRules } from '../bugs/record.js';
 import type { RafaConfig } from '../core/config/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type {
   FindingOutcome,
   FindingsDispatch,
@@ -272,17 +295,19 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
+import { bugTitle } from '../bugs/record.js';
+import { UNKNOWN_VALUE } from '../bugs/title.js';
 import { messageOf } from '../core/config/sections.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
+import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
 import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import {
   COMMENT_OPENING,
   ISSUE_OPENING,
   issueText,
-  issueTitle,
   similarCommentOpening,
 } from './issue-text.js';
 import { routeByKind } from './kind-route.js';
@@ -432,7 +457,8 @@ export interface TriageOptions {
   readonly secrets: readonly NamedSecret[];
   /**
    * Reads the paths and symbols a bug's artifact names, for its `Refs`
-   * section. `createArtifactRefsVerifier` over `repoRoot` when left out.
+   * section. `createArtifactRefsVerifier` over {@link checkout}, with
+   * {@link env}, when left out.
    */
   readonly verifyRefs?: RefVerifier;
   /** The home directory taken out of every filed text; `os.homedir()` when left out. */
@@ -453,6 +479,31 @@ export interface TriageOptions {
   readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
   /** The kind check's readings and the repair cap; left out, no entry is routed by its kind. */
   readonly kinds?: KindRouteOptions;
+  /**
+   * The checkout the task ran in: the project root itself, or a worktree
+   * of it, under the root or anywhere else. Its paths are taken out of
+   * every filed text together with `repoRoot`'s, and the `Refs` section is
+   * read in it; see the module note. `repoRoot` when left out.
+   */
+  readonly checkout?: string;
+  /**
+   * A git runner in {@link checkout}, which the bug record (#991) reads
+   * the code version through; left out, its `Versions` say `code: unknown`.
+   */
+  readonly git?: GitRunner;
+  /**
+   * The environment the run sees. The default `Refs` verifier looks for
+   * `ts-symbols` on its `PATH`, and the bug record suggests its place
+   * from it; left out, both read the process's own.
+   */
+  readonly env?: SecretEnvironment;
+  /**
+   * The rules a bug record is built under, as `bugRulesOf`
+   * (`src/config-schema-issues.ts`) answers them from the run's config:
+   * the title template, the summary cap, the vocabulary and the cause
+   * codes. `DEFAULT_BUG_RULES` (`./bug-filing.ts`) when left out.
+   */
+  readonly bugRules?: BugRules;
 }
 
 /** The environment a secret's value is read from. */
@@ -567,19 +618,54 @@ interface Filing {
    * {@link key} itself.
    */
   readonly legacyKeys: readonly string[];
-  /** The values {@link draft}'s body was built from, for the body of an issue filed in place of a closed one. */
+  /**
+   * The values {@link draft}'s body was built from, the record among them,
+   * for the body of an issue filed in place of a closed one.
+   */
   readonly values: BugValues;
+  /** The values {@link comment} was built from: the record left out, its `Versions` kept. */
+  readonly commentValues: BugValues;
   /** The `what` and artifact with local paths taken out, as the similarity step compares them. */
   readonly compared: ComparedText;
 }
 
-/** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
+/** How a bug's text is redacted: `local` takes out paths only, `redact` secrets too. */
+interface Redactors {
+  readonly local: (text: string) => string;
+  readonly redact: (text: string) => string;
+}
+
+/** The module a draft is filed under: the record's, or {@link TRIAGE_MODULE} for `unknown`. */
+function draftModuleOf(record: BugRecord): string {
+  return record.module === null || record.module === UNKNOWN_VALUE
+    ? TRIAGE_MODULE
+    : record.module;
+}
+
+/** The draft a bug is filed as: titled and labelled from its record; see the module note. */
+function draftOf(filing: BugFiling, rules: BugRules, redact: (text: string) => string): IssueDraft {
+  const { record } = filing;
+  return {
+    opt: 0,
+    title: bugTitle(record, rules),
+    body: issueText(ISSUE_OPENING, filing.values, redact),
+    type: 'bug',
+    module: draftModuleOf(record),
+    priority: null,
+    project: null,
+    blockedBy: [],
+    ...record.cause === null
+      ? {}
+      : { cause: record.cause },
+  };
+}
+
+/** The filing for one bug; see the module note. */
 async function filingFor(
   what: string,
   bug: ReportBug,
   options: TriageOptions,
-  local: (text: string) => string,
-  redact: (text: string) => string,
+  { local, redact }: Redactors,
   verifyRefs: RefVerifier,
 ): Promise<Filing> {
   const reported = artifactOf(bug);
@@ -595,31 +681,41 @@ async function filingFor(
   const refs = await buildRefsSection(artifact === null
     ? null
     : redact(artifact), verifyRefs);
-  const values: BugValues = {
+  const context: BugFilingContext = {
+    checkout: options.checkout ?? options.repoRoot,
+    ...options.git === undefined
+      ? {}
+      : { git: options.git },
+    ...options.env === undefined
+      ? {}
+      : { env: options.env },
+    ...options.bugRules === undefined
+      ? {}
+      : { bugRules: options.bugRules },
+  };
+  const filing = bugFilingOf({
+    bug,
     what,
-    artifact,
+    dispatch: options.dispatch,
+    feedback: options.report.feedback,
     key: searchText,
     refs,
-    planStub: options.dispatch.planStub,
-    taskText: options.dispatch.taskLine,
-    feedback: options.report.feedback,
-  };
+    context,
+    local,
+    redact,
+  });
+  const values: BugValues = { ...filing.values, record: filing.record, reported: filing.reported };
+  const commentValues: BugValues = filing.record.versions === null
+    ? filing.values
+    : { ...filing.values, versions: filing.record.versions };
   return {
-    draft: {
-      opt: 0,
-      title: issueTitle(redact(what)),
-      body: issueText(ISSUE_OPENING, values, redact),
-      type: 'bug',
-      module: TRIAGE_MODULE,
-      priority: null,
-      project: null,
-      blockedBy: [],
-    },
-    comment: issueText(COMMENT_OPENING, values, redact),
+    draft: draftOf({ ...filing, values }, options.bugRules ?? DEFAULT_BUG_RULES, redact),
+    comment: issueText(COMMENT_OPENING, commentValues, redact),
     searchText,
     key,
     legacyKeys: legacyKeysOf(options.trackerPath, key, reported, artifact),
     values,
+    commentValues,
     compared: { what: local(what), artifact },
   };
 }
@@ -819,7 +915,7 @@ async function answerRecurrence(run: BugRun, { ref, foundBy }: Recurrence): Prom
 /** Comments on the open bug the similarity step matched, naming its score; see the module note. */
 async function commentOnNearest(run: BugRun, nearest: ScoredIssue, threshold: number): Promise<BugTriage> {
   const opening = similarCommentOpening(nearest.score, threshold);
-  const comment = issueText(opening, run.filing.values, run.redact);
+  const comment = issueText(opening, run.filing.commentValues, run.redact);
   const result = await commentOn(run, nearest.issue.ref, 'similarity', 'commented', comment);
   return { ...result, score: nearest.score };
 }
@@ -939,9 +1035,10 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   checkPrivateTracker(options.tracker, privateTracker);
 
   const blocker = triageBlockers(options);
-  const local = localPathRedactor(repoRoot, options.home ?? homedir());
+  const checkout = options.checkout ?? repoRoot;
+  const local = localPathRedactor([checkout, repoRoot], options.home ?? homedir());
   const redact = (text: string): string => redactSecrets(local(text), options.secrets);
-  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(repoRoot);
+  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(checkout, options.env);
   const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',
@@ -990,7 +1087,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       bugs.push(routed.row);
       continue;
     }
-    const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
+    const filing = await filingFor(what, bug, options, { local, redact }, verifyRefs);
     const run: BugRun = { route, index, filing, redact };
     const { inherited } = options;
     const isInherited = routed.inherited || (route.channel === 'public'

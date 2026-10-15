@@ -58,6 +58,7 @@ import {
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { createGitRunner } from '../core/git/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
@@ -99,6 +100,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-follow-ups-int-')));
