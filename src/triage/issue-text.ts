@@ -56,7 +56,11 @@
 import type { ScoredIssue } from './similarity.js';
 import type { IssueRef } from '../ports/index.js';
 
+import { fenced } from '../bugs/fenced.js';
+
 import { oneLine } from './bug-key.js';
+
+export { fenced };
 
 /** The most code points a filed title holds, its cut marker included. */
 export const TITLE_MAX_LENGTH = 120;
@@ -64,25 +68,12 @@ export const TITLE_MAX_LENGTH = 120;
 /** What ends a title that was cut. */
 const TITLE_CUT = '...';
 
-/** The shortest fence a value is shown in. */
-const MIN_FENCE_LENGTH = 3;
-
 /** What opens a filed issue's body. */
 export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
   + ' dispatches no task for it: a plan that wants it fixed declares a task.';
 
 /** What opens a recurrence's comment. */
 export const COMMENT_OPENING = 'Reported again by a rafa task session.';
-
-/** A value in a fence one backtick longer than any run of backticks it holds. */
-export function fenced(value: string): string {
-  const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
-  const fence = '`'.repeat(Math.max(MIN_FENCE_LENGTH, ...runs.map((length) => length + 1)));
-  const body = value.endsWith('\n')
-    ? value
-    : `${value}\n`;
-  return `${fence}\n${body}${fence}`;
-}
 
 /** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
 export function issueTitle(redactedWhat: string): string {
