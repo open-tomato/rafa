@@ -228,6 +228,15 @@
  * module answers, has its local paths taken out first, as the key does
  * ({@link TriageOptions.home} names the home), then its secrets.
  *
+ * The paths are taken out over two roots in one pass, the checkout the
+ * task ran in ({@link TriageOptions.checkout}) and the project root, the
+ * longer first (`./local-paths.ts`). A loop in a worktree outside the
+ * project then leaves no folder between the home and the worktree, and
+ * the default worktree under the root leaves no `.rafa/worktrees/<stub>/`
+ * ahead of a path. Two passes would leave either one. The `Refs` section
+ * is read in the checkout too, so a path a filed body names is stamped
+ * against the tree the session saw.
+ *
  * {@link namedSecrets} answers the value of every `env` item under
  * `prerequisites`, both tiers, and of each of {@link SECRET_ENV_NAMES}
  * that is set. {@link redactSecrets} replaces each value with
@@ -257,7 +266,9 @@ import type { KindRouteOptions } from './kind-route.js';
 import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
+import type { BugRules } from '../bugs/record.js';
 import type { RafaConfig } from '../core/config/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type {
   FindingOutcome,
   FindingsDispatch,
@@ -432,7 +443,8 @@ export interface TriageOptions {
   readonly secrets: readonly NamedSecret[];
   /**
    * Reads the paths and symbols a bug's artifact names, for its `Refs`
-   * section. `createArtifactRefsVerifier` over `repoRoot` when left out.
+   * section. `createArtifactRefsVerifier` over {@link checkout}, with
+   * {@link env}, when left out.
    */
   readonly verifyRefs?: RefVerifier;
   /** The home directory taken out of every filed text; `os.homedir()` when left out. */
@@ -453,6 +465,30 @@ export interface TriageOptions {
   readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
   /** The kind check's readings and the repair cap; left out, no entry is routed by its kind. */
   readonly kinds?: KindRouteOptions;
+  /**
+   * The checkout the task ran in: the project root itself, or a worktree
+   * of it, under the root or anywhere else. Its paths are taken out of
+   * every filed text together with `repoRoot`'s, and the `Refs` section is
+   * read in it; see the module note. `repoRoot` when left out.
+   */
+  readonly checkout?: string;
+  /**
+   * A git runner in {@link checkout}, carried for the bug record (#951);
+   * triage reads nothing through it yet.
+   */
+  readonly git?: GitRunner;
+  /**
+   * The environment the run sees. The default `Refs` verifier looks for
+   * `ts-symbols` on its `PATH`; left out, that verifier reads the
+   * process's own.
+   */
+  readonly env?: SecretEnvironment;
+  /**
+   * The rules a bug record is checked against, as `bugRulesOf`
+   * (`src/config-schema-issues.ts`) answers them from the run's config;
+   * carried for the bug record (#951), and read by nothing here yet.
+   */
+  readonly bugRules?: BugRules;
 }
 
 /** The environment a secret's value is read from. */
@@ -939,9 +975,10 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   checkPrivateTracker(options.tracker, privateTracker);
 
   const blocker = triageBlockers(options);
-  const local = localPathRedactor(repoRoot, options.home ?? homedir());
+  const checkout = options.checkout ?? repoRoot;
+  const local = localPathRedactor([checkout, repoRoot], options.home ?? homedir());
   const redact = (text: string): string => redactSecrets(local(text), options.secrets);
-  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(repoRoot);
+  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(checkout, options.env);
   const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',

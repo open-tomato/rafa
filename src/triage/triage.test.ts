@@ -49,6 +49,13 @@
  * module and no line of it was re-measured here; the cases under `bug
  * identity keyed by artifact and tracker file` are the readings for the
  * key itself.
+ *
+ * The checkout cases were driven on 2026-10-15 against three mutations,
+ * the module restored sha256-identical after each: redacting over the
+ * root alone reddened both worktree cases, redacting the root then the
+ * checkout in two passes reddened both too, and reading `Refs` in the
+ * root reddened the checkout's `Refs` case. Each of the three cases runs
+ * the same report without `checkout` beside it as its control.
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
@@ -56,6 +63,7 @@ import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.j
 import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -1339,6 +1347,62 @@ describe('local paths in what is filed', () => {
 
     expect(onlyIssue(f.publicDir).draft.body).toContain(fence('/usr/local/bin/bun: not found'));
   });
+
+  /** A report whose what, artifact and feedback name a file of `checkout` and one of `root`. */
+  function checkoutReport(checkout: string, root: string): TaskReport {
+    return reportWith({
+      feedback: `Ran the suite in ${checkout}.`,
+      outOfScopeBugs: [bug(
+        `${checkout}/src/a.ts drops the last line`,
+        `${checkout}/src/a.ts:3 drops it; config ${root}/rafa.config.json`,
+        false,
+      )],
+    });
+  }
+
+  /** The artifact of {@link checkoutReport} once both roots are out. */
+  const CHECKOUT_ARTIFACT = 'src/a.ts:3 drops it; config rafa.config.json';
+
+  it('take a worktree outside the project out with the root in one pass, leaving no folder between the home and it', async () => {
+    const f = fixture();
+    const control = fixture();
+    const home = tempBase;
+    const checkout = join(tempBase, 'worktrees', 'demo-wt');
+
+    await triage(f, checkoutReport(checkout, f.root), { home, checkout });
+    await triage(control, checkoutReport(checkout, control.root), { home });
+
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.draft.title).toBe('src/a.ts drops the last line');
+    expect(issue.draft.body).toContain(`## Artifact\n\n${fence(CHECKOUT_ARTIFACT)}`);
+    expect(issue.draft.body).toContain(fence('Ran the suite in ..'));
+    expect(issue.contents).not.toContain('worktrees');
+    expect(issue.contents).not.toContain(tempBase);
+    expect(f.publicSpy.calls[0]).toEqual(['find', { text: bugKeyOf(TRACKER_FILE, CHECKOUT_ARTIFACT), type: 'bug' }]);
+    // Control: with the root alone, the worktree's folders under the home stay.
+    expect(onlyIssue(control.publicDir).draft.body)
+      .toContain(`${HOME_MARKER}/worktrees/demo-wt/src/a.ts:3 drops it; config rafa.config.json`);
+  });
+
+  it('take a worktree under the root out whole, leaving no .rafa/worktrees/<stub>/ ahead of a path', async () => {
+    const f = fixture();
+    const control = fixture();
+    const home = '/Users/alice';
+    const checkoutOf = (root: string): string => join(root, '.rafa', 'worktrees', 'demo');
+
+    await triage(f, checkoutReport(checkoutOf(f.root), f.root), { home, checkout: checkoutOf(f.root) });
+    await triage(control, checkoutReport(checkoutOf(control.root), control.root), { home });
+
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.draft.title).toBe('src/a.ts drops the last line');
+    expect(issue.draft.body).toContain(`## Artifact\n\n${fence(CHECKOUT_ARTIFACT)}`);
+    expect(issue.contents).not.toContain('.rafa/worktrees');
+    expect(issue.contents).not.toContain(f.root);
+    expect(f.publicSpy.calls[0]).toEqual(['find', { text: bugKeyOf(TRACKER_FILE, CHECKOUT_ARTIFACT), type: 'bug' }]);
+    // Control: with the root alone, the worktree's prefix stays ahead of the path.
+    expect(onlyIssue(control.publicDir).draft.body)
+      .toContain(fence('.rafa/worktrees/demo/src/a.ts:3 drops it; config rafa.config.json'));
+  });
 });
 
 describe('the Refs section', () => {
@@ -1426,5 +1490,43 @@ describe('the Refs section', () => {
     expect(onlyIssue(redacted.publicDir).draft.body).not.toContain('## Refs');
     // Control: unredacted, the same artifact names the path and it is read.
     expect(onPlain.asked).toEqual([`path:${secret}`]);
+  });
+
+  /** Runs git in `cwd`, throwing on failure: the planting's own git, not the verifier's. */
+  function plantGit(cwd: string, args: readonly string[]): string {
+    const result = spawnSync('git', [...args], { cwd, encoding: 'utf8' });
+    if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+    return result.stdout;
+  }
+
+  /** A repository under the temporary directory with `src/a.ts` committed. */
+  function plantCheckout(): string {
+    const checkout = join(tempBase, `checkout-${rootCount}`);
+    rootCount += 1;
+    mkdirSync(join(checkout, 'src'), { recursive: true });
+    writeFileSync(join(checkout, 'src', 'a.ts'), 'export const a = 1;\n', 'utf8');
+    plantGit(checkout, ['init', '--quiet', '--initial-branch=main']);
+    plantGit(checkout, ['config', 'user.email', 'rafa@example.test']);
+    plantGit(checkout, ['config', 'user.name', 'rafa test']);
+    plantGit(checkout, ['add', '--all']);
+    plantGit(checkout, ['commit', '--quiet', '--message', 'planted']);
+    return checkout;
+  }
+
+  it('is read in the checkout by default, not in the project root', async () => {
+    const checkout = plantCheckout();
+    const sha = plantGit(checkout, ['rev-parse', 'HEAD:src/a.ts']).trim();
+    const f = fixture();
+    const control = fixture();
+    const report = reportWith({ outOfScopeBugs: [bug('Parser drops the last line', 'TypeError at `src/a.ts`', false)] });
+    const env = { PATH: '' };
+
+    await triage(f, report, { checkout, env });
+    await triage(control, report, { env });
+
+    expect(sha).toMatch(/^[0-9a-f]{40}$/u);
+    expect(onlyIssue(f.publicDir).draft.body).toContain(`- path \`src/a.ts\`: \`blob:${sha}\``);
+    // Control: read in the root, which is no repository, the same path is unread.
+    expect(onlyIssue(control.publicDir).draft.body).toContain('- path `src/a.ts`: `unread`');
   });
 });
