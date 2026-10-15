@@ -145,11 +145,11 @@
  * `reads no home definition unless the setting sources include user`
  * pairs the default with such sources over the same roots.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
-import type { ClaudeSpawner } from '../core/loop/index.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
+import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 
 import {
   mkdirSync,
@@ -170,8 +170,9 @@ import {
   it,
 } from 'bun:test';
 
-import { runClaude } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { runClaude } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 

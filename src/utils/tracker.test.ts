@@ -28,14 +28,14 @@
  *
  * The comment's grammar alone, its escape pair and its reader on a
  * task's text with no tracker, is held by
- * `src/core/plan/blocker-comment.test.ts`, which the family moved to.
+ * `packages/rafa/src/core/plan/blocker-comment.test.ts`, which the family moved to.
  *
  * Every case plants its tracker under this file's own temporary
  * directory; nothing here reads a real plan, the home or a real session.
  */
 import type { TaskInfo } from './tracker.js';
-import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
+import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 
 import {
   mkdirSync,
@@ -56,7 +56,9 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration, stripTaskDeclaration , planStubFromPrompt , blockerComment, escapeBlockerText, splitBlockerComment } from '@open-tomato/rafa/core/plan';
+
 import { classifyPromptContent } from '../effort/classify.js';
 import { parsePlan } from '../plan/index.js';
 import { commitFinishedTask } from '../start/commit.js';
@@ -64,17 +66,7 @@ import { BLOCKER_PROMPT_PREFIX, buildTaskPrompt, dispatchTask } from '../start/d
 import { setActivePlanStub } from '../start/stamp.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { parseTaskDeclaration, stripTaskDeclaration } from './declaration.js';
-import { planStubFromPrompt } from './plan-stamp.js';
-import {
-  blockerComment,
-  escapeBlockerText,
-  findNextTask,
-  insertTrackerTask,
-  splitBlockerComment,
-  updateTrackerLine,
-  writeTrackerBlocker,
-} from './tracker.js';
+import { findNextTask, insertTrackerTask, updateTrackerLine, writeTrackerBlocker } from './tracker.js';
 
 /** The two spaces a tracker line puts before a block or a comment. */
 const GAP = '  ';

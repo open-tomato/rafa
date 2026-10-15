@@ -16,10 +16,11 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { bringForward } from '../effort/store/bring-forward.js';
-import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
-import { unknownAdditiveWarning } from '../effort/store/schema-report.js';
-import { migrateSchema, SQLITE_MIGRATIONS } from '../effort/store/sqlite.js';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
+import { unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
+import { migrateSchema, SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/sqlite';
+
 import { eventsOf, expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import {

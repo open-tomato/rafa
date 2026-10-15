@@ -46,8 +46,8 @@
  * takes the first for a match at its threshold and the first few for a
  * `Possible duplicates` section.
  */
-import type { OpenIssue } from '../ports/index.js';
-import type { ReportBug } from '../report/parse.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename } from 'node:path';
 

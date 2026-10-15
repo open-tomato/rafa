@@ -75,8 +75,8 @@
  * one line that named `rafa plan waits`, and `cli/running.ts` was
  * restored sha256-identical.
  */
-import type { CommandSpend, RafaCommand, RafaFlagSpec } from '../core/command/index.js';
-import type { OutputStream } from '../core/output/index.js';
+import type { CommandSpend, RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../adapter-registry.js';
 
@@ -86,10 +86,11 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { claudeArgs, spawnClaude } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { claudeArgs, spawnClaude } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

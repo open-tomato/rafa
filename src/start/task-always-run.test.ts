@@ -9,7 +9,8 @@ import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { failedOutsideAnyCase } from './suite-outside-case.js';

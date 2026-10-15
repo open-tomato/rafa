@@ -17,7 +17,7 @@ import type { FoldResult, ReleaseStrategyAdapter } from './strategy.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { RELEASE_STRATEGIES } from '../core/config/sections.js';
+import { RELEASE_STRATEGIES } from '@open-tomato/rafa/core/config/sections';
 
 import {
   foldWithStrategy,

@@ -26,7 +26,7 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RefreshItems } from '../../board/project/add-issue.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { TrackerKind } from '../../ports/index.js';
+import type { TrackerKind } from '@open-tomato/rafa/ports';
 
 import { refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 

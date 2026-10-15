@@ -339,7 +339,7 @@ The block strip rule means:
 - A block in a stage description does not appear in the operator log line
 - A block anywhere in the plan does not appear in a commit subject or commit body
 
-The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/core/plan/blocks.ts`):
+The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`packages/rafa/src/core/plan/blocks.ts`):
 
 - Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
 - A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
@@ -407,7 +407,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/core/plan/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `packages/rafa/src/core/plan/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
@@ -583,18 +583,18 @@ Rules:
 
 ## Format validation
 
-The loop parses plan files through `src/core/plan/parse.ts`:
+The loop parses plan files through `packages/rafa/src/core/plan/parse.ts`:
 
-- **Block parsing** (`src/core/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
-- **Plan parsing** (`src/core/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
-- **Declaration parsing** (`src/core/plan/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
-- **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
+- **Block parsing** (`packages/rafa/src/core/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
+- **Plan parsing** (`packages/rafa/src/core/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
+- **Declaration parsing** (`packages/rafa/src/core/plan/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
+- **Report parsing** (`packages/rafa/src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
 The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. A report yields no report only when its last `rafa:report` block is missing, never closed, not valid YAML, or not a mapping. A field that is missing, or holds a value it cannot take (a `findings` that is not a list, a `signal` other than `loud` or `silent`), is reported as an issue and the rest of the report is still read. Quote every string value in a report: an unquoted value that opens with a backtick, `@`, `%` or `[` makes the whole block unreadable, and a `#` after a space starts a comment that silently cuts the value short.
 
 Line numbers count two ways. A block's `span` (`readRafaBlocks`) and a `PlanIssue.line` count from one; `TaskInfo.lineNum` and the stage and task `lineNum` of the plan model count from zero, so compare `lineNum + 1` against either.
 
-The report rules in this skill restate `src/report/parse.ts`, which is the authority: change the two together.
+The report rules in this skill restate `packages/rafa/src/report/parse.ts`, which is the authority: change the two together.
 
 ---
 
@@ -611,11 +611,11 @@ When the spec adds or changes anything in `.rafa/effort/`:
 
 ## Command-development rule: Claude session declaration
 
-When planning work on rafa commands: every command that can start a Claude
-Code session must declare its `spends` field on its `RafaCommand` definition.
-The field tells the help system, `describe` output, and the spawn guard in
-`src/core/loop/claude.ts` what Claude usage the command declares. It is optional,
-and takes one of four shapes:
+When planning work on rafa commands: every command that can start a Claude Code
+session must declare its `spends` field on its `RafaCommand` definition. The
+field tells the help system, `describe` output, and the spawn guard in
+`packages/rafa/src/core/loop/claude.ts` what Claude usage the command declares.
+It is optional, and takes one of four shapes:
 
 - `{ when: 'always'; what: string }` — the command always starts a session
 - `{ when: 'with'; flag: string; what: string }` — starts a session only when
@@ -703,4 +703,4 @@ Both follow the same structured format. The difference is:
 - **Hand-written plans** (by a planner agent): Prose in the description, stage contexts, and task granularity reflect careful thought about the work.
 - **Generated plans** (by `rafa plan`): Produced from a spec document; structure is the same.
 
-A hand-written plan read by `src/core/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.
+A hand-written plan read by `packages/rafa/src/core/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.

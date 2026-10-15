@@ -6,14 +6,15 @@
  * beside an accepting control, and every key and message is SPELLED,
  * never read off the module.
  */
-import type { ConfigSetting } from './core/config/index.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
+import { EMPTY_CONFIG_REGISTRY, mergeConfigSections } from '@open-tomato/rafa/core/config';
+
 import { SETTINGS } from './config-registry.js';
 import { ERRORS_SECTION } from './config-schema-errors.js';
-import { EMPTY_CONFIG_REGISTRY, mergeConfigSections } from './core/config/index.js';
 
 /** Where every case reads the key. */
 const AT = { label: 'F: errors.codes', key: 'errors.codes' };

@@ -55,7 +55,7 @@
 import type { Recurrence } from './recurrence.js';
 import type { SkillsMetric, SkillsReport, SkillsReportArm, SkillsReportPlan } from './report-skills.js';
 import type { LessonSignalRow, SkillSignalRow, SkillTally } from './skill-signals.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { alignRows, formatCount, oneLine } from './report-format.js';
 

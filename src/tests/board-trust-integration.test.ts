@@ -55,8 +55,8 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { PullRequestComment } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,13 +64,14 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { SPEC_LABEL } from '../board/issue.js';
 import { specPath } from '../board/naming.js';
 import { inspectRoadmapIssue, resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ghBoardTrust } from '../board/trust.js';
 import { requireTrustedResolveAuthor, readTrustedTriageComment } from '../commands/pr/triage-trust.js';
-import { CommandExit } from '../core/command/index.js';
 import { TRIAGE_MARKER } from '../pr/triage/comment.js';
 
 import { sinkOutput } from './output-sinks.js';

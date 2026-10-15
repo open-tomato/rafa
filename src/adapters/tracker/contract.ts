@@ -86,7 +86,7 @@ import type {
   IssueType,
   Tracker,
   TrackerKind,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

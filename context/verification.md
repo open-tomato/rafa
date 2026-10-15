@@ -57,11 +57,14 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
-The full-suite scripts treat the workspace packages apart only for
-types: `check-types` runs `tsc` over the root, then each
-`packages/*/src/` with its tests included. `bun run lint` lints package
-code from the root config as it lints `src/`, so a changed package file
-belongs in the scoped `bunx eslint <changed files>` run too.
+The full-suite scripts treat the workspace packages apart only for types:
+`check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
+and the test files, then the same check in each of the three workspace
+packages: `packages/rafa` (core), which leaves its test files out as the root
+does, and `packages/rafa-hub` and `packages/rafa-sync-service`, which include
+theirs. `bun run lint` lints package code from the root config as it lints
+`src/`, so a changed package file belongs in the scoped
+`bunx eslint <changed files>` run too.
 
 **Runner recorded steps** (recorded at fixed points, each with its scope):
 - `baseline` — Full suite once at plan start (first dispatch); a run that
@@ -144,7 +147,7 @@ on that repair's line and halts.
 and three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
 cancelled): `bun test`, `bunx eslint .`, and `bun run check-types`, the
-root config and both workspace packages. **Two cases for
+root config and the three workspace packages. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` check (merge with `rafa pr wait <n>`
 then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
@@ -305,20 +308,18 @@ every line uncut. A case whose `(fail)` line is
 not found on stderr, or that printed nothing, carries no lines, and the
 blocker then names its file and count alone.
 
-**A newly red file is run alone once, and one green alone is red only
-in the step.** `bun test` runs the files of one selection in one
-process, one after another, so a module-level value one test file
-leaves behind is read by every file after it. A file failed that way
-is green from a shell and green in the repair session handed it: on
-2026-10-10 one run inserted five repair tasks for
-`src/core/loop/claude.test.ts`, 21 cases red in the runner's steps only,
-and each repair session reran it, found it green and changed nothing.
-So a task, stage or pre-wrap-up step that reads new failures runs each
-newly red test file alone, as `bun test ./<file>`, one process per
-file, before it settles (`src/start/suite-retake-alone.ts`); a failure
-the baseline holds is never retaken, and at most 20 files are
-(`RETAKE_ALONE_MAX_FILES`). Each newly red file reads one of five
-ways:
+**A newly red file is run alone once, and one green alone is red only in the
+step.** `bun test` runs the files of one selection in one process, one after
+another, so a module-level value one test file leaves behind is read by every
+file after it. A file failed that way is green from a shell and green in the
+repair session handed it: on 2026-10-10 one run inserted five repair tasks for
+`src/tests/core-coupled/core/loop/claude.test.ts`, 21 cases red in the runner's
+steps only, and each repair session reran it, found it green and changed
+nothing. So a task, stage or pre-wrap-up step that reads new failures runs each
+newly red test file alone, as `bun test ./<file>`, one process per file, before
+it settles (`src/start/suite-retake-alone.ts`); a failure the baseline holds is
+never retaken, and at most 20 files are (`RETAKE_ALONE_MAX_FILES`). Each newly
+red file reads one of five ways:
 
 - **Green alone** (a summary, a JUnit file that read, no error outside
   any test, no failure the baseline does not hold), and no file the
@@ -539,41 +540,39 @@ code do not change. `env -u CLAUDECODE bun test` prints every case.
 
 **The runner now checks touched test files against their base.** The task
 session's type gate runs `tsc` on files matching `**/*.test.ts` in the diff
-against their base commit. `tsconfig.json` excludes `**/*.test.ts` from the
-main gate, so `bun test` strips types without checking them. A test file
-type error that exists on the base branch is not new and does not block;
-one that first appears in the diff is red. Every task prompt carries one
-line handing its session that check before it reports done; the wrap-up's
-prompt does not, since `dispatchTask` alone adds it (`typeCheckLines` in
-`src/start/task-gate-lines.ts`). The line holds the scratch
-tsconfig as JSON, with `<test file>` where each test file's path relative
-to the checkout goes (the entry already opens with the checkout's path, so
-an absolute one doubles it and tsc reports TS6053), and
-`<modules>/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` to run
-in the checkout, both rendered by the type step's own
-`scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so the
-line cannot drift from the step. It asks for every error in a test file
-the task added, and in one it edited for the errors on the lines
-`git diff <base> -- <test file>` names, so the session acts on one run
-with no run at the base. A checkout with no `tsconfig.json` at its
-root, where the step runs nothing, gets no line, and so does one where the
-walk finds no `node_modules/.bin/tsc`; a run whose suite steps
-are off (no baseline) still gets it. To check one by hand, point a
-tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
-by absolute path (a bare `tsconfig.json` is looked up as a package, the
-repo's options are never applied, and hundreds of TS2802 errors follow),
-never `tsconfig.base.json`, which leaves `module` unset and fails
-`src/plan.ts` and `src/start.ts` on `import.meta` (TS1343), `files` holding
-the test's absolute path, `include` empty, `compilerOptions.typeRoots`
-naming `<repo>/node_modules/@types` absolutely (left out, every file
-reports `Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc
--p` on it. Test files already carry errors no gate ever reported, so
-compare against the base before attributing one to the diff: TS2769 where a
-`readonly` array reaches `toEqual` (`src/project/scaffold.test.ts`,
-`src/commands/index.test.ts`), and on the
-`it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
+against their base commit. `tsconfig.json` excludes `**/*.test.ts` from the main
+gate, so `bun test` strips types without checking them. A test file type error
+that exists on the base branch is not new and does not block; one that first
+appears in the diff is red. Every task prompt carries one line handing its
+session that check before it reports done; the wrap-up's prompt does not, since
+`dispatchTask` alone adds it (`typeCheckLines` in
+`src/start/task-gate-lines.ts`). The line holds the scratch tsconfig as JSON,
+with `<test file>` where each test file's path relative to the checkout goes
+(the entry already opens with the checkout's path, so an absolute one doubles it
+and tsc reports TS6053), and `<modules>/.bin/tsc -p <that tsconfig.json>
+--noEmit --pretty false` to run in the checkout, both rendered by the type
+step's own `scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so
+the line cannot drift from the step. It asks for every error in a test file the
+task added, and in one it edited for the errors on the lines `git diff <base> --
+<test file>` names, so the session acts on one run with no run at the base. A
+checkout with no `tsconfig.json` at its root, where the step runs nothing, gets
+no line, and so does one where the walk finds no `node_modules/.bin/tsc`; a run
+whose suite steps are off (no baseline) still gets it. To check one by hand,
+point a tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
+by absolute path (a bare `tsconfig.json` is looked up as a package, the repo's
+options are never applied, and hundreds of TS2802 errors follow), never
+`tsconfig.base.json`, which leaves `module` unset and fails `src/plan.ts` and
+`src/start.ts` on `import.meta` (TS1343), `files` holding the test's absolute
+path, `include` empty, `compilerOptions.typeRoots` naming
+`<repo>/node_modules/@types` absolutely (left out, every file reports `Cannot
+find module 'bun:test'`) — and run `./node_modules/.bin/tsc -p` on it. Test
+files already carry errors no gate ever reported, so compare against the base
+before attributing one to the diff: TS2769 where a `readonly` array reaches
+`toEqual` (`src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on
+the `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in
-`src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
+`src/tests/core-coupled/ports/index.test.ts`, which runs `ts.createProgram` over
+probe files.
 
 **Test-file type-error backlog:** A scratch tsconfig over every `*.test.ts`
 with the recipe above reported 460 errors in 144 files at commit
@@ -685,11 +684,11 @@ the reference example. This section replaces nothing.
   `src/tests/stand-in-gh.ts`), and nothing else. Plant an executable
   (mode 755) in `scratch.bin` to make a program present; leave it out of
   `scratch.bin` to make one absent that those directories do not hold.
-- `runRafa` also sets `RAFA_TEST=1` and the suite's own `TMPDIR` on the
-  child, ahead of the case's `env`, so a case naming either overrides it.
-  `RAFA_TEST=1` makes the child a test process to the effort store's test
-  guard (`src/effort/store/location.ts`), and the `TMPDIR` lets that guard
-  judge the scratch project by the directory the suite built it under.
+- `runRafa` also sets `RAFA_TEST=1` and the suite's own `TMPDIR` on the child,
+  ahead of the case's `env`, so a case naming either overrides it. `RAFA_TEST=1`
+  makes the child a test process to the effort store's test guard
+  (`packages/rafa/src/effort/store/location.ts`), and the `TMPDIR` lets that
+  guard judge the scratch project by the directory the suite built it under.
   This replaces nothing.
 - macOS keeps `cat`, `mkdir`, `rm` and `sleep` in `/bin` alone, and
   Linux in `/usr/bin` beside git, so a scratch `PATH` built by hand takes

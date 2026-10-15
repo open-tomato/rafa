@@ -41,16 +41,17 @@
  * dispatch alone names.
  */
 import type { TaskLearning } from './dispatch.js';
-import type { LessonSwitch, SkillResolverName } from '../core/config/sections.js';
 import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
-import type { Learning } from '../ports/index.js';
 import type { ResolvedSkill, TaskInput } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { LessonSwitch, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
+import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { Learning } from '@open-tomato/rafa/ports';
 
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { parsePlan } from '../plan/index.js';
 import { SKILL_RESOLVER_BY_NAME } from '../task/resolve-skills.js';
 import { selectLessons } from '../task/select-lessons.js';

@@ -39,6 +39,12 @@ describe('cut table: core upward edges', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('reads a table that lists edges of other packages, so core\'s empty list is not vacuous', () => {
+    const packages = readCutTable().packages;
+
+    expect(packages.some((pkg) => pkg.name !== CORE_PACKAGE_NAME && pkg.edges.length > 0)).toBe(true);
+  });
+
   it('holds clearedByIssue118 at 0', () => {
     expect(readCutTable().clearedByIssue118).toHaveLength(0);
   });

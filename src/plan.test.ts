@@ -99,7 +99,7 @@
  *
  * Nine mutations of `plan.ts` were driven on 2026-09-14 over this file,
  * `src/adapters/planner/claude.test.ts` and
- * `src/core/adapters/registry.test.ts`, one run each, with 79 pass before
+ * `packages/rafa/src/core/adapters/registry.test.ts`, one run each, with 79 pass before
  * and after and the module restored byte-identical (sha256), and every one
  * reddened at least one case. The command resolving core's registry in
  * place of the one handed over reddened the five cases that reach the
@@ -168,7 +168,7 @@
 import type { GhRunner } from './adapters/tracker/github.js';
 import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
-import type { CliEvent } from './ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import {
   chmodSync,
@@ -186,9 +186,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { epicContextArgs } from './board/epic-context.js';
 import { specPath } from './board/naming.js';
-import { loadConfig } from './core/config/load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,
@@ -312,7 +313,7 @@ const PROBE = [
   `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
   `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,

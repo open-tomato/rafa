@@ -130,8 +130,10 @@ import type { ProgressFeed } from '../board/project/progress.js';
 import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
-import type { Prompter } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+
+import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
@@ -148,7 +150,6 @@ import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.
 import { rankOf, stageOf } from '../board/project/rules.js';
 import { readBoardRepository } from '../board/repository.js';
 import { readRoadmapSetting } from '../board/setup-config.js';
-import { isMapping, messageOf } from '../core/config/sections.js';
 
 import { PROJECT_NUMBER_SETTING, writeProjectNumber } from './init-board-project-setting.js';
 import { YES_ANSWERS } from './init-board.js';

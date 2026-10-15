@@ -101,18 +101,19 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
 import type { DescribeDocument } from '../cli/describe.js';
-import type { Output } from '../ports/index.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
 import type { CheckoutRosterReader } from './plan/refs-check.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '../board/naming.js';
 import { memoiseVerifier } from '../board/refs-gate.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { withOutlineCache } from '../refs/outline-cache.js';
 import { readRefsText } from '../refs/reading.js';

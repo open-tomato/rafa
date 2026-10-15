@@ -20,8 +20,8 @@
 import type { StretchItemSeams } from './item.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
-import type { OpenIssue } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -31,9 +31,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { beginSession } from '@open-tomato/rafa/core/loop';
+
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
 import { runListArgs } from '../../ci/runs.js';
-import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

@@ -143,21 +143,27 @@ import type { EpicBody } from '../../board/epic-body.js';
 import type { UncheckedCriterion } from '../../board/epic-trail.js';
 import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { EpicCost } from '../../effort/epic-cost.js';
-import type { FindingsWriterSeams } from '../../effort/store/findings.js';
-import type { EffortStore } from '../../effort/store/types.js';
 import type { CriterionUncheckable, CriterionVerdict, EpicCriterion, VerifyPlanIssue } from '../../epic/verify-plan.js';
 import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/verify-run.js';
-import type { IssueRef, Tracker } from '../../ports/index.js';
-import type { TaskReport } from '../../report/parse.js';
 import type { BugTriage, NamedSecret } from '../../triage/triage.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { selectEffortStore } from '@open-tomato/rafa/store';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
@@ -168,12 +174,7 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/ep
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
 import { readEpicCost, renderEpicCost } from '../../effort/epic-cost.js';
-import { selectEffortStore } from '../../effort/store/index.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
 import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';

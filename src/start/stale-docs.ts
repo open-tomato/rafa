@@ -1,6 +1,6 @@
 /**
  * What `loop start` does with the doc task's report: the `stale_docs`
- * entries of the task declared `docs=repair` (`utils/declaration.ts`)
+ * entries of the task declared `docs=repair` (`core/plan/declaration.ts`)
  * are the documentation lines it could NOT settle. Each is stored as an
  * `unsettled` row and added as one line to the release's stale-docs
  * issue (`docs/release-issue.ts`), or, in a run with no tracker that can
@@ -92,30 +92,33 @@
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type {
   StaleDocEntry,
   StaleDocLineResult,
   StaleDocsTracker,
   StaleDocTickResult,
 } from '../docs/release-issue.js';
-import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
-import type { StaleDocsWriteResult } from '../effort/store/stale-docs.js';
-import type { IssueRef } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SettleForecast } from '../release/forecast.js';
 import type { FoldFragment } from '../release/strategy.js';
-import type { ReportStaleDoc } from '../report/parse.js';
 import type { SecretEnvironment } from '../triage/triage.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueRef } from '@open-tomato/rafa/ports';
+import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
+import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan , readDocsRole } from '@open-tomato/rafa/core/plan';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { parsePlan } from '../core/plan/index.js';
 import {
   addStaleDocLine,
   DOC_UPDATE_TITLE,
@@ -124,7 +127,6 @@ import {
   staleDocsVersion,
   tickStaleDocLine,
 } from '../docs/release-issue.js';
-import { writeStaleDocs } from '../effort/store/stale-docs.js';
 import { createGitRunner } from '../pr/index.js';
 import { resolveReleaseEnabled } from '../release/enabled.js';
 import { forecastSettle } from '../release/forecast.js';
@@ -136,10 +138,8 @@ import {
   RELEASE_BASE_BRANCH,
   RELEASE_REMOTE,
 } from '../release/version.js';
-import { parseReport } from '../report/parse.js';
 import { localPathRedactor } from '../triage/local-paths.js';
 import { namedSecrets, redactSecrets } from '../triage/triage.js';
-import { readDocsRole } from '../utils/declaration.js';
 
 /** What every line this module prints opens with, after its indent. */
 const LINE_PREFIX = 'Stale docs: ';

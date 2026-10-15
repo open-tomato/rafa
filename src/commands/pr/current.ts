@@ -71,10 +71,10 @@
  * request. A checks call that failed is NOT one of them; see above.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksVerdict, PullRequests, PullRequestState } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { DEFAULT_PR_SEAMS, expectNoArguments, openPrContext, pickPullRequest, PR_USAGE } from './pr-context.js';
 

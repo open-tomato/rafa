@@ -105,7 +105,8 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {

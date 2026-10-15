@@ -51,10 +51,10 @@
  * key itself.
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
-import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
 import {
   existsSync,
@@ -71,10 +71,11 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writeFindings } from '@open-tomato/rafa/store/findings';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
-import { writeFindings } from '../effort/store/findings.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
-import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';

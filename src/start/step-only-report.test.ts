@@ -8,7 +8,7 @@
  * steps holding no such file, where nothing is: no section, no heading
  * and no line printed.
  */
-import type { SessionStep, SessionStepOnly } from '../core/loop/index.js';
+import type { SessionStep, SessionStepOnly } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,8 +16,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { beginSession, sessionFilePath, updateSession } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { beginSession, sessionFilePath, updateSession } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

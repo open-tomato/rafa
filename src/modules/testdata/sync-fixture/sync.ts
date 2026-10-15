@@ -8,7 +8,7 @@
  * so a case can tell the adapter it made apart from any core strategy.
  * It takes no context: a fixture strategy touches no repository.
  */
-import type { Sync } from '../../../ports/index.js';
+import type { Sync } from '@open-tomato/rafa/ports';
 
 /** Makes the fixture's `git` strategy. */
 export default function create(): Sync {

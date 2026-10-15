@@ -75,19 +75,20 @@
  * rather than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
 import type { SpecRouteSeams } from './spec-route.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Need, NeedOrigin, NeedsReading, NeedsSeams, StackReading } from '../../plan/needs.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { isAbsolute, relative, resolve } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { isFile, plural } from '@open-tomato/rafa/core/plan';
+
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { isFile, plural } from '../../core/plan/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';

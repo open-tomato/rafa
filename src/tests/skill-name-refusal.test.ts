@@ -25,7 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import {
   buildPlanPrompt,
   readPlanFormat,

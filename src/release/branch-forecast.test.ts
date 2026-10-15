@@ -13,7 +13,7 @@ import type { TreeFragment } from './fragment-tree.js';
 import type { Fragment } from './fragment.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { ReleaseVerified } from './verify.js';
-import type { GitResult } from '../core/git/index.js';
+import type { GitResult } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 

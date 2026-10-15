@@ -48,8 +48,8 @@
 import type { BudgetedSession } from './report-budgets.js';
 import type { PlanBugKinds } from './report-kinds.js';
 import type { EffortGroup, EffortReport, GroupKind } from './report.js';
-import type { PreflightHalt } from './store/preflight.js';
-import type { TaskReportTally } from './store/reports.js';
+import type { PreflightHalt } from '@open-tomato/rafa/store/preflight';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
 
 import { describe, expect, it } from 'bun:test';
 

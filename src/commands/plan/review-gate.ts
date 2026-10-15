@@ -63,12 +63,13 @@
  */
 import type { SpecReviewGateOptions } from '../../board/gate.js';
 import type { SpecReviewReading } from '../../board/spec-review.js';
-import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
+import type { GeneratedPlan, Planner, PlanRequest } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { ClaudePlannerError } from '../../adapters/planner/claude.js';
 import { enforceSpecReview } from '../../board/gate.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 
 import { recordMissingReview, recordSkippedReview } from './plan-record.js';
 

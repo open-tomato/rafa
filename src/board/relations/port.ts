@@ -81,9 +81,9 @@
  * say it had not. `afterMerge` never rejects: the merge has already
  * happened by the time it runs.
  */
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { BlockedReading } from '../blocked.js';
 import type { BoardIssue, BoardIssueState } from '../roadmap-board.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 /** An issue named by a relationship, on this board's repository or another. */
 export interface RelatedIssue {

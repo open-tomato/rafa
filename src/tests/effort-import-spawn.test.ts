@@ -22,8 +22,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { bringForward } from '../effort/store/bring-forward.js';
-import { MOVE_TO_SQLITE } from '../effort/store/merge-store.js';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

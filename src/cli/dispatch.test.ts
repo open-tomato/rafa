@@ -76,7 +76,7 @@
  * is resolved 12.
  *
  * The running command cases came with the dispatcher recording the
- * command it runs (`src/core/command/running.ts`). Each sets a record of
+ * command it runs (`packages/rafa/src/core/command/running.ts`). Each sets a record of
  * its own ahead of the invocation, so a record put back is told apart from one cleared,
  * and `afterEach` clears it. Five mutations of `dispatch.ts` were driven
  * on 2026-09-23, one run each over this file with 89 pass before, each
@@ -102,10 +102,10 @@
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
-import type { RafaCommand, RafaContext, RunningCommand } from '../core/command/index.js';
-import type { DangerousPhrases } from '../core/config/index.js';
-import type { OutputStream } from '../core/output/index.js';
-import type { CliEvent, Output } from '../ports/index.js';
+import type { RafaCommand, RafaContext, RunningCommand } from '@open-tomato/rafa/core/command';
+import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 
@@ -116,19 +116,20 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { version } from '../../package.json';
-import { createJsonOutput } from '../adapters/output/json.js';
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 import {
   CommandExit,
   restoreRunningCommand,
   runningCommand,
   setRunningCommand,
   versionLine,
-} from '../core/command/index.js';
-import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
+} from '@open-tomato/rafa/core/command';
+import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
+
+import { version } from '../../package.json';
+import { createJsonOutput } from '../adapters/output/json.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 

@@ -11,13 +11,15 @@
  * The second plan, `other`, counts 1 done and 4 open, so 4 are left.
  */
 import type { LoopRow } from './report-trend.js';
-import type { TaskCounts } from '../core/plan/index.js';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 
 import {
   DEMO_PLAN_PATH,
@@ -27,7 +29,6 @@ import {
 } from '../tests/loop-session-fixtures.js';
 
 import { byProgressEstimate, byTaskEstimate, statusWidget } from './dashboard-status.js';
-import { writeTaskReport } from './store/reports.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dashboard-status-')));
 

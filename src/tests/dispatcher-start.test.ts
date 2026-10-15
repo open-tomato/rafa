@@ -9,8 +9,8 @@
  * the root would hide a missing one. The kinds are spelled in
  * registration order.
  */
-import type { RafaCommand } from '../core/command/index.js';
-import type { PortType } from '../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PortType } from '@open-tomato/rafa/ports';
 
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +22,7 @@ import {
   CORE_ADAPTER_REGISTRY,
   createAdapterRegistry,
   restoreAdapters,
-} from '../core/adapters/index.js';
+} from '@open-tomato/rafa/core/adapters';
 
 import { dispatchCaptured } from './cli-capture.js';
 

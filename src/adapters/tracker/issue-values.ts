@@ -2,7 +2,7 @@
  * The Tracker port's closed unions, as lists a module can read at run
  * time.
  *
- * `src/ports/index.ts` exports types and no value, so it spells
+ * `packages/rafa/src/ports/index.ts` exports types and no value, so it spells
  * `IssueType`, `IssuePriority` and `IssueState` as literal unions and
  * leaves out the `as const` tuples they were derived from:
  * `ISSUE_TYPES`, `ISSUE_PRIORITIES` and `ISSUE_STATES` in open-tomato's
@@ -20,7 +20,7 @@
  * the states. The exceptions are `epic` and `spec`, rafa's own types,
  * which the source lacks and which come last, in that order.
  */
-import type { IssuePriority, IssueState, IssueType } from '../../ports/index.js';
+import type { IssuePriority, IssueState, IssueType } from '@open-tomato/rafa/ports';
 
 /** Every issue type, closed over {@link IssueType}. */
 const TYPE_MEMBERS = {

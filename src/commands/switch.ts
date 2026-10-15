@@ -113,10 +113,14 @@ import type { BoardView } from '../board/epic-board.js';
 import type { EpicRelations, Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveDefaultBoard } from '../board/boards.js';
@@ -129,9 +133,6 @@ import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
 import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';

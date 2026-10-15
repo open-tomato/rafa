@@ -88,23 +88,25 @@
  */
 import type { ReleaseFinish } from './release-stage.js';
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
-import type { CliEvent } from '../ports/index.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { Instinct } from '../schema/instinct.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { localInstinctsDir } from '../adapters/learning/local.js';
 import { assumptionsHeading } from '../board/review-stamp.js';
-import { loadConfig } from '../core/config/load.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
@@ -1179,7 +1181,7 @@ describe('runWrapUp over the spawn seam', () => {
     writeFileSync(driver, [
       'import { writeFileSync } from \'node:fs\';',
       `import '${join(here, '../adapter-registry.js')}';`,
-      `import { setActiveOutput } from '${join(here, '../core/output/index.js')}';`,
+      `import { setActiveOutput } from '${fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'))}';`,
       `import { sinkOutput } from '${join(here, '../tests/output-sinks.js')}';`,
       `import { runWrapUp } from '${join(here, 'wrap-up-run.js')}';`,
       'const warnings: string[] = [];',

@@ -41,8 +41,8 @@
  */
 import type { HeldDescription } from './held.js';
 import type { DescribedInstinctRecord, LocalLearningOptions, PushLogLine } from './local.js';
-import type { InstinctRecord, Learning, Output, SyncPayload } from '../../ports/index.js';
 import type { Instinct } from '../../schema/instinct.js';
+import type { InstinctRecord, Learning, Output, SyncPayload } from '@open-tomato/rafa/ports';
 
 import {
   existsSync,
@@ -58,8 +58,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { CONFIG_DEFAULTS } from '../../config-registry.js';
-import { setActiveOutput } from '../../core/output/index.js';
 import { actionHash } from '../../learning/index.js';
 import { parseInstinct, writeInstinct } from '../../schema/instinct.js';
 

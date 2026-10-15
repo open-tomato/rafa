@@ -1,6 +1,6 @@
 /**
  * The logger this process writes its diagnostics through (#950), held
- * beside the active output (`src/core/output/active.ts`), for the same
+ * beside the active output (`packages/rafa/src/core/output/active.ts`), for the same
  * reason: a module far from any command still has somewhere to warn.
  *
  * Until something sets another, it is a console logger at verbosity 0
@@ -76,12 +76,12 @@
  * is module state: a case that sets a logger outside a scope sets
  * `null` after it.
  */
-import type { Logger } from '../../ports/index.js';
+import type { Logger } from '@open-tomato/rafa/ports';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { createConsoleLogger } from './console.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_KIND } from './settings.js';

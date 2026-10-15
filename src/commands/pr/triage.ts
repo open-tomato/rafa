@@ -140,7 +140,7 @@
  *
  * Every assessment, a resolve run's re-assessments included, hands the
  * pull request and the rows its checks answered to `recordPlanCi`
- * (`src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for
+ * (`packages/rafa/src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for
  * a settled verdict on a head branch that names a plan, and warns
  * rather than throws when the store refuses. The checks the bare form
  * reads to find the red candidates store nothing: a list answers no
@@ -169,14 +169,15 @@ import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
 import type { Permissions } from '../../board/trust.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { recordPlanCi } from '../../effort/store/plan-ci.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
+
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';

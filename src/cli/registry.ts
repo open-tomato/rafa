@@ -8,7 +8,7 @@
  * dispatcher routes through it, and the two rosters read it.
  *
  * The contract, {@link CommandRegistry} and the five shapes it names,
- * is declared in `src/core/command/registry-types.ts`, so core's
+ * is declared in `packages/rafa/src/core/command/registry-types.ts`, so core's
  * `RafaContext` can name it; this file re-exports the six under the
  * same names and keeps the builder and its refusals.
  *
@@ -60,7 +60,7 @@
  * ## A registry is a value
  *
  * {@link CommandRegistry.mount} answers a new registry and leaves the
- * one it was called on unchanged, as `src/core/adapters/registry.ts` does
+ * one it was called on unchanged, as `packages/rafa/src/core/adapters/registry.ts` does
  * and for its reason: bun runs every test file in one process. The lists a
  * registry answers are frozen copies of what it was handed.
  */
@@ -72,10 +72,10 @@ import type {
   RafaCommand,
   RosterOptions,
   SubjectSpec,
-} from '../core/command/index.js';
+} from '@open-tomato/rafa/core/command';
 
-import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '../core/command/index.js';
-import { describeValue } from '../core/config/sections.js';
+import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '@open-tomato/rafa/core/command';
+import { describeValue } from '@open-tomato/rafa/core/config/sections';
 
 /** What every refusal opens with. */
 const REFUSAL = 'command registry';

@@ -28,8 +28,8 @@ import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +37,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { positionAt, positionFilePath, writePositionFile } from '../project/position.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 

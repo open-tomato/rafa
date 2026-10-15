@@ -19,8 +19,9 @@ import type { PreflightCheck, PreflightReport } from '../preflight/run.js';
 
 import { basename, relative, sep } from 'node:path';
 
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { boardGaps } from '../board/status.js';
-import { plural } from '../core/plan/index.js';
 
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 

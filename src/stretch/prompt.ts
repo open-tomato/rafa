@@ -14,7 +14,7 @@
  *     other project is handed rafa's carried work.
  *   - **The rafa checkout** ({@link isRafaCheckout}) is a root whose
  *     `package.json` is named `@open-tomato/rafa` and which holds
- *     `src/rafa.ts`, the test `src/core/runtime/identity.ts` makes of
+ *     `src/rafa.ts`, the test `packages/rafa/src/core/runtime/identity.ts` makes of
  *     a checkout. The script asked instead whether the project was the
  *     checkout it sat in; a command runs from an installed package that
  *     sits in no checkout, so the project is asked what it is.
@@ -37,9 +37,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { errorCode } from '@open-tomato/rafa/core/loop';
+import { realEntry } from '@open-tomato/rafa/schema/tiers';
+
 import { name as RAFA_PACKAGE_NAME } from '../../package.json';
-import { errorCode } from '../core/loop/index.js';
-import { realEntry } from '../schema/tiers.js';
 
 import { STRETCH_DIR } from './folder.js';
 

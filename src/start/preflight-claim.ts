@@ -175,9 +175,15 @@ import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPath } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../board/project/issue-board-refresh.js';
@@ -193,12 +199,7 @@ import {
 } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { CommandExit } from '../core/command/index.js';
-import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { resolvePrProvider } from '../pr/provider.js';
-import { planStubFromPath } from '../utils/plan-stamp.js';
 
 import { branchNameFor, REMOTE } from './branch-decision.js';
 

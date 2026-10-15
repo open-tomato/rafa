@@ -63,12 +63,12 @@
  * temporary directory, and the text that would replace it is answered
  * rather than written.
  */
-import type { ReleaseEnabled } from '../core/config/sections.js';
+import type { ReleaseEnabled } from '@open-tomato/rafa/core/config/sections';
 
 import { readFileSync } from 'node:fs';
 
-import { configFilePath, parseConfigText } from '../core/config/index.js';
-import { isMapping, messageOf } from '../core/config/sections.js';
+import { configFilePath, parseConfigText } from '@open-tomato/rafa/core/config';
+import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** The setting this module reads and writes, as a message names it. */
 export const RELEASE_ENABLED_SETTING = 'release.enabled';

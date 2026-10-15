@@ -45,10 +45,11 @@
  * drives a fake and none of them opens a terminal or waits on an answer.
  */
 import type { AlternativeOffer, AlternativeOfferRequest } from '../../board/blocked-line.js';
-import type { Prompter } from '../../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import { createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { alternativeQuestion } from '../../board/blocked-line.js';
-import { createLinePrompter } from '../../core/command/index.js';
 import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */

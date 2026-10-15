@@ -47,14 +47,14 @@
  *     repeated `mcp` server accepted its own case.
  */
 import type { ManifestSeams, ModuleManifest } from './manifest.js';
-import type { PortVersions } from '../ports/index.js';
+import type { PortVersions } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { PORT_VERSIONS } from '../core/adapters/index.js';
+import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 

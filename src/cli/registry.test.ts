@@ -22,7 +22,7 @@
  * it: it received the engine's spread error in place of the refusal.
  */
 import type { CommandRegistryInput, SubjectSpec } from './registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 

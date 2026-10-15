@@ -51,8 +51,9 @@ import type { Ref } from '../refs/extract.js';
 import type { LiveReading } from '../refs/stamp.js';
 import type { RefVerifier } from '../refs/verify.js';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '../cli/describe.js';
-import { createGitRunner } from '../core/git/index.js';
 import { extractRefs } from '../refs/extract.js';
 import { fingerprintText } from '../refs/stamp.js';
 import { createRefVerifier, tsSymbolsOutliner } from '../refs/verify.js';

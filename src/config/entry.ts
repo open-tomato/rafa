@@ -16,7 +16,7 @@
  *   value (`routing`, the `tiers` pins) the loader keeps it as one, so it
  *   also shadows a lower layer's row, as in a YAML file; where it does
  *   not (`logger.modules`) the id is removed (`config-load.ts` in
- *   `src/core/config/`). A named key takes `false` only where its own
+ *   `packages/rafa/src/core/config/`). A named key takes `false` only where its own
  *   value does (`loop.retries`), never to remove it.
  * - `{ $replace: true, …rest }` at any mapping below the top replaces
  *   that mapping whole with `rest`, discarding what earlier entries put

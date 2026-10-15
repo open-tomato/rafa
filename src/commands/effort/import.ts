@@ -3,7 +3,7 @@
  * file, the `effort.sqlite` a `rafa effort copy` carried, pulled into
  * this project's store through the `file` sync strategy
  * (`src/effort/sync/file.ts`), whose pull is `mergeStore`
- * (`src/effort/store/merge-store.ts`, whose note is the long form).
+ * (`packages/rafa/src/effort/store/merge-store.ts`, whose note is the long form).
  * Starts no Claude session and declares no `spends`.
  *
  * It is the pull half of the `file` strategy put on the command line, and
@@ -34,10 +34,10 @@
  * result, as `rafa effort merge` writes it.
  */
 import type { MergeCommandSeams } from './merge.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { MergeResult } from '../../effort/store/merge-store.js';
 import type { FileSyncOptions } from '../../effort/sync/file.js';
-import type { Sync } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Sync } from '@open-tomato/rafa/ports';
+import type { MergeResult } from '@open-tomato/rafa/store/merge-store';
 
 import { resolve } from 'node:path';
 

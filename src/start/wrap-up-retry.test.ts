@@ -22,12 +22,13 @@
  * the prompt it spawned, the directory it spawned in, and the message it
  * answered.
  */
-import type { CapturedSpawnOptions } from '../core/loop/index.js';
 import type { ReleaseSkipped } from '../release/prepare.js';
+import type { CapturedSpawnOptions } from '@open-tomato/rafa/core/loop';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { classifyPromptContent } from '../effort/classify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

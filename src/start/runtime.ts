@@ -77,16 +77,16 @@
  *
  * Every line goes through the active output (`core/output/active.ts`).
  */
-import type { OutputMode } from '../core/config/sections.js';
-import type { CliEvent, CliEventResult, Output } from '../ports/index.js';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEvent, CliEventResult, Output } from '@open-tomato/rafa/ports';
 
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 
 import { argValue } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';

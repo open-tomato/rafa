@@ -51,14 +51,14 @@
  * None is a `CommandLineSetting`: the flags that outrank a key for one
  * run (`--retry=<n>`) are read by `start/run-setup.ts`.
  */
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
 import { join } from 'node:path';
 
-import { oneOf, refused, text } from './core/config/sections.js';
+import { oneOf, refused, text } from '@open-tomato/rafa/core/config/sections';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `loop-continue` section's fields, added to core's. */
   interface RafaConfig extends LoopContinueSettings {}
 }

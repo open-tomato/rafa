@@ -27,9 +27,9 @@
  * (`store-sources.sweep.test.ts`), so nothing outside a test file may import
  * from one.
  */
-import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { Device } from '../../tests/merged-stores.js';
-import type { OriginTable } from '../store/origins.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { OriginTable } from '@open-tomato/rafa/store/origins';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,11 +38,12 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { withoutGap } from '@open-tomato/rafa/store/merge-commit-gaps';
+import { ORIGIN_TABLES } from '@open-tomato/rafa/store/origins';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { copyDevice, freshDevice } from '../../tests/merged-stores.js';
-import { writeDispatch } from '../store/dispatches.js';
-import { withoutGap } from '../store/merge-commit-gaps.js';
-import { ORIGIN_TABLES } from '../store/origins.js';
-import { sqliteStorePath } from '../store/sqlite.js';
 
 import { createFileSync } from './file.js';
 

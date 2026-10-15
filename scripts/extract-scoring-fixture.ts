@@ -27,7 +27,8 @@ import type { BoardIssue, CauseJudgement, Filing, ScoringFixture } from '../src/
 
 import { resolve } from 'node:path';
 
-import { messageOf } from '../src/core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { fixtureScrubber, machineScrubContext } from '../src/fixtures/scrub.js';
 import { FIXTURE_REPO, filingsOf } from '../src/triage/scoring-fixture.js';
 

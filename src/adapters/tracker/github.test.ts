@@ -77,7 +77,7 @@
  */
 import type { FakeGh, FakeGhOptions } from './github-fake.js';
 import type { GhResult, GhRunner } from './github.js';
-import type { IssueRef, IssueState, Tracker } from '../../ports/index.js';
+import type { IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

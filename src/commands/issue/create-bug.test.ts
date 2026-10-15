@@ -7,8 +7,8 @@
  * seam answering a fixed commit, so no case reads this checkout.
  */
 import type { IssueSeams } from './issue-tracker.js';
-import type { GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../../adapter-registry.js';
 
@@ -18,9 +18,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
-import { RAFA_VERSION } from '../../core/command/index.js';
 import { dispatchInProject, plantProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createIssueCreateCommand } from './create.js';

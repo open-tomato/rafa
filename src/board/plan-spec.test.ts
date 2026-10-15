@@ -169,9 +169,9 @@ import type { ReadyOffer } from './plan-spec.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { BoardTrust } from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { Output } from '../ports/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -179,8 +179,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { lazyPrompter } from '../commands/issue/ready.js';
-import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 

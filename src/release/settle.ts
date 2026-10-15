@@ -83,15 +83,15 @@ import type { BranchForecastSettings } from './branch-forecast.js';
 import type { ChangelogInsertPoint } from './changelog.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { FoldFragment } from './strategy.js';
-import type { ReleaseStrategy } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
-import { errorCode } from '../core/loop/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+import { errorCode } from '@open-tomato/rafa/core/loop';
 
 import { insertChangelogEntry } from './changelog.js';
 import { readFragmentTree } from './fragment-tree.js';

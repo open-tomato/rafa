@@ -19,9 +19,9 @@
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { KindRouteOptions } from './kind-route.js';
 import type { TriageOptions, TriageResult } from './triage.js';
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
-import type { BugKind, ReportBug, TaskReport } from '../report/parse.js';
+import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+import type { BugKind, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +29,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readStaleDocsForPlan } from '../effort/store/stale-docs.js';
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+
 import { ABSENT } from '../refs/stamp.js';
 import { findNextTask } from '../utils/tracker.js';
 

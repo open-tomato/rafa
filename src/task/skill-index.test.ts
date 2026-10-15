@@ -3,10 +3,10 @@
  * description fallback, the per-line and whole-index cuts with their
  * order and tail, and what is left out.
  */
-import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventoryState } from '../inventory/record.js';
-import type { SkillTier } from '../schema/tiers.js';
 import type { Resolution, TierSettings } from '../tiers/resolve.js';
+import type { TierPin } from '@open-tomato/rafa/core/config/sections';
+import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 
 import { describe, expect, it } from 'bun:test';
 

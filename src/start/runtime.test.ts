@@ -21,7 +21,7 @@
  * SIGINT to the run once its runtime has started, and reads that the run
  * waited for the runtime and ended with its exit code.
  */
-import type { CliEvent, Output } from '../ports/index.js';
+import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
 import {
   existsSync,
@@ -39,8 +39,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { expectExit, plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 

@@ -14,7 +14,7 @@
  * mode is one a person reads: json and events lines are never coloured.
  */
 import type { LoggerTheme } from './settings.js';
-import type { LogLevel } from '../../ports/index.js';
+import type { LogLevel } from '@open-tomato/rafa/ports';
 
 /** The variable that turns colour on, or off when it is `0`. */
 const FORCE_COLOR = 'FORCE_COLOR';

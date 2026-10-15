@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.packages.json",
+  "include": ["src"],
+  // *.test.ts stays out of check-types, as at the root, until the test
+  // type-checking work lands (.rafa/specs/test-type-checking.md).
+  "exclude": ["**/*.test.ts"]
+}

@@ -32,8 +32,8 @@
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument } from '../cli/describe.js';
-import type { Output } from '../ports/index.js';
 import type { CheckoutRosterRead } from './plan/refs-check.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -42,8 +42,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { describeRegistry } from '../cli/describe.js';
-import { createGitRunner } from '../core/git/index.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, NEW, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';

@@ -179,8 +179,9 @@ import type {
 } from './types.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { parseChecks, verdictOf } from './checks.js';
 import { closePullRequest } from './gh-close.js';

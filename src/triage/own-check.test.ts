@@ -10,7 +10,7 @@
 import type { BaseRunAnswer } from './base-run.js';
 import type { KindCheckEntry, KindCheckInput, NamedTestReadings } from './own-check.js';
 import type { PlanFilesReading } from './plan-commits.js';
-import type { BugKind } from '../report/parse.js';
+import type { BugKind } from '@open-tomato/rafa/report/parse';
 
 import { describe, expect, it } from 'bun:test';
 

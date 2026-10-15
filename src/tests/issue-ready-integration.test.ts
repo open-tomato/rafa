@@ -34,8 +34,8 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
-import type { Prompter } from '../core/command/index.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../adapter-registry.js';
 
@@ -44,6 +44,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../board/gate.js';
@@ -54,7 +56,6 @@ import { SPEC_READY_LABEL, specReadyRefusalMessage } from '../board/readiness.js
 import { createIssueReadyCommand, readyQuestion } from '../commands/issue/ready.js';
 import { createPlanReadyOffer } from '../commands/plan/ready-offer.js';
 import { resolveCreateSpec } from '../commands/plan/spec-route.js';
-import { CommandExit } from '../core/command/index.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';

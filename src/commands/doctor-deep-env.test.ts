@@ -9,8 +9,8 @@
  * that reads the same world, changed in one place, as applied.
  */
 import type { SessionEnvSeams } from './doctor-deep-env.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { SpawnEnv } from '../core/loop/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,8 +18,8 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sessionSpawnEnv } from '../core/loop/index.js';
-import { bundledBinDirectory } from '../schema/tiers.js';
+import { sessionSpawnEnv } from '@open-tomato/rafa/core/loop';
+import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
 
 import {
   envDifferences,

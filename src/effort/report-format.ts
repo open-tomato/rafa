@@ -27,10 +27,10 @@ import type { BudgetedSession } from './report-budgets.js';
 import type { DocOnlyBugs } from './report-doc-bugs.js';
 import type { BugKindsReading, PlanBugKinds } from './report-kinds.js';
 import type { EffortGroup, EffortReport } from './report.js';
-import type { HaltedCheck, PreflightHalt } from './store/preflight.js';
-import type { TaskReportTally } from './store/reports.js';
+import type { HaltedCheck, PreflightHalt } from '@open-tomato/rafa/store/preflight';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
 
-import { BUG_KINDS } from '../report/parse.js';
+import { BUG_KINDS } from '@open-tomato/rafa/report/parse';
 
 /** Decimal places a formatted minute figure carries in the table. */
 const TABLE_MINUTE_DECIMALS = 1;

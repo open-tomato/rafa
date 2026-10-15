@@ -34,8 +34,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+
 import { DOC_TASK_HEADING } from '../docs/task-reading.js';
-import { readStaleDocsForPlan } from '../effort/store/stale-docs.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

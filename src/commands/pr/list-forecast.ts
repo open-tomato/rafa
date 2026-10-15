@@ -49,9 +49,9 @@
  * The column is left out altogether where the project's release is off
  * (`resolveReleaseEnabled`), since no body there carries a forecast.
  */
-import type { RafaConfig } from '../../core/config/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ForecastBasis } from '../../release/forecast.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { forecastMoved, readBodyForecast } from '../../release/body-forecast.js';
 import { RELEASE_REMOTE } from '../../release/version.js';

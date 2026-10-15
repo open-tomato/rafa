@@ -28,7 +28,7 @@
  */
 import type { ResolvedSpec } from '../board/spec-source.js';
 import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -37,9 +37,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { checkCreateRefs, RAFA_PACKAGE_NAME } from '../commands/plan/refs-check.js';
-import { CommandExit } from '../core/command/index.js';
 import { readRefsBlock } from '../refs/stamp.js';
 
 import { sinkOutput } from './output-sinks.js';

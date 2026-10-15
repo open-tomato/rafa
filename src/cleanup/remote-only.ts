@@ -109,13 +109,14 @@
  */
 import type { BranchesUnread } from './branches.js';
 import type { DeviceStoreIds } from '../claims/device.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { PullRequests } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { holdsClaim } from '../claims/device.js';
 import { claimBranchIssue, readClaimBranch } from '../claims/git.js';
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
 
 import { isKept, readRemoteHead } from './branches.js';
 

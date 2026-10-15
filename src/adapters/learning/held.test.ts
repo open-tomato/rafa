@@ -13,8 +13,8 @@
  * the other way round, a flagged trigger beside one held twice with one
  * action, the fallback beside a held member that overrides it.
  */
-import type { InstinctRecord } from '../../ports/index.js';
 import type { Instinct } from '../../schema/instinct.js';
+import type { InstinctRecord } from '@open-tomato/rafa/ports';
 
 import { describe, expect, test } from 'bun:test';
 

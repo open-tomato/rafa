@@ -44,7 +44,7 @@ import type { SpecReviewGap } from './spec-review.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 import {
   ASSUMPTIONS_HEADING,

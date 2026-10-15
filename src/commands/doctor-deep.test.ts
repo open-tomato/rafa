@@ -26,7 +26,8 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { resolveScope } from '../project/scope.js';
 
 import { readSessionEnv } from './doctor-deep-env.js';

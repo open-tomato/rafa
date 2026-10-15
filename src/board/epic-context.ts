@@ -79,10 +79,10 @@
 import type { EpicRelations } from './epics.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { readEpicBody } from './epic-body.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from './epics.js';

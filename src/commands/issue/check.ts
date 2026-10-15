@@ -61,18 +61,19 @@
  * `unreadable` for a target that could not be read): a new reference
  * reads `state: new`, `fingerprint: absent` and `stamp: new`.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RefRow } from '../../refs/reading.js';
 import type { LiveReading, RefState } from '../../refs/stamp.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { boardId, notesFileName, SPEC_EXTENSION } from '../../board/naming.js';
 import { memoiseVerifier } from '../../board/refs-gate.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../../refs/reading.js';
 import { fingerprintText, RefsBlockError } from '../../refs/stamp.js';
 import { RefVerifyError } from '../../refs/verify.js';

@@ -51,8 +51,8 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { configFilePath, parseConfigText } from '../core/config/index.js';
-import { isMapping, messageOf } from '../core/config/sections.js';
+import { configFilePath, parseConfigText } from '@open-tomato/rafa/core/config';
+import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** What the project config says `roadmap.issue` is, or why it could not be read. */
 export interface SettingReading {

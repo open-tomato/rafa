@@ -1,7 +1,7 @@
 /**
  * `rafa effort copy [--to=<dir>]`: the project's effort store copied
  * into a directory of its own by `copyEffortStore`
- * (`src/effort/store/copy.ts`, whose note says how each file is copied),
+ * (`packages/rafa/src/effort/store/copy.ts`, whose note says how each file is copied),
  * so branch code can run over real data with `RAFA_EFFORT_DIR` pointing
  * at the copy. Starts no Claude session and declares no `spends`.
  *
@@ -24,16 +24,17 @@
  * removed. In json mode the `EffortCopyResult`, with its `env` line, is
  * the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { EffortCopyResult } from '../../effort/store/copy.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EffortCopyResult } from '@open-tomato/rafa/store/copy';
 
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '@open-tomato/rafa/store/copy';
+import { EFFORT_DIR_VARIABLE } from '@open-tomato/rafa/store/location';
+import { EFFORT_STORE_DIR } from '@open-tomato/rafa/store/ndjson-files';
+
 import { fileStamp } from '../../effort/file-stamp.js';
-import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '../../effort/store/copy.js';
-import { EFFORT_DIR_VARIABLE } from '../../effort/store/location.js';
-import { EFFORT_STORE_DIR } from '../../effort/store.js';
 import { expectNoArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

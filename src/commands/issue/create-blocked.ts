@@ -65,10 +65,11 @@
  * with it and the remedy for the body instead.
  */
 import type { BlockedReading } from '../../board/blocked.js';
-import type { IssueDraft, Tracker } from '../../ports/index.js';
+import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { BLOCKED_BY_FIELD, readBlockedBy } from '../../board/blocked.js';
-import { CommandExit } from '../../core/command/index.js';
 
 import { onTracker } from './issue-tracker.js';
 

@@ -111,31 +111,31 @@ import type { SessionStats } from './session-log.js';
 import type {
   PlanStubMatch,
   PlanStubResolution,
-} from './store/plan-stubs.js';
+} from '@open-tomato/rafa/store/plan-stubs';
 
-import { planStubFromPrompt } from '../utils/plan-stamp.js';
+import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+import {
+  attributeBranch,
+  resolvePlanStub,
+} from '@open-tomato/rafa/store/plan-stubs';
 
 import {
   classifyPromptContent,
   matchesShape,
   PROMPT_SHAPES,
 } from './classify.js';
-import {
-  attributeBranch,
-  resolvePlanStub,
-} from './store/plan-stubs.js';
 
 export {
   attributeBranch,
   planStubsFromFileNames,
   queueIdOf,
   resolvePlanStub,
-} from './store/plan-stubs.js';
+} from '@open-tomato/rafa/store/plan-stubs';
 export type {
   BranchAttribution,
   PlanStubMatch,
   PlanStubResolution,
-} from './store/plan-stubs.js';
+} from '@open-tomato/rafa/store/plan-stubs';
 
 /** The modal branch of a session, with the spread it was chosen from. */
 export interface DominantBranch {

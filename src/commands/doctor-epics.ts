@@ -66,11 +66,12 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicProblem } from '../board/epic-problems.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing } from '../board/roadmap-board.js';
-import { messageOf } from '../core/config/sections.js';
-import { plural } from '../core/plan/index.js';
 
 /** The heading the epic label lines sit under, as `Blocked issues:` heads its own. */
 export const EPICS_HEADING = 'Epic labels:';

@@ -33,7 +33,7 @@
  *
  * Straight after the checks are read, before any refusal, the pull
  * request and the rows its checks answered go to `recordPlanCi`
- * (`src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for a
+ * (`packages/rafa/src/effort/store/plan-ci.ts`), which stores one `plan_ci` row for a
  * settled verdict on a head branch that names a plan. So a merge refused
  * on red checks, or on none, still records what it read. A store that
  * refuses the row is warned about and never changes the exit code.
@@ -205,10 +205,13 @@ import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { PidProbe } from '../../core/loop/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { PidProbe } from '@open-tomato/rafa/core/loop';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { epicTickSentence } from '../../board/epic-tick.js';
@@ -216,8 +219,6 @@ import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { unblockAfterMerge } from '../../board/unblock-after-merge.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import {
   createGitRunner,

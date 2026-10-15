@@ -68,13 +68,14 @@
 import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';

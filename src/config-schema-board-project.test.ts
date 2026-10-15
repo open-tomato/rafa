@@ -24,19 +24,20 @@
  * whose least is `0`, so for it `0` is the accepting edge and `-1` the
  * refusal beside it.
  */
-import type { ConfigOverrides, ConfigSetting } from './core/config/index.js';
+import type { ConfigOverrides, ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';
 import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   parseConfigText,
   resolveConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';
 
 /** The label every project-file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

@@ -69,9 +69,10 @@
  * {@link BranchesUnread} naming what went wrong, the shape
  * {@link GitRunner} itself has.
  */
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 
 /** The `for-each-ref` format every branch is read with; see the module note. */

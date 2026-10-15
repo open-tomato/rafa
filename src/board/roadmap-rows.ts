@@ -199,13 +199,14 @@ import type { ReadinessGap } from './readiness.js';
 import type { BlockersReading } from './relations/port.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapLine, RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, readdirSync } from 'node:fs';
 
-import { messageOf } from '../core/config/sections.js';
-import { stubOfPlanFile } from '../core/plan/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+
 import { positionFilePath } from '../project/position.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 

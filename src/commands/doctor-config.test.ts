@@ -10,7 +10,7 @@
  * project reads `doctor` as before is `src/tests/config-parity.test.ts`'s.
  * The registry is the one `src/config-registry.ts` registers on import.
  */
-import type { ResolvedConfig } from '../core/config/index.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,9 +18,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONFIG_ROWS_TITLE, doctorConfigRows, loadDoctorConfig, renderDoctorConfigNotes } from './doctor-config.js';

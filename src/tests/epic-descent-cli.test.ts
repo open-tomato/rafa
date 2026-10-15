@@ -39,12 +39,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { parseRoadmapBody } from '../board/roadmap.js';
 import { pickLine, roadmapHeaderLine } from '../board/spec-source-roadmap.js';
 import { describeIssue, dryRunLine } from '../board/spec-source.js';
-import { plural } from '../core/plan/index.js';
 import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../next/lines.js';
 import { projectConfigText } from '../project/scaffold.js';
 

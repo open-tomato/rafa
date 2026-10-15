@@ -33,7 +33,7 @@
  *    parent, and its control is the same lookup for a path no worktree
  *    was ever added at, which must answer null.
  */
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import {
   existsSync,
@@ -50,7 +50,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import {
   addResolveWorktree,

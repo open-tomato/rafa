@@ -92,11 +92,12 @@
  * restore line is printed for the operator to run.
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
-import type { CommitAttempt } from '../core/git/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { CommitAttempt } from '@open-tomato/rafa/core/git';
 
-import { CommandExit } from '../core/command/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED, guardCheckout, haltHeadline, readCheckout } from './checkout-guard.js';

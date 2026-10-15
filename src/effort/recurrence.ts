@@ -56,7 +56,7 @@
  * row of `facts` throws a `RangeError`.
  */
 import type { SkillFact, SkillFactEntry, SkillFactFinding } from './skill-facts.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 /** Where a recurrence was found. */
 export type RecurrenceSource = 'finding' | 'blocker' | 'out-of-scope-bug' | 'plan-ci';

@@ -37,7 +37,7 @@
  */
 import type { ClosingIssue } from './types.js';
 
-import { describeValue, isMapping } from '../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
 /** The `--json` field the references are read from. */
 export const CLOSING_ISSUES_FIELD = 'closingIssuesReferences';

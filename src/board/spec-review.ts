@@ -141,7 +141,7 @@
  * Every drop is recorded in {@link SpecReviewReading.issues}, whose
  * `field` is a path in the block's own key names (`gaps[2].what`) so it
  * can be found in the block as written. A key naming no field is
- * IGNORED rather than refused, the rule `utils/declaration.ts` applies
+ * IGNORED rather than refused, the rule `core/plan/declaration.ts` applies
  * to an unrecognised key: a review block written for a later phase must
  * not break this one.
  *
@@ -157,26 +157,26 @@
  * silently cuts a `what` short; and an empty body parses as null, which
  * is no mapping and so `malformed`.
  */
-import type { RafaBlock } from '../core/plan/block-reader.js';
+import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 import type {
   SpecReviewAnswer,
   SpecReviewGap,
   SpecReviewIssue,
   SpecReviewReading,
   SpecReviewVerdict,
-} from '../ports/spec-review.js';
+} from '@open-tomato/rafa/ports/spec-review';
 
-import { readRafaBlocks } from '../core/plan/block-reader.js';
-import { SPEC_REVIEW_VERDICTS } from '../ports/spec-review.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+import { SPEC_REVIEW_VERDICTS } from '@open-tomato/rafa/ports/spec-review';
 
-export { SPEC_REVIEW_ANSWERS, SPEC_REVIEW_VERDICTS } from '../ports/spec-review.js';
+export { SPEC_REVIEW_ANSWERS, SPEC_REVIEW_VERDICTS } from '@open-tomato/rafa/ports/spec-review';
 export type {
   SpecReviewAnswer,
   SpecReviewGap,
   SpecReviewIssue,
   SpecReviewReading,
   SpecReviewVerdict,
-} from '../ports/spec-review.js';
+} from '@open-tomato/rafa/ports/spec-review';
 
 /** The block kind a spec review is read from. */
 export const SPEC_REVIEW_KIND = 'spec-review';

@@ -31,7 +31,7 @@
  * is stored `done` beside `blocked` — which is exactly the row the third
  * case below reads back.
  */
-import type { CapturedSession } from '../core/loop/index.js';
+import type { CapturedSession } from '@open-tomato/rafa/core/loop';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -54,8 +54,9 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { finishCleanExit } from '../start/commit.js';
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
 import { findNextTask } from '../utils/tracker.js';

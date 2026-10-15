@@ -19,9 +19,9 @@
  */
 import type { FollowUpsConfig, FollowUpsInput, FollowUpsSeams } from './follow-ups.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { BugRoute, BugRouteRow } from '../effort/store/bug-routes.js';
-import type { OpenIssue, Tracker } from '../ports/index.js';
-import type { BugKind } from '../report/parse.js';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { BugKind } from '@open-tomato/rafa/report/parse';
+import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +29,10 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { writeBugRoutes } from '../effort/store/bug-routes.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

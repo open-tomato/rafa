@@ -22,13 +22,13 @@
  * installed runtime with no live loop and no git read. The devices'
  * own files are only read.
  */
-import type { RuntimeIdentity } from '../core/runtime/index.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { mergeStore } from '../effort/store/merge-store.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { mergeStore } from '@open-tomato/rafa/store/merge-store';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 /** The project both devices' `store_meta` rows name. */
 const PROJECT = 'root-commit-merged-stores';

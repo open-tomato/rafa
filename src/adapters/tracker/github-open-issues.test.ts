@@ -34,7 +34,7 @@
  * listing a row with none.
  */
 import type { GithubOpenIssuesReaders } from './github-open-issues.js';
-import type { IssueRef, OpenIssue, Tracker } from '../../ports/index.js';
+import type { IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

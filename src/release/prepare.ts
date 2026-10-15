@@ -88,13 +88,14 @@ import type { TreeFragment } from './fragment-tree.js';
 import type { Fragment } from './fragment.js';
 import type { ReleaseLevelReading, ReleaseLevelSource } from './level.js';
 import type { BaseVersionOptions } from './version.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
 
 import { groupChangeNotes, renderNoteLines } from './changelog.js';

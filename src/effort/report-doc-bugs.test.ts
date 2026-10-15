@@ -13,7 +13,7 @@
  * read.
  */
 import type { BugText } from './report-doc-bugs.js';
-import type { ReportBug } from '../report/parse.js';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,9 +21,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { writeTriage } from '@open-tomato/rafa/store/triage';
+
 import { countDocOnlyBugs, readDocOnlyBugs } from './report-doc-bugs.js';
-import { sqliteStorePath } from './store/sqlite.js';
-import { writeTriage } from './store/triage.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-doc-bugs-'));
 let planted = 0;

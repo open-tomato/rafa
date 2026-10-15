@@ -19,11 +19,11 @@
  * prompter records the question it was asked.
  */
 import type { CloseSeams, PrCloseResult } from './close.js';
-import type { Prompter } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { FakePrGh } from '../../pr/gh-fake.js';
 import type { PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -33,7 +33,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';

@@ -94,11 +94,12 @@
  * is left out. A `totalCount` below the nodes answered is refused.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
-import type { IssueType } from '../ports/index.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { IssueType } from '@open-tomato/rafa/ports';
+
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { moduleOfLabels, typeOfLabels } from '../adapters/tracker/github.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** What every refusal this module raises opens with. */
 const PREFIX = 'board listing';

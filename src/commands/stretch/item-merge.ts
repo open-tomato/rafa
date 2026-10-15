@@ -77,15 +77,16 @@
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BranchRun } from '../../ci/runs.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { Tracker } from '../../ports/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { Tracker } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
-import { CommandExit } from '../../core/command/index.js';
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';

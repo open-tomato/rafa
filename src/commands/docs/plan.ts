@@ -50,7 +50,7 @@
  * second task line, a heading, a stage or a fence; and `<!--` and `-->`
  * are broken, so no line opens or closes a comment, the blocker comment
  * and the plan stamp included. The declaration is the line's trailing
- * brace group (`utils/declaration.ts`), and every task line ends on its
+ * brace group (`core/plan/declaration.ts`), and every task line ends on its
  * own `{agent=doc-updater}`, so a brace group a line holds stays in the
  * task's text and is never read as its declaration. The escaping is
  * `unescapeBlockerText`'s to reverse, which is how a line is found again
@@ -71,25 +71,24 @@
  * how many issues. With `--output=json` the terminal result's `data` is
  * a {@link DocsPlanResult}.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { PlansDir } from '../../core/plan/index.js';
 import type { OpenStaleDocLine } from '../../docs/open-lines.js';
-import type { Tracker } from '../../ports/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PlansDir } from '@open-tomato/rafa/core/plan';
+import type { Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plansDirAt , isStampableStub, planStampLine , escapeBlockerText } from '@open-tomato/rafa/core/plan';
+
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { readOpenStaleDocLines } from '../../docs/open-lines.js';
 import { DOC_UPDATE_TASK_PREFIX, DOC_UPDATE_TITLE } from '../../docs/release-issue.js';
-import { isStampableStub, planStampLine } from '../../utils/plan-stamp.js';
-import { escapeBlockerText } from '../../utils/tracker.js';
 import { DEFAULT_ISSUE_SEAMS } from '../issue/issue-tracker.js';
 import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 

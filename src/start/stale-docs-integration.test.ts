@@ -36,11 +36,12 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { STALE_DOCS_MARKER, staleDocsTitle } from '../docs/release-issue.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { parseTaskDeclaration } from '../utils/declaration.js';
 
 import { createStartStaleDocs } from './stale-docs.js';
 

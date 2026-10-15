@@ -65,9 +65,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CLAUDE_BASE_ARGS, CLAUDE_BIN } from '../core/loop/index.js';
-import { readRafaBlocks } from '../core/plan/block-reader.js';
-import { parseReport } from '../report/parse.js';
+import { CLAUDE_BASE_ARGS, CLAUDE_BIN } from '@open-tomato/rafa/core/loop';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+
 import { buildTaskPrompt } from '../start/dispatch.js';
 
 /** `src/PROMPT.md`, the file `buildTaskPrompt` places in every task prompt. */

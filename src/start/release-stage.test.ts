@@ -42,8 +42,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { assumptionsHeading } from '../board/review-stamp.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { verifyRelease } from '../release/verify.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';

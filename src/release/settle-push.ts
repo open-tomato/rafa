@@ -115,9 +115,9 @@
  */
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { buildSettle, releaseCommitSubject } from './settle.js';
 

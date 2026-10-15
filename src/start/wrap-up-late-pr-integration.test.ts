@@ -231,7 +231,7 @@ function moduleUrl(relative: string): string {
 const DRIVER = `
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { setActiveOutput } from ${JSON.stringify(moduleUrl('../core/output/index.ts'))};
+import { setActiveOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output')))};
 import { sinkOutput } from ${JSON.stringify(moduleUrl('../tests/output-sinks.ts'))};
 import { openCheckoutExpectation } from ${JSON.stringify(moduleUrl('./checkout-watch.ts'))};
 import { bindEventsFile } from ${JSON.stringify(moduleUrl('./loop-events.ts'))};

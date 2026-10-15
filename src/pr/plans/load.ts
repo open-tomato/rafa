@@ -143,7 +143,7 @@
  *   - Every line is QUOTED with a `>` rather than fenced. A log line is
  *     untrusted text arriving inside a fenced block, and a bare
  *     three-backtick line in it CLOSES the `rafa:context` fence early
- *     (`src/core/plan/blocks.ts` takes any fence at least as long as the
+ *     (`packages/rafa/src/core/plan/blocks.ts` takes any fence at least as long as the
  *     opening one), spilling the rest of the log into the document as
  *     markdown, where a `- [ ] ` line is read as a TASK. A fence one
  *     backtick longer, the trick `../triage/follow-up.ts` uses, does not

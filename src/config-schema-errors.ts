@@ -20,15 +20,16 @@
  * list of mappings does.
  */
 
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader, Reading } from './core/config/sections.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
 
-import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from './core/config/sections.js';
+import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from '@open-tomato/rafa/core/config/sections';
+
 import { codeProblem, ERROR_LEVELS } from './errors/codes.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `errors` section's fields, added to core's. */
   interface RafaConfig extends ErrorsSettings {}
 }

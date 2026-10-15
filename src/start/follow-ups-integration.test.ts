@@ -30,8 +30,8 @@
  */
 import type { StartTriageOptions, TaskTriageInput } from './triage.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { IssueDraft, Tracker } from '../ports/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 
@@ -56,11 +56,12 @@ import {
   it,
 } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { createGitRunner } from '../core/git/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, SUMMARY } from '../tests/release-stage-fixtures.js';

@@ -54,7 +54,7 @@
  * secret behind.
  */
 import type { ScoredIssue } from './similarity.js';
-import type { IssueRef } from '../ports/index.js';
+import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { oneLine } from './bug-key.js';
 

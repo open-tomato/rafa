@@ -16,7 +16,8 @@
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { parseSemanticVersion } from '../release/version.js';
 
 /** The lock's file name, at the project root. */

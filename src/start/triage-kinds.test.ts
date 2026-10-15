@@ -15,12 +15,12 @@
  * them.
  */
 import type { StartKindOptions } from './triage-kinds.js';
-import type { GitResult } from '../core/git/index.js';
-import type { BugRouteEntry } from '../effort/store/bug-routes.js';
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { ReportBug } from '../report/parse.js';
 import type { BaseRunAnswer, NamedTest } from '../triage/base-run.js';
 import type { BugTriage } from '../triage/triage.js';
+import type { GitResult } from '@open-tomato/rafa/core/git';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
+import type { BugRouteEntry } from '@open-tomato/rafa/store/bug-routes';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,9 +28,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
-import { parseReport } from '../report/parse.js';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 
 import {
   bugRouteEntriesOf,

@@ -3,7 +3,7 @@
  * written: what leaves a URL, which headers stay, and the one line an
  * exchange reads as.
  */
-import type { ApiExchange } from '../../ports/index.js';
+import type { ApiExchange } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

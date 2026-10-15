@@ -63,16 +63,17 @@
  * link to a directory removed the link and left the directory it named
  * whole.
  */
-import type { GitRunner } from '../core/git/index.js';
 import type { JunitCase, SuiteSpawner } from '../suite/run.js';
-import type { SpawnEnv } from '../utils/session-env.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, normalize, relative, sep } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../core/git/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+
 import { parseJunitCases, runSuite } from '../suite/run.js';
 
 /** The folder name no named test file may sit under. */

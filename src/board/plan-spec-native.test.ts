@@ -22,8 +22,8 @@
 import type { SpecIssue } from './issue.js';
 import type { PlanSpecOptions } from './plan-spec.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

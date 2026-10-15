@@ -70,8 +70,8 @@
 import type { NextWorld } from './readings.js';
 import type { RowAnswer } from './state.js';
 
-import { messageOf } from '../core/config/sections.js';
-import { plural } from '../core/plan/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 /** How many changed files the tree pre-condition names before eliding. */
 const MAX_NAMED_FILES = 5;

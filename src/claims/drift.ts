@@ -60,11 +60,12 @@
 import type { BoardIssue, BoardIssueState, BoardListing } from '../board/roadmap-board.js';
 import type { BranchScan } from '../board/roadmap.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { isEpicIssue } from '../board/epic-walk.js';
 import { claimBranchOfRef } from '../board/roadmap-claims.js';
 import { parseRoadmapBody } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
-import { messageOf } from '../core/config/sections.js';
 
 import { claimBranchIssue } from './git.js';
 import { STAGE_LABELS } from './labels.js';

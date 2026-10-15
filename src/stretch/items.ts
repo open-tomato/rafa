@@ -16,7 +16,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { errorCode } from '../core/loop/index.js';
+import { errorCode } from '@open-tomato/rafa/core/loop';
 
 import { stretchFolder } from './folder.js';
 

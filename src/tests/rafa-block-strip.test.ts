@@ -46,8 +46,9 @@ import {
   it,
 } from 'bun:test';
 
-import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '../core/git/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '@open-tomato/rafa/core/git';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { findNextTask } from '../utils/tracker.js';

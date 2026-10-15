@@ -16,7 +16,8 @@ import type { ReleasePreparation } from '../release/prepare.js';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { RELEASE_BLOCK_CLOSE } from '../release/branch-forecast.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import {

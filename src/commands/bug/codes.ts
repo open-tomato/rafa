@@ -32,12 +32,13 @@
  * and a config the reader refuses; and 1 for `--check` over a list holding a pair that reads
  * alike, after the pairs in text mode.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ErrorCodeEntry } from '../../errors/codes.js';
 import type { CodeSuggestion, NearDuplicate } from '../../errors/match.js';
 import type { ListedCode } from '../../errors/rafa-codes.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { familyOf, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '../../errors/codes.js';
 import { nearDuplicates, suggestCodes } from '../../errors/match.js';
 import { FAMILY_DESCRIPTIONS, listedCodes } from '../../errors/rafa-codes.js';

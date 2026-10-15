@@ -133,14 +133,15 @@
  * and `criterion: "1"` reads as a string, which is refused rather than
  * turned into a number.
  */
-import type { RafaBlock } from '../core/plan/block-reader.js';
+import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../board/epic-template.js';
-import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 /** This module's own directory, where the template lookup starts. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));

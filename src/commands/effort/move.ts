@@ -2,7 +2,7 @@
  * `rafa effort move --to=sqlite`: a `store: ndjson` project's sessions
  * and commits appended to its SQLite store through the port, the counts
  * checked, and `store: sqlite` set in `.rafa/config.yaml`, by
- * `moveToSqlite` (`src/effort/store/move.ts`, whose note is the long
+ * `moveToSqlite` (`packages/rafa/src/effort/store/move.ts`, whose note is the long
  * form). Starts no Claude session and declares no `spends`.
  *
  * Both sides are the ones every other command would open: under
@@ -19,16 +19,17 @@
  * over a store it does not own. Exit code 0 otherwise. In json mode the
  * `MoveResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { KindMove, MoveResult } from '../../effort/store/move.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { KindMove, MoveResult } from '@open-tomato/rafa/store/move';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { SchemaRefusedError } from '../../effort/store/bring-forward.js';
-import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
-import { effortStoreDir } from '../../effort/store/location.js';
-import { MOVE_TO_SQLITE } from '../../effort/store/merge-store.js';
-import { MOVE_TARGET, MoveRefusal, moveToSqlite } from '../../effort/store/move.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { SchemaRefusedError } from '@open-tomato/rafa/store/bring-forward';
+import { DevelopmentBuildRefusedError } from '@open-tomato/rafa/store/development-build';
+import { effortStoreDir } from '@open-tomato/rafa/store/location';
+import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
+import { MOVE_TARGET, MoveRefusal, moveToSqlite } from '@open-tomato/rafa/store/move';
+
 import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

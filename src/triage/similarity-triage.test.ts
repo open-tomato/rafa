@@ -19,8 +19,8 @@
  * unrelated bug shares one word, `the`, with the second: 1 of 19, 0.05.
  */
 import type { TriageOptions, TriageResult } from './triage.js';
-import type { IssueType, OpenIssue, Tracker } from '../ports/index.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
+import type { IssueType, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

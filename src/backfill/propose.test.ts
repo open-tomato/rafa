@@ -43,8 +43,8 @@
  * names every file of the batch.
  */
 import type { ProposalFile, ProposalRow } from './proposal-file.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

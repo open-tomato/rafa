@@ -60,8 +60,10 @@ repository.
   `HEAD`. It is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent,
   sorted keys, `commit`, `tests` keyed by path, `unindexed`. It is read back by
   `bun scripts/survey/test-index.ts --against=docs/survey/test-index.baseline.json`, which writes nothing and exits 1
-  naming each test file whose index rose: a test file `scripts/survey/core-moves.ts` moves is held under its old path,
-  `src/core/` counts as one folder, and the walk stops at a core barrel.
+  naming each test file whose index rose: a test file under `packages/rafa/src/` or `src/tests/core-coupled/` is
+  brought back to `src/` first, a test file `scripts/survey/core-moves.ts` moves is held under its old path,
+  `src/core/` counts as one folder and every file under `packages/rafa/src/` as `packages/rafa`, and the walk stops
+  at a core barrel.
 
 - **`cut-table.{json,md}`**: The ten future packages of epic #801, lowest first, each with the folders and files it
   holds by rule and its count of upward edges: imports of kind `value` or `type`, between two files neither of which

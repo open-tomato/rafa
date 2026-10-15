@@ -104,13 +104,13 @@
  * modules learning a relationship. Stage reads the label only to pick a
  * column, so it takes the tracker's spelling of the same name.
  */
-import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { Epic } from '../epics.js';
 import type { Blocker, BlockersReading } from '../relations/port.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { Horizon } from '../roadmap-epic-rows.js';
 import type { RoadmapLine } from '../roadmap.js';
 import type { HorizonOption, StageOption } from './options.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';

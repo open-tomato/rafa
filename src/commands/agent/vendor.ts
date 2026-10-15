@@ -95,15 +95,16 @@
  * failed, the message naming the file and what the error said.
  */
 import type { AgentDefinitionFile } from '../../agents/roster.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
-import type { SkillTier } from '../../schema/tiers.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { readAgentDirectory } from '../../agents/roster.js';
-import { CommandExit } from '../../core/command/index.js';
 import { bundledAgentsDirectory } from '../../inventory/trees.js';
 import { AGENT_DEFINITION_DIR, readFrontmatter } from '../../utils/agent-definition.js';
 

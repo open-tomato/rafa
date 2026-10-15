@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { skillTierDirectory } from '../schema/tiers.js';
+import { skillTierDirectory } from '@open-tomato/rafa/schema/tiers';
 
 import {
   agentTreeDirectory,

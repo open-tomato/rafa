@@ -20,8 +20,8 @@
  *   neither of which is reported.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { RiskFinding, RiskSeams } from '../plan/risk.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
