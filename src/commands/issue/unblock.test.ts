@@ -13,7 +13,7 @@
  *
  * ## The controls
  *
- * Four readings here could pass while wrong, and each is paired:
+ * Five readings here could pass while wrong, and each is paired:
  *
  *  - The removal case runs one board twice, answering the question yes
  *    and then no, and holds the write against no write. Without the
@@ -27,6 +27,9 @@
  *    it closed: the label stays on the first and comes off the second.
  *  - The second-command case pairs a body whose line names ids with one
  *    that names none, and holds two commands against one.
+ *  - The `--yes` removal case runs the same board without the flag and
+ *    without a terminal, and holds one `gh issue edit` against none, so
+ *    an edit sent whatever the line said would not pass.
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
@@ -741,6 +744,108 @@ describe('rafa issue unblock, dispatched', () => {
   });
 });
 
+describe('rafa issue unblock --yes, on an issue the line names', () => {
+  /** A project of this file's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'yes-')));
+
+  /** The command over `gh`, with no terminal and a prompter that fails the case when opened. */
+  function yesCommand(gh: ReturnType<typeof fakeGh>): ReturnType<typeof createIssueUnblockCommand> {
+    return createIssueUnblockCommand({
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --yes');
+      },
+    });
+  }
+
+  /** The `gh issue edit` commands `gh` was handed. */
+  const edits = (gh: ReturnType<typeof fakeGh>): readonly (readonly string[])[] => gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue edit');
+
+  it('removes the label with one edit and no prompter when every blocker is closed, and not without it', async () => {
+    const issues = {
+      12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+      24: { state: 'CLOSED' as const },
+      26: { state: 'CLOSED' as const },
+    };
+    const yes = fakeGh({ issues });
+    const plain = fakeGh({ issues });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [yesCommand(yes)], plant());
+    const control = await dispatchInProject(['issue', 'unblock', '12'], SUBJECTS, [yesCommand(plain)], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: 'Removed spec:blocked from #12 under --yes; every blocker is closed: #24 #26\n',
+      stderr: '',
+    });
+    expect(edits(yes)).toEqual([['issue', 'edit', '12', '--remove-label', 'spec:blocked']]);
+    expect(control.exitCode).toBe(0);
+    expect(control.stdout).toContain('there is no terminal to ask on, so spec:blocked stays');
+    expect(edits(plain)).toEqual([]);
+  });
+
+  it('names the open blocker and sends no edit', async () => {
+    const gh = fakeGh({
+      issues: {
+        57: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+        24: { state: 'OPEN' },
+        26: { state: 'CLOSED' },
+      },
+    });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '57', '--yes'], SUBJECTS, [yesCommand(gh)], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: '#57 is blocked by #24 (open), so spec:blocked stays\n',
+      stderr: '',
+    });
+    expect(gh.routes()).toEqual(['issue view', 'issue list']);
+    expect(edits(gh)).toEqual([]);
+  });
+
+  it('reports a line naming an id the board has no issue for, and sends no edit', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        26: { state: 'CLOSED' },
+      },
+    });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [yesCommand(gh)], plant());
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.startsWith('warn: #12 ')).toBe(true);
+    expect(outcome.stdout).toContain('naming #24, which the board has no issue for');
+    expect(edits(gh)).toEqual([]);
+  });
+
+  it('gives the removal line as the outcome message in json mode', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        24: { state: 'CLOSED' },
+      },
+    });
+    const words = ['issue', 'unblock', '12', '--yes', '--output=json'];
+
+    const outcome = await dispatchInProject(words, SUBJECTS, [yesCommand(gh)], plant());
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect(eventsOf(outcome.stdout)[1]).toMatchObject({
+      ok: true,
+      data: { issues: [{
+        issue: 12,
+        status: 'removed',
+        blockers: [24],
+        message: 'Removed spec:blocked from #12 under --yes; every blocker is closed: #24',
+      }] },
+    });
+  });
+});
+
 describe('the line', () => {
   /** What a refused line wrote, dispatched over a runner nobody may reach. */
   async function refuse(words: readonly string[]): Promise<{ exitCode: number | null; stderr: string; sent: number }> {
@@ -787,5 +892,12 @@ describe('the line', () => {
 
     expect(outcome.exitCode).toBe(1);
     expect(outcome.stderr).toContain('--all takes no value, and read "maybe" as one');
+  });
+
+  it('refuses a value given to --yes, naming the flag and the usage and sending no command', async () => {
+    const outcome = await refuse(['12', '--yes=maybe']);
+
+    expect([outcome.exitCode, outcome.sent]).toEqual([1, 0]);
+    expect(outcome.stderr).toBe(`❌ --yes takes no value, and read "maybe" as one\nUsage: ${UNBLOCK_USAGE}\n`);
   });
 });

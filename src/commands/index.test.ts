@@ -224,7 +224,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
   'issue ready': [['n'], ['yes', 'dry-run', 'hint']],
-  'issue unblock': [['n'], ['all']],
+  'issue unblock': [['n'], ['all', 'yes']],
   'issue check': [['n'], ['stamp']],
   'issue edit': [['n'], ['append-file', 'append', 'reason', 'replace-file', 'title', 'priority', 'while-in-development', 'dry-run']],
   'pr current': [[], []],
