@@ -329,9 +329,8 @@ export const TRIAGE_MODULE = 'unassigned';
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
 
-/** Names `./bug-key.ts` and `./issue-text.ts` now hold, still answered from here. */
+/** Names `./bug-key.ts` now holds, still answered from here. */
 export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
-export { TITLE_MAX_LENGTH, issueTitle } from './issue-text.js';
 
 /** One named secret: the variable's name and the value it held. */
 export interface NamedSecret {

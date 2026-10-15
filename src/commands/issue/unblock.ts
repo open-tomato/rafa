@@ -4,7 +4,7 @@
  * off each one the answer says yes for, or that `--yes` answered.
  *
  * This is the command half. The library half, `src/board/unblock.ts`,
- * holds the run itself: `runUnblock`, the three `gh` commands it sends,
+ * holds the run itself: `runUnblock`, the four `gh` commands it sends,
  * the question's spelling, the one write, the report and its statuses,
  * and what a half-read board costs. This file reads the line, opens the
  * runner and the prompter, hands them to `runUnblock`, and writes what

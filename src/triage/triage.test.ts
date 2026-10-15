@@ -95,13 +95,11 @@ import {
   blockerTextOf,
   bugKeyOf,
   createPrivateTriageTracker,
-  issueTitle,
   legacyBugKeyOf,
   namedSecrets,
   PRIVATE_TRIAGE_DIR,
   privateTriageDir,
   redactSecrets,
-  TITLE_MAX_LENGTH,
   triageReport,
 } from './triage.js';
 
@@ -385,16 +383,6 @@ describe('redactSecrets', () => {
 
   it('answers the text unchanged with no secrets', () => {
     expect(redactSecrets('nothing to take out', [])).toBe('nothing to take out');
-  });
-});
-
-describe('issueTitle', () => {
-  it('puts the text on one line and cuts it to the cap', () => {
-    expect(issueTitle('Parser drops\n  the last line ')).toBe('Parser drops the last line');
-
-    const cut = issueTitle('w'.repeat(TITLE_MAX_LENGTH + 10));
-    expect(Array.from(cut)).toHaveLength(TITLE_MAX_LENGTH);
-    expect(cut.endsWith('...')).toBe(true);
   });
 });
 

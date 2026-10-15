@@ -27,6 +27,18 @@
  * - The `not-ready` case of the walk is paired with the same roadmap
  *   whose candidate carries `spec:ready`: one is passed over and the
  *   next line is offered, the other is offered itself.
+ * - The blocker numbered past any listing is read CLOSED in one walk
+ *   and OPEN in its pair, and the not-found case first shows its reader
+ *   rejects with `gh`'s not-found phrase, so "holds the line" is not a
+ *   reader that never got asked.
+ * - The one-read case runs the same walk over the same counting reader
+ *   unmemoised, which reads the blocker twice: the count could have
+ *   come out more than one.
+ *
+ * Answering a failed read as CLOSED in `blockerStatesOf`, driven on
+ * 2026-10-15 from a scratch copy restored and checked with `shasum -c`,
+ * failed 3 of 23: the reader's own case and the throw and not-found
+ * cases past the listing.
  *
  * ## What passes while wrong
  *
@@ -55,13 +67,16 @@
  */
 import type { SpecIssue } from './issue.js';
 import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { KNOWN_LIST_LIMIT } from './blocked-issues.js';
 import {
   alternativeQuestion,
   blockedLineSentence,
   blockerStatesOf,
+  blockingOf,
   declinedMessage,
   noAlternativeMessage,
   notReadySentence,
@@ -71,7 +86,8 @@ import {
   unaskedMessage,
 } from './blocked-line.js';
 import { blockedFaultMessage, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';
-import { SPEC_LABEL } from './issue.js';
+import { NOT_FOUND } from './blocker-states.js';
+import { createGhSpecIssueReader, SPEC_LABEL } from './issue.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import { createRoadmapReadings, parseRoadmapBody, skipSentence } from './roadmap.js';
 
@@ -293,6 +309,101 @@ describe('the blocker states over a walks own reader', () => {
 
     expect(await states(24)).toBe('CLOSED');
     expect(await states(26)).toBeNull();
+  });
+});
+
+/** A blocker numbered past any state listing `rafa issue unblock` reads first. */
+const PAST_LISTING = KNOWN_LIST_LIMIT + 1000;
+
+/** #57 labelled and waiting on {@link PAST_LISTING} alone. */
+function pastListingIssue(fields: Partial<SpecIssue> = {}): SpecIssue {
+  return issueOf({ body: `Blocked by: #${String(PAST_LISTING)}\n`, ...fields });
+}
+
+/** A `gh` answering #57 and writing the not-found phrase for every other issue, as `gh` 2.102.0 does. */
+function notFoundGh(): GhRunner {
+  const held = pastListingIssue();
+  return (args: readonly string[]): Promise<GhResult> => {
+    const number = Number(args[2]);
+    return Promise.resolve(number === held.number
+      ? { ok: true, stdout: JSON.stringify({ ...held, labels: held.labels.map((name) => ({ name })) }), stderr: '' }
+      : { ok: false, stdout: '', stderr: `GraphQL: ${NOT_FOUND} ${String(number)}. (repository.issue)` });
+  };
+}
+
+/** A reader over planted issues counting every read per number, memoised like `./spec-source.ts`'s or not. */
+function countingIssues(issues: readonly SpecIssue[], memoised: boolean): {
+  reader: (issue: number) => Promise<SpecIssue>;
+  reads: (issue: number) => number;
+} {
+  const planted = plantedIssues(issues);
+  const memo = new Map<number, Promise<SpecIssue>>();
+  let counted: ReadonlyMap<number, number> = new Map();
+  const counting = (issue: number): Promise<SpecIssue> => {
+    counted = new Map([...counted, [issue, (counted.get(issue) ?? 0) + 1]]);
+    return planted(issue);
+  };
+  return {
+    reader: (issue: number) => {
+      if (!memoised) return counting(issue);
+      const taken = memo.get(issue) ?? counting(issue);
+      memo.set(issue, taken);
+      return taken;
+    },
+    reads: (issue: number) => counted.get(issue) ?? 0,
+  };
+}
+
+describe('a blocker past any listing, read through the walks reader', () => {
+  it('clears the line when the reader answers it CLOSED, where an OPEN one holds it', async () => {
+    const closed = plantedIssues([pastListingIssue(), issueOf({ number: PAST_LISTING, state: 'CLOSED' })]);
+    const open = plantedIssues([pastListingIssue(), issueOf({ number: PAST_LISTING, state: 'OPEN' })]);
+
+    expect(await blockingOf({ issues: closed })(57)).toBeNull();
+    expect((await blockingOf({ issues: open })(57))?.open).toEqual([PAST_LISTING]);
+  });
+
+  it('holds the line as state not read when the reader throws on it', async () => {
+    const read = await blockingOf({ issues: plantedIssues([pastListingIssue()]) })(57);
+
+    expect(read?.unread).toEqual([PAST_LISTING]);
+    expect(blockedLineSentence(read!)).toBe(`#57 is blocked by #${String(PAST_LISTING)} (state not read)`);
+  });
+
+  it('holds the line the same way when the reader answers that there is no such issue', async () => {
+    const issues = createGhSpecIssueReader({ gh: notFoundGh() });
+    const read = await blockingOf({ issues })(57);
+
+    await expect(issues(PAST_LISTING)).rejects.toThrow(NOT_FOUND);
+    expect(read?.unread).toEqual([PAST_LISTING]);
+    expect(read?.fault).toBeNull();
+    expect(blockedLineSentence(read!)).toBe(`#57 is blocked by #${String(PAST_LISTING)} (state not read)`);
+  });
+
+  it('costs one read for a blocker two roadmap lines name, over a memoised reader', async () => {
+    const waitingOn = {
+      labels: [SPEC_LABEL, SPEC_READY_LABEL, SPEC_BLOCKED_LABEL],
+      body: `Blocked by: #${String(PAST_LISTING)}\n`,
+    };
+    const issues = [
+      ...walkIssues({ 58: waitingOn, 59: waitingOn }),
+      issueOf({ number: PAST_LISTING, labels: [SPEC_LABEL], state: 'OPEN' }),
+    ];
+    const memoised = countingIssues(issues, true);
+    const unmemoised = countingIssues(issues, false);
+    const walk = (reader: (issue: number) => Promise<SpecIssue>) => pickPlannableLine(
+      roadmapLines(),
+      lineFor(57),
+      plannableReadings({ issues: reader, readings: roadmapReadings(issues) }),
+    );
+
+    const pick = await walk(memoised.reader);
+    await walk(unmemoised.reader);
+
+    expect(pick.line).toBeNull();
+    expect(pick.passed.map((passed) => passed.reason)).toEqual(['blocked', 'blocked']);
+    expect(memoised.reads(PAST_LISTING)).toBe(1);
+    expect(unmemoised.reads(PAST_LISTING)).toBe(2);
   });
 });
 

@@ -19,46 +19,63 @@
  * issues, the question and the board. Nothing here reads a command
  * line, and nothing here imports a file under `src/commands/`.
  *
- * ## The three commands
+ * ## The four commands
  *
  * | Reading | Command |
  * |---|---|
  * | One issue the caller named | `gh issue view <n> --json number,title,body,state,labels,author` |
  * | The blocked issues, with no issue named | `gh issue list --state open --label spec:blocked --limit 100 --json number,body` |
  * | Every issue's state | `gh issue list --state all --limit 500 --json number,state` |
+ * | One blocker the full state listing did not hold | `gh issue view <n> --json number,state` |
  *
  * The first is `./issue.ts`'s reader, whole, so the one `gh` spelling
  * of "read issue `<n>`" is not written twice; its `labels` is what says
  * whether the issue carries `spec:blocked` at all, which the listing
  * answers by asking for that label.
  *
- * The third is ONE listing rather than a `gh issue view` per blocker: it
- * answers both questions a blocker raises at once — whether the board
- * has an issue for the id, and whether that issue is closed — and an
- * issue blocked by three ids costs one command rather than three. It is
- * sent only when some line actually named ids, for the reason
- * `./blocked-issues.ts` records: a body with no line, a line with no id
- * and a line naming itself are faults without it. {@link
- * BLOCKED_LIST_LIMIT} and {@link KNOWN_LIST_LIMIT} are that module's
- * constants, imported rather than respelled, so the two readings of the
- * board ask for the same number of issues.
+ * The last two are `./blocker-states.ts`'s {@link readBlockerStates},
+ * handed every id the `Blocked by:` lines named, and they go in that
+ * order. The state listing goes FIRST: it answers both questions a
+ * blocker raises at once — whether the board has an issue for the id,
+ * and whether that issue is closed — so an issue blocked by three ids
+ * costs one command rather than three on a board the listing holds
+ * whole. THEN one view per id the listing did not hold, sent only when
+ * the listing came back full, and once per id however many issues name
+ * it. The listing is sent only when some line actually named ids, for
+ * the reason `./blocked-issues.ts` records: a body with no line, a line
+ * with no id and a line naming itself are faults without it. {@link
+ * BLOCKED_LIST_LIMIT} is that module's constant, imported rather than
+ * respelled, and the state listing asks for its `KNOWN_LIST_LIMIT`, so
+ * the two readings of the board ask for the same number of issues.
  *
  * `--state all` because a blocker is cleared by being CLOSED, so a
  * closed issue is still an issue the board has.
  *
+ * What the board answered for each id comes to one of four words. An
+ * id answered `open` or `closed` is what it says. An id answered
+ * `dangling` — a listing short of its limit not naming it, or a view
+ * `gh` failed as no issue or pull request with that number — is the
+ * `readBlockedBy` fault for an id the board has no issue for, reported
+ * and never guessed at. An id answered `unread` is named
+ * `#<n> (state not read)`.
+ *
  * ## Nothing is removed on a half-read board
  *
- * The state listing asks for {@link KNOWN_LIST_LIMIT} issues, and a
- * board holding more answers a prefix of itself. When it comes back
- * full, no id is called unknown — {@link UnblockReport.unchecked}
- * carries the sentence saying so — and a blocker the prefix does not
- * name has no state this run read, which counts as NOT cleared. So a
- * board too big for one listing costs a label that stays on, never one
- * taken off over a blocker nobody looked at.
+ * The state listing asks for `KNOWN_LIST_LIMIT` issues, and a board
+ * holding more answers a prefix of itself. A blocker that prefix does
+ * not name is read by a view of its own, and only a view `gh` answered
+ * CLOSED clears it. A view that FAILED for any reason but the issue
+ * not existing, or answered a state that is neither word, still never
+ * removes a label: that blocker has no state this run read, which
+ * counts as NOT cleared, the issue is reported `waiting` naming
+ * `#<n> (state not read)`, and {@link UnblockReport.unchecked} carries
+ * the sentence naming every id left so. So a board too big for one
+ * listing costs a label that stays on, never one taken off over a
+ * blocker nobody looked at.
  *
  * A state listing that FAILED settles nothing either: every issue whose
- * line named ids is reported `failed` with what `gh` said, and no
- * question is asked about it.
+ * line named ids is reported `failed` with what `gh` said, no view is
+ * sent, and no question is asked about it.
  *
  * ## The question, and a caller with nobody to ask
  *
@@ -110,15 +127,16 @@
  * none of them reaches GitHub or spawns `gh`.
  */
 import type { BlockedReading } from './blocked.js';
+import type { BlockerAnswer, BlockerStatesReading } from './blocker-states.js';
 import type { IssueBoard } from './issue-board.js';
 import type { SpecIssueReader } from './issue.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
-import { plural } from '../core/plan/index.js';
 
-import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from './blocked-issues.js';
+import { BLOCKED_LIST_LIMIT } from './blocked-issues.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';
+import { readBlockerStates, rowNumber, rowsOf } from './blocker-states.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 
@@ -162,7 +180,7 @@ export interface UnblockReport {
   readonly issues: readonly UnblockOutcome[];
   /** Why no issue could be read at all; null when the board answered. */
   readonly problem: string | null;
-  /** Why no blocker id was checked against the board; null when every one was. */
+  /** The sentence naming the blocker ids whose state this run could not read; null when none was left unread. */
   readonly unchecked: string | null;
 }
 
@@ -200,45 +218,6 @@ export function unblockQuestion(issue: number, blockers: readonly number[]): str
     + ` Remove ${SPEC_BLOCKED_LABEL}? [y/N] `;
 }
 
-/** What a failed command wrote, for a message. Never empty. */
-function detailOf(result: GhResult, command: string): string {
-  const written = result.stderr.trim() || result.stdout.trim();
-  return written === ''
-    ? `${command} failed and wrote nothing`
-    : `${command} failed: ${written}`;
-}
-
-/** The rows `args` wrote. Throws, naming `command`, when it failed or answered something else. */
-async function rowsOf(gh: GhRunner, args: readonly string[], command: string): Promise<readonly unknown[]> {
-  const result = await gh(args);
-  if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.stdout) as unknown;
-  } catch (error) {
-    throw new Error(`${PREFIX}: ${command} wrote output that is not JSON: ${messageOf(error)}`, { cause: error });
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${PREFIX}: ${command} answered ${describeValue(parsed)}, expected a list of issues`);
-  }
-  return parsed as readonly unknown[];
-}
-
-/** One row's `number`, checked. */
-function rowNumber(row: unknown, command: string, where: string): number {
-  if (!isMapping(row)) {
-    throw new Error(`${PREFIX}: ${command} answered ${where} as ${describeValue(row)}, expected a mapping`);
-  }
-  const number = row['number'];
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
-    throw new Error(
-      `${PREFIX}: ${command} answered ${where}.number as ${describeValue(number)}, expected a positive whole number`,
-    );
-  }
-  return number;
-}
-
 /** One row's `body`, checked. An issue written with no body answers the empty string. */
 function rowBody(row: unknown, command: string, where: string): string {
   const body = isMapping(row)
@@ -261,57 +240,6 @@ const BLOCKED_ARGS: readonly string[] = Object.freeze([
 
 /** The blocked-issue listing, as a message names it. */
 const BLOCKED_COMMAND = `gh ${BLOCKED_ARGS.join(' ')}`;
-
-/** The arguments and the command line of the board's state listing. */
-const STATE_ARGS: readonly string[] = Object.freeze([
-  'issue', 'list',
-  '--state', 'all',
-  '--limit', String(KNOWN_LIST_LIMIT),
-  '--json', 'number,state',
-]);
-
-/** The state listing, as a message names it. */
-const STATE_COMMAND = `gh ${STATE_ARGS.join(' ')}`;
-
-/** What the board holds an issue as; a state this reads as neither is no reading at all. */
-type BoardState = 'open' | 'closed';
-
-/** What the board answered about its issues. */
-interface BoardStates {
-  /** Every issue number the listing named, whatever it said of its state. */
-  readonly numbers: ReadonlySet<number>;
-  /** The issues whose state the listing answered as one the board holds. */
-  readonly states: ReadonlyMap<number, BoardState>;
-  /** True when the listing answered its own limit, so the board may hold more. */
-  readonly full: boolean;
-}
-
-/** One row's `state`, folded, or null when it is neither state the board holds. */
-function rowState(row: unknown): BoardState | null {
-  const state = isMapping(row)
-    ? row['state']
-    : null;
-  if (typeof state !== 'string') return null;
-  const folded = state.trim().toUpperCase();
-  if (folded === 'OPEN') return 'open';
-  return folded === 'CLOSED'
-    ? 'closed'
-    : null;
-}
-
-/** Every issue the board holds with its state; throws, naming the command, when the listing failed. */
-async function readBoardStates(gh: GhRunner): Promise<BoardStates> {
-  const rows = await rowsOf(gh, STATE_ARGS, STATE_COMMAND);
-  const numbers = new Set<number>();
-  const states = new Map<number, BoardState>();
-  for (const [index, row] of rows.entries()) {
-    const number = rowNumber(row, STATE_COMMAND, `issue ${String(index)}`);
-    numbers.add(number);
-    const state = rowState(row);
-    if (state !== null) states.set(number, state);
-  }
-  return { numbers, states, full: rows.length >= KNOWN_LIST_LIMIT };
-}
 
 /** One issue this run considered: its body to read, or the outcome that already settled it. */
 interface Considered {
@@ -412,53 +340,40 @@ async function settleCleared(
   return outcome(read.issue, 'removed', `Removed ${SPEC_BLOCKED_LABEL} from #${String(read.issue)}`, named);
 }
 
-/** What the state listing came to, for the issues whose lines named ids. */
-interface StateReading {
-  /** The states read, empty when the listing was not sent or failed. */
-  readonly board: BoardStates | null;
-  /** What `gh` said when the listing failed, or null. */
-  readonly problem: string | null;
-}
-
-/** The state listing, sent only when some line named ids; its failure is carried, never thrown. */
-async function readStates(gh: GhRunner, wanted: boolean): Promise<StateReading> {
-  if (!wanted) return { board: null, problem: null };
-  try {
-    return { board: await readBoardStates(gh), problem: null };
-  } catch (error) {
-    return { board: null, problem: messageOf(error) };
-  }
-}
-
 /** One issue whose body is still to be read, settled against what the board answered. */
 async function settleIssue(
   row: Considered,
-  states: StateReading,
-  known: ReadonlySet<number> | undefined,
+  reading: BlockerStatesReading,
   options: { readonly ask: UnblockAsk | null; readonly board: IssueBoard },
 ): Promise<UnblockOutcome> {
+  const answer = (id: number): BlockerAnswer | undefined => reading.states.get(id);
+  const named = readBlockedBy(row.issue, row.body ?? '');
+  const known = new Set(named.blockers.filter((id) => answer(id) !== 'dangling'));
   const read = readBlockedBy(row.issue, row.body ?? '', known);
   if (read.kind !== 'blocked') {
     return outcome(read.issue, 'fault', blockedFaultMessage(read), { blockers: read.blockers });
   }
-  if (states.problem !== null) {
-    return outcome(read.issue, 'failed', `#${String(read.issue)} was not unblocked: ${states.problem},`
+  if (reading.problem !== null) {
+    return outcome(read.issue, 'failed', `#${String(read.issue)} was not unblocked: ${reading.problem},`
       + ' so the state of the issues it names was not read', { blockers: read.blockers });
   }
 
-  const held = states.board?.states ?? new Map<number, BoardState>();
-  const open = read.blockers.filter((id) => held.get(id) === 'open');
-  const unread = read.blockers.filter((id) => held.get(id) === undefined);
+  const open = read.blockers.filter((id) => answer(id) === 'open');
+  const unread = read.blockers.filter((id) => answer(id) !== 'open' && answer(id) !== 'closed');
   if (open.length + unread.length > 0) {
     return outcome(read.issue, 'waiting', waitingMessage(read, open, unread), { blockers: read.blockers, open, unread });
   }
   return settleCleared(read, options.ask, options.board);
 }
 
-/** What a board answering its own limit is reported as; no id is checked against it. */
-function uncheckedSentence(): string {
-  return `the board answered the ${plural(KNOWN_LIST_LIMIT, 'issue')} the listing asked for and may hold more,`
-    + ' so no blocker id was checked against it';
+/** Every id the lines of `pending` name, where the line reads `blocked` with no board to check against. */
+function namedIds(pending: readonly Considered[]): readonly number[] {
+  return pending.flatMap((row) => {
+    const read = readBlockedBy(row.issue, row.body ?? '');
+    return read.kind === 'blocked'
+      ? read.blockers
+      : [];
+  });
 }
 
 /**
@@ -485,23 +400,16 @@ export async function runUnblock(options: UnblockOptions): Promise<UnblockReport
   }
 
   const pending = considered.filter((row) => row.body !== null);
-  const named = pending.some((row) => readBlockedBy(row.issue, row.body ?? '').kind === 'blocked');
-  const states = await readStates(gh, named);
-  const full = states.board?.full === true;
-  const known = states.board === null || full
-    ? undefined
-    : states.board.numbers;
+  const reading = await readBlockerStates({ gh, ids: namedIds(pending) });
 
   const settled: UnblockOutcome[] = [];
   for (const row of considered) {
-    settled.push(row.settled ?? await settleIssue(row, states, known, { ask, board }));
+    settled.push(row.settled ?? await settleIssue(row, reading, { ask, board }));
   }
   return Object.freeze({
     issues: Object.freeze(settled),
     problem: null,
-    unchecked: full
-      ? uncheckedSentence()
-      : null,
+    unchecked: reading.unchecked,
   });
 }
 

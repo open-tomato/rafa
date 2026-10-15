@@ -3,9 +3,7 @@
  * or comment its sections make up.
  *
  * Triage titles a bug from its record (`bugTitle`, `../bugs/record.ts`,
- * #991). {@link issueTitle}, a bug's `what` on one line cut to
- * {@link TITLE_MAX_LENGTH} code points, is the title it filed under
- * before; no production code calls it now. The body opens with a sentence saying where the issue came from
+ * #991). The body opens with a sentence saying where the issue came from
  * ({@link ISSUE_OPENING}), then six sections, each value in a fence one
  * backtick longer than any backtick run it holds ({@link fenced}), so the
  * text a session wrote is shown verbatim and never rendered: `What`,
@@ -76,9 +74,7 @@
  * after `Feedback`. A `versions` beside a `record` is not written: the
  * record's own `Versions` section is.
  *
- * Every value goes through the caller's `redact` before it is shown, and
- * the title is cut from text already redacted, so no cut leaves part of a
- * secret behind.
+ * Every value goes through the caller's `redact` before it is shown.
  */
 import type { ScoredIssue } from './similarity.js';
 import type { BugRecord } from '../bugs/record.js';
@@ -87,15 +83,7 @@ import type { IssueRef } from '../ports/index.js';
 import { fenced } from '../bugs/fenced.js';
 import { BUG_FIELDS } from '../bugs/record.js';
 
-import { oneLine } from './bug-key.js';
-
 export { fenced };
-
-/** The most code points a filed title holds, its cut marker included. */
-export const TITLE_MAX_LENGTH = 120;
-
-/** What ends a title that was cut. */
-const TITLE_CUT = '...';
 
 /** What opens a filed issue's body. */
 export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
@@ -103,15 +91,6 @@ export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session re
 
 /** What opens a recurrence's comment. */
 export const COMMENT_OPENING = 'Reported again by a rafa task session.';
-
-/** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
-export function issueTitle(redactedWhat: string): string {
-  const line = oneLine(redactedWhat);
-  const points = Array.from(line);
-  if (points.length <= TITLE_MAX_LENGTH) return line;
-  const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
-  return `${kept.trimEnd()}${TITLE_CUT}`;
-}
 
 /** The values one bug's issue and comment show, before redaction. */
 export interface BugValues {

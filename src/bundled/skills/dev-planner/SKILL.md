@@ -475,6 +475,10 @@ A task's text never asks its session for a whole-suite run, or for any command t
   `src/start.ts`" task grows it enough for its own diff to flag, and phase
   0's six took `src/start.ts` from 798 lines to 960 with no task owning the
   split; only a whole-change-set review caught it.
+* When the project's entry test lists command modules, a task that adds
+  a command module or an import to one updates that list in the same
+  task and names the file in its Description: in rafa, `COMMAND_MODULES`
+  in `src/index.test.ts`.
 * Keep as SEPARATE tasks: cross-cutting verification (fan-out gates,
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.

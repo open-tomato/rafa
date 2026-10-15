@@ -19,8 +19,8 @@
  * a project filing it as one is never refused.
  *
  * {@link summaryOf} takes its cap as an argument: the redacted `what` on
- * one line, cut to the cap with `...` as `issueTitle`
- * (`../triage/issue-text.ts`) cuts a title. When the title rendered from
+ * one line, cut to the cap in code points, the last three of them `...`
+ * when it was cut. When the title rendered from
  * it does not read back as its fields (`titleRoundTrips`, the
  * test-file-and-colon case), the first `: ` of the summary is written
  * ` — `. The full `what` stays in the `What` section, which is the
