@@ -1,7 +1,7 @@
 /**
  * The `tests` section of the config schema: the three settings the
- * runner reads when it chooses which tests a recorded step runs, and the
- * one that says whether a step reruns a newly red file alone, each one's
+ * runner reads when it chooses which tests a recorded step runs, the one
+ * that names the contract tests, and the one that says whether a step reruns a newly red file alone, each one's
  * field, its default, its spec and its reader. {@link TESTS_SECTION}
  * hands them to core as one `ConfigSection`, package `tests`, and the
  * `declare module` below adds {@link TestsSettings} to `RafaConfig`.
@@ -14,15 +14,16 @@
  * The section has its own module, as `config-schema-release.ts` does,
  * because `config-sections.ts` stood at 699 lines, measured with
  * `wc -l`, when these keys were added, and takes nothing new under the
- * 800-line cap of `context/source.md`. The one reader the three glob keys
+ * 800-line cap of `context/source.md`. The one reader the four glob keys
  * share, {@link globList}, is a rule about a VALUE and sits here all the
  * same, for that reason. `config-registry.ts` imports this file to spread
  * it; a caller reads these settings off the resolved `RafaConfig`.
  *
- * ## The three glob keys
+ * ## The four glob keys
  *
  * `.rafa/plans/PLAN-rafa-479-loop-task-sessions-run.md` names the first
- * two, and the plan `rafa-683-content-sweeps-lint-run` the third. Each
+ * two, the plan `rafa-683-content-sweeps-lint-run` the third, and the
+ * plan `rafa-807-spec-monorepo-bootstrap-turbo` the fourth. Each
  * is a list of glob patterns, matched against a path relative to the
  * repository root, the form `git diff --name-only` answers with:
  *
@@ -46,6 +47,13 @@
  *     `-cli.test.ts`. Each default pattern opens with the any-folder
  *     prefix, two stars and a slash, which this note cannot spell
  *     because it would close the comment.
+ *   - `tests.contract` names the contract tests. A contract test checks
+ *     the promise a package makes to others, with a fixture, and runs in
+ *     that package's own `test` task in ring 1 of CI, where a use-case
+ *     test matching `tests.integration` runs in ring 0's full run. Its
+ *     default is one pattern: a name ending `.contract.test.ts`, in any
+ *     folder, under the same any-folder prefix. No step reads the key
+ *     yet; its readers come with the CI rings that run each kind.
  *   - `tests.alwaysRun` names the test files a task's scoped run takes
  *     beside the ones `bun test --changed=<base>` selects. A content
  *     sweep, a test that imports no project file and reads the tree at
@@ -61,7 +69,7 @@
  *
  * An empty list is a value every glob key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage
- * runs no integration tier, or a task runs no sweep beside its scoped
+ * runs no integration tier, no file is a contract test, or a task runs no sweep beside its scoped
  * tests. It is not read as "the default", since a list written `[]`
  * has been said.
  *
@@ -96,7 +104,7 @@
  *   - It is read through `flag` (`config-sections.ts`), a YAML boolean
  *     and nothing spelled like one, as `status.notice` is.
  *
- * No key here is a `CommandLineSetting`: three are lists, which the
+ * No key here is a `CommandLineSetting`: four are lists, which the
  * command line has no spelling for, as `config-schema.ts` says, and the
  * switch is none for the reason the `pr` section gives
  * (`config-schema-readings.ts`): a global flag nobody typed would be one
@@ -119,6 +127,7 @@ export interface TestsShape {
   readonly tests: {
     readonly fullSuiteTriggers: readonly string[];
     readonly integration: readonly string[];
+    readonly contract: readonly string[];
     readonly alwaysRun: readonly string[];
     readonly retakeRedAlone: boolean;
   };
@@ -136,6 +145,11 @@ export interface TestsSettings {
    * `tests.integration`.
    */
   testsIntegration: readonly string[];
+  /**
+   * Globs naming the contract tests, each checking the promise a package
+   * makes to others. `tests.contract`.
+   */
+  testsContract: readonly string[];
   /**
    * Globs naming the test files a task's scoped run takes beside the
    * changed-file selection. `tests.alwaysRun`.
@@ -160,7 +174,7 @@ const repoGlob: Reader<string> = (raw, at) => typeof raw === 'string' && isAbsol
   : text(GLOB_PATTERN)(raw, at);
 
 /**
- * The reader the three glob settings share: a list of glob patterns, each
+ * The reader the four glob settings share: a list of glob patterns, each
  * relative to the repository root, answered frozen in the order written.
  */
 export const globList: Reader<readonly string[]> = listOf(repoGlob, 'glob patterns');
@@ -180,6 +194,7 @@ export const TESTS_DEFAULTS: Readonly<TestsSettings> = Object.freeze({
     '**/*-spawned*.test.ts',
     '**/*-cli.test.ts',
   ]),
+  testsContract: Object.freeze(['**/*.contract.test.ts']),
   testsAlwaysRun: Object.freeze(['src/**/*.sweep.test.ts']),
   testsRetakeRedAlone: true,
 });
@@ -194,11 +209,12 @@ export const TESTS_SETTINGS: {
     cli: false,
   },
   testsIntegration: { key: 'tests.integration', read: globList, cli: false },
+  testsContract: { key: 'tests.contract', read: globList, cli: false },
   testsAlwaysRun: { key: 'tests.alwaysRun', read: globList, cli: false },
   testsRetakeRedAlone: { key: 'tests.retakeRedAlone', read: flag, cli: false },
 };
 
-/** The `tests` section: the four `tests` keys, with their defaults and no check. */
+/** The `tests` section: the five `tests` keys, with their defaults and no check. */
 export const TESTS_SECTION: ConfigSection = Object.freeze({
   package: 'tests',
   settings: Object.freeze(TESTS_SETTINGS),

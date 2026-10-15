@@ -220,6 +220,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '# tests:',
   `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
   `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
+  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
   `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
 ]);
