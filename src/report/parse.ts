@@ -118,6 +118,22 @@
  * is reported as `unusable-field` and also reads as `bug`, the kind an
  * entry had before the key existed.
  *
+ * ## An out-of-scope entry's bug fields
+ *
+ * Four more keys of an `out_of_scope_bugs` entry carry what a bug record
+ * needs, each optional and read as a plain string, null when absent:
+ *
+ *   - `module`: the part of the code the bug sits in.
+ *   - `action`: what was being done when it showed.
+ *   - `reproduce`: the command or steps that show it again.
+ *   - `cause`: why it happens, as a cause code or in words.
+ *
+ * Whether `cause` is a code or a sentence is the cause rule's business,
+ * never this parser's: it is kept as written either way. A value holding
+ * `: ` has to be double-quoted, as every string value does. A report on
+ * the prompt before the keys existed, with none of them, reads with no
+ * issue.
+ *
  * ## Change notes
  *
  * `changes` is the list of changelog lines a task returns for its own
@@ -320,6 +336,14 @@ export interface ReportBug {
    * with an `unusable-field` issue.
    */
   readonly kind: BugKind;
+  /** The part of the code the bug sits in. */
+  readonly module: string | null;
+  /** What was being done when the bug showed. */
+  readonly action: string | null;
+  /** The command or steps that show the bug again. */
+  readonly reproduce: string | null;
+  /** Why the bug happens, a cause code or words, kept as written. */
+  readonly cause: string | null;
   /** Every key that names no field. */
   readonly extras: readonly ReportExtra[];
 }
@@ -472,7 +496,7 @@ const FINDING_KEYS = [
 const BLOCKER_KEYS = ['what', 'artifact'];
 
 /** An out-of-scope bug's keys. */
-const BUG_KEYS = ['what', 'artifact', 'security', 'kind'];
+const BUG_KEYS = ['what', 'artifact', 'security', 'kind', 'module', 'action', 'reproduce', 'cause'];
 
 /** A change note's keys. */
 const CHANGE_KEYS = ['level', 'area', 'summary'];
@@ -667,6 +691,10 @@ function readBug(item: unknown, field: string, issues: ReportIssue[]): ReportBug
     artifact: stringField(scope, 'artifact', OPTIONAL),
     security: booleanField(scope, 'security', REQUIRED),
     kind: choiceField(scope, 'kind', BUG_KINDS, OPTIONAL) ?? DEFAULT_BUG_KIND,
+    module: stringField(scope, 'module', OPTIONAL),
+    action: stringField(scope, 'action', OPTIONAL),
+    reproduce: stringField(scope, 'reproduce', OPTIONAL),
+    cause: stringField(scope, 'cause', OPTIONAL),
     extras: scope.extras,
   };
 }

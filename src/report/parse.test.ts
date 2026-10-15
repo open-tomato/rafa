@@ -183,6 +183,9 @@ function changeLines(level: string, summary: string, extra: readonly string[] = 
   ];
 }
 
+/** The four bug-record fields of an out-of-scope entry that writes none of them. */
+const NO_BUG_FIELDS = { module: null, action: null, reproduce: null, cause: null } as const;
+
 /** A finding holding only its required fields. */
 function bareFinding(trigger: string, what: string): ReportFinding {
   return {
@@ -221,7 +224,14 @@ describe('the report a session output ends with', () => {
       ],
       skillsUsed: ['progress-hygiene'],
       blockers: [{ what: 'LINEAR_API_KEY unset', artifact: '401 Unauthorized', extras: [] }],
-      outOfScopeBugs: [{ what: '...', artifact: '...', security: false, kind: 'bug', extras: [] }],
+      outOfScopeBugs: [{
+        what: '...',
+        artifact: '...',
+        security: false,
+        kind: 'bug',
+        ...NO_BUG_FIELDS,
+        extras: [],
+      }],
       changes: [{
         level: 'minor',
         area: 'loop',
@@ -677,7 +687,7 @@ describe('the blockers and out_of_scope_bugs lists', () => {
     const reading = reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"');
 
     expect(reading.report.outOfScopeBugs).toEqual([
-      { what: 'bug', artifact: null, security: null, kind: 'bug', extras: [] },
+      { what: 'bug', artifact: null, security: null, kind: 'bug', ...NO_BUG_FIELDS, extras: [] },
     ]);
     expect(issuePairs(reading)).toEqual(['missing-field out_of_scope_bugs[0].security']);
   });
@@ -700,7 +710,7 @@ describe('an out_of_scope_bugs entry\'s kind', () => {
     const reading = bugReport(`    kind: ${kind}`);
 
     expect(reading.report.outOfScopeBugs).toEqual([
-      { what: 'bug', artifact: null, security: false, kind, extras: [] },
+      { what: 'bug', artifact: null, security: false, kind, ...NO_BUG_FIELDS, extras: [] },
     ]);
     expect(reading.issues).toEqual([]);
   });
@@ -778,6 +788,7 @@ describe('an out_of_scope_bugs entry\'s kind', () => {
           artifact: 'retries is undefined',
           security: false,
           kind: 'bug',
+          ...NO_BUG_FIELDS,
           extras: [],
         },
         {
@@ -785,11 +796,78 @@ describe('an out_of_scope_bugs entry\'s kind', () => {
           artifact: 'No such file or directory',
           security: true,
           kind: 'bug',
+          ...NO_BUG_FIELDS,
           extras: [],
         },
       ]);
       expect(reading.issues).toEqual([]);
     });
+  });
+});
+
+describe('an out_of_scope_bugs entry\'s bug fields', () => {
+  /** One bug entry with every required field, and `fieldLines` after them. */
+  function bugReport(...fieldLines: string[]): ReportPresent {
+    return reportOf('status: done', 'out_of_scope_bugs:', '  - what: "bug"', '    security: false', ...fieldLines);
+  }
+
+  it('reads module, action, reproduce and cause as written, with no issue', () => {
+    const reading = bugReport(
+      '    module: "src/triage"',
+      '    action: "filing a bug"',
+      '    reproduce: "bun test src/triage/triage.test.ts"',
+      '    cause: "io:missing-file"',
+    );
+
+    expect(reading.report.outOfScopeBugs).toEqual([{
+      what: 'bug',
+      artifact: null,
+      security: false,
+      kind: 'bug',
+      module: 'src/triage',
+      action: 'filing a bug',
+      reproduce: 'bun test src/triage/triage.test.ts',
+      cause: 'io:missing-file',
+      extras: [],
+    }]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('reads an entry carrying none of them as null on all four, with no issue', () => {
+    const reading = bugReport();
+
+    expect(reading.report.outOfScopeBugs).toEqual([
+      { what: 'bug', artifact: null, security: false, kind: 'bug', ...NO_BUG_FIELDS, extras: [] },
+    ]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('keeps a cause written as a quoted sentence holding a colon, byte for byte', () => {
+    const sentence = 'the config loader reads: retries before defaults apply';
+    const reading = bugReport(`    cause: "${sentence}"`);
+
+    expect(reading.report.outOfScopeBugs[0]?.cause).toBe(sentence);
+    expect(reading.report.outOfScopeBugs[0]?.extras).toEqual([]);
+    expect(reading.issues).toEqual([]);
+  });
+
+  it('refuses the same sentence unquoted, so the quoting is what the case above relies on', () => {
+    const output = doc(...reportBlock([
+      'status: done',
+      'out_of_scope_bugs:',
+      '  - what: "bug"',
+      '    security: false',
+      '    cause: the config loader reads: retries before defaults apply',
+    ]));
+
+    expect(absentOf(parseReport(output)).reason).toBe('malformed-block');
+  });
+
+  it('reports a blank cause as unusable and leaves it null', () => {
+    const reading = bugReport('    cause: "  "');
+
+    expect(reading.report.outOfScopeBugs[0]?.cause).toBeNull();
+    expect(issuePairs(reading)).toEqual(['unusable-field out_of_scope_bugs[0].cause']);
   });
 });
 
@@ -1267,6 +1345,7 @@ describe('the final message a real session ended with', () => {
         artifact: 'bad parameter or other API misuse',
         security: false,
         kind: 'bug',
+        ...NO_BUG_FIELDS,
         extras: [],
       },
     ]);
