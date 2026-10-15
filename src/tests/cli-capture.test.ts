@@ -27,6 +27,8 @@
 import type { RafaCommand } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

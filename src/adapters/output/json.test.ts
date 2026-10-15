@@ -25,7 +25,7 @@
  * from the system clock in place of `now` reddened six, and the output
  * left unfrozen the frozen case alone.
  */
-import type { OutputStream } from './stream.js';
+import type { OutputStream } from '../../core/output/index.js';
 import type { CliEvent, Output } from '../../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';

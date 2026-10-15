@@ -1,7 +1,7 @@
 /**
  * `skills=` measured over a planted plan, dispatch to commit.
  *
- * `utils/declaration.test.ts` measures the grammar in isolation:
+ * `core/plan/declaration.test.ts` measures the grammar in isolation:
  * `{skills=a}` alone is a declaration, and a `skills=` value that parses
  * lands on {@link TaskDeclaration.skills} rather than a flag. This file
  * measures the CLAIM those unit cases cannot: that a `skills=` block
@@ -14,7 +14,7 @@
  *
  *   - A task naming `{skills=a}` alone. Its block carries no other
  *     recognised key, so it is the control for the grammar rule
- *     `utils/declaration.ts` states: a block holding only `skills=` is
+ *     `core/plan/declaration.ts` states: a block holding only `skills=` is
  *     read as a declaration and not as task text, even though `skills`
  *     itself resolves to no flag. Its dispatch carries no `--agent`,
  *     `--model`, `--effort`, `--budget` or `--tools` — nothing at all
@@ -251,7 +251,7 @@ describe('a task naming agent= and skills= together', () => {
     expect(result.declaration?.skills).toEqual(['b']);
 
     // `agent` reaches the spawn. `skills` reaches no flag at all, under
-    // any block (`utils/declaration.ts`), so the argument list carries
+    // any block (`core/plan/declaration.ts`), so the argument list carries
     // no trace of it either.
     expect(result.flags).toEqual(['--agent', 'doc-updater']);
     expect(calls).toHaveLength(1);

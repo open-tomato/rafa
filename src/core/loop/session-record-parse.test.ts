@@ -1,6 +1,6 @@
 /**
  * Tests for the reading of a session record
- * (`loop/session-record-parse.ts`): a record read back as `sessions.ts`
+ * (`core/loop/session-record-parse.ts`): a record read back as `sessions.ts`
  * writes one, each refusal naming the file and its problem, every problem
  * of one record in one refusal, and `sessions.ts` re-exporting the
  * readers its callers import.
@@ -15,11 +15,9 @@
  * `sessions-steps.test.ts` and `sessions-phase.test.ts`, beside the
  * writes of each field.
  */
-import type { SessionRecord, SessionStep } from '../core/loop/index.js';
+import type { SessionRecord, SessionStep } from './sessions.js';
 
 import { describe, expect, it } from 'bun:test';
-
-import * as sessions from '../core/loop/index.js';
 
 import {
   isSessionId,
@@ -32,6 +30,7 @@ import {
   sessionPhase,
   sessionSteps,
 } from './session-record-parse.js';
+import * as sessions from './sessions.js';
 
 /** The id of the record every case reads. */
 const ID = 'session-0001';

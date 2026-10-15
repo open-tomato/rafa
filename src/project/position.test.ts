@@ -6,6 +6,11 @@
  * unset sits beside one that answers set, so a reader that always failed
  * would fail a case; the no-temporary-file case lists the directory after
  * a write and also plants a stray `.tmp` to show the listing can see one.
+ *
+ * The cases of one place's shape (a string board, a zero epic, a missing
+ * epic) moved with `asPlace` to `src/core/loop/hop-record.test.ts`; the
+ * wrong-shape cases here keep one malformed place in each of the three
+ * slots, to show a place `asPlace` refuses reads as a wrong shape.
  */
 import type { Place, Position } from './position.js';
 
@@ -91,10 +96,8 @@ describe('readPositionFile', () => {
     ['an array', '[]'],
     ['a number', '3'],
     ['no home', JSON.stringify({ current: BOARD_A, previous: null })],
-    ['a string board', JSON.stringify({ current: { board: '10', epic: 11 }, previous: null, home: BOARD_A })],
-    ['a zero epic', JSON.stringify({ current: { board: 10, epic: 0 }, previous: null, home: BOARD_A })],
-    ['a fractional board', JSON.stringify({ current: BOARD_A, previous: null, home: { board: 1.5, epic: null } })],
-    ['a missing epic', JSON.stringify({ current: { board: 10 }, previous: null, home: BOARD_A })],
+    ['a malformed current', JSON.stringify({ current: { board: '10', epic: 11 }, previous: null, home: BOARD_A })],
+    ['a malformed home', JSON.stringify({ current: BOARD_A, previous: null, home: { board: 1.5, epic: null } })],
     ['a missing previous', JSON.stringify({ current: BOARD_A, home: BOARD_A })],
     ['a malformed previous', JSON.stringify({ current: BOARD_A, previous: { board: -1, epic: null }, home: BOARD_A })],
   ])('reads %s as a wrong shape', (_label, text) => {

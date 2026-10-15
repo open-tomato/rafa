@@ -37,6 +37,8 @@ import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
 import type { Prompter } from '../core/command/index.js';
 import type { GitRunner } from '../core/git/index.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

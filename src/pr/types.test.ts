@@ -7,7 +7,7 @@
  * `bun:test`'s `expectTypeOf` checks nothing when the suite runs. Each
  * type claim is COMPILED instead, through the TypeScript compiler API,
  * under the options the root tsconfig gives `check-types`, exactly as
- * `src/cli/core/types.test.ts` does. The probes are written to a
+ * `src/core/command/types.test.ts` does. The probes are written to a
  * temporary directory outside the repository and import the port by
  * absolute path, so no gate ever reads one.
  *

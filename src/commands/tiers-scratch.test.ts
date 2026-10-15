@@ -11,6 +11,8 @@
  */
 import type { InventoryRecord } from '../inventory/record.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

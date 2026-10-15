@@ -7,6 +7,11 @@
  * registry (not a second one)", so this one value answers all three: the
  * dispatcher routes through it, and the two rosters read it.
  *
+ * The contract, {@link CommandRegistry} and the five shapes it names,
+ * is declared in `src/core/command/registry-types.ts`, so core's
+ * `RafaContext` can name it; this file re-exports the six under the
+ * same names and keeps the builder and its refusals.
+ *
  * ## What a registry holds
  *
  *   - Subjects, each a {@link SubjectSpec}: the routing word and the
@@ -59,7 +64,15 @@
  * and for its reason: bun runs every test file in one process. The lists a
  * registry answers are frozen copies of what it was handed.
  */
-import type { RafaCommand } from '../core/command/index.js';
+import type {
+  CommandAlias,
+  CommandRegistry,
+  CommandRegistryInput,
+  ModuleMount,
+  RafaCommand,
+  RosterOptions,
+  SubjectSpec,
+} from '../core/command/index.js';
 
 import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '../core/command/index.js';
 import { describeValue } from '../core/config/sections.js';
@@ -70,77 +83,14 @@ const REFUSAL = 'command registry';
 /** The word the dispatcher reads as a help request, never as a routing word. */
 export const HELP_WORD = 'help';
 
-/** A subject: the first routing word, and what its roster line says. */
-export interface SubjectSpec {
-  /** The routing word, singular: `issue`. */
-  readonly name: string;
-  /** One line for the root roster. */
-  readonly summary: string;
-}
-
-/** The commands one module's entry exports, mounted under `module/<name>`. */
-export interface ModuleMount {
-  /** The word typed after an `exec` action: `linear` in `rafa module exec linear next`. */
-  readonly name: string;
-  /** The file the commands were imported from. */
-  readonly entry: string;
-  /** The commands, each routed by its action. */
-  readonly commands: readonly RafaCommand[];
-}
-
-/** One alias: the words it is typed as, the command it routes to, and whether it is kept for good. */
-export interface CommandAlias {
-  readonly words: readonly string[];
-  readonly command: RafaCommand;
-  /** True for one of the command's `lastingAliases`, which prints no deprecation line. */
-  readonly lasting: boolean;
-}
-
-/** Whether a roster keeps hidden commands. */
-export interface RosterOptions {
-  /** Keeps the commands declaring `hidden`. Off by default. */
-  readonly includeHidden?: boolean;
-}
-
-/** What a registry is built from. */
-export interface CommandRegistryInput {
-  /** The subjects, in roster order. */
-  readonly subjects: readonly SubjectSpec[];
-  /** The core commands, in roster order. */
-  readonly commands: readonly RafaCommand[];
-}
-
-/** The subjects, commands, aliases and mounts the dispatcher routes through. Never changes once made. */
-export interface CommandRegistry {
-  /** The subjects, in the order declared. */
-  readonly subjects: () => readonly SubjectSpec[];
-  /** The subject a word names, as its name or its plural, or undefined. */
-  readonly subjectOf: (word: string) => SubjectSpec | undefined;
-  /** The core commands in the order declared, top-level ones included. */
-  readonly commands: (options?: RosterOptions) => readonly RafaCommand[];
-  /**
-   * The commands under a subject's name, or under a mount's key
-   * (`module/<name>`), in the order declared. Empty for a name holding
-   * none, a top-level command's included.
-   */
-  readonly actionsOf: (subject: string, options?: RosterOptions) => readonly RafaCommand[];
-  /** The command under a subject's name or a mount's key, and an action, or undefined. */
-  readonly find: (subject: string, action: string) => RafaCommand | undefined;
-  /** The top-level command a word names, or undefined. */
-  readonly topLevel: (word: string) => RafaCommand | undefined;
-  /** Every alias, longest first, in the order declared among equals. */
-  readonly aliases: () => readonly CommandAlias[];
-  /** The mounts, in the order mounted. */
-  readonly mounts: () => readonly ModuleMount[];
-  /** The mount a module name names, or undefined. */
-  readonly mountOf: (name: string) => ModuleMount | undefined;
-  /**
-   * A new registry holding this one's mounts followed by `mount`, leaving
-   * this one unchanged. Throws, answering no registry, on a mount the
-   * module note refuses.
-   */
-  readonly mount: (mount: ModuleMount) => CommandRegistry;
-}
+export type {
+  CommandAlias,
+  CommandRegistry,
+  CommandRegistryInput,
+  ModuleMount,
+  RosterOptions,
+  SubjectSpec,
+};
 
 /** Looks a command up by subject and action. */
 type FindCommand = (subject: string, action: string) => RafaCommand | undefined;

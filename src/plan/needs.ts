@@ -67,7 +67,7 @@
  *     rule), or, for a program rafa ships, when the rafa tier's
  *     `bundled/bin` holds one first (see Stack tools). The loop's
  *     sessions inherit that `PATH`, with `sessionSpawnEnv`
- *     (`src/utils/session-env.ts`) putting the running entry's
+ *     (`src/core/loop/session-env.ts`) putting the running entry's
  *     `bundled/bin` in front, the order this reading looks in, so a
  *     program has no separate visibility.
  *

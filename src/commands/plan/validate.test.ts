@@ -34,6 +34,8 @@
  */
 import type { CliEvent } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';

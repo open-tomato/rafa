@@ -40,6 +40,8 @@
  *   - **The pipeline ends at `rafa skill check` with no `--fix`**,
  *     which is the DoD the whole backfill exists to reach.
  */
+import '../adapter-registry.js';
+
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';

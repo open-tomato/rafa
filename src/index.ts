@@ -49,8 +49,11 @@
  *     reads.
  *   - The whole adapter registry, `core/adapters/registry.ts`:
  *     {@link createAdapterRegistry}, {@link CORE_ADAPTER_REGISTRY}, which
- *     holds core's own adapters keyed by port type and kind, and
- *     {@link PORT_VERSIONS}, the version core serves of each port.
+ *     answers the adapters registered on it keyed by port type and kind,
+ *     core's own once this entry is imported, {@link PORT_VERSIONS}, the
+ *     version core serves of each port, and {@link registerAdapters},
+ *     {@link restoreAdapters} and {@link activeAdapterRegistry}, which
+ *     register on, put back and read the registry it answers.
  *   - The whole manifest module, `modules/manifest.ts`:
  *     {@link validateManifest}, which reads the `rafa` manifest of a
  *     module's `package.json` and names every failure, with the schema's
@@ -64,12 +67,15 @@
  * re-exports, and `index.test.ts` holds each value identical to its
  * module's own.
  *
- * ## The registry loads first
+ * ## The registries load first
  *
  * The first import is `config-registry.ts`, for its effect: it hands
  * the twelve sections of the config schema to core, so every setting
  * is registered before any module behind this entry loads or reads a
- * config. {@link CONFIG_DEFAULTS} is the registry's own.
+ * config. {@link CONFIG_DEFAULTS} is the registry's own. The second is
+ * `adapter-registry.ts`, for its effect too: it hands core's adapters
+ * to the adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers
+ * every core kind before a caller of this entry resolves one.
  *
  * ## Why the commands carry a `Command` suffix
  *
@@ -122,6 +128,7 @@
  * it, so the entry needs Bun.
  */
 import './config-registry.js';
+import './adapter-registry.js';
 
 export type {
   Adapter,
@@ -261,7 +268,14 @@ export type {
   ScopeSeams,
 } from './project/scope.js';
 
-export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
+export {
+  activeAdapterRegistry,
+  CORE_ADAPTER_REGISTRY,
+  createAdapterRegistry,
+  PORT_VERSIONS,
+  registerAdapters,
+  restoreAdapters,
+} from './core/adapters/index.js';
 export { loadConfig, readConfigFile } from './core/config/load.js';
 export { CONFIG_DEFAULTS } from './config-registry.js';
 export {

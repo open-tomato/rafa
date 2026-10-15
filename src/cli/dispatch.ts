@@ -27,8 +27,8 @@
  *      (`src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
- *      flags (`running.ts`), for a reader below its `run` to ask, with
- *      its `dangerous` phrases beside the record
+ *      flags (`src/core/command/running.ts`), for a reader below its
+ *      `run` to ask, with its `dangerous` phrases beside the record
  *      (`src/core/config/dangerous.ts`), which end the loader's pass
  *      line of each key it declares; a help
  *      request, a version request, a refusal and `no_project` run no

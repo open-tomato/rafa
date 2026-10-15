@@ -407,7 +407,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/core/plan/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list, whose `readTestScope` reads a test scope and whose `DOCS_ROLES` and `readDocsRole` hold and read the one `docs` value; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
@@ -587,7 +587,7 @@ The loop parses plan files through `src/core/plan/parse.ts`:
 
 - **Block parsing** (`src/core/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
 - **Plan parsing** (`src/core/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
-- **Declaration parsing** (`src/utils/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
+- **Declaration parsing** (`src/core/plan/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
 - **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
 The parser is liberal with unknown input: unknown block kinds are kept, unknown declaration keys are kept, unknown YAML keys are kept. A report yields no report only when its last `rafa:report` block is missing, never closed, not valid YAML, or not a mapping. A field that is missing, or holds a value it cannot take (a `findings` that is not a list, a `signal` other than `loud` or `silent`), is reported as an issue and the rest of the report is still read. Quote every string value in a report: an unquoted value that opens with a backtick, `@`, `%` or `[` makes the whole block unreadable, and a `#` after a space starts a comment that silently cuts the value short.

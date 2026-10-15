@@ -59,6 +59,8 @@ import type { CommitEffortRow, SessionEffortRow } from './types.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { StoreBackend } from '../../core/config/sections.js';
 
+import '../../adapter-registry.js';
+
 import {
   existsSync,
   mkdirSync,

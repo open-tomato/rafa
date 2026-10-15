@@ -129,12 +129,12 @@
  * from. A home that does not resolve is not refused: nothing can sit
  * under it, so it is no directory the walk climbs.
  */
-import type { ConfigRoots } from '../core/config/load.js';
+import type { ProjectFound, Scope } from '../core/config/index.js';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
-import { CONFIG_FILE, configFilePath, SCOPE_DIR } from '../core/config/index.js';
+import { CONFIG_FILE, SCOPE_DIR, scopeAt } from '../core/config/index.js';
 import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
@@ -145,6 +145,16 @@ import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
  * the same name, so this module's importers read the same binding.
  */
 export { SCOPE_DIR };
+
+/**
+ * One scope's paths, the project the walk found, and the scope built
+ * from a base directory. Declared in the core config module, so core
+ * can name a project without importing this file, and re-exported here
+ * under the same names, so this module's importers read the same
+ * bindings.
+ */
+export type { ProjectFound, Scope };
+export { scopeAt };
 
 /**
  * The names a directory is probed for, in `loadConfig`'s lookup order
@@ -192,31 +202,6 @@ export interface ScopeSeams {
   readonly mainCheckout?: (dir: string) => string | null;
 }
 
-/** One scope's paths: its `.rafa` directory and its config file. */
-export interface Scope {
-  /** `<base>/.rafa`. */
-  readonly dir: string;
-  /**
-   * The config file. For a project found, the first of
-   * {@link CONFIG_LOOKUP} its root holds; otherwise, and for the user
-   * scope, `<base>/.rafa/config.yaml`, the file `rafa init` writes.
-   */
-  readonly configFile: string;
-}
-
-/**
- * The walk found a project. The answer is the `ConfigRoots` for
- * `loadConfig`: `root` is the project root, a real path, and `home` is
- * the home as the caller gave it.
- */
-export interface ProjectFound extends ConfigRoots {
-  readonly found: true;
-  /** The project scope, under `root`. */
-  readonly project: Scope;
-  /** The user scope, under `home`. */
-  readonly user: Scope;
-}
-
 /** The walk reached the filesystem root without finding a project. */
 export interface NoProject {
   readonly found: false;
@@ -246,15 +231,6 @@ export class ScopeError extends Error {
     super(`rafa scope: ${message}`, options);
     this.name = 'ScopeError';
   }
-}
-
-/**
- * The scope under `base`: `base` is a project root or a home directory.
- * `configFile` is `file` when given, the lookup name found under
- * `base`, and `<base>/.rafa/config.yaml` otherwise.
- */
-export function scopeAt(base: string, file: string = configFilePath(base)): Scope {
-  return { dir: join(base, SCOPE_DIR), configFile: file };
 }
 
 /** The first of {@link CONFIG_LOOKUP} under `dir` that `fs` finds, or null. */

@@ -139,6 +139,7 @@
  * --reason` makes no call on an issue already closed and drops the
  * changed reason; a reopen goes through `gh issue reopen`.
  */
+import type { GhResult, GhRunner } from '../../core/git/index.js';
 import type {
   Issue,
   IssueDraft,
@@ -161,21 +162,7 @@ import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 /** What every refusal opens with. */
 const PREFIX = 'github tracker';
 
-/** What one `gh` command answered. */
-export interface GhResult {
-  /** True when `gh` exited 0. */
-  readonly ok: boolean;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-/**
- * Runs `gh` with the arguments after its name. A command that fails,
- * or could not be run, answers `ok` false rather than rejecting.
- * `stdin`, when given, is the whole of what `gh` reads on its standard
- * input; left out, `gh` reads a closed one.
- */
-export type GhRunner = (args: readonly string[], stdin?: string) => Promise<GhResult>;
+export type { GhResult, GhRunner };
 
 /** What the runner spawning `gh` is made with. */
 export interface GhRunnerOptions {

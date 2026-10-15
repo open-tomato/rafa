@@ -1178,6 +1178,7 @@ describe('runWrapUp over the spawn seam', () => {
     const driver = join(scratch.bin, 'driver.ts');
     writeFileSync(driver, [
       'import { writeFileSync } from \'node:fs\';',
+      `import '${join(here, '../adapter-registry.js')}';`,
       `import { setActiveOutput } from '${join(here, '../core/output/index.js')}';`,
       `import { sinkOutput } from '${join(here, '../tests/output-sinks.js')}';`,
       `import { runWrapUp } from '${join(here, 'wrap-up-run.js')}';`,

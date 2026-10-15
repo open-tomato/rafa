@@ -1,72 +1,75 @@
 # Import graph
 
-Coverage: 1947 of 1947 tracked files read (src/ and packages/*/src/).
+Coverage: 2007 of 2007 tracked files read (src/ and packages/*/src/).
 
-1947 files, 9955 edges (7789 value, 2166 type), 27 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
+2007 files, 10397 edges (8159 value, 2238 type), 26 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
 
 ## Clusters by size
 
 | Cluster | Files | Folders |
 | --- | --- | --- |
-| `c01-github` | 344 | `src/board` (110), `src/board/project` (41), `src/commands` (30), `src/commands/epic` (23), `src/tests` (23), `src/next` (22), `src/board/relations` (19), `src/commands/issue` (18), `src/commands/plan` (10), `src/status` (10), `src/commands/pr` (8), `src/core/git` (6), `src/claims` (4), `src/commands/board` (4), `src/pr` (3), `src/adapters/tracker` (2), `src/commands/release` (2), `src/project` (2), `src/start` (2), `src/suite` (2), `src/cleanup` (1), `src/epic` (1), `src/refs` (1) |
-| `c02-sqlite` | 285 | `src/effort/store` (107), `src/effort` (57), `src/triage` (32), `src/commands/effort` (15), `src/start` (14), `src/tests` (14), `src/inventory/search` (10), `src/commands/epic` (4), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/epic` (3), `src/report` (3), `src/utils` (3), `src/docs` (2), `src/fixtures` (2), `src` (1), `src/adapters/tracker` (1), `src/claims` (1), `src/commands/claim` (1), `src/runtime` (1) |
-| `c03-cli-capture` | 212 | `src/tests` (88), `src/release` (38), `src/start` (17), `src/commands/release` (13), `src/commands/pr` (9), `src/commands/loop` (7), `src/loop` (6), `src/commands` (5), `src/runtime` (4), `src` (3), `src/project` (3), `src/utils` (3), `src/next` (2), `src/pr` (2), `src/pr/triage` (2), `src/release/strategies` (2), `src/cleanup` (1), `src/commands/bug` (1), `src/commands/config` (1), `src/commands/effort` (1), `src/commands/skill` (1), `src/commands/stretch` (1), `src/core/loop` (1), `src/notices` (1) |
-| `c04-sections` | 202 | `src/commands` (27), `src` (20), `src/core/config` (18), `src/release` (15), `src/tiers` (13), `src/inventory` (12), `src/start` (12), `src/plan/risk` (10), `src/tests` (9), `src/preflight` (8), `src/task` (8), `src/pr` (7), `src/schema` (6), `src/agents` (4), `src/check` (4), `src/effort/sync` (4), `src/utils` (4), `src/commands/agent` (3), `src/plan` (3), `src/project` (3), `src/board` (2), `src/effort` (2), `src/inventory/search` (2), `src/commands/config` (1), `src/commands/skill` (1), `src/effort/store` (1), `src/modules` (1), `src/notices` (1), `src/suite` (1) |
-| `c05-index` | 197 | `src/start` (95), `src/tests` (20), `src/board` (13), `src/commands/plan` (12), `src/plan` (11), `src/core/loop` (10), `src/suite` (10), `src/core/plan` (9), `src/utils` (6), `src` (2), `src/adapters/planner` (2), `src/loop` (2), `src/core/output` (1), `src/notices` (1), `src/ports` (1), `src/release` (1), `src/triage` (1) |
-| `c06-index` | 189 | `src/commands/pr` (52), `src/pr` (28), `src/next` (23), `src/cleanup` (20), `src/pr/triage` (18), `src/commands` (11), `src/cli/prompt` (10), `src/tests` (9), `src/start` (8), `src/pr/plans` (5), `src/inventory` (2), `src/status` (2), `src/board` (1) |
-| `c07-index` | 183 | `src/cli` (19), `src/project` (16), `src/claims` (13), `src/commands` (12), `src/start` (12), `src/commands/update` (10), `src/board` (8), `src/commands/claim` (8), `src/commands/loop` (8), `src/core/command` (8), `src/commands/plan` (7), `src/status` (7), `src/adapters/output` (5), `src/cli/core` (5), `src/tests` (5), `src/commands/agent` (4), `src/commands/module` (4), `src/commands/skill` (4), `src/commands/effort` (3), `src/core/loop` (3), `src/core/output` (3), `src/next` (3), `src/commands/epic` (2), `src/commands/pr` (2), `src/effort/sync` (2), `src/loop` (2), `src` (1), `src/commands/config` (1), `src/commands/instinct` (1), `src/core/config` (1), `src/inventory` (1), `src/modules` (1), `src/modules/testdata/seam-fixture` (1), `src/utils` (1) |
-| `c08-index` | 124 | `src/commands/issue` (20), `src/adapters/tracker` (14), `src/adapters/logger` (12), `src/start` (12), `src/learning` (10), `src/commands/instinct` (9), `src/tests` (9), `src/adapters/learning` (4), `src/core/adapters` (4), `src/docs` (4), `src/report` (3), `src/schema` (3), `src/adapters/output` (2), `src/board` (2), `src/commands/docs` (2), `src/commands/release` (2), `src/modules` (2), `src/pr` (2), `src/triage` (2), `src/cli` (1), `src/modules/testdata/hub-down-sync` (1), `src/modules/testdata/pull-merge-sync` (1), `src/modules/testdata/sync-fixture` (1), `src/ports` (1), `src/project` (1) |
-| `c09-frontmatter` | 73 | `src/bugs` (11), `src/backfill` (10), `src/demote` (10), `src/schema` (10), `src/errors` (6), `src/commands/skill` (5), `src/tests` (5), `src` (4), `src/check` (4), `src/commands` (2), `src/project` (2), `src/commands/bug` (1), `src/commands/instinct` (1), `src/commands/issue` (1), `src/inventory` (1) |
+| `c01-github` | 371 | `src/board` (118), `src/board/project` (41), `src/commands` (31), `src/commands/epic` (27), `src/commands/issue` (27), `src/tests` (26), `src/board/relations` (19), `src/next` (17), `src/commands/plan` (10), `src/status` (10), `src/commands/pr` (6), `src/core/git` (6), `src/claims` (5), `src/commands/board` (4), `src/epic` (4), `src/start` (4), `src/suite` (4), `src/pr` (3), `src/adapters/tracker` (2), `src/commands/release` (2), `src/project` (2), `src/cleanup` (1), `src/core/loop` (1), `src/refs` (1) |
+| `c02-index` | 309 | `src/start` (120), `src/tests` (23), `src/triage` (23), `src/adapters/tracker` (15), `src/adapters/logger` (12), `src/bugs` (11), `src/commands/issue` (10), `src/learning` (10), `src/commands/instinct` (9), `src/suite` (9), `src/core/output` (7), `src/utils` (6), `src/adapters/output` (5), `src/docs` (5), `src/task` (5), `src/adapters/learning` (4), `src/core/adapters` (4), `src/ports` (3), `src/report` (3), `src/schema` (3), `src` (2), `src/commands/docs` (2), `src/commands/release` (2), `src/fixtures` (2), `src/modules` (2), `src/project` (2), `src/cli` (1), `src/commands/epic` (1), `src/commands/plan` (1), `src/core/git` (1), `src/core/plan` (1), `src/modules/testdata/hub-down-sync` (1), `src/modules/testdata/pull-merge-sync` (1), `src/modules/testdata/sync-fixture` (1), `src/notices` (1), `src/preflight` (1) |
+| `c03-index` | 249 | `src/commands/pr` (45), `src/next` (31), `src/cli` (17), `src/start` (16), `src/commands` (14), `src/claims` (12), `src/tests` (11), `src/commands/update` (10), `src/project` (9), `src/commands/claim` (8), `src/commands/loop` (8), `src/pr` (8), `src/commands/plan` (7), `src/status` (7), `src/board` (5), `src/cli/core` (5), `src/commands/agent` (5), `src/commands/skill` (5), `src/commands/module` (4), `src/commands/effort` (3), `src` (2), `src/commands/config` (2), `src/commands/issue` (2), `src/effort/sync` (2), `src/loop` (2), `src/adapters/output` (1), `src/commands/instinct` (1), `src/core/command` (1), `src/core/config` (1), `src/core/loop` (1), `src/inventory` (1), `src/modules` (1), `src/modules/testdata/seam-fixture` (1), `src/utils` (1) |
+| `c04-sqlite` | 242 | `src/effort/store` (106), `src/effort` (59), `src/commands/effort` (15), `src/tests` (14), `src/triage` (12), `src/inventory/search` (10), `src/core/runtime` (4), `src/effort/store/testdata` (4), `src/commands` (3), `src/effort/sync` (3), `src/report` (3), `src/start` (2), `src/utils` (2), `src/claims` (1), `src/commands/claim` (1), `src/commands/epic` (1), `src/docs` (1), `src/runtime` (1) |
+| `c05-cli-capture` | 232 | `src/tests` (91), `src/release` (48), `src/start` (23), `src/commands/release` (13), `src/commands/loop` (7), `src/commands/pr` (7), `src/project` (7), `src/loop` (6), `src/commands` (5), `src/runtime` (4), `src/utils` (3), `src` (2), `src/next` (2), `src/pr` (2), `src/pr/triage` (2), `src/release/strategies` (2), `src/cleanup` (1), `src/commands/bug` (1), `src/commands/config` (1), `src/commands/effort` (1), `src/commands/skill` (1), `src/commands/stretch` (1), `src/core/loop` (1), `src/notices` (1) |
+| `c06-index` | 223 | `src/commands` (31), `src/core/config` (29), `src` (28), `src/core/command` (13), `src/tiers` (13), `src/inventory` (12), `src/plan/risk` (10), `src/tests` (8), `src/pr` (7), `src/preflight` (7), `src/project` (7), `src/config` (6), `src/release` (6), `src/start` (5), `src/agents` (4), `src/check` (4), `src/core/loop` (4), `src/effort/sync` (4), `src/schema` (4), `src/plan` (3), `src/task` (3), `src/utils` (3), `src/board` (2), `src/commands/agent` (2), `src/commands/config` (2), `src/effort/store` (2), `src/inventory/search` (2), `src/modules` (1), `src/notices` (1) |
+| `c07-types` | 130 | `src/pr` (22), `src/cleanup` (20), `src/tests` (20), `src/pr/triage` (18), `src/commands/pr` (15), `src/cli/prompt` (10), `src/commands` (7), `src/pr/plans` (5), `src/fixtures` (3), `src/start` (3), `src/inventory` (2), `src/status` (2), `src/board` (1), `src/effort/store` (1), `src/loop` (1) |
+| `c08-index` | 75 | `src/core/loop` (16), `src/core/plan` (15), `src/commands/plan` (11), `src/plan` (11), `src/board` (10), `src/tests` (7), `src/adapters/planner` (2), `src/ports` (2), `src` (1) |
+| `c09-frontmatter` | 57 | `src/schema` (12), `src/backfill` (10), `src/demote` (10), `src/errors` (6), `src/commands/skill` (5), `src/tests` (5), `src/check` (4), `src/commands` (2), `src/commands/bug` (1), `src/commands/instinct` (1), `src/inventory` (1) |
 | `c10-index` | 42 | `packages/rafa-hub/src` (11), `packages/rafa-sync-service/src` (9), `packages/rafa-hub/src/identity` (5), `packages/rafa-hub/src/store` (5), `packages/rafa-hub/src/testdata` (5), `packages/rafa-hub/src/identity/testdata` (3), `packages/rafa-hub/src/store/testdata` (2), `packages/rafa-sync-service/src/testdata` (1), `src/effort/store` (1) |
 | `c11-start` | 33 | `src/stretch` (13), `src/ci` (7), `src/commands/stretch` (7), `src` (2), `src/commands` (2), `src/commands/ci` (2) |
 | `c12-verify` | 29 | `src/refs` (12), `src/tests` (4), `src/board` (3), `src/commands` (3), `src/commands/issue` (2), `src/commands/plan` (2), `src/triage` (2), `src/cli` (1) |
-| `c13-sweep-timeout` | 19 | `src/tests` (13), `src/fixtures` (3), `src/commands` (1), `src/effort/store` (1), `src/start` (1) |
-| `c14-main` | 2 | `src/tools/ts-symbols/fixtures/proj/src` (2) |
-| `c15-types.test` | 1 | `src/cli/core` (1) |
-| `c16-config-schema-readings` | 1 | `src` (1) |
-| `c17-agent-gates.test` | 1 | `src/tests` (1) |
-| `c18-agents-split-accounting.test` | 1 | `src/tests` (1) |
-| `c19-cut-table-shape.test` | 1 | `src/tests` (1) |
-| `c20-entry-exports.test` | 1 | `src/tests` (1) |
-| `c21-epic-guard-workflow.test` | 1 | `src/tests` (1) |
-| `c22-eslint-stand-in` | 1 | `src/tests` (1) |
-| `c23-learning-boundary.test` | 1 | `src/tests` (1) |
-| `c24-skill-gap-section.test` | 1 | `src/tests` (1) |
-| `c25-verify-workflow.test` | 1 | `src/tests` (1) |
-| `c26-cli.test` | 1 | `src/tools/ts-symbols` (1) |
-| `c27-cli` | 1 | `src/tools/ts-symbols` (1) |
+| `c13-main` | 2 | `src/tools/ts-symbols/fixtures/proj/src` (2) |
+| `c14-config-schema-readings` | 1 | `src` (1) |
+| `c15-types.test` | 1 | `src/core/command` (1) |
+| `c16-agent-gates.test` | 1 | `src/tests` (1) |
+| `c17-agents-split-accounting.test` | 1 | `src/tests` (1) |
+| `c18-cut-table-shape.test` | 1 | `src/tests` (1) |
+| `c19-entry-exports.test` | 1 | `src/tests` (1) |
+| `c20-epic-guard-workflow.test` | 1 | `src/tests` (1) |
+| `c21-eslint-stand-in` | 1 | `src/tests` (1) |
+| `c22-learning-boundary.test` | 1 | `src/tests` (1) |
+| `c23-skill-gap-section.test` | 1 | `src/tests` (1) |
+| `c24-verify-workflow.test` | 1 | `src/tests` (1) |
+| `c25-cli.test` | 1 | `src/tools/ts-symbols` (1) |
+| `c26-cli` | 1 | `src/tools/ts-symbols` (1) |
 
 ## The 30 files of highest betweenness
 
 | Rank | File | Betweenness | Cluster |
 | --- | --- | --- | --- |
-| 1 | `src/ports/index.ts` | 61098.780141 | `c08-index` |
-| 2 | `src/core/config/index.ts` | 57442.126601 | `c04-sections` |
-| 3 | `src/core/config/config-schema.ts` | 53097.045847 | `c04-sections` |
-| 4 | `src/effort/store/merge-store.ts` | 52556.640122 | `c02-sqlite` |
-| 5 | `src/tests/cli-capture.ts` | 26625.084246 | `c03-cli-capture` |
-| 6 | `src/core/loop/index.ts` | 20679.327357 | `c03-cli-capture` |
-| 7 | `src/core/command/index.ts` | 17513.259573 | `c07-index` |
-| 8 | `src/adapters/tracker/github.ts` | 17252.339883 | `c01-github` |
-| 9 | `src/inventory/record.ts` | 16339.811092 | `c04-sections` |
-| 10 | `src/effort/store/development-build.ts` | 15899.482207 | `c02-sqlite` |
-| 11 | `src/tiers/routing.ts` | 15665.463731 | `c04-sections` |
-| 12 | `src/config-schema-issues.ts` | 14848.501268 | `c09-frontmatter` |
-| 13 | `src/board/roadmap.ts` | 14494.324786 | `c01-github` |
-| 14 | `src/pr/index.ts` | 14492.583695 | `c06-index` |
-| 15 | `src/tiers/resolve.ts` | 14385.250866 | `c04-sections` |
-| 16 | `src/core/adapters/index.ts` | 14349.777108 | `c08-index` |
-| 17 | `src/core/command/command.ts` | 14070.565553 | `c07-index` |
-| 18 | `src/core/adapters/registry.ts` | 14070.443775 | `c08-index` |
-| 19 | `src/commands/index.ts` | 13882.558172 | `c07-index` |
-| 20 | `src/project/scope.ts` | 13389.15918 | `c07-index` |
-| 21 | `src/core/loop/sessions.ts` | 12695.200499 | `c05-index` |
-| 22 | `src/board/relations/labels.ts` | 12394.211447 | `c01-github` |
-| 23 | `src/start/dispatch.ts` | 11994.061349 | `c05-index` |
-| 24 | `src/board/setup.ts` | 11779.699133 | `c01-github` |
-| 25 | `src/next/sources.ts` | 11513.237942 | `c01-github` |
-| 26 | `src/effort/store/sqlite.ts` | 10618.128497 | `c02-sqlite` |
-| 27 | `src/start/loop-events.ts` | 10441.1837 | `c05-index` |
-| 28 | `src/cli/dispatch.ts` | 10213.185193 | `c07-index` |
-| 29 | `src/check/run.ts` | 9975.019244 | `c09-frontmatter` |
-| 30 | `src/bugs/record.ts` | 9370.984199 | `c09-frontmatter` |
+| 1 | `src/ports/index.ts` | 54057.062018 | `c02-index` |
+| 2 | `src/effort/store/merge-store.ts` | 43941.869991 | `c04-sqlite` |
+| 3 | `src/config-registry.ts` | 24212.851893 | `c06-index` |
+| 4 | `src/tests/cli-capture.ts` | 22594.544544 | `c05-cli-capture` |
+| 5 | `src/core/command/index.ts` | 19374.296737 | `c03-index` |
+| 6 | `src/board/roadmap.ts` | 18326.686097 | `c01-github` |
+| 7 | `src/core/config/index.ts` | 18018.94406 | `c06-index` |
+| 8 | `src/adapters/tracker/github.ts` | 15563.633092 | `c01-github` |
+| 9 | `src/core/loop/index.ts` | 15268.107382 | `c05-cli-capture` |
+| 10 | `src/commands/index.ts` | 14779.721493 | `c03-index` |
+| 11 | `src/board/relations/labels.ts` | 12763.590596 | `c01-github` |
+| 12 | `src/start/dispatch.ts` | 12694.250326 | `c02-index` |
+| 13 | `src/board/setup.ts` | 12671.289591 | `c01-github` |
+| 14 | `src/pr/index.ts` | 12273.44647 | `c03-index` |
+| 15 | `src/start/loop-events.ts` | 12012.592705 | `c02-index` |
+| 16 | `src/next/sources.ts` | 11972.599537 | `c01-github` |
+| 17 | `src/adapter-registry.ts` | 11488.573923 | `c03-index` |
+| 18 | `src/project/scaffold.ts` | 10346.833629 | `c05-cli-capture` |
+| 19 | `src/board/gate.ts` | 10022.25736 | `c08-index` |
+| 20 | `src/config-schema-issues.ts` | 9725.484908 | `c06-index` |
+| 21 | `src/effort/store/sqlite.ts` | 9493.604919 | `c04-sqlite` |
+| 22 | `src/board/project/refresh.ts` | 9424.821307 | `c01-github` |
+| 23 | `src/core/config/scope.ts` | 8462.294744 | `c06-index` |
+| 24 | `src/effort/store/development-build.ts` | 8395.006685 | `c04-sqlite` |
+| 25 | `src/core/output/active.ts` | 7804.164188 | `c02-index` |
+| 26 | `src/effort/collect.ts` | 7737.642202 | `c04-sqlite` |
+| 27 | `src/core/config/config-load.ts` | 7448.348689 | `c06-index` |
+| 28 | `src/refs/extract.ts` | 7235.675336 | `c12-verify` |
+| 29 | `src/board/issue.ts` | 6883.144912 | `c01-github` |
+| 30 | `src/core/command/types.ts` | 6527.384138 | `c06-index` |
+
+## Unresolved imports
+
+- `src/tests/package-build.test.ts`: `${DEFINE_CONFIG}`

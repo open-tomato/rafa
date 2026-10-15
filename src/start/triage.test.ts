@@ -64,6 +64,8 @@ import type { FindingOutcome } from '../effort/store/findings.js';
 import type { IssueRef, Tracker } from '../ports/index.js';
 import type { TriageResult } from '../triage/triage.js';
 
+import '../adapter-registry.js';
+
 import {
   existsSync,
   mkdirSync,

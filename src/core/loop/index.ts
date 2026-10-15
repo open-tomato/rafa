@@ -1,14 +1,14 @@
 /**
  * The barrel over the loop's session records and its doors onto the
- * Claude CLI: every name `sessions.ts` and `claude.ts` export, and
- * nothing else.
+ * Claude CLI: every name `sessions.ts`, `claude.ts`, `session-env.ts` and
+ * `suite-failure.ts` export, and nothing else.
  *
  * A file outside `src/core/` imports this file and never the two behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
  * file inside `src/core/` imports the two directly and never this file:
  * `session-readings.ts` and the six test files of `sessions.ts` import
- * that file, and `src/core/adapters/registry.ts`, its test and
+ * that file, and `src/core/adapters/registry.ts` and
  * `claude.test.ts` import `claude.ts`. `index.test.ts`, this file's own
  * test, is the one file of `src/core/` that imports it.
  *
@@ -21,20 +21,28 @@
  *   - `claude.ts`: the two doors a Claude session is spawned through,
  *     the argument list both build, the spawners behind them, the
  *     interrupt of the sessions still running, and the spend guard's
- *     sentence.
+ *     sentence;
+ *   - `session-env.ts`: the environment a Claude session is spawned
+ *     with, which `claude.ts` imports by path;
+ *   - `suite-failure.ts`: the type of one failing test, which
+ *     `sessions.ts` imports by path and `src/suite/run.ts` re-exports.
  *
- * The two files share no name, and neither imports the other. One
+ * The four files share no name, and only `sessions.ts` imports
+ * `suite-failure.ts`, for a type. One
  * import of this barrel loads both: a file that takes `isPidAlive`
  * alone loads `claude.ts` with it.
  *
- * The reading of one record stays outside `src/core/`, in
- * `src/loop/session-record-parse.ts`: the sets a record's fields are
- * checked against, `parseSessionRecord`, `SessionRecordError` and the
- * readers of the optional fields. `sessions.ts` re-exports what a caller
- * of a record reads from there, four types and eleven runtime names, and
- * this barrel carries them with the rest. So a file outside `src/core/`
- * that reads a record needs this one import, as it needed `sessions.ts`
- * alone before the move.
+ * The reading of one record is `session-record-parse.ts`, beside
+ * `sessions.ts`, which imports it by path: the sets a record's fields
+ * are checked against, `parseSessionRecord`, `SessionRecordError` and
+ * the readers of the optional fields. It was
+ * `src/loop/session-record-parse.ts` until it moved here, and a
+ * re-export stays at that path. `sessions.ts` re-exports what a caller
+ * of a record reads from there, four types and thirteen runtime names,
+ * and this barrel carries them with the rest, so the parser takes no
+ * line of its own here. So a file outside `src/core/` that reads a
+ * record needs this one import, as it needed `sessions.ts` alone before
+ * the move.
  *
  * ## Why `claude.ts` is here
  *
@@ -46,7 +54,7 @@
  *
  * ## Why the session readings are not here
  *
- * `src/core/loop/` has two barrels, both listed under `CORE_BARRELS` in
+ * `src/core/loop/` has three barrels, all listed under `CORE_BARRELS` in
  * `scripts/survey/core-moves.ts`. `session-readings.ts`, the second
  * file that moved here, sits alone behind `readings.ts`. It reaches
  * `src/effort/store/development-build.ts` by value, through
@@ -56,21 +64,40 @@
  * store: a cycle of six files. `readings.ts` records the measurement,
  * and `readings.test.ts` holds that no name is on both barrels.
  *
+ * ## Why the hop record is not here
+ *
+ * `hop-record.ts`, the shapes of the hop record and of a place, sits
+ * alone behind `hops.ts`. `src/next/hop-record.ts` and
+ * `src/project/position.ts` re-export its names, so they import a
+ * barrel over it by value, and `src/loop/session-record-parse.ts`,
+ * which `sessions.ts` imported by value, imported `asHopRecord` from
+ * `src/next/hop-record.ts` by value when the split was made; it has
+ * since moved here and imports `hop-record.ts` by path. With `hop-record.ts` behind this
+ * barrel that is a cycle of four files: this one, `sessions.ts`, the
+ * parser and `src/next/hop-record.ts`. `hops.ts` records the
+ * measurement, and `hops.test.ts` holds that no name is on two loop
+ * barrels. `sessions.ts` imports `hop-record.ts` by path, for
+ * `HopRecord`.
+ *
  * ## Why the barrel closes no cycle
  *
  * A barrel that groups a file with a file outside `src/core/` that
  * imports the barrel back by value is a runtime cycle. `sessions.ts`
- * imports three files by value: `src/core/config/config-sections.ts`,
- * for `messageOf`, and two outside `src/core/`,
- * `src/loop/session-record-parse.ts` and `src/project/scope.ts`. Through
- * them it reached 38 files by value when it moved, and none of the 38
- * imported it by value.
+ * imported three files by value when it moved:
+ * `src/core/config/config-sections.ts`, for `messageOf`, and two outside
+ * `src/core/`, `src/loop/session-record-parse.ts` and
+ * `src/project/scope.ts`. Through them it reached 38 files by value, and
+ * none of the 38 imported it by value. Both have since moved into
+ * `src/core/`, as `session-record-parse.ts` beside it and
+ * `src/core/config/scope.ts`.
  *
- * `src/loop/session-record-parse.ts` does import this barrel, for the
- * record's interfaces, with `import type` alone, which is erased before
- * anything loads. Its own note says why its sets, its error and its id
- * check live on its side: so that it takes no value from `sessions.ts`.
- * That rule now holds this barrel as well.
+ * The parser, then `src/loop/session-record-parse.ts`, imported this
+ * barrel for the record's interfaces with `import type` alone, which is
+ * erased before anything loads; since it moved here as
+ * `session-record-parse.ts` it imports `sessions.ts` by path, the same
+ * way. Its own note says why its sets, its error and its id check live
+ * on its side: so that it takes no value from `sessions.ts`. That rule
+ * holds this barrel as well.
  *
  * Measured when the file moved: the value imports of the non-test files
  * under `src/` and `packages/` held six cycles before the move and the
@@ -97,11 +124,13 @@
  * reads the graph, each control held one cross-cluster cycle and the
  * tree as moved held none.
  *
- * `claude.ts` imports four files by value: two of `src/core/`,
- * `src/core/command/command.ts` for `commandSpelling` and
- * `src/core/output/active.ts` for the active output, and two outside
- * it, `src/cli/running.ts` and `src/utils/session-env.ts`. Through them
- * it reached 13 files by value when it moved, and none of the 13
+ * `claude.ts` imports four files by value: three of `src/core/`,
+ * `src/core/command/command.ts` for `commandSpelling`,
+ * `src/core/command/running.ts` for the running command and
+ * `src/core/output/active.ts` for the active output, and one outside
+ * it, `src/utils/session-env.ts`, which has since moved here as
+ * `session-env.ts`. When it moved, `running.ts` was still
+ * `src/cli/running.ts`; through the four it reached 13 files by value, and none of the 13
  * imported this barrel or `claude.ts` by value. None of the 38 files
  * `sessions.ts` reached did either. Eleven non-test files imported
  * `claude.ts` by value before the move and import this barrel since.
@@ -135,10 +164,10 @@
  * barrels spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the two files: every name either
- * exports is here once, as the same binding, the two share no name, the
+ * `index.test.ts` holds the list to the four files: every name each
+ * exports is here once, as the same binding, the first three share no name, the
  * names `sessions.ts` re-exports are the bindings
- * `src/loop/session-record-parse.ts` declares, and no other name is
+ * `session-record-parse.ts` declares, and no other name is
  * here.
  */
 export type {
@@ -160,16 +189,20 @@ export type {
   SessionTaskRef,
 } from './sessions.js';
 export type { CapturedSession, CapturedSpawnOptions, CapturingSpawner, ClaudeSpawner } from './claude.js';
+export type { SpawnEnv } from './session-env.js';
+export type { SuiteFailure } from './suite-failure.js';
 
 export {
   beginSession,
   errorCode,
   isPidAlive,
+  isPositiveWhole,
   isSessionId,
   parseSessionRecord,
   readSession,
   readSessions,
   readState,
+  RECORD_EXTENSION,
   RUNS_DIR,
   runsDir,
   samePlan,
@@ -201,3 +234,4 @@ export {
   spawnClaudeCaptured,
   spendWarning,
 } from './claude.js';
+export { sessionPath, sessionSpawnEnv } from './session-env.js';

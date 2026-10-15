@@ -1,7 +1,7 @@
 /**
  * The spend guard, end to end: a REAL line dispatched over a PLANTED
  * registry, through the REAL dispatcher (`cli/dispatch.ts`), which
- * records the running command in `cli/running.ts`, whose record a
+ * records the running command in `core/command/running.ts`, whose record a
  * planted command's `run` reads by calling the REAL `spawnClaude`
  * (`core/loop/claude.ts`) against a stand-in `claude` on PATH.
  *
@@ -58,9 +58,9 @@
  * the first started ending first, and `spawnClaude` is then called
  * outside any dispatch, as a later test file's stand-in session is. It
  * runs the stand-in once and warns nothing: a dispatch records its
- * command in an async scope of its own (`cli/running.ts`), so nothing is
- * left for the guard to read once both have ended. This is #927 as it
- * was measured: with the record put back in a `finally`, the second to
+ * command in an async scope of its own (`core/command/running.ts`), so
+ * nothing is left for the guard to read once both have ended. This is
+ * #927 as it was measured: with the record put back in a `finally`, the second to
  * end put back the first's record, and the guard, which threw at the
  * time, refused every session a later file started, naming a command
  * that had long ended. Run on 2026-10-10 against that dispatcher, this
@@ -75,9 +75,10 @@
  * one line that named `rafa plan waits`, and `cli/running.ts` was
  * restored sha256-identical.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { CommandSpend } from '../cli/spends.js';
-import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
+import type { CommandSpend, RafaCommand, RafaFlagSpec } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
+
+import '../adapter-registry.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

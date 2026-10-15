@@ -8,10 +8,12 @@
  * Each case dispatches one fixture command over a planted project, so
  * the config the command loads is the file the case wrote.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+
+import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

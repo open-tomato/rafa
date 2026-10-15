@@ -1,7 +1,7 @@
 /**
  * Tests for the `readings.ts` barrel: it exports every name
  * `session-readings.ts` exports, each once, as the same binding, no
- * other name, and no name the other loop barrel holds.
+ * other name, and no name `index.ts`, the first loop barrel, holds.
  *
  * The barrel spells its names, so a name added to
  * `session-readings.ts` and not to the barrel is a name no file outside

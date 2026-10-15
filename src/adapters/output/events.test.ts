@@ -3,7 +3,7 @@
  * event is one `rafa· ` line of its summary, an error is one folded
  * `rafa· error` line, and every other call writes nothing.
  */
-import type { OutputStream } from './stream.js';
+import type { OutputStream } from '../../core/output/index.js';
 import type { Output } from '../../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';

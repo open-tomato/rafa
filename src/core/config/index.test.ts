@@ -1,18 +1,18 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name
  * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`,
- * `config.ts` and `dangerous.ts` export and the `sections.ts` barrel
- * does not, each
+ * `config.ts`, `dangerous.ts`, `scope.ts` and `default-routing.ts` export and the `sections.ts`
+ * barrel does not, each
  * once, as the same binding, and no other name.
  *
- * The barrel spells its names, so a name added to one of the six files
+ * The barrel spells its names, so a name added to one of the eight files
  * and not to the barrel is a name no file outside `src/core/` can import.
  * Nothing here is spelled a second time: both sides are read off the
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `sections.test.ts` reads its barrel.
  *
  * `config.ts` re-exports names of the other files and of
- * `config-sections.ts`, so the expected list is the union of the six
+ * `config-sections.ts`, so the expected list is the union of the eight
  * files' names, each counted once, less the names of `sections.ts`. The
  * last case holds the two barrels apart on its own: no name is on both.
  *
@@ -22,7 +22,7 @@
  * indexes are `src/config-registry.ts`'s, outside `src/core/`, and the
  * first case holds that none of them is here.
  *
- * Nine names are held by name, so a reading that came back empty, or one
+ * Eleven names are held by name, so a reading that came back empty, or one
  * that saw runtime names alone, fails rather than agreeing with itself:
  * `SettingSpec`, a type of `config-schema.ts` that `config.ts` does not
  * re-export; `ConfigLayers`, a type of `config.ts`;
@@ -35,7 +35,8 @@
  * `InjectMode`, a type `config.ts` re-exports from `config-sections.ts`,
  * which is the control that the subtraction removes something; and
  * `runWithDangerousPhrases`, the one name of `dangerous.ts` a file
- * outside `src/core/` imports, the dispatcher.
+ * outside `src/core/` imports, the dispatcher; and `scopeAt` and
+ * `ProjectFound`, a value and a type of `scope.ts`.
  * `HubContext` is held absent from `config.ts`: the hub's types are
  * `src/config-schema-hub.ts`'s, which no file under `src/core/` imports.
  */
@@ -49,6 +50,8 @@ import * as schema from './config-schema.js';
 import * as config from './config.js';
 import * as coreSection from './core-section.js';
 import * as dangerous from './dangerous.js';
+import * as defaultRouting from './default-routing.js';
+import * as scope from './scope.js';
 import * as section from './section.js';
 import * as sectionsBarrel from './sections.js';
 
@@ -64,6 +67,8 @@ const CORE = 'src/core/config/core-section.ts';
 const SECTION = 'src/core/config/section.ts';
 const CONFIG = 'src/core/config/config.ts';
 const DANGEROUS = 'src/core/config/dangerous.ts';
+const SCOPE = 'src/core/config/scope.ts';
+const ROUTING = 'src/core/config/default-routing.ts';
 
 /**
  * Every export name of each file, types included, sorted.
@@ -110,7 +115,7 @@ function unionLess(lists: readonly (readonly string[])[], less: readonly string[
     .sort();
 }
 
-/** The runtime bindings of the six files, a name two of them export counted once. */
+/** The runtime bindings of the eight files, a name two of them export counted once. */
 const BEHIND: Readonly<Record<string, unknown>> = {
   ...items,
   ...schema,
@@ -118,10 +123,12 @@ const BEHIND: Readonly<Record<string, unknown>> = {
   ...section,
   ...config,
   ...dangerous,
+  ...scope,
+  ...defaultRouting,
 };
 
 describe('the config barrel', () => {
-  it('exports the runtime names of the six files the sections barrel does not hold, each once, and no other', () => {
+  it('exports the runtime names of the eight files the sections barrel does not hold, each once, and no other', () => {
     const expected = unionLess(
       [
         Object.keys(items),
@@ -130,6 +137,8 @@ describe('the config barrel', () => {
         Object.keys(section),
         Object.keys(config),
         Object.keys(dangerous),
+        Object.keys(scope),
+        Object.keys(defaultRouting),
       ],
       Object.keys(sectionsBarrel),
     );
@@ -149,6 +158,7 @@ describe('the config barrel', () => {
     expect(Object.keys(config)).not.toContain('activeSettingByKey');
     expect(expected).toContain('activeSettingByKey');
     expect(expected).toContain('runWithDangerousPhrases');
+    expect(Object.keys(scope)).toEqual(['scopeAt']);
     for (const merged of ['SETTINGS', 'CONFIG_DEFAULTS', 'SETTING_NAMES', 'SETTING_BY_KEY', 'SECTIONS', 'knownKeysAbove']) {
       expect([merged, merged in barrel]).toEqual([merged, false]);
     }
@@ -161,20 +171,33 @@ describe('the config barrel', () => {
     for (const name of Object.keys(barrel)) {
       expect([name, exported[name] === BEHIND[name]]).toEqual([name, true]);
     }
-    // A name two of the six export is one binding, so the spread above lost none.
+    // A name two of the eight export is one binding, so the spread above lost none.
     for (const [name, value] of [
       ...Object.entries(items),
       ...Object.entries(schema),
       ...Object.entries(coreSection),
       ...Object.entries(section),
       ...Object.entries(dangerous),
+      ...Object.entries(scope),
+      ...Object.entries(defaultRouting),
     ]) {
       expect([name, BEHIND[name] === value]).toEqual([name, true]);
     }
   });
 
-  it('exports the type names of the six files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, SECTIONS_BARREL, ITEMS, SCHEMA, CORE, SECTION, CONFIG, DANGEROUS]);
+  it('exports the type names of the eight files with the runtime ones, each once, and no other', () => {
+    const names = readExportNames([
+      BARREL,
+      SECTIONS_BARREL,
+      ITEMS,
+      SCHEMA,
+      CORE,
+      SECTION,
+      CONFIG,
+      DANGEROUS,
+      SCOPE,
+      ROUTING,
+    ]);
     const expected = unionLess(
       [
         names[ITEMS] ?? [],
@@ -183,6 +206,8 @@ describe('the config barrel', () => {
         names[SECTION] ?? [],
         names[CONFIG] ?? [],
         names[DANGEROUS] ?? [],
+        names[SCOPE] ?? [],
+        names[ROUTING] ?? [],
       ],
       names[SECTIONS_BARREL] ?? [],
     );
@@ -198,6 +223,8 @@ describe('the config barrel', () => {
     expect(Object.keys(config)).not.toContain('ConfigLayers');
     expect(expected).not.toContain('InjectMode');
     expect(names[DANGEROUS]).toContain('DangerousPhrases');
+    expect(names[SCOPE]).toEqual(['ProjectFound', 'Scope', 'scopeAt']);
+    expect(names[ROUTING]).toEqual(['DEFAULT_ROUTES', 'DEFAULT_ROUTING', 'Route']);
     expect(names[BARREL]).toEqual(expected);
   });
 

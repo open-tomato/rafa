@@ -81,6 +81,8 @@ import type { InitResult, InitSeams } from './init.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '../core/command/index.js';
 
+import '../adapter-registry.js';
+
 import {
   existsSync,
   lstatSync,

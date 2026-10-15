@@ -10,8 +10,10 @@
  * held to rafa 0.1.0 through the manifest seams, handed to the loader and
  * to the command alike.
  */
-import type { OutputStream } from '../../adapters/output/stream.js';
+import type { OutputStream } from '../../core/output/index.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

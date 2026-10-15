@@ -3,7 +3,7 @@
  * check (`src/core/command/command.ts`).
  *
  * The type claims are compiled as probes through the TypeScript compiler
- * API under the root tsconfig, as `src/cli/core/types.test.ts` does and
+ * API under the root tsconfig, as `src/core/command/types.test.ts` does and
  * for its reason: `check-types` never reads a test file, and `bun:test`'s
  * `expectTypeOf` checks nothing at run time. The clean probe holds that a
  * `run` written against `CliContext` is a `RafaCommand`'s `run`, that a

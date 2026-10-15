@@ -43,7 +43,7 @@
  * ticks a line to. Lines are the same `split('\n')`, and a task's text
  * is its capture trimmed, as `findNextTask` trims it, with a trailing
  * `<!-- blocked: ... -->` comment taken off, as `findNextTask` takes it
- * off through `splitBlockerComment` (`utils/tracker.ts`). The model does
+ * off through `splitBlockerComment` (`blocker-comment.ts`). The model does
  * not carry the comment's text. So outside a
  * `rafa:*` block never closed, a line is an open task of the model
  * exactly when `findNextTask` can dispatch it, with the same text,
@@ -96,7 +96,7 @@
  *
  * The kinds read are {@link PLAN_BLOCK_KINDS}. Every other kind — a
  * `rafa:report`, or one a later phase defines — is retained in
- * {@link PlanModel.blocks} and ignored, the rule `utils/declaration.ts`
+ * {@link PlanModel.blocks} and ignored, the rule `core/plan/declaration.ts`
  * applies to an unrecognised key. A header key that none of
  * {@link PLAN_HEADER_FIELDS} names is retained in
  * {@link PlanHeader.extras} for the same reason.
@@ -161,13 +161,12 @@
  * do.
  */
 import type { RafaBlock } from './blocks.js';
-import type { TaskDeclaration } from '../../utils/declaration.js';
+import type { TaskDeclaration } from './declaration.js';
 
-import { parseTaskDeclaration } from '../../utils/declaration.js';
-import { isStampableStub } from '../../utils/plan-stamp.js';
-import { splitBlockerComment } from '../../utils/tracker.js';
-
+import { splitBlockerComment } from './blocker-comment.js';
 import { readRafaBlocks } from './blocks.js';
+import { parseTaskDeclaration } from './declaration.js';
+import { isStampableStub } from './plan-stamp.js';
 
 /** The block kinds a plan is read from. Every other kind is ignored. */
 export const PLAN_BLOCK_KINDS = ['plan', 'context', 'stage-context'] as const;

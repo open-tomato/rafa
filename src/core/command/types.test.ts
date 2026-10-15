@@ -1,5 +1,5 @@
 /**
- * Tests for the command contracts (`src/cli/core/types.ts`).
+ * Tests for the command contracts (`src/core/command/types.ts`).
  *
  * The source's suite, open-tomato's
  * `packages/shared/cli-core/src/types.test.ts` at commit
@@ -34,13 +34,20 @@
  * Measured on 2026-09-14. Before `parseArgs.ts` exported `ParseArgsSpec`,
  * the clean probe drew exactly one diagnostic, TS2724 naming it, and every
  * refusal passed. Five mutations of `types.ts` were then driven against
- * `src/cli/core/`, one run each, with 125 pass before and after and the
- * module restored byte-identical (sha256), and every one reddened at least
- * one case. `outputMode` widened to `string` reddened the clean probe and
- * both mode refusals, and `output` made `Output | undefined` the clean
- * probe. `run` allowed to answer synchronously, a flag's `aliases` allowed
- * a string, and an argument's `default` allowed `null` each reddened their
- * own refusal alone.
+ * `src/cli/core/`, where the module and this file then sat, one run
+ * each, with 125 pass before and after and the module restored
+ * byte-identical (sha256), and every one reddened at least one case.
+ * `outputMode` widened to `string` reddened the clean probe and both mode
+ * refusals, and `output` made `Output | undefined` the clean probe. `run`
+ * allowed to answer synchronously, a flag's `aliases` allowed a string,
+ * and an argument's `default` allowed `null` each reddened their own
+ * refusal alone.
+ *
+ * The file moved with `types.ts` into `src/core/command/`. Its clean
+ * probe still reads `ParseArgsSpec` from `src/cli/core/parseArgs.ts`,
+ * which stays in the CLI: that path is a string written into a probe
+ * outside the repository, not an import of this file, so the import
+ * graph counts no edge from core for it.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,7 +71,7 @@ function specifierOf(...segments: string[]): string {
 /** A probe's source: the contracts imported as `T`, then the lines given. */
 function probeSource(...lines: string[]): string {
   return [
-    `import type * as T from ${specifierOf('cli', 'core', 'types.js')};`,
+    `import type * as T from ${specifierOf('core', 'command', 'types.js')};`,
     ...lines,
     '',
   ].join('\n');

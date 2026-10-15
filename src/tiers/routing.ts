@@ -6,9 +6,10 @@
  * `.rafa/specs/rafa-26-skill-tiers.md` turns the routing table, until
  * now prose in `context/workflow.md`, into the `routing` setting: a map
  * from a task shape to the agent that takes it. This module holds
- * rafa's defaults for that map, {@link DEFAULT_ROUTES}, and the map
+ * rafa's defaults for that map, `DEFAULT_ROUTES`, and the map
  * `CONFIG_DEFAULTS` answers when no layer names `routing`,
- * {@link DEFAULT_ROUTING}. How a file's value is READ is
+ * `DEFAULT_ROUTING`, both declared in `src/core/config/default-routing.ts`
+ * and re-exported here under the same names. How a file's value is READ is
  * `config-sections.ts`'s `routeTarget` inside `config-readers.ts`'s
  * `mapOf`, as for every other map setting.
  *
@@ -30,10 +31,10 @@
  *     `false` kept as a key's answer removes that row: a project writing
  *     `routing: { cleanup: refactor-cleaner }` is routed by the five
  *     rows below plus that one.
- *   - {@link DEFAULT_ROUTING} is one shared `Map`, as each empty map
+ *   - `DEFAULT_ROUTING` is one shared `Map`, as each empty map
  *     default in `CONFIG_DEFAULTS` is. A `Map` cannot be frozen, so the
  *     promise that no caller edits it rests on its `ReadonlyMap` type,
- *     while {@link DEFAULT_ROUTES}, a list, is frozen outright.
+ *     while `DEFAULT_ROUTES`, a list, is frozen outright.
  *
  * ## Every row must resolve
  *
@@ -61,8 +62,7 @@
  *      an `unloaded` tier, or held by no tier at all (`missing`).
  *
  * The built-ins are a parameter rather than an import because
- * `core-section.ts` imports this module for {@link DEFAULT_ROUTING},
- * and `agents/roster.ts` reaches the plan parser; a routing module
+ * this module imports the config barrel for `DEFAULT_ROUTING`, and `agents/roster.ts` reaches the plan parser; a routing module
  * importing it would put that graph under the config's.
  *
  * ## A configured row and a default row fail differently
@@ -90,24 +90,12 @@ import type { ConfigLayers } from '../core/config/index.js';
 import type { RouteTarget } from '../core/config/sections.js';
 import type { SkillTier } from '../schema/tiers.js';
 
+import { DEFAULT_ROUTING } from '../core/config/index.js';
+
 import { findTierItem } from './resolve.js';
 
-/** One default row: a task shape and the agent that takes it. */
-export type Route = readonly [shape: string, agent: string];
-
-/** rafa's routing table, in the order the spec lists it. */
-export const DEFAULT_ROUTES: readonly Route[] = Object.freeze([
-  Object.freeze(['prose', 'doc-updater'] as const),
-  Object.freeze(['tests', 'tdd-guide'] as const),
-  Object.freeze(['repair', 'build-error-resolver'] as const),
-  Object.freeze(['review', 'code-reviewer'] as const),
-  Object.freeze(['implementation', 'loop-implementer'] as const),
-]);
-
-/** {@link DEFAULT_ROUTES} as the map `routing` resolves to by default. */
-export const DEFAULT_ROUTING: ReadonlyMap<string, RouteTarget> = new Map<string, RouteTarget>(
-  DEFAULT_ROUTES,
-);
+export type { Route } from '../core/config/index.js';
+export { DEFAULT_ROUTES, DEFAULT_ROUTING } from '../core/config/index.js';
 
 /** What one row's agent resolves to. See "Every row must resolve". */
 export type RouteAnswer =
