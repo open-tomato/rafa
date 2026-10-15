@@ -9,11 +9,18 @@ import {
   baseName,
   CORE_BARRELS,
   CORE_FOLDER,
+  CORE_FOLDERS,
   CORE_MOVES,
+  CORE_NAMED_FILES,
+  CORE_PACKAGE,
+  CORE_PARKED_TESTS,
   CORE_REEXPORTS,
+  CORE_SOURCE,
   CORE_SUBJECTS,
   findCollisions,
   isCoreBarrel,
+  isCoreFile,
+  isCoreRead,
   movedPaths,
   movedTo,
   subjectFolder,
@@ -245,6 +252,79 @@ describe('CORE_REEXPORTS', () => {
   });
 });
 
+describe('where core is', () => {
+  it('names the package, its source folder and the parked tests\' folder, each with its closing /', () => {
+    expect(CORE_PACKAGE).toBe('packages/rafa/');
+    expect(CORE_SOURCE).toBe('packages/rafa/src/');
+    expect(CORE_PARKED_TESTS).toBe('src/tests/core-coupled/');
+  });
+
+  it('lists the three folders and the four named files core is before the move, sorted', () => {
+    expect(CORE_FOLDERS).toEqual([CORE_FOLDER, 'src/effort/store/', 'src/ports/']);
+    expect(CORE_FOLDERS).toEqual([...CORE_FOLDERS].sort());
+    expect(CORE_NAMED_FILES).toEqual(['src/report/parse.ts', 'src/report/record.ts', 'src/schema/project-id.ts', 'src/schema/tiers.ts']);
+    expect(CORE_NAMED_FILES).toEqual([...CORE_NAMED_FILES].sort());
+  });
+
+  it('closes every folder with / and puts no named file under a folder', () => {
+    for (const folder of CORE_FOLDERS) {
+      expect(folder.endsWith('/')).toBe(true);
+    }
+    for (const path of CORE_NAMED_FILES) {
+      expect([path, CORE_FOLDERS.some((folder) => path.startsWith(folder))]).toEqual([path, false]);
+    }
+  });
+});
+
+describe('isCoreFile', () => {
+  it('holds a file under each core folder and each named file', () => {
+    expect(isCoreFile('src/core/git/git.ts')).toBe(true);
+    expect(isCoreFile('src/effort/store/index.ts')).toBe(true);
+    expect(isCoreFile('src/ports/log-level.ts')).toBe(true);
+    for (const path of CORE_NAMED_FILES) {
+      expect([path, isCoreFile(path)]).toEqual([path, true]);
+    }
+  });
+
+  it('refuses a sibling of a named file, a folder that only shares a prefix, the parked tests and the package before it is core', () => {
+    expect(isCoreFile('src/report/parse.test.ts')).toBe(false);
+    expect(isCoreFile('src/report/render.ts')).toBe(false);
+    expect(isCoreFile('src/core-x.ts')).toBe(false);
+    expect(isCoreFile('src/effort/store-sync.ts')).toBe(false);
+    expect(isCoreFile('src/effort/sync/push.ts')).toBe(false);
+    expect(isCoreFile(`${CORE_PARKED_TESTS}core/config/config.test.ts`)).toBe(false);
+    expect(isCoreFile(`${CORE_SOURCE}core/git/git.ts`)).toBe(false);
+  });
+
+  it('reads planted lists: the package\'s source folder alone, with no named file, as after the move', () => {
+    const folders = [CORE_SOURCE];
+
+    expect(isCoreFile(`${CORE_SOURCE}report/parse.ts`, folders, [])).toBe(true);
+    expect(isCoreFile('src/report/parse.ts', folders, [])).toBe(false);
+    expect(isCoreFile('src/core/git/git.ts', folders, [])).toBe(false);
+  });
+});
+
+describe('isCoreRead', () => {
+  it('holds every core file and a test parked under src/tests/core-coupled/', () => {
+    expect(isCoreRead('src/core/git/git.ts')).toBe(true);
+    expect(isCoreRead('src/report/record.ts')).toBe(true);
+    expect(isCoreRead(`${CORE_PARKED_TESTS}effort/store/settings.test.ts`)).toBe(true);
+  });
+
+  it('refuses a file outside core, another test under src/tests/ and a folder that only shares the parked prefix', () => {
+    expect(isCoreRead('src/board/place.ts')).toBe(false);
+    expect(isCoreRead('src/tests/core-barrels.sweep.test.ts')).toBe(false);
+    expect(isCoreRead('src/tests/core-coupled-notes.ts')).toBe(false);
+  });
+
+  it('reads planted lists for the core files and keeps the parked tests', () => {
+    expect(isCoreRead(`${CORE_SOURCE}ports/log-level.ts`, [CORE_SOURCE], [])).toBe(true);
+    expect(isCoreRead(`${CORE_PARKED_TESTS}core/config/config.test.ts`, [CORE_SOURCE], [])).toBe(true);
+    expect(isCoreRead('src/ports/log-level.ts', [CORE_SOURCE], [])).toBe(false);
+  });
+});
+
 /**
  * The lists against the tracked tree. These stay true through the move:
  * a listed path is tracked where it is today or at its target, and never
@@ -269,6 +349,14 @@ describe('the lists against the tracked tree', () => {
     const moved = CORE_MOVES.filter((move) => kept.has(move.from) && tracked.has(move.to));
 
     expect(moved.map((move) => [move.from, tracked.has(move.from)])).toEqual(moved.map((move) => [move.from, true]));
+  });
+
+  it('finds a tracked code file under every core folder and every named file tracked', () => {
+    const files = [...tracked];
+
+    expect(CORE_FOLDERS.map((folder) => [folder, files.some((path) => path.startsWith(folder))]))
+      .toEqual(CORE_FOLDERS.map((folder) => [folder, true]));
+    expect(CORE_NAMED_FILES.map((path) => [path, tracked.has(path)])).toEqual(CORE_NAMED_FILES.map((path) => [path, true]));
   });
 
   it('lists every test file named after a file still at its old path that has no source file of its own', () => {

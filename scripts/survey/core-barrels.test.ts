@@ -171,6 +171,25 @@ describe('readCoreImports', () => {
     });
   });
 
+  it('reads no file of the other core folders, no named core file and no parked test, and names them', () => {
+    const reading = readingOf({
+      'src/effort/store/settings.ts': 'import { loadConfig } from \'../../core/config/config-load.js\';\n',
+      'src/ports/log-level.ts': 'import { SETTINGS } from \'../core/config/config-schema.js\';\n',
+      'src/report/parse.ts': 'import { readGit } from \'../core/git/git.js\';\n',
+      'src/report/render.ts': 'import { readGit } from \'../core/git/git.js\';\n',
+      'src/tests/core-coupled/core/config/config.test.ts': 'import { loadConfig } from \'../../../../core/config/config-load.js\';\n',
+    });
+
+    expect(reading.inside).toEqual([
+      'src/effort/store/settings.ts',
+      'src/ports/log-level.ts',
+      'src/report/parse.ts',
+      'src/tests/core-coupled/core/config/config.test.ts',
+    ]);
+    expect(reading.read).toEqual(['src/report/render.ts']);
+    expect(reading.deep.map((edge) => importLine(edge))).toEqual(['src/report/render.ts -> src/core/git/git.ts']);
+  });
+
   it('reads no file that is not code, and counts it neither as read nor as missing', () => {
     const reading = readCoreImports({
       files: ['context/source.md', 'docs/survey/cluster-map.json', 'src/board/place.ts', 'src/core/config/notes.md'],

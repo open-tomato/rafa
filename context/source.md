@@ -111,6 +111,10 @@ moved to `src/core/git/`. `src/report/parse.ts` reads like the run's
 report code, but the effort store reads it, so it is core. Core is also
 `src/ports/`, the effort store under `src/effort/store/` and
 `src/report/record.ts`: core by assignment, kept where they are.
+`CORE_FOLDERS` and `CORE_NAMED_FILES` of `scripts/survey/core-moves.ts`
+list core's folders and named files, and `isCoreFile` reads them: the
+one place a sweep, a survey script or a spawned loader takes core's
+location from.
 
 **A subject's barrel is the only file under `src/core/` that a file
 outside it may import.** There are thirteen, all listed in `CORE_BARRELS` of
@@ -132,9 +136,13 @@ half.
 **The deep-import sweep holds the outside half.**
 `src/tests/core-barrels.sweep.test.ts` reads every code file a commit
 would hold, tracked or untracked and not ignored, under `src/`, `scripts/`
-and `packages/` and at the root, test files included. It fails on any
-import from outside `src/core/` that reaches a file inside it other than a
-listed barrel. The reading is `readCoreImports` in
+and `packages/` and at the root, test files included, less core's own
+files and its parked tests: the paths `isCoreRead` of
+`scripts/survey/core-moves.ts` holds, today `src/core/`,
+`src/effort/store/`, `src/ports/`, the four named files and
+`src/tests/core-coupled/`, are named and not read. It fails on any
+import from outside core that reaches a file inside `src/core/` other
+than a listed barrel. The reading is `readCoreImports` in
 `scripts/survey/core-barrels.ts`, over the specifiers `textImports` finds,
 so an `import type`, an `export … from`, a dynamic `import()` and a
 `require()` count as much as a static import. It takes no allow-list: a

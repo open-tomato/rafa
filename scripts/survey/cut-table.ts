@@ -56,6 +56,7 @@ import type { EdgeKind, ImportEdge } from './import-graph';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
+import { CORE_FOLDERS, CORE_NAMED_FILES, subjectFolder } from './core-moves';
 import { OUTPUT_DIR, stableJson } from './import-graph';
 
 /** The files and folders one future package holds by rule. */
@@ -217,7 +218,7 @@ export const GRAPH_PATH: string = `${OUTPUT_DIR}/import-graph.json`;
 export const SECTIONS_ISSUE = 118;
 
 /** The folder whose imports of section files #118 clears, with its closing `/`. */
-export const SECTION_IMPORTER_FOLDER = 'src/core/config/';
+export const SECTION_IMPORTER_FOLDER: string = subjectFolder('config');
 
 /** A config section file: `src/config-schema-<section>.ts`, at the top of `src/`. */
 export const SECTION_FILE: RegExp = /^src\/config-schema-[^/]+\.ts$/;
@@ -255,14 +256,16 @@ export const BOARD_FILES_OF_C6: readonly string[] = [
 
 /**
  * The ten packages, lowest first, seeded from the survey's cluster order,
- * with the three folders left for the second architect pass.
+ * with the three folders left for the second architect pass. Core's
+ * folders and named files are `CORE_FOLDERS` and `CORE_NAMED_FILES` of
+ * `core-moves.ts`, which spells where core is.
  */
 export const CUT_RULES: CutRules = {
   packages: [
     {
-      folders: ['src/core/', 'src/effort/store/', 'src/ports/'],
+      folders: CORE_FOLDERS,
       name: CORE_PACKAGE,
-      named: ['src/report/parse.ts', 'src/report/record.ts', 'src/schema/project-id.ts', 'src/schema/tiers.ts'],
+      named: CORE_NAMED_FILES,
     },
     {
       folders: [

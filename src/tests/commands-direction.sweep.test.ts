@@ -40,6 +40,7 @@ import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
 import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
+import { subjectFolder } from '../../scripts/survey/core-moves.js';
 import { listTrackedFiles } from '../../scripts/survey/files.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
 
@@ -80,10 +81,12 @@ interface SplitModule {
  * that half resolves to, and a row naming the file behind it would hold
  * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
  * half is `src/core/plan/plan-files.ts` behind `src/core/plan/index.ts`.
+ * Both barrels are spelled under the subject folders of
+ * `scripts/survey/core-moves.ts`, so the rows follow core when it moves.
  */
 const SPLIT_MODULES: readonly SplitModule[] = [
-  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/core/plan/index.ts' },
-  { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/core/loop/readings.ts' },
+  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: `${subjectFolder('plan')}index.ts` },
+  { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: `${subjectFolder('loop')}readings.ts` },
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
   { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
   { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },

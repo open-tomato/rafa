@@ -19,11 +19,13 @@
  *     under `scripts/`, a package file, a config file at the root. Unlike
  *     the commands-direction reading, a test file is covered: a test
  *     outside `src/core/` reaches it through a barrel too;
- *   - less the files under `src/core/` themselves, which import their
- *     sibling files directly. They are named under `inside` and their
- *     imports are not read. That a file inside never imports a barrel is
- *     the other half of the move's import rule, and this reading does not
- *     measure it.
+ *   - less core's own files and its parked tests, which import their
+ *     sibling files directly: every path `isCoreRead` of `core-moves.ts`
+ *     holds, the files under `src/core/` and under the other core folders,
+ *     the named core files, and the tests under `CORE_PARKED_TESTS`. They
+ *     are named under `inside` and their imports are not read. That a file
+ *     inside never imports a barrel is the other half of the move's import
+ *     rule, and this reading does not measure it.
  *
  * Which imports count: every specifier `ts.preProcessFile` finds in the
  * source text (`textImports`, `scripts/survey/import-graph.ts`), so a
@@ -66,7 +68,7 @@ import type { ResolveImport } from './import-graph';
 
 import ts from 'typescript';
 
-import { barrelPaths, CORE_FOLDER } from './core-moves';
+import { barrelPaths, CORE_FOLDER, isCoreRead } from './core-moves';
 import { textImports } from './import-graph';
 
 const CODE_EXTENSION = /\.(?:[cm]?[jt]s|[jt]sx)$/;
@@ -103,7 +105,7 @@ export interface CoreImports {
   readonly deep: readonly CoreImport[];
   /** Every module augmentation that names a file under `src/core/`, sorted by line, free of duplicates. */
   readonly augment: readonly CoreImport[];
-  /** The code files under `src/core/` that were handed in and left unread, sorted. */
+  /** The code files `isCoreRead` holds that were handed in and left unread, sorted. */
   readonly inside: readonly string[];
   /** The files that should have been read and had no source text, sorted. */
   readonly missing: readonly string[];
@@ -213,21 +215,21 @@ function withoutAugments(imports: readonly string[], augments: readonly string[]
 }
 
 /**
- * Reads every import from a code file outside `src/core/` into it, and
+ * Reads every import from a code file outside core into `src/core/`, and
  * splits them into those that reach a barrel and those that reach deeper
  * (see the module note for which files and which imports). Pure: the
  * caller lists the files, reads their text and supplies the resolver.
  *
  * @param input - The files, their texts, a resolver, and the barrels when a test plants its own.
  * @returns The barrel imports, the deep imports, the augmentations, the
- *   files read, the files inside `src/core/` left unread, and the files
+ *   files read, core's files and parked tests left unread, and the files
  *   with no text.
  */
 export function readCoreImports(input: CoreImportsInput): CoreImports {
   const barrels = new Set(input.barrels ?? barrelPaths());
   const code = [...new Set(input.files)].filter(isCodeFile).sort();
-  const inside = code.filter((path) => path.startsWith(CORE_FOLDER));
-  const covered = code.filter((path) => !path.startsWith(CORE_FOLDER));
+  const inside = code.filter((path) => isCoreRead(path));
+  const covered = code.filter((path) => !isCoreRead(path));
   const read = covered.filter((path) => input.sources.has(path));
   const missing = covered.filter((path) => !input.sources.has(path));
   const barrel = new Map<string, CoreImport>();

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
+import { CORE_FOLDER } from '../../scripts/survey/core-moves.js';
 import { textImports } from '../../scripts/survey/import-graph.js';
 import { SETTING_NAMES } from '../config-registry.js';
 import { activeSettings, CORE_SECTION, EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '../core/config/index.js';
@@ -20,7 +21,7 @@ import { SWEEP_TIMEOUT } from './sweep-timeout.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
 
-const CORE_DIR = fileURLToPath(new URL('../core/', import.meta.url));
+const CORE_DIR = join(fileURLToPath(new URL('../../', import.meta.url)), CORE_FOLDER);
 const SCHEMA_SPECIFIER = /(^|\/)config-schema-[^/]+?(\.[cm]?[jt]s)?$/;
 const CODE_FILE = /\.[cm]?[jt]sx?$/;
 

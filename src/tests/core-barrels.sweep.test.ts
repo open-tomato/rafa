@@ -2,7 +2,7 @@
  * The core-barrels sweep: holds the import rule of the move of #905
  * against the live tree, not a fixture.
  *
- * The rule: a file outside `src/core/` imports a barrel that
+ * The rule: a file outside core imports a barrel that
  * `scripts/survey/core-moves.ts` lists and nothing deeper under
  * `src/core/`: static, `import type`, `export … from`, dynamic
  * `import()` or `require()`. `scripts/survey/core-barrels.ts`
@@ -18,7 +18,9 @@
  * task under check is untracked until the loop commits it, so a listing
  * of tracked files alone would pass the task and fail the commit after
  * it. The scope is the whole repository, test files included: `src/`,
- * `scripts/`, `packages/`, and whatever else holds code.
+ * `scripts/`, `packages/`, and whatever else holds code, less core's own
+ * files and its parked tests, the paths `isCoreRead` of `core-moves.ts`
+ * holds, which are named and not read.
  *
  * The count and the files read are printed once, at load time, before
  * any assertion runs, so a run that silently read nothing cannot pass by
@@ -36,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
 import { deepImportLine, isCodeFile, readCoreImports } from '../../scripts/survey/core-barrels.js';
-import { CORE_FOLDER } from '../../scripts/survey/core-moves.js';
+import { CORE_FOLDER, CORE_FOLDERS } from '../../scripts/survey/core-moves.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
 
 import { SWEEP_TIMEOUT } from './sweep-timeout.js';
@@ -76,7 +78,8 @@ function committableCodeFiles(): string[] {
  * @returns The count line and the line of names.
  */
 function filesReadLines(reading: ReturnType<typeof readCoreImports>): string {
-  const counts = `core-barrels: read ${reading.read.length} file(s) outside ${CORE_FOLDER}, left ${reading.inside.length} inside it unread; `
+  const counts = `core-barrels: read ${reading.read.length} file(s) outside core, left ${reading.inside.length} of core's `
+    + `(${CORE_FOLDERS.join(', ')}, its named files, its parked tests) unread; `
     + `${reading.barrel.length} import(s) reach a barrel, ${reading.deep.length} reach deeper`;
   return `${counts}\ncore-barrels: files read: ${reading.read.join(', ')}`;
 }
@@ -105,16 +108,17 @@ describe('the core-barrels sweep', () => {
     expect(reading.read).toContain('scripts/survey/core-barrels.ts');
   });
 
-  it('holds no import from outside src/core/ deeper than a barrel of scripts/survey/core-moves.ts', () => {
+  it('holds no import from outside core deeper than a barrel of scripts/survey/core-moves.ts', () => {
     const lines = reading.deep.map((edge) => deepImportLine(edge));
     expect(lines, `deep import(s) into ${CORE_FOLDER} from outside it, import the subject's barrel:\n${lines.join('\n')}`).toEqual([]);
   });
 
-  it('reaches a barrel from outside src/core/ once the folder holds a file, proving the scan sees it', () => {
-    const seesTheFolder = reading.inside.length === 0 || reading.barrel.length > 0;
+  it('reaches a barrel from outside core once the barrels\' folder holds a file, proving the scan sees it', () => {
+    const underBarrels = reading.inside.filter((path) => path.startsWith(CORE_FOLDER));
+    const seesTheFolder = underBarrels.length === 0 || reading.barrel.length > 0;
     expect(
       seesTheFolder,
-      `${reading.inside.length} code file(s) lie under ${CORE_FOLDER} and no import from outside it reaches a barrel: `
+      `${underBarrels.length} code file(s) lie under ${CORE_FOLDER} and no import from outside core reaches a barrel: `
       + 'the resolver is not reaching the folder, or the barrels of scripts/survey/core-moves.ts are not the ones written',
     ).toBe(true);
   });

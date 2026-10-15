@@ -3,7 +3,21 @@
  * which puts the files every part of rafa depends on into `src/core/`
  * before any package is cut (epic #801).
  *
- * Four things are listed, and nothing here reads the tree:
+ * Two things are spelled here first: where core is, and the files that
+ * move into `src/core/`. Where core is:
+ *
+ *   - {@link CORE_FOLDERS} and {@link CORE_NAMED_FILES}: the folders and
+ *     the files outside them that are core today, the one place a sweep,
+ *     a survey script or a spawned loader reads them from
+ *     ({@link isCoreFile}). When core moves into its workspace package
+ *     (#1090) they become `[CORE_SOURCE]` and `[]`;
+ *   - {@link CORE_PACKAGE} and {@link CORE_SOURCE}: the package's folder
+ *     and its source folder, which hold nothing before that move;
+ *   - {@link CORE_PARKED_TESTS}: where a test of core that imports a file
+ *     above core waits after the move. A sweep reads such a test as it
+ *     reads core's own files ({@link isCoreRead}).
+ *
+ * The move into `src/core/` lists four things:
  *
  *   - {@link CORE_MOVES}: the twenty-nine files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
@@ -36,6 +50,36 @@
 
 /** The folder the files move into, with its closing `/`. */
 export const CORE_FOLDER = 'src/core/';
+
+/** The folder of core's workspace package, with its closing `/`. */
+export const CORE_PACKAGE = 'packages/rafa/';
+
+/** The source folder of core's workspace package, with its closing `/`. */
+export const CORE_SOURCE: string = `${CORE_PACKAGE}src/`;
+
+/**
+ * Where a test of core that imports a file above core waits once core is
+ * its package, under its path below `src/`, with its closing `/`.
+ */
+export const CORE_PARKED_TESTS = 'src/tests/core-coupled/';
+
+/**
+ * The folders that are core, each with its closing `/`, sorted: today
+ * `src/core/`, the effort store and the ports. The move into the package
+ * makes it `[CORE_SOURCE]`.
+ */
+export const CORE_FOLDERS: readonly string[] = [CORE_FOLDER, 'src/effort/store/', 'src/ports/'];
+
+/**
+ * The files outside {@link CORE_FOLDERS} that are core, sorted. The move
+ * into the package empties it.
+ */
+export const CORE_NAMED_FILES: readonly string[] = [
+  'src/report/parse.ts',
+  'src/report/record.ts',
+  'src/schema/project-id.ts',
+  'src/schema/tiers.ts',
+];
 
 /** The subject folders under `src/core/`, sorted. */
 export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime'] as const;
@@ -424,6 +468,40 @@ export function barrelPaths(
  */
 export function isCoreBarrel(path: string): boolean {
   return barrelPaths().includes(path);
+}
+
+/**
+ * Whether a path is a core file: under one of the core folders, or one of
+ * the named files.
+ *
+ * @param path - A repository-relative path.
+ * @param folders - The core folders; {@link CORE_FOLDERS} unless a test plants its own.
+ * @param named - The named files; {@link CORE_NAMED_FILES} unless a test plants its own.
+ * @returns `true` when the path is core's.
+ */
+export function isCoreFile(
+  path: string,
+  folders: readonly string[] = CORE_FOLDERS,
+  named: readonly string[] = CORE_NAMED_FILES,
+): boolean {
+  return folders.some((folder) => path.startsWith(folder)) || named.includes(path);
+}
+
+/**
+ * Whether a sweep reads a path as one of core's own files: a core file,
+ * or a test parked under {@link CORE_PARKED_TESTS}.
+ *
+ * @param path - A repository-relative path.
+ * @param folders - The core folders; {@link CORE_FOLDERS} unless a test plants its own.
+ * @param named - The named files; {@link CORE_NAMED_FILES} unless a test plants its own.
+ * @returns `true` when the path is core's or a parked test.
+ */
+export function isCoreRead(
+  path: string,
+  folders: readonly string[] = CORE_FOLDERS,
+  named: readonly string[] = CORE_NAMED_FILES,
+): boolean {
+  return isCoreFile(path, folders, named) || path.startsWith(CORE_PARKED_TESTS);
 }
 
 /**
