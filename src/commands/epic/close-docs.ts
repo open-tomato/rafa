@@ -37,13 +37,14 @@
  * since the criterion does not hold.
  */
 import type { StaleDocLineResult, StaleDocsTracker } from '../../docs/release-issue.js';
-import type { FindingsWriterSeams } from '../../effort/store/findings.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
-import type { IssueRef } from '../../ports/index.js';
+import type { IssueRef } from '@open-tomato/rafa/ports';
+import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+
 import { addStaleDocLine, staleDocLineText } from '../../docs/release-issue.js';
-import { writeStaleDocs } from '../../effort/store/stale-docs.js';
 import { namesOnlyDocs } from '../../triage/doc-only.js';
 
 /** True when `criterion` names only documentation; see the module note. */

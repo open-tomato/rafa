@@ -15,13 +15,14 @@
  * beside the plan with one that does.
  */
 import type { ConventionBodyInput, ConventionBodySeams } from './convention-body.js';
-import type { BugRoute, BugRouteRow } from '../effort/store/bug-routes.js';
 import type { PrProviderReading, PullRequests } from '../pr/index.js';
 import type { PullRequestsDouble } from '../pr/pull-requests-double.js';
+import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, PROVIDER_NONE, SUMMARY } from '../tests/release-stage-fixtures.js';

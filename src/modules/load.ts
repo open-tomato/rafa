@@ -87,17 +87,18 @@
  */
 import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
 import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
-import type { AdapterRegistry, AnyAdapter } from '../core/adapters/index.js';
-import type { ModuleSource, ResolvedConfig } from '../core/config/index.js';
+import type { AdapterRegistry, AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { ModuleSource, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { importModuleEntry } from '../cli/modules.js';
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';

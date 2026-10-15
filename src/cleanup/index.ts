@@ -56,7 +56,7 @@ import type { RunRow, RunSeams } from './runs.js';
 import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
 import type { PullRequests } from '../pr/types.js';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { readBranches } from './branches.js';
 import { classifyBranches, holdBranchRows, readProviderMerges } from './groups.js';

@@ -39,12 +39,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { parseBoardListing } from '../board/roadmap-board.js';
 import { createPlanDirNames, readRoadmapRows } from '../board/roadmap-rows.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { renderRoadmapTable } from '../commands/issue/roadmap-table.js';
-import { createGitRunner } from '../core/git/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
@@ -67,7 +68,7 @@ function printFile(file: string): string {
  * Adds a reachable, empty bare `origin` remote to `scratch`, so the
  * branch scan's remote half (`git ls-remote --heads origin`) never fails
  * and warns: a warning would land on stdout beside the table
- * (`src/core/output/text.ts` writes every level to the one stream)
+ * (`packages/rafa/src/core/output/text.ts` writes every level to the one stream)
  * and break a byte-identical comparison.
  */
 function addOrigin(scratch: ScratchRepo): void {

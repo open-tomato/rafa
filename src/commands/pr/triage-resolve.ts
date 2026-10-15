@@ -183,7 +183,6 @@
 import type { ResolveLoopOutcome, ResolveLoopRunner } from './resolve-loop.js';
 import type { TriageReading } from './triage-report.js';
 import type { TriageTrust } from './triage-trust.js';
-import type { Output } from '../../ports/index.js';
 import type { GitRunner, PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { AttemptOutcome, AttemptReading } from '../../pr/triage/attempts.js';
 import type { TriageAssessment } from '../../pr/triage/classify.js';
@@ -191,9 +190,11 @@ import type { TriageBlock } from '../../pr/triage/comment.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 import type { SettleSettings } from '../../release/settle.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
 import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';

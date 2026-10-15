@@ -12,16 +12,23 @@
  * once the difference is put in.
  */
 import type { SkillFact, SkillFactEntry } from './skill-facts.js';
-import type { PlanCiRow } from './store/plan-ci.js';
-import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
 import type { Resolution, TierRow, TierSettings } from '../tiers/resolve.js';
+import type { TierPin } from '@open-tomato/rafa/core/config/sections';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { writeTriage } from '@open-tomato/rafa/store/triage';
 
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 import { resolveTiers } from '../tiers/resolve.js';
@@ -35,12 +42,6 @@ import {
   skillsReportOf,
 } from './report-skills.js';
 import { skillSignals } from './skill-signals.js';
-import { writeDispatch } from './store/dispatches.js';
-import { writePlanCi } from './store/plan-ci.js';
-import { writeTaskReport } from './store/reports.js';
-import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from './store/skill-invocations.js';
-import { sqliteStorePath } from './store/sqlite.js';
-import { writeTriage } from './store/triage.js';
 
 /** The plan most cases run under. */
 const PLAN = 'rafa-24-know-which-skills-earn';

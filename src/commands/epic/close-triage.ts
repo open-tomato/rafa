@@ -81,23 +81,24 @@
 import type { EpicCloseSeams } from './close.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { AddIssueOptions, RefreshAddedItems } from '../../board/project/add-issue.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
-import type { IssueRef, Tracker } from '../../ports/index.js';
-import type { TaskReport } from '../../report/parse.js';
 import type { BugTriage, NamedSecret, TriageResult } from '../../triage/triage.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { join } from 'node:path';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { bugRulesOf } from '../../config-schema-issues.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
 import { unresolvedTracker } from '../../start/triage.js';
 import { localPathRedactor } from '../../triage/local-paths.js';

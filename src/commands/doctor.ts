@@ -209,7 +209,7 @@
  *
  * ## What it prints
  *
- * In text mode, `rafa <version>` (`src/core/command/version.ts`) first,
+ * In text mode, `rafa <version>` (`packages/rafa/src/core/command/version.ts`) first,
  * printed before anything is checked so a person reads which build
  * answered whatever the preflight then does; then the config rows, when
  * the load warned or passed a `dangerous.*` key; then {@link renderDoctor}'s
@@ -259,10 +259,6 @@ import type { DoctorProjectReading } from './doctor-project.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '../core/config/index.js';
-import type { PrProvider } from '../core/config/sections.js';
-import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
@@ -271,15 +267,20 @@ import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers 
 import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 
 import { basename, resolve } from 'node:path';
 
+import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
+
 import { commandRetrySeams } from '../board/project/project-runner.js';
-import { CommandExit , versionLine } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { messageOf } from '../core/config/sections.js';
-import { isFile } from '../core/plan/index.js';
 import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
@@ -293,7 +294,6 @@ import {
 import { runPreflight } from '../preflight/run.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
-import { trackerPathFor } from '../utils/tracker.js';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';

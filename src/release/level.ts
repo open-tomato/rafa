@@ -53,8 +53,8 @@
  * caller that wants to word them differently; the level is the same, and
  * the wrap-up skips the bump either way.
  */
-import type { PlanReleaseLevel } from '../core/plan/index.js';
-import type { ChangeLevel } from '../report/parse.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { ChangeLevel } from '@open-tomato/rafa/report/parse';
 
 /**
  * How the four levels order, smallest first. `none` is the SMALLEST:

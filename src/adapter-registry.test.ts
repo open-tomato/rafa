@@ -3,7 +3,7 @@
  * core registers, read off `CORE_ADAPTER_REGISTRY` once this file has
  * imported the root, as every caller reads them.
  *
- * `src/core/adapters/registry.test.ts` holds the registry's mechanics
+ * `packages/rafa/src/core/adapters/registry.test.ts` holds the registry's mechanics
  * over fixture adapters it builds itself, and imports no adapter. The
  * cases here are the ones that read core's own kinds: the order `kinds`
  * answers them in, what each adapter makes from its context, the
@@ -53,16 +53,16 @@
  * kinds.
  *
  * Driven again on 2026-10-15 once the list moved here, one run each over
- * this file and `src/core/adapters/registry.test.ts`, 85 pass unmutated,
+ * this file and `packages/rafa/src/core/adapters/registry.test.ts`, 85 pass unmutated,
  * with both modules restored and verified with `sha256sum -c`: the root
  * registering nothing reddened 32 cases, every case of this file.
  */
 import type { DescribedInstinctRecord } from './adapters/learning/local.js';
-import type { AdapterContext, AnyAdapter } from './core/adapters/index.js';
-import type { CapturingSpawner } from './core/loop/index.js';
-import type { OutputStream } from './core/output/index.js';
-import type { SessionEffortRow } from './effort/store/index.js';
-import type { InstinctRecord, Sync } from './ports/index.js';
+import type { AdapterContext, AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { InstinctRecord, Sync } from '@open-tomato/rafa/ports';
+import type { SessionEffortRow } from '@open-tomato/rafa/store';
 
 import './config-registry.js';
 import './adapter-registry.js';
@@ -82,16 +82,17 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 
-import { draftFixture } from './adapters/tracker/contract.js';
-import { createFakeGh } from './adapters/tracker/github-fake.js';
-import { parseLocalIssue } from './adapters/tracker/local.js';
-import { parseSpecReview } from './board/spec-review.js';
-import { CORE_ADAPTER_REGISTRY } from './core/adapters/index.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import {
   EMPTY_CONFIG_REGISTRY,
   registerConfigSections,
   restoreConfigSections,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { draftFixture } from './adapters/tracker/contract.js';
+import { createFakeGh } from './adapters/tracker/github-fake.js';
+import { parseLocalIssue } from './adapters/tracker/local.js';
+import { parseSpecReview } from './board/spec-review.js';
 import { actionHash } from './learning/index.js';
 import { scratchHomeEnv } from './tests/scratch-home-env.js';
 
@@ -102,7 +103,7 @@ const CONFIG_REGISTRY_ENTRY = fileURLToPath(new URL('./config-registry.ts', impo
 const ROOT_ENTRY = fileURLToPath(new URL('./adapter-registry.ts', import.meta.url));
 
 /** The adapters barrel, as a child process imports it. */
-const BARREL_ENTRY = fileURLToPath(new URL('./core/adapters/index.ts', import.meta.url));
+const BARREL_ENTRY = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/adapters'));
 
 /** What the planner case's session writes to stdout: a review judging the spec ready. */
 const PLANNER_SESSION_STDOUT = [

@@ -81,7 +81,7 @@
 import type {
   SessionStats,
   SessionUsageTotals,
-} from './store/session-row-types.js';
+} from '@open-tomato/rafa/store/session-row-types';
 
 import { createReadStream } from 'node:fs';
 import { basename } from 'node:path';
@@ -90,7 +90,7 @@ import { createInterface } from 'node:readline';
 export type {
   SessionStats,
   SessionUsageTotals,
-} from './store/session-row-types.js';
+} from '@open-tomato/rafa/store/session-row-types';
 
 /** Where a row's identity comes from — never from the records themselves. */
 export interface SessionIdentity {

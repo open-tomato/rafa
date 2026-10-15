@@ -26,8 +26,8 @@
  */
 import type { DescribeDocument } from '../cli/describe.js';
 import type { ModuleListing } from '../commands/module/list.js';
-import type { OutputStream } from '../core/output/index.js';
-import type { CliEvent, CliEventLog, CliEventResult } from '../ports/index.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventLog, CliEventResult } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 

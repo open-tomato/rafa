@@ -23,8 +23,8 @@
  * without `user`, so a row that is absent is absent for its reason and
  * not because nothing was read.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { InventorySeams } from '../inventory/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

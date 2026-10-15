@@ -19,15 +19,16 @@
  * the run. The throw is written as a warning naming the plan and what
  * was thrown, and the run goes on to the notices.
  */
-import type { RafaConfig } from '../core/config/index.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
-import type { Output } from '../ports/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGitRunner } from '../core/git/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { assessPlanRisk, riskTotalLine } from '../plan/risk.js';
 
 /** What the reading is taken over. */

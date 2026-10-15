@@ -35,7 +35,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { dispatchCaptured, eventsOf } from '../tests/cli-capture.js';
 
 import {

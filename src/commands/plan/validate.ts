@@ -111,14 +111,19 @@
  * are refused with exit code 1 before anything is parsed.
  */
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
 
 import {
   collidingPlanSkills,
@@ -129,10 +134,6 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../../agents/roster.js';
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { formatCounts, issueLine, plural } from '../../core/plan/index.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';
 

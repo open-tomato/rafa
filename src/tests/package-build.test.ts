@@ -8,8 +8,9 @@
  * first three and phase 1's publishing stage the rest, so a target
  * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest, both tsconfig files, the README and `src/`) into a
- * scratch directory and runs `bun run build` there,
+ * (its manifest and lockfile, its tsconfig files, the README, `src/` and
+ * core's workspace package `packages/rafa/`) into a scratch directory and runs
+ * `bun run build` there,
  * the script as the manifest holds it, so nothing is written into the
  * repository's own `dist/`.
  *
@@ -36,7 +37,8 @@
  *     shared code moves into chunks beside `index.js` and all four were
  *     identical. `--root=src` spells out where each entry lands: at its
  *     source's path under `dist/`.
- *   - `tsc -p tsconfig.config-types.json` follows them and writes the
+ *   - `tsc -p packages/rafa/tsconfig.types.json` and then
+ *     `tsc -p tsconfig.config-types.json` follow them and write the
  *     declarations of the `./config` subpath, the one entry whose types
  *     the manifest publishes; see "The config subpath's declarations".
  *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
@@ -59,7 +61,7 @@
  *     `dist/`.
  *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
  *     its skills and agents, which sits beside the entry in both a
- *     checkout and a build (`src/schema/tiers.ts`). The dev-planner skill
+ *     checkout and a build (`packages/rafa/src/schema/tiers.ts`). The dev-planner skill
  *     in it is the plan format `buildPlanPrompt` inlines into the plan
  *     prompt, read at `bundled/skills/dev-planner/SKILL.md` under the
  *     module's directory, and a project running an installed rafa
@@ -309,7 +311,7 @@
  * 55 of 66: the scratch package copies no `node_modules`, so its build
  * cannot resolve the library until it is given one.
  *
- * It is given one now. `src/core/config/config-load.ts` imports
+ * It is given one now. `packages/rafa/src/core/config/config-load.ts` imports
  * `createLoader` by value, so the scratch package's `node_modules` links
  * the library the repository installed, as the probe's directory does;
  * without the link the build exits 1 on `Could not resolve:
@@ -319,12 +321,27 @@
  *
  * ## The config subpath's declarations
  *
- * `./config` is the one exports entry carrying conditions: `types` at
+ * `./config` is the exports entry carrying both conditions: `types` at
  * `dist/config/index.d.ts`, and `import` at `dist/config/index.js`, which
  * the `--splitting` build writes beside the other entries. The
- * declarations come from `tsc -p tsconfig.config-types.json`, a config
- * extending `tsconfig.base.json` with `noEmit` off, `emitDeclarationOnly`
- * and `declarationDir: dist`, including `src/config/index.ts` alone.
+ * declarations come from two `tsc` passes, since one program over the
+ * root's `src/` and core's `packages/rafa/src/` would write every
+ * declaration under `dist/src/` and `dist/packages/`. The first,
+ * `tsc -p packages/rafa/tsconfig.types.json`, writes the declarations of
+ * the core files the root's config files import, from core's own
+ * `src/` into the root's `dist/`. The second,
+ * `tsc -p tsconfig.config-types.json`, includes `src/config/index.ts`
+ * alone, with `rootDir: src` and a `paths` map sending each
+ * `@open-tomato/rafa/` subpath to the declaration the first pass wrote,
+ * so it writes none of core's. The emitted declarations keep those bare
+ * specifiers, and a consumer resolves each through the manifest's
+ * `exports`: a `types`-only entry for each core subpath they name, at the
+ * declaration already under `dist/` (#1090). The `dist/` file list is
+ * held to the one a build before the move wrote, chunk hashes set aside
+ * (`fixtures/dist-files-c920603.txt`): `c920603` is stretch 9's head
+ * before it merged the move, which differs from `ec376a8`'s list only by
+ * #991's declarations (`bugs/fenced.d.ts` added, four `triage/` ones no
+ * longer reached).
  *
  * `tsc` writes a declaration for every file of its program, and the
  * program is every file the entry reaches in source, value imports
@@ -338,9 +355,10 @@
  * type-checking a `rafa.config.ts` loads none of them. The case reads
  * that reach: it follows every relative specifier from the types target
  * through the emitted files (`ts.preProcessFile`, so a specifier inside a
- * comment is not read as one) and holds every other specifier, a
- * `node:` or `bun:` builtin and `@open-tomato/define-config` alike, to
- * none. A declaration under `dist/` that the types target does not reach
+ * comment is not read as one), and every `@open-tomato/rafa/` specifier
+ * through the manifest's `exports` to its declaration, and holds every
+ * other specifier, a `node:` or `bun:` builtin and
+ * `@open-tomato/define-config` alike, to none. A declaration under `dist/` that the types target does not reach
  * is out of the check: the subpath's promise is that its declaration
  * imports nothing outside rafa, and the eleven above stay where `tsc`
  * wrote them. The case's control plants a static `import type` of the
@@ -425,16 +443,17 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import * as portsSource from '@open-tomato/rafa/ports';
+import * as storeSource from '@open-tomato/rafa/store';
+
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import * as configSource from '../config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import * as storeSource from '../effort/store/index.js';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';
 import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
-import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
@@ -452,7 +471,11 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
  */
 const BIN = { rafa: 'dist/cli.js' };
 
-/** The exports map the manifest carries, as the phase 0 spec gives it. */
+/**
+ * The exports map the manifest carries, as the phase 0 spec gives it, and
+ * a `types`-only entry for each core subpath the emitted declarations name
+ * (#1090), at the declaration the build writes under `dist/`.
+ */
 const EXPORTS = {
   '.': './dist/index.js',
   './cli': './dist/cli.js',
@@ -464,7 +487,22 @@ const EXPORTS = {
     types: './dist/config/index.d.ts',
     import: './dist/config/index.js',
   },
+  './core/config': { types: './dist/core/config/index.d.ts' },
+  './core/config/config-schema': { types: './dist/core/config/config-schema.d.ts' },
+  './core/config/sections': { types: './dist/core/config/sections.d.ts' },
+  './ports/log-level': { types: './dist/ports/log-level.d.ts' },
+  './report/parse': { types: './dist/report/parse.d.ts' },
+  './store/check-rows': { types: './dist/effort/store/check-rows.d.ts' },
 };
+
+/** The prefix of a specifier that names one of the package's own subpaths. */
+const OWN_SUBPATH = '@open-tomato/rafa/';
+
+/** The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line. */
+const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
+
+/** A chunk the `--splitting` build names by its content hash, directly in `dist/`. */
+const HASHED_CHUNK = /^([^/]+)-[a-z0-9]{8}\.js$/;
 
 /** The declaration the `./config` subpath publishes, under `dist/`. */
 const CONFIG_TYPES = 'config/index.d.ts';
@@ -545,7 +583,19 @@ const PLAN_FORMAT_IN_TIER = 'bundled/skills/dev-planner/SKILL.md';
 const SKILL = `src/${PLAN_FORMAT_IN_TIER}`;
 
 /** The files the scratch copy of the package takes besides `src/`. */
-const PACKAGE_FILES = ['package.json', 'tsconfig.json', 'tsconfig.base.json', 'tsconfig.config-types.json', 'README.md'];
+const PACKAGE_FILES = [
+  'package.json',
+  // `bun pm pack` resolves the `workspace:*` devDependency on core's package through the lockfile.
+  'bun.lock',
+  'tsconfig.json',
+  'tsconfig.base.json',
+  'tsconfig.packages.json',
+  'tsconfig.config-types.json',
+  'README.md',
+];
+
+/** Core's workspace package, which the build reads core's source and first declarations pass from. */
+const CORE_PACKAGE_DIR = 'packages/rafa';
 
 /** The installed packages the declaration step reads, linked into the scratch package; see the module note. */
 const TYPESCRIPT_PACKAGES = ['typescript', '@types/bun', '@types/node'];
@@ -695,6 +745,7 @@ beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
+  cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), { recursive: true });
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
@@ -749,10 +800,28 @@ interface DeclarationReach {
 }
 
 /**
+ * The declaration under `dist/` a consumer reads for one of the package's
+ * own subpaths, through {@link EXPORTS}: the `types` target of its entry,
+ * or the `.d.ts` beside a bare target.
+ *
+ * @param specifier - A specifier opening with {@link OWN_SUBPATH}.
+ * @returns Its path relative to `dist/`, or `undefined` when no entry names it.
+ */
+function exportedDeclaration(specifier: string): string | undefined {
+  const entry: unknown = (EXPORTS as Record<string, unknown>)[`./${specifier.slice(OWN_SUBPATH.length)}`];
+  const target = typeof entry === 'string'
+    ? entry
+    : (entry as { types?: string } | undefined)?.types;
+  return target?.replace(/^\.\/dist\//, '').replace(/\.js$/, '.d.ts');
+}
+
+/**
  * Follows every relative specifier from `entry`, a declaration under
- * `root`, through the declarations beside it, and names every specifier
- * that is not relative: a package, a builtin, or a `/// <reference
- * types>`. See the module note.
+ * `root`, through the declarations beside it, and every specifier of the
+ * package's own subpaths through {@link EXPORTS} to its declaration, and
+ * names every other specifier: a package, a builtin, or a `/// <reference
+ * types>`. A `declare module` of a subpath is followed as an import is.
+ * See the module note.
  */
 function declarationReach(root: string, entry: string): DeclarationReach {
   const reached = new Set<string>();
@@ -764,7 +833,14 @@ function declarationReach(root: string, entry: string): DeclarationReach {
     reached.add(file);
     const read = ts.preProcessFile(readFileSync(join(root, file), 'utf8'), true, false);
     for (const { fileName } of read.typeReferenceDirectives) outside.push(`${file}: types ${fileName}`);
-    for (const { fileName } of read.importedFiles) {
+    const named = [...read.importedFiles.map(({ fileName }) => fileName), ...read.ambientExternalModules ?? []];
+    for (const fileName of named) {
+      if (fileName.startsWith(OWN_SUBPATH)) {
+        const target = exportedDeclaration(fileName);
+        if (target !== undefined && existsSync(join(root, target))) queue.push(target);
+        else missing.push(`${file}: ${fileName}`);
+        continue;
+      }
       if (!fileName.startsWith('.')) {
         outside.push(`${file}: ${fileName}`);
         continue;
@@ -973,7 +1049,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the six subpaths to their builds, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name to their types, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -1072,8 +1148,24 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(8);
+    expect(targets).toHaveLength(14);
     expect(missing).toEqual([]);
+  });
+
+  it('writes the files a build before core moved into its package wrote, chunk hashes set aside', () => {
+    const before = readFileSync(join(import.meta.dir, DIST_FILES_BEFORE_MOVE), 'utf8')
+      .split('\n')
+      .filter((line) => line !== '')
+      .sort();
+    // The board template the suite plants before its build is no file of the package's.
+    const now = builtFiles()
+      .filter((file) => file !== `templates/${PLANTED_BOARD_TEMPLATE}`)
+      .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
+      .sort();
+
+    expect(before).toHaveLength(149);
+    expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
+    expect(now).toEqual(before);
   });
 
   it('clears dist before it writes, so an earlier build leaves no chunk behind', () => {
@@ -1303,7 +1395,9 @@ describe('the config subpath in the build', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
 
     expect(reach.reached).toContain('config/shape.d.ts');
+    // Reached through a core subpath's `types` entry, as a consumer of the tarball resolves it.
     expect(reach.reached).toContain('core/config/index.d.ts');
+    expect(reach.reached).toContain('core/config/config-schema.d.ts');
     expect(reach.missing).toEqual([]);
     expect(reach.outside).toEqual([]);
   });
@@ -1321,7 +1415,7 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('sees a specifier outside rafa planted two hops from the entry, as a static and as a type import', () => {
+  it('sees a specifier outside rafa planted two hops from the entry, as a static and as a type import, and a subpath no entry names', () => {
     const copy = mkdtempSync(join(tempRoot, 'declarations-'));
     cpSync(DIST, copy, { recursive: true });
     const plant = (file: string, line: string) => writeFileSync(
@@ -1331,11 +1425,15 @@ describe('the config subpath in the build', () => {
     );
     plant('config/shape.d.ts', 'export type Planted = import(\'bun:sqlite\').Database;');
     plant('core/config/index.d.ts', `import type { StandardSchemaV1 } from '${DEFINE_CONFIG}';`);
+    plant('core/config/config-schema.d.ts', `import type { Absent } from '${OWN_SUBPATH}core/absent';`);
+    const reach = declarationReach(copy, CONFIG_TYPES);
 
-    expect(declarationReach(copy, CONFIG_TYPES).outside).toEqual([
+    expect(reach.outside).toEqual([
       'config/shape.d.ts: bun:sqlite',
       `core/config/index.d.ts: ${DEFINE_CONFIG}`,
     ]);
+    // A subpath of the package's own name that no exports entry names is a declaration that is not there.
+    expect(reach.missing).toEqual([`core/config/config-schema.d.ts: ${OWN_SUBPATH}core/absent`]);
   });
 });
 

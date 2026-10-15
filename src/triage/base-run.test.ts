@@ -7,8 +7,8 @@
  * file, so each case can read that the link reached it and that the
  * clean-up left it whole.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { SuiteSpawner, SuiteSpawnOptions } from '../suite/run.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

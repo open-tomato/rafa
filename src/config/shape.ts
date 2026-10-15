@@ -20,7 +20,7 @@
  * ## Who declares what
  *
  * This module declares core's own top-level keys, the keys of
- * `src/core/config/core-section.ts`, and composes {@link ConfigShape}
+ * `packages/rafa/src/core/config/core-section.ts`, and composes {@link ConfigShape}
  * from them and the interface each of the eleven section files
  * (`src/config-schema-*.ts`) exports for the keys it writes: `HubShape`
  * for `hub`, `ReleaseShape` for `pr` and `release`, and so on, each
@@ -59,7 +59,7 @@ import type { WrapUpShape } from '../config-schema-wrap-up.js';
 import type {
   ModuleSourceKind,
   PrerequisiteKind,
-} from '../core/config/index.js';
+} from '@open-tomato/rafa/core/config';
 import type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -75,7 +75,7 @@ import type {
   SyncStrategy,
   TierPin,
   TierSwitch,
-} from '../core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 
 /**
  * An item keyed by its kind: one of `K` as its key, naming the item.

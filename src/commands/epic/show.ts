@@ -129,10 +129,15 @@ import type { Epic, EpicRelations, Epics } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { TableStyle } from '../issue/roadmap-table.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
@@ -149,10 +154,6 @@ import {
   parseRoadmapBody,
   ROADMAP_REFUSAL_EXIT,
 } from '../../board/roadmap.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { roadmapBoard } from '../issue/list.js';

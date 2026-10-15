@@ -11,7 +11,7 @@
  * render is in `dispatch.test.ts`.
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,7 +19,8 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 

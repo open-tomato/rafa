@@ -32,10 +32,10 @@
  * `rafa init` hint (`src/cli/dispatch.ts`). A case running `init`, the
  * command that makes a project, asks for none.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { CliEvent, CliEventNamed } from '../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventNamed } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -43,9 +43,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { configFilePath } from '@open-tomato/rafa/core/config';
+
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { configFilePath } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { gitIdentityEnv } from './git-identity.js';
@@ -264,7 +265,7 @@ export function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, st
  * and HOME and the variables `env` names; see the module note.
  *
  * The child also gets `RAFA_TEST=1`, which makes it a test process to
- * the effort store's test guard (`src/effort/store/location.ts`), and
+ * the effort store's test guard (`packages/rafa/src/effort/store/location.ts`), and
  * this suite's temporary directory as `TMPDIR`, so the guard judges its
  * opens by the directory the scratch project was built under. A case
  * naming either in `env` overrides it, as it overrides the scratch HOME

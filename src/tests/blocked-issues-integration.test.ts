@@ -46,8 +46,8 @@
  * asked.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
 import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 

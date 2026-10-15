@@ -34,10 +34,11 @@
  *
  * That is `preflight-sync.test.ts`'s reading, its long line wrapped here.
  */
-import type { ResolvedConfig } from '../core/config/index.js';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 
 /** What the sync-strategy check reads, and the seams it loads modules through. */

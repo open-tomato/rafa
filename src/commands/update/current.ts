@@ -42,21 +42,22 @@
  * recorded `gh` with no network.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { BoardAccess, UpdateApplied, UpdatePlan } from '../../project/update-current.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+
+import { CommandExit , createLinePrompter , RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { CommandExit , createLinePrompter , RAFA_VERSION } from '../../core/command/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 import { LOCK_FILE, readProjectLock } from '../../project/lock.js';
 import { scaffoldConflicts } from '../../project/scaffold.js';
 import { applyUpdatePlan, planChanges, readUpdatePlan, UpdateStepError } from '../../project/update-current.js';
 import { readCurrentRange } from '../../project/update-range.js';
 import { mainCheckoutOf } from '../../project/worktree-root.js';
-import { gitRemoteUrl } from '../../schema/project-id.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 /** The usage line a refusal ends with. */

@@ -3,7 +3,7 @@
  * terminal check, and `paint` for each level, the plain theme and colour
  * off.
  */
-import type { LogLevel } from '../../ports/index.js';
+import type { LogLevel } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

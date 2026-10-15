@@ -27,7 +27,7 @@
  *     the lines as warnings, and the merge goes on. The setting that let
  *     it through is named by the loader's pass line, which ends with the
  *     phrase `pr merge` declares for the key
- *     ({@link MERGE_DANGEROUS_PHRASES}, `src/core/config/dangerous.ts`),
+ *     ({@link MERGE_DANGEROUS_PHRASES}, `packages/rafa/src/core/config/dangerous.ts`),
  *     so this step prints no line of its own for it.
  *
  * Every refusal names the answer and the setting first and the guard's
@@ -48,13 +48,14 @@
  * no line, and its `pr merge` is what it was before the guard.
  */
 import type { PrContext } from './pr-context.js';
-import type { Prompter } from '../../core/command/index.js';
-import type { DangerousPhrases } from '../../core/config/index.js';
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { GuardReaction } from '../../release/guard-merge.js';
 import type { GuardAnswer, GuardReading } from '../../release/guard.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
 import { guardLines, localPlanNotes } from '../../release/guard.js';

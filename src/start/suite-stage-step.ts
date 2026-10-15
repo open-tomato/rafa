@@ -15,12 +15,13 @@
  */
 
 import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
-import type { SessionStep, SessionStepReason } from '../core/loop/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
+import type { SessionStep, SessionStepReason } from '@open-tomato/rafa/core/loop';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../core/output/index.js';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { stageStepScope } from '../suite/scope.js';
 
 import { takeRetakes } from './suite-retake-alone.js';

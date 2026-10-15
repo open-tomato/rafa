@@ -72,9 +72,11 @@
  */
 import type { BugValues, ReportedWords } from './issue-text.js';
 import type { BugRecord, BugRules } from '../bugs/record.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { ReportBug } from '../report/parse.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 
 import { causeOf } from '../bugs/cause-rule.js';
 import { boundaryValueOf, summaryOf } from '../bugs/filed-values.js';
@@ -85,7 +87,6 @@ import { UNKNOWN_VALUE } from '../bugs/title.js';
 import { codeVersionOf, versionsText } from '../bugs/versions.js';
 import { ERRORS_DEFAULTS } from '../config-schema-errors.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { RAFA_VERSION } from '../core/command/index.js';
 import { packageOf, rootPackageOf } from '../project/package-of.js';
 
 import { artifactOf, hasText } from './bug-key.js';

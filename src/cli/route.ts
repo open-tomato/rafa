@@ -75,9 +75,9 @@
  * line for it (`dispatch.ts`).
  */
 import type { CommandAlias, CommandRegistry, ModuleMount, SubjectSpec } from './registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { commandSpelling } from '../core/command/index.js';
+import { commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { HELP_WORD, mountKey } from './registry.js';
 

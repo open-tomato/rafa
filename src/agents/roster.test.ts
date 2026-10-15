@@ -27,8 +27,8 @@
  * module's own answer.
  */
 import type { AgentRoster, AgentRosterRoots } from './roster.js';
-import type { ClaudeSettingSource, TierPin } from '../core/config/sections.js';
 import type { TierSettings } from '../tiers/resolve.js';
+import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

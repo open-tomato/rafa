@@ -17,7 +17,7 @@
  *
  *   - **The settings.** One project is planted, whose config sets
  *     `logger.level: error`. A command that loads it inside its `run`
- *     (`loadConfig`, `src/core/config/config-load.ts`) reads `error`
+ *     (`loadConfig`, `packages/rafa/src/core/config/config-load.ts`) reads `error`
  *     from then on; a command that loads nothing stays at the default,
  *     `warn`.
  *   - **The logger.** The dispatcher makes each from the invocation's
@@ -58,9 +58,9 @@
  * case, so a file bun ran earlier in the process leaves nothing a case
  * could read as left behind.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Logger } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 
@@ -71,10 +71,11 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CommandExit } from '../core/command/index.js';
-import { loadConfig } from '../core/config/load.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
 

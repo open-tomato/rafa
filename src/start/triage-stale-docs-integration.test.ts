@@ -10,7 +10,7 @@
  * plan stub.
  */
 import type { StartTriageOptions } from './triage.js';
-import type { Tracker } from '../ports/index.js';
+import type { Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,11 +24,12 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { recordTaskReport } from '@open-tomato/rafa/report/record';
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { readStaleDocsForPlan } from '../effort/store/stale-docs.js';
-import { recordTaskReport } from '../report/record.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
 

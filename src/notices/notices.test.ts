@@ -1,6 +1,6 @@
 import type { NoticeSeams } from './notices.js';
-import type { Prompter } from '../core/command/index.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';

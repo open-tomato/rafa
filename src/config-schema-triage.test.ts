@@ -10,9 +10,17 @@
  * module that renames a key or moves a default fails rather than
  * agreeing with itself.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
+
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
 
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
@@ -21,13 +29,6 @@ import {
   TRIAGE_DEFAULTS,
   TRIAGE_SECTION,
 } from './config-schema-triage.js';
-import {
-  ConfigError,
-  EMPTY_CONFIG_REGISTRY,
-  mergeConfigSections,
-  parseConfigText,
-  resolveConfig,
-} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

@@ -25,7 +25,7 @@ import type {
   TrendSegment,
 } from './report-trend.js';
 
-import { plural } from '../core/plan/index.js';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 import { alignRows, formatHistogram, formatMinutes, oneLine } from './report-format.js';
 

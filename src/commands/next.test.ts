@@ -131,11 +131,11 @@
  * read as a chain case, a reading case and two dispatched ones.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun } from '../next/lines.js';
 import type { NextState } from '../next/state.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 
@@ -145,7 +145,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';

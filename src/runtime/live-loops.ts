@@ -19,9 +19,9 @@
  * the main checkout, so a caller holding a linked worktree's root reads
  * none of them.
  */
-import type { PidProbe, SessionRecord } from '../core/loop/index.js';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 
-import { isPidAlive, readSessions } from '../core/loop/index.js';
+import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
 
 /**
  * The loops recorded under `<root>/.rafa/runs/` that read `running` or

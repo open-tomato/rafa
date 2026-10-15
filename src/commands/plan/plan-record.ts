@@ -51,6 +51,9 @@ import type { PlanFieldStamp } from '../../board/plan-field.js';
 import fs from 'fs';
 import path from 'path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
 import { issueFieldLine, stampPlanIssue } from '../../board/plan-field.js';
 import {
@@ -59,8 +62,6 @@ import {
   stampReviewMissing,
   stampReviewSkipped,
 } from '../../board/review-stamp.js';
-import { messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
 
 /**
  * Records one line in the generated plan's `rafa:plan` block, answering

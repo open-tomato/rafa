@@ -143,11 +143,12 @@
  * reads `pending — 0 check(s)`, the verdict the wait acted on.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { CheckRow, ChecksVerdict, PullRequestDetail } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';

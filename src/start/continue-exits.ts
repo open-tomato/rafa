@@ -33,7 +33,7 @@
  * as an interrupted task does, after the stop's own event naming
  * `interrupted` (`start/continue-run.ts`).
  */
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** A decision said `stop`, or a forced wrap-up was refused or its draft refused. */
 export const DECISION_STOP_EXIT = 20;

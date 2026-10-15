@@ -9,7 +9,7 @@
  */
 import type { BugValues } from './issue-text.js';
 import type { Filing, ScoringFixture } from './scoring-fixture.js';
-import type { OpenIssue } from '../ports/index.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

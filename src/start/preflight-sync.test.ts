@@ -15,8 +15,9 @@
  * never made, and the cases that read one hold it absent after, so the
  * check is read as touching no disk.
  */
-import type { ResolvedConfig } from '../core/config/index.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
+import '../config-registry.js';
 import '../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -26,9 +27,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { PORT_VERSIONS } from '../core/adapters/index.js';
-import { CommandExit } from '../core/command/index.js';
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
+import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+
 import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';
 
 import { refuseUnservedSync } from './preflight-sync.js';

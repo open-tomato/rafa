@@ -15,7 +15,7 @@
  * wrote, so the file's absence says the half wrote nothing.
  */
 import type { CollectOptions } from './collect.js';
-import type { EffortStore } from './store/types.js';
+import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,11 +25,12 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { openNdjsonStore } from '@open-tomato/rafa/store';
+import { readSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
+
 import { parseCollectArgs } from './collect-args.js';
 import { formatSkillSummary } from './collect-skills.js';
 import { collectEffort, collectSessionRow, formatCollectSummary, listSessionLogs } from './collect.js';
-import { openNdjsonStore } from './store/index.js';
-import { readSkillInvocations } from './store/skill-invocations.js';
 
 /** The recorded session's id. */
 const FIXTURE_ID = 'ac7aeff1-84f2-46c9-bb9c-b9ceb994599f';

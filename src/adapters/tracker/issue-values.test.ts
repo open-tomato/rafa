@@ -42,9 +42,9 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 /** The module the copies are made from. */
 const MODULE = fileURLToPath(new URL('./issue-values.ts', import.meta.url));
 
-/** The ports entry, as the module imports it, and as a copy outside the repository does. */
-const PORTS_IMPORT = '../../ports/index.js';
-const PORTS_ENTRY = fileURLToPath(new URL(PORTS_IMPORT, import.meta.url));
+/** The ports entry, as the module imports it by core's subpath, and as a copy outside the repository does. */
+const PORTS_IMPORT = '@open-tomato/rafa/ports';
+const PORTS_ENTRY = fileURLToPath(import.meta.resolve(PORTS_IMPORT));
 
 /** A member line of the types record, and what each plant puts in its place. */
 const ADR_LINE = '  \'adr\': true,\n';

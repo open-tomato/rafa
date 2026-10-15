@@ -87,12 +87,16 @@ import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EditKind, EditStateInput, EditStateReading } from '../../board/issue-edit-state.js';
 import type { BoardTrust, EditorLogin, EditorRefusal, TrustReading } from '../../board/trust.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '../../ports/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import {
@@ -121,9 +125,6 @@ import {
   TRUST_REFUSAL_EXIT,
   trustRefusalMessage,
 } from '../../board/trust.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 
 import { planPriorityEdit, priorityMessage, readPriorityFlag } from './edit-priority.js';

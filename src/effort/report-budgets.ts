@@ -25,7 +25,7 @@
  * {@link budgetedSessions} forms no runtime cycle.
  */
 import type { ReportSessionRow } from './report.js';
-import type { SessionBudget } from './store/dispatches.js';
+import type { SessionBudget } from '@open-tomato/rafa/store/dispatches';
 
 /** What one session's row measured, in the columns the report's table uses. */
 export interface BudgetUsage {

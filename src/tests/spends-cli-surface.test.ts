@@ -14,7 +14,7 @@
  * resolves to nothing and no case reaches a real session.
  */
 import type { DescribeDocument } from '../cli/describe.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

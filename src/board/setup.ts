@@ -144,10 +144,11 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { configFilePath } from '../core/config/index.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';

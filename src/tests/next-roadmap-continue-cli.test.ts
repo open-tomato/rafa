@@ -40,8 +40,8 @@
  */
 import type { ScratchRepo } from './cli-capture.js';
 import type { HopRecord } from '../next/hop-record.js';
-import type { CliEvent } from '../ports/index.js';
 import type { Position } from '../project/position.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

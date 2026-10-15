@@ -169,19 +169,20 @@
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { changelogVersions, readTags } from '../../release/status-readings.js';

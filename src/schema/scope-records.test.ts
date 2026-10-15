@@ -23,9 +23,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { RAFA_INSTINCTS_PATH } from '@open-tomato/rafa/schema/tiers';
+
 import { ACTION_HEADING, CAUSE_HEADING } from './instinct.js';
 import { readScope, readScopes } from './scope-records.js';
-import { RAFA_INSTINCTS_PATH } from './tiers.js';
 
 /** A temporary directory of this file's own, its path resolved through every link. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-scope-records-')));

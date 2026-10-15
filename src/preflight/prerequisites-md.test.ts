@@ -45,7 +45,7 @@ import { isAbsolute, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
 import {
   loadPlanPrerequisites,

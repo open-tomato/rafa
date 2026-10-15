@@ -84,10 +84,10 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RefreshAddedItems } from '../board/project/add-issue.js';
 import type { ProjectRefresh } from '../board/project/refresh.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { FindingOutcome } from '../effort/store/findings.js';
-import type { CliEventLog, IssueRef, Tracker } from '../ports/index.js';
 import type { TriageOptions, TriageResult } from '../triage/triage.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import '../adapter-registry.js';
 
@@ -112,6 +112,10 @@ import {
   it,
 } from 'bun:test';
 
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { createJsonOutput } from '../adapters/output/json.js';
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
@@ -120,9 +124,6 @@ import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
 import { scopeWarning } from '../board/project/refresh-warnings.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { RAFA_VERSION } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { bugKeyOf, createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';

@@ -24,8 +24,6 @@
  * as well as what it printed and posted.
  */
 import type { MergeSeams } from './merge.js';
-import type { RafaCommand , Prompter } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,
   ChecksReading,
@@ -36,6 +34,8 @@ import type {
 } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

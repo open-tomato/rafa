@@ -19,7 +19,7 @@
 import type { BoardStepResult, RelationsMoveStepOptions } from './init-board.js';
 import type { InitResult, InitSeams } from './init.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 

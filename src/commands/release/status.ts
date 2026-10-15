@@ -73,23 +73,24 @@
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { StaleDocsReader, StaleDocsReading, StaleDocsSettings } from './status-stale-docs.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { PlanReleaseLevel } from '../../core/plan/index.js';
-import type { PlanChange } from '../../effort/store/changes.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { AuditReading } from '../../release/audit.js';
 import type { TagReading, UntaggedReading } from '../../release/status-readings.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { PlanChange } from '@open-tomato/rafa/store/changes';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readPlanChanges } from '@open-tomato/rafa/store/changes';
+
 import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
-import { readPlanChanges } from '../../effort/store/changes.js';
 import { createGitRunner } from '../../pr/index.js';
 import { auditCell, auditLines, readAudit } from '../../release/audit.js';
 import { groupChangeNotes, renderNoteLines } from '../../release/changelog.js';

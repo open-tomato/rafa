@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sessionFilePath } from '../core/loop/index.js';
+import { sessionFilePath } from '@open-tomato/rafa/core/loop';
+
 import { emitLoopEvent, bindEventsFile, unbindEventsFile } from '../start/loop-events.js';
 
 import { eventsFileOf, parseEventLine, readEventsFrom } from './events-file.js';

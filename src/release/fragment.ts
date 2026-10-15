@@ -55,11 +55,11 @@
  * {@link serializeFragment} writes the format back and throws on a
  * fragment the parser would refuse, so nothing this module writes is a
  * file it would then refuse to read. The level words and their order are
- * `PLAN_RELEASE_LEVELS` from `src/core/plan/parse.ts`, not a third spelling.
+ * `PLAN_RELEASE_LEVELS` from `packages/rafa/src/core/plan/parse.ts`, not a third spelling.
  */
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
-import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
+import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
 
 /** The fence line that opens and closes a fragment's front matter. */
 export const FRAGMENT_FENCE = '---';

@@ -117,7 +117,7 @@ import type {
   CommitEffortRow,
   EffortStore,
   SessionEffortRow,
-} from '../effort/store/types.js';
+} from '@open-tomato/rafa/store/types';
 
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -125,8 +125,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
+
 import { collectEffort } from '../effort/collect.js';
-import { openNdjsonStore, openSqliteStore } from '../effort/store/index.js';
 
 import {
   freezeParitySessionLogs,

@@ -40,7 +40,7 @@
  * same line and whose data holds the retry's place, reason, subject,
  * issue and wait. An opener with a command context at hand reports to
  * that command's output; one without reports to the active output
- * (`src/core/output/active.ts`), read at each retry, as the
+ * (`packages/rafa/src/core/output/active.ts`), read at each retry, as the
  * refreshing issue board's warnings are.
  *
  * ## The wait
@@ -51,11 +51,11 @@
  */
 import type { RetryNotice } from './retry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { OutputMode } from '../../core/config/sections.js';
-import type { CliEventNamed, Output } from '../../ports/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEventNamed, Output } from '@open-tomato/rafa/ports';
 
-import { activeOutput, activeOutputMode } from '../../core/output/index.js';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 
 import { retryingGhRunner } from './retry.js';
 

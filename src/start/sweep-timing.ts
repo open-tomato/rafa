@@ -41,7 +41,8 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 
-import { activeOutput } from '../core/output/index.js';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { attributesOf, suitePathArgument } from '../suite/run.js';
 
 /** The time, in seconds, past which an always-run file is named as slow. */

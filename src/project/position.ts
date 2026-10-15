@@ -42,14 +42,14 @@
  * answers a position whose previous is home too. {@link positionAt} is the
  * position a first switch starts from.
  */
-import type { Place } from '../core/loop/hops.js';
+import type { Place } from '@open-tomato/rafa/core/loop/hops';
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { asPlace, isRecord } from '../core/loop/hops.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { asPlace, isRecord } from '@open-tomato/rafa/core/loop/hops';
 
 import { scopeAt } from './scope.js';
 

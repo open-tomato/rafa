@@ -17,8 +17,8 @@
  * inherited at all.
  */
 import type { StartTriage, TaskTriageInput } from './triage.js';
-import type { CliEvent, Tracker } from '../ports/index.js';
 import type { JunitReading, SuiteFailure } from '../suite/run.js';
+import type { CliEvent, Tracker } from '@open-tomato/rafa/ports';
 
 import {
   existsSync,
@@ -39,9 +39,10 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';

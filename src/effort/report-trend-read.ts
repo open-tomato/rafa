@@ -19,16 +19,16 @@ import type { TrendOptions, TrendReport, TrendSessionRow } from './report-trend.
 
 import { homedir } from 'node:os';
 
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+import { readSessionAgents } from '@open-tomato/rafa/store/dispatches';
+import { readReportedSkills } from '@open-tomato/rafa/store/reports';
 
 import { formatTrendReport } from './report-trend-format.js';
 import { summariseTrend } from './report-trend.js';
-import { readSessionAgents } from './store/dispatches.js';
-import { selectEffortStore } from './store/index.js';
-import { readReportedSkills } from './store/reports.js';
 
 /** Where the trend report reads from. */
 export interface TrendReadOptions {

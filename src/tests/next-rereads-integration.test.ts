@@ -35,8 +35,8 @@
  * `readNextState(sources.answer())` — reddens both.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import '../adapter-registry.js';
 

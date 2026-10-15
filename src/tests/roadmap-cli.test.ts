@@ -10,7 +10,7 @@
  * its `gh issue list` fail, which is the unreachable board.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

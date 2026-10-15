@@ -26,7 +26,7 @@
  * and declares no flag: `--output=json` is the global flag
  * `assembleContext` reads for every command.
  */
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { version } from '../../package.json';
 import { describeRegistry } from '../cli/describe.js';

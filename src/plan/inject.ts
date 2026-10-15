@@ -155,12 +155,11 @@
  *
  * Nothing here throws.
  */
-import type { InjectMode } from '../core/config/sections.js';
-import type { PlanModel, PlanTask, PlanTaskStatus } from '../core/plan/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
+import type { PlanModel, PlanTask, PlanTaskStatus } from '@open-tomato/rafa/core/plan';
 
-import { parsePlan } from '../core/plan/index.js';
-import { parseTaskDeclaration } from '../utils/declaration.js';
+import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 
 /**
  * The dispatched task, by the one field of `TaskInfo` it is located by.

@@ -53,14 +53,17 @@
  */
 import type { ScopeFileSystem, ScopeResolution } from './scope.js';
 
+import '../config-registry.js';
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import {
   DISK_FILE_SYSTEM,

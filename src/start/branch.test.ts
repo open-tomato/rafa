@@ -33,13 +33,14 @@
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
-import type { Prompter } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { offerRunBranch } from './branch.js';

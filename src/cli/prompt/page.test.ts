@@ -7,7 +7,7 @@ import type { Key, Terminal } from './terminal.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { CUT_MARK, DEFAULT_PAGE_HEIGHT, EMPTY_PAGE_TEXT, PAGE_KEYS_TEXT, page, pageLines, renderPage } from './page.js';
 import { INTERRUPT_EXIT_CODE, NO_TERMINAL_TEXT } from './terminal.js';

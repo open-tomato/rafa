@@ -15,8 +15,8 @@
  * never ending within the wait; a refused signal beside a pid already
  * gone. The refusals of the pick are held in `status.test.ts`.
  */
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../core/loop/readings.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import '../../adapter-registry.js';
 
@@ -26,8 +26,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sessionFilePath, updateSession } from '../../core/loop/index.js';
-import { STOP_POLL_MS } from '../../core/loop/readings.js';
+import { sessionFilePath, updateSession } from '@open-tomato/rafa/core/loop';
+import { STOP_POLL_MS } from '@open-tomato/rafa/core/loop/readings';
+
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER_PATH,

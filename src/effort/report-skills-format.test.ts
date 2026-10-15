@@ -1,7 +1,7 @@
 import type { Recurrence } from './recurrence.js';
 import type { SkillsReport, SkillsReportArm, SkillsReportPlan } from './report-skills.js';
 import type { LessonSignalRow, SkillSignalRow } from './skill-signals.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { describe, expect, test } from 'bun:test';
 

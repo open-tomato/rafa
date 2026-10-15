@@ -10,7 +10,7 @@ import { PassThrough } from 'node:stream';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import {
   decodeKeys,

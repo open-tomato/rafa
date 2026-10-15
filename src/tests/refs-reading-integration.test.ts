@@ -18,9 +18,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
-import { createGitRunner } from '../core/git/index.js';
 import { readCopyRefs, restampCopyRefs } from '../refs/reading.js';
 import { readRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier, ghIssueReader } from '../refs/verify.js';

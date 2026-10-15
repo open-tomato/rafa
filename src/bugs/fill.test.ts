@@ -1,6 +1,6 @@
 import type { BugRecord, BugRules } from './record.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { IssueDraft } from '../ports/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft } from '@open-tomato/rafa/ports';
 
 import { describe, expect, test } from 'bun:test';
 

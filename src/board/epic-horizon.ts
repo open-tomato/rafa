@@ -85,10 +85,10 @@ import type { BoardIssue } from './roadmap-board.js';
 import type { Horizon } from './roadmap-epic-rows.js';
 import type { PlanNames } from './roadmap-rows.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from './roadmap.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { HORIZON_LABEL_PREFIX } from './epic-problems.js';
 import { renderHorizonComment } from './epic-trail.js';

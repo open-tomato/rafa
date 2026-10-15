@@ -78,7 +78,7 @@ import type {
 } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 
-import { describeValue, isMapping } from '../../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
 import { PROJECT_PAGE_SIZE, ProjectPortError } from './port.js';
 

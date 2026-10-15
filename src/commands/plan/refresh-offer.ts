@@ -42,10 +42,11 @@
  * them reads standard input or waits on an answer.
  */
 import type { RefreshOffer, RefreshOfferRequest } from '../../board/snapshot-settle.js';
-import type { Prompter } from '../../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import { createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { refreshQuestion } from '../../board/snapshot-settle.js';
-import { createLinePrompter } from '../../core/command/index.js';
 import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */

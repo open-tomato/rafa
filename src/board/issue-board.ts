@@ -52,7 +52,7 @@
  *
  * ## Why not the Tracker port
  *
- * `Tracker` (`src/ports/index.ts`) carries `comment`, and nothing else
+ * `Tracker` (`packages/rafa/src/ports/index.ts`) carries `comment`, and nothing else
  * this needs: it lists no comments, so the marker comment to edit cannot
  * be found through it, it edits none, and it moves no labels — its
  * `create` makes labels and its `transition` opens and closes an issue.
@@ -140,7 +140,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { CREATED_ISSUE_URL } from './setup.js';
 

@@ -148,7 +148,7 @@
  *
  * A login that is not shaped like a GitHub login is refused before
  * either answer is consulted, through `isGitHubLogin`
- * (`src/core/config/config-sections.ts`), and refused as
+ * (`packages/rafa/src/core/config/config-sections.ts`), and refused as
  * `lookup-failed`, since no
  * lookup can be made for it. The shape check is also what keeps the
  * login out of the path's structure: `../../x` or a leading `-` would
@@ -209,12 +209,12 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { CommandExit } from '../core/command/index.js';
-import { describeValue, isGitHubLogin, isMapping, messageOf } from '../core/config/sections.js';
-import { TRUSTED_PERMISSIONS } from '../effort/store/trusted-permissions.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { describeValue, isGitHubLogin, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store/trusted-permissions';
 
-export type { TrustedPermission } from '../effort/store/trusted-permissions.js';
-export { TRUSTED_PERMISSIONS } from '../effort/store/trusted-permissions.js';
+export type { TrustedPermission } from '@open-tomato/rafa/store/trusted-permissions';
+export { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store/trusted-permissions';
 
 /** The repository placeholders `gh api` expands from the directory it runs in. */
 const REPO_PATH = '{owner}/{repo}';

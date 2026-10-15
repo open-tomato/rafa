@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Core's declarations for the root's ./config subpath, the build's first tsc pass, written into the root's dist",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "declarationDir": "../../dist"
+  },
+  "include": [
+    "src/core/config/index.ts",
+    "src/core/config/sections.ts",
+    "src/core/config/config-schema.ts",
+    "src/effort/store/check-rows.ts",
+    "src/effort/store/findings.ts",
+    "src/ports/log-level.ts",
+    "src/report/parse.ts"
+  ],
+  "references": []
+}

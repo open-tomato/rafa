@@ -5,13 +5,13 @@ import { join, resolve } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE } from '../src/effort/store/fixture-extract.js';
-import { SQLITE_MIGRATIONS } from '../src/effort/store/migrations.js';
+import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE } from '@open-tomato/rafa/store/fixture-extract';
+import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
 
 import { EXIT_COULD_NOT_RUN, EXIT_WRITTEN, readExtractArgs, runExtract, TAG, USAGE } from './extract-merge-fixture.js';
 
 /**
- * The script as the thin caller of `src/effort/store/fixture-extract.ts`,
+ * The script as the thin caller of `packages/rafa/src/effort/store/fixture-extract.ts`,
  * whose own suite holds the mapping and the sampling. These cases hold
  * what the script adds: the words it reads, the lines it writes, and its
  * exit codes, the last through one spawned run each way over stores

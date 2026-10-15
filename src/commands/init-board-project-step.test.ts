@@ -19,7 +19,7 @@
 import type { ProjectSetupConfig, ProjectSetupOptions, ProjectSetupReport, ProjectStepOptions } from './init-board-project.js';
 import type { BoardStepResult } from './init-board.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

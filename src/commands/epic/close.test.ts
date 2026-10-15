@@ -53,13 +53,13 @@
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { GitResult, GitRunner } from '../../core/git/index.js';
-import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
-import type { EffortStore } from '../../effort/store/types.js';
-import type { IssueRef, Tracker } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { TriageOptions, TriageResult } from '../../triage/triage.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import '../../adapter-registry.js';
 
@@ -68,6 +68,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 
 import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
@@ -80,7 +82,6 @@ import { scopeWarning } from '../../board/project/refresh-warnings.js';
 import { parseBoardListing } from '../../board/roadmap-board.js';
 import { staleDocsTitle } from '../../docs/release-issue.js';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '../../effort/epic-cost.js';
-import { readStaleDocsForPlan } from '../../effort/store/stale-docs.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';

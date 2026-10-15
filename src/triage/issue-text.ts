@@ -78,7 +78,7 @@
  */
 import type { ScoredIssue } from './similarity.js';
 import type { BugRecord } from '../bugs/record.js';
-import type { IssueRef } from '../ports/index.js';
+import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { fenced } from '../bugs/fenced.js';
 import { BUG_FIELDS } from '../bugs/record.js';

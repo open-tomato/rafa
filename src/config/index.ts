@@ -29,7 +29,7 @@
  * declarations emitted over this file).
  */
 import type { ConfigEntry } from './entry.js';
-import type { ConfigSetting } from '../core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 

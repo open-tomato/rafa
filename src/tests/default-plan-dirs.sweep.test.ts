@@ -190,7 +190,7 @@ describe('no tracked file outside the test suite still names .plans/ or .specs/'
     expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/project/pre-init-dirs.ts')).toBe(false);
     expect(isScannedPath('CHANGELOG.md')).toBe(false);
-    expect(isScannedPath('src/effort/store/testdata/merge/scenario-4/a.json')).toBe(false);
+    expect(isScannedPath('packages/rafa/src/effort/store/testdata/merge/scenario-4/a.json')).toBe(false);
     expect(isScannedPath('src/testdata-old/a.json')).toBe(true);
     expect(isScannedPath('docs/CHANGELOG.md')).toBe(true);
     expect(isScannedPath('AGENTS.md')).toBe(true);

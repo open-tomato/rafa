@@ -68,13 +68,14 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardListing } from '../board/roadmap-board.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { EPIC_LABEL_PREFIX } from '../board/epics.js';
 import { readBoardRepository } from '../board/repository.js';
-import { messageOf } from '../core/config/sections.js';
-import { plural } from '../core/plan/index.js';
 
 import { MOVE_FIX } from './init-board.js';
 

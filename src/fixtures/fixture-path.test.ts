@@ -16,7 +16,7 @@ describe('isFixturePath', () => {
   });
 
   it('accepts a file nested below a testdata folder', () => {
-    expect(isFixturePath('src/effort/store/testdata/merge/scenario-4/a.json')).toBe(true);
+    expect(isFixturePath('packages/rafa/src/effort/store/testdata/merge/scenario-4/a.json')).toBe(true);
     expect(isFixturePath('packages/rafa-hub/src/testdata/rows.json')).toBe(true);
   });
 

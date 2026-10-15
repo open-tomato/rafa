@@ -47,9 +47,9 @@
  */
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { DescribeDocument, DescribedAction } from '../../cli/describe.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,11 +58,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+
 import { version } from '../../../package.json';
 import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
 import { describeRegistry } from '../../cli/describe.js';
-import { CommandExit } from '../../core/command/index.js';
-import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '../../core/config/index.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { CORE_REGISTRY } from '../index.js';

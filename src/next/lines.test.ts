@@ -10,7 +10,7 @@ import type { NextState } from './state.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from './ceiling.js';
 import {

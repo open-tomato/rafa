@@ -82,18 +82,19 @@
  *
  * The running version is `package.json`'s `version`, imported by name as
  * `src/commands/describe.ts` imports it, and the served port versions
- * are `PORT_VERSIONS` from `src/core/adapters/registry.ts`. Both reach
+ * are `PORT_VERSIONS` from `packages/rafa/src/core/adapters/registry.ts`. Both reach
  * {@link validateManifest} through {@link ManifestSeams}, so a case holds
  * a module against a version core does not run.
  */
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
-import type { Reading, ValueAt } from '../core/config/sections.js';
-import type { PortType, PortVersions } from '../ports/index.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { Reading, ValueAt } from '@open-tomato/rafa/core/config/sections';
+import type { PortType, PortVersions } from '@open-tomato/rafa/ports';
+
+import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { optionalPrerequisite, requiredPrerequisite } from '@open-tomato/rafa/core/config';
+import { describeValue, isMapping, listOf } from '@open-tomato/rafa/core/config/sections';
 
 import { version as RUNNING_VERSION } from '../../package.json';
-import { PORT_VERSIONS } from '../core/adapters/index.js';
-import { optionalPrerequisite, requiredPrerequisite } from '../core/config/index.js';
-import { describeValue, isMapping, listOf } from '../core/config/sections.js';
 
 /** The manifest version this module reads. */
 export const MANIFEST_VERSION = 1;

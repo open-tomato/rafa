@@ -69,12 +69,12 @@
  * gives in `config-schema-readings.ts`: every command that refreshes the
  * project must write it the same way, which one run's flag would split.
  */
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
-import { refused } from './core/config/sections.js';
+import { refused } from '@open-tomato/rafa/core/config/sections';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `board-project` section's fields, added to core's. */
   interface RafaConfig extends BoardProjectLimitSettings {}
 }

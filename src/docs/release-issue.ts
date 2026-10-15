@@ -85,13 +85,14 @@
  * tracker said, and the caller warns with it: a failure here never stops
  * the run, as triage's failures do not.
  */
-import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '../ports/index.js';
 import type { SettleForecast } from '../release/forecast.js';
+import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { unescapeBlockerText } from '@open-tomato/rafa/core/plan';
+
 import { nextVersion } from '../release/version.js';
 import { TRIAGE_MODULE } from '../triage/triage.js';
-import { unescapeBlockerText } from '../utils/tracker.js';
 
 /** The comment a stale-docs issue's body holds, which marks the issue as one. */
 export const STALE_DOCS_MARKER = '<!-- rafa:stale-docs -->';

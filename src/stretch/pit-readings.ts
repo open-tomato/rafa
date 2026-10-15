@@ -21,7 +21,7 @@
  *   `since`, the caller's cut-off (the last ledger line's time,
  *   `lastItemTime` in `./items.ts`, else the stretch's start). Each
  *   bug's time is the `createdAt` its `OpenIssue` carries
- *   (`src/ports/index.ts`), so the one listing that counts the bugs
+ *   (`packages/rafa/src/ports/index.ts`), so the one listing that counts the bugs
  *   dates them too and no call is sent per bug. A tracker answers null
  *   where it names no time; with one such bug, or one whose time does
  *   not parse, the reading is not read and names the bug, since a bug
@@ -38,12 +38,13 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { CiStatusReading } from '../ci/status-reading.js';
-import type { OpenIssue, Tracker } from '../ports/index.js';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { readFailedCases } from '../ci/failed-cases.js';
 import { readNewestRun } from '../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
-import { messageOf } from '../core/config/sections.js';
 
 /** Where the readings come from. */
 export interface PitSeams {

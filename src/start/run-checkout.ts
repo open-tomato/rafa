@@ -75,9 +75,10 @@ import type { RunDirs } from './checkout.js';
 import type { RunBranchRequest } from './run-setup.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { createGitRunner } from '../core/git/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { readCheckedOutBranch } from '../utils/git.js';
 
 import { resolveRunDirs } from './checkout.js';

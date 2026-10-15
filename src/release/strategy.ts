@@ -35,7 +35,7 @@
  *
  * {@link RELEASE_STRATEGY_ADAPTERS} is keyed by the values
  * `release.strategy` accepts (`RELEASE_STRATEGIES` in
- * `src/core/config/config-readers.ts`), typed as a complete record of
+ * `packages/rafa/src/core/config/config-readers.ts`), typed as a complete record of
  * them, so a
  * name added to the config's closed list without an adapter fails the
  * type check rather than a settle.
@@ -47,7 +47,7 @@
  * strategy that gave it.
  */
 import type { Fragment } from './fragment.js';
-import type { ReleaseStrategy } from '../core/config/sections.js';
+import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
 
 import { createSemverByLevel } from './strategies/semver-by-level.js';
 

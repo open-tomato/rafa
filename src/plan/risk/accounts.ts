@@ -59,11 +59,12 @@
  */
 import type { RiskLevel } from './commands.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { PrProvider } from '../../core/config/sections.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 
 import { isGitHubRemote, remoteHost, resolvePrProvider } from '../../pr/provider.js';
-import { normalizeRemote } from '../../schema/project-id.js';
 
 /** The remote the loop pushes a branch to; see the module note. */
 export const PUSH_REMOTE = 'origin';

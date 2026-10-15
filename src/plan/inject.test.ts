@@ -30,7 +30,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { INJECT_MODES } from '../core/config/sections.js';
+import { INJECT_MODES } from '@open-tomato/rafa/core/config/sections';
+
 import { findNextTask, insertTrackerTask, listTrackerTasks, updateTrackerLine } from '../utils/tracker.js';
 
 import { renderInjection } from './inject.js';

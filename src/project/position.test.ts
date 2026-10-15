@@ -8,7 +8,7 @@
  * a write and also plants a stray `.tmp` to show the listing can see one.
  *
  * The cases of one place's shape (a string board, a zero epic, a missing
- * epic) moved with `asPlace` to `src/core/loop/hop-record.test.ts`; the
+ * epic) moved with `asPlace` to `packages/rafa/src/core/loop/hop-record.test.ts`; the
  * wrong-shape cases here keep one malformed place in each of the three
  * slots, to show a place `asPlace` refuses reads as a wrong shape.
  */

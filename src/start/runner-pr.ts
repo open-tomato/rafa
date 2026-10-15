@@ -79,10 +79,11 @@ import type { PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { pullRequestTitle } from '../board/naming.js';
 import { refreshFailedWarning, refreshIssueItems } from '../board/project/issue-board-refresh.js';
-import { messageOf } from '../core/config/sections.js';
 import { createGitRunner, ghPullRequestsIn, gitSaid, parseWorkingTree, pushBranch } from '../pr/index.js';
 import { parseFragment } from '../release/fragment.js';
 

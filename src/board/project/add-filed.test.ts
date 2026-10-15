@@ -26,8 +26,8 @@
 import type { AddIssueOptions } from './add-issue.js';
 import type { ProjectRefresh, RefreshConfig } from './refresh.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { IssueRef } from '../../ports/index.js';
 import type { BugTriage } from '../../triage/triage.js';
+import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -10,7 +10,7 @@
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
-import type { SessionBudget } from './store/dispatches.js';
+import type { SessionBudget } from '@open-tomato/rafa/store/dispatches';
 
 import { describe, expect, it } from 'bun:test';
 

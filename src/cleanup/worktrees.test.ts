@@ -5,8 +5,8 @@
  * from git itself rather than from this file's script.
  */
 import type { WorktreeRead, WorktreeRow, WorktreeSeams } from './worktrees.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';

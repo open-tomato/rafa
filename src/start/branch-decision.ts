@@ -160,7 +160,8 @@
  */
 import type { GitResult, WorkingTreeStatus } from '../pr/index.js';
 
-import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '../core/config/sections.js';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
 
 /** The remote a plan's branch is created from and tracked on. */

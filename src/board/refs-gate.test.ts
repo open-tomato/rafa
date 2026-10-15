@@ -21,9 +21,9 @@
  * `new` rows passing is paired with a stamped path deleted beside one,
  * refused by the deleted path's name alone.
  */
-import type { Output } from '../ports/index.js';
 import type { LiveReading, RefStamp } from '../refs/stamp.js';
 import type { RefVerifier } from '../refs/verify.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +31,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+
 import { CREATE_DANGEROUS_PHRASES } from '../commands/plan/refs-check.js';
 import { SETTINGS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '../core/config/index.js';
 import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';

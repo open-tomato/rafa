@@ -13,8 +13,8 @@
  * control that the same line otherwise appends.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { IssueDraft, IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { IssueDraft, IssueEdit, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -24,11 +24,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
 import { renderUpdateBlock } from '../../board/issue-edit-body.js';
-import { createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { requireEditingTracker } from './edit-run.js';

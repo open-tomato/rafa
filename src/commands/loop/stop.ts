@@ -40,20 +40,21 @@
  * refuses for any reason but the pid being gone. A record that cannot be
  * read after the signal is refused too, the signal having been sent.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../core/loop/readings.js';
 import type { PlanTask } from '../../plan/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 
-import { messageOf } from '../../core/config/sections.js';
-import { errorCode, readSession, SessionRecordError } from '../../core/loop/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { errorCode, readSession, SessionRecordError } from '@open-tomato/rafa/core/loop';
 import {
   isLive,
   planLabel,
   readSessionChecklist,
   refusal,
   resolveLoopSeams,
-} from '../../core/loop/readings.js';
+} from '@open-tomato/rafa/core/loop/readings';
+
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

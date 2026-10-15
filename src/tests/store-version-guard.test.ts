@@ -61,8 +61,8 @@
  * exercised in-process below, and unit-level in each module's own
  * suite.
  */
-import type { SessionRecord } from '../core/loop/index.js';
-import type { TaskReportInput } from '../report/record.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { TaskReportInput } from '@open-tomato/rafa/report/record';
 
 import {
   mkdirSync,
@@ -79,11 +79,12 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { runsDir, sessionFilePath } from '../core/loop/index.js';
+import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+import { recordTaskReport } from '@open-tomato/rafa/report/record';
+import { LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
+import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '@open-tomato/rafa/store/sqlite';
+
 import { sessionLogDir } from '../effort/collect.js';
-import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
-import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
-import { recordTaskReport } from '../report/record.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';

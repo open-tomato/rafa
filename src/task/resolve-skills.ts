@@ -61,10 +61,10 @@
  * into the one the session invokes (`sessionSkillName`) is the section
  * renderer's job, not a resolver's.
  */
-import type { SkillResolverName } from '../core/config/sections.js';
 import type { InventoryRecord, InventorySource } from '../inventory/record.js';
 import type { RankCandidate } from '../inventory/search/rank.js';
 import type { Resolution, ServedItem, TierRow } from '../tiers/resolve.js';
+import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 
 import { rankCandidates, readRankCandidate } from '../inventory/search/rank.js';
 

@@ -31,9 +31,9 @@
 import type { DescribeDocument } from '../cli/describe.js';
 import type { DispatchOptions, DispatchOutcome } from '../cli/dispatch.js';
 import type { ModuleImporter } from '../cli/modules.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { OutputStream } from '../core/output/index.js';
-import type { CliEvent } from '../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 

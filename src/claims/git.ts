@@ -4,7 +4,7 @@
  * moved with. What a commit SAYS is `./record.ts`'s; this module only
  * makes, moves and reads the commits.
  *
- * Git is reached through a `GitRunner` (`src/core/git/git.ts`), never a
+ * Git is reached through a `GitRunner` (`packages/rafa/src/core/git/git.ts`), never a
  * shell string, and every operation answers rather than throws when git
  * refuses or cannot run. The one throw is a caller's mistake: a branch
  * that is not `feat/rafa-<n>` or `feat/rafa-<n>-<slug>`, a pushed commit

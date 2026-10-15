@@ -14,7 +14,7 @@
  * there.
  */
 import type { SessionServing } from './serving.js';
-import type { TierPin, TierSwitch } from '../core/config/sections.js';
+import type { TierPin, TierSwitch } from '@open-tomato/rafa/core/config/sections';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

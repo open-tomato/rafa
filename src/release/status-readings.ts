@@ -60,12 +60,12 @@
  * line out rather than read a failed tag listing as no tags.
  */
 import type { SemanticVersion } from './version.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { parseSemanticVersion } from './version.js';
 

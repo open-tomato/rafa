@@ -95,7 +95,7 @@
  * `result.stdout` is empty for every fixture here. The colocated
  * stub suite owns that claim and can redden it.
  */
-import type { CommitAttempt } from '../core/git/index.js';
+import type { CommitAttempt } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -115,7 +115,7 @@ import {
   commitTaskWork,
   deriveCommitSubject,
   normaliseTaskText,
-} from '../core/git/index.js';
+} from '@open-tomato/rafa/core/git';
 
 /**
  * A plan task sentence of the length this loop's plans really carry.

@@ -25,13 +25,13 @@
  * `rafa effort report`, is not a pure projection of the store.
  */
 import type { LoopRow } from './report-trend.js';
-import type { PidProbe, SessionRecord, SessionTask } from '../core/loop/index.js';
-import type { SessionEta } from '../core/loop/readings.js';
-import type { TaskCounts } from '../core/plan/index.js';
+import type { PidProbe, SessionRecord, SessionTask } from '@open-tomato/rafa/core/loop';
+import type { SessionEta } from '@open-tomato/rafa/core/loop/readings';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
-import { readSessions } from '../core/loop/index.js';
-import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '../core/loop/readings.js';
-import { countTasks } from '../core/plan/index.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '@open-tomato/rafa/core/loop/readings';
+import { countTasks } from '@open-tomato/rafa/core/plan';
 
 /** Milliseconds in one second. */
 const MS_PER_SECOND = 1_000;

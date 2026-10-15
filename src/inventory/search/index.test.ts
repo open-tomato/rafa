@@ -15,9 +15,9 @@
  * search, and the log whose prompt the classifier reads as `other` is
  * shown to read as `other` before the runner stores it as `search`.
  */
-import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
-import type { EffortStore, SessionEffortRow } from '../../effort/store/types.js';
 import type { InventoryRecord } from '../record.js';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,9 +25,10 @@ import { join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
+import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { collectSessionRow, sessionLogDir } from '../../effort/collect.js';
-import { openNdjsonStore } from '../../effort/store/ndjson.js';
-import { openSqliteStore } from '../../effort/store/sqlite.js';
 import { readInventoryText, summarize } from '../record.js';
 
 import { SEARCH_PROMPT_PREFIX } from './prompt.js';

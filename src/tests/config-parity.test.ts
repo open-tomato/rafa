@@ -29,8 +29,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { CORE_COMMANDS, CORE_SUBJECTS } from '../commands/index.js';
-import { loadConfig } from '../core/config/load.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';

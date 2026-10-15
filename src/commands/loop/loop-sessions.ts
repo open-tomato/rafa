@@ -42,25 +42,25 @@
  * {@link NoSessionRefusal}, still exit code 1, so `loop wait` can end
  * them with its own code for no session without reading their words.
  */
-import type { RafaContext, RafaFlagSpec } from '../../core/command/index.js';
-import type { SessionChange, SessionPhase, SessionRecord } from '../../core/loop/index.js';
+import type { PlanTask } from '../../plan/index.js';
+import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { SessionChange, SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type {
   ResolvedLoopSeams,
   SessionChecklist,
   SessionEta,
-} from '../../core/loop/readings.js';
-import type { TaskCounts } from '../../core/plan/index.js';
-import type { PlanTask } from '../../plan/index.js';
+} from '@open-tomato/rafa/core/loop/readings';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import {
   isSessionId,
   SessionRecordError,
   sessionPhase,
   SessionStateError,
   updateSession,
-} from '../../core/loop/index.js';
+} from '@open-tomato/rafa/core/loop';
 import {
   formatDuration,
   isLive,
@@ -68,8 +68,8 @@ import {
   refusal,
   runsLabel,
   sessionLine,
-} from '../../core/loop/readings.js';
-import { plural } from '../../core/plan/index.js';
+} from '@open-tomato/rafa/core/loop/readings';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 /** The flag naming a session, by the name the context's flags carry it under. */
 export const SESSION_ID_FLAG = 'session-id';

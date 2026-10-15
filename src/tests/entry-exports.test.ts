@@ -1,6 +1,6 @@
 /**
  * Pins the export names of the five entry barrels, as read before the
- * move of #905 put any file under `src/core/`. The move is paths only: a
+ * move of #905 put any file under `packages/rafa/src/core/`. The move is paths only: a
  * barrel that gains or loses a name, runtime value or type, fails here.
  *
  * It also pins `src/config-registry.ts`, the module the merged schema's
@@ -307,7 +307,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'runPreflight',
     'runShellProbe',
   ],
-  'src/effort/store/index.ts': [
+  'packages/rafa/src/effort/store/index.ts': [
     'AppendResult',
     'CommitEffortRow',
     'EFFORT_KEY_PROJECTIONS',
@@ -349,7 +349,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'openSqliteStore',
     'selectEffortStore',
   ],
-  'src/ports/index.ts': [
+  'packages/rafa/src/ports/index.ts': [
     'ApiExchange',
     'AppendResult',
     'BlessedBundle',

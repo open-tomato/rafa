@@ -58,11 +58,11 @@
  * the same report without `checkout` beside it as its control.
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
-import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -80,11 +80,12 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { writeFindings } from '@open-tomato/rafa/store/findings';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
-import { RAFA_VERSION } from '../core/command/index.js';
-import { writeFindings } from '../effort/store/findings.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
-import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { RAFA_CODES } from '../errors/rafa-codes.js';
 import { findNextTask } from '../utils/tracker.js';
 

@@ -10,12 +10,13 @@
  * refusal is paired with a line the same board takes, so a case that
  * refused everything would fail.
  */
-import type { IssueDraft, IssueQuery, IssueRef, Tracker } from '../../ports/index.js';
+import type { IssueDraft, IssueQuery, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { readBlockedBy } from '../../board/blocked.js';
-import { CommandExit } from '../../core/command/index.js';
 
 import {
   KNOWN_LIST_LIMIT,

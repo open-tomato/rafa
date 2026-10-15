@@ -57,8 +57,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { INTERRUPT_EXIT_CODE, NO_TERMINAL_TEXT } from '../../cli/prompt/terminal.js';
-import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {

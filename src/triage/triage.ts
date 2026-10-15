@@ -177,7 +177,7 @@
  * A bug whose `what` and `artifact` name a system toolchain, a machine's
  * SDK path or a package-manager build failure is a fault of the MACHINE
  * the session ran on and not of rafa. `./machine-fault.ts` re-exports
- * `src/effort/store/machine-fault.ts`, the whole of that reading, whose
+ * `packages/rafa/src/effort/store/machine-fault.ts`, the whole of that reading, whose
  * note holds the families, the near misses that shaped them and what it
  * reads over the 27 bugs rafa's own runs filed.
  * Such a bug goes to a third channel, which has no tracker at all:
@@ -275,30 +275,32 @@ import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
-import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { BugRecord, BugRules } from '../bugs/record.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { RefVerifier } from '../refs/verify.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
+import type { BugKind, ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type {
   FindingOutcome,
   FindingsDispatch,
   FindingsWriterSeams,
-} from '../effort/store/findings.js';
-import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
-import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
-import type { RefVerifier } from '../refs/verify.js';
-import type { BugKind, ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
+} from '@open-tomato/rafa/store/findings';
+import type { MachineFault } from '@open-tomato/rafa/store/machine-fault';
+import type { TrackerRefWriteAction } from '@open-tomato/rafa/store/tracker-refs';
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
+import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+
 import { createLocalTracker } from '../adapters/tracker/local.js';
 import { bugTitle } from '../bugs/record.js';
 import { UNKNOWN_VALUE } from '../bugs/title.js';
-import { messageOf } from '../core/config/sections.js';
-import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
@@ -312,7 +314,6 @@ import {
 } from './issue-text.js';
 import { routeByKind } from './kind-route.js';
 import { localPathRedactor } from './local-paths.js';
-import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 import { nearestOpenBugs } from './similarity.js';
 import { triageStaleDocs } from './stale-docs.js';

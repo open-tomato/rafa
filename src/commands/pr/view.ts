@@ -45,7 +45,7 @@
  * `browse` the provider rejected.
  */
 import type { PrSeams, PullSource } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { SEPARATOR } from './current.js';
 import {

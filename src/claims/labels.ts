@@ -49,7 +49,7 @@
  */
 import type { IssueBoard } from '../board/issue-board.js';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 

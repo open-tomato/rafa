@@ -142,11 +142,12 @@ import type {
 } from '../release/prepare.js';
 import type { ReleaseVerification, ReleaseVerificationContext } from '../release/verify.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { readPlanChanges } from '@open-tomato/rafa/store/changes';
+
 import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { parsePlan } from '../core/plan/index.js';
-import { readPlanChanges } from '../effort/store/changes.js';
 import { createGitRunner, gitSaid, pushBranch } from '../pr/index.js';
 import {
   forecastLine,

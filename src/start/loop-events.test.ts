@@ -14,10 +14,11 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { runsDir } from '@open-tomato/rafa/core/loop';
+import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createEventsOutput } from '../adapters/output/events.js';
 import { createJsonOutput } from '../adapters/output/json.js';
-import { runsDir } from '../core/loop/index.js';
-import { createTextOutput, setActiveOutput } from '../core/output/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { listTrackerTasks } from '../utils/tracker.js';
 

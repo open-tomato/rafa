@@ -194,34 +194,35 @@ import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/track
 import type { RefreshAddedItems } from '../board/project/add-issue.js';
 import type { RefreshConfig } from '../board/project/refresh.js';
 import type { IssuesConfigSettings } from '../config-schema-issues.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
-import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { InheritedTriage } from '../triage/inherited.js';
 import type { KindRouteOptions } from '../triage/kind-route.js';
 import type { BugTriage, SecretEnvironment, TriageOptions, TriageResult } from '../triage/triage.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 
 import { homedir } from 'node:os';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../board/project/add-filed.js';
 import { openProjectRunner } from '../board/project/project-runner.js';
 import { bugRulesOf } from '../config-schema-issues.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
-import { activeOutput } from '../core/output/index.js';
-import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';
 import { inheritedFailureOf } from '../triage/inherited.js';
 import { scoreText } from '../triage/issue-text.js';
 import { checkedKindOf } from '../triage/kind-route.js';
 import { localPathRedactor } from '../triage/local-paths.js';
-import { isMachineFault } from '../triage/machine-fault.js';
 import {
   blockerTextOf,
   namedSecrets,

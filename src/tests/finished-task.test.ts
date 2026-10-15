@@ -93,9 +93,9 @@
  * re-anchored on the line above it. A leg that silently lands
  * somewhere else reads exactly like a module nothing guards.
  */
-import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { TaskCommitRunner } from '../start/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -118,7 +118,8 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 

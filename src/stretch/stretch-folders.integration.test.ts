@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { isPidAlive } from '../core/loop/index.js';
+import { isPidAlive } from '@open-tomato/rafa/core/loop';
 
 import {
   agentFilePath,

@@ -52,12 +52,13 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { selectBoardRelations } from '../../board/relations/select.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../core/config/sections.js';
-import { plural } from '../../core/plan/index.js';
 import { NATIVE_MODE } from '../epic/move-native.js';
 
 import { INDENT } from './merge-cleanup.js';

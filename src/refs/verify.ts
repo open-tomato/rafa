@@ -173,13 +173,14 @@ import type { Ref } from './extract.js';
 import type { IssueState, LiveReading } from './stamp.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument } from '../cli/describe.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { GLOBAL_FLAGS } from '../cli/help.js';
 import { pluralOf } from '../cli/registry.js';
 import { SETTINGS } from '../config-registry.js';
-import { gitSaid } from '../core/git/index.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 

@@ -31,9 +31,9 @@
  * `diff --name-only` without `-z` wrote `ü.txt` as `"\303\274.txt"`,
  * with `-z` as the bytes themselves.
  */
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 /** The remote the plan's base is read from. */
 const REMOTE = 'origin';

@@ -67,6 +67,8 @@
 import type { Permissions, TrustReading } from '../../board/trust.js';
 import type { PullRequestComment, PullRequestDetail } from '../../pr/index.js';
 
+import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
+
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import {
   createGhPermissions,
@@ -76,7 +78,6 @@ import {
 } from '../../board/trust.js';
 import { DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
 import { triageComments } from '../../pr/triage/comment.js';
-import { normalizeRemote } from '../../schema/project-id.js';
 
 /** What a sentence calls a repository it could name no other way. */
 export const UNNAMED_REPO = 'this repository';

@@ -16,7 +16,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { withSqliteStore, sqliteStorePath } from '../../effort/store/sqlite.js';
+import { withSqliteStore, sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { eventsOf, dispatchInProject, plantProject, plantProjectConfig } from '../../tests/cli-capture.js';
 import { plantDemoProject, plantSession, sessionRecord } from '../../tests/loop-session-fixtures.js';
 

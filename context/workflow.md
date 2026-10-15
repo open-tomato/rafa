@@ -22,7 +22,7 @@ the shape discriminates where the verb does not.
 <!-- routing-table:end -->
 
 **This table is generated from rafa's `routing` defaults**
-(`DEFAULT_ROUTES` in `src/core/config/default-routing.ts`) by
+(`DEFAULT_ROUTES` in `packages/rafa/src/core/config/default-routing.ts`) by
 `src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
 the page and the generator disagree, so change a row there and
 regenerate the table rather than editing it here. A project's own config (`.rafa/config.yaml`, or a
@@ -77,26 +77,23 @@ winner, exactly as an agent does: one no tier holds, one `tiers.skills`
 switches off, or one only an unloaded tier holds.
 `rafa plan validate` runs the same check and exits 1 on the same plan.
 
-**`agent=` outranks `model` and `tools` because routing supplies
-both.** A declaration carrying an agent never passes `--model` or
-`--tools`: the agent file's own frontmatter names its model and tool
-set, and every tracked file the table names carries a `model:`.
-`effort` is the exception, being the cost lever a plan most needs to
-reach the session: `--effort` joins `--agent` unless the definition
-declares an `effort` of its own. `src/utils/agent-definition.ts`
-answers that from `.claude/agents/<name>.md` under the repo root, then
-under the home directory when `loop.settingSources` includes `user`,
-and takes a file only when its frontmatter
-`name` is the name asked for, because the CLI resolves `--agent` by
-that `name` and not by the file name. A name found in neither still
-passes `--effort`, leaving the CLI to refuse the name. `budget` is
-outranked by nothing, since a definition supplies no budget:
-`--max-budget-usd` joins whatever the block resolved to, ahead of
-`--tools`, whose variadic value has to end the argument list. Every key
-stays on the dispatch record whatever reached the CLI, and on the
-session's `dispatches` row beside the flags that did
-(`src/effort/store/dispatches.ts`), and the `Routed as:` line names the
-ones left to the agent.
+**`agent=` outranks `model` and `tools` because routing supplies both.** A
+declaration carrying an agent never passes `--model` or `--tools`: the agent
+file's own frontmatter names its model and tool set, and every tracked file the
+table names carries a `model:`. `effort` is the exception, being the cost lever
+a plan most needs to reach the session: `--effort` joins `--agent` unless the
+definition declares an `effort` of its own. `src/utils/agent-definition.ts`
+answers that from `.claude/agents/<name>.md` under the repo root, then under the
+home directory when `loop.settingSources` includes `user`, and takes a file only
+when its frontmatter `name` is the name asked for, because the CLI resolves
+`--agent` by that `name` and not by the file name. A name found in neither still
+passes `--effort`, leaving the CLI to refuse the name. `budget` is outranked by
+nothing, since a definition supplies no budget: `--max-budget-usd` joins
+whatever the block resolved to, ahead of `--tools`, whose variadic value has to
+end the argument list. Every key stays on the dispatch record whatever reached
+the CLI, and on the session's `dispatches` row beside the flags that did
+(`packages/rafa/src/effort/store/dispatches.ts`), and the `Routed as:` line
+names the ones left to the agent.
 
 **Routing also changes what a session can be read back from.** The
 prompt is untouched, byte-identical to what was piped in, but record 0
@@ -379,17 +376,17 @@ the project's config and any user-level config under `~/.rafa/`.
 neither uses the defaults, and a file spelling one but not the other
 keeps the other at its default.
 
-**The dispatch record holds what skills and lessons reached the prompt.**
-The `dispatches` table in the store (`src/effort/store/dispatches.ts`)
-carries three new columns: `resolver` (the name that ran, one of
-`planner`, `tag` or `none`, or NULL when not recorded), `skills_offered`
-(a JSON array of the bare names, in order, or NULL), and `lessons_offered`
-(a JSON array of lesson ids, or NULL). A dispatch that ran no resolver or
-handed no handout writes NULL for the resolver and `[]` for both lists, so
-an empty offer and an unrecorded one stay apart. A session's use of a skill
-can be read against what it was handed by matching the names in
-`skills_offered` against the skill invocations in the `skill_invocations`
-table (`src/effort/store/skill-invocations.ts`).
+**The dispatch record holds what skills and lessons reached the prompt.** The
+`dispatches` table in the store (`packages/rafa/src/effort/store/dispatches.ts`)
+carries three new columns: `resolver` (the name that ran, one of `planner`,
+`tag` or `none`, or NULL when not recorded), `skills_offered` (a JSON array of
+the bare names, in order, or NULL), and `lessons_offered` (a JSON array of
+lesson ids, or NULL). A dispatch that ran no resolver or handed no handout
+writes NULL for the resolver and `[]` for both lists, so an empty offer and an
+unrecorded one stay apart. A session's use of a skill can be read against what
+it was handed by matching the names in `skills_offered` against the skill
+invocations in the `skill_invocations` table
+(`packages/rafa/src/effort/store/skill-invocations.ts`).
 
 ### Naming convention
 
@@ -649,25 +646,23 @@ the planner's own review can keep a plan when assumptions are named.
 
 ### The interaction rule
 
-**A person fills in a form, rafa runs ONE fixed-template session, code
-validates the result, and the person accepts or rejects. No conversation
-inside rafa.** The command reads the form through the prompt kit in
-`src/cli/prompt/`, collects answers into a payload, passes them to a
-Claude session with a fixed prompt template and receives one response.
-A gate code checks the response against a schema — validating the
-structure, running any custom checks, and reporting every failure. If all
-checks pass, the person is offered the result: a yes confirms the action
-and the command ends successfully, a no discards it and the command exits
-with no state written, asking why only in a test. Commands that read a
-form declare their own `spends` on their `RafaCommand`
-(`src/core/command/spends.ts`) for the one session they will start if the
-person reaches the form. No
-command spawns a second Claude session, no prompt asks the person to
-continue in Claude Code, and no runtime dependency enters the package:
-the prompt kit runs in raw mode on `stdio` and every session reads the
-API from the `RafaContext.env` values or the project's config, so the
-loop's own machinery (`src/core/loop/claude.ts` for the session and
-`src/effort/store/` for the record) runs all the code.
+**A person fills in a form, rafa runs ONE fixed-template session, code validates
+the result, and the person accepts or rejects. No conversation inside rafa.**
+The command reads the form through the prompt kit in `src/cli/prompt/`, collects
+answers into a payload, passes them to a Claude session with a fixed prompt
+template and receives one response. A gate code checks the response against a
+schema — validating the structure, running any custom checks, and reporting
+every failure. If all checks pass, the person is offered the result: a yes
+confirms the action and the command ends successfully, a no discards it and the
+command exits with no state written, asking why only in a test. Commands that
+read a form declare their own `spends` on their `RafaCommand`
+(`packages/rafa/src/core/command/spends.ts`) for the one session they will start
+if the person reaches the form. No command spawns a second Claude session, no
+prompt asks the person to continue in Claude Code, and no runtime dependency
+enters the package: the prompt kit runs in raw mode on `stdio` and every session
+reads the API from the `RafaContext.env` values or the project's config, so the
+loop's own machinery (`packages/rafa/src/core/loop/claude.ts` for the session
+and `packages/rafa/src/effort/store/` for the record) runs all the code.
 
 ### Bug sweep convention
 

@@ -13,7 +13,7 @@
  *
  * Nothing here spawns. The board arrives through the {@link GhRunner}
  * seam declared in `src/adapters/tracker/github.ts` and git through the
- * {@link GitRunner} declared in `src/core/git/git.ts`, as they do for the
+ * {@link GitRunner} declared in `packages/rafa/src/core/git/git.ts`, as they do for the
  * tracker, the pull request provider, the trust reading and the issue
  * snapshot. Every case in `./roadmap.test.ts` drives a fake of its own
  * over a planted roadmap body: none reaches GitHub, spawns `gh` or
@@ -139,12 +139,13 @@
 import type { SpecIssueReader } from './issue.js';
 import type { BranchClaim, RemoteClaimReader } from './roadmap-claims.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { boardId, BRANCH_PREFIX } from './naming.js';
 import {

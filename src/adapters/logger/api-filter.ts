@@ -38,7 +38,7 @@
  * `method`, `requestId` or the entry's `data`. Those are the caller's to
  * keep clean.
  */
-import type { ApiExchange } from '../../ports/index.js';
+import type { ApiExchange } from '@open-tomato/rafa/ports';
 
 /** What a filtered value is written as. */
 export const REDACTED = '[redacted]';

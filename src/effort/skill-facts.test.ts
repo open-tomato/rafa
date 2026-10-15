@@ -20,11 +20,11 @@
  * rows of one session stamped the same time, which is what the origin
  * pair would order.
  */
-import type { FindingsDispatch } from './store/findings.js';
-import type { PlanCiRow } from './store/plan-ci.js';
-import type { SkillResolverName } from '../core/config/sections.js';
-import type { ReportBlocker, ReportBug, ReportFinding } from '../report/parse.js';
 import type { Device, MergedBothWays } from '../tests/merged-stores.js';
+import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
+import type { ReportBlocker, ReportBug, ReportFinding } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,17 +33,18 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { writeFindings } from '@open-tomato/rafa/store/findings';
+import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { writeTriage } from '@open-tomato/rafa/store/triage';
+
 import { copyDevice, freshDevice, mergeBothWays } from '../tests/merged-stores.js';
 
 import { readSkillFacts } from './skill-facts.js';
-import { writeDispatch } from './store/dispatches.js';
-import { writeFindings } from './store/findings.js';
-import { writePlanCi } from './store/plan-ci.js';
-import { writeTaskReport } from './store/reports.js';
-import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from './store/skill-invocations.js';
-import { sqliteStorePath } from './store/sqlite.js';
-import { writeTrackerRef } from './store/tracker-refs.js';
-import { writeTriage } from './store/triage.js';
 
 /** The plan most cases dispatch under. */
 const PLAN = 'rafa-24-know-which-skills-earn';

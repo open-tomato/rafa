@@ -42,7 +42,7 @@
  * the parser does not know, are dropped. The first problem found, in
  * that order of fields, is the one the reason names.
  */
-import { readRafaBlocks } from '../core/plan/block-reader.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 /** The info string's kind the decision block is fenced with. */
 export const DECISION_KIND = 'decision';

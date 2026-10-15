@@ -114,8 +114,8 @@ import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { DeviceStoreId, DeviceStoreIds } from './device.js';
 import type { ClaimBranchReading } from './git.js';
 import type { IssueBoard } from '../board/issue-board.js';
-import type { ClaimsAhead, ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimsAhead, ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import path from 'node:path';
 

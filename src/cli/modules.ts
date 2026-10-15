@@ -38,12 +38,12 @@
  * `allowList:` names from a `path` source whose manifest checked out.
  */
 import type { CommandRegistry } from './registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { describeValue } from '../core/config/sections.js';
+import { describeValue } from '@open-tomato/rafa/core/config/sections';
 
 /** One module's command entry: the name its commands mount under, and the file exporting them. */
 export interface ModuleCommandEntry {

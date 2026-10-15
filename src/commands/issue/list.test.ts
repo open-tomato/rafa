@@ -29,11 +29,11 @@
 import type { LineFlags } from './issue-tracker.js';
 import type { RoadmapListResult } from './list.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { Issue, IssueDraft } from '../../ports/index.js';
 import type { LiveReading } from '../../refs/stamp.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Issue, IssueDraft } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -43,6 +43,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
@@ -50,7 +52,6 @@ import { changedArgs, WATERMARK_ARGS } from '../../board/board-cache.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
-import { CommandExit } from '../../core/command/index.js';
 import { ABSENT, PRESENT, UNREADABLE, writeRefsBlock } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';

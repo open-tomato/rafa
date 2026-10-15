@@ -61,11 +61,14 @@
  */
 import type { IssueSeams, LineFlags } from './issue-tracker.js';
 import type { BugRecord } from '../../bugs/record.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { IssueDraft } from '../../ports/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueDraft } from '@open-tomato/rafa/ports';
 
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { bodyOf, checkoutOf, draftOf, redacted, settled } from '../../bugs/fill.js';
 import { suggestedEnvironment } from '../../bugs/places.js';
@@ -74,8 +77,6 @@ import { firstProjectPath } from '../../bugs/stack-path.js';
 import { parseTitle } from '../../bugs/title.js';
 import { codeVersionOf, versionsText } from '../../bugs/versions.js';
 import { bugRulesOf } from '../../config-schema-issues.js';
-import { RAFA_VERSION } from '../../core/command/index.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { isInside, packageOf, rootPackageOf } from '../../project/package-of.js';
 import { localPathRedactor } from '../../triage/local-paths.js';
 import { namedSecrets, redactSecrets } from '../../triage/triage.js';

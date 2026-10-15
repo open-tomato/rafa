@@ -4,8 +4,8 @@
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
- * Core declares the section contract (`src/core/config/section.ts`) and
- * names no section. This module, outside `src/core/`, is the one place
+ * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
+ * names no section. This module, outside `packages/rafa/src/core/`, is the one place
  * the twelve are listed, {@link CONFIG_SECTIONS}: core's own
  * (`CORE_SECTION`) and the eleven files `src/config-schema-*.ts`.
  * Importing it calls `registerConfigSections` once, with that list cut
@@ -16,7 +16,7 @@
  * A refused registration throws at import, naming what it refused.
  *
  * Importing it also sets core's load hook (`setConfigLoadHook` in
- * `src/core/config/section.ts`) to {@link handConfigToLogger}, so every
+ * `packages/rafa/src/core/config/section.ts`) to {@link handConfigToLogger}, so every
  * config `loadConfig` resolves hands the logger its `logger` settings
  * without core importing the logger's section file.
  *
@@ -55,12 +55,12 @@
  * ## Beside core
  *
  * This module is the one place the six names are built: the core barrel
- * `src/core/config/index.ts` exports none of them, and a file outside
- * `src/core/` imports them from here. Core reads the registered
+ * `packages/rafa/src/core/config/index.ts` exports none of them, and a file outside
+ * `packages/rafa/src/core/` imports them from here. Core reads the registered
  * settings and defaults through `activeSettings()` and
  * `activeDefaults()`, and the key indexes through `activeSettingByKey()`,
  * `activeSectionPaths()` and `activeKnownKeysAbove()`, all in
- * `src/core/config/section.ts`. Those follow registration order, which
+ * `packages/rafa/src/core/config/section.ts`. Those follow registration order, which
  * is the order here, so they answer what {@link SETTING_BY_KEY},
  * {@link SECTIONS} and {@link knownKeysAbove} answer.
  * `src/index.ts` publishes this module's {@link CONFIG_DEFAULTS}.
@@ -72,7 +72,9 @@ import type {
   CoreSetting,
   RafaConfig,
   SettingSpec,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { CORE_SECTION, registerConfigSections, setConfigLoadHook } from '@open-tomato/rafa/core/config';
 
 import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import {
@@ -111,7 +113,6 @@ import {
 import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
-import { CORE_SECTION, registerConfigSections, setConfigLoadHook } from './core/config/index.js';
 
 /** The twelve sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([

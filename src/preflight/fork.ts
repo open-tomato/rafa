@@ -89,7 +89,7 @@ import type { PreflightEnv, PreflightOptions, PreflightReport, PreflightTiers } 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { firstLineOf, runPreflight } from './run.js';
 

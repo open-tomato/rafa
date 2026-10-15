@@ -26,12 +26,12 @@
  * fixture's root. A filed or commented-on body is read back off its
  * issue file on disk, never off what `triageReport` answered.
  */
-import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { Tracker } from '../ports/index.js';
-import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { NamedSecret } from '../triage/triage.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
 import {
   existsSync,
@@ -54,11 +54,13 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
-import { escapeBlockerText, findNextTask } from '../utils/tracker.js';
+import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 
@@ -292,7 +294,7 @@ describe('a machine-scoped bug over the local adapter', () => {
   /**
    * #17's artifact: a linker failure against an Xcode Command Line Tools
    * SDK installed on the machine the session ran on, not against rafa.
-   * `src/effort/store/machine-fault.test.ts` and
+   * `packages/rafa/src/effort/store/machine-fault.test.ts` and
    * `src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
    * this case is the same pairing over the real `local` adapter.
    */

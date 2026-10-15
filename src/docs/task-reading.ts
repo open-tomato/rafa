@@ -71,14 +71,15 @@
  * hands the session `context/a.md`. Redaction comes after the joining,
  * so a path a line break split is matched whole.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { StaleDocRow } from '../effort/store/stale-docs.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { StaleDocRow } from '@open-tomato/rafa/store/stale-docs';
 
 import { homedir } from 'node:os';
 
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../core/git/index.js';
-import { readStaleDocsForPlan } from '../effort/store/stale-docs.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+
 import { localPathRedactor } from '../triage/local-paths.js';
 
 /** The heading of the doc task's section. */

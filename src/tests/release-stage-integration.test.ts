@@ -30,8 +30,8 @@ import type { CapturedRun } from './cli-capture.js';
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
 import type { ReleaseLevelSource } from '../release/level.js';
 import type { ReleasePreparation } from '../release/prepare.js';
-import type { ReportChange } from '../report/parse.js';
 import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
+import type { ReportChange } from '@open-tomato/rafa/report/parse';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,9 +40,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { RELEASE_AUTO } from '../core/config/sections.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { writeChanges } from '../effort/store/changes.js';
+import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { writeChanges } from '@open-tomato/rafa/store/changes';
+
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
@@ -248,7 +249,7 @@ const SYSTEM_PATH = ['/usr/bin', '/bin'].join(delimiter);
  * script it writes sits outside this repository's own tree.
  */
 const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../start/release-stage.ts', import.meta.url));
-const OUTPUT_ACTIVE_MODULE = fileURLToPath(new URL('../core/output/index.ts', import.meta.url));
+const OUTPUT_ACTIVE_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'));
 const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.meta.url));
 
 /**

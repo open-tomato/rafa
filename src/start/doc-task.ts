@@ -3,7 +3,7 @@
  * {@link docTaskPrompt}.
  *
  * A plan that changes code ends on one task declared `docs=repair`
- * beside `agent=doc-updater` (`utils/declaration.ts`). That task, and no
+ * beside `agent=doc-updater` (`core/plan/declaration.ts`). That task, and no
  * other, is handed the `## Documentation to repair` section
  * `docs/task-reading.ts` renders: the plan's `sighting` rows and the
  * files its commits touched. `dispatchTask` (`start/dispatch.ts`) makes
@@ -35,14 +35,15 @@
  * names none. Nothing here throws on a read: `readDocTaskInput` answers
  * a failed read as a sentence the section carries.
  */
-import type { GitRunner } from '../core/git/index.js';
 import type { DocTaskInputOptions } from '../docs/task-reading.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { readDocsRole } from '@open-tomato/rafa/core/plan';
 
 import { resolveBaseBranch } from '../cleanup/branches.js';
-import { createGitRunner } from '../core/git/index.js';
 import { readDocTaskInput, renderDocTaskSection } from '../docs/task-reading.js';
-import { readDocsRole } from '../utils/declaration.js';
 
 /** Where the run's doc task reads its input: what `start()` knows of the run. */
 export interface DocTaskPlace {

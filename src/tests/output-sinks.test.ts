@@ -6,11 +6,11 @@
  * records too, so a line handed to the wrong level is a reading here
  * rather than a line some other case happens not to look for.
  */
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { activeOutput, setActiveOutput } from '../core/output/index.js';
+import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { sinkOutput } from './output-sinks.js';
 

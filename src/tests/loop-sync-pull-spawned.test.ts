@@ -35,9 +35,10 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../core/loop/index.js';
-import { writeDispatch } from '../effort/store/dispatches.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 

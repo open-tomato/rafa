@@ -79,7 +79,7 @@
 import type { UnblockAsk, UnblockReport } from './unblock.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { closedIssuesIn } from './roadmap.js';
 import { isUnblockFailure, runUnblock } from './unblock.js';

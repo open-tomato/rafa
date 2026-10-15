@@ -10,7 +10,8 @@
 import type { PullRequests } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { readHopRecord, staleAgainst } from '../next/hop-record.js';
 import { readPositionFile } from '../project/position.js';
 

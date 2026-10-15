@@ -7,7 +7,7 @@
  * its home in the temporary root, as `position.integration.test.ts`
  * runs it, so no case reads the operator's own repository or config.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

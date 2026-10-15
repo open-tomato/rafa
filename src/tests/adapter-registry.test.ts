@@ -5,7 +5,7 @@
  * `src/adapter-registry.ts`, one example apiece of three claims the
  * registry stands on.
  *
- * `src/core/adapters/registry.test.ts` and
+ * `packages/rafa/src/core/adapters/registry.test.ts` and
  * `src/adapters/tracker/resolve.test.ts`
  * carry the mutation-driven grid behind each of those claims. The
  * running example that makes every one of core's kinds from ONE shared
@@ -25,8 +25,8 @@
  *     hands it the reason the attempt before it failed with, which
  *     `local` then writes into the issue it captures on disk.
  */
-import type { AnyAdapter } from '../core/adapters/index.js';
-import type { Tracker } from '../ports/index.js';
+import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { Tracker } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 
@@ -40,11 +40,12 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createFakeGh } from '../adapters/tracker/github-fake.js';
 import { parseLocalIssue } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../core/adapters/index.js';
 
 /** What `gh auth status` writes with no hosts, as the fake records it. */
 const NOT_LOGGED_IN = 'You are not logged into any GitHub hosts. To log in, run: gh auth login';

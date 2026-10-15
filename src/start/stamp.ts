@@ -4,10 +4,10 @@
  * Holds the run's active plan stub and answers, through
  * {@link withStamp}, whether a prompt is stamped at all. The marker
  * itself, and why it is appended below a prompt and never above it,
- * belong to `utils/plan-stamp.ts`. `start()` sets the stub once, after
+ * belong to `core/plan/plan-stamp.ts`. `start()` sets the stub once, after
  * the branch guard has let the run through.
  */
-import { stampPrompt } from '../utils/plan-stamp.js';
+import { stampPrompt } from '@open-tomato/rafa/core/plan';
 
 /**
  * The plan this run is executing, or null when nothing set one.

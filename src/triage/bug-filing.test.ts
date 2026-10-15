@@ -1,6 +1,6 @@
 import type { BugFilingContext, BugFilingInput } from './bug-filing.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { ReportBug } from '../report/parse.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,8 +8,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+
 import { bugTitle } from '../bugs/record.js';
-import { RAFA_VERSION } from '../core/command/index.js';
 import { RAFA_CODES } from '../errors/rafa-codes.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES, reproduceOf, rerunOf } from './bug-filing.js';

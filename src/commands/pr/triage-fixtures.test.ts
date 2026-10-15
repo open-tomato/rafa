@@ -49,12 +49,12 @@
  */
 import type { TriageGuardReader } from './triage-guard.js';
 import type { TriageSeams } from './triage.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { FakePrAuthor, FakePrCheck, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { TriageClass } from '../../pr/triage/classes.js';
 import type { GuardReading } from '../../release/guard.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

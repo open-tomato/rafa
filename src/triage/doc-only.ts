@@ -36,7 +36,7 @@
  * as naming code when it named only pages, never the reverse.
  *
  * Measured on 2026-10-14 over the 27 filed bodies
- * `src/effort/store/machine-fault.test.ts` holds: five such pieces in
+ * `packages/rafa/src/effort/store/machine-fault.test.ts` holds: five such pieces in
  * four bodies (`doc/behavior`, `app/dependabot`), none of them a folder,
  * and taking them out changed no body's answer. Three bodies answer `true` on their `what`, #33, #34
  * and #45, each a report of a stale page. The `artifact` of all three

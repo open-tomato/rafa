@@ -66,7 +66,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { KNOWN_LIST_LIMIT } from './blocked-issues.js';
 

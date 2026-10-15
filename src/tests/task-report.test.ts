@@ -106,9 +106,9 @@
  * machine, never reaching a real `gh` in git's directory. The blocker case
  * reads its one `gh auth status` call.
  */
-import type { CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -135,10 +135,11 @@ import {
   it,
 } from 'bun:test';
 
-import { CLAUDE_BASE_ARGS } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { readPlanChanges } from '../effort/store/changes.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { CLAUDE_BASE_ARGS } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { readPlanChanges } from '@open-tomato/rafa/store/changes';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { projectConfigText } from '../project/scaffold.js';
 import {
   dispatchTask,

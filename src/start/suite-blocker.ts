@@ -114,14 +114,15 @@
  * writes its blocker on that line, as it does after a step's repair.
  */
 import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
-import type { PlanTask } from '../core/plan/index.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
 import type { InsertedTask } from '../utils/tracker.js';
+import type { PlanTask } from '@open-tomato/rafa/core/plan';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { parsePlan } from '../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
 import { isLeftoverRepairTask } from '../triage/leftover-repair.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 

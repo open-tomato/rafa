@@ -39,8 +39,8 @@
  * ({@link draftOf}).
  */
 import type { BugRecord, BugRules } from './record.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { IssueDraft } from '../ports/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft } from '@open-tomato/rafa/ports';
 
 import { isInside } from '../project/package-of.js';
 import { TRIAGE_MODULE } from '../triage/triage.js';

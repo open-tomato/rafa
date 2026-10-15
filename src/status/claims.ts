@@ -49,8 +49,8 @@
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimOwnership, ClaimStateName } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import { claimBranchIssue, readClaimBranch } from '../claims/git.js';
 import { STAGE_LABELS } from '../claims/labels.js';

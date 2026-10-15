@@ -56,7 +56,7 @@ import type { ChecklistEditResult } from './epic-checklist.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { editChecklists, tickLine } from './epic-checklist.js';
 import { EPIC_TYPE_LABEL } from './epic-context.js';

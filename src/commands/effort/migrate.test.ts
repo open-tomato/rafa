@@ -8,9 +8,9 @@
  * row count, so each case has a control that could have failed.
  */
 import type { MigrateCommandSeams } from './migrate.js';
-import type { RuntimeIdentity } from '../../core/runtime/index.js';
-import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
 
 import '../../adapter-registry.js';
 
@@ -21,12 +21,13 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RAFA_VERSION } from '../../core/command/index.js';
-import { beginSession } from '../../core/loop/index.js';
-import { bringForward } from '../../effort/store/bring-forward.js';
-import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN } from '../../effort/store/migrations.js';
-import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS } from '../../effort/store/sqlite.js';
-import { storeRows } from '../../effort/store/testdata/store-rows.js';
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
+import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/sqlite';
+import { storeRows } from '@open-tomato/rafa/store/testdata/store-rows';
+
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createMigrateCommand } from './migrate.js';

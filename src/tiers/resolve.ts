@@ -140,13 +140,13 @@
  * also carries that pin and the copies that outrank it (see "A skill
  * pin must name the copy Claude Code loads").
  */
-import type { ClaudeSettingSource, TierPin, TierSwitch } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
-import type { SkillTier } from '../schema/tiers.js';
+import type { ClaudeSettingSource, TierPin, TierSwitch } from '@open-tomato/rafa/core/config/sections';
+import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 
 import { readFileSync } from 'node:fs';
 
-import { isSkillTier, SKILL_TIERS } from '../schema/tiers.js';
+import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
 /** One inventory row as the resolver reads it; a `SourceItem` or an `InventoryRecord` is one. */
 export interface TierRow {

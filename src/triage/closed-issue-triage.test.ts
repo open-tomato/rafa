@@ -11,7 +11,7 @@
  */
 import type { TriageResult } from './triage.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -172,18 +172,22 @@ import type { DocOnlyBugs } from './report-doc-bugs.js';
 import type { BugKindsReading } from './report-kinds.js';
 import type { SkillsReport } from './report-skills.js';
 import type { SessionUsageTotals } from './session-log.js';
-import type { SessionBudget } from './store/dispatches.js';
-import type { PreflightHalt } from './store/preflight.js';
-import type { TaskReportTally } from './store/reports.js';
-import type { EffortStore } from './store/types.js';
-import type { ConfigRoots } from '../core/config/load.js';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { SessionBudget } from '@open-tomato/rafa/store/dispatches';
+import type { PreflightHalt } from '@open-tomato/rafa/store/preflight';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
+import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import { homedir } from 'node:os';
 
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+import { readSessionBudgets } from '@open-tomato/rafa/store/dispatches';
+import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
+import { readTaskReportTallies } from '@open-tomato/rafa/store/reports';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { minutesBetween } from './commits.js';
@@ -195,10 +199,6 @@ import { readBugKinds } from './report-kinds.js';
 import { formatSkillsReport } from './report-skills-format.js';
 import { readSkillsReport } from './report-skills-read.js';
 import { writeTrendReport } from './report-trend-read.js';
-import { readSessionBudgets } from './store/dispatches.js';
-import { selectEffortStore } from './store/index.js';
-import { readPreflightHalts } from './store/preflight.js';
-import { readTaskReportTallies } from './store/reports.js';
 import { pullBeforeRead } from './sync/contact.js';
 
 /** Decimal places a summed minute figure is re-rounded to. */

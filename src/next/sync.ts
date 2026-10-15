@@ -1,7 +1,7 @@
 /**
  * The one action of `./state.ts` that runs no registered command: the
  * fast-forward of a base that is behind its remote, spawned through the
- * git seam of `src/core/git/git.ts`.
+ * git seam of `packages/rafa/src/core/git/git.ts`.
  *
  * Row 2 of the table answers `sync`, and `./actions.ts` maps the other
  * eight ids onto a command and answers null for this one — there is no
@@ -17,7 +17,7 @@
  * ending, a refusal included, because the caller — `rafa next`, which
  * runs a chain of steps — decides what a refusal costs, prints it and
  * picks the exit code. That is the shape of `GitResult` itself
- * (`src/core/git/git.ts`) and of `readStepOutcome`
+ * (`packages/rafa/src/core/git/git.ts`) and of `readStepOutcome`
  * (`src/start/branch-decision.ts`), whose refusal wording this one
  * follows: `❌` on the first line, the following lines indented, git's
  * own words quoted as it said them.
@@ -55,7 +55,8 @@
  */
 import type { GitRunner } from '../pr/index.js';
 
-import { plural } from '../core/plan/index.js';
+import { plural } from '@open-tomato/rafa/core/plan';
+
 import { gitSaid } from '../pr/index.js';
 import { hasDiverged, parseBaseStanding } from '../start/branch-decision.js';
 

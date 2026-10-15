@@ -70,8 +70,8 @@
  * roster order case and the refusal listing the actions of `effort`.
  */
 import type { DispatchOutcome } from '../cli/dispatch.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { OutputStream } from '../core/output/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../adapter-registry.js';
 
@@ -82,9 +82,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
+
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { commandProblem, commandSpelling } from '../core/command/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';

@@ -249,7 +249,7 @@
  * existed. The notice sits after the injected plan text and before the
  * plan stamp `withStamp` appends: the prompt's first line is the `task`
  * classifier key (`effort/classify.ts`), and `planStubFromPrompt` answers
- * the first stamp a prompt holds (`utils/plan-stamp.ts`).
+ * the first stamp a prompt holds (`core/plan/plan-stamp.ts`).
  *
  * ## The automatic items
  *
@@ -334,9 +334,6 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
-import type { PrerequisiteItem, RafaConfig } from '../core/config/index.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
   PreflightItems,
@@ -345,11 +342,23 @@ import type {
 } from '../preflight/prerequisites-md.js';
 import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 import type { TierSettings } from '../tiers/resolve.js';
+import type { PrerequisiteItem, RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { PreflightWriterSeams } from '@open-tomato/rafa/store/preflight';
 
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { trackerPathFor } from '@open-tomato/rafa/core/plan';
+import { effortStoreDir } from '@open-tomato/rafa/store/location';
+import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
+import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
+import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
 
 import {
   collidingPlanSkills,
@@ -361,13 +370,6 @@ import {
   unresolvedSkillLine,
 } from '../agents/roster.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { effortStoreDir } from '../effort/store/location.js';
-import { writePreflightChecks } from '../effort/store/preflight.js';
-import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';
-import { SQLITE_STORE_FILE_NAME } from '../effort/store/sqlite.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
@@ -378,7 +380,7 @@ import {
   prerequisitesPathForPlan,
 } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
-import { listOpenTasks, trackerPathFor } from '../utils/tracker.js';
+import { listOpenTasks } from '../utils/tracker.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { reportStartDrift } from './preflight-drift.js';

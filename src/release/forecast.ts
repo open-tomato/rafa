@@ -53,7 +53,7 @@
  * status` prints it; like {@link forecastRelease} it reads nothing.
  */
 import type { FoldFragment, ReleaseStrategyAdapter } from './strategy.js';
-import type { ReleaseStrategy } from '../core/config/sections.js';
+import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
 
 import { foldWithStrategy } from './strategy.js';
 import { parseSemanticVersion } from './version.js';

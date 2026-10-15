@@ -32,10 +32,11 @@
  * person in either output mode.
  */
 import type { EditSeams } from './edit-run.js';
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
-import { CommandExit } from '../../core/command/index.js';
 
 import { PRIORITY_FLAG } from './edit-priority.js';
 import { editIssue, renderEditReport } from './edit-run.js';

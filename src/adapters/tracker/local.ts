@@ -6,7 +6,7 @@
  * Copied from `createLocalTracker` in open-tomato's
  * `packages/shared/issue-tracker/src/adapters/local.ts` at commit
  * `45aaab563e5b4f4e6258e19ebf752b7cfeb67bf0` (2026-08-05), and retyped
- * against rafa's `Tracker` port, which `src/ports/index.ts` copies from
+ * against rafa's `Tracker` port, which `packages/rafa/src/ports/index.ts` copies from
  * the same commit's `port.ts`.
  *
  * ## One file per issue
@@ -72,7 +72,7 @@
  *     path naming a file. The source answered no issues for every
  *     failure. An issue file `find` cannot read is skipped and reported
  *     through `warn`, which defaults to the active output's `warn`
- *     (`src/core/output/active.ts`), read when the report is made.
+ *     (`packages/rafa/src/core/output/active.ts`), read when the report is made.
  *     The source wrote the report with `console.warn`.
  *   - Names. The source's say pending, since its captures wait for a
  *     sync rafa does not port: `PendingCapture` is
@@ -129,13 +129,13 @@ import type {
   Tracker,
   TrackerCapabilities,
   TransitionResult,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 

@@ -62,7 +62,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, test } from 'bun:test';
 
-import { parsePlan } from '../../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
 import { DEPENDENCY_BUMP_SIMPLE_CLASSES, SIMPLE_TRIAGE_CLASSES } from '../triage/classes.js';
 
 import {

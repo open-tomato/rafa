@@ -60,15 +60,15 @@
  */
 import type { AccountSeams, AccountSettings } from './risk/accounts.js';
 import type { CommandFinding, PathSeams, RiskLevel } from './risk/commands.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { PlanTask } from '../core/plan/index.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { PlanTask , TaskDeclaration } from '@open-tomato/rafa/core/plan';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
-import { parsePlan } from '../core/plan/index.js';
-import { resolveSkillTiers } from '../schema/tiers.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { resolveSkillTiers } from '@open-tomato/rafa/schema/tiers';
+
 import { findAgentDefinition } from '../utils/agent-definition.js';
 
 import { readAccounts } from './risk/accounts.js';

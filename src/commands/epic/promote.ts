@@ -15,7 +15,7 @@
  * so it declares no `spends`.
  */
 import type { EpicHorizonSeams } from './horizon-change.js';
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { REASON_FLAG } from '../../board/epic-trail.js';
 

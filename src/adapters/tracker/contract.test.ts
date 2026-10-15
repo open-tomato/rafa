@@ -68,7 +68,7 @@
  * priority reddens the one case standing in for the four.
  */
 import type { TrackerContractOptions } from './contract.js';
-import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '../../ports/index.js';
+import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

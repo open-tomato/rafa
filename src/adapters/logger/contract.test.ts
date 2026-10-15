@@ -4,7 +4,7 @@
  * break the cases meant to catch them.
  */
 import type { LoggerContractOptions } from './contract.js';
-import type { Logger, LogEntry } from '../../ports/index.js';
+import type { Logger, LogEntry } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

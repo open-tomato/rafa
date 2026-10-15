@@ -38,15 +38,16 @@
  * the plan where the loop finds it, with the same rules.
  */
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
-import type { GeneratedPlan, Output } from '../../ports/index.js';
+import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
-import { isFile, plural, rejectedPath } from '../../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { isFile, plural, rejectedPath } from '@open-tomato/rafa/core/plan';
+
 import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 

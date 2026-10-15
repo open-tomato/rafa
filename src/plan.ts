@@ -158,7 +158,7 @@
  * `src/` in a checkout and `dist/` in a build, where the build copies
  * `src/bundled/` whole; a project running an installed rafa has no copy
  * of its own. The directory is this module's `import.meta.url`, not the
- * entry `bundledSkillsDirectory` measures from (`src/schema/tiers.ts`):
+ * entry `bundledSkillsDirectory` measures from (`packages/rafa/src/schema/tiers.ts`):
  * `planCommand` also runs from the library bundle, `dist/index.js`,
  * where `Bun.main` is the importing program and not rafa's `cli.js`.
  *
@@ -218,15 +218,23 @@ import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
-import type { AdapterRegistry } from './core/adapters/index.js';
-import type { RafaConfig } from './core/config/index.js';
-import type { RouteTarget } from './core/config/sections.js';
 import type { TierSettings } from './tiers/resolve.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPath } from '@open-tomato/rafa/core/plan';
+import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
 import { planFilePath } from './adapters/planner/claude.js';
 import { createGhRunner } from './adapters/tracker/github.js';
@@ -239,18 +247,11 @@ import { checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
-import { CORE_ADAPTER_REGISTRY } from './core/adapters/index.js';
-import { CommandExit } from './core/command/index.js';
-import { ConfigError } from './core/config/index.js';
-import { loadConfig } from './core/config/load.js';
-import { activeOutput } from './core/output/index.js';
 import { requireNoticesAnswered } from './notices/run.js';
-import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
 import { resolveSessionTiers } from './start/serving.js';
 import { renderSkillIndex } from './task/skill-index.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
-import { planStubFromPath } from './utils/plan-stamp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

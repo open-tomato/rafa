@@ -7,7 +7,7 @@ import type { Key, Terminal } from './terminal.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { DISABLED_MARK, multiSelect, NO_CHOICES_TEXT, NONE_CHECKED_TEXT, renderMultiSelect } from './multi-select.js';
 import { NO_MATCHES_TEXT } from './select.js';

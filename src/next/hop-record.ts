@@ -8,7 +8,7 @@
  *
  * A {@link HopRecord} holds the fields below. Its type, `HopKind`,
  * `HopState` and {@link asHopRecord}, the check of its shape, live in
- * `src/core/loop/hop-record.ts`, where a session record reads them; this
+ * `packages/rafa/src/core/loop/hop-record.ts`, where a session record reads them; this
  * file re-exports them under the same names.
  *
  * - `kind`: `blocker` for a hop to the epic holding H's blocker C, or
@@ -51,15 +51,16 @@
  * record's `home`: a person switched by hand, which re-homes, so the
  * record no longer describes this checkout and the caller drops it.
  */
-import type { HopKind, HopRecord, HopState } from '../core/loop/hops.js';
 import type { Position } from '../project/position.js';
+import type { HopKind, HopRecord, HopState } from '@open-tomato/rafa/core/loop/hops';
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { asHopRecord } from '../core/loop/hops.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { asHopRecord } from '@open-tomato/rafa/core/loop/hops';
+
 import { scopeAt } from '../project/scope.js';
 
 export type { HopKind, HopRecord, HopState };

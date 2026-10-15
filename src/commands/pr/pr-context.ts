@@ -90,19 +90,20 @@
  * request, and a provider call that rejected.
  */
 import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import { execFileSync } from 'node:child_process';
 
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { mergeGuardSettings } from '../../release/guard-merge.js';
 

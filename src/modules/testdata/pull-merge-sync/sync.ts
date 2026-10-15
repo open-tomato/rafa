@@ -16,8 +16,8 @@
  * call, to `.rafa/sync-calls.log` under the repository the adapter is
  * made for, so a case reads what each end-of-task pull did.
  */
-import type { AdapterContext } from '../../../core/adapters/index.js';
-import type { Sync, SyncPullRequest, SyncPullResult } from '../../../ports/index.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { Sync, SyncPullRequest, SyncPullResult } from '@open-tomato/rafa/ports';
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,7 +1,7 @@
 /**
  * `rafa effort move` dispatched in planted `store: ndjson` projects
  * under the temp directory. `moveToSqlite`'s own cases
- * (`src/effort/store/move.test.ts`) hold the append, the count check and
+ * (`src/tests/core-coupled/effort/store/move.test.ts`) hold the append, the count check and
  * the config edit, so these hold what the command adds: the lines it
  * prints, the `--to` it takes and refuses, a repeated move, and json.
  *
@@ -9,8 +9,8 @@
  * and after and finds both byte-identical; the move case finds them
  * changed, so a snapshot that could not tell would fail there.
  */
-import type { EffortRow } from '../../effort/store/types.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { EffortRow } from '@open-tomato/rafa/store/types';
 
 import '../../adapter-registry.js';
 
@@ -20,8 +20,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { openNdjsonStore } from '../../effort/store/ndjson.js';
-import { openSqliteStore, sqliteStorePath } from '../../effort/store/sqlite.js';
+import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
+import { openSqliteStore, sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { createMoveCommand } from './move.js';

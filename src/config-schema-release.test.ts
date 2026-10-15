@@ -22,10 +22,18 @@
  * here with it from `core/config/config-sections.test.ts`. They drive
  * the reader directly, at a label of their own, as they did there.
  */
-import type { ConfigFile, ConfigSetting } from './core/config/index.js';
-import type { Reader, ValueAt } from './core/config/sections.js';
+import type { ConfigFile, ConfigSetting } from '@open-tomato/rafa/core/config';
+import type { Reader, ValueAt } from '@open-tomato/rafa/core/config/sections';
 
 import { describe, expect, it } from 'bun:test';
+
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
 
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
@@ -35,13 +43,6 @@ import {
   RELEASE_DEFAULTS,
   RELEASE_SECTION,
 } from './config-schema-release.js';
-import {
-  ConfigError,
-  EMPTY_CONFIG_REGISTRY,
-  mergeConfigSections,
-  parseConfigText,
-  resolveConfig,
-} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
