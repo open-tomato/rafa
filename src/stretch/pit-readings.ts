@@ -28,6 +28,19 @@
  *   left out would read as not filed. A bug filed and closed between
  *   two items is not open, so it is not listed.
  *
+ * ## Known cause: filed-since is derived from the open listing
+ *
+ * The filed-since reading has no listing of its own: it filters the same
+ * `openIssues('bug')` the count reads. A bug the pit-stop operator closes
+ * between the loop's filing and the item's readings therefore drops out of
+ * both. Stretch 7 recorded it in five times: the cut-off
+ * (`2026-10-14T01:29:39.610Z`, the last ledger line), #1084 filed after it
+ * (`2026-10-14T03:04:38Z`), #1084 closed by the operator, the item's
+ * readings taken, and the lines printed, `Bugs: 3 open.` and
+ * `Filed since 2026-10-14T01:29:39.610Z: none.`. The listing's label
+ * filter, its limit and the cut-off were all right; the source of the
+ * reading was not. `pit-readings.test.ts` records this shape.
+ *
  * ## Each reading stands alone
  *
  * A reading that fails, a `gh` that would not answer or a tracker that

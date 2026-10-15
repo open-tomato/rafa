@@ -220,6 +220,23 @@ describe('the bug readings', () => {
   });
 });
 
+describe('the cause: filed-since is derived from the open listing', () => {
+  it('prints none and the open count when the bug filed after the cut-off was closed before the reading', async () => {
+    // Stretch 7: #1084 was filed at 03:04:38Z, after the cut-off, and closed
+    // by the operator, so the open listing holds only the three older bugs.
+    const cutoff = new Date('2026-10-14T01:29:39.610Z');
+    const listing = [
+      bug('1001', 'an open bug', '2026-10-10T09:00:00Z'),
+      bug('1040', 'another open bug', '2026-10-12T09:00:00Z'),
+      bug('1070', 'a third open bug', '2026-10-13T09:00:00Z'),
+    ];
+
+    const lines = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, listing), { branch: 'stretch/7', since: cutoff }));
+
+    expect(lines.slice(-2)).toEqual(['Bugs: 3 open.', 'Filed since 2026-10-14T01:29:39.610Z: none.']);
+  });
+});
+
 describe('the rendered lines', () => {
   it('prints the red run, its cases, the count and the new bugs', async () => {
     const red = caseGh([plantedRun({ conclusion: 'failure' })]);
