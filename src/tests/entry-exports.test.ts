@@ -365,6 +365,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'EffortRow',
     'EffortRowByKind',
     'EffortRowKind',
+    'FiledIssue',
     'GeneratedPlan',
     'InstinctRecord',
     'Issue',
