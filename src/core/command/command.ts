@@ -89,8 +89,8 @@
 import type { CommandRegistry } from './registry-types.js';
 import type { CommandSpend } from './spends.js';
 import type { CliCommand, CliContext, FlagSpec } from './types.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { DangerousPhrases } from '../config/dangerous.js';
+import type { ProjectFound } from '../config/scope.js';
 
 import { describeValue } from '../config/config-sections.js';
 

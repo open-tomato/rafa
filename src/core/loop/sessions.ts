@@ -245,8 +245,8 @@ import {
   sessionSteps,
   stepProblems,
 } from '../../loop/session-record-parse.js';
-import { scopeAt } from '../../project/scope.js';
 import { messageOf } from '../config/config-sections.js';
+import { scopeAt } from '../config/scope.js';
 
 export type {
   SessionPhase,

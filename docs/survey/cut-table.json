@@ -2255,7 +2255,7 @@
     {
       "kind": "source",
       "path": "src/project/scope.ts",
-      "upwardEdgesIn": 12
+      "upwardEdgesIn": 10
     },
     {
       "kind": "source",
@@ -3610,13 +3610,6 @@
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/core/command/command.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/config/config-sections.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3670,13 +3663,6 @@
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
           "to": "src/next/hop-record.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/loop/sessions.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/project/scope.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -3737,7 +3723,7 @@
         }
       ],
       "fileCounts": {
-        "source": 101,
+        "source": 102,
         "test": 109,
         "testSupport": 2
       },
@@ -3752,6 +3738,7 @@
         "src/core/command/confirm.ts",
         "src/core/command/index.test.ts",
         "src/core/command/index.ts",
+        "src/core/command/registry-types.ts",
         "src/core/command/running.test.ts",
         "src/core/command/running.ts",
         "src/core/command/spends.test.ts",
@@ -3956,7 +3943,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 87,
+        "src/core/": 88,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3973,8 +3960,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 18,
-      "upwardEdges": 18
+      "remaining": 16,
+      "upwardEdges": 16
     },
     {
       "clearedByIssue118": 0,
@@ -7761,12 +7748,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1984,
+    "files": 1985,
     "leftToPlace": 718,
     "nonTestEdges": 4428,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 270
+    "upwardEdges": 268
   },
   "unassigned": [
     {

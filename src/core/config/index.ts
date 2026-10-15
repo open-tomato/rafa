@@ -1,13 +1,13 @@
 /**
  * The barrel over the config's schema and its layers: every name
  * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`,
- * `config.ts` and `dangerous.ts` export, less the names the
+ * `config.ts`, `dangerous.ts` and `scope.ts` export, less the names the
  * `sections.ts` barrel holds, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the six
+ * A file outside `src/core/` imports this file and never the seven
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the six directly and never this
+ * file inside `src/core/` imports the seven directly and never this
  * file.
  *
  * ## The barrels hold no name in common
@@ -26,6 +26,13 @@
  * and `src/index.ts` publishes `load.ts` whole, where the phrases and
  * pass lines are no published name.
  *
+ * `scope.ts` joined it with a scope's paths, `Scope`, the project the
+ * dispatcher resolved, `ProjectFound`, and `scopeAt`, whose walk,
+ * `resolveScope`, stays in `src/project/scope.ts`. It reads `config.ts`
+ * and `core-section.ts` by value and `config-load.ts` as a type, so it
+ * is no leaf for `sections.ts`, and `load.ts` holds `config-load.ts`
+ * alone.
+ *
  * `config.ts` re-exports twenty-seven names of `config-sections.ts`
  * (`InjectMode`, `OUTPUT_MODES`, `ConfigExtra` and the like), as it did
  * before it moved. None of them is exported here: a caller outside
@@ -33,10 +40,10 @@
  * be learned from. A file that used to take `ConfigError` and
  * `OUTPUT_MODES` in one line from `config.js` now spells two lines.
  *
- * ## Why one barrel can hold all six
+ * ## Why one barrel can hold all seven
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. One of the six
+ * imports the barrel back by value is a runtime cycle. One of the seven
  * files behind this one imports outward by value: `core-section.ts`
  * reads `src/tiers/routing.ts`, which imports this barrel with
  * `import type` alone, erased before anything loads. No file behind it
@@ -48,7 +55,7 @@
  * holds the rule for every file under `src/core/`. The registry imports
  * this barrel by value and nothing here imports the registry. A section
  * file reads its values from `sections.ts`, which imports none of the
- * six, and adds its fields to `RafaConfig` with a `declare module` on
+ * seven, and adds its fields to `RafaConfig` with a `declare module` on
  * `config-schema.ts`, which the checker follows and which loads
  * nothing. `config-schema.ts` and `section.ts` import types alone.
  *
@@ -112,7 +119,7 @@
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
- * `index.test.ts` holds the list to the six files: every name any of
+ * `index.test.ts` holds the list to the seven files: every name any of
  * them exports and `sections.ts` does not is here once, as the same
  * binding, and no other name is here.
  */
@@ -148,6 +155,7 @@ export type {
   ResolvedConfig,
 } from './config.js';
 export type { DangerousPhrases } from './dangerous.js';
+export type { ProjectFound, Scope } from './scope.js';
 
 export {
   MODULE_SOURCE_KEYS,
@@ -193,3 +201,4 @@ export {
   setDangerousPhrases,
   writeDangerousPassLines,
 } from './dangerous.js';
+export { scopeAt } from './scope.js';
