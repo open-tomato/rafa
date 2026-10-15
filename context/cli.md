@@ -354,17 +354,17 @@ New; it replaces no earlier text. What a row or an action added to
   than to a habit, so `reads the imports <path> takes as the ones spelled
   here` goes red the moment a module gains, drops or renames one import.
   `src/rafa.ts` is held the same way by `CLI_IMPORTS` in the same file,
-  whose note also names those imports in words, so an import added to
-  the entry point moves the list and the sentence.
-  Adding an import to a command module is therefore a two-file change,
-  the module and that roster — the sibling of the declared-flag roster
-  `src/commands/index.test.ts` holds. Its `IMPORT_PATTERN` matches
-  RELATIVE specifiers only, those opening `./` or `../`, so a module's
-  `node:fs` and `node:path` imports are spelled nowhere in the roster and
-  adding one reddens nothing. Only the registered command modules are
-  listed, not the helpers they import: an import added to
-  `src/commands/plan/spec-route.ts` reddens nothing, while one added to
-  `src/commands/plan/create.ts` does.
+  whose note also names those imports in words, so an import added to the
+  entry point moves the list and the sentence. Adding an import to a
+  command module is therefore a two-file change, the module and that
+  roster — the sibling of the declared-flag roster
+  `src/commands/index.test.ts` holds. Both edits land in that same task.
+  Its `IMPORT_PATTERN` matches RELATIVE specifiers only, those opening
+  `./` or `../`, so a module's `node:fs` and `node:path` imports are
+  spelled nowhere in the roster and adding one reddens nothing. Only the
+  registered command modules are listed, not the helpers they import: an
+  import added to `src/commands/plan/spec-route.ts` reddens nothing,
+  while one added to `src/commands/plan/create.ts` does.
 - **Neither roster walks the filesystem.** Both are spelled lists checked
   against `CORE_REGISTRY`, so a module added under `src/commands/` and not
   yet registered reddens neither, and a plan can split "add the module"
