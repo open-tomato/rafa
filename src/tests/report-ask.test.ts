@@ -124,6 +124,15 @@ describe('the report ask in src/PROMPT.md', () => {
     expect(reading.issues).toEqual([]);
     expect(reading.report.status).toBe('done');
     expect(reading.report.findings).toHaveLength(1);
+    expect(reading.report.outOfScopeBugs).toHaveLength(1);
+    expect(reading.report.outOfScopeBugs[0]).toMatchObject({
+      kind: 'bug',
+      module: expect.any(String),
+      action: expect.any(String),
+      reproduce: expect.any(String),
+      cause: expect.any(String),
+      extras: [],
+    });
   });
 
   it('reports the status of an example that copies the spec choice literally', () => {
