@@ -47,6 +47,7 @@ const SETTINGS: MergeGuardSettings = {
   releaseHeading: '## {version} — {date}, {title}',
   prVersionCollision: 'refuse',
   dangerousAcceptVersionCollision: false,
+  releaseMoveLock: false,
 };
 
 /** When every read runs. */

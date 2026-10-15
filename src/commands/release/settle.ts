@@ -172,6 +172,7 @@ function settleSettings(config: RafaConfig): SettleSettings {
     releaseFragments: config.releaseFragments,
     releaseStrategy: config.releaseStrategy,
     releaseHeading: config.releaseHeading,
+    releaseMoveLock: config.releaseMoveLock,
   };
 }
 

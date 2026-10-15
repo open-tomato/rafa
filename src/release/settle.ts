@@ -104,6 +104,8 @@ export interface SettleSettings extends BranchForecastSettings {
   readonly releaseChangelog: string;
   /** `release.fragments`, the directory the waiting fragments sit in. */
   readonly releaseFragments: string;
+  /** `release.moveLock`, whether the release commit moves `rafa.lock` to the version it settles. */
+  readonly releaseMoveLock: boolean;
 }
 
 /** One fragment a settle folds: the fold's view of it, and where it sits. */
