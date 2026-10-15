@@ -1090,6 +1090,11 @@ runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
 spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
 `afterMerge`). `--yes` does not answer that question; every failure is a warning.
+Each blocker's state is read the way `rafa issue unblock` reads it
+(`src/board/blocker-states.ts`): one `gh issue list --state all --limit 500`,
+then one `gh issue view <n> --json number,state` for each blocker that a full
+listing did not hold. A blocker whose state is not read counts as not cleared,
+so its issue keeps the label and the run names it `#<n> (state not read)`.
 
 In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
 the open issues the merge freed, read through the port's `freedBy`, and sends no
