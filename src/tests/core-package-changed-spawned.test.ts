@@ -18,6 +18,7 @@ import { realNodeModules } from './real-node-modules.js';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const CHECKOUT = REPO_ROOT;
 const EDITED = 'packages/rafa/src/effort/store/schema-plan.ts';
 const ROOT_TEST = 'src/index.test.ts';
 const HUB_TEST = 'packages/rafa-hub/src/core-subpaths.test.ts';
@@ -53,7 +54,7 @@ beforeAll(() => {
 }, SCRATCH_TIMEOUT_MS);
 
 afterAll(() => {
-  if (worktree !== '') Bun.spawnSync(['git', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+  if (worktree !== '') Bun.spawnSync(['git', 'worktree', 'remove', '--force', worktree], { cwd: CHECKOUT });
   if (tempBase !== '') rmSync(tempBase, { recursive: true, force: true });
 });
 
