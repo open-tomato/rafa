@@ -51,7 +51,7 @@
  *
  * ## Why the session readings are not here
  *
- * `src/core/loop/` has two barrels, both listed under `CORE_BARRELS` in
+ * `src/core/loop/` has three barrels, all listed under `CORE_BARRELS` in
  * `scripts/survey/core-moves.ts`. `session-readings.ts`, the second
  * file that moved here, sits alone behind `readings.ts`. It reaches
  * `src/effort/store/development-build.ts` by value, through
@@ -60,6 +60,20 @@
  * this barrel the store would import this file, and this file the
  * store: a cycle of six files. `readings.ts` records the measurement,
  * and `readings.test.ts` holds that no name is on both barrels.
+ *
+ * ## Why the hop record is not here
+ *
+ * `hop-record.ts`, the shapes of the hop record and of a place, sits
+ * alone behind `hops.ts`. `src/next/hop-record.ts` and
+ * `src/project/position.ts` re-export its names, so they import a
+ * barrel over it by value, and `src/loop/session-record-parse.ts`,
+ * which `sessions.ts` imports by value, imports `asHopRecord` from
+ * `src/next/hop-record.ts` by value. With `hop-record.ts` behind this
+ * barrel that is a cycle of four files: this one, `sessions.ts`, the
+ * parser and `src/next/hop-record.ts`. `hops.ts` records the
+ * measurement, and `hops.test.ts` holds that no name is on two loop
+ * barrels. `sessions.ts` imports `hop-record.ts` by path, for
+ * `HopRecord`.
  *
  * ## Why the barrel closes no cycle
  *

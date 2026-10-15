@@ -19,9 +19,9 @@
  *
  * ## Why one file has a barrel of its own
  *
- * `src/core/loop/` has two barrels, both listed under `CORE_BARRELS` in
+ * `src/core/loop/` has three barrels, all listed under `CORE_BARRELS` in
  * `scripts/survey/core-moves.ts`. `index.ts` holds `sessions.ts` and
- * `claude.ts`. This one holds `session-readings.ts` alone, because
+ * `claude.ts` with two more, and `hops.ts` holds `hop-record.ts`. This one holds `session-readings.ts` alone, because
  * `index.ts` cannot take it.
  *
  * A barrel that groups a file with a file outside `src/core/` that
@@ -74,7 +74,8 @@
  *
  * `readings.test.ts` holds the list to the file: every name
  * `session-readings.ts` exports is here once, as the same binding, no
- * other name is here, and no name here is on the other loop barrel.
+ * other name is here, and no name here is on `index.ts`; `hops.test.ts`
+ * holds `hops.ts` apart from both.
  */
 export type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from './session-readings.js';
 

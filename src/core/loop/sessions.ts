@@ -212,6 +212,7 @@
  * read. This module re-exports what a caller reads from there, so
  * `./sessions.js` stays the one import a record's reader needs.
  */
+import type { HopRecord } from './hop-record.js';
 import type { SuiteFailure } from './suite-failure.js';
 import type {
   SessionPhase,
@@ -219,7 +220,6 @@ import type {
   SessionStepKind,
   SessionStepReason,
 } from '../../loop/session-record-parse.js';
-import type { HopRecord } from '../../next/hop-record.js';
 import type { TestScope } from '../plan/declaration.js';
 
 import {

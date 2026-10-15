@@ -308,20 +308,24 @@ export const CORE_REEXPORTS: readonly string[] = [
  * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
  * file under `src/` and so reaches nothing that imports it back.
  *
- * `loop` has two. `session-readings.ts` sits alone behind
+ * `loop` has three. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
- * that file imports `index.ts` back. `index.ts` holds `sessions.ts`
- * and `claude.ts`, which share it because neither reaches a file that
- * imports it back.
+ * that file imports `index.ts` back. `hop-record.ts` sits alone behind
+ * `hops.ts`, because `src/next/hop-record.ts` imports it by value and
+ * is reached by value from `sessions.ts`, through
+ * `src/loop/session-record-parse.ts`, so `index.ts` over it would close
+ * a cycle. `index.ts` holds `sessions.ts`, `claude.ts`,
+ * `session-env.ts` and `suite-failure.ts`, which share it because none
+ * reaches a file that imports it back.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],
   command: ['src/core/command/index.ts'],
   config: ['src/core/config/index.ts', 'src/core/config/load.ts', 'src/core/config/sections.ts'],
   git: ['src/core/git/index.ts'],
-  loop: ['src/core/loop/index.ts', 'src/core/loop/readings.ts'],
+  loop: ['src/core/loop/hops.ts', 'src/core/loop/index.ts', 'src/core/loop/readings.ts'],
   output: ['src/core/output/index.ts'],
   plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
   runtime: ['src/core/runtime/index.ts'],

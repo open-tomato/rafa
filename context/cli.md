@@ -221,7 +221,8 @@ that rafa prints omit the proposal words `hop` and `home` unless the run was
 typed with `--roadmap`.
 
 The hop record (`.rafa/hop.json`): Where a hop is under way, this per-project
-file holds the one record `src/next/hop-record.ts` defines. It names the kind
+file holds the one record `src/core/loop/hop-record.ts` defines and
+`src/next/hop-record.ts` reads and writes. It names the kind
 (`blocker` for a hop to C's epic, `dry` for a hop to the next `now` epic),
 the places the hop comes back to (the position's `home`) and leaves from,
 the issue numbers H and C (null on a dry hop), the epic and board the hop

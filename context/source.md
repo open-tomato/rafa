@@ -113,10 +113,10 @@ report code, but the effort store reads it, so it is core. Core is also
 `src/report/record.ts`: core by assignment, kept where they are.
 
 **A subject's barrel is the only file under `src/core/` that a file
-outside it may import.** There are twelve, all listed in `CORE_BARRELS` of
+outside it may import.** There are thirteen, all listed in `CORE_BARRELS` of
 `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
-four more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts` and
-`plan/block-reader.ts`. A barrel re-exports the names of the files behind
+five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
+`loop/hops.ts` and `plan/block-reader.ts`. A barrel re-exports the names of the files behind
 it and no more. The barrels are the declared exports until the cut names
 real subpaths (#808).
 
@@ -217,7 +217,7 @@ with no section registered to a refusal naming `src/config-registry.ts`.
 barrel that groups a file with one outside `src/core/` that imports the
 barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
-proves nothing about it. The four barrels beyond the subject indexes are
+proves nothing about it. The five barrels beyond the subject indexes are
 the splits made so far. `config/sections.ts` holds the leaf pair
 `config-sections.ts` and `config-readers.ts`, split while
 `config-merged.ts` imported section files that import the pair back;
@@ -227,6 +227,10 @@ alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
 from which `development-build.ts` imports `loop/index.ts` back.
+`loop/hops.ts` stands alone over `hop-record.ts`, because
+`src/next/hop-record.ts` imports it back by value and
+`src/loop/session-record-parse.ts`, which `sessions.ts` imports by
+value, imports that file by value.
 `plan/block-reader.ts` stands alone, split while `parse.ts` imported
 `src/utils/tracker.ts`, which imports `blocks.ts` back; `parse.ts` now
 reads `plan/blocker-comment.ts` instead and no core file imports the

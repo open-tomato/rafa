@@ -109,7 +109,7 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists twelve barrels, three of them for config, two for loop and two for plan', () => {
+  it('lists thirteen barrels, three of them for config, three for loop and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'src/core/adapters/index.ts',
       'src/core/command/index.ts',
@@ -117,6 +117,7 @@ describe('CORE_BARRELS', () => {
       'src/core/config/load.ts',
       'src/core/config/sections.ts',
       'src/core/git/index.ts',
+      'src/core/loop/hops.ts',
       'src/core/loop/index.ts',
       'src/core/loop/readings.ts',
       'src/core/output/index.ts',
@@ -133,6 +134,8 @@ describe('CORE_BARRELS', () => {
     expect(isCoreBarrel('src/core/plan/blocks.ts')).toBe(false);
     expect(isCoreBarrel('src/core/loop/readings.ts')).toBe(true);
     expect(isCoreBarrel('src/core/loop/session-readings.ts')).toBe(false);
+    expect(isCoreBarrel('src/core/loop/hops.ts')).toBe(true);
+    expect(isCoreBarrel('src/core/loop/hop-record.ts')).toBe(false);
     expect(isCoreBarrel('src/core/runtime/index.ts')).toBe(true);
     expect(isCoreBarrel('src/core/runtime/identity.ts')).toBe(false);
     expect(isCoreBarrel('src/runtime/identity.ts')).toBe(false);

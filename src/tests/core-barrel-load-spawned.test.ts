@@ -141,6 +141,7 @@ describe('the entry point in a fresh process', () => {
 const PLAN_LOOP_STORE_FIRST: string[] = [
   join('core', 'plan', 'index.ts'),
   join('core', 'plan', 'block-reader.ts'),
+  join('core', 'loop', 'hops.ts'),
   join('core', 'loop', 'index.ts'),
   join('core', 'loop', 'readings.ts'),
   join('effort', 'store', 'index.ts'),

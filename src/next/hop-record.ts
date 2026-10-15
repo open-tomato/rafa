@@ -6,12 +6,16 @@
  *
  * ## The record
  *
- * A {@link HopRecord} holds:
+ * A {@link HopRecord} holds the fields below. Its type, `HopKind`,
+ * `HopState` and {@link asHopRecord}, the check of its shape, live in
+ * `src/core/loop/hop-record.ts`, where a session record reads them; this
+ * file re-exports them under the same names.
  *
  * - `kind`: `blocker` for a hop to the epic holding H's blocker C, or
  *   `dry` for a hop to the next `now` epic after the home epic ran dry.
  * - `home` and `from`: the place the hop comes back to, and the place it
- *   left. Both are {@link Place} pairs, read as `position.ts` reads them.
+ *   left. Both are `Place` pairs, read through `asPlace` as `position.ts`
+ *   reads them.
  * - `blocked` and `target`: the issue numbers H and C. A `blocker` record
  *   holds both; a `dry` record holds null in both, and any other mix is
  *   read as a wrong shape.
@@ -47,42 +51,22 @@
  * record's `home`: a person switched by hand, which re-homes, so the
  * record no longer describes this checkout and the caller drops it.
  */
-import type { Place, Position } from '../project/position.js';
+import type { HopKind, HopRecord, HopState } from '../core/loop/hops.js';
+import type { Position } from '../project/position.js';
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
-import { asPlace } from '../project/position.js';
+import { asHopRecord } from '../core/loop/hops.js';
 import { scopeAt } from '../project/scope.js';
+
+export type { HopKind, HopRecord, HopState };
+export { asHopRecord };
 
 /** The hop record's file name, under the project's `.rafa/`. */
 export const HOP_FILE = 'hop.json';
-
-/** Why the hop went: H's blocker, or a home epic that ran dry. */
-export type HopKind = 'blocker' | 'dry';
-
-/** Where the hop stands: working its target, back home waiting on it or with it merged, or back home from a halt. */
-export type HopState = 'away' | 'waiting' | 'merged' | 'halted';
-
-/** The record the file holds; see the module note. */
-export interface HopRecord {
-  readonly kind: HopKind;
-  readonly home: Place;
-  readonly from: Place;
-  /** H, the home issue its blocker stopped; null on a dry hop. */
-  readonly blocked: number | null;
-  /** C, H's blocker the hop works; null on a dry hop. */
-  readonly target: number | null;
-  readonly targetEpic: number;
-  readonly targetBoard: number;
-  readonly state: HopState;
-  /** The target's pull request, null before it is opened. */
-  readonly pullRequest: number | null;
-  /** ISO 8601. */
-  readonly startedAt: string;
-}
 
 /** Why the file reads as unset. */
 export type HopUnsetReason = 'absent' | 'unreadable' | 'wrong-shape';
@@ -92,70 +76,9 @@ export type HopReading =
   | { readonly set: true; readonly record: HopRecord }
   | { readonly set: false; readonly reason: HopUnsetReason; readonly detail: string };
 
-const HOP_KINDS: readonly string[] = ['blocker', 'dry'] satisfies readonly HopKind[];
-const HOP_STATES: readonly string[] = ['away', 'waiting', 'merged', 'halted'] satisfies readonly HopState[];
-
 /** `<root>/.rafa/hop.json`. */
 export function hopFilePath(root: string): string {
   return join(scopeAt(root).dir, HOP_FILE);
-}
-
-/** True for a plain object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** True for an issue number: a positive integer. */
-function isIssueNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
-}
-
-/** True for an issue number or null. */
-function isIssueOrNull(value: unknown): value is number | null {
-  return value === null || isIssueNumber(value);
-}
-
-/** True for a string `Date` can read. */
-function isTimestamp(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
-}
-
-/** True when `blocked` and `target` match the kind: both set on a blocker hop, both null on a dry one. */
-function issuesMatchKind(kind: HopKind, blocked: number | null, target: number | null): boolean {
-  return kind === 'blocker'
-    ? blocked !== null && target !== null
-    : blocked === null && target === null;
-}
-
-/**
- * `value` as a hop record, or null when it is not one: the check
- * {@link readHopRecord} makes on the parsed file, which the session record
- * makes on its `hop` field (`src/core/loop/sessions.ts`).
- */
-export function asHopRecord(value: unknown): HopRecord | null {
-  if (!isRecord(value)) return null;
-  const { kind, blocked, target, targetEpic, targetBoard, state, pullRequest, startedAt } = value;
-  const home = asPlace(value.home);
-  const from = asPlace(value.from);
-  if (typeof kind !== 'string' || !HOP_KINDS.includes(kind)) return null;
-  if (typeof state !== 'string' || !HOP_STATES.includes(state)) return null;
-  if (home === null || from === null) return null;
-  if (!isIssueOrNull(blocked) || !isIssueOrNull(target) || !isIssueOrNull(pullRequest)) return null;
-  if (!isIssueNumber(targetEpic) || !isIssueNumber(targetBoard) || !isTimestamp(startedAt)) return null;
-  const hopKind = kind as HopKind;
-  if (!issuesMatchKind(hopKind, blocked, target)) return null;
-  return {
-    kind: hopKind,
-    home,
-    from,
-    blocked,
-    target,
-    targetEpic,
-    targetBoard,
-    state: state as HopState,
-    pullRequest,
-    startedAt,
-  };
 }
 
 /** Reads `.rafa/hop.json`; see the module note. */

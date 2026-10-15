@@ -1850,7 +1850,7 @@
     {
       "kind": "source",
       "path": "src/next/hop-record.ts",
-      "upwardEdgesIn": 3
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -3638,13 +3638,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/core/loop/sessions.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/next/hop-record.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3660,7 +3653,7 @@
         }
       ],
       "fileCounts": {
-        "source": 108,
+        "source": 109,
         "test": 113,
         "testSupport": 2
       },
@@ -3736,6 +3729,7 @@
         "src/core/loop/sessions-worktree.test.ts",
         "src/core/loop/sessions.test.ts",
         "src/core/loop/sessions.ts",
+        "src/core/loop/suite-failure.ts",
         "src/core/output/active.test.ts",
         "src/core/output/active.ts",
         "src/core/output/index.test.ts",
@@ -3890,7 +3884,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 98,
+        "src/core/": 99,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3907,8 +3901,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 7,
-      "upwardEdges": 7
+      "remaining": 6,
+      "upwardEdges": 6
     },
     {
       "clearedByIssue118": 0,
@@ -7695,12 +7689,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1995,
+    "files": 1996,
     "leftToPlace": 718,
-    "nonTestEdges": 4443,
+    "nonTestEdges": 4444,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 259
+    "upwardEdges": 258
   },
   "unassigned": [
     {
