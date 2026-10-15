@@ -16,6 +16,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { findStoreRuleProblems } from '../../plan/store-rules.js';
 import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
 
 import { findBundledEdits, writeTierPins } from './bundled-check.js';
@@ -302,5 +303,30 @@ describe('writeTierPins', () => {
 
     expect(writeTierPins(path, PLAN_FILE, [])).toEqual([]);
     expect(existsSync(path)).toBe(false);
+  });
+});
+
+describe('findBundledEdits then writeTierPins over a planted project', () => {
+  it('lands both pins in one file under one heading and leaves the store rules answering nothing', () => {
+    const plan = planOf(
+      '- [ ] Rewrite `src/bundled/agents/doc-updater.md` to read the changes fragment',
+      '- [ ] Teach the planner in `.claude/skills/dev-planner` a new step',
+    );
+    const path = freshPrerequisitesPath();
+
+    const edits = findBundledEdits(plan, { repoRoot: project });
+    expect(edits.map(({ name }) => name).sort()).toEqual(['dev-planner', 'doc-updater']);
+    expect(writeTierPins(path, PLAN_FILE, edits)).toHaveLength(2);
+
+    const text = readFileSync(path, 'utf8');
+    expect(text.match(/^## /gmu)).toEqual(['## ']);
+    expect(text.match(/## Tier pins \[human\]/gu)).toHaveLength(1);
+    expect(text).toContain('`tiers.agents: { doc-updater: project }`');
+    expect(text).toContain('`tiers.skills: { dev-planner: project }`');
+    expect(parsePrerequisites(text).map(({ tag, probe }) => ({ tag, probe }))).toEqual([
+      { tag: 'human', probe: null },
+      { tag: 'human', probe: null },
+    ]);
+    expect(findStoreRuleProblems({ plan, prerequisites: text, prerequisitesName: PLAN_FILE })).toEqual([]);
   });
 });
