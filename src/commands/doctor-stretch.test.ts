@@ -34,6 +34,8 @@ import type { RafaCommand } from '../core/command/index.js';
 import type { Output } from '../ports/index.js';
 import type { StretchFolderSeams, StretchFs } from '../stretch/folder.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

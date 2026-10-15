@@ -110,6 +110,8 @@ import type { CommitLogParseResult, CommitStats } from './commits.js';
 import type { SessionLogCandidate } from './session-log-dirs.js';
 import type { EffortStore } from './store/types.js';
 
+import '../adapter-registry.js';
+
 import {
   chmodSync,
   existsSync,

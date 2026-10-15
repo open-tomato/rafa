@@ -5,8 +5,10 @@
  * Among the seams core carries from phase 1, the modules spec names "an
  * adapter registry inside core keyed by `(type, kind)`, populated from
  * core's own adapters at startup and from enabled modules", with config
- * selecting by kind. This module is that registry and core's part of
- * populating it. Enabling a module is phase 7's work; until then an
+ * selecting by kind. This module is that registry and the slot it is
+ * populated through; core's own adapters are handed in by the
+ * composition root `src/adapter-registry.ts` (see "What core
+ * registers"). Enabling a module is phase 7's work; until then an
  * add-on reaches the registry through {@link AdapterRegistry.register},
  * which `src/modules/load.ts` calls for each module `allowList:` names
  * from a `path` source. No reader resolves through that registry yet:
@@ -54,26 +56,44 @@
  * `portVersion` afterwards cannot get past the check. Bun runs every
  * test file in one process, and a registry changed in place would carry
  * one case's fixture adapter into every file after it.
- * {@link CORE_ADAPTER_REGISTRY} is a constant for the same reason.
+ *
+ * The one module-level value is the active registry, and it is replaced,
+ * never changed: {@link registerAdapters} replaces it with one holding
+ * more adapters and answers the one it replaced, and
+ * {@link restoreAdapters} puts one back, as `registerConfigSections` and
+ * `restoreConfigSections` do for the config sections
+ * (`src/core/config/section.ts`). A case that registers puts the
+ * previous registry back in a `finally`, or every file bun runs later
+ * reads its adapters. {@link activeAdapterRegistry} answers the active
+ * registry as the value it is. {@link CORE_ADAPTER_REGISTRY} is a
+ * frozen facade over that slot: no caller can change it, and each of its
+ * members reads the active registry when it is called.
  *
  * ## What core registers
  *
- * The two store backends, `store/sqlite` and `store/ndjson`, which
- * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
- * the three outputs, `output/text` from `src/core/output/` and
- * `output/json` and `output/events` under `src/adapters/output/`, the
- * logger under
- * `src/adapters/logger/`, `logger/console`, the two trackers under `src/adapters/tracker/`,
+ * Nothing of its own: this module imports no adapter. The composition
+ * root `src/adapter-registry.ts`, outside `src/core/`, lists core's
+ * adapters and hands them to {@link registerAdapters} as it is imported,
+ * and `src/rafa.ts` and `src/index.ts` import it right after
+ * `src/config-registry.ts`. Until something registers, every member of
+ * {@link CORE_ADAPTER_REGISTRY} refuses, naming that module.
+ *
+ * The root registers the two store backends, `store/sqlite` and
+ * `store/ndjson`, which `selectEffortStore` resolves through
+ * {@link CORE_ADAPTER_REGISTRY}, the three outputs, `output/text` from
+ * `src/core/output/` and `output/json` and `output/events` under
+ * `src/adapters/output/`, the logger under `src/adapters/logger/`,
+ * `logger/console`, the two trackers under `src/adapters/tracker/`,
  * `tracker/local` and `tracker/github`, the learning adapter under
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
  * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
- * the phase 1 table names. The `sync` port adds `sync/local`, the default
- * strategy of `effort.sync`, from `src/effort/sync/select.ts`, whose
- * `selectSync` resolves `effort.sync` through a registry, and `sync/file`,
- * the store carried as a file, from `src/effort/sync/file.ts`. `git`,
- * `service` and `p2p` are modules' strategies, registered by a loaded
- * module.
+ * the phase 1 table names. The `sync` port adds `sync/local`, the
+ * default strategy of `effort.sync`, from `src/effort/sync/select.ts`,
+ * whose `selectSync` resolves `effort.sync` through a registry, and
+ * `sync/file`, the store carried as a file, from
+ * `src/effort/sync/file.ts`. `git`, `service` and `p2p` are modules'
+ * strategies, registered by a loaded module.
  *
  * ## What an adapter answers
  *
@@ -97,11 +117,15 @@
  * strategy added `store`, and the `service` sync strategy a module
  * brings added `hub`. The planner's first three are optional to the
  * type and not to the adapter: none has a default it could fall back on
- * (`src/adapters/planner/claude.ts` says why), so its `create` throws
- * when any is left out. `store` is the same to `sync/file`: a default of
+ * (`src/adapters/planner/claude.ts` says why), so the `create` the root
+ * registers throws when any is left out. `store` is the same to
+ * `sync/file`: a default of
  * `sqlite` would carry an NDJSON project's store without its sessions
  * (`src/effort/sync/file.ts` says why), so its `create` throws when it is
- * left out or names no backend. Each output `create` makes a new output,
+ * left out or names no backend. The `local` learning adapter's floor
+ * defaults to the registered `learning.bless.minConfidence`, and its
+ * `create` throws, naming `src/config-registry.ts`, when no section
+ * registered one. Each output `create` makes a new output,
  * so a `json` output's one terminal result belongs to the command it was
  * made for. Each tracker `create` makes a new tracker, so the reason a
  * `local` tracker records is the one its own context named, and the
@@ -123,40 +147,10 @@ import type { GhRunner } from '../git/gh-runner.js';
 import type { CapturingSpawner } from '../loop/claude.js';
 import type { OutputStream } from '../output/stream.js';
 
-import { homedir } from 'node:os';
-
-import { createLocalLearning, localInstinctsDir } from '../../adapters/learning/local.js';
-import { createConsoleLogger } from '../../adapters/logger/console.js';
-import { createEventsOutput } from '../../adapters/output/events.js';
-import { createJsonOutput } from '../../adapters/output/json.js';
-import { createClaudePlanner } from '../../adapters/planner/claude.js';
-import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
-import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
-import { openNdjsonStore } from '../../effort/store/ndjson.js';
-import { openSqliteStore } from '../../effort/store/sqlite.js';
-import { createFileSync } from '../../effort/sync/file.js';
-import { createLocalSync } from '../../effort/sync/select.js';
-import { describeValue, STORE_BACKENDS } from '../config/config-sections.js';
-import { activeDefaults } from '../config/section.js';
-import { createTextOutput } from '../output/text.js';
+import { describeValue } from '../config/config-sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';
-
-/**
- * The registered default of `learning.bless.minConfidence`, for a
- * learning adapter made with none: read off the sections registered
- * with `section.ts`, since core imports no list of them. Throws when
- * nothing registered one, naming the module that registers them.
- */
-function registeredBlessMinConfidence(): number {
-  const value = activeDefaults().learningBlessMinConfidence;
-  if (value === undefined) {
-    throw new Error(`${REFUSAL}: learning.bless.minConfidence has no registered default:`
-      + ' import src/config-registry.ts before making the local learning adapter without one');
-  }
-  return value;
-}
 
 /**
  * The version core serves of each port, by port type.
@@ -319,7 +313,8 @@ export interface AdapterRegistry {
   readonly register: (adapter: AnyAdapter) => AdapterRegistry;
   /**
    * The adapter held under a port type and kind, or undefined when none
-   * is. Never throws, whatever it is handed.
+   * is. Never throws, whatever it is handed, but for
+   * {@link CORE_ADAPTER_REGISTRY} while nothing is registered.
    */
   readonly find: <P extends PortType>(port: P, kind: string) => Adapter<P> | undefined;
   /**
@@ -445,139 +440,91 @@ export function createAdapterRegistry(adapters: readonly AnyAdapter[] = []): Ada
   return Object.freeze(registry);
 }
 
+/** The registry before anything is registered: no adapter under any port type. */
+const EMPTY_ADAPTER_REGISTRY: AdapterRegistry = createAdapterRegistry();
+
+/** The module that registers core's adapters, as a refusal names it. */
+const COMPOSITION_ROOT = 'src/adapter-registry.ts';
+
+/** The module-level registry {@link CORE_ADAPTER_REGISTRY} reads at call time. */
+let active: AdapterRegistry = EMPTY_ADAPTER_REGISTRY;
+
+/** Whether a registry holds no adapter under any port type. */
+function holdsNone(registry: AdapterRegistry): boolean {
+  return [...SERVED_VERSIONS.keys()].every((port) => registry.kinds(port as PortType).length === 0);
+}
+
 /**
- * Each store backend's opener, by the name the config selects it with.
+ * Registers `adapters` on the active registry, each accepted in order as
+ * {@link AdapterRegistry.register} accepts one, and answers the registry
+ * it replaced, for {@link restoreAdapters}.
  *
- * A mapped record so the set is closed over `StoreBackend`: a name the
- * config accepts with no opener here does not compile.
+ * Throws on the first adapter `register` would refuse, and leaves the
+ * active registry as it was: none of `adapters` is registered.
  */
-const STORE_OPENERS: {
-  readonly [B in StoreBackend]: (repoRoot: string) => SelectedEffortStore;
-} = {
-  sqlite: openSqliteStore,
-  ndjson: openNdjsonStore,
-};
+export function registerAdapters(adapters: readonly AnyAdapter[]): AdapterRegistry {
+  const previous = active;
+  active = adapters.reduce<AdapterRegistry>((registry, adapter) => registry.register(adapter), previous);
+  return previous;
+}
 
 /**
- * The adapters core registers, in the order `kinds` answers them: the
- * store backends, in the order the config names them, then the `text`
- * and `json` outputs, then the `local` and `github` trackers, then the
- * `local` learning adapter, then the `claude` planner, then the `local`
- * and `file` sync strategies.
+ * Makes `registry` the active one: what {@link registerAdapters} or
+ * {@link activeAdapterRegistry} answered, or one made with
+ * {@link createAdapterRegistry}, which with no adapters is the registry
+ * before anything is registered.
+ *
+ * Throws a `TypeError`, leaving the active registry as it was, when
+ * handed {@link CORE_ADAPTER_REGISTRY} itself: the facade reads the
+ * active registry, so making it the active one would leave every call
+ * reading itself.
  */
-const CORE_ADAPTERS: readonly AnyAdapter[] = [
-  ...STORE_BACKENDS.map(
-    (backend): AnyAdapter => ({
-      port: 'store',
-      kind: backend,
-      portVersion: PORT_VERSIONS.store,
-      create: ({ repoRoot }) => STORE_OPENERS[backend](repoRoot),
-    }),
-  ),
-  {
-    port: 'output',
-    kind: 'text',
-    portVersion: PORT_VERSIONS.output,
-    create: ({ stream = process.stdout, verbosity = 0 }) => createTextOutput({ verbosity, stream }),
-  },
-  {
-    port: 'output',
-    kind: 'json',
-    portVersion: PORT_VERSIONS.output,
-    create: ({ stream = process.stdout }) => createJsonOutput({ stream }),
-  },
-  {
-    port: 'output',
-    kind: 'events',
-    portVersion: PORT_VERSIONS.output,
-    create: ({ stream = process.stdout }) => createEventsOutput({ stream }),
-  },
-  {
-    port: 'logger',
-    kind: 'console',
-    portVersion: PORT_VERSIONS.logger,
-    create: ({ verbosity = 0, colour = false }) => createConsoleLogger({ verbosity, colour }),
-  },
-  {
-    port: 'tracker',
-    kind: 'local',
-    portVersion: PORT_VERSIONS.tracker,
-    create: ({ repoRoot, fallbackReason = null }) => createLocalTracker({
-      issuesDir: localIssuesDir(repoRoot),
-      fallbackReason,
-    }),
-  },
-  {
-    port: 'tracker',
-    kind: 'github',
-    portVersion: PORT_VERSIONS.tracker,
-    create: ({ repoRoot, gh }) => createGithubTracker({ gh: gh ?? createGhRunner({ cwd: repoRoot }) }),
-  },
-  {
-    port: 'learning',
-    kind: 'local',
-    portVersion: PORT_VERSIONS.learning,
-    create: ({
-      repoRoot,
-      home = homedir(),
-      learningBlessMinConfidence = registeredBlessMinConfidence(),
-    }) => createLocalLearning({
-      instinctsDir: localInstinctsDir(repoRoot),
-      home,
-      minConfidence: learningBlessMinConfidence,
-    }),
-  },
-  {
-    port: 'planner',
-    kind: 'claude',
-    portVersion: PORT_VERSIONS.planner,
-    create: ({ repoRoot, settingSources, planPrompt, planDir, claude }) => {
-      if (!Array.isArray(settingSources)) {
-        throw new TypeError(
-          `${REFUSAL}: planner/claude has settingSources ${describeValue(settingSources)} in its context,`
-            + ' expected a list of setting sources',
-        );
-      }
-      if (typeof planPrompt !== 'function') {
-        throw new TypeError(
-          `${REFUSAL}: planner/claude has planPrompt ${describeValue(planPrompt)} in its context,`
-            + ' expected a function',
-        );
-      }
-      if (typeof planDir !== 'string') {
-        throw new TypeError(
-          `${REFUSAL}: planner/claude has planDir ${describeValue(planDir)} in its context,`
-            + ' expected a directory path',
-        );
-      }
-      return createClaudePlanner({ repoRoot, planDir, settingSources, buildPrompt: planPrompt, spawn: claude });
-    },
-  },
-  {
-    port: 'sync',
-    kind: 'local',
-    portVersion: PORT_VERSIONS.sync,
-    create: () => createLocalSync(),
-  },
-  {
-    port: 'sync',
-    kind: 'file',
-    portVersion: PORT_VERSIONS.sync,
-    create: ({ repoRoot, store }) => {
-      if (!(STORE_BACKENDS as readonly unknown[]).includes(store)) {
-        throw new TypeError(
-          `${REFUSAL}: sync/file has store ${describeValue(store)} in its context,`
-            + ` expected one of: ${STORE_BACKENDS.join(', ')}`,
-        );
-      }
-      return createFileSync({ repoRoot, backend: store as StoreBackend });
-    },
-  },
-];
+export function restoreAdapters(registry: AdapterRegistry): void {
+  if (registry === CORE_ADAPTER_REGISTRY) {
+    throw new TypeError(
+      `${REFUSAL}: CORE_ADAPTER_REGISTRY reads the active registry and cannot be made the active one;`
+        + ' restore what registerAdapters or activeAdapterRegistry answered',
+    );
+  }
+  active = registry;
+}
 
 /**
- * Core's registry: every adapter core registers, and nothing else. An
- * add-on extends it with `register`, which answers a new registry and
- * leaves this one as it is.
+ * The active registry as it is now: a value, which a later
+ * {@link registerAdapters} does not change. It holds no adapter until
+ * something registers one.
  */
-export const CORE_ADAPTER_REGISTRY: AdapterRegistry = createAdapterRegistry(CORE_ADAPTERS);
+export function activeAdapterRegistry(): AdapterRegistry {
+  return active;
+}
+
+/** The active registry, or a refusal naming the module that registers core's adapters. */
+function registered(): AdapterRegistry {
+  if (holdsNone(active)) {
+    throw new Error(
+      `${REFUSAL}: no adapter is registered: import ${COMPOSITION_ROOT},`
+        + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY',
+    );
+  }
+  return active;
+}
+
+/**
+ * Core's registry: whatever the active registry holds when it is called,
+ * which `src/adapter-registry.ts` fills with core's adapters as it is
+ * imported. Core imports no adapter; it reads the ones it is handed.
+ *
+ * A frozen facade, not a registry value: each member reads the active
+ * registry at call time, so a caller holding it reads what was
+ * registered after it took hold of it. While the active registry holds
+ * no adapter, every member, `find` among them, throws an `Error` naming
+ * `src/adapter-registry.ts`, so a caller that never imported it learns
+ * so at its first read rather than finding nothing. `register` answers
+ * a new registry, a value, and leaves the active registry as it is.
+ */
+export const CORE_ADAPTER_REGISTRY: AdapterRegistry = Object.freeze<AdapterRegistry>({
+  register: (adapter) => registered().register(adapter),
+  find: (port, kind) => registered().find(port, kind),
+  resolve: (port, kind) => registered().resolve(port, kind),
+  kinds: (port) => registered().kinds(port),
+});

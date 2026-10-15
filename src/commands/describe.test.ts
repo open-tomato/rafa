@@ -35,6 +35,8 @@ import type { RafaCommand } from '../core/command/index.js';
 import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

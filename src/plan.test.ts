@@ -309,6 +309,7 @@ type Outcome =
 const PROBE = [
   'import { mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
+  `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
   `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,

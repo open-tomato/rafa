@@ -24,6 +24,8 @@ import type { AdapterContext } from '../../core/adapters/index.js';
 import type { ResolvedConfig } from '../../core/config/index.js';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

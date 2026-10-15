@@ -20,6 +20,8 @@ import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
 import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, sep } from 'node:path';

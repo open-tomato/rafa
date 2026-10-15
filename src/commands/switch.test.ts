@@ -23,6 +23,8 @@ import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

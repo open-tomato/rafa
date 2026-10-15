@@ -13,6 +13,8 @@
 import type { OutputStream } from '../../core/output/index.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

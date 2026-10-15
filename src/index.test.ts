@@ -38,7 +38,8 @@
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
  * config registry (`src/config-registry.ts`) for its effect, then the
- * dispatcher, the help renderer, the core registry, the module loader
+ * adapter registry's composition root (`src/adapter-registry.ts`) for
+ * its effect, then the dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
@@ -133,7 +134,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { CONFIG_DEFAULTS } from './config-registry.js';
-import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
+import {
+  activeAdapterRegistry,
+  CORE_ADAPTER_REGISTRY,
+  createAdapterRegistry,
+  PORT_VERSIONS,
+  registerAdapters,
+  restoreAdapters,
+} from './core/adapters/index.js';
 import * as registryModule from './core/adapters/index.js';
 import {
   CONFIG_FILE,
@@ -265,6 +273,7 @@ const RUNTIME_EXPORTS = [
   'WIRE_VERSION',
   'WireExportRefusal',
   'WireFormatError',
+  'activeAdapterRegistry',
   'configFilePath',
   'createAdapterRegistry',
   'decodeWirePayload',
@@ -290,9 +299,11 @@ const RUNTIME_EXPORTS = [
   'prerequisitesPathForPlan',
   'readConfigFile',
   'readRafaBlocks',
+  'registerAdapters',
   'renderInjection',
   'resolveConfig',
   'resolveScope',
+  'restoreAdapters',
   'runPreflight',
   'runShellProbe',
   'scopeAt',
@@ -342,6 +353,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['WIRE_VERSION', entry.WIRE_VERSION, WIRE_VERSION],
   ['WireExportRefusal', entry.WireExportRefusal, WireExportRefusal],
   ['WireFormatError', entry.WireFormatError, WireFormatError],
+  ['activeAdapterRegistry', entry.activeAdapterRegistry, activeAdapterRegistry],
   ['configFilePath', entry.configFilePath, configFilePath],
   ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
   ['decodeWirePayload', entry.decodeWirePayload, decodeWirePayload],
@@ -367,9 +379,11 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
+  ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
   ['resolveScope', entry.resolveScope, resolveScope],
+  ['restoreAdapters', entry.restoreAdapters, restoreAdapters],
   ['runPreflight', entry.runPreflight, runPreflight],
   ['runShellProbe', entry.runShellProbe, runShellProbe],
   ['scopeAt', entry.scopeAt, scopeAt],
@@ -451,6 +465,7 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 /** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
   ['./config-registry.js', []],
+  ['./adapter-registry.js', []],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],

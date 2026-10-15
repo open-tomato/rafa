@@ -114,6 +114,8 @@ import type { SessionUsageTotals } from './session-log.js';
 import type { SessionEffortRow } from './store/types.js';
 import type { CliEvent } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import {
   mkdirSync,
   mkdtempSync,

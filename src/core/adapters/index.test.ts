@@ -1,7 +1,8 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name `registry.ts`
- * exports, each once, as the same binding, and no other name, and the
- * import cycle it sits in loads whichever of its files comes first.
+ * exports, each once, as the same binding, and no other name, and it
+ * loads no adapter, so the barrel, `registry.ts` and
+ * `src/effort/sync/select.ts` load whichever comes first.
  *
  * The barrel spells its names, so a name added to `registry.ts` and not
  * to the barrel is a name no file outside `src/core/` can import.
@@ -12,33 +13,40 @@
  *
  * Three names are held by name, so a reading that came back empty, or
  * one that saw runtime names alone, fails rather than agreeing with
- * itself: `CORE_ADAPTER_REGISTRY`, the registry every caller resolves
+ * itself: `CORE_ADAPTER_REGISTRY`, the facade every caller resolves
  * through; `AdapterContext`, a type, which the namespace must not hold
  * and the checker must; and `AdapterRegistry`, the type of the registry.
  *
- * The binding case is what a barrel over a constant has to hold: a
- * second copy of `registry.ts` would have a `CORE_ADAPTER_REGISTRY` of
- * its own, and an adapter a caller found through one would not be the
- * adapter another found through the other.
+ * The binding case is what a barrel over a module-level slot has to
+ * hold: a second copy of `registry.ts` would have an active registry of
+ * its own, and an adapter registered through one would not be found
+ * through the other. The case registers a fixture adapter through the
+ * barrel, reads it through `registry.ts`, and puts back the registry it
+ * found, so it imports no adapter.
  *
- * The cycle cases read `src/core/adapters/index.ts`, `registry.ts` and
+ * The load cases read `src/core/adapters/index.ts`, `registry.ts` and
  * `src/effort/sync/select.ts`, the three files of the cycle the barrel's
- * note describes, each imported first in a child `bun`, since this file
- * has already imported two of them by the time a case runs. Each child
- * resolves `sync/local` through the barrel and pushes with it, so a
- * module that loaded with a binding still unset fails the case.
+ * note records as gone, each imported first in a child `bun`, since this
+ * file has already imported two of them by the time a case runs. Each
+ * child imports the composition root `src/adapter-registry.ts` after
+ * it, resolves `sync/local` through the barrel and pushes with it, so a
+ * module that loaded with a binding still unset fails the case. The
+ * control child imports the barrel and `select.ts` without the root,
+ * and must be refused naming it.
  *
  * Three mutations were driven against this file on 2026-10-12, one run
- * each, with every file restored and verified with `sha256sum -c`. The
- * barrel spelling two of the three runtime names reddened the first,
- * second and fourth cases. The barrel leaving out the type `AnyAdapter`
- * reddened the fourth case alone. `select.ts` reading
- * `CORE_ADAPTER_REGISTRY.kinds('sync')` at its top level failed this
- * file at load, no case running, since this file imports the barrel.
- * The same mutation with the three orders run by hand, one fresh `bun`
- * each, failed with a `ReferenceError` when the barrel or `registry.ts`
- * came first and loaded when `select.ts` did.
+ * each, with every file restored and verified with `sha256sum -c`, while
+ * `registry.ts` still imported `select.ts`. The barrel spelling two of
+ * the three runtime names reddened the first, second and fourth cases.
+ * The barrel leaving out the type `AnyAdapter` reddened the fourth case
+ * alone. `select.ts` reading `CORE_ADAPTER_REGISTRY.kinds('sync')` at
+ * its top level failed this file at load, no case running, since this
+ * file imports the barrel. The same mutation with the three orders run
+ * by hand, one fresh `bun` each, failed with a `ReferenceError` when the
+ * barrel or `registry.ts` came first and loaded when `select.ts` did.
  */
+import type { Adapter } from './registry.js';
+
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
@@ -53,6 +61,11 @@ const ROOT = resolve(import.meta.dir, '../../..');
 const BARREL = 'src/core/adapters/index.ts';
 const REGISTRY = 'src/core/adapters/registry.ts';
 const SELECT = 'src/effort/sync/select.ts';
+const ROOT_MODULE = 'src/adapter-registry.ts';
+
+/** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
+const UNREGISTERED = 'adapter registry: no adapter is registered: import src/adapter-registry.ts,'
+  + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY';
 
 /**
  * Every export name of each file, types included, sorted.
@@ -86,15 +99,20 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
 }
 
 /**
- * Runs a child `bun` that imports `first` before the other two files of
- * the cycle, then resolves `sync/local` through the barrel.
+ * Runs a child `bun` that imports `first` before the other two files,
+ * then the composition root unless `withRoot` is false, then resolves
+ * `sync/local` through the barrel.
  *
  * @param first - Repository-relative path of the file to import first.
- * @returns The child's exit code and what it printed.
+ * @param withRoot - Whether the child imports the composition root.
+ * @returns The child's exit code, what it printed, and what it wrote to stderr.
  */
-function loadingFirst(first: string): { exitCode: number; stdout: string } {
+function loadingFirst(first: string, withRoot = true): { exitCode: number; stdout: string; stderr: string } {
   const script = [
     `await import(${JSON.stringify(resolve(ROOT, first))});`,
+    ...(withRoot
+      ? [`await import(${JSON.stringify(resolve(ROOT, ROOT_MODULE))});`]
+      : []),
     `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(resolve(ROOT, BARREL))});`,
     `const { selectSync } = await import(${JSON.stringify(resolve(ROOT, SELECT))});`,
     'const sync = selectSync("/nonexistent", { effortSync: "local" });',
@@ -102,7 +120,7 @@ function loadingFirst(first: string): { exitCode: number; stdout: string } {
     'console.log(JSON.stringify([CORE_ADAPTER_REGISTRY.kinds("sync"), sync.kind, pushed.status]));',
   ].join('\n');
   const child = Bun.spawnSync([process.execPath, '-e', script]);
-  return { exitCode: child.exitCode, stdout: child.stdout.toString() };
+  return { exitCode: child.exitCode, stdout: child.stdout.toString(), stderr: child.stderr.toString() };
 }
 
 describe('the adapters barrel', () => {
@@ -123,10 +141,29 @@ describe('the adapters barrel', () => {
     }
   });
 
-  it('resolves through the one registry of registry.ts', () => {
-    expect(barrel.CORE_ADAPTER_REGISTRY).toBe(registry.CORE_ADAPTER_REGISTRY);
-    expect(barrel.CORE_ADAPTER_REGISTRY.resolve('sync', 'local'))
-      .toBe(registry.CORE_ADAPTER_REGISTRY.resolve('sync', 'local'));
+  it('registers on and resolves through the one active registry of registry.ts', () => {
+    const fixture: Adapter<'sync'> = {
+      port: 'sync',
+      kind: 'barrel-fixture',
+      portVersion: barrel.PORT_VERSIONS.sync,
+      create: () => ({
+        kind: 'git',
+        push: async () => ({ status: 'nothing-to-sync' }),
+        pull: async () => ({ status: 'nothing-to-sync' }),
+      }),
+    };
+    const found = registry.activeAdapterRegistry();
+    try {
+      barrel.restoreAdapters(registry.createAdapterRegistry());
+      barrel.registerAdapters([fixture]);
+
+      expect(barrel.CORE_ADAPTER_REGISTRY).toBe(registry.CORE_ADAPTER_REGISTRY);
+      expect(registry.activeAdapterRegistry()).toBe(barrel.activeAdapterRegistry());
+      expect(barrel.CORE_ADAPTER_REGISTRY.resolve('sync', 'barrel-fixture'))
+        .toBe(registry.CORE_ADAPTER_REGISTRY.resolve('sync', 'barrel-fixture'));
+    } finally {
+      registry.restoreAdapters(found);
+    }
   });
 
   it('exports the type names of registry.ts with the runtime ones, each once, and no other', () => {
@@ -139,11 +176,20 @@ describe('the adapters barrel', () => {
   });
 });
 
-describe('the import cycle the adapters barrel is in', () => {
-  it.each([BARREL, REGISTRY, SELECT])('resolves sync/local when %s is imported first', (first) => {
+describe('loading the adapters barrel beside select.ts', () => {
+  it.each([BARREL, REGISTRY, SELECT])('resolves sync/local when %s is imported first and the root after it', (first) => {
     expect(loadingFirst(first)).toEqual({
       exitCode: 0,
       stdout: '[["local","file"],"local","nothing-to-sync"]\n',
+      stderr: '',
     });
+  });
+
+  it('refuses sync/local naming the root when no file imported it', () => {
+    const run = loadingFirst(BARREL, false);
+
+    expect(run.exitCode).not.toBe(0);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain(UNREGISTERED);
   });
 });

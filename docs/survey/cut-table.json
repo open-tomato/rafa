@@ -4,6 +4,16 @@
   "leftToPlace": [
     {
       "kind": "test",
+      "path": "src/adapter-registry.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/adapter-registry.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/adapters/learning/held.test.ts",
       "upwardEdgesIn": 0
     },
@@ -20,7 +30,7 @@
     {
       "kind": "source",
       "path": "src/adapters/learning/local.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -60,7 +70,7 @@
     {
       "kind": "source",
       "path": "src/adapters/logger/console.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -90,7 +100,7 @@
     {
       "kind": "source",
       "path": "src/adapters/output/events.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -100,7 +110,7 @@
     {
       "kind": "source",
       "path": "src/adapters/output/json.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "source",
@@ -120,7 +130,7 @@
     {
       "kind": "source",
       "path": "src/adapters/planner/claude.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -3595,69 +3605,6 @@
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/learning/local.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/logger/console.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/output/events.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/output/json.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/planner/claude.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/tracker/github.ts",
-          "toPackage": "rafa-board"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/tracker/local.ts",
-          "toPackage": "rafa-board"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/sync/file.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/core/adapters/registry.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/effort/sync/select.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/core/command/command.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -4043,8 +3990,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 31,
-      "upwardEdges": 31
+      "remaining": 22,
+      "upwardEdges": 22
     },
     {
       "clearedByIssue118": 0,
@@ -7049,11 +6996,13 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 263,
-        "test": 467,
+        "source": 264,
+        "test": 468,
         "testSupport": 27
       },
       "files": [
+        "src/adapter-registry.test.ts",
+        "src/adapter-registry.ts",
         "src/adapters/learning/held.test.ts",
         "src/adapters/learning/held.ts",
         "src/adapters/learning/local.test.ts",
@@ -7831,12 +7780,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1978,
-    "leftToPlace": 715,
-    "nonTestEdges": 4418,
+    "files": 1980,
+    "leftToPlace": 717,
+    "nonTestEdges": 4423,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 283
+    "upwardEdges": 274
   },
   "unassigned": [
     {

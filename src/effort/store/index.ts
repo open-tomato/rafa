@@ -25,8 +25,9 @@
  * own, and a selection that is never used leaves no trace.
  *
  * The backend is the `store` adapter of that name in core's adapter
- * registry, `src/core/adapters/registry.ts`, which registers both backends
- * from a record closed over the config's backend names. A name added to
+ * registry, `src/core/adapters/registry.ts`, where the composition root
+ * `src/adapter-registry.ts` registers both backends from a record closed
+ * over the config's backend names. A name added to
  * `STORE_BACKENDS` therefore fails to compile there until a backend
  * opens it, rather than being accepted by the config and refused by the
  * store. The selector resolves through core's registry and never through

@@ -46,6 +46,8 @@ import type { DispatchOutcome } from '../cli/dispatch.js';
 import type { RafaCommand } from '../core/command/index.js';
 import type { OutputStream } from '../core/output/index.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

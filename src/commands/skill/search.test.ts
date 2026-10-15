@@ -24,6 +24,8 @@
 import type { SearchCommandResult } from './search.js';
 import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

@@ -112,6 +112,8 @@ import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import '../adapter-registry.js';
+
 import {
   existsSync,
   mkdirSync,

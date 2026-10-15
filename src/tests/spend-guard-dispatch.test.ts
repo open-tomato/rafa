@@ -79,6 +79,8 @@ import type { CommandSpend } from '../cli/spends.js';
 import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
 import type { OutputStream } from '../core/output/index.js';
 
+import '../adapter-registry.js';
+
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -10,6 +10,8 @@ import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { SchemaReport } from '../../effort/store/schema-report.js';
 import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

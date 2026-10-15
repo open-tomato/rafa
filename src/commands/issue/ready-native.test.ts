@@ -17,6 +17,8 @@ import type { SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
 import type { GitRunner } from '../../core/git/index.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

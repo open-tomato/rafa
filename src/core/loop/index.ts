@@ -8,7 +8,7 @@
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
  * file inside `src/core/` imports the two directly and never this file:
  * `session-readings.ts` and the six test files of `sessions.ts` import
- * that file, and `src/core/adapters/registry.ts`, its test and
+ * that file, and `src/core/adapters/registry.ts` and
  * `claude.test.ts` import `claude.ts`. `index.test.ts`, this file's own
  * test, is the one file of `src/core/` that imports it.
  *

@@ -18,6 +18,7 @@
     "packages/rafa-sync-service/src/sync.ts": "c7",
     "packages/rafa-sync-service/src/testdata/stand-in-hub.ts": "c7",
     "packages/rafa-sync-service/src/token.ts": "c7",
+    "src/adapter-registry.ts": "c7",
     "src/adapters/learning/held.ts": "c4",
     "src/adapters/learning/local.ts": "c4",
     "src/adapters/output/events.ts": "c2",

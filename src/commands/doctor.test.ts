@@ -145,6 +145,8 @@ import type { PrerequisiteItem } from '../core/config/index.js';
 import type { OutputStream } from '../core/output/index.js';
 import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';

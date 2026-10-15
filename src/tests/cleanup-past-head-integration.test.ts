@@ -17,6 +17,8 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
 import type { Prompter } from '../core/command/index.js';
 
+import '../adapter-registry.js';
+
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createScratchRepository, SCRATCH_LATER, SCRATCH_NOW } from '../cleanup/scratch-repository.js';

@@ -108,6 +108,8 @@ import type { DangerousPhrases } from '../core/config/index.js';
 import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -930,6 +932,7 @@ describe('the active output and the exit code', () => {
     const cwd = mkdtempSync(join(tempBase, 'exit-code-'));
     plantProjectConfig(cwd);
     writeFileSync(join(cwd, 'probe.ts'), [
+      `await import(${JSON.stringify(join(CLI_DIR, '..', 'adapter-registry.ts'))});`,
       `const { dispatch } = await import(${JSON.stringify(join(CLI_DIR, 'dispatch.ts'))});`,
       `const { createCommandRegistry } = await import(${JSON.stringify(join(CLI_DIR, 'registry.ts'))});`,
       'const registry = createCommandRegistry({',

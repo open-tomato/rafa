@@ -11,51 +11,35 @@
  * ## What sits behind it
  *
  * `registry.ts` alone: the registry keyed by port type and kind, the
- * version core serves of each port, and the registry holding core's own
- * adapters. The adapters themselves stay under `src/adapters/`, the two
- * store backends under `src/effort/store/` and the two sync strategies
- * under `src/effort/sync/`; `registry.ts` imports each by value, which
- * is why it has a barrel of its own and shares none with another
- * subject.
+ * version core serves of each port, the slot the active registry is
+ * kept in with the three functions that register, restore and read it,
+ * and `CORE_ADAPTER_REGISTRY`, the frozen facade every caller resolves
+ * through. `registry.ts` imports no adapter, so this barrel loads none.
+ * Core's adapters stay under `src/adapters/`, the two store backends
+ * under `src/effort/store/` and the two sync strategies under
+ * `src/effort/sync/`, and the composition root `src/adapter-registry.ts`
+ * imports each by value and registers them through this barrel when it
+ * is imported. `src/rafa.ts` and `src/index.ts` import that root; a
+ * caller of this barrel that imports neither imports the root itself,
+ * or every member of `CORE_ADAPTER_REGISTRY` refuses, naming it.
  *
- * ## The cycle this barrel is in
+ * ## No cycle runs through it
  *
- * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle, and this barrel
- * is in one. `registry.ts` imports `createLocalSync` from
- * `src/effort/sync/select.ts`, and that file imports
- * `CORE_ADAPTER_REGISTRY` back, through this file since the move. The
- * cycle is older than the barrel: before the move the two files imported
- * each other directly (`select.ts` says why under "The import cycle").
- * The move changed paths and no logic, so it could not take the cycle
- * out, and a barrel over one file cannot be split to step round it.
- *
- * Measured when the file moved: the value imports of the non-test files
- * under `src/` and `packages/` held six cycles before the move and six
- * after it. The one through `registry.ts` held two files before,
- * `registry.ts` and `select.ts`, and three after, with this file
- * between them. `docs/survey/cluster-map.json` places `registry.ts` and
- * `select.ts` in one cluster, and this file by its folder in the same
- * one, so `src/tests/import-cycle.sweep.test.ts` reads the cycle as
- * inside a cluster.
- *
- * The cycle loads in every order because neither side reads the other's
- * binding while it evaluates: `registry.ts` calls `createLocalSync`
- * inside an adapter's `create`, and `select.ts` reads
- * `CORE_ADAPTER_REGISTRY` inside `selectSync`. Each of the three files
- * was imported first in a fresh `bun` process and `sync/local` resolved
- * in all three. The control, the same tree with `select.ts` reading
- * `CORE_ADAPTER_REGISTRY.kinds('sync')` at its top level, failed with a
- * `ReferenceError` when this file or `registry.ts` was imported first
- * and loaded when `select.ts` was. `index.test.ts` holds the three
- * orders.
+ * Before the root, `registry.ts` imported `createLocalSync` from
+ * `src/effort/sync/select.ts`, and that file imported
+ * `CORE_ADAPTER_REGISTRY` back through this barrel: a runtime cycle of
+ * three files, inside one cluster of `docs/survey/cluster-map.json`. The
+ * root imports `select.ts` now and `registry.ts` imports nothing above
+ * core, so the cycle is gone. `index.test.ts` imports each of this file,
+ * `registry.ts` and `select.ts` first in a fresh `bun`, the root after
+ * it, and resolves `sync/local` in each order.
  *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the other core
- * barrels spell theirs. Eight of the nine names are part of the
+ * barrels spell theirs. Eleven of the twelve names are part of the
  * published surface: `src/index.ts` re-exports them from this file. The
- * ninth, `PlanPromptBuilder`, is read by the `claude` planner, which
+ * twelfth, `PlanPromptBuilder`, is read by the `claude` planner, which
  * re-exports it under the same name.
  *
  * `index.test.ts` holds the list to the file: every name `registry.ts`
@@ -70,4 +54,11 @@ export type {
   PortImplementations,
 } from './registry.js';
 
-export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './registry.js';
+export {
+  activeAdapterRegistry,
+  CORE_ADAPTER_REGISTRY,
+  createAdapterRegistry,
+  PORT_VERSIONS,
+  registerAdapters,
+  restoreAdapters,
+} from './registry.js';

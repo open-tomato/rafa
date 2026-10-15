@@ -22,6 +22,8 @@
 import type { AnyAdapter } from '../../core/adapters/index.js';
 import type { BlessedBundle, InstinctRecord, Learning, MergeResult } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

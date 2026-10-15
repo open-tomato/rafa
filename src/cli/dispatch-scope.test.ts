@@ -57,6 +57,8 @@ import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/ind
 import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { createJsonOutput } from '../adapters/output/json.js';

@@ -35,12 +35,15 @@
  *
  * Its first import is `src/config-registry.ts`, for its effect: the
  * twelve sections of the config schema are handed to core before any
- * module loaded here reads a config.
+ * module loaded here reads a config. Its second is
+ * `src/adapter-registry.ts`, for its effect too: core's adapters are
+ * registered before anything loaded here resolves one.
  *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
 import './config-registry.js';
+import './adapter-registry.js';
 
 import { homedir } from 'node:os';
 

@@ -38,6 +38,8 @@
 import type { AnyAdapter } from '../../core/adapters/index.js';
 import type { PreflightResult, Tracker } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

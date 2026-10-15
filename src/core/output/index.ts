@@ -8,7 +8,7 @@
  * file inside `src/core/` imports the file it needs directly and never
  * this file: `src/core/config/config-load.ts` imports `active.ts`, for
  * the output its warnings go through, and
- * `src/core/adapters/registry.ts` imports `text.ts` and `stream.ts`.
+ * `src/core/adapters/registry.ts` imports `stream.ts`.
  *
  * ## What sits behind it
  *
