@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2006 files, 1978 of them in 10 packages (719 left to place) and 28 in 3 unassigned folders. Of the 4452 edges between two files neither of which is a test, value and type alike, 252 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2007 files, 1979 of them in 10 packages (720 left to place) and 28 in 3 unassigned folders. Of the 4452 edges between two files neither of which is a test, value and type alike, 252 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -19,7 +19,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 7 | `rafa-effort` | 70 | 36 | 34 | 0 | 5 | 0 | 5 |
 | 8 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 9 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 10 | `@open-tomato/rafa-cli` | 758 | 264 | 467 | 27 | 0 | 0 | 0 |
+| 10 | `@open-tomato/rafa-cli` | 759 | 264 | 468 | 27 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -93,7 +93,7 @@ None.
 
 ## Files left to place
 
-No rule holds these 719 files. By folder, with the upward edges that end on its files:
+No rule holds these 720 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
@@ -137,7 +137,7 @@ No rule holds these 719 files. By folder, with the upward edges that end on its 
 | `src/modules/testdata/sync-fixture/` | 1 | 1 | 0 |
 | `src/notices/` | 3 | 2 | 0 |
 | `src/status/` | 19 | 9 | 0 |
-| `src/tests/` | 217 | 21 | 0 |
+| `src/tests/` | 218 | 21 | 0 |
 | `src/tools/ts-symbols/` | 2 | 1 | 0 |
 | `src/tools/ts-symbols/fixtures/proj/src/` | 2 | 2 | 0 |
 

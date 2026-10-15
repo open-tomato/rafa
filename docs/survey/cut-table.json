@@ -2584,6 +2584,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-reexports.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/cut-table-shape.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6879,7 +6884,7 @@
       "edges": [],
       "fileCounts": {
         "source": 264,
-        "test": 467,
+        "test": 468,
         "testSupport": 27
       },
       "files": [
@@ -7438,6 +7443,7 @@
         "src/tests/core-barrels.sweep.test.ts",
         "src/tests/core-config-sections.sweep.test.ts",
         "src/tests/core-reexport-bindings.test.ts",
+        "src/tests/core-reexports.test.ts",
         "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
         "src/tests/declaration-flags.test.ts",
@@ -7661,8 +7667,8 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2006,
-    "leftToPlace": 719,
+    "files": 2007,
+    "leftToPlace": 720,
     "nonTestEdges": 4452,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
