@@ -85,6 +85,8 @@ import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleReading, SettleSettings } from '../../release/settle.js';
 
+import { relative } from 'node:path';
+
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { CommandExit } from '../../core/command/index.js';
@@ -324,6 +326,7 @@ export async function runSettle(
     context.output.warn(message);
   });
   const settings = settleSettings(config);
+  const configFile = relative(project.root, project.project.configFile);
   const branch = config.prBase ?? RELEASE_BASE_BRANCH;
   const pulls = !dryRun && config.releaseSettle === 'pr'
     ? providerFor(project, config, seams)
@@ -337,7 +340,7 @@ export async function runSettle(
   const ran = await withSettleWorktree(options, async (worktree) => {
     if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch, settings.releaseChangelog);
     const delivered: SettleDelivered = pulls === null
-      ? { delivery: 'push', outcome: settleByPush(worktree, settings) }
+      ? { delivery: 'push', outcome: settleByPush(worktree, settings, configFile) }
       : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls) };
     const tag = tagSettle(worktree, config.releaseTag, delivered);
     return settledResult(delivered, tag, worktree.ref, branch);

@@ -182,9 +182,14 @@ interface Settled {
 
 /**
  * Runs `settleByPush` in a settle worktree of the caller's `origin/main`.
- * `beforePush[n]` runs just before the n-th push reaches git.
+ * `beforePush[n]` runs just before the n-th push reaches git, and
+ * `configFile` is the project scope's config file a rule refusal names.
  */
-async function settleIn(w: World, beforePush: readonly (() => void)[] = []): Promise<Settled> {
+async function settleIn(
+  w: World,
+  beforePush: readonly (() => void)[] = [],
+  configFile = '.rafa/config.yaml',
+): Promise<Settled> {
   const argv: string[][] = [];
   let pushes = 0;
   const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (made: SettleWorktree) => {
@@ -196,7 +201,7 @@ async function settleIn(w: World, beforePush: readonly (() => void)[] = []): Pro
       }
       return made.git(args);
     };
-    return settleByPush({ ...made, git }, SETTINGS);
+    return settleByPush({ ...made, git }, SETTINGS, configFile);
   });
   if (!outcome.ok) throw new Error(outcome.problem);
   return { outcome: outcome.value, argv };
@@ -386,7 +391,7 @@ describe('settleByPush, the refused-push rule', () => {
         if (args[0] === 'fetch') return { ok: false, stdout: '', stderr: 'planted fetch failure' };
         return made.git(args);
       };
-      return settleByPush({ ...made, git }, SETTINGS);
+      return settleByPush({ ...made, git }, SETTINGS, '.rafa/config.yaml');
     });
 
     if (!outcome.ok) throw new Error(outcome.problem);
@@ -470,6 +475,28 @@ describe('settleByPush, a repository rule', () => {
     expect(pushesOf(settled)).toHaveLength(1);
     expect(originMain(w)).toBe(before);
     expect(originFragments(w)).toEqual(['.changes/rafa-1.md', '.changes/rafa-9.md']);
+  });
+
+  it('names rafa.config.ts in the rule sentence of a project that holds one, the protected sentence still naming the key alone', async () => {
+    const ruled = world();
+    landTwo(ruled);
+    ruled.refuseWith(refusingHook(GH013));
+    const guarded = world();
+    landTwo(guarded);
+    guarded.refuseWith(`#!/bin/sh\necho "${GH006}" >&2\nexit 1\n`);
+
+    const rule = await settleIn(ruled, [], 'rafa.config.ts');
+    const protectedBase = await settleIn(guarded, [], 'rafa.config.ts');
+
+    expect(rule.outcome.outcome).toBe('rule');
+    if (rule.outcome.outcome !== 'rule') return;
+    expect(rule.outcome.sentence).toEndWith('set release.settle: pr in rafa.config.ts to deliver it through a pull request.');
+    expect(rule.outcome.sentence).not.toContain('.rafa/config.yaml');
+    expect(protectedBase.outcome.outcome).toBe('protected');
+    if (protectedBase.outcome.outcome !== 'protected') return;
+    expect(protectedBase.outcome.sentence).toContain('set release.settle: pr to deliver it through a pull request');
+    expect(protectedBase.outcome.sentence).not.toContain('rafa.config.ts');
+    expect(protectedBase.outcome.sentence).not.toContain('config.yaml');
   });
 
   it('is the control: git itself ends the refused push\'s porcelain stdout on Done, exiting 1', () => {
