@@ -219,7 +219,8 @@ runTrackerContract({
   editsPriority: true,
   create: async () => {
     contractDir = freshDir('contract');
-    return localTracker(contractDir);
+    // The filedIssues cases hold a cut-off against the time an issue is filed, so this tracker keeps the system clock.
+    return localTracker(contractDir, { now: () => new Date().toISOString() });
   },
   readComments: async (ref) => {
     const path = join(contractDir, `${ref.externalId}.md`);
