@@ -96,6 +96,17 @@ export function readProjectLock(root: string): ProjectLock | null {
   } catch (error) {
     refuse(`could not be read: ${messageOf(error)}`);
   }
+  return parseProjectLock(text);
+}
+
+/**
+ * `text` read as a lock, so a lock held anywhere but on disk (a git blob)
+ * is read by the same rules as the file.
+ *
+ * @throws ProjectLockError, naming `rafa.lock`, for text that is not JSON,
+ * is in another format, or names no version.
+ */
+export function parseProjectLock(text: string): ProjectLock {
   let value: unknown;
   try {
     value = JSON.parse(text);
