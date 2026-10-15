@@ -19,7 +19,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { findStoreRuleProblems } from '../../plan/store-rules.js';
 import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
 
-import { findBundledEdits, writeTierPins } from './bundled-check.js';
+import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-bundled-check-'));
 
@@ -328,5 +328,23 @@ describe('findBundledEdits then writeTierPins over a planted project', () => {
       { tag: 'human', probe: null },
     ]);
     expect(findStoreRuleProblems({ plan, prerequisites: text, prerequisitesName: PLAN_FILE })).toEqual([]);
+  });
+});
+
+describe('bundledEditLine', () => {
+  it('names the file, every line, the item, the path as typed and the pin, where a one-line edit names one line', () => {
+    const edit: BundledEdit = {
+      kind: 'skill',
+      name: 'dev-planner',
+      path: '.claude/skills/dev-planner',
+      lines: [5, 9],
+      pinLine: 'tiers.skills: { dev-planner: project }',
+    };
+
+    expect(bundledEditLine('plans/PLAN-x.md', edit)).toBe(
+      'plans/PLAN-x.md:5,9: a task edits the bundled skill `dev-planner` (`.claude/skills/dev-planner`);'
+        + ' each clone that merges it needs the pin `tiers.skills: { dev-planner: project }`',
+    );
+    expect(bundledEditLine('plans/PLAN-x.md', { ...edit, lines: [5] })).toStartWith('plans/PLAN-x.md:5: a task');
   });
 });

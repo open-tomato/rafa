@@ -864,15 +864,24 @@ New; it replaces no earlier text. What a row or an action added to
   start`'s preflight halts on, so a plan the loop would refuse is
   refused here too. The store rules are read by
   `src/commands/plan/store-check.ts`, which `plan create` refuses a
-  generated plan with as well. The roster is the project the dispatcher found and the config that
-  resolves there, which is the only thing this command reads beyond the
-  file; handed no project it says so and checks no agent and no skill.
+  generated plan with as well. Then, never as a refusal, one `info` note
+  per agent or skill rafa bundles that a still-to-run task edits, named
+  under `src/bundled/` or through a `.claude/` link into it
+  (`findBundledEdits`, `src/commands/plan/bundled-check.ts`), as
+  `<file>:<lines>: <the line `bundledEditLine` words>` with the
+  `tiers.agents` or `tiers.skills` pin a clone that merges the plan
+  needs; when nothing refuses the plan, `writeTierPins` writes each pin
+  as a `[human]` item of the `PREREQUISITES-<stub>.md` beside it, once.
+  The roster is the project the dispatcher found and the config that
+  resolves there, and the bundle is that project's; handed no project it
+  says so, checks no agent and no skill and reads no bundled edit.
   In json mode a list, a plan and a clean validation are the terminal
   result's `data`, the validation carrying an empty `issues`, an empty
   `missingAgents`, an empty `skillCollisions`, an empty
-  `unresolvedSkills` and an empty `storeProblems`, and each issue,
+  `unresolvedSkills`, an empty `storeProblems` and the `bundledEdits`
+  read, and each issue,
   missing agent, skill collision, unresolved skill and broken store rule
-  is an `error` `log` event; text
+  is an `error` `log` event and each bundled-edit note an `info` one; text
   mode writes lines and no `result: ` line.
   `src/commands/plan/validate.test.ts` spawns `plan validate` with a
   stand-in `claude` first on the PATH and finds it never called, where

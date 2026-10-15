@@ -68,8 +68,12 @@
  * writes no second copy. `parsePrerequisites` reads each item as `human`,
  * with no probe: the pin is a line a person sets, never a check.
  *
- * No command calls either yet; `rafa plan validate` and `rafa plan
- * create` are the callers the spec names.
+ * ## Who calls it
+ *
+ * `rafa plan validate` (`./validate.ts`) reads the edits over the
+ * project it was handed, prints one {@link bundledEditLine} per edit as a
+ * note and, when nothing refuses the plan, writes the pins;
+ * `rafa plan create` is the other caller the spec names.
  */
 import type { InventoryKind } from '../../inventory/record.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
@@ -255,6 +259,16 @@ export function findBundledEdits(markdown: string, seams: BundledSeams): readonl
     lines: [...lines],
     pinLine: pinLine(item.kind, item.name, 'project'),
   }));
+}
+
+/**
+ * The note naming one edit: the plan file as `file` spells it, the lines
+ * naming the item, the item, the path as typed, and the pin each clone
+ * that merges the plan needs. A caller adds what became of the pin.
+ */
+export function bundledEditLine(file: string, edit: BundledEdit): string {
+  return `${file}:${edit.lines.join(',')}: a task edits the bundled ${edit.kind} \`${edit.name}\` (\`${edit.path}\`);`
+    + ` each clone that merges it needs the pin \`${edit.pinLine}\``;
 }
 
 /** The heading lines a prerequisites file this module creates opens with. */

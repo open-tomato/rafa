@@ -524,7 +524,8 @@ describe('the agents rafa plan validate checks', () => {
 
     expect(ran).toBeUndefined();
     expect(info).toEqual([
-      'ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.',
+      'ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked'
+        + ' and no edit of a bundled agent or skill was read.',
       '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
     ]);
     expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
