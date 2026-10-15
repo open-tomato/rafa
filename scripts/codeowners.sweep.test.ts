@@ -9,9 +9,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, setDefaultTimeout, test } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from '../src/tests/sweep-timeout.js';
 
 import { CODEOWNERS_FILE, collectOwnedProjects, main, renderCodeowners } from './codeowners';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 /** The team every manifest of this repository names. */
 const TEAM = '@open-tomato/maintainers';
