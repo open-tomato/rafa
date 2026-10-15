@@ -13,6 +13,8 @@ import type { StaleDocsProject, StaleDocsReader } from './status-stale-docs.js';
 import type { OpenLinesTracker } from '../../docs/open-lines.js';
 import type { IssueDraft, OpenIssue } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -11,6 +11,8 @@ import type { FixSchemaCommandSeams } from './fix-schema.js';
 import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

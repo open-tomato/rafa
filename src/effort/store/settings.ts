@@ -10,7 +10,8 @@
  * resolves the config, so every command that reads its config opens
  * the store with the value the operator gave. Until then, and after
  * {@link setActiveStoreSettings} with `null`, the value is the config
- * default, read off `CONFIG_DEFAULTS` so the number is spelled once.
+ * default, read off `CORE_SECTION.defaults` so the number is spelled
+ * once.
  *
  * The setter refuses a value the config reader would refuse, with a
  * `RangeError`, so a caller that built its settings by hand cannot put
@@ -22,7 +23,7 @@
  * case that sets a value sets `null` after it, or every file bun runs
  * later opens its stores with that case's timeout.
  */
-import { CONFIG_DEFAULTS } from '../../config-registry.js';
+import { CORE_SECTION } from '../../core/config/index.js';
 import {
   BUSY_TIMEOUT_MAX_MS,
   BUSY_TIMEOUT_MIN_MS,
@@ -37,7 +38,7 @@ export interface StoreSettings {
 
 /** The settings in force while nothing has set any. */
 const DEFAULT_STORE_SETTINGS: StoreSettings = Object.freeze({
-  busyTimeoutMs: CONFIG_DEFAULTS.effortBusyTimeoutMs,
+  busyTimeoutMs: CORE_SECTION.defaults.effortBusyTimeoutMs,
 });
 
 /** The settings in force now. */

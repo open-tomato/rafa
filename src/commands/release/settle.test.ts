@@ -30,6 +30,8 @@ import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag
 import type { SettleBuilt } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

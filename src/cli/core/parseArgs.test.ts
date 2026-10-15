@@ -29,7 +29,7 @@
  * one-dash `-no-` negated, and the negation read before the `=`.
  */
 import type { ParseArgsSpec } from './parseArgs.js';
-import type { ArgSpec, FlagSpec } from './types.js';
+import type { ArgSpec, FlagSpec } from '../../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

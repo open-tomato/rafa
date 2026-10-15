@@ -139,19 +139,19 @@
  */
 import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type {
-  MergeMethod,
   PrProvider,
+  Reader,
   ReleaseEnabled,
   ReleaseSettleMode,
   ReleaseStrategy,
   ReleaseTagMode,
   VersionCollisionMode,
 } from './core/config/sections.js';
+import type { MergeMethod } from './pr/types.js';
 
 import {
   flag,
   fragmentsDirectory,
-  mergeMethod,
   oneOf,
   PR_PROVIDERS,
   RELEASE_AUTO,
@@ -164,6 +164,7 @@ import {
   usdAmount,
   versionCollisionMode,
 } from './core/config/sections.js';
+import { MERGE_METHODS } from './pr/types.js';
 
 declare module './core/config/config-schema.js' {
   /** The `release` section's fields, added to core's. */
@@ -299,6 +300,22 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
 export const DANGEROUS_RELEASE_DEFAULTS: Readonly<DangerousReleaseSettings> = Object.freeze({
   dangerousAcceptVersionCollision: false,
 });
+
+/**
+ * Accepts one of the pull request port's three merge methods. The list
+ * is the port's (`pr/types.ts`), which spells them to match what
+ * `gh pr merge` takes, so a second spelling here could not disagree
+ * with it.
+ *
+ * It sits here, beside the one setting that reads it, and not among
+ * core's readers in `config-sections.ts`, so no core file imports
+ * `pr/types.ts`. The port is reached at `./pr/types.js` and not through
+ * the `./pr/index.js` barrel, because the barrel carries `pr/gh.ts`,
+ * which imports the config's sections barrel and the `gh` spawner:
+ * importing it here would put the CLI adapter behind every config read.
+ * `pr/types.ts` imports types alone, so this import reaches nothing back.
+ */
+export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
 
 /** The `pr` section's setting specs, in the order problems are reported. */
 export const PR_SETTINGS: {

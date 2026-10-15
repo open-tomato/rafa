@@ -31,8 +31,8 @@
  * `now`, which defaults to the system clock; the source reads the clock
  * itself, and the seam lets a test hold a line to its exact bytes. An
  * event handed to `emit` is written as it is, its own `ts` included. The
- * stream's `write` is a property, as `stream.ts` says, and the output
- * answered is frozen.
+ * stream's `write` is a property, as `src/core/output/stream.ts` says,
+ * and the output answered is frozen.
  */
 import type { OutputStream } from './stream.js';
 import type { CliEvent, CliEventLog, Output } from '../../ports/index.js';

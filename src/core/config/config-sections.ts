@@ -94,7 +94,7 @@
  *
  * The spec spells `routing` as a map of a task shape to an agent.
  * {@link routeTarget} reads one value; the map around it is `mapOf`
- * again, and the defaults are `tiers/routing.ts`'s. Two readings are
+ * again, and the defaults are `default-routing.ts`'s. Two readings are
  * this module's:
  *
  *   - A value is an agent name, any non-empty string, or `false`, a
@@ -145,59 +145,42 @@
  *
  * ## The lists this module does not own
  *
- * Every other closed list here is declared here. Three are not, and
- * neither is one range, because another module is already their
- * authority and a second spelling could disagree with it:
+ * Every other closed list here is declared here. Two are not, because
+ * another module is already their authority and a second spelling could
+ * disagree with it:
  *
  *   - The three tiers a pin names are `schema/tiers.ts`'s
  *     {@link SKILL_TIERS}, the order a listing reads them in. That
  *     module imports `node:fs` and `node:path` alone, so reaching it
  *     here is no cycle.
- *   - {@link MergeMethod} and the three methods behind
- *     {@link mergeMethod} are the pull request port's
- *     (`pr/types.ts`), which spells them to match what `gh pr merge`
- *     takes. The type is re-exported so `config-schema-release.ts` names a
- *     field with it without reaching past this module, and nothing
- *     more: a caller acting on a merge reads the port.
  *   - The shape {@link usdAmount} accepts is `parseBudgetUsd`'s
- *     (`utils/declaration.ts`), which is what a plan's `budget=` goes
+ *     (`core/plan/declaration.ts`), which is what a plan's `budget=` goes
  *     through and therefore what `--max-budget-usd` has been measured
  *     against. The reader asks it about `String(raw)`, so a config
  *     value is accepted only when the number the loop would pass on
  *     survives that round trip: `.inf`, `.nan`, `1e21` and `1e-7` are
  *     each a number the parser returns and `String` writes as something
  *     the flag never takes.
- *   - The range {@link confidence} accepts, 0.3 to 0.9, is the learning
- *     library's {@link CONFIDENCE_MIN} and {@link CONFIDENCE_MAX}
- *     (`learning/identity.ts`), the range every lesson's confidence is
- *     clamped to. A threshold outside it is one no lesson can meet, or
- *     one every lesson meets, so the reader asks the library's bounds
- *     rather than spell its own.
  *
- * `learning/identity.ts` imports `node:crypto` alone, and neither of the
- * other two imports is a cycle. `pr/types.ts` imports
- * types alone and `utils/declaration.ts` imports nothing, so this
- * module reaches both without either reaching back. The port is reached at `../../pr/types.js`
- * and not through the `../../pr/index.js` barrel a caller outside `src/pr/`
- * would normally use, because the barrel carries `pr/gh.ts`, which
- * imports THIS module and the `gh` spawner behind it: importing it here
- * would make the graph cyclic and put the CLI adapter behind every
- * config read. That cycle was measured, not assumed, and it does not
- * break: with the barrel imported instead, on bun 1.3.14, `MERGE_METHODS`
- * read as its three values and `CONFIG_DEFAULTS.prMergeMethod` as
- * `squash` with `config.js`, `pr/index.js` and `pr/gh.js` each imported
- * first, and the config and `src/pr/` suites passed. The narrower import
- * is the graph this module wants, not a fix for an observed failure.
+ * `core/plan/declaration.ts` imports only the store's `effort-levels.ts`,
+ * which imports nothing, so this module reaches it without its reaching
+ * back.
+ *
+ * The range {@link confidence} accepts, {@link CONFIDENCE_MIN} to
+ * {@link CONFIDENCE_MAX}, is declared here and not read from the
+ * learning library: core imports nothing above it, and `src/learning/`
+ * imports nothing from the rest of `src/`, so each declares the pair the
+ * library clamps every lesson's confidence to, and
+ * `src/tests/learning-contract.test.ts` holds the two equal.
+ *
+ * The reader of `pr.mergeMethod`, over the pull request port's three
+ * methods, is not here: it sits with the setting it reads, in
+ * `config-schema-release.ts`, so no core file imports `pr/types.ts`.
  */
-import type { MergeMethod } from '../../pr/types.js';
 import type { SkillTier } from '../../schema/tiers.js';
 
-import { CONFIDENCE_MAX, CONFIDENCE_MIN } from '../../learning/identity.js';
-import { MERGE_METHODS } from '../../pr/types.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';
-import { parseBudgetUsd } from '../../utils/declaration.js';
-
-export type { MergeMethod } from '../../pr/types.js';
+import { parseBudgetUsd } from '../plan/declaration.js';
 
 /** One key a file carried that names nothing this version reads. */
 export interface ConfigExtra {
@@ -447,12 +430,6 @@ export const flag: Reader<boolean> = (raw, at) => typeof raw === 'boolean'
   : refused(at, raw, 'true or false');
 
 /**
- * Accepts one of the pull request port's three merge methods. The list
- * is the port's, for the reason in the module note.
- */
-export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
-
-/**
  * Accepts a number of US dollars a session can be handed as a budget:
  * above zero, at most six digits either side of the point, and no
  * string spelled like one. What it accepts is `parseBudgetUsd`'s shape,
@@ -534,6 +511,18 @@ export function isBusyTimeoutMs(raw: unknown): raw is number {
 export const busyTimeoutMs: Reader<number> = (raw, at) => isBusyTimeoutMs(raw)
   ? accepted(raw)
   : refused(at, raw, `a lock wait in milliseconds, a whole number from ${String(BUSY_TIMEOUT_MIN_MS)} to ${String(BUSY_TIMEOUT_MAX_MS)}`);
+
+/**
+ * The lowest confidence a lesson may carry, and the lowest
+ * {@link confidence} accepts: the learning library's `CONFIDENCE_MIN`.
+ */
+export const CONFIDENCE_MIN = 0.3;
+
+/**
+ * The highest confidence a lesson may carry, and the highest
+ * {@link confidence} accepts: the learning library's `CONFIDENCE_MAX`.
+ */
+export const CONFIDENCE_MAX = 0.9;
 
 /**
  * Accepts a lesson confidence as the `learning` thresholds take one: a

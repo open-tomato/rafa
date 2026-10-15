@@ -24,6 +24,8 @@ import type { AdapterContext } from '../../core/adapters/index.js';
 import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { Device } from '../../tests/merged-stores.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

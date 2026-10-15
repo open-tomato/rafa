@@ -1,7 +1,7 @@
 /**
  * One declared task, from the tracker line to the argument list.
  *
- * This is the JOIN no colocated suite can make. `utils/declaration.ts`
+ * This is the JOIN no colocated suite can make. `core/plan/declaration.ts`
  * knows what a block resolves to and nothing about a prompt;
  * `core/loop/claude.ts` knows what an argument list looks like and nothing
  * about where its flags came from; `start/dispatch.ts` is where the
@@ -77,7 +77,7 @@
  * ## The mutation grid
  *
  * Twenty-one mutations of `start.ts`, `core/loop/claude.ts` and
- * `utils/declaration.ts` were driven against this file, while
+ * `core/plan/declaration.ts` were driven against this file, while
  * `start.ts` still held what `start/dispatch.ts` and `start/commit.ts`
  * hold now, and all TWENTY-ONE reddened at least one case. Every leg
  * ran TWICE and named the IDENTICAL red set on both passes, asked for
@@ -114,7 +114,7 @@
  * for every task reaches
  * `says nothing about routing for a plain task`; and
  * `leaves a brace that is task text alone` is reached by a COMPOUND
- * leg over `utils/declaration.ts` — dropping the end anchor AND the
+ * leg over `core/plan/declaration.ts` — dropping the end anchor AND the
  * recognised-key rule together. Neither half reddens anything alone
  * (measured, 0 of 14 each): each shadows the other, so only the pair
  * can say which two layers that case rests on.
@@ -127,7 +127,7 @@
  * the dispatch passed `--effort`. Every other dispatch here is handed
  * roots that hold nothing, so its effort always passes. Both cases were
  * driven against legs over `start/dispatch.ts`,
- * `utils/agent-definition.ts` and `utils/declaration.ts`, each run
+ * `utils/agent-definition.ts` and `core/plan/declaration.ts`, each run
  * twice with identical red sets, and both redden. Handing the resolver
  * a lookup that ignores the definitions reddens both; swapping
  * `repoRoot` and `home` on their way to the lookup reddened the home

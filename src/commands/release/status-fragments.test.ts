@@ -25,6 +25,8 @@ import type { WaitingSettings } from './status-fragments.js';
 import type { RafaCommand } from '../../core/command/index.js';
 import type { Fragment } from '../../release/fragment.js';
 
+import '../../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

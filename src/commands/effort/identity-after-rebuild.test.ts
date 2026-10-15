@@ -16,6 +16,8 @@ import type { RuntimeIdentity } from '../../core/runtime/index.js';
 import type { StoreIdentitySeams, StoreMeta } from '../../effort/store/store-meta.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

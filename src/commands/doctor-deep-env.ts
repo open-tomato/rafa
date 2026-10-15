@@ -12,7 +12,7 @@
  *
  * Two layers, the second over the first:
  *
- *   1. **The spawn.** `sessionSpawnEnv(env)` (`src/utils/session-env.ts`),
+ *   1. **The spawn.** `sessionSpawnEnv(env)` (`src/core/loop/session-env.ts`),
  *      where `env` is the invocation's `RafaContext.env`: the function
  *      both spawn doors in `src/core/loop/claude.ts` call, called here
  *      rather than spelled again, so the reading cannot drift from what

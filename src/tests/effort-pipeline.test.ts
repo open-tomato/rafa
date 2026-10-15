@@ -119,6 +119,8 @@ import type { CollectOptions } from '../effort/collect.js';
 import type { CommitLogParseResult, CommitStats } from '../effort/commits.js';
 import type { EffortGroup, EffortReport } from '../effort/report.js';
 
+import '../adapter-registry.js';
+
 import {
   mkdirSync,
   mkdtempSync,

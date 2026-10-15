@@ -24,6 +24,8 @@
 import type { RafaConfig } from '../core/config/index.js';
 import type { LoadedModules } from '../modules/load.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

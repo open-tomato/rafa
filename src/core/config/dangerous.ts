@@ -43,9 +43,9 @@
  * held as the active output is (`core/output/active.ts`): the
  * dispatcher runs every command inside {@link runWithDangerousPhrases}
  * with the command's own, beside the running-command record
- * (`src/cli/running.ts`), in an async scope that ends with the run, so
- * two invocations overlapping in one process each read their own and
- * nothing outlives either. {@link setDangerousPhrases} sets them at
+ * (`src/core/command/running.ts`), in an async scope that ends with the
+ * run, so two invocations overlapping in one process each read their own
+ * and nothing outlives either. {@link setDangerousPhrases} sets them at
  * module level, read outside every scope, and answers the phrases it
  * replaced for {@link restoreDangerousPhrases}: a test standing in for
  * a dispatch puts them back in a `finally`, since bun runs every test

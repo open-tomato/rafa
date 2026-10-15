@@ -442,6 +442,7 @@ describe('subjectBarrels', () => {
       'src/core/plan/index.ts',
     ]);
     expect(subjectBarrels('src/core/loop/session-readings.ts')).toEqual([
+      'src/core/loop/hops.ts',
       'src/core/loop/index.ts',
       'src/core/loop/readings.ts',
     ]);

@@ -22,6 +22,8 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

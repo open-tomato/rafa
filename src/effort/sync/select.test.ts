@@ -15,12 +15,13 @@
  * that is never made, and each case that selects holds it absent after,
  * so selecting and the `local` strategy are read as touching no disk.
  *
- * The import cycle between this module and
- * `src/core/adapters/registry.ts` is
+ * The load order of this module and `src/core/adapters/registry.ts`,
+ * which imported each other until the composition root
+ * `src/adapter-registry.ts` took core's adapters out of the registry, is
  * read in a child `bun` per import order, since this file has already
  * imported both by the time a case runs. The registry's side is entered
  * through its barrel, `src/core/adapters/index.ts`, as this module
- * enters it.
+ * enters it, and each child imports the root after both.
  *
  * Three mutations were driven on 2026-09-29 over this file,
  * `src/core/adapters/registry.test.ts`,
@@ -36,6 +37,8 @@
 import type { AdapterContext, Adapter } from '../../core/adapters/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { Sync } from '../../ports/index.js';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -302,15 +305,17 @@ describe('the lines a SyncModuleMissing names', () => {
   });
 });
 
-describe('the import cycle with the adapter registry', () => {
+describe('the load order with the adapter registry', () => {
   const SELECT_ENTRY = fileURLToPath(new URL('./select.ts', import.meta.url));
   const BARREL_ENTRY = fileURLToPath(new URL('../../core/adapters/index.ts', import.meta.url));
+  const ROOT_ENTRY = fileURLToPath(new URL('../../adapter-registry.ts', import.meta.url));
 
   /** Runs a child `bun` importing `first` before the other module, answering its exit code and stdout. */
   const importing = (first: string, second: string): { exitCode: number; stdout: string } => {
     const script = [
       `const first = await import(${JSON.stringify(first)});`,
       `const second = await import(${JSON.stringify(second)});`,
+      `await import(${JSON.stringify(ROOT_ENTRY)});`,
       'const { selectSync } = first.selectSync ? first : second;',
       'const { CORE_ADAPTER_REGISTRY } = first.CORE_ADAPTER_REGISTRY ? first : second;',
       'const sync = selectSync("/nonexistent", { effortSync: "local" });',

@@ -11,12 +11,10 @@
  * reads the entry barrels. A name both files exported would make the
  * expected list one longer than the barrel's and fail the same cases.
  *
- * Three names are held by name, so a reading that came back empty, or
+ * Two names are held by name, so a reading that came back empty, or
  * one that saw runtime names alone, fails rather than agreeing with
- * itself: `Reader`, a type of `config-sections.ts`; `ReleaseStrategy`, a
- * type of `config-readers.ts`; and `MergeMethod`, the type
- * `config-sections.ts` re-exports from `pr/types.ts` and declares
- * nowhere.
+ * itself: `Reader`, a type of `config-sections.ts`; and
+ * `ReleaseStrategy`, a type of `config-readers.ts`.
  */
 import { resolve } from 'node:path';
 
@@ -86,8 +84,8 @@ describe('the sections barrel', () => {
     const expected = [...(names[SECTIONS] ?? []), ...(names[READERS] ?? [])].sort();
 
     expect(names[SECTIONS]).toContain('Reader');
-    expect(names[SECTIONS]).toContain('MergeMethod');
     expect(names[READERS]).toContain('ReleaseStrategy');
+    expect(names[BARREL]).not.toContain('MergeMethod');
     expect(Object.keys(sections)).not.toContain('Reader');
     expect(names[BARREL]).toEqual(expected);
   });

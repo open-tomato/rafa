@@ -1,11 +1,11 @@
 /**
  * Tests for the async scope the dispatcher runs a command in
- * (`src/cli/dispatch.ts`, step 5): the running command (`running.ts`)
- * and the active output (`src/core/output/active.ts`) each
- * invocation carries, read from inside a command's `run`, and what is
- * left once invocations that overlap have ended. The rest of the
- * dispatcher is `dispatch.test.ts`'s, where no two invocations overlap
- * but the four of its start-event case.
+ * (`src/cli/dispatch.ts`, step 5): the running command
+ * (`src/core/command/running.ts`) and the active output
+ * (`src/core/output/active.ts`) each invocation carries, read from
+ * inside a command's `run`, and what is left once invocations that
+ * overlap have ended. The rest of the dispatcher is `dispatch.test.ts`'s,
+ * where no two invocations overlap but the four of its start-event case.
  *
  * ## What overlaps, and in which order
  *
@@ -53,19 +53,25 @@
  */
 import type { DispatchOutcome } from './dispatch.js';
 import type { CommandRegistry } from './registry.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
+
+import '../adapter-registry.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { createJsonOutput } from '../adapters/output/json.js';
-import { CommandExit } from '../core/command/index.js';
+import {
+  CommandExit,
+  restoreRunningCommand,
+  runningCommand,
+  setRunningCommand,
+} from '../core/command/index.js';
 import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
 
 import { dispatch } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
-import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';
 
 /** What a command read from inside its `run`. */
 interface Reading {

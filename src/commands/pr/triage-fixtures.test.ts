@@ -56,6 +56,8 @@ import type { TriageClass } from '../../pr/triage/classes.js';
 import type { GuardReading } from '../../release/guard.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

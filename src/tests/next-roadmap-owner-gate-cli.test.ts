@@ -176,6 +176,7 @@ const PR_DETAIL = Object.freeze({
 function buildProbe(options: ProbeOptions): string {
   return [
     'import { writeFileSync } from "node:fs";',
+    `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,

@@ -23,6 +23,8 @@ import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent, Tracker } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';

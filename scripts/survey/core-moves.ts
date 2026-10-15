@@ -5,7 +5,7 @@
  *
  * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the twenty files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty-nine files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
@@ -72,9 +72,24 @@ export interface Collision {
 }
 
 /**
- * The twenty files that move, sorted by their path today: the nineteen
- * of #905, and `src/runtime/identity.ts`, which #1088 moved so the
- * effort store imports nothing above core for it.
+ * The twenty-nine files that move, sorted by their path today: the
+ * nineteen of #905, `src/runtime/identity.ts`, which #1088 moved so the
+ * effort store imports nothing above core for it, the `text` output
+ * adapter with the `OutputStream` it writes to, which #1089 moved so
+ * `src/core/output/active.ts` and `src/core/adapters/registry.ts` import
+ * nothing above core for them, and the command contracts of
+ * `src/cli/core/types.ts` and the `spends` declaration of
+ * `src/cli/spends.ts`, which #1089 moved so `src/core/command/command.ts`
+ * imports nothing above core for them, and the running command record
+ * of `src/cli/running.ts`, which #1089 moved so
+ * `src/core/loop/claude.ts` imports nothing above core for it, and the
+ * plan stamp and the task declaration parser of `src/utils/`, which
+ * #1089 moved so `src/core/plan/` imports nothing above core for them,
+ * and the session environment of `src/utils/session-env.ts`, which #1089
+ * moved so `src/core/loop/claude.ts` imports nothing above core for it,
+ * and the session record parser of `src/loop/session-record-parse.ts`,
+ * which #1089 moved so `src/core/loop/sessions.ts` imports nothing above
+ * core for it.
  */
 export const CORE_MOVES: readonly CoreMove[] = [
   {
@@ -82,6 +97,18 @@ export const CORE_MOVES: readonly CoreMove[] = [
     subject: 'output',
     tests: ['src/adapters/output/active.test.ts'],
     to: 'src/core/output/active.ts',
+  },
+  {
+    from: 'src/adapters/output/stream.ts',
+    subject: 'output',
+    tests: [],
+    to: 'src/core/output/stream.ts',
+  },
+  {
+    from: 'src/adapters/output/text.ts',
+    subject: 'output',
+    tests: ['src/adapters/output/text.test.ts'],
+    to: 'src/core/output/text.ts',
   },
   {
     from: 'src/adapters/registry.ts',
@@ -96,10 +123,28 @@ export const CORE_MOVES: readonly CoreMove[] = [
     to: 'src/core/command/command.ts',
   },
   {
+    from: 'src/cli/core/types.ts',
+    subject: 'command',
+    tests: ['src/cli/core/types.test.ts'],
+    to: 'src/core/command/types.ts',
+  },
+  {
     from: 'src/cli/prompt/confirm.ts',
     subject: 'command',
     tests: ['src/cli/prompt/confirm.test.ts'],
     to: 'src/core/command/confirm.ts',
+  },
+  {
+    from: 'src/cli/running.ts',
+    subject: 'command',
+    tests: ['src/cli/running.test.ts'],
+    to: 'src/core/command/running.ts',
+  },
+  {
+    from: 'src/cli/spends.ts',
+    subject: 'command',
+    tests: ['src/cli/spends.test.ts'],
+    to: 'src/core/command/spends.ts',
   },
   {
     from: 'src/cli/version.ts',
@@ -148,6 +193,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
     subject: 'loop',
     tests: [],
     to: 'src/core/loop/session-readings.ts',
+  },
+  {
+    from: 'src/loop/session-record-parse.ts',
+    subject: 'loop',
+    tests: ['src/loop/session-record-parse.test.ts'],
+    to: 'src/core/loop/session-record-parse.ts',
   },
   {
     from: 'src/loop/sessions.ts',
@@ -204,6 +255,24 @@ export const CORE_MOVES: readonly CoreMove[] = [
     tests: ['src/utils/commit.test.ts'],
     to: 'src/core/git/commit.ts',
   },
+  {
+    from: 'src/utils/declaration.ts',
+    subject: 'plan',
+    tests: ['src/utils/declaration.test.ts'],
+    to: 'src/core/plan/declaration.ts',
+  },
+  {
+    from: 'src/utils/plan-stamp.ts',
+    subject: 'plan',
+    tests: [],
+    to: 'src/core/plan/plan-stamp.ts',
+  },
+  {
+    from: 'src/utils/session-env.ts',
+    subject: 'loop',
+    tests: ['src/utils/session-env.test.ts'],
+    to: 'src/core/loop/session-env.ts',
+  },
 ];
 
 /**
@@ -213,7 +282,18 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * {@link CORE_MOVES}. The third step of core's move into its package
  * (#1090) removes them.
  */
-export const CORE_REEXPORTS: readonly string[] = ['src/runtime/identity.ts'];
+export const CORE_REEXPORTS: readonly string[] = [
+  'src/adapters/output/stream.ts',
+  'src/adapters/output/text.ts',
+  'src/cli/core/types.ts',
+  'src/cli/running.ts',
+  'src/cli/spends.ts',
+  'src/loop/session-record-parse.ts',
+  'src/runtime/identity.ts',
+  'src/utils/declaration.ts',
+  'src/utils/plan-stamp.ts',
+  'src/utils/session-env.ts',
+];
 
 /**
  * The barrel files of each subject, sorted. `config` has three. The
@@ -238,20 +318,27 @@ export const CORE_REEXPORTS: readonly string[] = ['src/runtime/identity.ts'];
  * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
  * file under `src/` and so reaches nothing that imports it back.
  *
- * `loop` has two. `session-readings.ts` sits alone behind
+ * `loop` has three. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
- * that file imports `index.ts` back. `index.ts` holds `sessions.ts`
- * and `claude.ts`, which share it because neither reaches a file that
- * imports it back.
+ * that file imports `index.ts` back. `hop-record.ts` sits alone behind
+ * `hops.ts`, because `src/next/hop-record.ts` imports it by value and
+ * was reached by value from `sessions.ts`, through
+ * `src/loop/session-record-parse.ts`, when the split was made, so
+ * `index.ts` over it would have closed a cycle; that parser has since
+ * moved here as `session-record-parse.ts` and imports `hop-record.ts`
+ * by path. `index.ts` holds `sessions.ts`, `claude.ts`,
+ * `session-env.ts` and `suite-failure.ts`, which share it because none
+ * reaches a file that imports it back; the parser's names reach it
+ * through `sessions.ts`.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],
   command: ['src/core/command/index.ts'],
   config: ['src/core/config/index.ts', 'src/core/config/load.ts', 'src/core/config/sections.ts'],
   git: ['src/core/git/index.ts'],
-  loop: ['src/core/loop/index.ts', 'src/core/loop/readings.ts'],
+  loop: ['src/core/loop/hops.ts', 'src/core/loop/index.ts', 'src/core/loop/readings.ts'],
   output: ['src/core/output/index.ts'],
   plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
   runtime: ['src/core/runtime/index.ts'],

@@ -1,7 +1,15 @@
 /**
- * Tests for the adapter registry: the port versions it serves, what core
- * registers, what `register` accepts and refuses, and what a lookup
- * answers.
+ * Tests for the adapter registry's mechanics: the port versions it
+ * serves, what `register` accepts and refuses, what a lookup answers,
+ * and the active registry `registerAdapters`, `restoreAdapters` and
+ * `activeAdapterRegistry` keep, which `CORE_ADAPTER_REGISTRY` reads.
+ *
+ * Every case runs over fixture adapters built here: {@link BASE} holds
+ * fixtures under the kinds core registers, so a refusal listing the
+ * kinds held lists what it listed when these cases read core's own, and
+ * this file imports nothing above core. Core's own adapters are read in
+ * `src/adapter-registry.test.ts`, beside the composition root that
+ * registers them.
  *
  * `PORT_VERSIONS` is held to the literal types `src/ports/index.ts`
  * declares by reading them off the TypeScript compiler, under the
@@ -13,36 +21,12 @@
  *
  * Every refusal is spelled here in full, and each sits beside a case the
  * registry accepts, so a registry refusing everything fails as surely as
- * one refusing nothing. The store cases read which backend an adapter
- * opened off the disk under a fresh temporary root, never off the store
- * it answered, with the file names spelled here. The output cases read
- * what an adapter wrote off a stream the case hands it, or off a spy on
- * `process.stdout.write` the case restores, and each `text` reading
- * spells a line the `json` adapter could not have written. The `local`
- * tracker case reads the issues that adapter wrote off the disk under a
- * fresh temporary root, and the reason each records off its file. The
- * `local` learning case reads the file and the push-log line that
- * adapter wrote off the disk under a fresh temporary root, and the
- * bundle a second adapter made over that root answers. Every learning
- * case names a scratch home, apart from one that spawns a child `bun`
- * with a scratch `HOME`, because bun's `homedir()` keeps the `HOME` a
- * process started with (measured on bun 1.3.14: setting
- * `process.env.HOME` in the process left `homedir()` unchanged).
- * Driven on 2026-09-25, the context's home ignored for `homedir()`
- * reddened the two cases that name one, and the context's floor ignored
- * reddened the floor case alone. The `github`
- * tracker cases hand that adapter the recorded fake as its `gh` runner
- * and read what it filed off the fake. No case runs the runner the
- * adapter makes when its context names none, which spawns the real
- * `gh`. The `claude` planner case hands that adapter a recording
- * spawner as its `claude` and reads the plan it answers off a fresh
- * temporary root. No case makes a planner without a
- * spawner of its own, whose default spawns the real `claude`; the
- * refusals throw before one is made.
+ * one refusing nothing.
  *
- * No case changes `CORE_ADAPTER_REGISTRY`. An add-on is registered on it
- * through `register`, which answers a new registry, and a case holds the
- * core registry unchanged afterwards.
+ * The active registry is a module-level value, and bun runs every test
+ * file in one process, where an earlier file may already have imported
+ * the root. So each case over it starts from an empty registry it
+ * restores, and puts back the registry it found in a `finally`.
  *
  * Twelve mutations were driven against this file on 2026-09-14, one run
  * each, with the unmutated modules at 52 pass before them and restored
@@ -66,47 +50,11 @@
  *     registered in reverse reddened the order case, and with it the
  *     store entry's refusals, which list the kinds in that order.
  *
- * Three more were driven the same way on 2026-09-14, once the outputs
- * were registered, with `src/adapters/` at 112 pass before and after. The
- * `json` output made once and shared across creates reddened the
- * fresh-output case and the `json` stdout case, whose line went to the
- * stream an earlier case had made the shared output with. The `text`
- * output made at verbosity 0 whatever its context reddened the stream
- * and verbosity case alone, and a default stream of `process.stderr` the
- * `text` stdout case alone.
- *
- * Three more were driven the same way on 2026-09-14, once the `local`
- * tracker was registered, with `src/adapters/` at 242 pass before and
- * after. The context's reason defaulting to a string, the context's
- * reason ignored, and the issues written at the repository root in place
- * of `.rafa/issues/` each reddened the tracker case alone.
- *
- * Two more were driven the same way on 2026-09-14, once the `github`
- * tracker was registered, with this file and `github.test.ts` at 168 pass
- * before and after and `registry.ts` restored byte-identical (sha256).
- * The context's runner ignored for one spawning `gh` in the context's
- * root, and one github tracker shared across creates, each reddened the
- * runner case alone. The first ran no `gh`: that case's root,
- * `/nonexistent`, was checked absent first, and `Bun.spawn` throws for a
- * missing `cwd` before it runs anything, as `github.ts` notes.
- *
- * Two more were driven the same way on 2026-09-14, once the `local`
- * learning stub was registered, over this file and
- * `src/adapters/learning/local.test.ts` at 101 pass before and after,
- * with `registry.ts` restored byte-identical (sha256). The entry removed
- * reddened four cases: the learning kinds case, the learning case, the
- * frozen-registry case and the refusal naming the kinds held. The entry
- * making the stub at the root in place of `.rafa/instincts/` reddened
- * the learning case alone.
- *
- * Five more were driven the same way on 2026-09-14, once the `claude`
- * planner was registered, over this file,
- * `src/adapters/planner/claude.test.ts` and `src/plan.test.ts` at 79 pass
- * before and after, with `registry.ts` restored byte-identical (sha256)
- * and a PATH on which no `claude` resolves. The entry registered under
- * another kind reddened the four planner cases. Each refusal dropped
- * reddened its own case alone. The context's spawner ignored, and the
- * context's sources ignored, each reddened the planner case alone.
+ * The cases those readings name that read core's own kinds (the order
+ * case, the core registry left unchanged, the frozen-registry case and
+ * the store entry's refusals) moved to `src/adapter-registry.test.ts`
+ * with the adapters, as did the readings driven once each core adapter
+ * was registered; that file summarises them.
  *
  * Two more were driven on 2026-09-29, once the `sync` port was served
  * with no core kind, over this file, `src/ports/index.test.ts`,
@@ -116,74 +64,48 @@
  * literal case and both sync add-on cases. The sync adapters left out
  * of the index reddened the add-on sync kind case alone.
  *
- * Core's `sync/local` arrived the same day (`src/effort/sync/select.ts`).
- * Its entry removed reddened six cases here: the sync kinds case, the
- * local strategy case, the frozen-registry case, the add-on sync kind
- * case, the refusal of an add-on taking `local` over, and the refusal
- * naming the kinds held.
+ * Five more were driven on 2026-10-15, once the active registry and its
+ * facade arrived, one run each over this file and
+ * `src/adapter-registry.test.ts`, 85 pass unmutated, with `registry.ts`
+ * restored and verified with `sha256sum -c`. The facade's `find`
+ * answering without the refusal reddened the refusal case alone.
+ * `registerAdapters` keeping the adapters it accepted before a refused
+ * one reddened the refused-list case alone. `restoreAdapters` taking the
+ * facade reddened its refusal case alone. The facade's `kinds` caching
+ * the first registry it read reddened twelve cases, the call-time case
+ * among them. A fifth, the facade's `kinds` reading a registry captured
+ * when the module loaded, reddened nothing: that registry is always the
+ * empty one, so the mutant fell through to the active registry and
+ * answered as the facade does.
  */
-import type { AdapterContext, AnyAdapter } from './registry.js';
-import type { DescribedInstinctRecord } from '../../adapters/learning/local.js';
-import type { SessionEffortRow } from '../../effort/store/types.js';
-import type { InstinctRecord, Sync, Tracker } from '../../ports/index.js';
-import type { CapturingSpawner } from '../loop/claude.js';
+import type { AdapterRegistry, AnyAdapter } from './registry.js';
+import type { Sync, Tracker } from '../../ports/index.js';
 
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { draftFixture } from '../../adapters/tracker/contract.js';
-import { createFakeGh } from '../../adapters/tracker/github-fake.js';
-import { parseLocalIssue } from '../../adapters/tracker/local.js';
-import { parseSpecReview } from '../../board/spec-review.js';
-import { actionHash } from '../../learning/index.js';
-import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 import {
-  EMPTY_CONFIG_REGISTRY,
-  registerConfigSections,
-  restoreConfigSections,
-} from '../config/section.js';
-
-import {
+  activeAdapterRegistry,
   CORE_ADAPTER_REGISTRY,
   createAdapterRegistry,
   PORT_VERSIONS,
+  registerAdapters,
+  restoreAdapters,
 } from './registry.js';
 
 /** The repository root, whose tsconfig the compiler reads under. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-
-/** The registry itself, as a child process imports it. */
-const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
 
 /** The ports entry, whose literal version types the value is held to. */
 const PORTS_ENTRY = fileURLToPath(new URL('../../ports/index.ts', import.meta.url));
 
 /** The port types, in the order a refusal lists them. */
 const PORT_TYPES = 'tracker, store, learning, output, planner, sync, logger';
-
-/** What the planner case's session writes to stdout: a review judging the spec ready. */
-const PLANNER_SESSION_STDOUT = [
-  'I read the spec first.',
-  '',
-  '```rafa:spec-review',
-  'verdict: ready',
-  'gaps: []',
-  '```',
-  '',
-].join('\n');
 
 /** A probe declaring one version drifted and one widened. */
 const DRIFTED_PROBE = [
@@ -200,58 +122,6 @@ const DRIFTED_PROBE = [
 
 /** What the reader must report for the drifted probe. */
 const DRIFTED_READING = { tracker: 2, store: 1, learning: 1, output: 1, planner: 'number', sync: 1 };
-
-/** Each store backend and the files it leaves once a session row is written. */
-const STORE_LAYOUTS: readonly (readonly [string, readonly string[]])[] = [
-  ['sqlite', ['effort.sqlite']],
-  ['ndjson', ['sessions.ndjson']],
-];
-
-/** The record the learning case pushes, as the port carries it. */
-const INSTINCT: InstinctRecord = {
-  id: 'instinct-1',
-  trigger: 'a test fails under the full suite and passes alone',
-  action: 'find the file that runs before it and the state it leaves',
-  action_hash: actionHash('find the file that runs before it and the state it leaves'),
-  confidence: 0.5,
-  usage_count: 1,
-  signal: 'loud',
-  status: 'active',
-  created_at: '2026-09-14T10:00:00.000Z',
-  updated_at: '2026-09-14T10:00:00.000Z',
-};
-
-/** {@link INSTINCT} with what its `.md` file says beside the merge fields. */
-const DESCRIBED_INSTINCT: DescribedInstinctRecord = {
-  ...INSTINCT,
-  description: {
-    kind: 'gotcha',
-    domain: 'testing',
-    scope: 'project',
-    source: 'imported',
-    evidence: [],
-    cause: 'an earlier file leaves state behind',
-    projectId: null,
-  },
-};
-
-/** What a second terminal result from one json output is refused with. */
-const SECOND_RESULT_REFUSAL
-  = 'json output: refused a second terminal result event; a command emits exactly one';
-
-/** A stream of its own, and the chunks written to it. */
-function memoryStream(): { stream: { write: (chunk: string) => unknown }; chunks: string[] } {
-  const chunks: string[] = [];
-  return {
-    stream: {
-      write: (chunk) => {
-        chunks.push(chunk);
-        return true;
-      },
-    },
-    chunks,
-  };
-}
 
 /** A tracker every fixture adapter answers. Never called. */
 const FIXTURE_TRACKER: Tracker = {
@@ -291,17 +161,44 @@ function addOn(fields: Record<string, unknown> = {}): AnyAdapter {
   } as unknown as AnyAdapter;
 }
 
-/** A session row carrying its key and one counter. The cast is the plant. */
-const SESSION = { sessionId: 'aaaa-1111', assistantRecordCount: 1 } as unknown as SessionEffortRow;
-
 let tempDir = '';
 let program: ts.Program | null = null;
-let planted = 0;
 
-/** A repo root of its own, not yet on disk. */
-function freshRoot(name: string): string {
-  planted += 1;
-  return join(tempDir, `${planted}-${name}`);
+/**
+ * A registry of fixture adapters under the kinds core registers, in the
+ * order the root registers them: the registry the mechanics run over.
+ */
+const BASE: AdapterRegistry = createAdapterRegistry([
+  addOn({ port: 'store', kind: 'sqlite' }),
+  addOn({ port: 'store', kind: 'ndjson' }),
+  addOn({ kind: 'local' }),
+  addOn({ kind: 'github' }),
+  addOn({ port: 'learning', kind: 'local' }),
+  addOn({ port: 'planner', kind: 'claude' }),
+  addOn({ port: 'sync', kind: 'local', create: () => FIXTURE_SYNC }),
+  addOn({ port: 'sync', kind: 'file', create: () => FIXTURE_SYNC }),
+]);
+
+/** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
+const UNREGISTERED = 'adapter registry: no adapter is registered: import src/adapter-registry.ts,'
+  + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY';
+
+/** What `restoreAdapters` throws when handed `CORE_ADAPTER_REGISTRY` itself. */
+const RESTORE_REFUSAL = 'adapter registry: CORE_ADAPTER_REGISTRY reads the active registry and cannot be made the active one;'
+  + ' restore what registerAdapters or activeAdapterRegistry answered';
+
+/**
+ * Runs `body` with no adapter registered, and puts back the registry it
+ * found, whatever `body` registered or threw.
+ */
+function overEmpty(body: () => void): void {
+  const found = activeAdapterRegistry();
+  restoreAdapters(createAdapterRegistry());
+  try {
+    body();
+  } finally {
+    restoreAdapters(found);
+  }
 }
 
 /**
@@ -376,320 +273,22 @@ describe('PORT_VERSIONS', () => {
   });
 });
 
-describe('the core adapter registry', () => {
-  it('registers both store backends, in the order the config names them', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('store')).toEqual(['sqlite', 'ndjson']);
-  });
-
-  it.each(STORE_LAYOUTS)('opens the %s backend under the root it is made with', (kind, files) => {
-    const root = freshRoot(kind);
-    const store = CORE_ADAPTER_REGISTRY.resolve('store', kind).create({ repoRoot: root });
-
-    expect(existsSync(root)).toBe(false);
-    store.append('sessions', [SESSION]);
-    expect(readdirSync(join(root, '.rafa', 'effort')).sort()).toEqual([...files]);
-    expect(store.read('sessions')).toEqual([SESSION]);
-  });
-
-  it('registers the three outputs, text, then json, then events', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('output')).toEqual(['text', 'json', 'events']);
-  });
-
-  it('makes the text output over the stream and verbosity its context names', () => {
-    const { stream, chunks } = memoryStream();
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('output', 'text');
-
-    const quiet = adapter.create({ repoRoot: '/nonexistent', stream });
-    quiet.debug('hidden');
-    quiet.info('loop line');
-    adapter.create({ repoRoot: '/nonexistent', stream, verbosity: 2 }).debug('shown');
-
-    expect(chunks).toEqual(['loop line\n', 'debug: shown\n']);
-  });
-
-  it('makes a new json output on each create, each writing one result of its own', () => {
-    const { stream, chunks } = memoryStream();
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('output', 'json');
-
-    const first = adapter.create({ repoRoot: '/nonexistent', stream });
-    first.result('one');
-    adapter.create({ repoRoot: '/nonexistent', stream }).result('two');
-
-    expect(chunks.map((chunk) => JSON.parse(chunk) as unknown)).toMatchObject([
-      { type: 'result', ok: true, data: 'one' },
-      { type: 'result', ok: true, data: 'two' },
-    ]);
-    expect(() => first.result('three')).toThrow(SECOND_RESULT_REFUSAL);
-    expect(chunks).toHaveLength(2);
-  });
-
-  it.each([
-    ['text', 'warn: careful\n'],
-    ['json', '"level":"warn","message":"careful"'],
-  ])('makes the %s output over process.stdout when its context names no stream', (kind, line) => {
-    const written: string[] = [];
-    const spy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      written.push(String(chunk));
-      return true;
-    });
-    try {
-      CORE_ADAPTER_REGISTRY.resolve('output', kind)
-        .create({ repoRoot: '/nonexistent' })
-        .warn('careful');
-    } finally {
-      spy.mockRestore();
-    }
-
-    expect(written).toHaveLength(1);
-    expect(written[0]).toContain(line);
-  });
-
-  it('registers both trackers, local before github', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local', 'github']);
-  });
-
-  it('makes the local tracker under .rafa/issues of its root, recording the reason its context names', async () => {
-    const root = freshRoot('tracker');
-    const issuesDir = join(root, '.rafa', 'issues');
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('tracker', 'local');
-
-    const fellBack = adapter.create({ repoRoot: root, fallbackReason: 'github: gh auth status exited 1' });
-    const chosenFirst = adapter.create({ repoRoot: root });
-    expect(existsSync(root)).toBe(false);
-    await fellBack.create(draftFixture());
-    await chosenFirst.create(draftFixture());
-
-    expect(root.startsWith(tempDir)).toBe(true);
-    expect(readdirSync(issuesDir).sort()).toEqual(['1.md', '2.md']);
-    expect(parseLocalIssue(readFileSync(join(issuesDir, '1.md'), 'utf8')).fallbackReason)
-      .toBe('github: gh auth status exited 1');
-    expect(parseLocalIssue(readFileSync(join(issuesDir, '2.md'), 'utf8')).fallbackReason).toBeNull();
-  });
-
-  it('makes the github tracker over the gh runner its context names, a new tracker on each create', async () => {
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('tracker', 'github');
-    const fake = createFakeGh();
-
-    const first = adapter.create({ repoRoot: '/nonexistent', gh: fake.run });
-    const second = adapter.create({ repoRoot: '/nonexistent', gh: fake.run });
-    const preflight = await first.preflight();
-    await first.create(draftFixture());
-    await second.create(draftFixture());
-
-    expect(preflight).toEqual({ ok: true });
-    expect(second).not.toBe(first);
-    expect(fake.issueCount()).toBe(2);
-    // Each tracker remembers the labels it made, so the second makes its three again.
-    expect(fake.calls().filter((call) => call[0] === 'label')).toHaveLength(6);
-  });
-
-  it('makes the github tracker when its context names no runner', () => {
-    const tracker = CORE_ADAPTER_REGISTRY.resolve('tracker', 'github').create({ repoRoot: '/nonexistent' });
-
-    expect(tracker.kind).toBe('github');
-    expect(tracker.capabilities()).toEqual({ projects: false, customFields: false, issueTypes: false });
-  });
-
-  it('registers the local learning adapter alone', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('learning')).toEqual(['local']);
-  });
-
-  it('makes the local learning adapter under .rafa/instincts of its root', async () => {
-    const root = freshRoot('learning');
-    const home = freshRoot('learning-home');
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
-
-    const pushing = adapter.create({ repoRoot: root, home });
-    const pulling = adapter.create({ repoRoot: root, home });
-    expect(existsSync(root)).toBe(false);
-    const result = await pushing.push({ source_id: 'session-1', instincts: [DESCRIBED_INSTINCT] });
-    const bundle = await pulling.pullBlessed();
-
-    expect(root.startsWith(tempDir)).toBe(true);
-    expect(readdirSync(join(root, '.rafa', 'instincts')).sort()).toEqual(['instinct-1.md', 'instincts.ndjson']);
-    expect(JSON.parse(readFileSync(join(root, '.rafa', 'instincts', 'instincts.ndjson'), 'utf8'))).toEqual({
-      source_id: 'session-1',
-      rule: 'new-trigger',
-      incoming: DESCRIBED_INSTINCT,
-      produced: ['instinct-1'],
-      discarded: [],
-    });
-    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger']);
-    expect(bundle.instincts).toEqual([{ ...INSTINCT, sources: ['session-1'] }]);
-  });
-
-  it('makes the local learning adapter over the home and the floor its context names', async () => {
-    const home = freshRoot('learning-user-home');
-    const root = freshRoot('learning-user-root');
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
-    // A push with the home as its root plants the user scope another root reads.
-    await adapter.create({ repoRoot: home, home: freshRoot('learning-no-home') }).push({
-      source_id: 'session-1',
-      instincts: [{ ...DESCRIBED_INSTINCT, id: 'user-1', trigger: 'another trigger', confidence: 0.6 }],
-    });
-
-    const pull = async (context: Partial<AdapterContext>): Promise<string[]> => (
-      await adapter.create({ repoRoot: root, home, ...context }).pullBlessed()
-    ).instincts.map((record) => record.id);
-
-    expect(await pull({})).toEqual(['user-1']);
-    expect(await pull({ learningBlessMinConfidence: 0.7 })).toEqual([]);
-    // Control: the floor the record meets answers it.
-    expect(await pull({ learningBlessMinConfidence: 0.6 })).toEqual(['user-1']);
-    expect(existsSync(root)).toBe(false);
-  });
-
-  it('refuses a local learning adapter with no floor when no section registered one, naming the registry', () => {
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('learning', 'local');
-    const held = registerConfigSections([]);
-    try {
-      restoreConfigSections(EMPTY_CONFIG_REGISTRY);
-
-      expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered') })).toThrow(
-        'adapter registry: learning.bless.minConfidence has no registered default:'
-          + ' import src/config-registry.ts before making the local learning adapter without one',
-      );
-      // Control: a floor the context names needs no registered default.
-      expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered'), learningBlessMinConfidence: 0.5 }))
-        .not.toThrow();
-    } finally {
-      restoreConfigSections(held);
-    }
-  });
-
-  it('reads the user scope under the HOME the process started with when its context names no home', async () => {
-    const home = freshRoot('learning-spawned-home');
-    const emptyHome = freshRoot('learning-spawned-empty-home');
-    const root = freshRoot('learning-spawned-root');
-    const planting = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: home, home: emptyHome });
-    await planting.push({
-      source_id: 'session-1',
-      instincts: [{ ...DESCRIBED_INSTINCT, id: 'user-1', trigger: 'another trigger' }],
-    });
-    // bun's homedir() keeps the HOME the process started with, so each reading is a child of its own.
-    const script = [
-      `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(REGISTRY_ENTRY)});`,
-      `const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: ${JSON.stringify(root)} });`,
-      'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',
-    ].join('\n');
-    const pulled = (scratchHome: string): { exitCode: number; stdout: string } => {
-      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { TMPDIR: tmpdir(), ...process.env, ...scratchHomeEnv(scratchHome) } });
-      return { exitCode: child.exitCode, stdout: child.stdout.toString() };
-    };
-
-    expect(pulled(home)).toEqual({ exitCode: 0, stdout: '["user-1"]\n' });
-    // Control: a HOME with no user scope answers nothing, so the reading above came from the HOME.
-    expect(pulled(emptyHome)).toEqual({ exitCode: 0, stdout: '[]\n' });
-    expect(existsSync(emptyHome)).toBe(false);
-  });
-
-  it('registers the claude planner alone', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('planner')).toEqual(['claude']);
-  });
-
-  it('makes the claude planner over the sources, prompt, plans directory and spawner its context names', async () => {
-    const root = freshRoot('planner');
-    mkdirSync(root, { recursive: true });
-    writeFileSync(join(root, 'spec.md'), 'the spec\n', 'utf8');
-    const sessions: string[][] = [];
-    const claude: CapturingSpawner = async (args, prompt) => {
-      sessions.push([...args, prompt]);
-      writeFileSync(join(root, 'plans-here', 'PLAN-probe.md'), 'the plan\n', 'utf8');
-      return { exitCode: 0, stdout: PLANNER_SESSION_STDOUT };
-    };
-
-    const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create({
-      repoRoot: root,
-      settingSources: ['local'],
-      planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
-      planDir: 'plans-here',
-      claude,
-    });
-    const generated = await planner.create({ specPath: 'spec.md', stub: 'probe' });
-
-    expect(root.startsWith(tempDir)).toBe(true);
-    expect(generated).toEqual({
-      planPath: 'plans-here/PLAN-probe.md',
-      prerequisitesPath: null,
-      review: parseSpecReview(PLANNER_SESSION_STDOUT),
-    });
-    expect(generated.review?.answer).toBe('ready');
-    expect(sessions).toEqual([
-      ['-p', '--dangerously-skip-permissions', '--setting-sources', 'local', 'probe: the spec\n'],
-    ]);
-  });
-
-  it.each([
-    [
-      'settingSources',
-      { planPrompt: (): string => 'prompt', planDir: '.rafa/plans' },
-      'settingSources undefined in its context, expected a list of setting sources',
-    ],
-    ['planPrompt', { settingSources: ['project', 'local'], planDir: '.rafa/plans' }, 'planPrompt undefined in its context, expected a function'],
-    ['planDir', { settingSources: ['project', 'local'], planPrompt: (): string => 'prompt' }, 'planDir undefined in its context, expected a directory path'],
-  ])('refuses to make the claude planner when its context names no %s', (_field, fields, named) => {
-    const adapter = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude');
-    const attempt = (): unknown => adapter.create({ repoRoot: '/nonexistent', ...fields } as AdapterContext);
-
-    expect(attempt).toThrow(TypeError);
-    expect(attempt).toThrow(`adapter registry: planner/claude has ${named}`);
-  });
-
-  it('registers the local and file sync strategies, in that order', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local', 'file']);
-  });
-
-  it('makes the local sync strategy, whose push and pull answer that there is nothing to sync', async () => {
-    const root = freshRoot('sync');
-    const sync = CORE_ADAPTER_REGISTRY.resolve('sync', 'local').create({ repoRoot: root });
-
-    expect(sync.kind).toBe('local');
-    expect(await sync.push({ to: join(root, 'copy') })).toEqual({ status: 'nothing-to-sync' });
-    expect(await sync.pull({ from: join(root, 'effort.sqlite'), dryRun: false }))
-      .toEqual({ status: 'nothing-to-sync' });
-    expect(existsSync(root)).toBe(false);
-  });
-
-  it('registers the console logger', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('logger')).toEqual(['console']);
-  });
-
-  it('makes the console logger at the verbosity it is handed', () => {
-    const quiet = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create({ repoRoot: freshRoot('logger') });
-    const verbose = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create({ repoRoot: freshRoot('logger'), verbosity: 2 });
-
-    expect(quiet.enabled('warn')).toBe(true);
-    expect(quiet.enabled('debug')).toBe(false);
-    expect(verbose.enabled('debug')).toBe(true);
-  });
-
-  it('is frozen, and so is every adapter it holds', () => {
-    expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output', 'tracker', 'learning', 'planner', 'sync', 'logger'] as const) {
-      expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
-      for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
-        expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);
-      }
-    }
-  });
-});
-
 describe('registering an adapter', () => {
   it('answers a new registry holding an add-on kind, leaving the one it extended unchanged', () => {
-    const extended = CORE_ADAPTER_REGISTRY.register(addOn());
+    const extended = BASE.register(addOn());
 
-    expect(extended).not.toBe(CORE_ADAPTER_REGISTRY);
+    expect(extended).not.toBe(BASE);
     expect(extended.kinds('tracker')).toEqual(['local', 'github', 'obsidian']);
     expect(extended.kinds('store')).toEqual(['sqlite', 'ndjson']);
     expect(extended.resolve('tracker', 'obsidian').create({ repoRoot: '/nonexistent' }))
       .toBe(FIXTURE_TRACKER);
-    expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['local', 'github']);
-    expect(CORE_ADAPTER_REGISTRY.find('tracker', 'obsidian')).toBeUndefined();
+    expect(BASE.kinds('tracker')).toEqual(['local', 'github']);
+    expect(BASE.find('tracker', 'obsidian')).toBeUndefined();
   });
 
   it('never calls create when it registers or resolves an adapter', () => {
     const contexts: unknown[] = [];
-    const extended = CORE_ADAPTER_REGISTRY.register(addOn({
+    const extended = BASE.register(addOn({
       create: (context: unknown) => {
         contexts.push(context);
         return FIXTURE_TRACKER;
@@ -704,7 +303,7 @@ describe('registering an adapter', () => {
 
   it('holds a frozen copy, so changing the adapter handed over changes nothing held', () => {
     const handed = addOn() as { kind: string; portVersion: number };
-    const extended = CORE_ADAPTER_REGISTRY.register(handed as unknown as AnyAdapter);
+    const extended = BASE.register(handed as unknown as AnyAdapter);
     handed.portVersion = 2;
     handed.kind = 'moved';
 
@@ -727,7 +326,7 @@ describe('registering an adapter', () => {
     [1.5, '1.5'],
     [undefined, 'undefined'],
   ])('refuses an add-on implementing port version %p, naming both numbers', (version, quoted) => {
-    expect(() => CORE_ADAPTER_REGISTRY.register(addOn({ portVersion: version }))).toThrow(
+    expect(() => BASE.register(addOn({ portVersion: version }))).toThrow(
       `adapter registry: tracker/obsidian implements tracker port version ${quoted},`
         + ' and core serves tracker port version 1',
     );
@@ -736,7 +335,7 @@ describe('registering an adapter', () => {
   it('names the port a refused version belongs to', () => {
     const store = addOn({ port: 'store', kind: 'homelab', portVersion: 2 });
 
-    expect(() => CORE_ADAPTER_REGISTRY.register(store)).toThrow(
+    expect(() => BASE.register(store)).toThrow(
       'adapter registry: store/homelab implements store port version 2,'
         + ' and core serves store port version 1',
     );
@@ -745,9 +344,9 @@ describe('registering an adapter', () => {
   it('refuses a second adapter under a port type and kind already held', () => {
     const again = addOn({ port: 'store', kind: 'sqlite' });
 
-    expect(() => CORE_ADAPTER_REGISTRY.register(again))
+    expect(() => BASE.register(again))
       .toThrow('adapter registry: store/sqlite is already registered');
-    expect(CORE_ADAPTER_REGISTRY.register(addOn({ kind: 'sqlite' })).kinds('tracker'))
+    expect(BASE.register(addOn({ kind: 'sqlite' })).kinds('tracker'))
       .toEqual(['local', 'github', 'sqlite']);
   });
 
@@ -760,7 +359,7 @@ describe('registering an adapter', () => {
     ['a list naming a port type', ['store'], 'a list'],
     ['no port at all', undefined, 'undefined'],
   ])('refuses an adapter whose port is %s', (_label, port, quoted) => {
-    const attempt = (): unknown => CORE_ADAPTER_REGISTRY.register(addOn({ port }));
+    const attempt = (): unknown => BASE.register(addOn({ port }));
 
     expect(attempt).toThrow(TypeError);
     expect(attempt).toThrow(`adapter registry: port is ${quoted}, expected one of: ${PORT_TYPES}`);
@@ -771,7 +370,7 @@ describe('registering an adapter', () => {
     [42, '42'],
     [undefined, 'undefined'],
   ])('refuses an adapter whose kind is %p', (kind, quoted) => {
-    const attempt = (): unknown => CORE_ADAPTER_REGISTRY.register(addOn({ kind }));
+    const attempt = (): unknown => BASE.register(addOn({ kind }));
 
     expect(attempt).toThrow(TypeError);
     expect(attempt).toThrow(
@@ -780,7 +379,7 @@ describe('registering an adapter', () => {
   });
 
   it('refuses an adapter with no create function', () => {
-    const attempt = (): unknown => CORE_ADAPTER_REGISTRY.register(addOn({ create: undefined }));
+    const attempt = (): unknown => BASE.register(addOn({ create: undefined }));
 
     expect(attempt).toThrow(TypeError);
     expect(attempt).toThrow(
@@ -792,32 +391,32 @@ describe('registering an adapter', () => {
     [null, 'null'],
     ['tracker', '"tracker"'],
   ])('refuses %p in place of an adapter', (value, quoted) => {
-    const attempt = (): unknown => CORE_ADAPTER_REGISTRY.register(value as unknown as AnyAdapter);
+    const attempt = (): unknown => BASE.register(value as unknown as AnyAdapter);
 
     expect(attempt).toThrow(TypeError);
     expect(attempt).toThrow(`adapter registry: an adapter is ${quoted}, expected a mapping`);
   });
 
-  it('answers a new registry holding an add-on sync kind after core\'s local and file', () => {
-    const extended = CORE_ADAPTER_REGISTRY.register(
+  it('answers a new registry holding an add-on sync kind after the sync kinds held', () => {
+    const extended = BASE.register(
       addOn({ port: 'sync', kind: 'git', create: () => FIXTURE_SYNC }),
     );
 
     expect(extended.kinds('sync')).toEqual(['local', 'file', 'git']);
     expect(extended.resolve('sync', 'git').create({ repoRoot: '/nonexistent' })).toBe(FIXTURE_SYNC);
-    expect(CORE_ADAPTER_REGISTRY.kinds('sync')).toEqual(['local', 'file']);
+    expect(BASE.kinds('sync')).toEqual(['local', 'file']);
   });
 
-  it('refuses a sync add-on taking core\'s local kind over', () => {
+  it('refuses a sync add-on taking a held sync kind over', () => {
     const local = addOn({ port: 'sync', kind: 'local', create: () => FIXTURE_SYNC });
 
-    expect(() => CORE_ADAPTER_REGISTRY.register(local)).toThrow('adapter registry: sync/local is already registered');
+    expect(() => BASE.register(local)).toThrow('adapter registry: sync/local is already registered');
   });
 
   it('refuses a sync add-on at a port version core does not serve, naming both numbers', () => {
     const sync = addOn({ port: 'sync', kind: 'git', portVersion: 2, create: () => FIXTURE_SYNC });
 
-    expect(() => CORE_ADAPTER_REGISTRY.register(sync)).toThrow(
+    expect(() => BASE.register(sync)).toThrow(
       'adapter registry: sync/git implements sync port version 2,'
         + ' and core serves sync port version 1',
     );
@@ -838,8 +437,8 @@ describe('registering an adapter', () => {
 });
 
 describe('looking an adapter up', () => {
-  it('finds a core store backend by its kind', () => {
-    expect(CORE_ADAPTER_REGISTRY.find('store', 'sqlite')).toMatchObject({
+  it('finds a store backend by its kind', () => {
+    expect(BASE.find('store', 'sqlite')).toMatchObject({
       port: 'store',
       kind: 'sqlite',
       portVersion: 1,
@@ -856,39 +455,39 @@ describe('looking an adapter up', () => {
     ['a number', 42],
     ['undefined', undefined],
   ])('finds nothing under %s', (_label, kind) => {
-    expect(CORE_ADAPTER_REGISTRY.find('store', kind as unknown as string)).toBeUndefined();
+    expect(BASE.find('store', kind as unknown as string)).toBeUndefined();
   });
 
   it.each(['storage', 'constructor', '__proto__'])('finds nothing under the port %p, throwing nothing', (port) => {
-    const find = CORE_ADAPTER_REGISTRY.find as (port: unknown, kind: string) => unknown;
+    const find = BASE.find as (port: unknown, kind: string) => unknown;
 
     expect(find(port, 'sqlite')).toBeUndefined();
   });
 
   it('resolves nothing under a kind not held, naming the kinds that are', () => {
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('store', 'postgres')).toThrow(
+    expect(() => BASE.resolve('store', 'postgres')).toThrow(
       'adapter registry: no store adapter is registered as "postgres"; registered: sqlite, ndjson',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('store', 'constructor')).toThrow(
+    expect(() => BASE.resolve('store', 'constructor')).toThrow(
       'adapter registry: no store adapter is registered as "constructor"; registered: sqlite, ndjson',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('tracker', 'linear')).toThrow(
+    expect(() => BASE.resolve('tracker', 'linear')).toThrow(
       'adapter registry: no tracker adapter is registered as "linear"; registered: local, github',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('learning', 'remote')).toThrow(
+    expect(() => BASE.resolve('learning', 'remote')).toThrow(
       'adapter registry: no learning adapter is registered as "remote"; registered: local',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('planner', 'webhook')).toThrow(
+    expect(() => BASE.resolve('planner', 'webhook')).toThrow(
       'adapter registry: no planner adapter is registered as "webhook"; registered: claude',
     );
-    expect(() => CORE_ADAPTER_REGISTRY.resolve('sync', 'git')).toThrow(
+    expect(() => BASE.resolve('sync', 'git')).toThrow(
       'adapter registry: no sync adapter is registered as "git"; registered: local, file',
     );
   });
 
   it('refuses a port type it does not declare, in resolve and in kinds', () => {
-    const resolve = CORE_ADAPTER_REGISTRY.resolve as (port: unknown, kind: string) => unknown;
-    const kinds = CORE_ADAPTER_REGISTRY.kinds as (port: unknown) => unknown;
+    const resolve = BASE.resolve as (port: unknown, kind: string) => unknown;
+    const kinds = BASE.kinds as (port: unknown) => unknown;
     const refusal = `adapter registry: port is "storage", expected one of: ${PORT_TYPES}`;
 
     expect(() => resolve('storage', 'sqlite')).toThrow(TypeError);
@@ -898,9 +497,104 @@ describe('looking an adapter up', () => {
   });
 
   it('answers kinds a caller can change without changing the registry', () => {
-    const kinds = CORE_ADAPTER_REGISTRY.kinds('store') as string[];
+    const kinds = BASE.kinds('store') as string[];
     kinds.push('postgres');
 
-    expect(CORE_ADAPTER_REGISTRY.kinds('store')).toEqual(['sqlite', 'ndjson']);
+    expect(BASE.kinds('store')).toEqual(['sqlite', 'ndjson']);
+  });
+});
+
+describe('the active registry and CORE_ADAPTER_REGISTRY', () => {
+  it('refuses every member while nothing is registered, naming the module that registers core\'s adapters', () => {
+    overEmpty(() => {
+      expect(() => CORE_ADAPTER_REGISTRY.resolve('logger', 'console')).toThrow(UNREGISTERED);
+      expect(() => CORE_ADAPTER_REGISTRY.find('logger', 'console')).toThrow(UNREGISTERED);
+      expect(() => CORE_ADAPTER_REGISTRY.kinds('logger')).toThrow(UNREGISTERED);
+      expect(() => CORE_ADAPTER_REGISTRY.register(addOn())).toThrow(UNREGISTERED);
+
+      // Control: one adapter registered, and each member answers.
+      registerAdapters([addOn()]);
+      const find = CORE_ADAPTER_REGISTRY.find as (port: unknown, kind: string) => unknown;
+
+      expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['obsidian']);
+      expect(CORE_ADAPTER_REGISTRY.find('tracker', 'obsidian')?.kind).toBe('obsidian');
+      expect(find('storage', 'obsidian')).toBeUndefined();
+      expect(CORE_ADAPTER_REGISTRY.resolve('tracker', 'obsidian').create({ repoRoot: '/nonexistent' }))
+        .toBe(FIXTURE_TRACKER);
+      expect(CORE_ADAPTER_REGISTRY.register(addOn({ kind: 'linear' })).kinds('tracker'))
+        .toEqual(['obsidian', 'linear']);
+      expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['obsidian']);
+    });
+  });
+
+  it('reads the active registry when a member is called, not when the registry was taken', () => {
+    overEmpty(() => {
+      const taken = CORE_ADAPTER_REGISTRY;
+      registerAdapters([addOn()]);
+
+      expect(taken.kinds('tracker')).toEqual(['obsidian']);
+      const before = registerAdapters([addOn({ kind: 'linear' })]);
+      expect(taken.kinds('tracker')).toEqual(['obsidian', 'linear']);
+      restoreAdapters(before);
+      expect(taken.kinds('tracker')).toEqual(['obsidian']);
+    });
+  });
+
+  it('registers in order and answers the registry it replaced, which a later registration leaves unchanged', () => {
+    overEmpty(() => {
+      const empty = activeAdapterRegistry();
+      const replaced = registerAdapters([addOn(), addOn({ kind: 'linear' })]);
+      const first = activeAdapterRegistry();
+      registerAdapters([addOn({ port: 'store', kind: 'homelab' })]);
+
+      expect(replaced).toBe(empty);
+      expect(replaced.kinds('tracker')).toEqual([]);
+      expect(first.kinds('tracker')).toEqual(['obsidian', 'linear']);
+      expect(first.kinds('store')).toEqual([]);
+      expect(activeAdapterRegistry().kinds('store')).toEqual(['homelab']);
+      expect(activeAdapterRegistry().kinds('tracker')).toEqual(['obsidian', 'linear']);
+    });
+  });
+
+  it('registers none of a list it refuses, leaving the active registry as it was', () => {
+    overEmpty(() => {
+      registerAdapters([addOn()]);
+      const before = activeAdapterRegistry();
+
+      expect(() => registerAdapters([addOn({ kind: 'linear' }), addOn({ kind: 'jira', portVersion: 2 })])).toThrow(
+        'adapter registry: tracker/jira implements tracker port version 2,'
+          + ' and core serves tracker port version 1',
+      );
+      expect(() => registerAdapters([addOn()])).toThrow('adapter registry: tracker/obsidian is already registered');
+      expect(activeAdapterRegistry()).toBe(before);
+      expect(CORE_ADAPTER_REGISTRY.find('tracker', 'linear')).toBeUndefined();
+
+      // Control: the same list without the refused adapter registers.
+      registerAdapters([addOn({ kind: 'linear' })]);
+      expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['obsidian', 'linear']);
+    });
+  });
+
+  it('refuses CORE_ADAPTER_REGISTRY as the registry to restore, leaving the active one as it was', () => {
+    overEmpty(() => {
+      registerAdapters([addOn()]);
+      const before = activeAdapterRegistry();
+      const attempt = (): void => restoreAdapters(CORE_ADAPTER_REGISTRY);
+
+      expect(attempt).toThrow(TypeError);
+      expect(attempt).toThrow(RESTORE_REFUSAL);
+      expect(activeAdapterRegistry()).toBe(before);
+      expect(CORE_ADAPTER_REGISTRY.kinds('tracker')).toEqual(['obsidian']);
+    });
+  });
+
+  it('is frozen, as every registry is, so no caller swaps a member', () => {
+    const facade = CORE_ADAPTER_REGISTRY as { kinds: unknown };
+
+    expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
+    expect(Object.isFrozen(BASE)).toBe(true);
+    expect(() => {
+      facade.kinds = () => [];
+    }).toThrow(TypeError);
   });
 });

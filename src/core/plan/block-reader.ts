@@ -18,10 +18,14 @@
  * A barrel that groups a file with a file outside `src/core/` that
  * imports the barrel back by value is a runtime cycle.
  * `src/utils/tracker.ts` imports `readRafaBlocks` by value, and
- * `parse.ts`, behind `index.ts`, imports that file by value. So
- * `blocks.ts` behind `index.ts` closes a cycle through the tracker.
- * `blocks.ts` imports no file, so a barrel that holds it alone is
- * imported back by nothing it reaches.
+ * `parse.ts`, behind `index.ts`, imported that file by value when the
+ * split was made. So `blocks.ts` behind `index.ts` closed a cycle
+ * through the tracker. `blocks.ts` imports no file, so a barrel that
+ * holds it alone is imported back by nothing it reaches.
+ *
+ * `parse.ts` now reads the blocker comment from `blocker-comment.ts`,
+ * and no file of `src/core/` imports the tracker, so that cycle is
+ * gone. The split stands as it was made.
  *
  * `index.ts` records the measurement: six cycles before the move and
  * the same six after it, and a seventh in the control that puts all

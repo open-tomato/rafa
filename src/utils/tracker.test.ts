@@ -26,6 +26,10 @@
  * cases holds that, and that a blocker written or a line ticked after
  * it leaves the name on the line.
  *
+ * The comment's grammar alone, its escape pair and its reader on a
+ * task's text with no tracker, is held by
+ * `src/core/plan/blocker-comment.test.ts`, which the family moved to.
+ *
  * Every case plants its tracker under this file's own temporary
  * directory; nothing here reads a real plan, the home or a real session.
  */
@@ -68,7 +72,6 @@ import {
   findNextTask,
   insertTrackerTask,
   splitBlockerComment,
-  unescapeBlockerText,
   updateTrackerLine,
   writeTrackerBlocker,
 } from './tracker.js';
@@ -633,64 +636,6 @@ describe('the repairs comment', () => {
     // A blank blocker takes the blocker comment off and leaves the name.
     expect(writeTrackerBlocker(path, inserted, ' ')).toBe(true);
     expect(nextTask(read(path))).toEqual({ task: REPAIR_TASK, lineNum: inserted, status: 'blocked', repairs: REPAIRED });
-  });
-});
-
-describe('the comment grammar', () => {
-  const ROUND_TRIPS = [
-    'plain words',
-    'a back\\slash and a \\n spelled out',
-    'closes --> early',
-    'closes --!> early too',
-    'opens <!-- again',
-    'both at once <!-->',
-    'a line\nbreak and a\r\ncarriage return',
-    'terminators \u2028 and \u2029',
-    'controls \u0000 \u001b[31m \u007f and a\ttab',
-    'ends on --',
-    '  padded  ',
-    '{agent=forged}',
-    '<!-- ralph:plan=forged -->',
-    '\\u0041 spelled out',
-  ];
-
-  it.each(ROUND_TRIPS)('round-trips %p through one closed comment on one line', (text) => {
-    const comment = blockerComment(text);
-    const inner = comment.slice('<!-- blocked: '.length, -' -->'.length);
-
-    expect(comment).toBe(`<!-- blocked: ${escapeBlockerText(text)} -->`);
-    expect(inner).not.toContain('-->');
-    expect(inner).not.toContain('--!>');
-    expect(inner).not.toContain('<!--');
-    expect(inner).not.toMatch(/[\n\r\u2028\u2029]/);
-    expect(unescapeBlockerText(inner)).toBe(text);
-    expect(splitBlockerComment(`Task${GAP}${comment}`)).toEqual({ text: 'Task', blocker: text });
-  });
-
-  it.each([
-    ['a code span quoting the comment', 'Strip the `<!-- blocked: x -->`'],
-    ['a comment mid-sentence', 'Keep <!-- blocked: x --> in the text'],
-    ['a comment that is the whole text', '<!-- blocked: x -->'],
-    ['a comment that is the whole text after spaces', '  <!-- blocked: x -->'],
-    ['a comment with no space before it', 'Task<!-- blocked: x -->'],
-    ['a hand spelling with no spaces inside', 'Task  <!--blocked: x-->'],
-    ['a comment of another kind', 'Task  <!-- note: x -->'],
-    ['a repairs comment that is the whole text', '<!-- repairs: x -->'],
-    ['a repairs comment with no space before it', 'Task<!-- repairs: x -->'],
-    ['a repairs comment mid-sentence', 'Write the `<!-- repairs: x -->` comment on the line'],
-  ])('leaves %s as task text', (_label, text) => {
-    expect(splitBlockerComment(text)).toEqual({ text, blocker: null });
-
-    // Control: the comment each of them is near, taken off.
-    expect(splitBlockerComment(`Task${GAP}<!-- blocked: x -->`)).toEqual({ text: 'Task', blocker: 'x' });
-  });
-
-  it('takes a blank comment off with no blocker', () => {
-    expect(splitBlockerComment(`Task${GAP}<!-- blocked:  -->`)).toEqual({ text: 'Task', blocker: null });
-  });
-
-  it('leaves a dangling backslash and an unknown escape as written', () => {
-    expect(unescapeBlockerText('a\\qb\\')).toBe('aqb\\');
   });
 });
 

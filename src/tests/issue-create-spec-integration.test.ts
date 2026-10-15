@@ -10,6 +10,8 @@
  * refused line is checked against the issue count and the `gh` calls
  * that file (`issue create`), beside a line the same board takes.
  */
+import '../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

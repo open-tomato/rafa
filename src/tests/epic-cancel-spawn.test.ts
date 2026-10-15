@@ -273,6 +273,7 @@ describe('rafa epic cancel 40, spawned, with no terminal', () => {
  */
 function buildCancelProbe(): string {
   return [
+    `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
     `import { createEpicCancelCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'epic', 'cancel.ts'))};`,

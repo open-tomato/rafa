@@ -47,11 +47,11 @@ function plant(from: string, to: string, tests: readonly string[] = []): CoreMov
 }
 
 describe('CORE_MOVES', () => {
-  it('lists twenty files, each once, sorted by the path it has today', () => {
+  it('lists twenty-nine files, each once, sorted by the path it has today', () => {
     const from = CORE_MOVES.map((move) => move.from);
 
-    expect(from).toHaveLength(20);
-    expect(new Set(from).size).toBe(20);
+    expect(from).toHaveLength(29);
+    expect(new Set(from).size).toBe(29);
     expect(from).toEqual([...from].sort());
   });
 
@@ -81,11 +81,11 @@ describe('CORE_MOVES', () => {
     }
   });
 
-  it('holds 23 test files, with none for plan-files.ts and session-readings.ts', () => {
+  it('holds 30 test files, with none for stream.ts, plan-files.ts, session-readings.ts and plan-stamp.ts', () => {
     const without = CORE_MOVES.filter((move) => move.tests.length === 0).map((move) => move.from);
 
-    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(23);
-    expect(without).toEqual(['src/loop/session-readings.ts', 'src/plan/plan-files.ts']);
+    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(30);
+    expect(without).toEqual(['src/adapters/output/stream.ts', 'src/loop/session-readings.ts', 'src/plan/plan-files.ts', 'src/utils/plan-stamp.ts']);
   });
 
   it('uses every subject folder', () => {
@@ -109,7 +109,7 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists twelve barrels, three of them for config, two for loop and two for plan', () => {
+  it('lists thirteen barrels, three of them for config, three for loop and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'src/core/adapters/index.ts',
       'src/core/command/index.ts',
@@ -117,6 +117,7 @@ describe('CORE_BARRELS', () => {
       'src/core/config/load.ts',
       'src/core/config/sections.ts',
       'src/core/git/index.ts',
+      'src/core/loop/hops.ts',
       'src/core/loop/index.ts',
       'src/core/loop/readings.ts',
       'src/core/output/index.ts',
@@ -133,6 +134,8 @@ describe('CORE_BARRELS', () => {
     expect(isCoreBarrel('src/core/plan/blocks.ts')).toBe(false);
     expect(isCoreBarrel('src/core/loop/readings.ts')).toBe(true);
     expect(isCoreBarrel('src/core/loop/session-readings.ts')).toBe(false);
+    expect(isCoreBarrel('src/core/loop/hops.ts')).toBe(true);
+    expect(isCoreBarrel('src/core/loop/hop-record.ts')).toBe(false);
     expect(isCoreBarrel('src/core/runtime/index.ts')).toBe(true);
     expect(isCoreBarrel('src/core/runtime/identity.ts')).toBe(false);
     expect(isCoreBarrel('src/runtime/identity.ts')).toBe(false);
@@ -141,10 +144,10 @@ describe('CORE_BARRELS', () => {
 });
 
 describe('movedPaths and movedTo', () => {
-  it('spreads the moves into 43 paths, a file first and its test files after it', () => {
+  it('spreads the moves into 59 paths, a file first and its test files after it', () => {
     const paths = movedPaths();
 
-    expect(paths).toHaveLength(43);
+    expect(paths).toHaveLength(59);
     expect(paths.slice(0, 2)).toEqual([
       { from: 'src/adapters/output/active.ts', to: 'src/core/output/active.ts' },
       { from: 'src/adapters/output/active.test.ts', to: 'src/core/output/active.test.ts' },
@@ -161,7 +164,7 @@ describe('movedPaths and movedTo', () => {
 });
 
 describe('findCollisions', () => {
-  it('finds none across the twenty moves, their test files and the barrels', () => {
+  it('finds none across the twenty-nine moves, their test files and the barrels', () => {
     expect(findCollisions(CORE_MOVES, CORE_BARRELS)).toEqual([]);
   });
 
@@ -223,7 +226,18 @@ describe('CORE_REEXPORTS', () => {
   it('lists the old path of a moved source file, each once, sorted', () => {
     const from = CORE_MOVES.map((move) => move.from);
 
-    expect(CORE_REEXPORTS).toEqual(['src/runtime/identity.ts']);
+    expect(CORE_REEXPORTS).toEqual([
+      'src/adapters/output/stream.ts',
+      'src/adapters/output/text.ts',
+      'src/cli/core/types.ts',
+      'src/cli/running.ts',
+      'src/cli/spends.ts',
+      'src/loop/session-record-parse.ts',
+      'src/runtime/identity.ts',
+      'src/utils/declaration.ts',
+      'src/utils/plan-stamp.ts',
+      'src/utils/session-env.ts',
+    ]);
     expect(CORE_REEXPORTS).toEqual([...new Set(CORE_REEXPORTS)].sort());
     for (const path of CORE_REEXPORTS) {
       expect([path, from.includes(path)]).toEqual([path, true]);

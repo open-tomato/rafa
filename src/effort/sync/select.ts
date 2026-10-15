@@ -8,9 +8,9 @@
  * that wrote it. {@link createLocalSync} answers a `Sync` whose push and
  * pull both answer `nothing-to-sync` and read nothing of their request,
  * so neither opens the store nor touches the disk. Core registers it as
- * `sync/local` in `CORE_ADAPTER_REGISTRY`
- * (`src/core/adapters/registry.ts`), which calls {@link createLocalSync}
- * from the entry's `create`.
+ * `sync/local` in `CORE_ADAPTER_REGISTRY` through its composition root
+ * (`src/adapter-registry.ts`), which calls {@link createLocalSync} from
+ * the entry's `create`.
  *
  * ## Selecting
  *
@@ -51,18 +51,19 @@
  * Every lookup goes through the registry's `find`, a `Map`, so a kind
  * such as `constructor` finds nothing rather than a prototype member.
  *
- * ## The import cycle
+ * ## No import cycle
  *
- * `registry.ts` imports {@link createLocalSync} from here, and this
- * module imports `CORE_ADAPTER_REGISTRY` back through the barrel over
- * it, `src/core/adapters/index.ts`. Neither reads the other's binding
- * while it evaluates: the registry calls
- * {@link createLocalSync} only inside the entry's `create`, and this
- * module reads the registry only inside {@link selectSync}. So either
- * module can be imported first. `select.test.ts` imports this module and
- * the barrel each first in a child `bun` and resolves `sync/local`
- * there, and `src/core/adapters/index.test.ts` does the same with
- * `registry.ts` first.
+ * This module imports `CORE_ADAPTER_REGISTRY` through the barrel over
+ * the registry, `src/core/adapters/index.ts`, and the registry imports
+ * nothing back: {@link createLocalSync} is imported by the composition
+ * root `src/adapter-registry.ts`, which `registry.ts` never imports. The
+ * cycle `registry.ts` and this module once made is gone. This module
+ * still reads the registry only inside {@link selectSync}, never while
+ * it evaluates, so it loads before the root registers anything.
+ * `select.test.ts` imports this module and the barrel each first in a
+ * child `bun`, the root after them, and resolves `sync/local` there, and
+ * `src/core/adapters/index.test.ts` does the same with `registry.ts`
+ * first.
  */
 import type { AdapterContext, AdapterRegistry } from '../../core/adapters/index.js';
 import type { RafaConfig } from '../../core/config/index.js';

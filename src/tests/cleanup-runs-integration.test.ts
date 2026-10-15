@@ -15,6 +15,8 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { Prompter } from '../core/command/index.js';
 import type { SessionRecord } from '../core/loop/index.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';

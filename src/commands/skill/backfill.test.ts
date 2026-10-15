@@ -34,6 +34,8 @@
  */
 import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

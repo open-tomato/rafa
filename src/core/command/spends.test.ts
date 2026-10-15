@@ -1,5 +1,5 @@
 /**
- * Tests for the `spends` declaration (`src/cli/spends.ts`).
+ * Tests for the `spends` declaration (`src/core/command/spends.ts`).
  *
  * Each of the four forms is held to pass the shape check, to its
  * condition and to its mark. Every malformed shape is spelled in full,

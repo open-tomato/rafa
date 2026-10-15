@@ -29,6 +29,8 @@
 import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
 import type { LoopSessionSeams } from '../../core/loop/readings.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

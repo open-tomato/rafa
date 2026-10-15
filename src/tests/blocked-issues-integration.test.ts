@@ -49,6 +49,8 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '../core/command/index.js';
 import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
 
+import '../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
