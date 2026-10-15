@@ -144,14 +144,20 @@ finding the ticked pre-wrap-up repair on the tracker, writes its blocker
 on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
-`.github/workflows/verify.yml` runs one job, `verify`, with two triggers
-and three gates. **Triggers:** pull requests into `main` or `integration`,
+`.github/workflows/verify.yml` runs two jobs under two triggers, each
+with three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
-cancelled): `bun test`, `bunx eslint .`, and `bun run check-types`, the
-root config and the three workspace packages. **Two cases for
+cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
+`bun run check-types`, the root config and the three workspace packages;
+ring 1's job `affected` runs `bun run verify:affected` (`turbo run lint
+check-types test --affected`), `bunx tsc --build tsconfig.references.json`
+and `bun scripts/workspace/graph-check.ts`. `affected` checks out the
+whole history and names turbo's base in `TURBO_SCM_BASE`: the pull
+request's base branch on a pull request, `origin/integration` on a push
+to `stretch/**`. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
-`integration` reports the `verify` check (merge with `rafa pr wait <n>`
-then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
+`integration` reports the `verify` and `affected` checks (merge with
+`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
 check (merge with `rafa pr merge <n> --skip-checks`). One more gate runs
 at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
