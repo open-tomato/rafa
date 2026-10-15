@@ -26,7 +26,7 @@
  * copy.
  */
 import type { ParseArgsSpec } from './parseArgs.js';
-import type { ArgSpec, FlagSpec } from './types.js';
+import type { ArgSpec, FlagSpec } from '../../core/command/index.js';
 import type { OutputStream } from '../../core/output/index.js';
 
 import { describe, expect, it, spyOn } from 'bun:test';

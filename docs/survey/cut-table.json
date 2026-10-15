@@ -2624,6 +2624,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/dispatcher-start.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/docs-plan-spawned.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3608,13 +3613,6 @@
           "from": "src/core/command/command.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
-          "to": "src/cli/core/types.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/command/command.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
           "to": "src/cli/registry.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -3760,8 +3758,8 @@
         }
       ],
       "fileCounts": {
-        "source": 98,
-        "test": 106,
+        "source": 99,
+        "test": 107,
         "testSupport": 2
       },
       "files": [
@@ -3775,6 +3773,8 @@
         "src/core/command/confirm.ts",
         "src/core/command/index.test.ts",
         "src/core/command/index.ts",
+        "src/core/command/types.test.ts",
+        "src/core/command/types.ts",
         "src/core/command/version.test.ts",
         "src/core/command/version.ts",
         "src/core/config/config-items.test.ts",
@@ -3973,7 +3973,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 81,
+        "src/core/": 83,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3990,8 +3990,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 22,
-      "upwardEdges": 22
+      "remaining": 21,
+      "upwardEdges": 21
     },
     {
       "clearedByIssue118": 0,
@@ -7064,7 +7064,6 @@
         "src/cli/core/assembleContext.ts",
         "src/cli/core/parseArgs.test.ts",
         "src/cli/core/parseArgs.ts",
-        "src/cli/core/types.test.ts",
         "src/cli/core/types.ts",
         "src/cli/describe.test.ts",
         "src/cli/describe.ts",
@@ -7567,6 +7566,7 @@
         "src/tests/demotion-pass.test.ts",
         "src/tests/detached-head-start-integration.test.ts",
         "src/tests/dispatch-records.test.ts",
+        "src/tests/dispatcher-start.test.ts",
         "src/tests/docs-plan-spawned.test.ts",
         "src/tests/doctor-deep-env-integration.test.ts",
         "src/tests/doctor-deep-spawned.test.ts",
@@ -7762,7 +7762,7 @@
         "src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 37
+        "src/cli/": 36
       },
       "folders": [
         "src/cli/"
@@ -7780,12 +7780,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1980,
-    "leftToPlace": 717,
-    "nonTestEdges": 4423,
+    "files": 1982,
+    "leftToPlace": 718,
+    "nonTestEdges": 4425,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 274
+    "upwardEdges": 273
   },
   "unassigned": [
     {

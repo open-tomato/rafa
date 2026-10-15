@@ -658,6 +658,7 @@
     "src/cli/core/types.ts",
     "src/config-locked.ts",
     "src/config-schema-readings.ts",
+    "src/core/command/types.ts",
     "src/core/output/stream.ts",
     "src/effort/store/migration-shapes.ts",
     "src/effort/store/testdata/store-rows.ts",

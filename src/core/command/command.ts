@@ -4,7 +4,7 @@
  *
  * The CLI surface spec declares `RafaCommand` as a superset of `cli-core`'s
  * `CliCommand`, so a `cli-core` command still loads. The superset is spelled
- * here over the copy in `src/cli/core/types.ts`.
+ * here over the copy in `types.ts` beside this file.
  *
  * ## Routing keys
  *
@@ -84,9 +84,9 @@
  * one deprecation line (`src/cli/dispatch.ts`), so
  * `rafa effort report --json` runs as `rafa effort report --output=json`.
  * The field is declared here rather than on `FlagSpec`, so the copy of
- * `cli-core` in `src/cli/core/` keeps the source's shape.
+ * `cli-core`'s contracts in `types.ts` keeps the source's shape.
  */
-import type { CliCommand, CliContext, FlagSpec } from '../../cli/core/types.js';
+import type { CliCommand, CliContext, FlagSpec } from './types.js';
 import type { CommandRegistry } from '../../cli/registry.js';
 import type { CommandSpend } from '../../cli/spends.js';
 import type { ProjectFound } from '../../project/scope.js';
