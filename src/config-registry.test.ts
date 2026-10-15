@@ -9,7 +9,10 @@
  * both packages, leaving the registry as it was. Every key, every
  * section and every package name is SPELLED here, never read off the
  * module, so a section dropped, renamed or reordered fails rather than
- * agreeing with itself.
+ * agreeing with itself. The list merged into `EMPTY_CONFIG_REGISTRY`
+ * is held to meet no refusal, so no two of the twelve define one file
+ * key under two setting names; `section.test.ts` holds the refusal that
+ * case could meet.
  *
  * The probe cases import one module first in a fresh `bun` process and
  * print how many settings and defaults core's registry answers. The
@@ -60,6 +63,7 @@ import {
   activeSettings,
   ConfigSectionError,
   EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
 } from './core/config/index.js';
@@ -251,6 +255,14 @@ describe('CONFIG_SECTIONS', () => {
 
   it('is frozen', () => {
     expect(Object.isFrozen(CONFIG_SECTIONS)).toBe(true);
+  });
+
+  it('merges into the empty registry with no refusal, every file key under one setting name', () => {
+    const merged = mergeConfigSections(EMPTY_CONFIG_REGISTRY, CONFIG_SECTIONS);
+    const keys = Object.values(merged.settings).map((spec) => spec?.key);
+
+    expect(merged.sections.map((section) => section.package)).toEqual(PACKAGES);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

@@ -164,8 +164,10 @@ that loads a config. A file outside `src/core/` takes the merged `SETTINGS`,
 `knownKeysAbove` from the registry, never from the core barrel, which exports
 none of them; core reads the same through the `active*` functions of
 `section.ts`. A registration that breaks a rule throws at import, naming what
-it refused: a setting name two sections define, or a `dangerous.*` key one
-section lists and a second defines, each naming both packages.
+it refused: a setting name two sections define, a file key a second section
+defines under another setting name, which names both setting names too, or a
+`dangerous.*` key a second section defines under the same setting name, each
+naming both packages.
 
 **A section adds its keys to `RafaConfig` by `declare module`.**
 `RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
