@@ -279,7 +279,7 @@ describe('the two directories start.ts points each call at', () => {
   });
 
   it('guards and records the branch that settling answered, and commits in the checkout', () => {
-    expect(callTo(EVERY, 'guardRunBranch').args).toEqual(['planStub', 'branch', 'args']);
+    expect(callTo(EVERY, 'guardRunBranch').args).toEqual(['planStub', 'branch', 'args', 'runConfig.config.namingBranch']);
     expect(firstArgument('openRunSession')).toContain('branch,');
     expect(callTo(EVERY, 'announceRunDirs').args).toEqual(['{ projectRoot: repoRoot, checkout }']);
     expect(firstArgument('finishCleanExit')).toContain('repoRoot: checkout,');
