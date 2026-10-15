@@ -1,7 +1,7 @@
 /**
  * The declaration parser's negative paths, each with its own control.
  *
- * `utils/declaration.test.ts` beside the module drives the grammar it
+ * `core/plan/declaration.test.ts` beside the module drives the grammar it
  * ACCEPTS, and hands these six shapes here by name: an unclosed
  * brace, nested braces, a trailing code span, an unrecognised key, an
  * empty block, and a block that is not anchored at end of line. All
@@ -79,7 +79,7 @@
 import type {
   AgentEffortLookup,
   TaskDeclaration,
-} from '../utils/declaration.js';
+} from '../core/plan/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -87,7 +87,7 @@ import {
   parseTaskDeclaration,
   resolveDeclarationFlags,
   stripTaskDeclaration,
-} from '../utils/declaration.js';
+} from '../core/plan/index.js';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

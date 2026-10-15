@@ -3533,14 +3533,9 @@
       "upwardEdgesIn": 0
     },
     {
-      "kind": "test",
-      "path": "src/utils/declaration.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "source",
       "path": "src/utils/declaration.ts",
-      "upwardEdgesIn": 18
+      "upwardEdgesIn": 15
     },
     {
       "kind": "test",
@@ -3550,6 +3545,11 @@
     {
       "kind": "source",
       "path": "src/utils/git.ts",
+      "upwardEdgesIn": 3
+    },
+    {
+      "kind": "source",
+      "path": "src/utils/plan-stamp.ts",
       "upwardEdgesIn": 3
     },
     {
@@ -3624,13 +3624,6 @@
           "toPackage": "rafa-pr"
         },
         {
-          "from": "src/core/config/config-sections.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/config/core-section.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3673,20 +3666,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/core/loop/sessions.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/plan/parse.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/plan/parse.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3709,8 +3688,8 @@
         }
       ],
       "fileCounts": {
-        "source": 104,
-        "test": 109,
+        "source": 105,
+        "test": 110,
         "testSupport": 2
       },
       "files": [
@@ -3794,6 +3773,8 @@
         "src/core/plan/block-reader.ts",
         "src/core/plan/blocks.test.ts",
         "src/core/plan/blocks.ts",
+        "src/core/plan/declaration.test.ts",
+        "src/core/plan/declaration.ts",
         "src/core/plan/index.test.ts",
         "src/core/plan/index.ts",
         "src/core/plan/parse.test.ts",
@@ -3931,7 +3912,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 90,
+        "src/core/": 92,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3948,8 +3929,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 14,
-      "upwardEdges": 14
+      "remaining": 11,
+      "upwardEdges": 11
     },
     {
       "clearedByIssue118": 0,
@@ -5960,6 +5941,13 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/start/preflight-claim.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/plan-stamp.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/start/preflight-sync.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
@@ -6195,6 +6183,13 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/declaration.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/stamp.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/utils/plan-stamp.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -6557,8 +6552,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 91,
-      "upwardEdges": 91
+      "remaining": 93,
+      "upwardEdges": 93
     },
     {
       "clearedByIssue118": 0,
@@ -6725,6 +6720,13 @@
       "clearedByIssue118": 0,
       "edges": [
         {
+          "from": "src/effort/attribution.ts",
+          "fromPackage": "rafa-effort",
+          "kind": "value",
+          "to": "src/utils/plan-stamp.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/effort/collect.ts",
           "fromPackage": "rafa-effort",
           "kind": "value",
@@ -6841,8 +6843,8 @@
         "src/schema/frontmatter.ts"
       ],
       "rank": 7,
-      "remaining": 4,
-      "upwardEdges": 4
+      "remaining": 5,
+      "upwardEdges": 5
     },
     {
       "clearedByIssue118": 0,
@@ -6933,8 +6935,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 263,
-        "test": 467,
+        "source": 264,
+        "test": 466,
         "testSupport": 27
       },
       "files": [
@@ -7683,10 +7685,10 @@
         "src/utils/agent-definition.ts",
         "src/utils/agent-shell.test.ts",
         "src/utils/agent-shell.ts",
-        "src/utils/declaration.test.ts",
         "src/utils/declaration.ts",
         "src/utils/git.test.ts",
         "src/utils/git.ts",
+        "src/utils/plan-stamp.ts",
         "src/utils/progress.test.ts",
         "src/utils/progress.ts",
         "src/utils/schedule.ts",
@@ -7715,9 +7717,9 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1987,
+    "files": 1989,
     "leftToPlace": 718,
-    "nonTestEdges": 4427,
+    "nonTestEdges": 4438,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
     "upwardEdges": 263

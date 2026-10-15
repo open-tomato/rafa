@@ -96,7 +96,7 @@
  *
  * The kinds read are {@link PLAN_BLOCK_KINDS}. Every other kind — a
  * `rafa:report`, or one a later phase defines — is retained in
- * {@link PlanModel.blocks} and ignored, the rule `utils/declaration.ts`
+ * {@link PlanModel.blocks} and ignored, the rule `core/plan/declaration.ts`
  * applies to an unrecognised key. A header key that none of
  * {@link PLAN_HEADER_FIELDS} names is retained in
  * {@link PlanHeader.extras} for the same reason.
@@ -161,12 +161,12 @@
  * do.
  */
 import type { RafaBlock } from './blocks.js';
-import type { TaskDeclaration } from '../../utils/declaration.js';
+import type { TaskDeclaration } from './declaration.js';
 
-import { parseTaskDeclaration } from '../../utils/declaration.js';
 import { splitBlockerComment } from '../../utils/tracker.js';
 
 import { readRafaBlocks } from './blocks.js';
+import { parseTaskDeclaration } from './declaration.js';
 import { isStampableStub } from './plan-stamp.js';
 
 /** The block kinds a plan is read from. Every other kind is ignored. */

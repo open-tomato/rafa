@@ -80,7 +80,7 @@
  *     first dispatch, `task` after a task commits, `stage` after a stage's
  *     last task, `pre-wrap-up` before the wrap-up.
  *   - `scope`: `affected`, `module` or `full` (`TEST_SCOPES`,
- *     `utils/declaration.ts`), or the list of files and folders run, which
+ *     `core/plan/declaration.ts`), or the list of files and folders run, which
  *     may be empty.
  *   - `reason`: optional, why the step ran at that scope, one of
  *     {@link SESSION_STEP_REASONS}: `declared` for the task's own `tests=`
@@ -220,7 +220,7 @@ import type {
 } from '../../loop/session-record-parse.js';
 import type { HopRecord } from '../../next/hop-record.js';
 import type { SuiteFailure } from '../../suite/run.js';
-import type { TestScope } from '../../utils/declaration.js';
+import type { TestScope } from '../plan/declaration.js';
 
 import {
   linkSync,

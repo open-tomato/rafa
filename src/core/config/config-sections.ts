@@ -160,7 +160,7 @@
  *     field with it without reaching past this module, and nothing
  *     more: a caller acting on a merge reads the port.
  *   - The shape {@link usdAmount} accepts is `parseBudgetUsd`'s
- *     (`utils/declaration.ts`), which is what a plan's `budget=` goes
+ *     (`core/plan/declaration.ts`), which is what a plan's `budget=` goes
  *     through and therefore what `--max-budget-usd` has been measured
  *     against. The reader asks it about `String(raw)`, so a config
  *     value is accepted only when the number the loop would pass on
@@ -176,8 +176,9 @@
  *
  * `learning/identity.ts` imports `node:crypto` alone, and neither of the
  * other two imports is a cycle. `pr/types.ts` imports
- * types alone and `utils/declaration.ts` imports nothing, so this
- * module reaches both without either reaching back. The port is reached at `../../pr/types.js`
+ * types alone and `core/plan/declaration.ts` imports only the store's
+ * `effort-levels.ts`, which imports nothing, so this module reaches
+ * both without either reaching back. The port is reached at `../../pr/types.js`
  * and not through the `../../pr/index.js` barrel a caller outside `src/pr/`
  * would normally use, because the barrel carries `pr/gh.ts`, which
  * imports THIS module and the `gh` spawner behind it: importing it here
@@ -195,7 +196,7 @@ import type { SkillTier } from '../../schema/tiers.js';
 import { CONFIDENCE_MAX, CONFIDENCE_MIN } from '../../learning/identity.js';
 import { MERGE_METHODS } from '../../pr/types.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';
-import { parseBudgetUsd } from '../../utils/declaration.js';
+import { parseBudgetUsd } from '../plan/declaration.js';
 
 export type { MergeMethod } from '../../pr/types.js';
 

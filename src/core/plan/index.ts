@@ -1,12 +1,13 @@
 /**
- * The barrel over the plan parser and the plan-file helpers and the plan stamp:
- * every name `parse.ts`, `plan-files.ts` and `plan-stamp.ts` export, and
+ * The barrel over the plan parser, the plan-file helpers, the plan stamp
+ * and the task declaration parser: every name `parse.ts`,
+ * `plan-files.ts`, `plan-stamp.ts` and `declaration.ts` export, and
  * nothing else.
  *
- * A file outside `src/core/` imports this file and never the two behind
+ * A file outside `src/core/` imports this file and never the four behind
  * them (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the three directly and never this file.
+ * file inside `src/core/` imports the four directly and never this file.
  * None outside this folder does today.
  *
  * ## What sits behind it
@@ -18,7 +19,10 @@
  *     named, counted and worded: the plans directory, the file a stub
  *     names, the task counts, and the lines the plan commands print;
  *   - `plan-stamp.ts`: the plan marker the loop appends to every prompt
- *     it dispatches, and the readers of a stub from a prompt or a path.
+ *     it dispatches, and the readers of a stub from a prompt or a path;
+ *   - `declaration.ts`: the routing declaration a task line may carry
+ *     in a trailing brace block, its keys and value sets, and the flags
+ *     it resolves to.
  *
  * ## Why the block reader is not here
  *
@@ -55,10 +59,10 @@
  * `docs/survey/cluster-map.json`, and the three files of the seventh
  * were all placed in cluster c3.
  *
- * The other file outside `src/core/` that the files behind this barrel
- * import by value, `src/utils/declaration.ts`, imports no file by value.
- * `plan-stamp.ts` imports none either; it moved here from `src/utils/`,
- * where a re-export of its names stays for the importers outside core.
+ * `declaration.ts` and `plan-stamp.ts` moved here from `src/utils/`,
+ * where a re-export of each one's names stays for the importers outside
+ * core. `plan-stamp.ts` imports no file by value, and `declaration.ts`
+ * only the store's `effort-levels.ts`, which imports none.
  *
  * ## What it exports
  *
@@ -69,10 +73,11 @@
  * `src/plan/index.ts`, the `./plan` entry, re-exports `parsePlan`,
  * `PLAN_BLOCK_KINDS`, `PLAN_HEADER_FIELDS` and ten types of `parse.ts`
  * from here. It leaves out `PLAN_RELEASE_LEVELS`, `PlanReleaseLevel` and
- * every name of `plan-files.ts` and `plan-stamp.ts`, as it did before the move.
+ * every name of `plan-files.ts`, `plan-stamp.ts` and `declaration.ts`, as it
+ * did before the move.
  * `src/tests/entry-exports.test.ts` pins that entry's names.
  *
- * `index.test.ts` holds the list to the three files: every name either
+ * `index.test.ts` holds the list to the four files: every name any
  * exports is here once, as the same binding, no other name is here, and
  * no name here is on the other plan barrel.
  */
@@ -89,8 +94,46 @@ export type {
   PlanTask,
   PlanTaskStatus,
 } from './parse.js';
+export type {
+  AgentEffortLookup,
+  DeclarationEntry,
+  DeclarationIssue,
+  DeclarationIssueReason,
+  DeclarationKey,
+  DocsRole,
+  EffortLevel,
+  GranularKey,
+  ParsedTask,
+  ResolvedFlags,
+  TaskDeclaration,
+  TestScope,
+} from './declaration.js';
 export type { PlansDir, TaskCounts } from './plan-files.js';
 
+export {
+  AGENT_OWNED_KEYS,
+  BUDGET_FLAG,
+  DECLARATION_KEYS,
+  DEFAULT_TEST_SCOPE,
+  DOCS_ROLES,
+  EFFORT_LEVELS,
+  GRANULAR_KEYS,
+  isAgentName,
+  isDocsRole,
+  isEffortLevel,
+  isModelValue,
+  isTestScope,
+  MODEL_ALIASES,
+  parseBudgetUsd,
+  parseSkillList,
+  parseTaskDeclaration,
+  parseToolList,
+  readDocsRole,
+  readTestScope,
+  resolveDeclarationFlags,
+  stripTaskDeclaration,
+  TEST_SCOPES,
+} from './declaration.js';
 export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS, PLAN_RELEASE_LEVELS } from './parse.js';
 export {
   checkbox,

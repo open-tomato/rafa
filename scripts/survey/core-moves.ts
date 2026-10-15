@@ -5,7 +5,7 @@
  *
  * Four things are listed, and nothing here reads the tree:
  *
- *   - {@link CORE_MOVES}: the twenty-six files that change path, each with
+ *   - {@link CORE_MOVES}: the twenty-seven files that change path, each with
  *     its path under `src/core/` and its subject folder. A file keeps its
  *     base name;
  *   - with each file, its colocated test files by their path today. A test
@@ -72,7 +72,7 @@ export interface Collision {
 }
 
 /**
- * The twenty-six files that move, sorted by their path today: the
+ * The twenty-seven files that move, sorted by their path today: the
  * nineteen of #905, `src/runtime/identity.ts`, which #1088 moved so the
  * effort store imports nothing above core for it, the `text` output
  * adapter with the `OutputStream` it writes to, which #1089 moved so
@@ -82,7 +82,9 @@ export interface Collision {
  * `src/cli/spends.ts`, which #1089 moved so `src/core/command/command.ts`
  * imports nothing above core for them, and the running command record
  * of `src/cli/running.ts`, which #1089 moved so
- * `src/core/loop/claude.ts` imports nothing above core for it.
+ * `src/core/loop/claude.ts` imports nothing above core for it, and the
+ * plan stamp and the task declaration parser of `src/utils/`, which
+ * #1089 moved so `src/core/plan/` imports nothing above core for them.
  */
 export const CORE_MOVES: readonly CoreMove[] = [
   {
@@ -243,6 +245,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
     to: 'src/core/git/commit.ts',
   },
   {
+    from: 'src/utils/declaration.ts',
+    subject: 'plan',
+    tests: ['src/utils/declaration.test.ts'],
+    to: 'src/core/plan/declaration.ts',
+  },
+  {
     from: 'src/utils/plan-stamp.ts',
     subject: 'plan',
     tests: [],
@@ -264,6 +272,7 @@ export const CORE_REEXPORTS: readonly string[] = [
   'src/cli/running.ts',
   'src/cli/spends.ts',
   'src/runtime/identity.ts',
+  'src/utils/declaration.ts',
   'src/utils/plan-stamp.ts',
 ];
 

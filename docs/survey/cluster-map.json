@@ -643,7 +643,7 @@
     "src/triage/test-failure.ts": "c1",
     "src/triage/triage.ts": "c1",
     "src/utils/agent-definition.ts": "c4",
-    "src/utils/declaration.ts": "c3",
+    "src/core/plan/declaration.ts": "c3",
     "src/utils/git.ts": "c3",
     "src/core/plan/plan-stamp.ts": "c3",
     "src/utils/progress.ts": "c3",
