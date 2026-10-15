@@ -59,12 +59,18 @@ step anyway.
 
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
-and the test files, then `tsc --build` in each of the three code packages,
-`packages/rafa` (core), `packages/rafa-hub` and `packages/rafa-sync-service`,
-each leaving its test files out as the root does and building core's
-declarations into `packages/rafa/.tsbuild/` before a service reads them.
-`bun run lint` lints package code from the root config as it lints `src/`,
-so a changed package file belongs in the scoped
+and the test files, then `bun run --filter './packages/*' check-types`, which
+runs the `check-types` script of each member that has one. Three do:
+`packages/rafa` (core), `packages/rafa-hub` and `packages/rafa-sync-service`.
+Each runs `tsc --build` over its composite `tsconfig.json`, which leaves its
+test files out as the root does, writes declarations into its own `.tsbuild/`
+(gitignored at every depth), and builds the projects it references first, so
+a service reads core's declarations from `packages/rafa/.tsbuild/`. The two
+config packages, `packages/typescript-config` and `packages/eslint-config`,
+hold no `tsconfig.json` and no `check-types` script, so no type step asks
+anything of them. `bun run lint` lints package code from the root config as
+it lints `src/`, and each member's own `lint` script runs `eslint .` from its
+directory, so a changed package file belongs in the scoped
 `bunx eslint <changed files>` run too.
 
 **Runner recorded steps** (recorded at fixed points, each with its scope):
@@ -105,7 +111,11 @@ its change reaches:
 - `tests.alwaysRun` (glob list, defaults to `src/**/*.sweep.test.ts`) —
   content sweeps that always run alongside scoped tests in every task's
   gates, since they read files at run time and `--changed` follows only
-  the import graph
+  the import graph. The workspace-graph sweep,
+  `src/tests/workspace-graph.sweep.test.ts`, is one of them: it runs the
+  graph check over the live tree, beside the turbo-config sweep
+  (`src/tests/turbo-config.sweep.test.ts`), which holds `turbo.json`'s
+  `agentGuidance` key and its three tasks
 - `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
   `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
   named in `[test] preload` of `bunfig.toml`)
@@ -148,13 +158,23 @@ on that repair's line and halts.
 with three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
 cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
-`bun run check-types`, the root config and the three workspace packages;
-ring 1's job `affected` runs `bun run verify:affected` (`turbo run lint
-check-types test --affected`), `bunx tsc --build tsconfig.references.json`
-and `bun scripts/workspace/graph-check.ts`. `affected` checks out the
-whole history and names turbo's base in `TURBO_SCM_BASE`: the pull
-request's base branch on a pull request, `origin/integration` on a push
-to `stretch/**`. **Two cases for
+`bun run check-types`, the root config and the three composite members,
+which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
+(`turbo run lint check-types test --affected`), `bunx tsc --build
+tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.
+`affected` checks out the whole history and names turbo's base in
+`TURBO_SCM_BASE`: the pull request's base branch on a pull request,
+`origin/integration` on a push to `stretch/**`. turbo builds its graph from
+the manifests alone, so a package is marked affected only through a declared
+`workspace:*` line, never through a `paths` alias; the graph check refuses a
+member that imports an `@open-tomato/*` package its manifest does not declare
+(`context/source.md`). `turbo.json` sets `agentGuidance` to `false`: under an
+agent environment every `turbo run` would otherwise write a block into the
+root `AGENTS.md`, which is capped at 80 lines, so a session that runs turbo
+reads `git status` afterwards and finds no such block. Measured on turbo
+2.11.8: a dry run under `CLAUDECODE` and `AI_AGENT` left `git status` empty
+and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
+key. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` and `affected` checks (merge with
 `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports no

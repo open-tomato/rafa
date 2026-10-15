@@ -40,13 +40,16 @@ spells out, and the shapes the lint config forces.
 ### Explicit types on exports
 
 **`base.json` of `packages/typescript-config` sets `isolatedDeclarations`
-and `erasableSyntaxOnly`**, and every tsconfig extends it, by the name
-`@open-tomato/rafa-typescript-config/base`, so the root config and the three
-code packages are held to them by `bun run check-types`, with no flag on the
-command line. The package's `base.test.ts` holds both flags and
-`declaration`. `declaration` sits beside
-them because `tsc` refuses `isolatedDeclarations` without it; under the base's
-`noEmit` it writes no file. The root `tsconfig.json` excludes `**/*.test.ts`,
+and `erasableSyntaxOnly`**. Every tsconfig reaches it by one chain: the
+root `tsconfig.json` and each composite member's `tsconfig.json` extend
+`tsconfig.packages.json`, which extends
+`@open-tomato/rafa-typescript-config/base`, the name the root's
+`workspace:*` line links into `node_modules`. So the root config and the
+three code packages are held to both flags by `bun run check-types`, with no
+flag on the command line. The package's `base.test.ts` holds both flags and
+`declaration`. `declaration` sits beside them because `tsc` refuses
+`isolatedDeclarations` without it; under the base's `noEmit` it writes no
+file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
@@ -141,11 +144,12 @@ augmentation target reads `core/config/config-schema`. A store file is
 **Two names, by job.** An import reads `@open-tomato/rafa/<subpath>`, which
 the `paths` map of `tsconfig.packages.json` resolves to core's source, so no
 import line spells the manifest name. That name is `@open-tomato/rafa-core`,
-an interim name for core's workspace package (`packages/rafa/package.json`,
-private) until #808 renames it. The manifests spell it in four places: core's
-own `package.json` and the three `workspace:*` lines, the root's
-`devDependencies` and the two services' `dependencies`. #808 replaces it and
-retires the `types`-only `exports` entries the root keeps for core's files.
+core's workspace package name for good (`packages/rafa/package.json`,
+private); the root publishes `@open-tomato/rafa` with core bundled. The
+manifests spell it in four places: core's own `package.json` and the three
+`workspace:*` lines, the root's `devDependencies` and the two services'
+`dependencies`. #808 retires the `types`-only `exports` entries the root keeps
+for core's files.
 
 **A subject's barrel is the only file under `packages/rafa/src/core/` that a
 file outside it may import.** There are thirteen, all listed in `CORE_BARRELS`
@@ -190,7 +194,7 @@ no import: a `declare module` naming
 answered under `augment` and passes. It has to name the declaring file:
 spelled through the config barrel, two augmentations merged with each other
 and not with `RafaConfig`, whose `keyof` missed both. That file is one of
-core's `exports` entries until the rename (#808).
+core's `exports` entries until #808 retires them.
 
 **The two-names sweep holds the two names to the live tree.**
 `src/tests/core-package.sweep.test.ts`, beside the barrels sweep, has three
@@ -202,8 +206,8 @@ lands elsewhere, or nowhere, fails. The inside half: each specifier of a core
 file, relative or bare, lands on a core file or outside the repository, and a
 bare `@open-tomato/rafa/` specifier inside core fails even when it would land
 inside. One import inside core lands outside it on purpose:
-`core/command/version.ts` reads the root `package.json` until #808 publishes
-core under rafa's name, and the half fails once that read is gone, so the
+`core/command/version.ts` reads the root `package.json` until #808 bundles core
+into the root, and the half fails once that read is gone, so the
 exception cannot outlive it. The third check holds the two names' maps to the
 same files: each `paths` entry of `tsconfig.packages.json` names one existing
 target under `packages/rafa/src/`, and each `exports` key of
@@ -346,14 +350,27 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with four members: `packages/rafa/`
-  (`@open-tomato/rafa-core`, core, under its interim name),
-  `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
-  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and
-  `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`), the
-  tsconfig base, which the root declares with `workspace:*` so the `extends`
-  name resolves from the root. All four are `private`: publishing them is an
-  operator's decision, and the root `files` ships none of them.
+  `package.json`) with five members, all `private`: `packages/rafa/`
+  (`@open-tomato/rafa-core`, core, the name for good), `packages/rafa-hub/`
+  (`@open-tomato/rafa-hub`), `packages/rafa-sync-service/`
+  (`@open-tomato/rafa-sync-service`), and the two config packages,
+  `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`) and
+  `packages/eslint-config/` (`@open-tomato/rafa-eslint-config`). Publishing
+  them is an operator's decision, and the root `files` ships none of them.
+  The root publishes `@open-tomato/rafa` with core bundled.
+- **The config packages are the shared configs every member extends.**
+  `packages/typescript-config/base.json` is the strict tsconfig base, reached
+  as `@open-tomato/rafa-typescript-config/base`; the root declares it with
+  `workspace:*` so the chain resolves from the root, as "Explicit types on
+  exports" above sets out. `packages/eslint-config/base.mjs` is the flat ESLint
+  config, with `sharedRules.mjs` and `rules/` beside it, reached as
+  `@open-tomato/rafa-eslint-config`; a member's `eslint.config.mjs` imports it
+  and adds only its own ignores. Neither package holds a `tsconfig.json` or a
+  `check-types` script; each has its own `lint` and `test` scripts. Each
+  manifest declares `openTomato.team` (`@open-tomato/maintainers`), which
+  `scripts/codeowners.ts` reads to derive `.github/CODEOWNERS`. `bun run
+  codeowners --check` refuses a file that differs from the manifests, but no
+  check confirms that a team exists on GitHub.
 - **The import name resolves through `paths`, not `node_modules`.**
   `tsconfig.packages.json` maps four entries, longest prefix first:
   `@open-tomato/rafa/store` and `@open-tomato/rafa/ports` to the two barrels,
@@ -364,8 +381,8 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   Nothing installs `@open-tomato/rafa` into `node_modules`: a member depending
   on that name with `workspace:*` fails `bun install` with
   `@open-tomato/rafa@workspace:* failed to resolve`, since the root is not a
-  member of its own workspace. The members depend on the interim name,
-  `@open-tomato/rafa-core`, instead.
+  member of its own workspace. The members depend on
+  `@open-tomato/rafa-core` instead.
 - **A package imports core through the entries the import rule allows.** A
   file outside core takes the barrels, the store and ports entries and the
   named files by the subpaths of "Core and its barrels" above, and nothing
@@ -379,64 +396,91 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `tsconfig.packages.json`, into core's `exports` and into both lists. The
   third check of `src/tests/core-package.sweep.test.ts` holds the map and
   core's `exports` to the same files.
-- **Which gates reach a package.** `bun run test` runs its tests. `bun run
-  check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json` leaves
-  out `packages/` and the test files, then `bun run --filter './packages/*'
-  check-types`, each code package's own `tsc --build`. The `tsconfig.json` of
-  `packages/rafa`, `packages/rafa-hub` and `packages/rafa-sync-service` is
-  composite: it keeps the `extends` of `tsconfig.packages.json`, leaves its
-  test files out, writes declarations only into the package's `.tsbuild/`
-  (gitignored, its `tsBuildInfoFile` there too, so two packages never share
-  one), and names what it imports under `references`, core none and the two
-  services `../rafa`. `tsc --build` builds a reference first, reads core
-  through `paths` from that reference's declarations, and is a no-op on a
-  second run. A service with its reference to core dropped fails with
-  `TS6307` and `TS6059` on core's files, and still writes their `.d.ts`
-  files beside core's sources, so a run that fails that way leaves stray
-  files under `packages/rafa/src/` to remove. The root solution file
+- **Which gates reach a package.** Each member's `test` script runs `bun test`
+  from its folder, and ring 1's `turbo run test --affected` reaches it.
+  `bun run check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json`
+  leaves out `packages/` and the test files, then `bun run --filter
+  './packages/*' check-types`, which runs the `check-types` script of each
+  member that has one: `tsc --build` in the three composite members. `bun run
+  lint` lints package code from the root config like `src/`, its `testdata/`
+  folders included, and so does the runner's lint step on a task's diff; the
+  root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
+  never lints the declarations a `check-types` run left behind. Each member's
+  own `eslint.config.mjs` is a leaf on `@open-tomato/rafa-eslint-config` that
+  adds only `.tsbuild/**` and `node_modules/**` to the ignores, and its `lint`
+  script, `eslint .` run from the package directory, lints that package alone.
+  The import names resolve for `import/no-unresolved` because the resolver of
+  `packages/eslint-config/base.mjs`, the shared config the root
+  `eslint.config.mjs` imports, lists `./packages/*/tsconfig.json` beside the
+  root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
+  `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
+  several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
+  every run prints `Multiple projects found` to stderr.
+- **The composite recipe builds the three code packages' declarations.** The
+  `tsconfig.json` of `packages/rafa`, `packages/rafa-hub` and
+  `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
+  and sets `composite: true`, `noEmit: false`, `emitDeclarationOnly: true`,
+  `rootDir: "src"`, `outDir: ".tsbuild"` and `tsBuildInfoFile:
+  ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages never share one
+  (TS6377). It leaves its test files out, and its `references` name what it
+  imports: core none, the two services `../rafa`. `tsc --build` builds a
+  reference first, reads core through `paths` from that reference's
+  declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
+  every depth. Each code package's `turbo.json` extends the root's
+  (`"extends": ["//"]`) and declares `check-types.outputs` as `.tsbuild/**`, so
+  a cache hit restores the declarations a dependent's build reads. The two
+  config packages emit nothing and carry no override. A service with its
+  reference to core dropped fails with `TS6307` and `TS6059` on core's files,
+  and still writes their `.d.ts` files beside core's sources, so a run that
+  fails that way leaves stray files under `packages/rafa/src/` to remove; list
+  them with `git ls-files --others --exclude-standard`.
+- **The solution file builds the members in dependency order.** The root
   `tsconfig.references.json` holds `"files": []` and one reference per
-  composite member, so `tsc --build tsconfig.references.json` builds them all
-  in dependency order and refuses a reference cycle with `TS6202`, exit 4.
-  Each code package's `turbo.json` extends the root's (`"extends": ["//"]`)
-  and declares `check-types.outputs` as `.tsbuild/**`, so a cache hit
-  restores the declarations a dependent's build reads; the two config
-  packages emit nothing and carry no override. `bun run lint` lints package
-  code from the root config like `src/`, its `testdata/` folders included,
-  and so does the runner's lint step on a task's diff. The import names
-  resolve for `import/no-unresolved` because the resolver of
-  `packages/eslint-config/base.mjs`, the shared
-  config the root `eslint.config.mjs` imports as
-  `@open-tomato/rafa-eslint-config`, lists `./packages/*/tsconfig.json`
-  beside the root `tsconfig.json`; without that entry, `bunx eslint packages`
-  reported 21 `import/no-unresolved` errors (measured on ESLint 9.39.5). Two
-  globs make several projects, so the resolver also sets
-  `noWarnOnMultipleProjects`, or every run prints `Multiple projects found` to
-  stderr. Each of the five workspace members also lints itself: its own
-  `eslint.config.mjs` is a leaf on `@open-tomato/rafa-eslint-config` that
-  adds only `.tsbuild/**` and `node_modules/**` to the ignores, and its
-  `lint` script, `eslint .` run from the package directory, lints that
-  package alone. The root `eslint.config.mjs` ignores `**/.tsbuild/**`
-  as well, so the root `eslint .` never lints the declarations a
-  `check-types` run left behind. Bun links each member in isolation, so
-  every member but the eslint-config package declares
-  `@open-tomato/rafa-eslint-config`
-  (`workspace:*`), `eslint` and `typescript` in its `devDependencies` at
-  the root's ranges; the eslint-config package already lists `eslint` in
-  its `dependencies`, adds `typescript` as a devDependency, and imports
-  itself by name through its own `exports`.
+  composite member, so `tsc --build tsconfig.references.json` builds all three
+  and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
+  umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
+  reads core's source through `paths` as before.
+- **The graph check refuses four things.** `scripts/workspace/graph-check.ts`
+  reads each member under `packages/*` and refuses it on four counts, one line
+  per reason: it has no script for a task in the root `turbo.json` (`lint`,
+  `check-types` and `test` today), with `check-types` asked only of a member
+  that holds a `tsconfig.json`; its `tsconfig.json` is not `composite`, or the
+  solution file does not reference it; its `tsconfig.json` `references` omit a
+  workspace dependency whose own `tsconfig.json` is composite; or a `.ts`,
+  `.mjs` or `.js` file under it imports an `@open-tomato/*` package that its
+  `dependencies`, `devDependencies` or `peerDependencies` do not declare, a
+  `paths` alias counting as the member it resolves into. It exits 0 with one
+  `ok` line per member and exits 1 with a line per reason; a root it cannot
+  read is a refusal too. Ring 1 runs it, and
+  `src/tests/workspace-graph.sweep.test.ts` runs it over the live tree in every
+  task's gates. Each refusal has a planted-tree control in
+  `scripts/workspace/graph-check.test.ts`.
+- **Bun links each member in isolation, so a member declares what its files
+  import.** A member's own `node_modules/` holds only what its manifest
+  declares, so a bare import resolves from its manifest and not from the
+  root's. Each member but the eslint-config package declares
+  `@open-tomato/rafa-eslint-config` (`workspace:*`), `eslint` and `typescript`
+  in its `devDependencies`, the last two at the root's ranges, so one install
+  serves its scripts; the two services also declare `@open-tomato/rafa-core`
+  (`workspace:*`). The graph check's fourth refusal holds the `@open-tomato/*`
+  imports to those declarations and reads no `eslint` or `typescript` import,
+  which the scripts name. The eslint-config package lists `eslint` in its
+  `dependencies`, declares `typescript` as a `devDependency`, and imports
+  itself by name through its own `exports`. After a manifest edit, `bun
+  install` refreshes `bun.lock` and the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script bun-builds `src/effort/store/index.ts` and
   `src/ports/index.ts`, two of its entries, which are one-line `export *`
   shims of `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the
-  `dist/` files the root `exports` name exist until #808 publishes core
-  itself. Its declarations come in two passes:
+  `dist/` files the root `exports` name exist until #808 bundles core into
+  the root. Its declarations come in two passes:
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
   them. The root `exports` also keeps six `types`-only entries for core's
   files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./ports/log-level`, `./report/parse` and
-  `./store/check-rows`), which the rename retires.
+  `./store/check-rows`), which #808 retires.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a
