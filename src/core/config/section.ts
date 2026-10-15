@@ -19,19 +19,24 @@
  *
  * ## The refusals
  *
- * A registration that breaks one of three rules throws a
+ * A registration that breaks one of four rules throws a
  * {@link ConfigSectionError} listing every problem it found, one
  * sentence each, and leaves the active registry as it was:
  *
  *   - A setting name registered by one section and again by another, in
  *     this call or an earlier one. The sentence names both packages, the
  *     one holding the name first.
+ *   - A file key defined by one section and again by another under a
+ *     different setting name. Two settings read off one key would
+ *     answer one value under two names, so the sentence names both
+ *     packages and both setting names, the one holding the key first.
  *   - A file key opening with `dangerous.` defined by one section and
- *     again by another, under the same setting name or a different one.
- *     A `dangerous.*` key is a person's consent to a risk, so a second
- *     package defining it could widen what that consent was given for;
- *     the sentence names both packages. A setting name registered twice
- *     with a `dangerous.` key reads both sentences.
+ *     again by another under the same setting name. A `dangerous.*` key
+ *     is a person's consent to a risk, so a second package defining it
+ *     could widen what that consent was given for; the sentence names
+ *     both packages, and the setting-name sentence is read beside it.
+ *     Any other key redefined under the same name reads the setting-name
+ *     sentence alone.
  *   - A {@link RafaConfig} field no section defines: a default given for
  *     a field no registered section has a setting for, or a setting no
  *     registered section gives a default for. The sentence names the
@@ -45,8 +50,9 @@
  * refused at the first. A section's package must be a non-empty string,
  * since every refusal names one.
  *
- * Only a `dangerous.` key is refused when two sections define it under
- * two setting names. Another file key defined twice is not refused here.
+ * The key rules compare one section with the sections before it, in
+ * this call or an earlier one; two setting names one section gives the
+ * same key are not compared with each other.
  *
  * ## A registry is a value
  *
@@ -147,8 +153,9 @@ export interface ConfigSectionRegistry {
 }
 
 /**
- * A registration refused: a setting name or a `dangerous.` key defined
- * twice, a field no section defines, or a section with no package name.
+ * A registration refused: a setting name defined twice, a file key two
+ * sections define under two setting names or a `dangerous.` key under
+ * one, a field no section defines, or a section with no package name.
  */
 export class ConfigSectionError extends Error {
   /** Every problem found, one sentence each. */
@@ -187,21 +194,45 @@ function frozenCopy(section: ConfigSection): ConfigSection {
   });
 }
 
-/** The package holding each setting name, and each `dangerous.` key, across `sections`. */
-interface Owners {
-  readonly names: Map<string, string>;
-  readonly dangerousKeys: Map<string, string>;
+/** The section that defined a file key first: its package and its setting name. */
+interface KeyOwner {
+  readonly package: string;
+  readonly name: string;
 }
 
-/** Records the setting names and `dangerous.` keys of `section` in `owners`. */
+/** The package holding each setting name, and the owner of each file key, across `sections`. */
+interface Owners {
+  readonly names: Map<string, string>;
+  readonly keys: Map<string, KeyOwner>;
+}
+
+/** Records the setting names and file keys of `section` in `owners`. */
 function recordOwners(owners: Owners, section: ConfigSection): void {
   for (const [name, spec] of Object.entries(section.settings)) {
     if (!owners.names.has(name)) owners.names.set(name, section.package);
     const key = spec?.key;
-    if (key?.startsWith(DANGEROUS_PREFIX) === true && !owners.dangerousKeys.has(key)) {
-      owners.dangerousKeys.set(key, section.package);
+    if (key !== undefined && !owners.keys.has(key)) {
+      owners.keys.set(key, { package: section.package, name });
     }
   }
+}
+
+/**
+ * The sentence refusing `key`, which `owner` defined first, defined
+ * again by `section` under the setting `name`, or null when it is no
+ * collision: a key outside `dangerous.` redefined under the same setting
+ * name is read by the setting-name sentence alone.
+ */
+function keyCollisionOf(owner: KeyOwner, key: string, name: string, section: ConfigSection): string | null {
+  if (owner.name !== name) {
+    return `file key ${key} is defined by package ${quoted(owner.package)} under setting ${owner.name}`
+      + ` and again by package ${quoted(section.package)} under setting ${name}`;
+  }
+  if (key.startsWith(DANGEROUS_PREFIX)) {
+    return `${key} is defined by package ${quoted(owner.package)} and again by package ${quoted(section.package)};`
+      + ' a dangerous. key is a person\'s consent and one package defines it';
+  }
+  return null;
 }
 
 /** The sentences refusing what `section` defines again, read against `owners`. */
@@ -218,13 +249,11 @@ function collisionsOf(owners: Owners, section: ConfigSection): string[] {
     const key = spec?.key;
     const keyOwner = key === undefined
       ? undefined
-      : owners.dangerousKeys.get(key);
-    if (keyOwner !== undefined) {
-      problems.push(
-        `${key} is defined by package ${quoted(keyOwner)} and again by package ${quoted(section.package)};`
-          + ' a dangerous. key is a person\'s consent and one package defines it',
-      );
-    }
+      : owners.keys.get(key);
+    const keyProblem = key === undefined || keyOwner === undefined
+      ? null
+      : keyCollisionOf(keyOwner, key, name, section);
+    if (keyProblem !== null) problems.push(keyProblem);
     return problems;
   });
 }
@@ -254,7 +283,7 @@ export function mergeConfigSections(
   registry: ConfigSectionRegistry,
   sections: readonly ConfigSection[],
 ): ConfigSectionRegistry {
-  const owners: Owners = { names: new Map(), dangerousKeys: new Map() };
+  const owners: Owners = { names: new Map(), keys: new Map() };
   for (const section of registry.sections) recordOwners(owners, section);
 
   const problems: string[] = [];

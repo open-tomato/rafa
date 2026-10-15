@@ -94,8 +94,10 @@ import {
   resolveConfig,
 } from './config.js';
 import {
+  activeSections,
   activeSettings,
   EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
 } from './section.js';
@@ -1728,6 +1730,29 @@ describe('the registered sections', () => {
     const resolved = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
 
     expect([resolved.config.effortSync, resolved.config.hubUrl]).toEqual(['service', 'https://hub.example.org']);
+  });
+
+  it('merges logger.modules across the user and project files through its spec\'s map flag alone', () => {
+    const user = fileOf('logger:\n  modules: { board: { level: debug }, store: { level: warn } }\n', USER_PATH);
+    const file = fileOf('logger:\n  modules: { store: { level: error } }\n');
+
+    expect(resolveConfig({ file, user }).config.loggerModules)
+      .toEqual(new Map([['board', 'debug'], ['store', 'error']]));
+
+    const unflagged = activeSections().map((section) => {
+      const spec = section.settings.loggerModules;
+      if (spec === undefined) return section;
+      return { ...section, settings: { ...section.settings, loggerModules: { ...spec, map: undefined } } };
+    });
+    const previous = registerConfigSections([]);
+    restoreConfigSections(mergeConfigSections(EMPTY_CONFIG_REGISTRY, unflagged));
+    try {
+      expect(activeSettings().loggerModules?.map).toBeUndefined();
+      expect(resolveConfig({ file, user }).config.loggerModules)
+        .toEqual(new Map([['store', 'error']]));
+    } finally {
+      restoreConfigSections(previous);
+    }
   });
 
   it('reads no setting with no section registered, the registry and not a literal naming the settings', () => {

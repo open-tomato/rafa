@@ -149,6 +149,7 @@
 import type { Planting, Scratch } from './loop-scratch.js';
 import type { CliEvent } from '../ports/index.js';
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -419,6 +420,26 @@ describe('loop start refusing', () => {
       '',
       `❌ Refusing to create feat/${STUB} from a stale origin/main: fetch origin main failed.`,
     ]);
+    expect(existsSync(scratch.callLog)).toBe(false);
+  }, RUN_TIMEOUT);
+});
+
+describe('loop start refusing under a naming.branch template', () => {
+  const config = 'naming:\n  branch: work/{stub}\n';
+
+  it.each([
+    ['a detached HEAD', true],
+    ['the main branch', false],
+  ] as const)('names work/<stub> and never feat/ when refusing %s', (_label, detached) => {
+    const scratch = plant({ branch: 'main', plan: PLAN_OPEN, config });
+    if (detached) execFileSync('git', ['checkout', '-q', '--detach'], { cwd: scratch.repo, stdio: 'pipe' });
+
+    const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait']);
+
+    expectExit(run, 1, { ...scratch });
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain(`work/${STUB}`);
+    expect(run.stderr).not.toContain('feat/');
     expect(existsSync(scratch.callLog)).toBe(false);
   }, RUN_TIMEOUT);
 });

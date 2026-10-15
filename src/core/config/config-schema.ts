@@ -226,4 +226,11 @@ export interface SettingSpec<K extends ConfigSetting> {
     : false;
   /** For a list of mappings, the keys each item reads. */
   itemKeys?: readonly string[];
+  /**
+   * Whether the value is a map that `resolveConfig` (`config.ts`) merges
+   * by key across the default, the user's file and the project's, the
+   * later layer's entry winning for a key both name. Unset, a layer's
+   * value replaces a lower layer's whole.
+   */
+  map?: true;
 }

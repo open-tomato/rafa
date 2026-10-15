@@ -29,6 +29,29 @@
  * today; one that becomes one prints `(command line)` in place of the
  * file and entry.
  *
+ * ## The command's phrase
+ *
+ * A command may say what it does under a key: `RafaCommand.dangerous`
+ * (`src/core/command/command.ts`) maps a `dangerous.*` key to a phrase,
+ * such as `a release guard reading collision merges anyway` for
+ * `dangerous.acceptVersionCollision`. The pass line of a key the
+ * running command declares ends with it:
+ *
+ *     dangerous.<key>: <value> (<file>, entry <n>); <phrase>
+ *
+ * and a key it does not declare prints the bare line. The phrases are
+ * held as the active output is (`core/output/active.ts`): the
+ * dispatcher runs every command inside {@link runWithDangerousPhrases}
+ * with the command's own, beside the running-command record
+ * (`src/cli/running.ts`), in an async scope that ends with the run, so
+ * two invocations overlapping in one process each read their own and
+ * nothing outlives either. {@link setDangerousPhrases} sets them at
+ * module level, read outside every scope, and answers the phrases it
+ * replaced for {@link restoreDangerousPhrases}: a test standing in for
+ * a dispatch puts them back in a `finally`, since bun runs every test
+ * file in one process. {@link dangerousPhrases} reads the scope's, else
+ * the module-level ones.
+ *
  * ## Once per invocation
  *
  * A command may load its config more than once, and the lines are not
@@ -43,6 +66,8 @@
 import type { ConfigSetting } from './config-schema.js';
 import type { ResolvedConfig } from './config.js';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { describeValue } from './config-sections.js';
 import { activeDefaults, activeSettings } from './section.js';
 
@@ -53,6 +78,67 @@ const DANGEROUS_PREFIX = 'dangerous.';
 interface DangerousSetting {
   readonly setting: ConfigSetting;
   readonly key: string;
+}
+
+/** What a command does under each `dangerous.*` key it declares, by key. */
+export type DangerousPhrases = Readonly<Record<string, string>>;
+
+/** The phrases while no command declares any. */
+const NO_PHRASES: DangerousPhrases = Object.freeze({});
+
+/** The phrases of each run {@link runWithDangerousPhrases} has in flight, by async scope. */
+const phraseScopes = new AsyncLocalStorage<DangerousPhrases>();
+
+/** The module-level phrases; see the module note. */
+let modulePhrases: DangerousPhrases = NO_PHRASES;
+
+/** A frozen copy of `phrases`, or the empty phrases for `undefined`. */
+function phrasesOf(phrases: DangerousPhrases | undefined): DangerousPhrases {
+  return phrases === undefined
+    ? NO_PHRASES
+    : Object.freeze({ ...phrases });
+}
+
+/**
+ * Runs `run` with `phrases` as the running command's in an async scope
+ * of its own, and answers what `run` answers; see the module note.
+ *
+ * @param phrases - The command's `dangerous` field, absent for none.
+ * @param run - The command's run.
+ * @returns What `run` answers.
+ */
+export function runWithDangerousPhrases<T>(phrases: DangerousPhrases | undefined, run: () => T): T {
+  return phraseScopes.run(phrasesOf(phrases), run);
+}
+
+/**
+ * Sets `phrases` at module level; see the module note.
+ *
+ * @param phrases - The phrases to set, absent for none.
+ * @returns The module-level phrases replaced, for {@link restoreDangerousPhrases}.
+ */
+export function setDangerousPhrases(phrases: DangerousPhrases | undefined): DangerousPhrases {
+  const previous = modulePhrases;
+  modulePhrases = phrasesOf(phrases);
+  return previous;
+}
+
+/**
+ * Puts back phrases {@link setDangerousPhrases} answered.
+ *
+ * @param previous - The phrases it answered.
+ */
+export function restoreDangerousPhrases(previous: DangerousPhrases): void {
+  modulePhrases = previous;
+}
+
+/**
+ * The running command's phrases: the scope's, else the module-level ones.
+ *
+ * @returns The phrases by key, empty when none is declared.
+ */
+export function dangerousPhrases(): DangerousPhrases {
+  return phraseScopes.getStore() ?? modulePhrases;
 }
 
 /** The lines already written, by invocation; see the module note. */
@@ -87,10 +173,12 @@ function sameValue(first: unknown, second: unknown): boolean {
  *
  * @param resolved - A resolution `loadConfig` or `resolveConfig` answered.
  * @returns The lines, such as
- *   `dangerous.acceptStaleRefs: true (/repo/rafa.config.ts, entry 1)`.
+ *   `dangerous.acceptStaleRefs: true (/repo/rafa.config.ts, entry 1)`,
+ *   each ending with `; <phrase>` for a key the running command declares.
  */
 export function dangerousPassLines(resolved: ResolvedConfig): readonly string[] {
   const defaults = activeDefaults();
+  const phrases = dangerousPhrases();
   return dangerousSettings().flatMap(({ setting, key }) => {
     const value: unknown = resolved.config[setting];
     if (sameValue(value, defaults[setting])) return [];
@@ -98,7 +186,10 @@ export function dangerousPassLines(resolved: ResolvedConfig): readonly string[] 
     const where = origin === null
       ? 'command line'
       : `${origin.file}, entry ${origin.entry}`;
-    return [`${key}: ${describeValue(value)} (${where})`];
+    const phrase = Object.hasOwn(phrases, key)
+      ? `; ${phrases[key]}`
+      : '';
+    return [`${key}: ${describeValue(value)} (${where})${phrase}`];
   });
 }
 

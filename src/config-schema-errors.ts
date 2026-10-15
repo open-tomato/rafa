@@ -3,8 +3,8 @@
  * codes a project adds to rafa's list (#949). {@link ERRORS_SECTION}
  * hands it to core as one `ConfigSection`, package `errors`, and the
  * `declare module` below adds {@link ErrorsSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link ErrorsShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `release` section. It has its
  * own module because `config-schema.ts` stood at 643 lines and
@@ -33,13 +33,11 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends ErrorsSettings {}
 }
 
-declare module './config/shape.js' {
-  /** The `errors` keys a file writes. */
-  interface ConfigShape {
-    readonly errors: {
-      readonly codes: readonly ErrorCodeFileItem[];
-    };
-  }
+/** The `errors` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface ErrorsShape {
+  readonly errors: {
+    readonly codes: readonly ErrorCodeFileItem[];
+  };
 }
 
 /** One `errors.codes` entry as a file writes it, `since` left out or null. */

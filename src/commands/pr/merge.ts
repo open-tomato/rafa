@@ -227,7 +227,7 @@ import {
 
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
 import { freedAfterMerge } from './merge-freed.js';
-import { guardBeforeMerge } from './merge-guard.js';
+import { guardBeforeMerge, MERGE_DANGEROUS_PHRASES } from './merge-guard.js';
 import { refreshProjectAfterMerge } from './merge-project.js';
 import { refuseFromGit } from './merge-refuse.js';
 import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
@@ -734,6 +734,7 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       },
     ],
     outputs: ['text', 'json'],
+    dangerous: MERGE_DANGEROUS_PHRASES,
     run: async (context) => {
       const merged = await runMerge(context, seams);
       if (context.outputMode === 'json') context.output.result(merged);

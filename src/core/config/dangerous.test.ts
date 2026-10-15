@@ -13,6 +13,12 @@
  *
  * Every pass case has its control: a file spelling the default, whose
  * `sources` name the file, prints nothing.
+ *
+ * The phrase cases set the running command's phrases at module level or
+ * in a scope (`runWithDangerousPhrases`). Each control is a phrase for
+ * a key the resolution leaves at its default, or for another key, whose
+ * line stays bare; the module-level phrases are put back in a `finally`
+ * for every later test file.
  */
 import type { ConfigSection } from './section.js';
 
@@ -28,7 +34,14 @@ import { runWithActiveOutput } from '../output/active.js';
 
 import { loadConfig } from './config-load.js';
 import { flag } from './config-sections.js';
-import { dangerousKeys, dangerousPassLines } from './dangerous.js';
+import {
+  dangerousKeys,
+  dangerousPassLines,
+  dangerousPhrases,
+  restoreDangerousPhrases,
+  runWithDangerousPhrases,
+  setDangerousPhrases,
+} from './dangerous.js';
 import { EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from './section.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-dangerous-'));
@@ -151,7 +164,89 @@ describe('dangerousPassLines', () => {
   });
 });
 
+describe('the running command\'s phrases', () => {
+  const PHRASE = 'a release guard reading collision merges anyway';
+
+  it('ends the line of a key the module-level phrases declare with the phrase, and leaves another key bare', async () => {
+    const root = freshDir('phrases');
+    const path = write(join(root, '.rafa', 'config.yaml'), [
+      'dangerous:',
+      '  acceptVersionCollision: true',
+      '  selfUpdateDuringLoop: true',
+      '',
+    ].join('\n'));
+    const { resolved } = await loadCollecting({ root, home: freshDir('home') });
+
+    const previous = setDangerousPhrases({
+      'dangerous.acceptVersionCollision': PHRASE,
+      'dangerous.acceptStaleRefs': 'never printed',
+    });
+    try {
+      expect(dangerousPassLines(resolved)).toEqual([
+        `dangerous.acceptVersionCollision: true (${path}, entry 0); ${PHRASE}`,
+        `dangerous.selfUpdateDuringLoop: true (${path}, entry 0)`,
+      ]);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+    expect(dangerousPassLines(resolved)).toEqual([
+      `dangerous.acceptVersionCollision: true (${path}, entry 0)`,
+      `dangerous.selfUpdateDuringLoop: true (${path}, entry 0)`,
+    ]);
+  });
+
+  it('reads a scope\'s phrases inside it over the module-level ones, and the module-level ones after', async () => {
+    const project = yamlProject('dangerous:\n  acceptStaleRefs: true\n');
+    const { resolved } = await loadCollecting(project);
+    const outer = { 'dangerous.acceptStaleRefs': 'the module-level phrase' };
+
+    const previous = setDangerousPhrases(outer);
+    try {
+      const inside = await runWithDangerousPhrases({ 'dangerous.acceptStaleRefs': 'the scope\'s phrase' }, async () => {
+        await Promise.resolve();
+        return dangerousPassLines(resolved);
+      });
+      const bare = runWithDangerousPhrases(undefined, () => dangerousPassLines(resolved));
+
+      expect(inside).toEqual([`dangerous.acceptStaleRefs: true (${project.path}, entry 0); the scope's phrase`]);
+      expect(bare).toEqual([`dangerous.acceptStaleRefs: true (${project.path}, entry 0)`]);
+      expect(dangerousPassLines(resolved)).toEqual([
+        `dangerous.acceptStaleRefs: true (${project.path}, entry 0); the module-level phrase`,
+      ]);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+  });
+
+  it('keeps a frozen copy, so changing the phrases handed in changes nothing set', () => {
+    const handed: Record<string, string> = { 'dangerous.acceptStaleRefs': 'before' };
+
+    const previous = setDangerousPhrases(handed);
+    try {
+      handed['dangerous.acceptStaleRefs'] = 'after';
+
+      expect(dangerousPhrases()).toEqual({ 'dangerous.acceptStaleRefs': 'before' });
+      expect(Object.isFrozen(dangerousPhrases())).toBe(true);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+    expect(dangerousPhrases()).toEqual({});
+  });
+});
+
 describe('loadConfig and the pass lines', () => {
+  it('writes the pass line ending with the phrase of the scope it loads in', async () => {
+    const project = yamlProject('dangerous:\n  acceptStaleRefs: true\n');
+    const lines: string[] = [];
+
+    await runWithDangerousPhrases(
+      { 'dangerous.acceptStaleRefs': 'check 4 refuses no reference' },
+      () => loadConfig(project, {}, (line) => lines.push(line)),
+    );
+
+    expect(lines).toEqual([`dangerous.acceptStaleRefs: true (${project.path}, entry 0); check 4 refuses no reference`]);
+  });
+
   it('writes the pass line through the warning sink after the load\'s warnings', async () => {
     const project = yamlProject('dangerous:\n  acceptStaleRefs: true\nnotAKey: 1\n');
 

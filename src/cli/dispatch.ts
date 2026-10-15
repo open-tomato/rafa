@@ -27,7 +27,10 @@
  *      (`src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
- *      flags (`running.ts`), for a reader below its `run` to ask; a help
+ *      flags (`running.ts`), for a reader below its `run` to ask, with
+ *      its `dangerous` phrases beside the record
+ *      (`src/core/config/dangerous.ts`), which end the loader's pass
+ *      line of each key it declares; a help
  *      request, a version request, a refusal and `no_project` run no
  *      command and record none. Its context's `registry` is the one the
  *      line was routed through, with every module that loaded mounted on
@@ -49,7 +52,10 @@
  * for without a context handed down to it. Each invocation carries its
  * own in an async scope, an `AsyncLocalStorage` each of the four modules
  * holds (`runWithActiveOutput`, `runAsRunningCommand`,
- * `runWithActiveLogger`, `runWithLoggerSettings`): they are read inside
+ * `runWithActiveLogger`, `runWithLoggerSettings`), and the command's
+ * dangerous phrases in a fifth (`runWithDangerousPhrases`, set beside
+ * the running command's record and read by the loader's pass lines
+ * alone): they are read inside
  * the command's `run` and everything it awaits, and nothing of them is
  * left once it ends, whether it returns or throws. The dispatcher sets
  * and puts back no module-level value.
@@ -236,6 +242,7 @@ import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
 import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
 import { CommandExit , versionLine } from '../core/command/index.js';
+import { runWithDangerousPhrases } from '../core/config/index.js';
 import { runWithActiveOutput } from '../core/output/index.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
@@ -580,7 +587,10 @@ async function runCommand(
     await runWithCommandLogger(logger, async () => runAsRunningCommand(
       route.command,
       base.flags,
-      async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+      async () => runWithDangerousPhrases(
+        route.command.dangerous,
+        async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+      ),
     ));
     return success(guarded.payload());
   } catch (error) {

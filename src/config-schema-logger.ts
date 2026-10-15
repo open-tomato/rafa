@@ -4,8 +4,8 @@
  * {@link LOGGER_SECTION} hands them to core as one `ConfigSection`,
  * package `logger`, and the `declare module` below adds
  * {@link LoggerConfigSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link LoggerShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `errors` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
@@ -17,9 +17,9 @@
  *     outside the order and has its own key.
  *   - `logger.modules` gives one module a level of its own, over
  *     `logger.level`: `modules: { board: { level: debug } }`. It is one
- *     of the map settings `config.ts` merges across layers, so the
- *     user's and the project's maps are joined by module name, the
- *     project's entry winning for a module both name. A module's mapping
+ *     of the map settings `config.ts` merges across layers (its spec
+ *     sets `map`), so the user's and the project's maps are joined by
+ *     module name, the project's entry winning for a module both name. A module's mapping
  *     holds `level` today, and any other key is kept and warned about.
  *   - `logger.api` turns on `api` entries, the metadata of each request
  *     to a service. Off by default.
@@ -43,7 +43,7 @@
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
 import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
-import type { LogLevel } from './ports/index.js';
+import type { LogLevel } from './ports/log-level.js';
 
 import { DEFAULT_LOGGER_KIND, LOG_LEVELS, LOGGER_THEMES } from './adapters/logger/settings.js';
 import { below, flag, isMapping, mapOf, oneOf, refused, text } from './core/config/sections.js';
@@ -53,18 +53,19 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends LoggerConfigSettings {}
 }
 
-declare module './config/shape.js' {
-  /** The `logger` keys a file writes, each `logger.modules` entry a mapping holding `level`. */
-  interface ConfigShape {
-    readonly logger: {
-      readonly kind: string;
-      readonly level: LogLevel;
-      readonly theme: LoggerTheme;
-      readonly modules: Readonly<Record<string, { readonly level: LogLevel }>>;
-      readonly callSite: boolean;
-      readonly api: boolean;
-    };
-  }
+/**
+ * The `logger` keys a file writes, each `logger.modules` entry a mapping
+ * holding `level`; `src/config/shape.ts` composes them into `ConfigShape`.
+ */
+export interface LoggerShape {
+  readonly logger: {
+    readonly kind: string;
+    readonly level: LogLevel;
+    readonly theme: LoggerTheme;
+    readonly modules: Readonly<Record<string, { readonly level: LogLevel }>>;
+    readonly callSite: boolean;
+    readonly api: boolean;
+  };
 }
 
 /** The `logger` settings. */
@@ -114,7 +115,7 @@ export const LOGGER_SETTINGS: { readonly [K in keyof LoggerConfigSettings]: Sett
   loggerKind: { key: 'logger.kind', read: text('an adapter kind, such as console'), cli: false },
   loggerLevel: { key: 'logger.level', read: oneOf(LOG_LEVELS), cli: false },
   loggerTheme: { key: 'logger.theme', read: oneOf(LOGGER_THEMES), cli: false },
-  loggerModules: { key: 'logger.modules', read: mapOf(moduleLevel, MODULE_EXPECTED), cli: false },
+  loggerModules: { key: 'logger.modules', read: mapOf(moduleLevel, MODULE_EXPECTED), cli: false, map: true },
   loggerCallSite: { key: 'logger.callSite', read: flag, cli: false },
   loggerApi: { key: 'logger.api', read: flag, cli: false },
 };

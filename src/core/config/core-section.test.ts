@@ -193,6 +193,14 @@ describe('CORE_SECTION', () => {
     expect(named).toEqual([...COMMAND_LINE]);
   });
 
+  it('flags its three maps as merged by key, and no other setting', () => {
+    const flagged = Object.entries(CORE_SECTION.settings)
+      .filter(([, spec]) => spec.map === true)
+      .map(([setting]) => setting);
+
+    expect(flagged).toEqual(['tiersSkills', 'tiersAgents', 'routing']);
+  });
+
   it('carries item keys for its lists of mappings and for nothing else', () => {
     const withItems = Object.entries(CORE_SECTION.settings)
       .filter(([, spec]) => spec.itemKeys !== undefined)

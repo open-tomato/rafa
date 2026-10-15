@@ -516,7 +516,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     args,
     branchTemplate: runConfig.config.namingBranch,
   });
-  guardRunBranch(planStub, branch, args);
+  guardRunBranch(planStub, branch, args, runConfig.config.namingBranch);
   // What the loop guard holds the checkout to: its branch at the HEAD it
   // starts from, moved on by each task commit (`start/checkout-watch.ts`).
   let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });

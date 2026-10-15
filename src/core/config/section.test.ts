@@ -210,23 +210,53 @@ describe('mergeConfigSections', () => {
     const refusal = refusalOf(() => mergeConfigSections(EMPTY_CONFIG_REGISTRY, [beta(), redefined]));
 
     expect(refusal.problems).toEqual([
-      'dangerous.acceptStaleRefs is defined by package "beta" and again by package "epsilon";'
-        + ' a dangerous. key is a person\'s consent and one package defines it',
+      'file key dangerous.acceptStaleRefs is defined by package "beta" under setting dangerousAcceptStaleRefs'
+        + ' and again by package "epsilon" under setting dangerousSelfUpdateDuringLoop',
     ]);
   });
 
-  it('accepts two dangerous. keys of two packages, and a key outside dangerous. defined twice', () => {
-    const selfUpdate: ConfigSection = {
-      package: 'epsilon',
-      settings: { dangerousSelfUpdateDuringLoop: SETTINGS.dangerousSelfUpdateDuringLoop },
-      defaults: { dangerousSelfUpdateDuringLoop: false },
-    };
+  it('refuses a file key outside dangerous. a second package defines under another setting name, naming both', () => {
     const specsUnderPlanKey: ConfigSection = {
       package: 'zeta',
       settings: { specsDir: { ...SETTINGS.specsDir, key: 'plan.dir' } },
       defaults: { specsDir: '.rafa/specs' },
     };
-    const merged = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [alpha(), beta(), selfUpdate, specsUnderPlanKey]);
+    const refusal = refusalOf(() => mergeConfigSections(EMPTY_CONFIG_REGISTRY, [alpha(), specsUnderPlanKey]));
+
+    expect(refusal.problems).toEqual([
+      'file key plan.dir is defined by package "alpha" under setting planDir'
+        + ' and again by package "zeta" under setting specsDir',
+    ]);
+  });
+
+  it('refuses a file key an earlier registration holds under another setting name', () => {
+    const first = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [alpha()]);
+    const storeUnderPlanKey: ConfigSection = {
+      package: 'kappa',
+      settings: { specsDir: { ...SETTINGS.specsDir, key: 'store' } },
+      defaults: { specsDir: '.rafa/specs' },
+    };
+    const refusal = refusalOf(() => mergeConfigSections(first, [storeUnderPlanKey]));
+
+    expect(refusal.problems).toEqual([
+      'file key store is defined by package "alpha" under setting store'
+        + ' and again by package "kappa" under setting specsDir',
+    ]);
+    expect(Object.keys(first.settings)).toEqual(['store', 'planDir']);
+  });
+
+  it('accepts two dangerous. keys of two packages, and a setting under a key of its own beside a section', () => {
+    const selfUpdate: ConfigSection = {
+      package: 'epsilon',
+      settings: { dangerousSelfUpdateDuringLoop: SETTINGS.dangerousSelfUpdateDuringLoop },
+      defaults: { dangerousSelfUpdateDuringLoop: false },
+    };
+    const specsUnderPlan: ConfigSection = {
+      package: 'zeta',
+      settings: { specsDir: { ...SETTINGS.specsDir, key: 'plan.specs' } },
+      defaults: { specsDir: '.rafa/specs' },
+    };
+    const merged = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [alpha(), beta(), selfUpdate, specsUnderPlan]);
 
     expect(Object.keys(merged.settings)).toEqual([
       'store',

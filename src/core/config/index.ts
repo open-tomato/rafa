@@ -1,13 +1,13 @@
 /**
  * The barrel over the config's schema and its layers: every name
- * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`
- * and `config.ts` export, less the names the `sections.ts` barrel
- * holds, and nothing else.
+ * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`,
+ * `config.ts` and `dangerous.ts` export, less the names the
+ * `sections.ts` barrel holds, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the five
+ * A file outside `src/core/` imports this file and never the six
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the five directly and never this
+ * file inside `src/core/` imports the six directly and never this
  * file.
  *
  * ## The barrels hold no name in common
@@ -19,7 +19,12 @@
  * argues the same for it. This one holds the four files that read a
  * key or rank a layer, and `section.ts`, the contract a section file
  * outside `src/core/` is typed by, the registry it is handed to and the
- * key indexes read off that registry.
+ * key indexes read off that registry. `dangerous.ts` joined it with the
+ * running command's phrases (`runWithDangerousPhrases`), which the
+ * dispatcher sets around every command. It fits neither other barrel:
+ * it imports `config-sections.ts`, so it is no leaf for `sections.ts`,
+ * and `src/index.ts` publishes `load.ts` whole, where the phrases and
+ * pass lines are no published name.
  *
  * `config.ts` re-exports twenty-seven names of `config-sections.ts`
  * (`InjectMode`, `OUTPUT_MODES`, `ConfigExtra` and the like), as it did
@@ -28,10 +33,10 @@
  * be learned from. A file that used to take `ConfigError` and
  * `OUTPUT_MODES` in one line from `config.js` now spells two lines.
  *
- * ## Why one barrel can hold all five
+ * ## Why one barrel can hold all six
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. One of the five
+ * imports the barrel back by value is a runtime cycle. One of the six
  * files behind this one imports outward by value: `core-section.ts`
  * reads `src/tiers/routing.ts`, which imports this barrel with
  * `import type` alone, erased before anything loads. No file behind it
@@ -43,7 +48,7 @@
  * holds the rule for every file under `src/core/`. The registry imports
  * this barrel by value and nothing here imports the registry. A section
  * file reads its values from `sections.ts`, which imports none of the
- * five, and adds its fields to `RafaConfig` with a `declare module` on
+ * six, and adds its fields to `RafaConfig` with a `declare module` on
  * `config-schema.ts`, which the checker follows and which loads
  * nothing. `config-schema.ts` and `section.ts` import types alone.
  *
@@ -78,6 +83,12 @@
  * section file loaded first in a fresh `bun` process, the registry then
  * answering 89 registered settings and 89 defaults each time.
  *
+ * Measured again when `dangerous.ts` joined, on bun 1.3.14: this
+ * barrel, `dangerous.ts`, `config-load.ts`, the registry,
+ * `src/cli/dispatch.ts` and `src/core/command/command.ts` each loaded
+ * first in a fresh `bun` process, the registry then holding 91 settings
+ * and `dangerousKeys` three keys each time.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as `sections.ts` spells
@@ -97,11 +108,11 @@
  * section, the item readers, `config.ts`'s two document readers the
  * loader reads a scope through, and the section registry with its key
  * indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
- * `activeSettingByKey` and nineteen more), which `src/index.test.ts`
+ * `activeSettingByKey` and twenty-six more), which `src/index.test.ts`
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
- * `index.test.ts` holds the list to the five files: every name any of
+ * `index.test.ts` holds the list to the six files: every name any of
  * them exports and `sections.ts` does not is here once, as the same
  * binding, and no other name is here.
  */
@@ -136,6 +147,7 @@ export type {
   ConfigSource,
   ResolvedConfig,
 } from './config.js';
+export type { DangerousPhrases } from './dangerous.js';
 
 export {
   MODULE_SOURCE_KEYS,
@@ -172,3 +184,12 @@ export {
   readConfigDocument,
   resolveConfig,
 } from './config.js';
+export {
+  dangerousKeys,
+  dangerousPassLines,
+  dangerousPhrases,
+  restoreDangerousPhrases,
+  runWithDangerousPhrases,
+  setDangerousPhrases,
+  writeDangerousPassLines,
+} from './dangerous.js';

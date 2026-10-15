@@ -184,6 +184,14 @@ describe('the section', () => {
     expect(Object.isFrozen(LOGGER_SECTION.defaults)).toBe(true);
   });
 
+  it('flags logger.modules as a map merged by key, and no other of its settings', () => {
+    const flagged = Object.entries(LOGGER_SECTION.settings)
+      .filter(([, spec]) => spec?.map === true)
+      .map(([setting]) => setting);
+
+    expect(flagged).toEqual(['loggerModules']);
+  });
+
   it('registers alone, each of its settings paired with a default', () => {
     const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [LOGGER_SECTION]);
 

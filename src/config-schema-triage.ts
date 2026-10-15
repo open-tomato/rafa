@@ -5,8 +5,8 @@
  * {@link TRIAGE_SECTION} hands them to core as one `ConfigSection`,
  * package `triage`, and the `declare module` below adds
  * {@link TriageSettings} to `RafaConfig`.
- * A second, on `src/config/shape.ts`, adds the keys a file writes to
- * `ConfigShape`, the nested file shape.
+ * {@link TriageShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `claims` section.
  *
@@ -54,16 +54,14 @@ declare module './core/config/config-schema.js' {
   interface RafaConfig extends TriageSettings {}
 }
 
-declare module './config/shape.js' {
-  /** The `triage` keys a file writes. */
-  interface ConfigShape {
-    readonly triage: {
-      readonly similarity: {
-        readonly threshold: SimilarityThreshold;
-        readonly candidates: number;
-      };
+/** The `triage` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface TriageShape {
+  readonly triage: {
+    readonly similarity: {
+      readonly threshold: SimilarityThreshold;
+      readonly candidates: number;
     };
-  }
+  };
 }
 
 /** The most `triage.similarity.threshold` accepts. */

@@ -91,6 +91,13 @@
  * record of their own ahead of the invocation, and now read it as left
  * in place afterwards, hidden only while the command runs. The mutations
  * of the scoped code are counted in `dispatch-scope.test.ts`.
+ *
+ * The dangerous phrase cases came with `RafaCommand.dangerous`: each
+ * command loads a planted config setting `dangerous.acceptStaleRefs`
+ * and reads the pass line its sink is handed, a command declaring no
+ * phrase being the control whose line stays bare. One mutation of
+ * `dispatch.ts`, the command's phrases replaced by none, was driven on
+ * 2026-10-15 and reddened two of the three cases.
  */
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
@@ -98,6 +105,7 @@ import type { CommandRegistry } from './registry.js';
 import type { RunningCommand } from './running.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { DangerousPhrases } from '../core/config/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -109,7 +117,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CommandExit , versionLine } from '../core/command/index.js';
+import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
 import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
@@ -1022,6 +1033,86 @@ describe('the running command', () => {
     expect(outcome.exitCode).toBe(0);
     expect(rendering).toEqual([null]);
     expect(runningCommand()).toBeNull();
+  });
+});
+
+describe('the dangerous phrases', () => {
+  /** The phrase the probe command declares for `dangerous.acceptStaleRefs`. */
+  const PHRASE = 'check 4 re-stamps every reference as reviewed';
+
+  /** Phrases set ahead of the invocation, so leaving them in place is told apart from clearing them. */
+  const OUTER: DangerousPhrases = { 'dangerous.acceptVersionCollision': 'the outer phrase' };
+
+  /** A project of its own, its config setting `dangerous.acceptStaleRefs` off its default. */
+  const DANGEROUS_PROJECT = join(tempBase, 'dangerous-project');
+  const dangerousFile = plantProjectConfig(DANGEROUS_PROJECT, 'dangerous:\n  acceptStaleRefs: true\n');
+
+  /** A registry of a command declaring the phrase and one declaring none, each loading the config while it runs. */
+  function probeRegistry(during: DangerousPhrases[], lines: string[]): CommandRegistry {
+    const probe = async (): Promise<void> => {
+      during.push(dangerousPhrases());
+      await loadConfig({ root: DANGEROUS_PROJECT, home: HOME }, {}, (line) => {
+        lines.push(line);
+      });
+    };
+    return createCommandRegistry({
+      subjects: [{ name: 'plan', summary: 'plans' }],
+      commands: [
+        command('plan', 'declares', { dangerous: { 'dangerous.acceptStaleRefs': PHRASE }, run: probe }),
+        command('plan', 'plain', { run: probe }),
+        command('plan', 'throws', {
+          dangerous: { 'dangerous.acceptStaleRefs': PHRASE },
+          run: async () => {
+            during.push(dangerousPhrases());
+            throw new Error('boom');
+          },
+        }),
+      ],
+    });
+  }
+
+  it('ends the pass line of a key the command declares with its phrase, and leaves the phrases set before in place', async () => {
+    const during: DangerousPhrases[] = [];
+    const lines: string[] = [];
+    const previous = setDangerousPhrases(OUTER);
+    try {
+      const { outcome } = await run(['plan', 'declares'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, lines) });
+
+      expect(outcome.exitCode).toBe(0);
+      expect(during).toEqual([{ 'dangerous.acceptStaleRefs': PHRASE }]);
+      expect(lines).toEqual([`dangerous.acceptStaleRefs: true (${dangerousFile}, entry 0); ${PHRASE}`]);
+      expect(dangerousPhrases()).toEqual(OUTER);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+  });
+
+  it('writes the bare pass line for a command declaring no phrase, hiding the phrases set before while it runs', async () => {
+    const during: DangerousPhrases[] = [];
+    const lines: string[] = [];
+    const previous = setDangerousPhrases(OUTER);
+    try {
+      const { outcome } = await run(['plan', 'plain'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, lines) });
+
+      expect(CONFIG_DEFAULTS.dangerousAcceptStaleRefs).toBe(false);
+      expect(dangerousKeys()).toContain('dangerous.acceptStaleRefs');
+      expect(outcome.exitCode).toBe(0);
+      expect(during).toEqual([{}]);
+      expect(lines).toEqual([`dangerous.acceptStaleRefs: true (${dangerousFile}, entry 0)`]);
+      expect(dangerousPhrases()).toEqual(OUTER);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+  });
+
+  it('reads the phrases of a command that throws while it runs, and none once it ends as command_error', async () => {
+    const during: DangerousPhrases[] = [];
+
+    const { outcome } = await run(['plan', 'throws'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, []) });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(during).toEqual([{ 'dangerous.acceptStaleRefs': PHRASE }]);
+    expect(dangerousPhrases()).toEqual({});
   });
 });
 
