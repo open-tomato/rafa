@@ -153,6 +153,14 @@ const ASK_ASSUMPTION = 'carries the `assumption:` you would plan under';
 /** The sentence telling the session which gaps are blocking. */
 const ASK_WHEN_BLOCKING = 'A gap is blocking when guessing wrong';
 
+/** The clause asking the three free-text values of a gap for double quotes. */
+const ASK_QUOTES = '`heading`, `what` and `assumption`, in double quotes';
+
+/** True when `prompt` asks for the free-text values of a gap in double quotes. */
+function asksForTheQuotes(prompt: string): boolean {
+  return prompt.includes(SPEC_REVIEW_FENCE) && prompt.includes(ASK_QUOTES);
+}
+
 /** True when `prompt` asks for the review block at the end of the final message. */
 function asksForTheBlockLast(prompt: string): boolean {
   return prompt.includes(SPEC_REVIEW_FENCE)
@@ -617,6 +625,18 @@ describe('the drift guard between the prompt and this parser', () => {
     expect(asksForBlockingAndAssumption(narrow)).toBe(false);
     expect(narrow).toContain(SPEC_REVIEW_FENCE);
     expect(asksForTheBlockLast(narrow)).toBe(true);
+  });
+
+  it('finds the prompt asking for heading, what and assumption in double quotes', () => {
+    expect(asksForTheQuotes(PLAN_PROMPT)).toBe(true);
+  });
+
+  it('proves that guard fails on a prompt without the ask for quotes', () => {
+    const unquoted = PLAN_PROMPT.replace(ASK_QUOTES, '`heading`, `what` and `assumption`, as plain text');
+
+    expect(asksForTheQuotes(unquoted)).toBe(false);
+    expect(unquoted).toContain(SPEC_REVIEW_FENCE);
+    expect(asksForBlockingAndAssumption(unquoted)).toBe(true);
   });
 
   it('finds no ask left in the prompt for the gap shape this parser outgrew', () => {
