@@ -50,9 +50,10 @@ them because `tsc` refuses `isolatedDeclarations` without it; under the base's
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
-`tsconfig.json` of `packages/rafa-hub` and `packages/rafa-sync-service`
-includes its test files, so `check-types` holds one under those two packages;
-`packages/rafa`'s leaves them out, as the root does.
+`tsconfig.json` of each of the three code packages leaves its test files out
+too, as the root does, so `check-types` holds no test file anywhere: `tsc`
+reports no `isolatedDeclarations` error for a program with any other error,
+and the test files carry hundreds (the spike's probe 8, #804).
 
 - **An export carries its type.** An exported `const`, a function's
   return, and a parameter or property whose default is not a plain
@@ -381,13 +382,29 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 - **Which gates reach a package.** `bun run test` runs its tests. `bun run
   check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json` leaves
   out `packages/` and the test files, then `bun run --filter './packages/*'
-  check-types`, each package's own `tsc --noEmit`. `packages/rafa`'s
-  `tsconfig.json` leaves its test files out, as the root does; the
-  `tsconfig.json` of `packages/rafa-hub` and `packages/rafa-sync-service`
-  includes theirs. `bun run lint` lints package code from the root config like
-  `src/`, its `testdata/` folders included, and so does the runner's lint step
-  on a task's diff. The import names resolve for `import/no-unresolved`
-  because the resolver of `packages/eslint-config/base.mjs`, the shared
+  check-types`, each code package's own `tsc --build`. The `tsconfig.json` of
+  `packages/rafa`, `packages/rafa-hub` and `packages/rafa-sync-service` is
+  composite: it keeps the `extends` of `tsconfig.packages.json`, leaves its
+  test files out, writes declarations only into the package's `.tsbuild/`
+  (gitignored, its `tsBuildInfoFile` there too, so two packages never share
+  one), and names what it imports under `references`, core none and the two
+  services `../rafa`. `tsc --build` builds a reference first, reads core
+  through `paths` from that reference's declarations, and is a no-op on a
+  second run. A service with its reference to core dropped fails with
+  `TS6307` and `TS6059` on core's files, and still writes their `.d.ts`
+  files beside core's sources, so a run that fails that way leaves stray
+  files under `packages/rafa/src/` to remove. The root solution file
+  `tsconfig.references.json` holds `"files": []` and one reference per
+  composite member, so `tsc --build tsconfig.references.json` builds them all
+  in dependency order and refuses a reference cycle with `TS6202`, exit 4.
+  Each code package's `turbo.json` extends the root's (`"extends": ["//"]`)
+  and declares `check-types.outputs` as `.tsbuild/**`, so a cache hit
+  restores the declarations a dependent's build reads; the two config
+  packages emit nothing and carry no override. `bun run lint` lints package
+  code from the root config like `src/`, its `testdata/` folders included,
+  and so does the runner's lint step on a task's diff. The import names
+  resolve for `import/no-unresolved` because the resolver of
+  `packages/eslint-config/base.mjs`, the shared
   config the root `eslint.config.mjs` imports as
   `@open-tomato/rafa-eslint-config`, lists `./packages/*/tsconfig.json`
   beside the root `tsconfig.json`; without that entry, `bunx eslint packages`
@@ -398,8 +415,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `eslint.config.mjs` is a leaf on `@open-tomato/rafa-eslint-config` that
   adds only `.tsbuild/**` and `node_modules/**` to the ignores, and its
   `lint` script, `eslint .` run from the package directory, lints that
-  package alone. Bun links each member in isolation, so every member but
-  the eslint-config package declares `@open-tomato/rafa-eslint-config`
+  package alone. The root `eslint.config.mjs` ignores `**/.tsbuild/**`
+  as well, so the root `eslint .` never lints the declarations a
+  `check-types` run left behind. Bun links each member in isolation, so
+  every member but the eslint-config package declares
+  `@open-tomato/rafa-eslint-config`
   (`workspace:*`), `eslint` and `typescript` in its `devDependencies` at
   the root's ranges; the eslint-config package already lists `eslint` in
   its `dependencies`, adds `typescript` as a devDependency, and imports
@@ -539,8 +559,8 @@ runtime import cycle that spans two clusters.** It reads the import graph
 the way `scripts/survey/import-graph.ts` does: `readMetafile` and
 `buildImportGraph` from there, and the file set from
 `scripts/survey/files.ts`. Type-only imports are erased in the graph, so
-a type-level cycle passes; `#807`'s `tsc --build` with project references
-is the gate for those.
+a type-level cycle passes; `tsc --build tsconfig.references.json`, over
+the composite packages' project references, is the gate for those.
 
 **Files are mapped to clusters via `docs/survey/cluster-map.json`,** the
 file-to-cluster assignment from the eight-cluster import graph survey run. A

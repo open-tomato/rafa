@@ -30,6 +30,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # turbo's local cache and run logs
 .turbo/
 
+# the declarations and build info each workspace package's `tsc --build` writes
+.tsbuild/
+
 # IntelliJ based IDEs
 .idea
 

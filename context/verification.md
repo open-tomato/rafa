@@ -59,11 +59,12 @@ step anyway.
 
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
-and the test files, then the same check in each of the three workspace
-packages: `packages/rafa` (core), which leaves its test files out as the root
-does, and `packages/rafa-hub` and `packages/rafa-sync-service`, which include
-theirs. `bun run lint` lints package code from the root config as it lints
-`src/`, so a changed package file belongs in the scoped
+and the test files, then `tsc --build` in each of the three code packages,
+`packages/rafa` (core), `packages/rafa-hub` and `packages/rafa-sync-service`,
+each leaving its test files out as the root does and building core's
+declarations into `packages/rafa/.tsbuild/` before a service reads them.
+`bun run lint` lints package code from the root config as it lints `src/`,
+so a changed package file belongs in the scoped
 `bunx eslint <changed files>` run too.
 
 **Runner recorded steps** (recorded at fixed points, each with its scope):

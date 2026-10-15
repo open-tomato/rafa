@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint .",
     "test": "bun test",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --build"
   },
   "dependencies": {
     "@open-tomato/rafa-core": "workspace:*"
