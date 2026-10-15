@@ -14,6 +14,14 @@
  *    settling and not a runner never wired.
  *  - The case with no `board.project.number` sits beside the same filed
  *    bug with the number set, which opens the runner and sends calls.
+ *
+ * ## The real refresh
+ *
+ * One case leaves the refresh unplanted, so `refreshProjectItems` runs
+ * over the project and facts fakes behind one router, as `refresh.test.ts`
+ * builds it. The filed bug is read back through the project port: its item
+ * is on the project with its Stage set. The same bug settled `commented`
+ * sits beside it, after which the project holds no item for it.
  */
 import type { AddIssueOptions } from './add-issue.js';
 import type { ProjectRefresh, RefreshConfig } from './refresh.js';
@@ -24,6 +32,7 @@ import type { BugTriage } from '../../triage/triage.js';
 import { describe, expect, it } from 'bun:test';
 
 import { addFiledBugs, filedIssueNumber } from './add-filed.js';
+import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from './project-fake.js';
 
@@ -183,6 +192,84 @@ describe('addFiledBugs: nothing without board.project.number', () => {
 
     expect(run.opened).toBe(1);
     expect(run.calls.length).toBeGreaterThan(0);
+  });
+});
+
+/** The state of the project after {@link addFiledBugs} ran the real refresh. */
+interface RealRun {
+  readonly lines: readonly string[];
+  /** The Stage each issue's item holds, by issue number. */
+  readonly stages: Readonly<Record<number, string | null>>;
+}
+
+/** Adds `bugs` with the real refresh over the project and facts fakes behind one router. */
+async function realRun(bugs: readonly BugTriage[]): Promise<RealRun> {
+  const project = createFakeProjectGh({
+    projects: [{ owner: OWNER, number: NUMBER, items: [] }],
+    owners: [OWNER],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [FIRST] }],
+  });
+  const facts = createFakeFactsGh({
+    issues: [
+      { number: 1, state: 'OPEN', labels: ['type:roadmap'] },
+      { number: FIRST, state: 'OPEN', labels: ['type:spec', 'spec:ready'] },
+    ],
+    pulls: [],
+    trees: {},
+  });
+  const listing = [{
+    number: FIRST,
+    title: `#${String(FIRST)}`,
+    body: '',
+    state: 'OPEN',
+    stateReason: '',
+    labels: [{ name: 'type:spec' }, { name: 'spec:ready' }],
+  }];
+  const roadmap = {
+    number: 1,
+    title: 'Roadmap',
+    body: `- [ ] #${String(FIRST)} filed\n`,
+    state: 'OPEN',
+    stateReason: '',
+    labels: [{ name: 'type:roadmap' }],
+  };
+  const gh: GhRunner = (args) => {
+    const line = args.join(' ');
+    if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
+    if (line.startsWith('issue list --label type:roadmap --state open')) return Promise.resolve(answered([roadmap]));
+    if (line.startsWith('issue list --state all')) return Promise.resolve(answered([roadmap, ...listing]));
+    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api') return project.gh(args);
+    return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
+  };
+  const options: AddIssueOptions = { config: CONFIG, openGh: () => gh, sleep: () => Promise.resolve() };
+  const lines = await addFiledBugs(options, { bugs });
+  const port = createGhProjectPort(gh);
+  const found = await port.find({ owner: OWNER, number: NUMBER });
+  const read = await port.items(found?.id ?? '');
+  const stages = Object.fromEntries(read.flatMap(({ content, values }) => {
+    if (content.kind !== 'issue') return [];
+    const stage = values.get('Stage');
+    return [[content.number, stage?.kind === 'option'
+      ? stage.name
+      : null] as const];
+  }));
+  return { lines, stages };
+}
+
+describe('addFiledBugs: over the real refresh', () => {
+  it('puts a filed bug on the project with its Stage set', async () => {
+    const run = await realRun([filed(0, FIRST)]);
+
+    expect(run.lines).toEqual([]);
+    expect(run.stages).toEqual({ [FIRST]: 'Ready' });
+  });
+
+  it('control: the same bug settled commented leaves the project with no item for it', async () => {
+    const run = await realRun([bug(0, { channel: 'public', action: 'commented', ref: githubRef(FIRST) })]);
+
+    expect(run.lines).toEqual([]);
+    expect(run.stages).toEqual({});
   });
 });
 
