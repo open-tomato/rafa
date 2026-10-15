@@ -87,9 +87,11 @@
  * Each failed check is one report of its own, holding one bug and no
  * blocker, handed to `triageReport` with the check session's id, since
  * that session is where the evidence came from, and `failed` as the
- * outcome. The bug is `security: false` and `kind: bug`: a criterion that
- * does not hold is a product bug, so it goes to the public tracker the
- * chain resolves, resolved once and only when a check failed
+ * outcome. The bug is `security: false` and `kind: bug`, its module
+ * `epic`, its action `close`, its reproduce `rafa epic close <n>` and no
+ * cause: a criterion that does not hold is a product bug, so it goes to
+ * the public tracker the chain resolves, resolved once and only when a
+ * check failed
  * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
  * standing in for a chain that landed nowhere, so each bug then fails
  * with its refusal). Its
@@ -106,8 +108,11 @@
  * say, and comments on the nearest at the threshold. No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only
  * thing `triageReport` writes into its tracker file. The feedback holds
- * the check, the commit and the evidence. When #249's ladder lands it
- * routes these bugs; until then they are filed as out-of-scope bugs are.
+ * the check, the commit and the evidence. Triage is handed the project
+ * root as the checkout, the git runner the run reads `origin/main` with
+ * ({@link EpicCloseSeams.git}), the command's environment and the bug
+ * record's rules, `bugRulesOf` over the run's config. When #249's
+ * ladder lands it routes these bugs; until then they are filed as out-of-scope bugs are.
  *
  * A failed check whose criterion's text names only documentation
  * (`namesOnlyDocs`, `src/triage/doc-only.ts`) is no bug: in place of the
@@ -154,7 +159,7 @@ import type { CriterionUncheckable, CriterionVerdict, EpicCriterion, VerifyPlanI
 import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/verify-run.js';
 import type { IssueRef, Tracker } from '../../ports/index.js';
 import type { TaskReport } from '../../report/parse.js';
-import type { BugTriage, NamedSecret } from '../../triage/triage.js';
+import type { BugTriage, NamedSecret, TriageOptions, TriageResult } from '../../triage/triage.js';
 
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -168,6 +173,7 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/ep
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
+import { bugRulesOf } from '../../config-schema-issues.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
@@ -253,6 +259,8 @@ export interface EpicCloseSeams extends EpicProjectSeams {
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Where a bug routed private goes. `triageReport`'s own when left out. */
   readonly privateTracker?: Tracker;
+  /** Triages one failed check's report. `triageReport` when left out. */
+  readonly triageReport?: (options: TriageOptions) => Promise<TriageResult>;
   /** Seams for the tracker reference `triageReport` stores. */
   readonly findings?: FindingsWriterSeams;
   /** The board's relationships, which read the epic's members; `labels` mode when left out. See the module note. */
@@ -457,9 +465,9 @@ export function failedCheckReport(epic: number, failure: CheckAnswered, commit: 
       artifact: failedCheckArtifact(epic, criterion),
       security: false,
       kind: 'bug',
-      module: null,
-      action: null,
-      reproduce: null,
+      module: 'epic',
+      action: 'close',
+      reproduce: `rafa epic close ${String(epic)}`,
       cause: null,
       extras: [],
     })],
@@ -540,6 +548,9 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
     tracker = unresolvedTracker(run.config.trackerDefault, messageOf(error));
   }
   const local = localPathRedactor([run.root], run.home);
+  const git = run.seams.git ?? createGitRunner(run.root);
+  const bugRules = bugRulesOf(run.config);
+  const triage = run.seams.triageReport ?? triageReport;
   let version: string | null = null;
   const docs = {
     repoRoot: run.root, epic, tracker, seams: run.seams.findings,
@@ -556,7 +567,7 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
       continue;
     }
     try {
-      const result = await triageReport({
+      const result = await triage({
         repoRoot: run.root,
         trackerPath: closeTriageFile(run.root, epic),
         lineNum: 0,
@@ -568,6 +579,10 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
         secrets,
         seams: run.seams.findings,
         similarity: run.config,
+        checkout: run.root,
+        git,
+        env: run.context.env,
+        bugRules,
       });
       for (const bug of result.bugs) {
         const line = bugLine(criterion, bug);
