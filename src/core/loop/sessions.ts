@@ -97,7 +97,7 @@
  *   - `summary`: Bun's `Ran N tests across M files.` line, or null when it
  *     printed none.
  *   - `failures`: the failing tests, each a file and a full test name
- *     (`SuiteFailure`, `suite/run.ts`).
+ *     (`SuiteFailure`, `suite-failure.ts`).
  *   - `newFailures`: those of `failures` that are new against the
  *     baseline; every one of them is also in `failures`, compared by file
  *     and name. A new failure also carries `errorLines`, after its
@@ -212,6 +212,7 @@
  * read. This module re-exports what a caller reads from there, so
  * `./sessions.js` stays the one import a record's reader needs.
  */
+import type { SuiteFailure } from './suite-failure.js';
 import type {
   SessionPhase,
   SessionState,
@@ -219,7 +220,6 @@ import type {
   SessionStepReason,
 } from '../../loop/session-record-parse.js';
 import type { HopRecord } from '../../next/hop-record.js';
-import type { SuiteFailure } from '../../suite/run.js';
 import type { TestScope } from '../plan/declaration.js';
 
 import {

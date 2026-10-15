@@ -651,6 +651,7 @@
     "src/utils/progress.ts": "c3",
     "src/utils/schedule.ts": "c3",
     "src/core/loop/session-env.ts": "c4",
+    "src/core/loop/suite-failure.ts": "c3",
     "src/utils/tracker.ts": "c3"
   },
   "outside": [

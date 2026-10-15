@@ -1,6 +1,6 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name `sessions.ts`,
- * `claude.ts` and `session-env.ts` export, each once, as the same binding, and no other
+ * `claude.ts`, `session-env.ts` and `suite-failure.ts` (one type) export, each once, as the same binding, and no other
  * name.
  *
  * The barrel spells its names, so a name added to one of the two files
@@ -64,6 +64,7 @@ const BARREL = 'src/core/loop/index.ts';
 const SESSIONS = 'src/core/loop/sessions.ts';
 const CLAUDE = 'src/core/loop/claude.ts';
 const SESSION_ENV = 'src/core/loop/session-env.ts';
+const SUITE_FAILURE = 'src/core/loop/suite-failure.ts';
 
 /**
  * Every export name of each file, types included, sorted.
@@ -158,13 +159,19 @@ describe('the loop barrel', () => {
   });
 
   it('exports the type names of the three files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, SESSIONS, CLAUDE, SESSION_ENV]);
-    const expected = [...(names[SESSIONS] ?? []), ...(names[CLAUDE] ?? []), ...(names[SESSION_ENV] ?? [])].sort();
+    const names = readExportNames([BARREL, SESSIONS, CLAUDE, SESSION_ENV, SUITE_FAILURE]);
+    const expected = [
+      ...(names[SESSIONS] ?? []),
+      ...(names[CLAUDE] ?? []),
+      ...(names[SESSION_ENV] ?? []),
+      ...(names[SUITE_FAILURE] ?? []),
+    ].sort();
 
     expect(names[SESSIONS]).toContain('SessionRecord');
     expect(names[SESSIONS]).toContain('SessionState');
     expect(names[CLAUDE]).toContain('CapturedSession');
     expect(names[SESSION_ENV]).toContain('SpawnEnv');
+    expect(names[SUITE_FAILURE]).toEqual(['SuiteFailure']);
     expect(Object.keys(sessions)).not.toContain('SessionRecord');
     expect(Object.keys(sessions)).not.toContain('SessionState');
     expect(Object.keys(claude)).not.toContain('CapturedSession');

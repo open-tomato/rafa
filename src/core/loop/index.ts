@@ -1,7 +1,7 @@
 /**
  * The barrel over the loop's session records and its doors onto the
- * Claude CLI: every name `sessions.ts`, `claude.ts` and `session-env.ts`
- * export, and nothing else.
+ * Claude CLI: every name `sessions.ts`, `claude.ts`, `session-env.ts` and
+ * `suite-failure.ts` export, and nothing else.
  *
  * A file outside `src/core/` imports this file and never the two behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
@@ -23,9 +23,12 @@
  *     interrupt of the sessions still running, and the spend guard's
  *     sentence;
  *   - `session-env.ts`: the environment a Claude session is spawned
- *     with, which `claude.ts` imports by path.
+ *     with, which `claude.ts` imports by path;
+ *   - `suite-failure.ts`: the type of one failing test, which
+ *     `sessions.ts` imports by path and `src/suite/run.ts` re-exports.
  *
- * The three files share no name, and neither imports the other. One
+ * The four files share no name, and only `sessions.ts` imports
+ * `suite-failure.ts`, for a type. One
  * import of this barrel loads both: a file that takes `isPidAlive`
  * alone loads `claude.ts` with it.
  *
@@ -139,8 +142,8 @@
  * barrels spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the three files: every name each
- * exports is here once, as the same binding, the three share no name, the
+ * `index.test.ts` holds the list to the four files: every name each
+ * exports is here once, as the same binding, the first three share no name, the
  * names `sessions.ts` re-exports are the bindings
  * `src/loop/session-record-parse.ts` declares, and no other name is
  * here.
@@ -165,6 +168,7 @@ export type {
 } from './sessions.js';
 export type { CapturedSession, CapturedSpawnOptions, CapturingSpawner, ClaudeSpawner } from './claude.js';
 export type { SpawnEnv } from './session-env.js';
+export type { SuiteFailure } from './suite-failure.js';
 
 export {
   beginSession,

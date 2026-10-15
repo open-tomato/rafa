@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 1994 files, 1966 of them in 10 packages (717 left to place) and 28 in 3 unassigned folders. Of the 4438 edges between two files neither of which is a test, value and type alike, 258 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 1995 files, 1967 of them in 10 packages (718 left to place) and 28 in 3 unassigned folders. Of the 4443 edges between two files neither of which is a test, value and type alike, 259 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -10,16 +10,16 @@ An upward edge leaves a package for one further down this table. A file left to 
 
 | Rank | Package | Files | Source | Test | Test support | Upward edges | Cleared by #118 | Remaining |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `@open-tomato/rafa` | 223 | 108 | 113 | 2 | 8 | 0 | 8 |
+| 1 | `@open-tomato/rafa` | 223 | 108 | 113 | 2 | 7 | 0 | 7 |
 | 2 | `rafa-inventory` | 102 | 51 | 51 | 0 | 26 | 0 | 26 |
 | 3 | `rafa-board` | 303 | 136 | 160 | 7 | 71 | 0 | 71 |
-| 4 | `rafa-pr` | 177 | 76 | 99 | 2 | 47 | 0 | 47 |
-| 5 | `rafa-run` | 221 | 92 | 129 | 0 | 92 | 0 | 92 |
+| 4 | `rafa-pr` | 177 | 76 | 99 | 2 | 48 | 0 | 48 |
+| 5 | `rafa-run` | 221 | 92 | 129 | 0 | 93 | 0 | 93 |
 | 6 | `rafa-release` | 73 | 35 | 38 | 0 | 9 | 0 | 9 |
 | 7 | `rafa-effort` | 70 | 36 | 34 | 0 | 5 | 0 | 5 |
 | 8 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 9 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 10 | `@open-tomato/rafa-cli` | 756 | 263 | 466 | 27 | 0 | 0 | 0 |
+| 10 | `@open-tomato/rafa-cli` | 757 | 264 | 466 | 27 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -45,7 +45,6 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `@open-tomato/rafa` | `rafa-inventory` | 3 |
 | `@open-tomato/rafa` | `rafa-board` | 1 |
 | `@open-tomato/rafa` | `rafa-pr` | 1 |
-| `@open-tomato/rafa` | `rafa-run` | 1 |
 | `@open-tomato/rafa` | `@open-tomato/rafa-cli` | 2 |
 | `rafa-inventory` | `rafa-run` | 1 |
 | `rafa-inventory` | `rafa-effort` | 16 |
@@ -57,10 +56,10 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-board` | `@open-tomato/rafa-cli` | 50 |
 | `rafa-pr` | `rafa-run` | 7 |
 | `rafa-pr` | `rafa-release` | 26 |
-| `rafa-pr` | `@open-tomato/rafa-cli` | 14 |
+| `rafa-pr` | `@open-tomato/rafa-cli` | 15 |
 | `rafa-run` | `rafa-release` | 16 |
 | `rafa-run` | `rafa-effort` | 3 |
-| `rafa-run` | `@open-tomato/rafa-cli` | 73 |
+| `rafa-run` | `@open-tomato/rafa-cli` | 74 |
 | `rafa-release` | `rafa-effort` | 1 |
 | `rafa-release` | `@open-tomato/rafa-cli` | 8 |
 | `rafa-effort` | `@open-tomato/rafa-cli` | 5 |
@@ -98,11 +97,11 @@ None.
 
 ## Files left to place
 
-No rule holds these 717 files. By folder, with the upward edges that end on its files:
+No rule holds these 718 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
-| `src/utils/` | 14 | 8 | 46 |
+| `src/utils/` | 15 | 9 | 48 |
 | `src/` | 37 | 19 | 22 |
 | `src/project/` | 27 | 13 | 19 |
 | `src/commands/plan/` | 31 | 16 | 16 |

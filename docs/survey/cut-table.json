@@ -3573,6 +3573,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "source",
+      "path": "src/utils/session-env.ts",
+      "upwardEdgesIn": 2
+    },
+    {
       "kind": "test",
       "path": "src/utils/tracker-open-tasks.test.ts",
       "upwardEdgesIn": 0
@@ -3638,13 +3643,6 @@
           "kind": "type",
           "to": "src/next/hop-record.ts",
           "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/loop/sessions.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/suite/run.ts",
-          "toPackage": "rafa-run"
         },
         {
           "from": "src/ports/index.ts",
@@ -3909,8 +3907,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 8,
-      "upwardEdges": 8
+      "remaining": 7,
+      "upwardEdges": 7
     },
     {
       "clearedByIssue118": 0,
@@ -5372,6 +5370,13 @@
           "toPackage": "rafa-run"
         },
         {
+          "from": "src/triage/base-run.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/utils/session-env.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
@@ -5620,8 +5625,8 @@
         "src/pr/index.ts"
       ],
       "rank": 4,
-      "remaining": 47,
-      "upwardEdges": 47
+      "remaining": 48,
+      "upwardEdges": 48
     },
     {
       "clearedByIssue118": 0,
@@ -6264,6 +6269,13 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/suite/run.ts",
+          "fromPackage": "rafa-run",
+          "kind": "type",
+          "to": "src/utils/session-env.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/suite/scope.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
@@ -6518,8 +6530,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 92,
-      "upwardEdges": 92
+      "remaining": 93,
+      "upwardEdges": 93
     },
     {
       "clearedByIssue118": 0,
@@ -6901,7 +6913,7 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 263,
+        "source": 264,
         "test": 466,
         "testSupport": 27
       },
@@ -7659,6 +7671,7 @@
         "src/utils/progress.test.ts",
         "src/utils/progress.ts",
         "src/utils/schedule.ts",
+        "src/utils/session-env.ts",
         "src/utils/tracker-open-tasks.test.ts",
         "src/utils/tracker.test.ts",
         "src/utils/tracker.ts"
@@ -7682,12 +7695,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1994,
-    "leftToPlace": 717,
-    "nonTestEdges": 4438,
+    "files": 1995,
+    "leftToPlace": 718,
+    "nonTestEdges": 4443,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 258
+    "upwardEdges": 259
   },
   "unassigned": [
     {
