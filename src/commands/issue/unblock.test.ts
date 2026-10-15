@@ -846,6 +846,78 @@ describe('rafa issue unblock --yes, on an issue the line names', () => {
   });
 });
 
+describe('rafa issue unblock --all --yes, over a board of four kinds of issue', () => {
+  /** A project of this file's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'all-yes-')));
+
+  /** One issue per kind: #10 all closed, #11 one open, #12 no line, #13 a dangling id. */
+  const boardOfFour = (): ReturnType<typeof fakeGh> => fakeGh({
+    issues: {
+      10: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #20 #21') },
+      11: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #22') },
+      12: { labels: [SPEC_BLOCKED_LABEL], body: '## Spec\n\nSomething to build.\n' },
+      13: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #99') },
+      20: { state: 'CLOSED' },
+      21: { state: 'CLOSED' },
+      22: { state: 'OPEN' },
+    },
+  });
+
+  /** The command over `gh`, with no terminal and a prompter that fails the case when opened. */
+  const commandOver = (gh: ReturnType<typeof fakeGh>, opened: string[]): ReturnType<typeof createIssueUnblockCommand> => createIssueUnblockCommand({
+    openGh: () => gh.run,
+    isTerminal: () => false,
+    openPrompter: () => {
+      opened.push('opened');
+      throw new Error('the run opened a prompter without a terminal');
+    },
+  });
+
+  /** The `gh issue edit` commands `gh` was handed. */
+  const edits = (gh: ReturnType<typeof fakeGh>): readonly (readonly string[])[] => gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue edit');
+
+  it('removes the label from the passing issue alone and reports the other three as it does without --yes', async () => {
+    const yes = boardOfFour();
+    const plain = boardOfFour();
+    const yesOpened: string[] = [];
+    const plainOpened: string[] = [];
+
+    const outcome = await dispatchInProject(
+      ['issue', 'unblock', '--all', '--yes'],
+      SUBJECTS,
+      [commandOver(yes, yesOpened)],
+      plant(),
+    );
+    const control = await dispatchInProject(
+      ['issue', 'unblock', '--all'],
+      SUBJECTS,
+      [commandOver(plain, plainOpened)],
+      plant(),
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stderr).toBe('');
+    expect(yesOpened).toEqual([]);
+    expect(edits(yes)).toEqual([['issue', 'edit', '10', '--remove-label', 'spec:blocked']]);
+    expect(outcome.stdout).toContain('Removed spec:blocked from #10 under --yes; every blocker is closed: #20 #21');
+
+    // The other three lines are the control's own, word for word.
+    const keptLines = (text: string): readonly string[] => text.split('\n')
+      .filter((line) => line !== '' && !line.includes('#10'));
+    expect(keptLines(outcome.stdout)).toEqual(keptLines(control.stdout));
+    expect(outcome.stdout).toContain('#11 is blocked by #22 (open), so spec:blocked stays');
+    expect(outcome.stdout).toContain('carries no "Blocked by:" line');
+    expect(outcome.stdout).toContain('naming #99, which the board has no issue for');
+
+    // The control: --all alone, no terminal, removes nothing and opens nothing.
+    expect(control.exitCode).toBe(0);
+    expect(plainOpened).toEqual([]);
+    expect(edits(plain)).toEqual([]);
+    expect(control.stdout).toContain('there is no terminal to ask on, so spec:blocked stays');
+  });
+});
+
 describe('the line', () => {
   /** What a refused line wrote, dispatched over a runner nobody may reach. */
   async function refuse(words: readonly string[]): Promise<{ exitCode: number | null; stderr: string; sent: number }> {
