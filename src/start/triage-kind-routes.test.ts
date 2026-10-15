@@ -47,6 +47,7 @@ import {
 } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { readBugRoutesForPlan } from '../effort/store/bug-routes.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -91,6 +92,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const BASE = 'base0000000000000000';

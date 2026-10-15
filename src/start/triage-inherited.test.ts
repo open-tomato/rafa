@@ -40,6 +40,7 @@ import {
 } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -175,6 +176,8 @@ function triageFor(f: Fixture): StartTriage {
       prerequisitesOptional: [],
       triageSimilarityThreshold: 0.3,
       triageSimilarityCandidates: 3,
+      ...ISSUES_DEFAULTS,
+      errorsCodes: [],
     },
     env: {},
     resolve: () => Promise.resolve({

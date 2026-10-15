@@ -115,6 +115,19 @@
  * `env` names another. `triageReport` redacts every filed text of them, and
  * this module redacts every failure it warns about.
  *
+ * ## The checkout, its git and the bug record
+ *
+ * Every `triageReport` is handed the run's checkout
+ * ({@link StartTriageOptions.checkout}, the repo root when left out), a
+ * git runner in it, the environment the secrets are read from, and the
+ * rules a bug record is checked against, `bugRulesOf`
+ * (`config-schema-issues.ts`) over the run's resolved config, read once
+ * when the triage is made. Paths are taken out over the checkout and the
+ * repo root in one pass, here as in `triageReport`, so a run in a
+ * worktree outside the project names neither in a filed body nor in a
+ * line printed here. The store and both issue directories stay at the
+ * repo root.
+ *
  * ## A failure never stops the run
  *
  * The triage never rejects. A blocker text not written, a bug skipped or
@@ -152,19 +165,23 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { IssuesConfigSettings } from '../config-schema-issues.js';
 import type { RafaConfig } from '../core/config/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
 import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { InheritedTriage } from '../triage/inherited.js';
 import type { KindRouteOptions } from '../triage/kind-route.js';
-import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triage.js';
+import type { BugTriage, SecretEnvironment, TriageOptions, TriageResult } from '../triage/triage.js';
 
 import { homedir } from 'node:os';
 
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { bugRulesOf } from '../config-schema-issues.js';
 import { messageOf } from '../core/config/sections.js';
+import { createGitRunner } from '../core/git/index.js';
 import { activeOutput } from '../core/output/index.js';
 import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
@@ -220,7 +237,8 @@ export interface StartTriageOptions {
   /**
    * The run's resolved config: `tracker.default` and `tracker.fallback` for
    * the chain, the prerequisite tiers whose `env` items name secrets, and
-   * the `triage.similarity` settings.
+   * the `triage.similarity` settings, and the `issues` keys and
+   * `errors.codes` the bug record's rules are read from.
    */
   readonly config: Pick<
     RafaConfig,
@@ -230,9 +248,25 @@ export interface StartTriageOptions {
     | 'prerequisitesOptional'
     | 'triageSimilarityThreshold'
     | 'triageSimilarityCandidates'
+    | keyof IssuesConfigSettings
+    | 'errorsCodes'
   >;
-  /** The environment the secrets' values are read from. `process.env` when left out. */
+  /**
+   * The environment the secrets' values are read from, handed to every
+   * `triageReport` as its own. `process.env` when left out.
+   */
   readonly env?: SecretEnvironment;
+  /**
+   * The checkout the run's tasks run in: the repo root, or a worktree of
+   * it. Its paths are taken out of every filed and printed text with the
+   * repo root's, and `triageReport` reads `Refs` in it. The repo root
+   * when left out.
+   */
+  readonly checkout?: string;
+  /** A git runner in {@link checkout}, handed to every `triageReport`. `createGitRunner(checkout)` when left out. */
+  readonly git?: GitRunner;
+  /** Triages one report. `triageReport` when left out; a seam for tests. */
+  readonly triageReport?: (options: TriageOptions) => Promise<TriageResult>;
   /** Resolves the chain. `resolveTracker` over the core registry when left out. */
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Where security bugs go. `triageReport`'s own, under the repo root, when left out. */
@@ -557,9 +591,14 @@ function inheritedByIndex(
  * the run-start baseline not yet read. See the module note.
  */
 export function createStartTriage(options: StartTriageOptions): StartTriage {
-  const secrets = namedSecrets(options.config, options.env ?? process.env);
+  const env = options.env ?? process.env;
+  const secrets = namedSecrets(options.config, env);
   const redact = (text: string): string => redactSecrets(text, secrets);
-  const local = localPathRedactor(options.repoRoot, homedir());
+  const checkout = options.checkout ?? options.repoRoot;
+  const local = localPathRedactor([checkout, options.repoRoot], homedir());
+  const git = options.git ?? createGitRunner(checkout);
+  const bugRules = bugRulesOf(options.config);
+  const triage = options.triageReport ?? triageReport;
   const kindReader: KindReader | null = options.kinds === undefined
     ? null
     : createKindReader(options.kinds);
@@ -595,7 +634,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       ? undefined
       : kindReader();
     const dispatch = dispatchOf(input);
-    const result = await triageReport({
+    const result = await triage({
       repoRoot: options.repoRoot,
       trackerPath: input.trackerPath,
       lineNum: input.lineNum,
@@ -609,6 +648,10 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       inherited: run,
       similarity: options.config,
       kinds,
+      checkout,
+      git,
+      env,
+      bugRules,
     });
 
     const routes = bugRouteEntriesOf(result, report, saidKindsOf(reading.block.body));
