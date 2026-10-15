@@ -1,10 +1,11 @@
 /**
- * The text loop-owned triage (`./triage.ts`) files a bug with: the title,
- * and the body or comment its sections make up.
+ * The text loop-owned triage (`./triage.ts`) files a bug with: the body
+ * or comment its sections make up.
  *
- * The title is the bug's `what` on one line, cut to
- * {@link TITLE_MAX_LENGTH} code points ({@link issueTitle}). The body
- * opens with a sentence saying where the issue came from
+ * Triage titles a bug from its record (`bugTitle`, `../bugs/record.ts`,
+ * #991). {@link issueTitle}, a bug's `what` on one line cut to
+ * {@link TITLE_MAX_LENGTH} code points, is the title it filed under
+ * before; no production code calls it now. The body opens with a sentence saying where the issue came from
  * ({@link ISSUE_OPENING}), then six sections, each value in a fence one
  * backtick longer than any backtick run it holds ({@link fenced}), so the
  * text a session wrote is shown verbatim and never rendered: `What`,

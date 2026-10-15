@@ -91,6 +91,7 @@ import {
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
+import { RAFA_VERSION } from '../core/command/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -1024,11 +1025,15 @@ describe('what each triageReport is handed', () => {
     expect(handed?.bugRules?.environments).toContain('staging');
     expect(handed?.bugRules?.modules).toEqual(['parser']);
     expect(handed?.bugRules?.codes.map((entry) => entry.code)).toContain('parse:dropped-line');
-    // Nothing reads through the runner yet (#951 reads the code version
-    // through it), so the fake answered no call: the store and the issue
-    // stayed at the repo root all the same.
-    expect(calls).toEqual([]);
+    // The record reads the code version through the runner handed, and the
+    // place through the environment handed: the fake's answer to the status
+    // read is a changed file, so the commit reads dirty. The store and the
+    // issue stay at the repo root all the same.
+    expect(calls).toEqual([['rev-parse', '--short', 'HEAD'], ['status', '--porcelain', '--untracked-files=no']]);
     expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    const [filed] = issueFiles(f.publicDir);
+    expect(filed?.contents).toContain('## Environment\n\nci\n');
+    expect(filed?.contents).toContain(`## Versions\n\n\`\`\`\nrafa: ${RAFA_VERSION}\ncode: abc1234-dirty\n\`\`\`\n`);
   });
 
   it('left without a checkout, a git runner or an environment, hands the repo root, a runner of its own and the process environment', async () => {

@@ -510,7 +510,9 @@ describe('rafa epic close, dispatched', () => {
 
     expect(first.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(first.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
-    expect(first.trackerCalls).toEqual([`create Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`]);
+    // The title is rendered from the record: the epic's module and action
+    // ahead of the summary, which is cut to the default 80 code points.
+    expect(first.trackerCalls).toEqual(['create epic - close: Epic #40 acceptance criterion 2 fails against main: - `rafa epics` shows one...']);
     expect(first.stdout).toContain('Criterion 2: filed on the public tracker as local issue');
     expect(closesOf(first.ghCalls)).toEqual([]);
 
@@ -566,7 +568,7 @@ describe('rafa epic close, dispatched', () => {
     expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(outcome.trackerCalls).toHaveLength(2);
     expect(outcome.trackerCalls[0]).toBe(`create ${staleDocsTitle(STALE_DOCS_VERSION)}`);
-    expect(outcome.trackerCalls[1]).toStartWith('create Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
+    expect(outcome.trackerCalls[1]).toStartWith('create epic - close: Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
     expect(outcome.stdout).toContain(`Criterion 1: names only documentation, so no bug is filed; opened local issue 1, ${staleDocsTitle(STALE_DOCS_VERSION)}, with the line.`);
     expect(outcome.stdout).toContain('Criterion 2: filed on the public tracker as local issue 2.');
     expect(outcome.stderr).toContain('1 criterion failed its check, each filed as a bug, and 1 criterion naming only documentation failed,'

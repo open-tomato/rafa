@@ -80,11 +80,13 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
+import { RAFA_VERSION } from '../core/command/index.js';
 import { writeFindings } from '../effort/store/findings.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { findNextTask } from '../utils/tracker.js';
 
+import { DEFAULT_BUG_RULES } from './bug-filing.js';
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';
 import { HOME_MARKER } from './local-paths.js';
 import {
@@ -436,7 +438,8 @@ describe('a public bug', () => {
   it('is filed as one needs-triage bug after the tracker finds none, and its reference is stored', async () => {
     const f = fixture();
 
-    const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
+    // An empty environment, so the place reads `local` whatever `CI` the suite runs under.
+    const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }), { env: {} });
 
     const issue = onlyIssue(f.publicDir);
     expect(methodsOf(f.publicSpy)).toEqual(['find', 'create']);
@@ -452,12 +455,19 @@ describe('a public bug', () => {
         `## Plan\n\n${fence('demo')}`,
         `## Task\n\n${fence('Wire the loop')}`,
         `## Feedback\n\n${fence('Built the module; the hook refused the commit.')}`,
+        `## Reproduce\n\n${fence('seen while running task Wire the loop of plan demo')}`,
+        '## Cause\n\nunknown:new-context',
+        '## Module\n\nunknown',
+        '## Action\n\nunknown',
+        '## Environment\n\nlocal',
+        `## Versions\n\n${fence(`rafa: ${RAFA_VERSION}\ncode: unknown`)}`,
       ].join('\n\n') + '\n',
       type: 'bug',
       module: 'unassigned',
       priority: null,
       project: null,
       blockedBy: [],
+      cause: 'unknown:new-context',
     });
 
     const ref: IssueRef = { opt: 0, kind: 'local', externalId: '1', url: null };
@@ -497,6 +507,9 @@ describe('a public bug', () => {
     expect(issue.comments[0]).toContain(fence('Seen again while wiring the loop.'));
     // The comment carries the key, so an issue filed before this rafa gains one.
     expect(issue.comments[0]).toContain(`## Recurrence key\n\n${fence(KEY)}`);
+    // The comment carries the versions it was seen again on, and no other record field.
+    expect(issue.comments[0]).toEndWith(`## Feedback\n\n${fence('Seen again while wiring the loop.')}\n\n## Versions\n\n${fence(`rafa: ${RAFA_VERSION}\ncode: unknown`)}\n`);
+    expect(issue.comments[0]).not.toContain('## Cause');
     expect(refRows(f.root).map((row) => row.session_id)).toEqual(['session-1']);
   });
 
@@ -1220,7 +1233,7 @@ describe('named secrets in what is filed', () => {
 
   it('are taken out of a title before it is cut, so no part of one straddling the cut is filed', async () => {
     const secret = 'SECRETVALUE0123456789';
-    const what = `${'x'.repeat(TITLE_MAX_LENGTH - 10)}${secret}`;
+    const what = `${'x'.repeat(DEFAULT_BUG_RULES.summaryMax - 10)}${secret}`;
     const report = reportWith({ outOfScopeBugs: [bug(what, null, false)] });
     const redacted = fixture();
     const plain = fixture();

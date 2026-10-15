@@ -6,11 +6,14 @@ fields under the same headings, and a title rendered from them (#951).
 line into it, and `context/error-codes.md` is the authority for the cause
 codes it carries.
 
-The loop's own filing (`context/triage.md`) does not build the record
-yet: triage titles a bug with its `what` and files it under module
-`unassigned`, until the loop-side spec (#991) lands. The two bodies
-already share their `What` and `Artifact` sections, so either is read by
-the other's code.
+The loop's own filing (`context/triage.md`) builds the same record from
+a session's report (`src/triage/bug-filing.ts`, #991): the title is
+rendered through the same template, the draft carries the record's
+module, `unassigned` for `unknown`, and its cause, and the record's
+sections follow the body's `Feedback`. A recurrence's comment gains the
+`Versions` it was seen again on and no other field. The two bodies share
+their `What` and `Artifact` sections, so either is read by the other's
+code.
 
 ### Three axes
 
