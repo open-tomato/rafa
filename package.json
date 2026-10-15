@@ -25,6 +25,9 @@
     "bun"
   ],
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "author": "Marcos Tomatti <marcos@opentomato.io>",
   "packageManager": "bun@1.3.14",
   "type": "module",
@@ -79,6 +82,7 @@
     "lint": "eslint .",
     "check-types": "tsc --noEmit && bun run --filter './packages/*' check-types",
     "verify:affected": "turbo run lint check-types test --affected",
+    "codeowners": "bun scripts/codeowners.ts",
     "gate:control-bytes": "bun scripts/control-byte-gate/control-byte-gate.ts",
     "snapshot": "bun scripts/snapshot-runtime.ts",
     "stretch": "bash scripts/stretch/stretch.sh",

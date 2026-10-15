@@ -4,6 +4,9 @@
   "description": "The shared flat ESLint config every rafa config builds on: the plugins, the shared rules and the ar/no-unsafe-unicode rule, in one place.",
   "private": true,
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "type": "module",
   "exports": {
     ".": "./base.mjs",

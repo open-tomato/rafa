@@ -4,6 +4,9 @@
   "description": "rafa's core: the contracts, the effort store and the ports every other part of rafa imports. Private until #808 publishes it.",
   "private": true,
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "type": "module",
   "exports": {
     "./store": "./src/effort/store/index.ts",

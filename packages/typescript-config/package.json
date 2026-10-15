@@ -4,6 +4,9 @@
   "description": "The strict tsconfig base every rafa tsconfig extends: isolatedDeclarations, erasableSyntaxOnly and the rest, in one place.",
   "private": true,
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "type": "module",
   "exports": {
     "./base": "./base.json"
