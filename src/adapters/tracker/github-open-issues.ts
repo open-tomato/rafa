@@ -106,8 +106,20 @@ export function createdAtOf(value: unknown): string | null {
     : null;
 }
 
-/** The open issue row `index` answers under `ref`. Throws, naming the row, when its title or body is not a string. */
-function openIssueOf(row: unknown, index: number, ref: IssueRef): OpenIssue {
+/** The title and body of a listed row, and the `createdAt` it holds, unread. */
+export interface ListedText {
+  readonly title: string;
+  readonly body: string;
+  readonly createdAt: unknown;
+}
+
+/**
+ * The title and body of listed row `index`, with its `createdAt` as
+ * written. Throws, naming the row, when its title or body is not a
+ * string. `filedIssues` (`github-filed-issues.ts`) reads its rows with it
+ * too, so the two readings refuse a row's text in one spelling.
+ */
+export function listedTextOf(row: unknown, index: number): ListedText {
   // The row reader refused any row that is not a mapping.
   const fields: Record<string, unknown> = isMapping(row)
     ? row
@@ -119,6 +131,12 @@ function openIssueOf(row: unknown, index: number, ref: IssueRef): OpenIssue {
   if (typeof body !== 'string') {
     throw new Error(`${PREFIX}: ${LIST_COMMAND} answered row ${index} with body ${describeValue(body)}, expected a string`);
   }
+  return { title, body, createdAt };
+}
+
+/** The open issue row `index` answers under `ref`. Throws, naming the row, when its title or body is not a string. */
+function openIssueOf(row: unknown, index: number, ref: IssueRef): OpenIssue {
+  const { title, body, createdAt } = listedTextOf(row, index);
   return { ref, title, body, createdAt: createdAtOf(createdAt) };
 }
 

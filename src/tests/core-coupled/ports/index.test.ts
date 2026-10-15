@@ -138,6 +138,21 @@
  * copy and verified with `sha256sum -c`: `createdAt` made optional
  * reddened that refusal alone.
  *
+ * The optional `filedIssues` reading arrived on 2026-10-15 with
+ * `FiledIssue`'s name, a fifth tracker in the conforming probe that
+ * implements it, a call reading its rows' times as strings, and three
+ * refusals. Five mutations of the entry were driven that day against
+ * this file, restored from a scratch copy and verified with
+ * `sha256sum -c`, at 46 pass unmutated. `createdAt` made nullable
+ * reddened the clean probe, whose call reads it as a string, and the
+ * refusal of a null one. `since` widened to a string reddened the
+ * clean probe and the refusal of a string `since`. A synchronous
+ * answer allowed reddened its own refusal alone. `filedIssues` made
+ * required reddened the clean probe and the refusals of a tracker with
+ * no `transition` and of a synchronous `filedIssues`, whose readings it
+ * changed. `FiledIssue` left unexported reddened the name list, the
+ * clean probe and the string-`since` call, which name it.
+ *
  * The optional `editable` and `edit` pair arrived on 2026-10-06 with
  * the names `EditableIssue` and `IssueEdit`, a third tracker in the
  * conforming probe that implements the pair, a call writing a body, a
@@ -198,6 +213,7 @@ const TYPE_EXPORTS = [
   'EffortRow',
   'EffortRowByKind',
   'EffortRowKind',
+  'FiledIssue',
   'GeneratedPlan',
   'InstinctRecord',
   'Issue',
@@ -305,6 +321,26 @@ function trackerLiteral(kind: string, transition: string | null, openIssues: str
 /** An `openIssues` answering one open issue of the type it is handed. */
 const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b", createdAt: null }]';
 
+/** A row of a `filedIssues` answer, created at the time given. */
+function filedRow(createdAt: string): string {
+  return `{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t", body: "b", createdAt: ${createdAt} }`;
+}
+
+/**
+ * A tracker literal as {@link trackerLiteral} writes it, under `name`,
+ * with `filedIssues` as given.
+ */
+function filingTrackerLiteral(filedIssues: string, name = 'tracker'): string[] {
+  return [
+    ...trackerLiteral('"local"', 'async () => ({})', null, name).slice(0, -1),
+    `  filedIssues: ${filedIssues},`,
+    '};',
+  ];
+}
+
+/** A `filedIssues` answering one issue filed after the time it is handed. */
+const FILED_ISSUES = 'async (_type, since) => [' + filedRow('new Date(since.getTime() + 1).toISOString()') + ']';
+
 /**
  * A tracker literal as {@link trackerLiteral} writes it, under `name`,
  * with `editable` and `edit` as given.
@@ -345,6 +381,11 @@ const CONFORMING_PROBE = probeSource(
   `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
   ...trackerLiteral('"local"', 'async () => ({})', OPEN_ISSUES, 'reader'),
+  ...filingTrackerLiteral(FILED_ISSUES, 'filer'),
+  'export async function filedSince(tracker: P.Tracker): Promise<string[]> {',
+  '  const filed = await tracker.filedIssues?.("bug", new Date("2026-10-14T01:29:39Z"));',
+  '  return (filed ?? []).map((issue: P.FiledIssue): string => issue.createdAt);',
+  '}',
   ...editingTrackerLiteral(EDITABLE, EDIT, 'editor'),
   ...editingTrackerLiteral(EDITABLE_WITH_PRIORITY, EDIT, 'prioritiser'),
   'export async function rewrite(tracker: P.Tracker, ref: P.IssueRef): Promise<void> {',
@@ -521,6 +562,31 @@ const REFUSALS: readonly Refusal[] = [
     ),
     code: 2345,
     names: '"feature"',
+  },
+  {
+    title: 'a tracker whose filed issues carry a null createdAt',
+    file: 'tracker-filed-issues-null-created-at.ts',
+    source: probeSource(...filingTrackerLiteral(`async () => [${filedRow('null')}]`)),
+    code: 2322,
+    names: 'Type \'null\' is not assignable to type \'string\'',
+  },
+  {
+    title: 'a tracker whose filedIssues answers without a promise',
+    file: 'tracker-sync-filed-issues.ts',
+    source: probeSource(...filingTrackerLiteral('() => []')),
+    code: 2322,
+    names: 'Promise<FiledIssue[]>',
+  },
+  {
+    title: 'a filedIssues call whose since is not a Date',
+    file: 'tracker-filed-issues-string-since.ts',
+    source: probeSource(
+      'export async function since(tracker: P.Tracker): Promise<P.FiledIssue[] | undefined> {',
+      '  return tracker.filedIssues?.("bug", "2026-10-14T01:29:39Z");',
+      '}',
+    ),
+    code: 2345,
+    names: '\'Date\'',
   },
   {
     title: 'a tracker whose editable answers no author',
