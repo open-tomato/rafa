@@ -655,6 +655,11 @@ the session check 3 is part of, so a refusal from it spends no session:
    writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
    the standing it answers is `assumed` and the command does not refuse.
 
+   Whatever the verdict, each issue the reader filed against the block is
+   one warning line of its own (`reviewIssueWarning`), so a block read only
+   after its `heading`, `what` and `assumption` values were quoted names
+   its line on the terminal, `verdict: ready` included.
+
    A MISSING or malformed block is not that verdict and is not treated as
    one. It is weighed against the plan the session wrote: one that
    `plan validate` reads without an issue STANDS, with one warning, no
