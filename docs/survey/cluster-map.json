@@ -677,6 +677,7 @@
     "src/modules/testdata/seam-fixture/commands.ts",
     "src/modules/testdata/sync-fixture/sync.ts",
     "src/ports/index.ts",
+    "src/ports/learning.ts",
     "src/pr/gh-fake-shapes.ts",
     "src/pr/gh-fake.ts",
     "src/pr/pull-requests-double.ts",

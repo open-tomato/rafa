@@ -145,9 +145,9 @@
  *
  * ## The lists this module does not own
  *
- * Every other closed list here is declared here. Two are not, and
- * neither is one range, because another module is already their
- * authority and a second spelling could disagree with it:
+ * Every other closed list here is declared here. Two are not, because
+ * another module is already their authority and a second spelling could
+ * disagree with it:
  *
  *   - The three tiers a pin names are `schema/tiers.ts`'s
  *     {@link SKILL_TIERS}, the order a listing reads them in. That
@@ -161,17 +161,17 @@
  *     survives that round trip: `.inf`, `.nan`, `1e21` and `1e-7` are
  *     each a number the parser returns and `String` writes as something
  *     the flag never takes.
- *   - The range {@link confidence} accepts, 0.3 to 0.9, is the learning
- *     library's {@link CONFIDENCE_MIN} and {@link CONFIDENCE_MAX}
- *     (`learning/identity.ts`), the range every lesson's confidence is
- *     clamped to. A threshold outside it is one no lesson can meet, or
- *     one every lesson meets, so the reader asks the library's bounds
- *     rather than spell its own.
  *
- * `learning/identity.ts` imports `node:crypto` alone, and
  * `core/plan/declaration.ts` imports only the store's `effort-levels.ts`,
- * which imports nothing, so this module reaches both without either
- * reaching back.
+ * which imports nothing, so this module reaches it without its reaching
+ * back.
+ *
+ * The range {@link confidence} accepts, {@link CONFIDENCE_MIN} to
+ * {@link CONFIDENCE_MAX}, is declared here and not read from the
+ * learning library: core imports nothing above it, and `src/learning/`
+ * imports nothing from the rest of `src/`, so each declares the pair the
+ * library clamps every lesson's confidence to, and
+ * `src/tests/learning-contract.test.ts` holds the two equal.
  *
  * The reader of `pr.mergeMethod`, over the pull request port's three
  * methods, is not here: it sits with the setting it reads, in
@@ -179,7 +179,6 @@
  */
 import type { SkillTier } from '../../schema/tiers.js';
 
-import { CONFIDENCE_MAX, CONFIDENCE_MIN } from '../../learning/identity.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';
 import { parseBudgetUsd } from '../plan/declaration.js';
 
@@ -512,6 +511,18 @@ export function isBusyTimeoutMs(raw: unknown): raw is number {
 export const busyTimeoutMs: Reader<number> = (raw, at) => isBusyTimeoutMs(raw)
   ? accepted(raw)
   : refused(at, raw, `a lock wait in milliseconds, a whole number from ${String(BUSY_TIMEOUT_MIN_MS)} to ${String(BUSY_TIMEOUT_MAX_MS)}`);
+
+/**
+ * The lowest confidence a lesson may carry, and the lowest
+ * {@link confidence} accepts: the learning library's `CONFIDENCE_MIN`.
+ */
+export const CONFIDENCE_MIN = 0.3;
+
+/**
+ * The highest confidence a lesson may carry, and the highest
+ * {@link confidence} accepts: the learning library's `CONFIDENCE_MAX`.
+ */
+export const CONFIDENCE_MAX = 0.9;
 
 /**
  * Accepts a lesson confidence as the `learning` thresholds take one: a

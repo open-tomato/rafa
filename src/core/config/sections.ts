@@ -99,6 +99,8 @@ export {
   claimsStaleAfter,
   CLAUDE_SETTING_SOURCES,
   confidence,
+  CONFIDENCE_MAX,
+  CONFIDENCE_MIN,
   CONFIG_VERSIONS,
   dayCount,
   describeValue,

@@ -47,9 +47,8 @@
  * imports the barrel back by value is a runtime cycle. `commit.ts`
  * imports `node:child_process` and no file. `git.ts` imports one file by
  * value: `src/core/config/config-sections.ts`, for `messageOf`. That
- * file imports four files outside `src/core/` by value
- * (`src/learning/identity.ts`, `src/pr/types.ts`, `src/schema/tiers.ts`
- * and `src/utils/declaration.ts`), and none of them reaches this barrel.
+ * file imports one file outside `src/core/` by value,
+ * `src/schema/tiers.ts`, and it does not reach this barrel.
  *
  * `src/pr/index.ts`, the `pr` subject's barrel, re-exports the four
  * names of `git.ts` from this file, as it re-exported them from

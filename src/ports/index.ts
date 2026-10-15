@@ -17,8 +17,7 @@
  * The entry exports no runtime value, so importing it runs nothing and
  * adds nothing to a service's bundle. Its imports are `import type`
  * lines, which the bundler erases, so naming {@link GeneratedPlan}'s
- * review type pulls `src/board/spec-review.ts` into no bundle, and the
- * learning records pull in no part of `src/learning/` but its types. That
+ * review type pulls `src/board/spec-review.ts` into no bundle. That
  * keeps three things a port could otherwise carry out of this module:
  *
  *   - The store's key projection, `EFFORT_KEY_PROJECTIONS`, which is a
@@ -63,11 +62,13 @@
  *     and results it is typed against come with it.
  *   - {@link Learning}: `distributed-learning-library.md`, "rafa's
  *     Learning port", with the records it passes taken from that spec's
- *     package shape. The learning library owns the records:
- *     {@link InstinctRecord}, {@link SyncPayload}, {@link BlessedBundle},
- *     {@link MergeRule}, {@link MergeDecision} and {@link MergeResult}
- *     are declared in `src/learning/types.ts` and re-exported here under
- *     the same names, so each is declared once.
+ *     package shape. {@link InstinctRecord}, {@link SyncPayload},
+ *     {@link BlessedBundle}, {@link MergeRule}, {@link MergeDecision} and
+ *     {@link MergeResult} are declared in `./learning.ts` and re-exported
+ *     here under the same names. The learning library declares its own
+ *     six in `src/learning/types.ts`, since neither side may import the
+ *     other, and `src/tests/learning-contract.test.ts` holds each pair
+ *     mutually assignable.
  *   - {@link Output}: open-tomato's `packages/shared/cli-core`, the
  *     events from `src/events.ts` at
  *     `2b00895eaec9edcdce02839831429da97441c0f5` and the interface from
@@ -83,7 +84,7 @@
  *     and the five strategies `effort.sync` selects between. Every
  *     adapter's pull runs `mergeStore` (`src/effort/store/merge-store.ts`),
  *     so {@link SyncPullResult} carries that merge's own result type,
- *     imported as `StoreMergeResult` because the learning library's
+ *     imported as `StoreMergeResult` because the Learning port's
  *     `MergeResult` already holds the name here. The request types are
  *     read off what the `file` strategy needs: the directory
  *     `rafa effort copy` writes into, and the `effort.sqlite` and
@@ -111,10 +112,10 @@
  *     plan` has today. The webhook adapter phase 6 adds lands a plan on a
  *     branch, which may widen the answer.
  */
+import type { BlessedBundle, MergeResult, SyncPayload } from './learning.js';
 import type { LogLevel } from './log-level.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
 import type { MergeResult as StoreMergeResult } from '../effort/store/merge-store.js';
-import type { BlessedBundle, MergeResult, SyncPayload } from '../learning/types.js';
 
 export type { LogLevel } from './log-level.js';
 export type {
@@ -124,7 +125,7 @@ export type {
   MergeResult,
   MergeRule,
   SyncPayload,
-} from '../learning/types.js';
+} from './learning.js';
 export type {
   AppendResult,
   CommitEffortRow,

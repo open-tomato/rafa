@@ -2844,6 +2844,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/learning-contract.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/lesson-push-e2e.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3610,29 +3615,15 @@
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/core/config/config-sections.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/learning/identity.ts",
-          "toPackage": "rafa-inventory"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
           "to": "src/board/spec-review.ts",
           "toPackage": "rafa-board"
-        },
-        {
-          "from": "src/ports/index.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/learning/types.ts",
-          "toPackage": "rafa-inventory"
         }
       ],
       "fileCounts": {
-        "source": 113,
+        "source": 114,
         "test": 116,
         "testSupport": 2
       },
@@ -3859,6 +3850,7 @@
         "src/effort/store/wire.ts",
         "src/ports/index.test.ts",
         "src/ports/index.ts",
+        "src/ports/learning.ts",
         "src/ports/log-level.ts",
         "src/report/parse.test.ts",
         "src/report/parse.ts",
@@ -3872,7 +3864,7 @@
       "filesByFolder": {
         "src/core/": 106,
         "src/effort/store/": 114,
-        "src/ports/": 3
+        "src/ports/": 4
       },
       "folders": [
         "src/core/",
@@ -3887,8 +3879,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 3,
-      "upwardEdges": 3
+      "remaining": 1,
+      "upwardEdges": 1
     },
     {
       "clearedByIssue118": 0,
@@ -6894,7 +6886,7 @@
       "edges": [],
       "fileCounts": {
         "source": 264,
-        "test": 466,
+        "test": 467,
         "testSupport": 27
       },
       "files": [
@@ -7505,6 +7497,7 @@
         "src/tests/issue-ready-integration.test.ts",
         "src/tests/learning-adapter.test.ts",
         "src/tests/learning-boundary.test.ts",
+        "src/tests/learning-contract.test.ts",
         "src/tests/lesson-push-e2e.test.ts",
         "src/tests/logger-harness.ts",
         "src/tests/loop-continue-spawned.test.ts",
@@ -7675,12 +7668,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2003,
-    "leftToPlace": 718,
-    "nonTestEdges": 4451,
+    "files": 2005,
+    "leftToPlace": 719,
+    "nonTestEdges": 4450,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 255
+    "upwardEdges": 253
   },
   "unassigned": [
     {
