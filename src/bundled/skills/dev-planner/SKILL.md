@@ -611,11 +611,11 @@ When the spec adds or changes anything in `.rafa/effort/`:
 
 ## Command-development rule: Claude session declaration
 
-When planning work on rafa commands: every command that can start a Claude
-Code session must declare its `spends` field on its `RafaCommand` definition.
-The field tells the help system, `describe` output, and the spawn guard in
-`packages/rafa/src/core/loop/claude.ts` what Claude usage the command declares. It is optional,
-and takes one of four shapes:
+When planning work on rafa commands: every command that can start a Claude Code
+session must declare its `spends` field on its `RafaCommand` definition. The
+field tells the help system, `describe` output, and the spawn guard in
+`packages/rafa/src/core/loop/claude.ts` what Claude usage the command declares.
+It is optional, and takes one of four shapes:
 
 - `{ when: 'always'; what: string }` — the command always starts a session
 - `{ when: 'with'; flag: string; what: string }` — starts a session only when

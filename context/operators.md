@@ -8,13 +8,13 @@ may become a feature.
 ### Where they live, and why no loop sees them
 
 `src/bundled/operators/` holds them, `agents/<name>.md` and
-`skills/<name>/SKILL.md`. The build copies `src/bundled/` whole, so they
-ship in the package. The rafa tier reads only `bundled/agents`
-(`BUNDLED_AGENTS_DIR`, `src/inventory/trees.ts`) and `bundled/skills`
-(`BUNDLED_SKILLS_DIR`, `packages/rafa/src/schema/tiers.ts`), so no loop session is
-ever served an operator and the planner never routes a task to one.
-`src/tests/operators.test.ts` holds both, and runs `rafa skill check`
-over the skills.
+`skills/<name>/SKILL.md`. The build copies `src/bundled/` whole, so they ship in
+the package. The rafa tier reads only `bundled/agents` (`BUNDLED_AGENTS_DIR`,
+`src/inventory/trees.ts`) and `bundled/skills` (`BUNDLED_SKILLS_DIR`,
+`packages/rafa/src/schema/tiers.ts`), so no loop session is ever served an
+operator and the planner never routes a task to one.
+`src/tests/operators.test.ts` holds both, and runs `rafa skill check` over the
+skills.
 
 Never link an operator into this repository's `.claude/`, as the
 loop's agents are: there it would be a project-tier item, served to
@@ -106,18 +106,18 @@ case, the open-bug count, and the bugs filed since the last item. It decides
 nothing; the pit stop does.
 
 The filed-since line reads `Filed since <time>: <n>.`, where the time is the
-last ledger line's, or the stretch's start when the ledger holds none. Then
-one indented line per bug, `#<n> <title> (<filed time>)`, oldest first. Each
-bug's filed time is the `createdAt` its open issue carries in the tracker's
-one listing (`openIssues('bug')`, `packages/rafa/src/ports/index.ts`), so no `gh issue view`
-runs per bug. GitHub answers it from `gh issue list`
+last ledger line's, or the stretch's start when the ledger holds none. Then one
+indented line per bug, `#<n> <title> (<filed time>)`, oldest first. Each bug's
+filed time is the `createdAt` its open issue carries in the tracker's one
+listing (`openIssues('bug')`, `packages/rafa/src/ports/index.ts`), so no `gh
+issue view` runs per bug. GitHub answers it from `gh issue list`
 (`src/adapters/tracker/github-open-issues.ts`); the local tracker answers the
 record's `capturedAt`, the time the issue was created, not a file's time on
-disk. A bug with no time, or one whose time does not parse, turns the line
-into `Filed since the last item: not read: no filing time for #<n>`, since a
-bug left out would read as not filed. A tracker with no open-issue listing
-reads the same way, with its own reason. A bug filed and closed between two
-items is not open, so it is not listed.
+disk. A bug with no time, or one whose time does not parse, turns the line into
+`Filed since the last item: not read: no filing time for #<n>`, since a bug left
+out would read as not filed. A tracker with no open-issue listing reads the same
+way, with its own reason. A bug filed and closed between two items is not open,
+so it is not listed.
 
 `rafa stretch end [--dry-run]` opens the integration branch into the
 default branch with `report.md` as its body and every merged item's `Closes`
@@ -216,14 +216,13 @@ refusal reads the shell and not who is typing.
 
 ### The events output
 
-`RAFA_OUTPUT=events` (or `--output=events`) is the output the
-operators read a loop in. Only a command declaring `events` among its
-outputs gets it, `loop start` today; any other command reads it as
-text. The named event is a fifth `CliEvent` kind, `{ type: 'event',
-name, summary, data, ts }` (`packages/rafa/src/ports/index.ts`): text drops it, json
-writes it whole, and the events adapter prints its `summary` after the
-prefix. Every kind is padded to one column of 17 (`padKind`,
-`src/adapters/output/events.ts`):
+`RAFA_OUTPUT=events` (or `--output=events`) is the output the operators read a
+loop in. Only a command declaring `events` among its outputs gets it, `loop
+start` today; any other command reads it as text. The named event is a fifth
+`CliEvent` kind, `{ type: 'event', name, summary, data, ts }`
+(`packages/rafa/src/ports/index.ts`): text drops it, json writes it whole, and
+the events adapter prints its `summary` after the prefix. Every kind is padded
+to one column of 17 (`padKind`, `src/adapters/output/events.ts`):
 
 ```text
 rafa· task 3/9 start   "Group duplicate bugs"

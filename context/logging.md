@@ -15,8 +15,8 @@ It sits beside `Output`, and the two never share a job.
 
 ### The port
 
-`packages/rafa/src/ports/index.ts` declares it, and re-exports its `LogLevel` from the
-leaf `packages/rafa/src/ports/log-level.ts`:
+`packages/rafa/src/ports/index.ts` declares it, and re-exports its `LogLevel`
+from the leaf `packages/rafa/src/ports/log-level.ts`:
 
 - `log(entry)` writes a `LogEntry`: `level`, `message`, and optionally
   `module`, `action`, `code` (a cause code, `context/error-codes.md`),
@@ -27,8 +27,8 @@ leaf `packages/rafa/src/ports/log-level.ts`:
 - `enabled(level, module)` says whether an entry would be written.
 
 `logger` is the seventh port type of the adapter registry
-(`packages/rafa/src/core/adapters/registry.ts`), at version 1, and the composition root
-`src/adapter-registry.ts` registers `logger/console`.
+(`packages/rafa/src/core/adapters/registry.ts`), at version 1, and the
+composition root `src/adapter-registry.ts` registers `logger/console`.
 
 ### Which entries are written
 
