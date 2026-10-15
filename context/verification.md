@@ -57,11 +57,14 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
-The full-suite scripts treat the workspace packages apart only for
-types: `check-types` runs `tsc` over the root, then each
-`packages/*/src/` with its tests included. `bun run lint` lints package
-code from the root config as it lints `src/`, so a changed package file
-belongs in the scoped `bunx eslint <changed files>` run too.
+The full-suite scripts treat the workspace packages apart only for types:
+`check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
+and the test files, then the same check in each of the three workspace
+packages: `packages/rafa` (core), which leaves its test files out as the root
+does, and `packages/rafa-hub` and `packages/rafa-sync-service`, which include
+theirs. `bun run lint` lints package code from the root config as it lints
+`src/`, so a changed package file belongs in the scoped
+`bunx eslint <changed files>` run too.
 
 **Runner recorded steps** (recorded at fixed points, each with its scope):
 - `baseline` — Full suite once at plan start (first dispatch); a run that
@@ -144,7 +147,7 @@ on that repair's line and halts.
 and three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
 cancelled): `bun test`, `bunx eslint .`, and `bun run check-types`, the
-root config and both workspace packages. **Two cases for
+root config and the three workspace packages. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` check (merge with `rafa pr wait <n>`
 then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
