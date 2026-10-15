@@ -573,11 +573,12 @@ Blocked specs are those marked `spec:blocked` with a `Blocked by:` line
 naming one or more open blockers. `plan create --next` skips them,
 offers the first unblocked spec instead, and asks whether to plan that
 one. Once a blocker closes, `rafa issue unblock [<n>]` checks the line,
-asks when every blocker is closed, and removes the label. `pr merge`
-runs that same `issue unblock` logic after a clean merge, so closing
-issue #24 automatically unblocks any issue naming it in a `Blocked by:`
-line, with no extra commands needed. An `owner/repo#<n>` token on the
-line is kept as written in `BlockedReading.foreign`
+asks when every blocker is closed, and removes the label. `--yes` removes
+it with no question, from a script or an agent, and every refusal stays.
+`pr merge` runs that same `issue unblock` logic after a clean merge, so
+closing issue #24 automatically unblocks any issue naming it in a
+`Blocked by:` line, with no extra commands needed. An `owner/repo#<n>`
+token on the line is kept as written in `BlockedReading.foreign`
 (`src/board/blocked.ts`) and never read as local `#<n>`; a line naming
 only such tokens reads as the `no-ids` fault, so `issue unblock` never
 takes a foreign-only line for "every blocker closed" and drops the label.
