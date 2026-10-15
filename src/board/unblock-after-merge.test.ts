@@ -330,7 +330,7 @@ describe('every failure is a warning naming the reading', () => {
     expect(lines.infos()).toEqual([]);
   });
 
-  it('warns the board it could not read whole, so no blocker was checked against it', async () => {
+  it('warns of a blocker past the full listing whose view failed, so its state was not read', async () => {
     const rows = Array.from({ length: 500 }, (_unused, index) => ({ number: 1000 + index, state: 'CLOSED' }));
     const gh = fakeGh({
       issues: { 12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') } },
@@ -347,9 +347,10 @@ describe('every failure is a warning naming the reading', () => {
     });
 
     expect(report?.issues.map((issue) => issue.status)).toEqual(['waiting']);
+    expect(gh.routes()).toContain('issue view');
     expect(gh.removed()).toEqual([]);
     expect(lines.warnings()).toHaveLength(1);
-    expect(lines.warnings()[0]).toContain('no blocker id was checked against it');
+    expect(lines.warnings()[0]).toContain('the state of #24 could not be read off the board');
   });
 
   it('answers null with a warning rather than throwing when the question itself threw', async () => {
