@@ -298,6 +298,7 @@
     "src/core/adapters/registry.ts": "c7",
     "src/core/command/command.ts": "c2",
     "src/core/command/confirm.ts": "c6",
+    "src/core/command/running.ts": "c2",
     "src/core/command/spends.ts": "c2",
     "src/core/command/version.ts": "c5",
     "src/core/config/config-items.ts": "c7",

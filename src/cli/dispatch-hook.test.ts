@@ -42,13 +42,12 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit, restoreRunningCommand } from '../core/command/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
-import { restoreRunningCommand } from './running.js';
 
 /** A temporary directory of this file's own, outside the repository. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-hook-')));

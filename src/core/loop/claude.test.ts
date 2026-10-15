@@ -138,8 +138,8 @@
  *
  * The guard cases run each door, with its default spawner, against a
  * stand-in that appends one line to a file per session it runs, under a
- * running command recorded through `src/cli/running.ts` and put back
- * after the case, with the active output's `warn` lines collected. An
+ * running command recorded through `src/core/command/running.ts` and put
+ * back after the case, with the active output's `warn` lines collected. An
  * uncovered run reads as one warning naming the command and one line in
  * that file, since usage is never a gate and the session runs anyway;
  * each warned form is paired in its case with the same command under a
@@ -175,10 +175,10 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { restoreRunningCommand, setRunningCommand } from '../../cli/running.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../../utils/declaration.js';
 import { sessionSpawnEnv } from '../../utils/session-env.js';
+import { restoreRunningCommand, setRunningCommand } from '../command/running.js';
 import { setActiveOutput } from '../output/active.js';
 
 import {

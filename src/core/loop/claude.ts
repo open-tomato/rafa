@@ -156,7 +156,8 @@
  * Both doors warn when the running command's `spends` declaration
  * (`src/core/command/spends.ts`) does not cover the session they start,
  * and start it anyway: usage is never a gate. The running command is the
- * one the dispatcher recorded with its parsed flags (`src/cli/running.ts`).
+ * one the dispatcher recorded with its parsed flags
+ * (`src/core/command/running.ts`).
  * The check runs once per session, before `Bun.spawn`: {@link spawnClaude}
  * in json mode hands its session to the same unchecked spawner
  * {@link spawnClaudeCaptured} uses rather than to that door, and so does
@@ -180,12 +181,12 @@
  * stream (`src/core/output/text.ts`); in json mode a `log` event at
  * level `warn`; in events mode nothing, since that output drops `warn`.
  */
-import type { RunningCommand } from '../../cli/running.js';
+import type { RunningCommand } from '../command/running.js';
 import type { ClaudeSettingSource } from '../config/config-sections.js';
 
-import { runningCommand } from '../../cli/running.js';
 import { sessionSpawnEnv } from '../../utils/session-env.js';
 import { commandSpelling } from '../command/command.js';
+import { runningCommand } from '../command/running.js';
 import { activeOutput, activeOutputMode } from '../output/active.js';
 
 /**

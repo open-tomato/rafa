@@ -1,7 +1,7 @@
 /**
- * Tests for the running command record (`src/cli/running.ts`): set, read
- * and restore, nesting, and the frozen copy of the flags; then the async
- * scope {@link runAsRunningCommand} runs a function in.
+ * Tests for the running command record (`src/core/command/running.ts`):
+ * set, read and restore, nesting, and the frozen copy of the flags; then
+ * the async scope {@link runAsRunningCommand} runs a function in.
  *
  * The scope cases hold what the module-level value cannot: two runs that
  * overlap each read their own record after an await, and nothing is
@@ -25,7 +25,7 @@
  * the module-level record, and the same listener wrapped with
  * `AsyncResource.bind` where it is registered reads the scope's.
  */
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from './command.js';
 
 import { AsyncResource } from 'node:async_hooks';
 import { EventEmitter } from 'node:events';

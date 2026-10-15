@@ -76,8 +76,8 @@
  * is resolved 12.
  *
  * The running command cases came with the dispatcher recording the
- * command it runs (`running.ts`). Each sets a record of its own ahead of
- * the invocation, so a record put back is told apart from one cleared,
+ * command it runs (`src/core/command/running.ts`). Each sets a record of
+ * its own ahead of the invocation, so a record put back is told apart from one cleared,
  * and `afterEach` clears it. Five mutations of `dispatch.ts` were driven
  * on 2026-09-23, one run each over this file with 89 pass before, each
  * restored sha256-identical: no record set reddened two cases, none put
@@ -102,8 +102,7 @@
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
-import type { RunningCommand } from './running.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { RafaCommand, RafaContext, RunningCommand } from '../core/command/index.js';
 import type { DangerousPhrases } from '../core/config/index.js';
 import type { OutputStream } from '../core/output/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
@@ -120,7 +119,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CommandExit , versionLine } from '../core/command/index.js';
+import {
+  CommandExit,
+  restoreRunningCommand,
+  runningCommand,
+  setRunningCommand,
+  versionLine,
+} from '../core/command/index.js';
 import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
@@ -130,7 +135,6 @@ import { plantProjectConfig } from '../tests/cli-capture.js';
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
-import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
 const CLI_DIR = fileURLToPath(new URL('./', import.meta.url));

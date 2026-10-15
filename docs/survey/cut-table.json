@@ -3655,13 +3655,6 @@
           "from": "src/core/loop/claude.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
-          "to": "src/cli/running.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/loop/claude.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
           "to": "src/utils/session-env.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -3751,8 +3744,8 @@
         }
       ],
       "fileCounts": {
-        "source": 100,
-        "test": 108,
+        "source": 101,
+        "test": 109,
         "testSupport": 2
       },
       "files": [
@@ -3766,6 +3759,8 @@
         "src/core/command/confirm.ts",
         "src/core/command/index.test.ts",
         "src/core/command/index.ts",
+        "src/core/command/running.test.ts",
+        "src/core/command/running.ts",
         "src/core/command/spends.test.ts",
         "src/core/command/spends.ts",
         "src/core/command/types.test.ts",
@@ -3968,7 +3963,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 85,
+        "src/core/": 87,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3985,8 +3980,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 20,
-      "upwardEdges": 20
+      "remaining": 19,
+      "upwardEdges": 19
     },
     {
       "clearedByIssue118": 0,
@@ -6991,8 +6986,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 264,
-        "test": 467,
+        "source": 263,
+        "test": 466,
         "testSupport": 27
       },
       "files": [
@@ -7086,8 +7081,6 @@
         "src/cli/registry.ts",
         "src/cli/route.test.ts",
         "src/cli/route.ts",
-        "src/cli/running.test.ts",
-        "src/cli/running.ts",
         "src/cli/spends-roster.test.ts",
         "src/cli/spends.ts",
         "src/commands/agent/list.test.ts",
@@ -7756,7 +7749,7 @@
         "src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 35
+        "src/cli/": 33
       },
       "folders": [
         "src/cli/"
@@ -7779,7 +7772,7 @@
     "nonTestEdges": 4427,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 272
+    "upwardEdges": 271
   },
   "unassigned": [
     {

@@ -97,11 +97,12 @@
  * reads the graph, each control held one cross-cluster cycle and the
  * tree as moved held none.
  *
- * `claude.ts` imports four files by value: two of `src/core/`,
- * `src/core/command/command.ts` for `commandSpelling` and
- * `src/core/output/active.ts` for the active output, and two outside
- * it, `src/cli/running.ts` and `src/utils/session-env.ts`. Through them
- * it reached 13 files by value when it moved, and none of the 13
+ * `claude.ts` imports four files by value: three of `src/core/`,
+ * `src/core/command/command.ts` for `commandSpelling`,
+ * `src/core/command/running.ts` for the running command and
+ * `src/core/output/active.ts` for the active output, and one outside
+ * it, `src/utils/session-env.ts`. When it moved, `running.ts` was still
+ * `src/cli/running.ts`; through the four it reached 13 files by value, and none of the 13
  * imported this barrel or `claude.ts` by value. None of the 38 files
  * `sessions.ts` reached did either. Eleven non-test files imported
  * `claude.ts` by value before the move and import this barrel since.

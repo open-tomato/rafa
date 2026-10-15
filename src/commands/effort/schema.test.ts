@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runningCommand } from '../../cli/running.js';
+import { runningCommand } from '../../core/command/index.js';
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
@@ -421,8 +421,9 @@ describe('the refusal reasons and their next steps', () => {
     ];
     const reports = await Promise.all(cases.map(async ({ plant, migrations }) => jsonReport(plant, migrations)));
 
-    // The dispatch scope of src/cli/running.ts (runAsRunningCommand) holds
-    // each dispatch's record to itself, so none leaks once all seven settle.
+    // The dispatch scope of src/core/command/running.ts
+    // (runAsRunningCommand) holds each dispatch's record to itself, so
+    // none leaks once all seven settle.
     expect(runningCommand()).toBeNull();
     expect(reports.map(({ status }) => status)).toEqual([...REFUSAL_REASONS]);
     expect(reports.map(({ nextStep }) => nextStep)).toEqual([
