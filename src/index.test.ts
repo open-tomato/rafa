@@ -1188,6 +1188,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/relations/labels.js', ['LABELS_READS']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
+    ['../../config-schema-issues.js', ['bugRulesOf']],
     ['../../core/command/index.js', ['CommandExit']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../core/git/index.js', ['createGitRunner']],
