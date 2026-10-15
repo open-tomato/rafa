@@ -55,6 +55,19 @@
  * reads a blocker older than the board listing, which the listing's own
  * rows would answer as not read.
  *
+ * It does not move onto `readBlockerStates` (`./blocker-states.ts`),
+ * the listing-then-view reading `rafa issue unblock` and `rafa pr merge`
+ * take. That reading exists because a state listing stops at its limit
+ * and an id past it needs a view of its own; the walk's reader has no
+ * such limit, since {@link blockerStatesOf} reads ANY id, listed or not,
+ * one issue at a time through the walk's memoised reader. Every blocker
+ * is therefore read already, and one that is itself a roadmap line, or
+ * that two lines name, costs no read beyond the one the walk made. A
+ * read that fails — `gh` could not answer, or the board has no issue
+ * for the id — is `null`, so the line holds with the blocker named
+ * `(state not read)`; no reading here tells a dangling id apart, and
+ * none is needed, since neither clears the line.
+ *
  * In `native` mode the line's issue is read off the one board listing
  * the caller holds ({@link BlockerWaiting}), and what it waits on is its
  * `blockedBy` nodes, each with the state GitHub holds for it: no
