@@ -43,8 +43,9 @@
  *    `<home>/.rafa/worktrees`, runs each check as its own session, and
  *    removes the worktree. A git step it refuses is exit 1, naming the
  *    command and what git said; a removal git refuses is a `warn` line.
- * 7. The verdicts. Every check that answered `fail` is filed as an
- *    out-of-scope bug through `triageReport` (`src/triage/triage.ts`), or,
+ * 7. The verdicts. Every check that answered `fail` is filed
+ *    (`./close-triage.ts`) as an out-of-scope bug through `triageReport`
+ *    (`src/triage/triage.ts`), or,
  *    when its criterion names only documentation, sent to the `docs`
  *    channel (`./close-docs.ts`), and the close is refused. A check whose session answered nothing is
  *    neither a pass nor a fail, and refuses the close too, filing
@@ -84,42 +85,16 @@
  *
  * ## Filing a failed check
  *
- * Each failed check is one report of its own, holding one bug and no
- * blocker, handed to `triageReport` with the check session's id, since
- * that session is where the evidence came from, and `failed` as the
- * outcome. The bug is `security: false` and `kind: bug`, its module
- * `epic`, its action `close`, its reproduce `rafa epic close <n>` and no
- * cause: a criterion that does not hold is a product bug, so it goes to
- * the public tracker the chain resolves, resolved once and only when a
- * check failed
- * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
- * standing in for a chain that landed nowhere, so each bug then fails
- * with its refusal). Its
- * `what` names the epic and the criterion, and its `artifact` is
- * {@link failedCheckArtifact}: the epic and the criterion's text on one
- * line, which is what stays the same when the close is run again. The
- * recurrence key is that artifact, stripped of its numbers as
- * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
- * name, which keeps the epic's number, so a second close failing the same
- * criterion comments on the first issue rather than filing another, unless
- * that issue was closed as completed, when a new one is filed in its place
- * (`src/triage/triage.ts`). A criterion whose key finds nothing is compared
- * with the open bugs by its words, as the run's `triage.similarity` settings
- * say, and comments on the nearest at the threshold. No file is read or written at
- * that path: the report carries no blocker, and a blocker is the only
- * thing `triageReport` writes into its tracker file. The feedback holds
- * the check, the commit and the evidence. Triage is handed the project
- * root as the checkout, the git runner the run reads `origin/main` with
- * ({@link EpicCloseSeams.git}), the command's environment and the bug
- * record's rules, `bugRulesOf` over the run's config. When #249's
- * ladder lands it routes these bugs; until then they are filed as out-of-scope bugs are.
- *
- * A failed check whose criterion's text names only documentation
- * (`namesOnlyDocs`, `src/triage/doc-only.ts`) is no bug: in place of the
- * report it is one `unsettled` stale-docs row with no plan stub and one
- * line on the release's stale-docs issue, on the same tracker, the
- * version read once per run ({@link EpicCloseSeams.staleDocsVersion}).
- * `./close-docs.ts` says what is stored and written.
+ * `./close-triage.ts` files each failed check, as a bug through
+ * `triageReport` or as a line on the release's stale-docs issue
+ * (`./close-docs.ts`), and its module note says how: the report, the
+ * recurrence key, the tracker and the lines it writes. With
+ * `board.project.number` set, each bug it filed on the public `github`
+ * tracker is then added to the repository's project and filled
+ * (`addFiledBugs`), every line of that add a warning after the bug's own
+ * line, through the same `gh`, `projectRefresh` and `sleep` seams the
+ * project refresh below takes. The close is refused all the same, with
+ * {@link EPIC_CLOSE_REFUSAL_EXIT}.
  *
  * ## The project refresh
  *
@@ -157,15 +132,12 @@ import type { FindingsWriterSeams } from '../../effort/store/findings.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { CriterionUncheckable, CriterionVerdict, EpicCriterion, VerifyPlanIssue } from '../../epic/verify-plan.js';
 import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/verify-run.js';
-import type { IssueRef, Tracker } from '../../ports/index.js';
-import type { TaskReport } from '../../report/parse.js';
-import type { BugTriage, NamedSecret, TriageOptions, TriageResult } from '../../triage/triage.js';
+import type { Tracker } from '../../ports/index.js';
+import type { TriageOptions, TriageResult } from '../../triage/triage.js';
 
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { readEpicBody } from '../../board/epic-body.js';
 import { PLACEHOLDER_REASON } from '../../board/epic-template.js';
 import { renderCloseComment } from '../../board/epic-trail.js';
@@ -173,7 +145,6 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/ep
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { bugRulesOf } from '../../config-schema-issues.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
@@ -183,14 +154,11 @@ import { selectEffortStore } from '../../effort/store/index.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
 import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
-import { readStaleDocsVersion } from '../../start/stale-docs.js';
-import { unresolvedTracker } from '../../start/triage.js';
-import { localPathRedactor } from '../../triage/local-paths.js';
-import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { readSwitch } from '../plan/plan-files.js';
 
-import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
+import { isDocsOnlyCriterion } from './close-docs.js';
+import { fileFailures } from './close-triage.js';
 import { closeTarget, refreshProjectAfterEpic } from './epic-project.js';
 
 /** The exit code every refusal of the gate ends the command with. */
@@ -429,92 +397,6 @@ export async function planVerification(input: PlanningInput): Promise<VerifyPlan
   return Object.freeze({ status: 'planned', sessionId, verdicts: reading.verdicts, issues: reading.issues });
 }
 
-/** The file name half of a failed check's recurrence key; see the module note. Nothing is at this path. */
-export function closeTriageFile(root: string, epic: number): string {
-  return join(root, '.rafa', `epic-${String(epic)}-close`);
-}
-
-/** A failed check's artifact: what stays the same when the close is run again. */
-export function failedCheckArtifact(epic: number, criterion: EpicCriterion): string {
-  return `epic ${ref(epic)} acceptance criterion: ${oneLine(criterion.text)}`;
-}
-
-/** The report one failed check is filed through `triageReport` as; see the module note. */
-export function failedCheckReport(epic: number, failure: CheckAnswered, commit: string): TaskReport {
-  const { criterion } = failure.check;
-  const feedback = [
-    `Epic ${ref(epic)} was being closed through the closing gate, and this acceptance criterion's check failed.`,
-    '',
-    `Criterion ${String(criterion.number)}:`,
-    criterion.text,
-    '',
-    'Check:',
-    failure.check.check,
-    '',
-    `Evidence, against commit ${commit}:`,
-    failure.evidence,
-  ].join('\n');
-  return Object.freeze({
-    status: null,
-    feedback,
-    findings: [],
-    skillsUsed: [],
-    blockers: [],
-    outOfScopeBugs: [Object.freeze({
-      what: `Epic ${ref(epic)} acceptance criterion ${String(criterion.number)} fails against main: ${oneLine(criterion.text)}`,
-      artifact: failedCheckArtifact(epic, criterion),
-      security: false,
-      kind: 'bug',
-      module: 'epic',
-      action: 'close',
-      reproduce: `rafa epic close ${String(epic)}`,
-      cause: null,
-      extras: [],
-    })],
-    changes: [],
-    staleDocs: [],
-    extras: [],
-  });
-}
-
-/** How a line names an issue: its URL, or its kind and id. */
-function issueName(issue: IssueRef): string {
-  return issue.url ?? `${issue.kind} issue ${issue.externalId}`;
-}
-
-/** The line one filed bug is reported with, and whether it is a warning. */
-export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly text: string; readonly warn: boolean } {
-  const which = `Criterion ${String(criterion.number)}`;
-  switch (bug.action) {
-    case 'filed': {
-      return { text: `${which}: filed on the ${bug.channel} tracker as ${bug.ref === null
-        ? 'an issue'
-        : issueName(bug.ref)}.`, warn: false };
-    }
-    case 'commented': {
-      return { text: `${which}: recurs in ${bug.ref === null
-        ? 'an issue'
-        : issueName(bug.ref)} on the ${bug.channel} tracker; commented on it.`, warn: false };
-    }
-    case 'inherited': {
-      return { text: `${which}: not filed: a test failure the run started with.`, warn: false };
-    }
-    case 'skipped': {
-      return { text: `${which}: not filed: ${bug.problem ?? 'no reason given'}.`, warn: true };
-    }
-    case 'failed': {
-      return { text: `${which}: not filed on the ${bug.channel} tracker: ${bug.problem ?? 'no reason given'}`, warn: true };
-    }
-    case 'repair':
-    case 'follow-up':
-    case 'pr-body':
-    case 'docs': {
-      // Answered only by kind routing, which this run never turns on.
-      return { text: `${which}: not filed: routed to ${bug.action} by its kind.`, warn: true };
-    }
-  }
-}
-
 /** Everything a run writes through, and the seams it runs with, resolved. */
 interface CloseRun {
   readonly context: RafaContext;
@@ -534,65 +416,6 @@ function say(run: CloseRun, text: string): void {
 /** Writes `text` at `warn`. */
 function warn(run: CloseRun, text: string): void {
   run.context.output.warn(text);
-}
-
-/** Files each failed check through `triageReport`, the public tracker resolved once; see the module note. */
-async function fileFailures(run: CloseRun, epic: number, failures: readonly CheckAnswered[], commit: string): Promise<void> {
-  const secrets: readonly NamedSecret[] = namedSecrets(run.config, run.context.env);
-  let tracker: Tracker;
-  try {
-    const resolved = await (run.seams.resolve ?? resolveTracker)({ config: run.config, context: { repoRoot: run.root } });
-    tracker = resolved.tracker;
-  } catch (error) {
-    warn(run, `No tracker resolved, so no failed check is filed: ${messageOf(error)}`);
-    tracker = unresolvedTracker(run.config.trackerDefault, messageOf(error));
-  }
-  const local = localPathRedactor([run.root], run.home);
-  const git = run.seams.git ?? createGitRunner(run.root);
-  const bugRules = bugRulesOf(run.config);
-  const triage = run.seams.triageReport ?? triageReport;
-  let version: string | null = null;
-  const docs = {
-    repoRoot: run.root, epic, tracker, seams: run.seams.findings,
-    redact: (text: string): string => local(redactSecrets(text, secrets)),
-    version: (): string => version ??= (run.seams.staleDocsVersion ?? (() => readStaleDocsVersion({ repoRoot: run.root, checkout: run.root, config: run.config })))(),
-  };
-  for (const failure of failures) {
-    const { criterion } = failure.check;
-    if (isDocsOnlyCriterion(criterion)) {
-      for (const line of await routeDocsOnlyFailure({ ...docs, criterion, sessionId: failure.sessionId })) {
-        if (line.warn) warn(run, line.text);
-        else say(run, line.text);
-      }
-      continue;
-    }
-    try {
-      const result = await triage({
-        repoRoot: run.root,
-        trackerPath: closeTriageFile(run.root, epic),
-        lineNum: 0,
-        dispatch: { sessionId: failure.sessionId, planStub: null, taskLine: `rafa epic close ${String(epic)}` },
-        outcome: 'failed',
-        report: failedCheckReport(epic, failure, commit),
-        tracker,
-        privateTracker: run.seams.privateTracker,
-        secrets,
-        seams: run.seams.findings,
-        similarity: run.config,
-        checkout: run.root,
-        git,
-        env: run.context.env,
-        bugRules,
-      });
-      for (const bug of result.bugs) {
-        const line = bugLine(criterion, bug);
-        if (line.warn) warn(run, line.text);
-        else say(run, line.text);
-      }
-    } catch (error) {
-      warn(run, `Criterion ${String(criterion.number)}: not filed: ${messageOf(error)}`);
-    }
-  }
 }
 
 /** Names each uncheckable criterion, refusing unless `--accept-unchecked` closes over them. */

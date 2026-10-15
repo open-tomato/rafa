@@ -2288,11 +2288,11 @@ New; it replaces no earlier text. What a row or an action added to
   worktree of `origin/main` under `<home>/.rafa/worktrees/epic-<n>`, one
   session per check, the worktree removed after; a git step it refuses
   is exit 1, and a removal it refuses a `warn` line. Each check that
-  answered `fail` is filed through `triageReport` as one report holding
-  one `security: false` bug and no blocker, its artifact the epic and the
-  criterion on one line (`failedCheckArtifact`) and its key's file half
-  `epic-<n>-close` (`closeTriageFile`, a name only: nothing is written
-  there), so a second failing close comments on the first issue, or files
+  answered `fail` is filed (`close-triage.ts`) through `triageReport` as
+  one report holding one `security: false` bug and no blocker, its
+  artifact the epic and the criterion on one line (`failedCheckArtifact`)
+  and its key's file half `epic-<n>-close` (`closeTriageFile`, a name
+  only: nothing is written there), so a second failing close comments on the first issue, or files
   one in its place when the first was closed as completed; the
   public tracker is resolved once, and only when a check failed. A failed
   check whose criterion's text satisfies `namesOnlyDocs`
