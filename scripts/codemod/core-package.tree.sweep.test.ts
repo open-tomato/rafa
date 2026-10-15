@@ -11,12 +11,15 @@ import type { CorePackagePlan } from './core-package';
 
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
+import { SWEEP_TIMEOUT } from '../../src/tests/sweep-timeout';
 import { CORE_FOLDERS, CORE_SOURCE } from '../survey/core-moves';
 import { classifyFile } from '../survey/files';
 
 import { CorePackageError, readCorePackage, reportLines } from './core-package';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TIMEOUT_MS = 120_000;
