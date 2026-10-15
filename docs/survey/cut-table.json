@@ -1,110 +1,5 @@
 {
-  "clearedByIssue118": [
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-load.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-logger.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-board-project.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-errors.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-hub.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-logger.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-loop-continue.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-loop-retries.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-release.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-tests.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-triage.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config-schema.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-wrap-up.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    },
-    {
-      "clearedBy": 118,
-      "from": "src/core/config/config.ts",
-      "fromPackage": "@open-tomato/rafa",
-      "kind": "value",
-      "to": "src/config-schema-hub.ts",
-      "toPackage": "@open-tomato/rafa-cli"
-    }
-  ],
+  "clearedByIssue118": [],
   "graph": "docs/survey/import-graph.json",
   "leftToPlace": [
     {
@@ -185,7 +80,7 @@
     {
       "kind": "source",
       "path": "src/adapters/logger/settings.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -499,6 +394,16 @@
     },
     {
       "kind": "test",
+      "path": "src/commands/config/show.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/commands/config/show.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/commands/describe.test.ts",
       "upwardEdgesIn": 0
     },
@@ -565,6 +470,16 @@
     {
       "kind": "source",
       "path": "src/commands/doctor-cleanup.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/commands/doctor-config.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/commands/doctor-config.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -1464,13 +1379,23 @@
     },
     {
       "kind": "test",
+      "path": "src/config-registry.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/config-registry.ts",
+      "upwardEdgesIn": 9
+    },
+    {
+      "kind": "test",
       "path": "src/config-schema-board-project.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "source",
       "path": "src/config-schema-board-project.ts",
-      "upwardEdgesIn": 3
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -1480,7 +1405,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-errors.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -1490,7 +1415,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-hub.ts",
-      "upwardEdgesIn": 3
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1500,7 +1425,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-issues.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1510,7 +1435,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-logger.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -1520,7 +1445,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-loop-continue.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1530,7 +1455,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-loop-retries.ts",
-      "upwardEdgesIn": 7
+      "upwardEdgesIn": 6
     },
     {
       "kind": "source",
@@ -1545,7 +1470,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-release.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -1555,7 +1480,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-tests.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1565,7 +1490,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-triage.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -1575,7 +1500,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-wrap-up.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1585,6 +1510,36 @@
     {
       "kind": "source",
       "path": "src/config-set.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/config/entry.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/config/entry.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/config/index.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/config/index.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/config/shape.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/config/shape.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -2584,7 +2539,17 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/config-code-spawned.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/config-layers.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/config-parity.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -2600,6 +2565,11 @@
     {
       "kind": "test",
       "path": "src/tests/core-barrels.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-config-sections.sweep.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3253,6 +3223,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test-support",
+      "path": "src/tests/replaying-fake-gh.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test",
       "path": "src/tests/repo-hygiene.sweep.test.ts",
       "upwardEdgesIn": 0
@@ -3622,7 +3597,7 @@
   ],
   "packages": [
     {
-      "clearedByIssue118": 13,
+      "clearedByIssue118": 0,
       "edges": [
         {
           "from": "src/core/adapters/registry.ts",
@@ -3730,116 +3705,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/core/config/config-load.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/adapters/logger/settings.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-load.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-logger.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-board-project.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-errors.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-hub.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-logger.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-loop-continue.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-release.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-tests.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-triage.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "clearedBy": 118,
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/config-schema-wrap-up.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/config/config-schema.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/tiers/routing.ts",
-          "toPackage": "rafa-inventory"
-        },
-        {
           "from": "src/core/config/config-sections.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3861,12 +3726,11 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "clearedBy": 118,
-          "from": "src/core/config/config.ts",
+          "from": "src/core/config/core-section.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
-          "to": "src/config-schema-hub.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "to": "src/tiers/routing.ts",
+          "toPackage": "rafa-inventory"
         },
         {
           "from": "src/core/loop/claude.ts",
@@ -3975,8 +3839,8 @@
         }
       ],
       "fileCounts": {
-        "source": 89,
-        "test": 101,
+        "source": 95,
+        "test": 105,
         "testSupport": 2
       },
       "files": [
@@ -3996,21 +3860,30 @@
         "src/core/config/config-items.ts",
         "src/core/config/config-load.test.ts",
         "src/core/config/config-load.ts",
+        "src/core/config/config-origins.test.ts",
+        "src/core/config/config-origins.ts",
         "src/core/config/config-readers.test.ts",
         "src/core/config/config-readers.ts",
         "src/core/config/config-schema-board.test.ts",
-        "src/core/config/config-schema.test.ts",
         "src/core/config/config-schema.ts",
         "src/core/config/config-sections.test.ts",
         "src/core/config/config-sections.ts",
         "src/core/config/config.test.ts",
         "src/core/config/config.ts",
+        "src/core/config/core-section.test.ts",
+        "src/core/config/core-section.ts",
+        "src/core/config/dangerous.test.ts",
+        "src/core/config/dangerous.ts",
         "src/core/config/index.test.ts",
         "src/core/config/index.ts",
         "src/core/config/load.test.ts",
         "src/core/config/load.ts",
+        "src/core/config/section.test.ts",
+        "src/core/config/section.ts",
         "src/core/config/sections.test.ts",
         "src/core/config/sections.ts",
+        "src/core/config/standard-schema.test.ts",
+        "src/core/config/standard-schema.ts",
         "src/core/git/commit.test.ts",
         "src/core/git/commit.ts",
         "src/core/git/git.test.ts",
@@ -4164,6 +4037,7 @@
         "src/effort/store/wire.ts",
         "src/ports/index.test.ts",
         "src/ports/index.ts",
+        "src/ports/log-level.ts",
         "src/report/parse.test.ts",
         "src/report/parse.ts",
         "src/report/record.test.ts",
@@ -4174,9 +4048,9 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 68,
+        "src/core/": 77,
         "src/effort/store/": 114,
-        "src/ports/": 2
+        "src/ports/": 3
       },
       "folders": [
         "src/core/",
@@ -4191,8 +4065,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 35,
-      "upwardEdges": 48
+      "remaining": 34,
+      "upwardEdges": 34
     },
     {
       "clearedByIssue118": 0,
@@ -4301,6 +4175,13 @@
           "kind": "value",
           "to": "src/schema/frontmatter.ts",
           "toPackage": "rafa-effort"
+        },
+        {
+          "from": "src/inventory/index.ts",
+          "fromPackage": "rafa-inventory",
+          "kind": "value",
+          "to": "src/config-registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/inventory/plugins.ts",
@@ -4509,8 +4390,8 @@
       "name": "rafa-inventory",
       "named": [],
       "rank": 2,
-      "remaining": 25,
-      "upwardEdges": 25
+      "remaining": 26,
+      "upwardEdges": 26
     },
     {
       "clearedByIssue118": 0,
@@ -4593,6 +4474,13 @@
           "toPackage": "rafa-run"
         },
         {
+          "from": "src/board/refs-gate.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/config-registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/board/roadmap-claims.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
@@ -4618,6 +4506,13 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/position.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/board/roadmap.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/config-registry.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -4957,6 +4852,13 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
+          "from": "src/refs/extract.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/config-registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
           "from": "src/refs/outline-cache.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
@@ -4982,6 +4884,13 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/cli/registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/refs/verify.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/config-registry.ts",
           "toPackage": "@open-tomato/rafa-cli"
         }
       ],
@@ -5332,8 +5241,8 @@
         "src/board/trust.ts"
       ],
       "rank": 3,
-      "remaining": 67,
-      "upwardEdges": 67
+      "remaining": 71,
+      "upwardEdges": 71
     },
     {
       "clearedByIssue118": 0,
@@ -5676,8 +5585,8 @@
         }
       ],
       "fileCounts": {
-        "source": 75,
-        "test": 98,
+        "source": 76,
+        "test": 99,
         "testSupport": 2
       },
       "files": [
@@ -5729,6 +5638,8 @@
         "src/commands/pr/retarget.ts",
         "src/commands/pr/show.test.ts",
         "src/commands/pr/show.ts",
+        "src/commands/pr/triage-config-trust.test.ts",
+        "src/commands/pr/triage-config-trust.ts",
         "src/commands/pr/triage-convert.test.ts",
         "src/commands/pr/triage-convert.ts",
         "src/commands/pr/triage-fixtures.test.ts",
@@ -5858,7 +5769,7 @@
         "src/triage/triage.ts"
       ],
       "filesByFolder": {
-        "src/commands/pr/": 71,
+        "src/commands/pr/": 73,
         "src/pr/": 65,
         "src/triage/": 37
       },
@@ -6155,6 +6066,13 @@
           "from": "src/start/pr-lifecycle.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
+          "to": "src/config-registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/start/pr-lifecycle.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
           "to": "src/utils/git.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -6171,6 +6089,13 @@
           "kind": "value",
           "to": "src/effort/sync/doctor-reading.ts",
           "toPackage": "rafa-effort"
+        },
+        {
+          "from": "src/start/preflight.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/config-registry.ts",
+          "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/start/preflight.ts",
@@ -6763,8 +6688,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 91,
-      "upwardEdges": 91
+      "remaining": 93,
+      "upwardEdges": 93
     },
     {
       "clearedByIssue118": 0,
@@ -6823,6 +6748,13 @@
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/release/scaffold.ts",
+          "fromPackage": "rafa-release",
+          "kind": "value",
+          "to": "src/config-registry.ts",
           "toPackage": "@open-tomato/rafa-cli"
         }
       ],
@@ -6917,8 +6849,8 @@
       "name": "rafa-release",
       "named": [],
       "rank": 6,
-      "remaining": 8,
-      "upwardEdges": 8
+      "remaining": 9,
+      "upwardEdges": 9
     },
     {
       "clearedByIssue118": 0,
@@ -6928,6 +6860,13 @@
           "fromPackage": "rafa-effort",
           "kind": "value",
           "to": "src/utils/plan-stamp.ts",
+          "toPackage": "@open-tomato/rafa-cli"
+        },
+        {
+          "from": "src/effort/collect.ts",
+          "fromPackage": "rafa-effort",
+          "kind": "value",
+          "to": "src/config-registry.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -7040,8 +6979,8 @@
         "src/schema/frontmatter.ts"
       ],
       "rank": 7,
-      "remaining": 4,
-      "upwardEdges": 4
+      "remaining": 5,
+      "upwardEdges": 5
     },
     {
       "clearedByIssue118": 0,
@@ -7132,9 +7071,9 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 257,
-        "test": 459,
-        "testSupport": 26
+        "source": 263,
+        "test": 468,
+        "testSupport": 27
       },
       "files": [
         "src/adapters/learning/held.test.ts",
@@ -7252,6 +7191,8 @@
         "src/commands/config/set-agent-integration.test.ts",
         "src/commands/config/set.test.ts",
         "src/commands/config/set.ts",
+        "src/commands/config/show.test.ts",
+        "src/commands/config/show.ts",
         "src/commands/describe.test.ts",
         "src/commands/describe.ts",
         "src/commands/docs/plan.test.ts",
@@ -7266,6 +7207,8 @@
         "src/commands/doctor-cleanup-row.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-cleanup.ts",
+        "src/commands/doctor-config.test.ts",
+        "src/commands/doctor-config.ts",
         "src/commands/doctor-deep-env.test.ts",
         "src/commands/doctor-deep-env.ts",
         "src/commands/doctor-deep-needs.test.ts",
@@ -7447,6 +7390,8 @@
         "src/commands/wrap.ts",
         "src/config-locked.test.ts",
         "src/config-locked.ts",
+        "src/config-registry.test.ts",
+        "src/config-registry.ts",
         "src/config-schema-board-project.test.ts",
         "src/config-schema-board-project.ts",
         "src/config-schema-errors.test.ts",
@@ -7472,6 +7417,12 @@
         "src/config-schema-wrap-up.ts",
         "src/config-set.test.ts",
         "src/config-set.ts",
+        "src/config/entry.test.ts",
+        "src/config/entry.ts",
+        "src/config/index.test.ts",
+        "src/config/index.ts",
+        "src/config/shape.test.ts",
+        "src/config/shape.ts",
         "src/docs/open-lines.test.ts",
         "src/docs/open-lines.ts",
         "src/docs/release-issue.test.ts",
@@ -7674,10 +7625,13 @@
         "src/tests/command-output.test.ts",
         "src/tests/commands-direction.sweep.test.ts",
         "src/tests/commit-refusals.test.ts",
+        "src/tests/config-code-spawned.test.ts",
         "src/tests/config-layers.test.ts",
+        "src/tests/config-parity.test.ts",
         "src/tests/context-page-imports.sweep.test.ts",
         "src/tests/core-barrel-load-spawned.test.ts",
         "src/tests/core-barrels.sweep.test.ts",
+        "src/tests/core-config-sections.sweep.test.ts",
         "src/tests/core-reexport-bindings.test.ts",
         "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
@@ -7808,6 +7762,7 @@
         "src/tests/release-settle-squash-merge-spawned-cli.test.ts",
         "src/tests/release-stage-fixtures.ts",
         "src/tests/release-stage-integration.test.ts",
+        "src/tests/replaying-fake-gh.ts",
         "src/tests/repo-hygiene.sweep.test.ts",
         "src/tests/report-ask-live.test.ts",
         "src/tests/report-ask.test.ts",
@@ -7898,13 +7853,13 @@
     }
   ],
   "totals": {
-    "clearedByIssue118": 13,
-    "files": 1947,
-    "leftToPlace": 700,
-    "nonTestEdges": 4329,
+    "clearedByIssue118": 0,
+    "files": 1975,
+    "leftToPlace": 716,
+    "nonTestEdges": 4410,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 291
+    "upwardEdges": 286
   },
   "unassigned": [
     {
