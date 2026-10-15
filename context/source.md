@@ -24,7 +24,7 @@ spells out, and the shapes the lint config forces.
   `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
 - **Every `import type` line forms one `import/order` group**
-  (`sharedRules.mjs`), and no short rule predicts its order: neither plain
+  (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its order: neither plain
   name order, "every sibling before every parent", nor path depth first,
   as this bullet read until 2026-09-24. `src/plan/risk.ts` puts its two
   `./risk/` lines first and its `../core/` and `../utils/` lines after,
@@ -387,7 +387,9 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   includes theirs. `bun run lint` lints package code from the root config like
   `src/`, its `testdata/` folders included, and so does the runner's lint step
   on a task's diff. The import names resolve for `import/no-unresolved`
-  because `eslint.base.mjs`'s resolver lists `./packages/*/tsconfig.json`
+  because the resolver of `packages/eslint-config/base.mjs`, the shared
+  config the root `eslint.config.mjs` imports as
+  `@open-tomato/rafa-eslint-config`, lists `./packages/*/tsconfig.json`
   beside the root `tsconfig.json`; without that entry, `bunx eslint packages`
   reported 21 `import/no-unresolved` errors (measured on ESLint 9.39.5). Two
   globs make several projects, so the resolver also sets
@@ -453,10 +455,10 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 
 ### The size cap no gate reads
 
-**The 800-line cap is a convention only.** `eslint.base.mjs`,
-`eslint.config.mjs` and `sharedRules.mjs` carry no `max-lines` rule, so
-nothing refuses an oversized module and a file crosses the cap without
-any capture going red. Count the file with `wc -l` when a task adds to one
+**The 800-line cap is a convention only.** The root `eslint.config.mjs`
+and the `base.mjs` and `sharedRules.mjs` of `packages/eslint-config` carry
+no `max-lines` rule, so nothing refuses an oversized module and a file
+crosses the cap without any capture going red. Count the file with `wc -l` when a task adds to one
 already near the cap; a module that has to grow puts the new concern in
 a new file, and a note that has outgrown its module can move to the
 `context/` page that owns the subject. Some modules including

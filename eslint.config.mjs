@@ -1,4 +1,4 @@
-import baseConfig from './eslint.base.mjs';
+import baseConfig from '@open-tomato/rafa-eslint-config';
 
 /**
  * Root leaf: lints src/, scripts/, packages/ and root-level files.

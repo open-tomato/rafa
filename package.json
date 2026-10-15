@@ -88,6 +88,7 @@
     "@eslint/markdown": "^8.0.3",
     "@open-tomato/define-config": "0.5.0",
     "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-eslint-config": "workspace:*",
     "@open-tomato/rafa-typescript-config": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "^1.4.0",

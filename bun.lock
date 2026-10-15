@@ -9,6 +9,7 @@
         "@eslint/markdown": "^8.0.3",
         "@open-tomato/define-config": "0.5.0",
         "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-eslint-config": "workspace:*",
         "@open-tomato/rafa-typescript-config": "workspace:*",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/bun": "^1.4.0",
@@ -21,6 +22,23 @@
         "globals": "^17.12.0",
         "jsonc-eslint-parser": "^3.1.0",
         "typescript": "^5.9.3",
+        "typescript-eslint": "^8.69.0",
+      },
+    },
+    "packages/eslint-config": {
+      "name": "@open-tomato/rafa-eslint-config",
+      "version": "0.0.0",
+      "dependencies": {
+        "@eslint/js": "^9.39.4",
+        "@eslint/markdown": "^8.0.3",
+        "@stylistic/eslint-plugin": "^5.10.0",
+        "@typescript-eslint/parser": "^8.69.0",
+        "eslint": "^9.39.4",
+        "eslint-import-resolver-typescript": "^4.4.4",
+        "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-jsonc": "^3.4.2",
+        "globals": "^17.12.0",
+        "jsonc-eslint-parser": "^3.1.0",
         "typescript-eslint": "^8.69.0",
       },
     },
@@ -92,6 +110,8 @@
     "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
 
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
+
+    "@open-tomato/rafa-eslint-config": ["@open-tomato/rafa-eslint-config@workspace:packages/eslint-config"],
 
     "@open-tomato/rafa-hub": ["@open-tomato/rafa-hub@workspace:packages/rafa-hub"],
 
