@@ -395,12 +395,14 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 
 /**
  * The runtime names the config barrel holds and the root does not
- * publish: core's section, the item readers and the section registry
- * with its key indexes and its load hook.
+ * publish: core's section, the routing defaults, the item readers and
+ * the section registry with its key indexes and its load hook.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
   'CORE_SECTION',
   'ConfigSectionError',
+  'DEFAULT_ROUTES',
+  'DEFAULT_ROUTING',
   'EMPTY_CONFIG_REGISTRY',
   'MODULE_SOURCE_KEYS',
   'OPTIONAL_ITEM_KEYS',

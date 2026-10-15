@@ -94,7 +94,7 @@
  *
  * The spec spells `routing` as a map of a task shape to an agent.
  * {@link routeTarget} reads one value; the map around it is `mapOf`
- * again, and the defaults are `tiers/routing.ts`'s. Two readings are
+ * again, and the defaults are `default-routing.ts`'s. Two readings are
  * this module's:
  *
  *   - A value is an agent name, any non-empty string, or `false`, a

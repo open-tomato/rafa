@@ -22,10 +22,10 @@ the shape discriminates where the verb does not.
 <!-- routing-table:end -->
 
 **This table is generated from rafa's `routing` defaults**
-(`DEFAULT_ROUTES` in `src/tiers/routing.ts`) by `src/tiers/routing-table.ts`,
-and `routing-table.test.ts` fails when the page and the generator
-disagree, so change a row there and regenerate the table rather than
-editing it here. A project's own config (`.rafa/config.yaml`, or a
+(`DEFAULT_ROUTES` in `src/core/config/default-routing.ts`) by
+`src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
+the page and the generator disagree, so change a row there and
+regenerate the table rather than editing it here. A project's own config (`.rafa/config.yaml`, or a
 `rafa.config.ts` or `rafa.config.mjs`) can add, re-point or remove a row
 under `routing`, and the planner reads the resolved map
 from its `{ROUTING}` slot rather than from this page.

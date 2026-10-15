@@ -2873,6 +2873,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test",
+      "path": "src/tests/loop-reexports.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test-support",
       "path": "src/tests/loop-scratch.ts",
       "upwardEdgesIn": 0
@@ -3619,13 +3624,6 @@
           "toPackage": "rafa-pr"
         },
         {
-          "from": "src/core/config/core-section.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/tiers/routing.ts",
-          "toPackage": "rafa-inventory"
-        },
-        {
           "from": "src/ports/index.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
@@ -3895,8 +3893,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 5,
-      "upwardEdges": 5
+      "remaining": 4,
+      "upwardEdges": 4
     },
     {
       "clearedByIssue118": 0,
@@ -6902,7 +6900,7 @@
       "edges": [],
       "fileCounts": {
         "source": 264,
-        "test": 465,
+        "test": 466,
         "testSupport": 27
       },
       "files": [
@@ -7519,6 +7517,7 @@
         "src/tests/loop-events-file-integration.test.ts",
         "src/tests/loop-events-output.test.ts",
         "src/tests/loop-output.test.ts",
+        "src/tests/loop-reexports.test.ts",
         "src/tests/loop-scratch.ts",
         "src/tests/loop-session-fixtures.ts",
         "src/tests/loop-sessions.test.ts",
@@ -7682,12 +7681,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2001,
-    "leftToPlace": 717,
-    "nonTestEdges": 4449,
+    "files": 2002,
+    "leftToPlace": 718,
+    "nonTestEdges": 4448,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 257
+    "upwardEdges": 256
   },
   "unassigned": [
     {

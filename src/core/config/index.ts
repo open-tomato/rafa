@@ -1,13 +1,13 @@
 /**
  * The barrel over the config's schema and its layers: every name
  * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`,
- * `config.ts`, `dangerous.ts` and `scope.ts` export, less the names the
+ * `config.ts`, `dangerous.ts`, `scope.ts` and `default-routing.ts` export, less the names the
  * `sections.ts` barrel holds, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the seven
+ * A file outside `src/core/` imports this file and never the eight
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the seven directly and never this
+ * file inside `src/core/` imports the eight directly and never this
  * file.
  *
  * ## The barrels hold no name in common
@@ -40,13 +40,14 @@
  * be learned from. A file that used to take `ConfigError` and
  * `OUTPUT_MODES` in one line from `config.js` now spells two lines.
  *
- * ## Why one barrel can hold all seven
+ * ## Why one barrel can hold all eight
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. One of the seven
- * files behind this one imports outward by value: `core-section.ts`
- * reads `src/tiers/routing.ts`, which imports this barrel with
- * `import type` alone, erased before anything loads. No file behind it
+ * imports the barrel back by value is a runtime cycle. None of the
+ * eight files behind this one imports outward by value:
+ * `core-section.ts` reads the routing defaults from `default-routing.ts`
+ * beside it, and `src/tiers/routing.ts` imports them from this barrel by
+ * value with nothing here importing it back. No file behind it
  * imports a section file (`src/config-schema-*.ts`), by value or as a
  * type: `config-merged.ts`, which spread the eleven into one schema,
  * was retired when its importers moved to `src/config-registry.ts`,
@@ -55,7 +56,7 @@
  * holds the rule for every file under `src/core/`. The registry imports
  * this barrel by value and nothing here imports the registry. A section
  * file reads its values from `sections.ts`, which imports none of the
- * seven, and adds its fields to `RafaConfig` with a `declare module` on
+ * eight, and adds its fields to `RafaConfig` with a `declare module` on
  * `config-schema.ts`, which the checker follows and which loads
  * nothing. `config-schema.ts` and `section.ts` import types alone.
  *
@@ -112,14 +113,14 @@
  *
  * The published surface is narrower than this file. `src/index.ts`
  * re-exports part of it, and of the runtime names leaves out core's
- * section, the item readers, `config.ts`'s two document readers the
- * loader reads a scope through, and the section registry with its key
- * indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
- * `activeSettingByKey` and twenty-six more), which `src/index.test.ts`
+ * section, the routing defaults, the item readers, `config.ts`'s two
+ * document readers the loader reads a scope through, and the section
+ * registry with its key indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
+ * `activeSettingByKey` and twenty-eight more), which `src/index.test.ts`
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
- * `index.test.ts` holds the list to the seven files: every name any of
+ * `index.test.ts` holds the list to the eight files: every name any of
  * them exports and `sections.ts` does not is here once, as the same
  * binding, and no other name is here.
  */
@@ -156,6 +157,7 @@ export type {
 } from './config.js';
 export type { DangerousPhrases } from './dangerous.js';
 export type { ProjectFound, Scope } from './scope.js';
+export type { Route } from './default-routing.js';
 
 export {
   MODULE_SOURCE_KEYS,
@@ -202,3 +204,4 @@ export {
   writeDangerousPassLines,
 } from './dangerous.js';
 export { scopeAt } from './scope.js';
+export { DEFAULT_ROUTES, DEFAULT_ROUTING } from './default-routing.js';
