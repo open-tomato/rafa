@@ -1,13 +1,14 @@
 /**
- * The barrel over the plan parser, the plan-file helpers, the plan stamp
- * and the task declaration parser: every name `parse.ts`,
- * `plan-files.ts`, `plan-stamp.ts` and `declaration.ts` export, and
- * nothing else.
+ * The barrel over the plan parser, the plan-file helpers, the plan stamp,
+ * the task declaration parser, the blocker comment and the tracker path:
+ * every name `parse.ts`, `plan-files.ts`, `plan-stamp.ts`,
+ * `declaration.ts`, `blocker-comment.ts` and `tracker-path.ts` export,
+ * and nothing else.
  *
- * A file outside `src/core/` imports this file and never the four behind
- * them (`scripts/survey/core-barrels.ts` measures that, and
+ * A file outside `src/core/` imports this file and never the six behind
+ * it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the four directly and never this file.
+ * file inside `src/core/` imports the six directly and never this file.
  * None outside this folder does today.
  *
  * ## What sits behind it
@@ -22,7 +23,11 @@
  *     it dispatches, and the readers of a stub from a prompt or a path;
  *   - `declaration.ts`: the routing declaration a task line may carry
  *     in a trailing brace block, its keys and value sets, and the flags
- *     it resolves to.
+ *     it resolves to;
+ *   - `blocker-comment.ts`: the blocker and repairs comments a tracker's
+ *     task line may trail, written, escaped and read back, with the
+ *     pieces the tracker's line writers put a comment back with;
+ *   - `tracker-path.ts`: the tracker path a plan file is tracked in.
  *
  * ## Why the block reader is not here
  *
@@ -31,11 +36,12 @@
  * here, sits alone behind `block-reader.ts`.
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. `parse.ts`
- * imports `src/utils/tracker.ts` by value, for `splitBlockerComment`,
- * and that file imports `readRafaBlocks` of `blocks.ts` by value. With
- * `blocks.ts` behind this barrel the tracker would import this file,
- * and this file `parse.ts`: a cycle of three.
+ * imports the barrel back by value is a runtime cycle. When the split
+ * was made, `parse.ts` imported `src/utils/tracker.ts` by value, for
+ * `splitBlockerComment`, and that file imports `readRafaBlocks` of
+ * `blocks.ts` by value. With `blocks.ts` behind this barrel the tracker
+ * would have imported this file, and this file `parse.ts`: a cycle of
+ * three.
  *
  * Measured when the three moved: the value imports of the non-test
  * files under `src/` and `packages/` held six cycles before the move and
@@ -64,6 +70,14 @@
  * core. `plan-stamp.ts` imports no file by value, and `declaration.ts`
  * only the store's `effort-levels.ts`, which imports none.
  *
+ * `blocker-comment.ts` and `tracker-path.ts` were cut out of
+ * `src/utils/tracker.ts`, which stays above core and re-exports their
+ * names. `parse.ts` now reads `splitBlockerComment` from
+ * `blocker-comment.ts`, so no file of this folder imports the tracker,
+ * and the tracker imports this barrel by value with no cycle back. The
+ * block reader stays split as it was made: the plan keeps the barrel
+ * listed as it is.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the other core
@@ -73,11 +87,12 @@
  * `src/plan/index.ts`, the `./plan` entry, re-exports `parsePlan`,
  * `PLAN_BLOCK_KINDS`, `PLAN_HEADER_FIELDS` and ten types of `parse.ts`
  * from here. It leaves out `PLAN_RELEASE_LEVELS`, `PlanReleaseLevel` and
- * every name of `plan-files.ts`, `plan-stamp.ts` and `declaration.ts`, as it
- * did before the move.
+ * every name of `plan-files.ts`, `plan-stamp.ts`, `declaration.ts`,
+ * `blocker-comment.ts` and `tracker-path.ts`, as it did before the
+ * moves.
  * `src/tests/entry-exports.test.ts` pins that entry's names.
  *
- * `index.test.ts` holds the list to the four files: every name any
+ * `index.test.ts` holds the list to the six files: every name any
  * exports is here once, as the same binding, no other name is here, and
  * no name here is on the other plan barrel.
  */
@@ -109,6 +124,7 @@ export type {
   TestScope,
 } from './declaration.js';
 export type { PlansDir, TaskCounts } from './plan-files.js';
+export type { BlockerSplit, TrailingComments } from './blocker-comment.js';
 
 export {
   AGENT_OWNED_KEYS,
@@ -134,6 +150,17 @@ export {
   stripTaskDeclaration,
   TEST_SCOPES,
 } from './declaration.js';
+export {
+  BLOCKER_GAP,
+  blockerComment,
+  commentText,
+  escapeBlockerText,
+  keptRepairs,
+  repairsComment,
+  splitBlockerComment,
+  splitTrailingComments,
+  unescapeBlockerText,
+} from './blocker-comment.js';
 export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS, PLAN_RELEASE_LEVELS } from './parse.js';
 export {
   checkbox,
@@ -149,3 +176,4 @@ export {
   stubOfPlanFile,
 } from './plan-files.js';
 export { isStampableStub, planStampLine, planStubFromPath, planStubFromPrompt, stampPrompt } from './plan-stamp.js';
+export { trackerPathFor } from './tracker-path.js';

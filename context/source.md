@@ -227,8 +227,10 @@ alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
 from which `development-build.ts` imports `loop/index.ts` back.
-`plan/block-reader.ts` stands alone, because `parse.ts` imports
-`src/utils/tracker.ts`, which imports `blocks.ts` back.
+`plan/block-reader.ts` stands alone, split while `parse.ts` imported
+`src/utils/tracker.ts`, which imports `blocks.ts` back; `parse.ts` now
+reads `plan/blocker-comment.ts` instead and no core file imports the
+tracker, so the split stands as it was made.
 
 ### The cut table
 

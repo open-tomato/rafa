@@ -43,7 +43,7 @@
  * ticks a line to. Lines are the same `split('\n')`, and a task's text
  * is its capture trimmed, as `findNextTask` trims it, with a trailing
  * `<!-- blocked: ... -->` comment taken off, as `findNextTask` takes it
- * off through `splitBlockerComment` (`utils/tracker.ts`). The model does
+ * off through `splitBlockerComment` (`blocker-comment.ts`). The model does
  * not carry the comment's text. So outside a
  * `rafa:*` block never closed, a line is an open task of the model
  * exactly when `findNextTask` can dispatch it, with the same text,
@@ -163,8 +163,7 @@
 import type { RafaBlock } from './blocks.js';
 import type { TaskDeclaration } from './declaration.js';
 
-import { splitBlockerComment } from '../../utils/tracker.js';
-
+import { splitBlockerComment } from './blocker-comment.js';
 import { readRafaBlocks } from './blocks.js';
 import { parseTaskDeclaration } from './declaration.js';
 import { isStampableStub } from './plan-stamp.js';

@@ -3590,7 +3590,7 @@
     {
       "kind": "source",
       "path": "src/utils/tracker.ts",
-      "upwardEdgesIn": 23
+      "upwardEdgesIn": 21
     }
   ],
   "order": [
@@ -3638,13 +3638,6 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/core/loop/session-readings.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/core/loop/sessions.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "value",
@@ -3664,13 +3657,6 @@
           "kind": "type",
           "to": "src/suite/run.ts",
           "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/core/plan/parse.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/ports/index.ts",
@@ -3929,8 +3915,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 11,
-      "upwardEdges": 11
+      "remaining": 9,
+      "upwardEdges": 9
     },
     {
       "clearedByIssue118": 0,
@@ -7719,10 +7705,10 @@
     "clearedByIssue118": 0,
     "files": 1989,
     "leftToPlace": 718,
-    "nonTestEdges": 4438,
+    "nonTestEdges": 4437,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 263
+    "upwardEdges": 261
   },
   "unassigned": [
     {

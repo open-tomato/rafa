@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 1989 files, 1961 of them in 10 packages (718 left to place) and 28 in 3 unassigned folders. Of the 4438 edges between two files neither of which is a test, value and type alike, 263 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 1989 files, 1961 of them in 10 packages (718 left to place) and 28 in 3 unassigned folders. Of the 4437 edges between two files neither of which is a test, value and type alike, 261 point upward, 0 of them cleared by #118, and 78 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -10,7 +10,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 
 | Rank | Package | Files | Source | Test | Test support | Upward edges | Cleared by #118 | Remaining |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `@open-tomato/rafa` | 217 | 105 | 110 | 2 | 11 | 0 | 11 |
+| 1 | `@open-tomato/rafa` | 217 | 105 | 110 | 2 | 9 | 0 | 9 |
 | 2 | `rafa-inventory` | 102 | 51 | 51 | 0 | 26 | 0 | 26 |
 | 3 | `rafa-board` | 303 | 136 | 160 | 7 | 71 | 0 | 71 |
 | 4 | `rafa-pr` | 177 | 76 | 99 | 2 | 48 | 0 | 48 |
@@ -46,7 +46,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `@open-tomato/rafa` | `rafa-board` | 1 |
 | `@open-tomato/rafa` | `rafa-pr` | 1 |
 | `@open-tomato/rafa` | `rafa-run` | 1 |
-| `@open-tomato/rafa` | `@open-tomato/rafa-cli` | 5 |
+| `@open-tomato/rafa` | `@open-tomato/rafa-cli` | 3 |
 | `rafa-inventory` | `rafa-run` | 1 |
 | `rafa-inventory` | `rafa-effort` | 16 |
 | `rafa-inventory` | `@open-tomato/rafa-cli` | 9 |
@@ -69,7 +69,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 
 | File | Upward edges in | Counted in | Placed |
 | --- | --- | --- | --- |
-| `src/utils/tracker.ts` | 23 | `@open-tomato/rafa-cli` | left to place |
+| `src/utils/tracker.ts` | 21 | `@open-tomato/rafa-cli` | left to place |
 | `src/schema/frontmatter.ts` | 15 | `rafa-effort` | by rule |
 | `src/utils/declaration.ts` | 15 | `@open-tomato/rafa-cli` | left to place |
 | `src/commands/plan/plan-files.ts` | 13 | `@open-tomato/rafa-cli` | left to place |
@@ -102,7 +102,7 @@ No rule holds these 718 files. By folder, with the upward edges that end on its 
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
-| `src/utils/` | 16 | 9 | 51 |
+| `src/utils/` | 16 | 9 | 49 |
 | `src/` | 37 | 19 | 22 |
 | `src/project/` | 27 | 13 | 19 |
 | `src/commands/plan/` | 31 | 16 | 16 |
