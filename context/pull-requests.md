@@ -713,10 +713,14 @@ the session check 3 is part of, so a refusal from it spends no session:
    target appears, prints `🔖 --accept-refs: re-stamped <count> references of
    issue #<n> as reviewed.` with each row it let through, and plans.
    `dangerous.acceptStaleRefs: true` in the config does the same on every run
-   and names itself in that line; it also prints one warn line at the very
-   start of a board-route run that is not `--dry-run`, before any board read,
-   so a forgotten setting is seen before anything is spent. When both are on,
-   the flag is the one named.
+   and names itself in that line; its one warn line is the loader's pass
+   line for the key, written when the config is loaded and so before any
+   board read, ending `; check 4 re-stamps every reference of the spec as
+   reviewed and refuses none on this run` (the phrase `plan create`
+   declares, `src/commands/plan/refs-check.ts`), so a forgotten setting is
+   seen before anything is spent. It is printed on every `plan create` run
+   with the key on, a `--spec` or `--dry-run` one included. When both are
+   on, the flag is the one named.
 
 `--skip-review` bypasses check 3 only, and the plan's `rafa:plan` block
 records `review: skipped`. No flag but `--accept-refs`, and no setting

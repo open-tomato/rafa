@@ -61,10 +61,12 @@
  * asked for. Three cases: refused with exit 2 and no session, planned
  * under `--accept-refs` with the `absent` stamp left in the snapshot,
  * and planned with `dangerous.acceptStaleRefs: true` in the config,
- * whose pass line is the run's first. Dropping the `checkCreateRefs`
- * call from `src/plan.ts` reddened all three, and dropping the
- * `announceCreateRefs` call reddened the third alone (2026-09-24, 25
- * and 27 pass of 28, the module restored and checked with `shasum -c`).
+ * whose pass line is the run's first and its one line for the key,
+ * ending with the words check 4's own line printed before it was folded
+ * into the loader's ({@link ACCEPT_STALE_REFS_WORDS}). Dropping the
+ * `checkCreateRefs` call from `src/plan.ts` reddened all three
+ * (2026-09-24, 25 of 28, the module restored and checked with
+ * `shasum -c`).
  *
  * That every `--spec` case is green is a reading of its own: the board
  * seams are built for every run (`src/board/plan-spec.ts`) and a file
@@ -186,7 +188,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { epicContextArgs } from './board/epic-context.js';
 import { specPath } from './board/naming.js';
-import { acceptStaleRefsPassLine } from './board/refs-gate.js';
 import { loadConfig } from './core/config/load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
@@ -236,6 +237,14 @@ const ISSUE = {
  * repository tracks, so check 4 reads it `dangling`.
  */
 const GONE_BODY = completeSpecBody('Spec: the board routes', 'Touches `src/gone.ts`.');
+
+/**
+ * The words check 4's own line printed for `dangerous.acceptStaleRefs`
+ * before it was folded into the loader's pass line, written out here
+ * rather than read off the source, so a phrase that drifts from them
+ * reddens the case.
+ */
+const ACCEPT_STALE_REFS_WORDS = 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run';
 
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';
@@ -942,17 +951,16 @@ describe('rafa plan through the adapter registry', () => {
     expect(readRecord(scratch)).toMatchObject({ request: { specPath: snapshot } });
   }, 30_000);
 
-  it('prints the loader pass line of dangerous.acceptStaleRefs, then the one of check 4, and plans past check 4 with the setting on', () => {
+  it('prints one line for dangerous.acceptStaleRefs, the loader pass line ending with check 4\'s words, and plans past check 4 with the setting on', () => {
     const scratch = plantScratch({ body: GONE_BODY, config: 'dangerous:\n  acceptStaleRefs: true\n' });
 
     const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
 
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
     const configFile = join(realpathSync(scratch.repo), '.rafa', 'config.yaml');
-    expect(run.stdout.split('\n').slice(0, 2)).toEqual([
-      `warn: dangerous.acceptStaleRefs: true (${configFile}, entry 0)`,
-      `warn: ${acceptStaleRefsPassLine()}`,
-    ]);
+    const lines = run.stdout.split('\n');
+    expect(lines[0]).toBe(`warn: dangerous.acceptStaleRefs: true (${configFile}, entry 0); ${ACCEPT_STALE_REFS_WORDS}`);
+    expect(lines.filter((line) => line.startsWith('warn:') && line.includes('dangerous.acceptStaleRefs'))).toHaveLength(1);
     expect(run.stdout).toContain('🔖 dangerous.acceptStaleRefs: re-stamped 1 reference of issue #20 as reviewed.');
     expect(existsSync(scratch.record)).toBe(true);
   }, 30_000);

@@ -235,7 +235,7 @@ import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
-import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
+import { checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
@@ -613,9 +613,6 @@ export default async function plan(
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
-  // Before any board read, so an operator who forgot the setting is told
-  // before anything is spent (`commands/plan/refs-check.ts`).
-  announceCreateRefs(args, dangerousAcceptStaleRefs);
 
   // The spec, the cheap refusals over it, then the claim on its issue,
   // all before any session is paid for ("The claim").

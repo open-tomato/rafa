@@ -49,10 +49,12 @@
  * each target is read once: a `gh issue view` per issue, not two.
  *
  * The flag wins when both are on, since it is what was typed for this
- * run. The config's own line is printed once at the START of the run by
- * {@link announceAcceptStaleRefs}, before any board read, so an
- * operator who forgot the setting is told before anything is spent,
- * and not only when a reference would have refused.
+ * run. The config's own line is the loader's pass line for the key
+ * (`src/core/config/dangerous.ts`), written when the config is loaded
+ * and so before any board read, ending with the phrase `plan create`
+ * declares for it (`src/commands/plan/refs-check.ts`): an operator who
+ * forgot the setting is told before anything is spent, and not only
+ * when a reference would have refused.
  *
  * ## What cannot be read
  *
@@ -141,21 +143,6 @@ export function refsAcceptance(flag: boolean, acceptStaleRefs: boolean): RefsAcc
   if (flag) return 'flag';
   if (acceptStaleRefs) return 'config';
   return 'none';
-}
-
-/** The one line a run with `dangerous.acceptStaleRefs` on starts with. */
-export function acceptStaleRefsPassLine(): string {
-  return `⚠️  ${ACCEPT_STALE_REFS_KEY} is on: check 4 re-stamps every reference of the spec as reviewed`
-    + ' and refuses none on this run.';
-}
-
-/**
- * Prints {@link acceptStaleRefsPassLine} when `acceptStaleRefs` is on,
- * and nothing when it is off. Called once, at the start of a `plan
- * create` run; see the module note.
- */
-export function announceAcceptStaleRefs(acceptStaleRefs: boolean, output: Output = activeOutput()): void {
-  if (acceptStaleRefs) output.warn(acceptStaleRefsPassLine());
 }
 
 /** True for a row check 4 refuses unless the run accepts it. */

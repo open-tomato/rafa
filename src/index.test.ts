@@ -467,7 +467,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
-    ['./refs-check.js', ['registryRoster']],
+    ['./refs-check.js', ['CREATE_DANGEROUS_PHRASES', 'registryRoster']],
   ]],
   ['./commands/plan/list.js', [
     ['../../core/plan/index.js', ['formatCounts', 'plural']],
@@ -775,7 +775,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['./merge-cleanup.js', ['cleanUpAfterMerge', 'INDENT', 'reportFollowUps']],
     ['./merge-freed.js', ['freedAfterMerge']],
-    ['./merge-guard.js', ['guardBeforeMerge']],
+    ['./merge-guard.js', ['guardBeforeMerge', 'MERGE_DANGEROUS_PHRASES']],
     ['./merge-project.js', ['refreshProjectAfterMerge']],
     ['./merge-refuse.js', ['refuseFromGit']],
     ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
