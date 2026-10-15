@@ -8,8 +8,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from './core-moves';
 import {
   BASELINE_PATH,
+  CORE_PACKAGE_UNIT,
+  CORE_TEST_PREFIXES,
   against,
   compareToBaseline,
   computeTestIndex,
@@ -19,6 +22,7 @@ import {
   main,
   parseBaseline,
   parseMode,
+  pathBeforePackage,
   readCommit,
   renderComparison,
   renderTestIndexBaselineJson,
@@ -297,6 +301,19 @@ describe('the rules of the comparison', () => {
   it('leave the index of a tree with no src/core/ as the survey counts it', () => {
     expect(computeTestIndex(plantedInput(), coreRules())).toEqual(plantedIndex());
   });
+
+  it('count every file under the package source as the package, src/core/ included once it lies there', () => {
+    const today = coreRules([]);
+    expect(today.folderOf(`${CORE_SOURCE}effort/store/settings.ts`)).toBe(CORE_PACKAGE_UNIT);
+    expect(today.folderOf(`${CORE_SOURCE}report/parse.ts`)).toBe(CORE_PACKAGE_UNIT);
+    expect(today.folderOf('src/core/config/config.ts')).toBe('src/core');
+    expect(today.folderOf('src/effort/store/settings.ts')).toBe('src/effort/store');
+    // After the flip, src/core/ lies under the package: the package is read first, so it is not a unit of its own.
+    const moved = coreRules([], `${CORE_SOURCE}core/`);
+    expect(moved.folderOf(`${CORE_SOURCE}core/config/config.ts`)).toBe(CORE_PACKAGE_UNIT);
+    expect(moved.folderOf('src/core/config/config.ts')).toBe('src/core/config');
+    expect(CORE_PACKAGE_UNIT).toBe('packages/rafa');
+  });
 });
 
 describe('the comparison against a baseline', () => {
@@ -488,6 +505,122 @@ describe('the comparison against a baseline', () => {
     expect(() => parseBaseline('{"commit":"abc","tests":{"a.test.ts":{"folders":[],"index":1.5,"spawns":false,"spawnsVia":[]}},"unindexed":[]}'))
       .toThrow('tests["a.test.ts"] must hold folders, a whole index, spawns and spawnsVia');
     expect(() => parseBaseline('{"commit":"abc","tests":{"a.test.ts":{"index":1}},"unindexed":[]}')).toThrow('tests["a.test.ts"]');
+  });
+});
+
+describe('the comparison once core is its package', () => {
+  const X = 'src/deep/x.ts';
+  const MATE = 'src/deep/mate.ts';
+  const Y = 'src/far/y.ts';
+  const STORE = 'src/effort/store/s.ts';
+  const PORT = 'src/ports/p.ts';
+  const MOVED = 'src/deep/x.test.ts';
+  const MOVED_MATE = 'src/deep/x-mate.test.ts';
+  const STORE_TEST = 'src/effort/store/s.test.ts';
+  const COUPLED = 'src/effort/store/c.test.ts';
+  const moves: readonly CoreMove[] = [{ from: X, subject: 'plan', tests: [MOVED_MATE, MOVED], to: 'src/core/plan/x.ts' }];
+
+  const PKG_X = `${CORE_SOURCE}core/plan/x.ts`;
+  const PKG_STORE = `${CORE_SOURCE}effort/store/s.ts`;
+  const PKG_PORT = `${CORE_SOURCE}ports/p.ts`;
+  const MOVED_NOW = `${CORE_SOURCE}core/plan/x.test.ts`;
+  const MATE_PARKED = `${CORE_PARKED_TESTS}core/plan/x-mate.test.ts`;
+  const STORE_TEST_NOW = `${CORE_SOURCE}effort/store/s.test.ts`;
+  const COUPLED_PARKED = `${CORE_PARKED_TESTS}effort/store/c.test.ts`;
+  const ELSEWHERE = 'packages/other/src/effort/store/s.test.ts';
+
+  const before = computeTestIndex({
+    graph: plantedGraph(
+      [X, MATE, Y, STORE, PORT, MOVED, MOVED_MATE, STORE_TEST, COUPLED],
+      [
+        [MOVED, X],
+        [MOVED, PORT],
+        [MOVED_MATE, X],
+        [MOVED_MATE, Y],
+        [STORE_TEST, STORE],
+        [STORE_TEST, PORT],
+        [COUPLED, STORE],
+        [COUPLED, Y],
+      ],
+    ),
+    sources: new Map(),
+  });
+  const baseline = parseBaseline(renderTestIndexBaselineJson(before, 'abc123'));
+
+  // `x.ts` has moved into `src/core/`, and the package holds it, the store and the ports; two tests wait parked outside it.
+  const after = computeTestIndex(
+    {
+      graph: plantedGraph(
+        [PKG_X, PKG_STORE, PKG_PORT, MATE, Y, MOVED_NOW, MATE_PARKED, STORE_TEST_NOW, COUPLED_PARKED, ELSEWHERE],
+        [
+          [MOVED_NOW, PKG_X],
+          [MOVED_NOW, PKG_PORT],
+          [MATE_PARKED, PKG_X],
+          [MATE_PARKED, Y],
+          [MATE_PARKED, MATE],
+          [STORE_TEST_NOW, PKG_STORE],
+          [STORE_TEST_NOW, PKG_PORT],
+          [COUPLED_PARKED, PKG_STORE],
+          [COUPLED_PARKED, Y],
+          [ELSEWHERE, PKG_STORE],
+        ],
+      ),
+      sources: new Map(),
+    },
+    coreRules([], `${CORE_SOURCE}core/`),
+  );
+  const comparison = compareToBaseline(after, baseline, moves);
+
+  it('brings a path under the package source or the parked tests back to src/, and leaves any other', () => {
+    expect(CORE_TEST_PREFIXES).toEqual([CORE_SOURCE, CORE_PARKED_TESTS]);
+    expect(pathBeforePackage(STORE_TEST_NOW)).toBe(STORE_TEST);
+    expect(pathBeforePackage(COUPLED_PARKED)).toBe(COUPLED);
+    expect(pathBeforePackage(MOVED_NOW)).toBe('src/core/plan/x.test.ts');
+    expect(pathBeforePackage(ELSEWHERE)).toBe(ELSEWHERE);
+    expect(pathBeforePackage(`${CORE_PACKAGE}build.test.ts`)).toBe(`${CORE_PACKAGE}build.test.ts`);
+    expect(pathBeforePackage(STORE_TEST)).toBe(STORE_TEST);
+  });
+
+  it('counts the package once for a test inside it, whatever folders of the package it reaches', () => {
+    expect(entryOf(after, STORE_TEST_NOW)).toMatchObject({ folder: CORE_PACKAGE_UNIT, folders: [CORE_PACKAGE_UNIT], index: 1 });
+    expect(entryOf(after, MOVED_NOW)).toMatchObject({ folder: CORE_PACKAGE_UNIT, folders: [CORE_PACKAGE_UNIT], index: 1 });
+  });
+
+  it('holds a package test under its path brought back to src/, fallen when the store and the ports are one folder', () => {
+    expect(comparison.fallen.find((change) => change.test === STORE_TEST_NOW)).toEqual({
+      after: 1,
+      baselineTest: STORE_TEST,
+      before: 2,
+      gained: [CORE_PACKAGE_UNIT],
+      lost: ['src/effort/store', 'src/ports'],
+      spawnsSince: [],
+      test: STORE_TEST_NOW,
+    });
+  });
+
+  it('holds a parked test under its path brought back to src/', () => {
+    expect(comparison.equal.find((change) => change.test === COUPLED_PARKED)).toMatchObject({
+      after: 2,
+      baselineTest: COUPLED,
+      before: 2,
+    });
+  });
+
+  it('follows a package or parked test brought back to src/ on to the path the moves took it from', () => {
+    expect(comparison.fallen.find((change) => change.test === MOVED_NOW)).toMatchObject({ after: 1, baselineTest: MOVED, before: 2 });
+    // The parked mate still reaches the folder its file left, so it rises, held to the entry under its old path.
+    expect(comparison.risen).toEqual([
+      { after: 3, baselineTest: MOVED_MATE, before: 2, gained: [CORE_PACKAGE_UNIT], lost: [], spawnsSince: [], test: MATE_PARKED },
+    ]);
+    expect(comparison).toMatchObject({ added: [ELSEWHERE], gone: [], unread: [] });
+  });
+
+  it('reads a test brought back to a moved path as new without the list of moves, the control', () => {
+    const unfollowed = compareToBaseline(after, baseline, []);
+    expect(unfollowed.added).toEqual([ELSEWHERE, MOVED_NOW, MATE_PARKED].sort());
+    expect(unfollowed.gone).toEqual([MOVED_MATE, MOVED]);
+    // The prefix rule needs no list: the store and parked tests are held still.
+    expect([...unfollowed.equal, ...unfollowed.fallen].map((change) => change.baselineTest).sort()).toEqual([COUPLED, STORE_TEST]);
   });
 });
 
