@@ -246,6 +246,23 @@ export function readManifestVersion(text: string): string | null {
     : trimmed;
 }
 
+/**
+ * The `name` a manifest's text declares, trimmed, or null when the text
+ * is no JSON object or its `name` is absent, blank or not a string. The
+ * sibling of {@link readManifestVersion}: settle reads it to tell rafa's
+ * own manifest from a project's (`./settle-lock.ts`).
+ */
+export function readManifestName(text: string): string | null {
+  const fields = manifestFields(text);
+  if (fields === null) return null;
+  const value = fields['name'];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === ''
+    ? null
+    : trimmed;
+}
+
 /** Every `"version": "..."` pair in a text, its key and separator captured apart from its value. */
 const VERSION_PAIR = /("version"\s*:\s*)"(?:[^"\\]|\\.)*"/g;
 
