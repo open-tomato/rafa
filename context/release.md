@@ -107,6 +107,29 @@ and their forecasts unchanged; a changelog that exists and can't be read still
 reads as "could not be read". `rafa release tag` still refuses on a missing
 changelog, since a tag names a version a section already holds.
 
+**The lock** (`release.moveLock: true`): the release commit also writes
+`rafa.lock` at the repository root, the record of which rafa the project was
+last brought to (`src/project/lock.ts`), to the version settle folds to. It
+goes in the same commit as the version file and the changelog, and the commit
+creates it when the base holds none. The lock step reads git objects only, as
+the rest of the reading does: the manifest and `rafa.lock` at the base commit
+are read as blobs, never from a checkout. Two refusals stop the settle before
+anything is written, with exit 1, and a dry run gives the same refusal:
+
+- the `release.versionFile` at the base names a package other than
+  `@open-tomato/rafa`; the sentence names `release.moveLock`, the name found,
+  and that only rafa's own release moves `rafa.lock`;
+- the `rafa.lock` at the base does not read as a lock, such as one a newer rafa
+  wrote in a format this one cannot read; the sentence names `rafa.lock`, and
+  the file is not replaced.
+
+The dry run prints `Lock: rafa.lock would move from <from> to <to>.`, or
+`Lock: rafa.lock is missing, so the release commit creates it at <to>.` when
+the base holds none, above its `Dry run:` line. A delivered run prints
+`Lock: rafa.lock moved to <to>.` above its delivery line, and only when the
+delivery landed; a refused delivery prints none. With the key off, settle never
+reads or writes the lock.
+
 **The project refresh**: with `board.project.number` set, a push delivery that
 landed (or that another settle beat to the same fragments) is followed by a
 refresh of the repository's project: the issues closed by the pull requests
@@ -236,7 +259,7 @@ base branch. It warns when fragments wait and names `rafa release settle`.
 
 ### Config keys
 
-Seven keys control the release flow, all under the `release` section except two:
+Eight keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -265,6 +288,13 @@ tagged tree is the one published. The manifest's `packageManager` field is not
 read for it: that field names the tool a project installs with, and tagging
 0.24.1 printed `bun publish` from it while rafa is published with `npm publish`.
 
+**`release.moveLock`** — Boolean (default `false`, read through `flag`, so
+`"true"`, `yes` and `1` are refused). `true` has settle also write `rafa.lock`
+at the root to the version it settles, in the release commit, so the repository
+that releases rafa keeps its lock moving with each release. A project that uses
+rafa leaves it off. The refusals and the dry run's line are under "The lock" in
+"Settle and its deliveries". Read by `rafa release settle` and its dry run.
+
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
 (error and stop). `collision` always refuses, requiring
@@ -278,5 +308,6 @@ another.
 All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
 `release.settle` defaults to `push`, an absent `release.tag` defaults to
-`manual`, and an absent `release.publishCommand` defaults to `npm publish`.
-They're set by `rafa init` and read by `loadConfig`.
+`manual`, an absent `release.publishCommand` defaults to `npm publish`, and an
+absent `release.moveLock` defaults to `false`. They're set by `rafa init` and
+read by `loadConfig`.
