@@ -27,6 +27,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# turbo's local cache and run logs
+.turbo/
+
 # IntelliJ based IDEs
 .idea
 
