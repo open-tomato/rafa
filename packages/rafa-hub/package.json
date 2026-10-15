@@ -9,10 +9,16 @@
     "rafa-hub": "./src/bin.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "test": "bun test",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@open-tomato/rafa-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
   }
 }

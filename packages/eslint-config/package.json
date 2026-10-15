@@ -15,6 +15,7 @@
     "rules"
   ],
   "scripts": {
+    "lint": "eslint .",
     "test": "bun test"
   },
   "dependencies": {
@@ -29,5 +30,8 @@
     "globals": "^17.12.0",
     "jsonc-eslint-parser": "^3.1.0",
     "typescript-eslint": "^8.69.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

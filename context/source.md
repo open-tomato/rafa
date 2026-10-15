@@ -394,7 +394,16 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   reported 21 `import/no-unresolved` errors (measured on ESLint 9.39.5). Two
   globs make several projects, so the resolver also sets
   `noWarnOnMultipleProjects`, or every run prints `Multiple projects found` to
-  stderr.
+  stderr. Each of the five workspace members also lints itself: its own
+  `eslint.config.mjs` is a leaf on `@open-tomato/rafa-eslint-config` that
+  adds only `.tsbuild/**` and `node_modules/**` to the ignores, and its
+  `lint` script, `eslint .` run from the package directory, lints that
+  package alone. Bun links each member in isolation, so every member but
+  the eslint-config package declares `@open-tomato/rafa-eslint-config`
+  (`workspace:*`), `eslint` and `typescript` in its `devDependencies` at
+  the root's ranges; the eslint-config package already lists `eslint` in
+  its `dependencies`, adds `typescript` as a devDependency, and imports
+  itself by name through its own `exports`.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script bun-builds `src/effort/store/index.ts` and
   `src/ports/index.ts`, two of its entries, which are one-line `export *`

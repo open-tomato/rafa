@@ -12,6 +12,12 @@
     "base.json"
   ],
   "scripts": {
+    "lint": "eslint .",
     "test": "bun test"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
   }
 }

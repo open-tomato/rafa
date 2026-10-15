@@ -41,10 +41,18 @@
         "jsonc-eslint-parser": "^3.1.0",
         "typescript-eslint": "^8.69.0",
       },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
     },
     "packages/rafa": {
       "name": "@open-tomato/rafa-core",
       "version": "0.45.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
     "packages/rafa-hub": {
       "name": "@open-tomato/rafa-hub",
@@ -55,6 +63,11 @@
       "dependencies": {
         "@open-tomato/rafa-core": "workspace:*",
       },
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
     "packages/rafa-sync-service": {
       "name": "@open-tomato/rafa-sync-service",
@@ -62,10 +75,20 @@
       "dependencies": {
         "@open-tomato/rafa-core": "workspace:*",
       },
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
     "packages/typescript-config": {
       "name": "@open-tomato/rafa-typescript-config",
       "version": "0.0.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
   },
   "packages": {
