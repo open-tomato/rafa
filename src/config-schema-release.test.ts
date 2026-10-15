@@ -197,6 +197,32 @@ describe('release.publishCommand', () => {
   });
 });
 
+describe('release.moveLock', () => {
+  it('spells the key file-only, and defaults to false in its section object', () => {
+    expect(SETTINGS.releaseMoveLock.key).toBe('release.moveLock');
+    expect(SETTINGS.releaseMoveLock.cli).toBe(false);
+    expect(RELEASE_DEFAULTS.releaseMoveLock).toBe(false);
+    expect(resolveConfig().config.releaseMoveLock).toBe(false);
+    expect(resolveConfig().sources.releaseMoveLock).toBe('default');
+  });
+
+  it.each([true, false])('accepts %p as written', (raw) => {
+    expectAccepted('releaseMoveLock', raw);
+  });
+
+  it.each(['true', 'yes', 1])('refuses %p, which is not a strict boolean', (raw) => {
+    expectRefused('releaseMoveLock', raw, `F: release.moveLock is ${JSON.stringify(raw)}, expected true or false`);
+  });
+
+  it('resolves a file naming true to true, from the file', () => {
+    const file = parseConfigText('release:\n  moveLock: true\n', PATH);
+    const resolved = resolveConfig({ file });
+
+    expect(resolved.config.releaseMoveLock).toBe(true);
+    expect(resolved.sources.releaseMoveLock).toBe('file');
+  });
+});
+
 describe('pr.versionCollision', () => {
   it.each(['allow', 'report', 'ask', 'refuse'])('accepts %s', (raw) => {
     expectAccepted('prVersionCollision', raw);
@@ -376,6 +402,7 @@ describe('the section', () => {
       ['releaseSettle', 'release.settle'],
       ['releaseTag', 'release.tag'],
       ['releasePublishCommand', 'release.publishCommand'],
+      ['releaseMoveLock', 'release.moveLock'],
       ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
     ]);
     expect(RELEASE_SECTION.defaults).toEqual({
@@ -393,6 +420,7 @@ describe('the section', () => {
       releaseSettle: 'push',
       releaseTag: 'manual',
       releasePublishCommand: 'npm publish',
+      releaseMoveLock: false,
       dangerousAcceptVersionCollision: false,
     });
     expect(RELEASE_SECTION.checks ?? []).toEqual([]);
