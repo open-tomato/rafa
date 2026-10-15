@@ -49,7 +49,7 @@
  * the module-level output, and the same listener wrapped with
  * `AsyncResource.bind` where it is registered reads the scope's.
  */
-import type { OutputStream } from '../../adapters/output/stream.js';
+import type { OutputStream } from './stream.js';
 import type { Output } from '../../ports/index.js';
 
 import { AsyncResource } from 'node:async_hooks';

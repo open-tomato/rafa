@@ -79,8 +79,6 @@ import type { ConfigSection } from './section.js';
 
 import { dirname, join } from 'node:path';
 
-import { DEFAULT_ROUTING } from '../../tiers/routing.js';
-
 import {
   MODULE_SOURCE_KEYS,
   moduleSource,
@@ -126,6 +124,7 @@ import {
   text,
   tierSwitch,
 } from './config-sections.js';
+import { DEFAULT_ROUTING } from './default-routing.js';
 
 /**
  * The config file, relative to the directory it sits under: the project

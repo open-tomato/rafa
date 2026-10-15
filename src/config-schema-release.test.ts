@@ -16,14 +16,21 @@
  * through `resolveConfig`, and shows that a file carrying the refused
  * value is reported with a `ConfigError` naming it, as every other
  * unusable value is.
+ *
+ * The `mergeMethod` reader behind `pr.mergeMethod` is declared in this
+ * section's module rather than among core's readers, and its cases moved
+ * here with it from `core/config/config-sections.test.ts`. They drive
+ * the reader directly, at a label of their own, as they did there.
  */
 import type { ConfigFile, ConfigSetting } from './core/config/index.js';
+import type { Reader, ValueAt } from './core/config/sections.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
+  mergeMethod,
   PR_DEFAULTS,
   RELEASE_DEFAULTS,
   RELEASE_SECTION,
@@ -63,6 +70,22 @@ function expectAccepted(setting: ConfigSetting, raw: unknown): void {
 /** Holds `setting` to refusing `raw` with exactly `problem`, and no value. */
 function expectRefused(setting: ConfigSetting, raw: unknown, problem: string): void {
   expect(readAs(setting, raw)).toEqual({ value: undefined, problems: [problem], extras: [] });
+}
+
+/** Where every case of a reader driven directly reads its value. */
+const AT: ValueAt = { label: 'F: s', key: 's' };
+
+/** The problems `read` names for `raw`; empty when it accepts it. */
+function problemsOf<T>(read: Reader<T>, raw: unknown): readonly string[] {
+  return read(raw, AT).problems;
+}
+
+/** The value `read` accepts `raw` as. Fails the case on a refusal. */
+function valueOf<T>(read: Reader<T>, raw: unknown): T {
+  const reading = read(raw, AT);
+  expect(reading.problems).toEqual([]);
+  if (reading.value === undefined) throw new Error('accepted, with no value');
+  return reading.value;
 }
 
 /** The {@link ConfigError} `run` throws. Fails when it throws none. */
@@ -192,6 +215,30 @@ describe('pr.versionCollision', () => {
       false,
       'F: pr.versionCollision is false, expected one of: allow, report, ask, refuse',
     );
+  });
+});
+
+describe('mergeMethod', () => {
+  it('accepts each of the pull request port three methods as itself', () => {
+    const methods = ['squash', 'merge', 'rebase'] as const;
+
+    expect(methods.map((raw) => valueOf(mergeMethod, raw))).toEqual([...methods]);
+  });
+
+  it.each([
+    ['a different case', 'Squash', '"Squash"'],
+    ['a method gh pr merge has not', 'ff-only', '"ff-only"'],
+    ['the flag rather than its value', '--squash', '"--squash"'],
+    ['a list of methods', ['squash'], 'a list'],
+    ['null', null, 'null'],
+  ])('refuses %s, naming the three in the order the port lists them', (_label, raw, found) => {
+    expect(problemsOf(mergeMethod, raw)).toEqual([
+      `F: s is ${found}, expected one of: squash, merge, rebase`,
+    ]);
+  });
+
+  it('is the reader the spec of pr.mergeMethod reads with', () => {
+    expect(SETTINGS.prMergeMethod.read).toBe(mergeMethod);
   });
 });
 

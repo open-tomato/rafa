@@ -22,6 +22,8 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../core/command/index.js';
 import type { EditableIssue, IssueDraft, IssueEdit, IssuePriority, IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -83,7 +83,7 @@ import type { OutputMode } from '../config/config-sections.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { createTextOutput } from '../../adapters/output/text.js';
+import { createTextOutput } from './text.js';
 
 /** An output and the mode it renders in, as one scope holds them. */
 interface ScopedOutput {

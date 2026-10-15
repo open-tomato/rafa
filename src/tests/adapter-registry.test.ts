@@ -1,24 +1,19 @@
 /**
  * The adapter registry, read the way a caller outside `src/adapters/`
- * reads it: through `registry.js`'s public exports alone, one example
- * apiece of the four claims the registry stands on.
+ * reads it: through the adapters barrel's public exports alone, with
+ * core's adapters registered by importing the composition root
+ * `src/adapter-registry.ts`, one example apiece of three claims the
+ * registry stands on.
  *
  * `src/core/adapters/registry.test.ts` and
  * `src/adapters/tracker/resolve.test.ts`
- * carry the mutation-driven grid behind each of those claims, one case
- * per kind, each made with a context built just for that kind. Repeating
- * that grid here would add nothing the size of this file could earn
- * back. What this file adds instead is the single running example the
- * mutation grid never assembles: every one of the twelve kinds core
- * registers, made from ONE shared context, so a kind whose `create`
- * reaches for a field none of the others need cannot pass silently by
- * only ever being exercised alongside a context tailored to it.
+ * carry the mutation-driven grid behind each of those claims. The
+ * running example that makes every one of core's kinds from ONE shared
+ * context, with the list of kinds it holds, moved to
+ * `src/adapter-registry.test.ts`, beside the root that registers them.
  *
- * The four claims:
+ * The three claims:
  *
- *   - Every core port kind resolves and makes something real, from a
- *     context wide enough to satisfy every one of the twelve at once,
- *     across all seven port types.
  *   - A fixture add-on adapter registers under a name of its own and is
  *     found beside the core kinds, without changing the registry it
  *     extended.
@@ -30,13 +25,12 @@
  *     hands it the reason the attempt before it failed with, which
  *     `local` then writes into the issue it captures on disk.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { AdapterContext, AnyAdapter } from '../core/adapters/index.js';
-import type { ClaudeSpawner } from '../core/loop/index.js';
+import type { AnyAdapter } from '../core/adapters/index.js';
 import type { Tracker } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import {
-  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -99,86 +93,6 @@ beforeAll(() => {
 
 afterAll(() => {
   if (tempDir !== '') rmSync(tempDir, { recursive: true, force: true });
-});
-
-describe('every core port kind', () => {
-  it('resolves and makes something real, from one shared context, across every port type', async () => {
-    const root = freshRoot('every-kind');
-    const chunks: string[] = [];
-    const stream: OutputStream = {
-      write: (chunk) => {
-        chunks.push(chunk);
-        return true;
-      },
-    };
-    const claude: ClaudeSpawner = async () => 0;
-    const context: AdapterContext = {
-      repoRoot: root,
-      stream,
-      verbosity: 0,
-      gh: createFakeGh().run,
-      settingSources: ['project', 'local'],
-      planPrompt: (specContent, stub) => `${stub}: ${specContent}`,
-      planDir: '.rafa/plans',
-      claude,
-      store: 'sqlite',
-    };
-
-    expect({
-      tracker: CORE_ADAPTER_REGISTRY.kinds('tracker'),
-      store: CORE_ADAPTER_REGISTRY.kinds('store'),
-      learning: CORE_ADAPTER_REGISTRY.kinds('learning'),
-      output: CORE_ADAPTER_REGISTRY.kinds('output'),
-      planner: CORE_ADAPTER_REGISTRY.kinds('planner'),
-      sync: CORE_ADAPTER_REGISTRY.kinds('sync'),
-      logger: CORE_ADAPTER_REGISTRY.kinds('logger'),
-    }).toEqual({
-      tracker: ['local', 'github'],
-      store: ['sqlite', 'ndjson'],
-      learning: ['local'],
-      output: ['text', 'json', 'events'],
-      planner: ['claude'],
-      sync: ['local', 'file'],
-      logger: ['console'],
-    });
-
-    const sqlite = CORE_ADAPTER_REGISTRY.resolve('store', 'sqlite').create(context);
-    const ndjson = CORE_ADAPTER_REGISTRY.resolve('store', 'ndjson').create(context);
-    const text = CORE_ADAPTER_REGISTRY.resolve('output', 'text').create(context);
-    const json = CORE_ADAPTER_REGISTRY.resolve('output', 'json').create(context);
-    const local = CORE_ADAPTER_REGISTRY.resolve('tracker', 'local').create(context);
-    const github = CORE_ADAPTER_REGISTRY.resolve('tracker', 'github').create(context);
-    const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create(context);
-    const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create(context);
-    const sync = CORE_ADAPTER_REGISTRY.resolve('sync', 'local').create(context);
-    const fileSync = CORE_ADAPTER_REGISTRY.resolve('sync', 'file').create(context);
-    const logger = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create(context);
-
-    expect(sqlite.path('sessions')).toContain(root);
-    expect(ndjson.path('sessions')).toContain(root);
-    expect(local.kind).toBe('local');
-    expect(github.kind).toBe('github');
-    expect(typeof learning.push).toBe('function');
-    expect(typeof learning.pullBlessed).toBe('function');
-    expect(typeof planner.create).toBe('function');
-    expect(sync.kind).toBe('local');
-    expect(await sync.push({ to: null })).toEqual({ status: 'nothing-to-sync' });
-    expect(fileSync.kind).toBe('file');
-    expect(logger.enabled('warn')).toBe(true);
-
-    text.info('shared context smoke check');
-    json.result('shared context smoke check');
-    expect(chunks).toHaveLength(2);
-    expect(chunks[0]).toBe('shared context smoke check\n');
-    expect(JSON.parse(chunks[1] ?? '')).toMatchObject({
-      type: 'result',
-      ok: true,
-      data: 'shared context smoke check',
-    });
-
-    // None of the twelve touched disk making the adapter alone.
-    expect(existsSync(root)).toBe(false);
-  });
 });
 
 describe('a fixture add-on adapter', () => {

@@ -94,6 +94,14 @@
  * `MergeRule` declared in the entry in place of its re-export reddened
  * its own name's case and the no-copy case, and nothing else.
  *
+ * On 2026-10-15 core took its own declaration of the six, in
+ * `src/ports/learning.ts`, so the ports entry stops importing
+ * `src/learning/`; the entry re-exports them from there, and that leaf
+ * is the declaration each is held to. `src/tests/learning-contract.test.ts`
+ * holds it to the library's. Measured that day at 43 pass: the held
+ * path left at `src/learning/types.ts` reddened the six cases and
+ * nothing else.
+ *
  * The `Sync` port arrived on 2026-09-29 with its four refusals. Six
  * mutations of the entry were driven that day against this file,
  * `src/core/adapters/registry.test.ts`,
@@ -234,13 +242,13 @@ const TYPE_EXPORTS = [
   'TransitionResult',
 ];
 
-/** The library that owns the learning records the entry re-exports. */
-const LEARNING_TYPES_FILE = join(SRC_DIR, 'learning', 'types.ts');
+/** Core's leaf that declares the learning records the entry re-exports. */
+const LEARNING_TYPES_FILE = join(SRC_DIR, 'ports', 'learning.ts');
 
 /** The leaf that declares `LogLevel`, which the entry re-exports. */
 const LOG_LEVEL_FILE = join(SRC_DIR, 'ports', 'log-level.ts');
 
-/** The names the entry takes from the learning library, sorted. */
+/** The names the entry takes from `./learning.ts`, sorted. */
 const LEARNING_EXPORTS = [
   'BlessedBundle',
   'InstinctRecord',
@@ -818,7 +826,7 @@ describe('the ports entry as the compiler reads it', () => {
     expect(names).toEqual(TYPE_EXPORTS);
   });
 
-  it.each(LEARNING_EXPORTS)('exports %s as the learning library declares it, not a copy', (name) => {
+  it.each(LEARNING_EXPORTS)('exports %s as the ports learning leaf declares it, not a copy', (name) => {
     const checker = compiledProbes().program.getTypeChecker();
     const exported = entryExports().find((symbol) => symbol.name === name);
     if (exported === undefined) throw new Error(`the entry exports no ${name}`);
@@ -843,7 +851,7 @@ describe('the ports entry as the compiler reads it', () => {
       .toEqual([LOG_LEVEL_FILE]);
   });
 
-  it('declares nothing in the entry under a learning library name', () => {
+  it('declares nothing in the entry under a learning record name', () => {
     const { program } = compiledProbes();
     const entry = program.getSourceFile(ENTRY_FILE);
     if (entry === undefined) throw new Error('the program holds no entry');

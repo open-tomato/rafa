@@ -273,9 +273,10 @@ to `30s`, as `3s`). `selectSync` hands the three to the adapter as
 `AdapterContext.hub` (`src/config-schema-hub.ts`). A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
-**Core registers two adapters in `CORE_ADAPTER_REGISTRY`
-(`src/core/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
-(copy exchange).** The `git`, `service` and `p2p` adapters come from
+**Core's two sync adapters are registered in `CORE_ADAPTER_REGISTRY`
+(`src/core/adapters/registry.ts`) by the composition root
+`src/adapter-registry.ts`: `sync/local` (no action) and `sync/file` (copy
+exchange).** The `git`, `service` and `p2p` adapters come from
 modules loaded under `src/modules/load.ts`; core ships no code for them.
 When `rafa doctor`, the loop preflight and `describe` read the config,
 a strategy with no adapter and no module to implement it is named with
@@ -1058,9 +1059,9 @@ beside two `[]` offers. No column holds the outcome: `task_reports` and
 The declaration a write carries is a `DispatchDeclaration`, declared in
 `store/dispatches.ts` from the six fields of the parser's
 `TaskDeclaration` it stores (`raw`, `agent`, `model`, `effort`, `budget`,
-`tools`), so the store imports nothing of `src/utils/declaration.ts`; its
+`tools`), so the store imports nothing of `src/core/plan/declaration.ts`; its
 `effort` is typed by `EffortLevel`, which `store/effort-levels.ts` holds
-with `EFFORT_LEVELS`, both re-exported by `src/utils/declaration.ts`.
+with `EFFORT_LEVELS`, both re-exported by `src/core/plan/declaration.ts`.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
@@ -1305,7 +1306,7 @@ over rafa-63: 210 rows under the stub, 12 of them null-`kind`.
 
 ### Attribution
 
-**`planStubFromPrompt` (`src/utils/plan-stamp.ts`) answers the FIRST
+**`planStubFromPrompt` (`src/core/plan/plan-stamp.ts`) answers the FIRST
 `ralph:plan=` stamp in a prompt.** Task and wrap-up prompts carry plan
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.

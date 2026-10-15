@@ -21,6 +21,8 @@
 import type { PlantedProject } from './cli-capture.js';
 import type { SessionRecord } from '../core/loop/index.js';
 
+import '../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

@@ -25,6 +25,8 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

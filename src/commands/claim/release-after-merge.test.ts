@@ -28,6 +28,8 @@ import type { StoreIdentitySeams } from '../../effort/store/store-meta.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

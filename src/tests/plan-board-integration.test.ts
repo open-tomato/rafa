@@ -145,6 +145,7 @@ const SPECS_DIR = '.rafa/specs';
 const PROBE = [
   'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
+  `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
@@ -192,6 +193,7 @@ const PROBE = [
 const PROBE_WITH_PROMPT = [
   'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
+  `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,

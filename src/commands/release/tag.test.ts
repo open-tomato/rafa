@@ -52,6 +52,8 @@ import type { ReleaseTag } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

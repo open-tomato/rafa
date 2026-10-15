@@ -14,7 +14,7 @@
  *
  *   - `sessionId`: the run's id, the file's name before `.json`.
  *   - `planStub`: the plan's stub, or null for a plan whose file name
- *     carries none, as `PLAN.md` does (`utils/plan-stamp.ts`).
+ *     carries none, as `PLAN.md` does (`core/plan/plan-stamp.ts`).
  *   - `plan`: the plan's path relative to the project root. The spec lists
  *     the stub alone; the path is what tells two stubless plans apart.
  *   - `branch`: the branch the run was started on.
@@ -80,7 +80,7 @@
  *     first dispatch, `task` after a task commits, `stage` after a stage's
  *     last task, `pre-wrap-up` before the wrap-up.
  *   - `scope`: `affected`, `module` or `full` (`TEST_SCOPES`,
- *     `utils/declaration.ts`), or the list of files and folders run, which
+ *     `core/plan/declaration.ts`), or the list of files and folders run, which
  *     may be empty.
  *   - `reason`: optional, why the step ran at that scope, one of
  *     {@link SESSION_STEP_REASONS}: `declared` for the task's own `tests=`
@@ -97,7 +97,7 @@
  *   - `summary`: Bun's `Ran N tests across M files.` line, or null when it
  *     printed none.
  *   - `failures`: the failing tests, each a file and a full test name
- *     (`SuiteFailure`, `suite/run.ts`).
+ *     (`SuiteFailure`, `suite-failure.ts`).
  *   - `newFailures`: those of `failures` that are new against the
  *     baseline; every one of them is also in `failures`, compared by file
  *     and name. A new failure also carries `errorLines`, after its
@@ -208,19 +208,21 @@
  * ## Reading a record
  *
  * The record's field readers and {@link parseSessionRecord} live in
- * `loop/session-record-parse.ts`, whose note lists what is refused on
- * read. This module re-exports what a caller reads from there, so
- * `./sessions.js` stays the one import a record's reader needs.
+ * `session-record-parse.ts`, beside this file, whose note lists what is
+ * refused on read. This module re-exports what a caller reads from
+ * there, so `./sessions.js` stays the one import a record's reader
+ * needs: `isPositiveWhole` and `RECORD_EXTENSION` among them, which
+ * `src/stretch/folder.ts` and `src/cleanup/runs.ts` read.
  */
+import type { HopRecord } from './hop-record.js';
 import type {
   SessionPhase,
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from '../../loop/session-record-parse.js';
-import type { HopRecord } from '../../next/hop-record.js';
-import type { SuiteFailure } from '../../suite/run.js';
-import type { TestScope } from '../../utils/declaration.js';
+} from './session-record-parse.js';
+import type { SuiteFailure } from './suite-failure.js';
+import type { TestScope } from '../plan/declaration.js';
 
 import {
   linkSync,
@@ -233,6 +235,9 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { messageOf } from '../config/config-sections.js';
+import { scopeAt } from '../config/scope.js';
+
 import {
   freezeRecord,
   isPositiveWhole,
@@ -244,19 +249,19 @@ import {
   sessionDecisions,
   sessionSteps,
   stepProblems,
-} from '../../loop/session-record-parse.js';
-import { scopeAt } from '../../project/scope.js';
-import { messageOf } from '../config/config-sections.js';
+} from './session-record-parse.js';
 
 export type {
   SessionPhase,
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from '../../loop/session-record-parse.js';
+} from './session-record-parse.js';
 export {
+  isPositiveWhole,
   isSessionId,
   parseSessionRecord,
+  RECORD_EXTENSION,
   SESSION_DECISION_STRATEGIES,
   SESSION_PHASES,
   SESSION_STATES,
@@ -266,7 +271,7 @@ export {
   sessionDecisions,
   sessionPhase,
   sessionSteps,
-} from '../../loop/session-record-parse.js';
+} from './session-record-parse.js';
 
 /** The directory the records are kept in, under a project's `.rafa/`. */
 export const RUNS_DIR = 'runs';

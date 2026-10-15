@@ -40,6 +40,8 @@ import type { PrerequisiteItem } from '../core/config/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { PreflightTiers } from '../preflight/run.js';
 
+import '../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,

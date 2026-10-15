@@ -67,7 +67,7 @@ function printFile(file: string): string {
  * Adds a reachable, empty bare `origin` remote to `scratch`, so the
  * branch scan's remote half (`git ls-remote --heads origin`) never fails
  * and warns: a warning would land on stdout beside the table
- * (`src/adapters/output/text.ts` writes every level to the one stream)
+ * (`src/core/output/text.ts` writes every level to the one stream)
  * and break a byte-identical comparison.
  */
 function addOrigin(scratch: ScratchRepo): void {

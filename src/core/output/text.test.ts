@@ -1,5 +1,5 @@
 /**
- * Tests for the `text` Output adapter (`src/adapters/output/text.ts`).
+ * Tests for the `text` Output adapter (`src/core/output/text.ts`).
  *
  * The source's suite, `output.test.ts` beside the source at the commit
  * the module header records, is ported to `bun:test`, with the one case

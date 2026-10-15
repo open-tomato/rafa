@@ -61,11 +61,11 @@ import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { readTaskFinishes } from '../../effort/store/task-finishes.js';
-import { trackerPathFor } from '../../utils/tracker.js';
 import { CommandExit } from '../command/command.js';
 import { messageOf } from '../config/config-sections.js';
 import { parsePlan } from '../plan/parse.js';
 import { isFile } from '../plan/plan-files.js';
+import { trackerPathFor } from '../plan/tracker-path.js';
 
 import { isPidAlive, readSessions, runsDir, SessionRecordError } from './sessions.js';
 

@@ -34,6 +34,8 @@ import type { NextState } from '../next/state.js';
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { Fragment } from '../release/fragment.js';
 
+import '../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

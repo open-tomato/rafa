@@ -43,7 +43,6 @@ import {
   LESSON_SWITCHES,
   lessonSwitch,
   listOf,
-  mergeMethod,
   oneOf,
   PR_PROVIDERS,
   recurrenceCount,
@@ -280,26 +279,6 @@ describe('the pr provider reader', () => {
 
     expect(parsed.provider).toBe('none');
     expect(valueOf(provider, parsed.provider)).toBe('none');
-  });
-});
-
-describe('mergeMethod', () => {
-  it('accepts each of the pull request port three methods as itself', () => {
-    const methods = ['squash', 'merge', 'rebase'];
-
-    expect(methods.map((raw) => valueOf(mergeMethod, raw))).toEqual(methods);
-  });
-
-  it.each([
-    ['a different case', 'Squash', '"Squash"'],
-    ['a method gh pr merge has not', 'ff-only', '"ff-only"'],
-    ['the flag rather than its value', '--squash', '"--squash"'],
-    ['a list of methods', ['squash'], 'a list'],
-    ['null', null, 'null'],
-  ])('refuses %s, naming the three in the order the port lists them', (_label, raw, found) => {
-    expect(problemsOf(mergeMethod, raw)).toEqual([
-      `F: s is ${found}, expected one of: squash, merge, rebase`,
-    ]);
   });
 });
 

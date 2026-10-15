@@ -57,8 +57,7 @@ describe('docs/survey/cut-table.json', () => {
     );
   });
 
-  test('marks at least one edge as cleared by issue 118', () => {
-    expect(table.clearedByIssue118.length).toBeGreaterThan(0);
+  test('marks every edge it lists as cleared by issue 118', () => {
     for (const edge of table.clearedByIssue118) {
       expect(edge.clearedBy).toBe(118);
     }

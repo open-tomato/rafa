@@ -16,6 +16,8 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueDraft, IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

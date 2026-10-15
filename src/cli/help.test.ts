@@ -64,8 +64,8 @@
  * run with it set to `1` passed and wrote the original bytes back.
  */
 import type { CommandRegistry } from './registry.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../core/command/index.js';
+import type { OutputStream } from '../core/output/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -1,12 +1,13 @@
 /**
  * The records the learning library settles, and the answers it gives.
  *
- * The library owns these types: `src/ports/index.ts` re-exports each of
- * them under the same name rather than declaring it again, so the
- * `Learning` port passes exactly what the library takes and answers, and
- * a service typing an adapter against `./ports` and one calling the
- * library read one declaration. Like the rest of `src/learning/`, this
- * module imports nothing from the rest of `src/`.
+ * The library keeps its own declaration of each. Like the rest of
+ * `src/learning/`, this module imports nothing from the rest of `src/`,
+ * and core imports nothing above it, so the `Learning` port declares
+ * the same six again in `src/ports/learning.ts`.
+ * `src/tests/learning-contract.test.ts` holds every pair mutually
+ * assignable, so the port passes exactly what the library takes and
+ * answers.
  *
  * The fields are snake case, as the distributed-learning spec spells the
  * record a sync payload carries. Every type here is erased at build, so

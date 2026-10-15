@@ -39,6 +39,8 @@
  */
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

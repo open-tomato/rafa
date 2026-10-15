@@ -27,6 +27,8 @@
 import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';

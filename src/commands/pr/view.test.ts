@@ -25,6 +25,8 @@ import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -113,10 +113,10 @@ report code, but the effort store reads it, so it is core. Core is also
 `src/report/record.ts`: core by assignment, kept where they are.
 
 **A subject's barrel is the only file under `src/core/` that a file
-outside it may import.** There are twelve, all listed in `CORE_BARRELS` of
+outside it may import.** There are thirteen, all listed in `CORE_BARRELS` of
 `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
-four more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts` and
-`plan/block-reader.ts`. A barrel re-exports the names of the files behind
+five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
+`loop/hops.ts` and `plan/block-reader.ts`. A barrel re-exports the names of the files behind
 it and no more. The barrels are the declared exports until the cut names
 real subpaths (#808).
 
@@ -169,6 +169,18 @@ defines under another setting name, which names both setting names too, or a
 `dangerous.*` key a second section defines under the same setting name, each
 naming both packages.
 
+**The adapters are handed in, never imported.** Core declares the adapter
+registry in `src/core/adapters/registry.ts`, and that file imports no
+adapter: core's adapters sit under `src/adapters/`, `src/effort/store/` and
+`src/effort/sync/`, above core. `src/adapter-registry.ts`, outside
+`src/core/`, lists them and hands them to `registerAdapters` as it is
+imported. `src/rafa.ts` and `src/index.ts` import it right after
+`src/config-registry.ts`, before anything resolves an adapter, so the two
+composition roots are the two entries' imports. Until the root is imported,
+every member of `CORE_ADAPTER_REGISTRY` refuses, naming it. A test that
+reads core's adapters off the registry imports the root for its effect, as
+the entries do.
+
 **A section adds its keys to `RafaConfig` by `declare module`.**
 `RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
 keys. Each section file adds its own by a `declare module` naming that file,
@@ -205,7 +217,7 @@ with no section registered to a refusal naming `src/config-registry.ts`.
 barrel that groups a file with one outside `src/core/` that imports the
 barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
-proves nothing about it. The four barrels beyond the subject indexes are
+proves nothing about it. The five barrels beyond the subject indexes are
 the splits made so far. `config/sections.ts` holds the leaf pair
 `config-sections.ts` and `config-readers.ts`, split while
 `config-merged.ts` imported section files that import the pair back;
@@ -215,8 +227,16 @@ alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
 from which `development-build.ts` imports `loop/index.ts` back.
-`plan/block-reader.ts` stands alone, because `parse.ts` imports
-`src/utils/tracker.ts`, which imports `blocks.ts` back.
+`loop/hops.ts` stands alone over `hop-record.ts`, split while
+`src/next/hop-record.ts` imported it back by value and the session record
+parser, which `sessions.ts` imports by value, imported that file by
+value; the parser now sits beside `sessions.ts` as
+`loop/session-record-parse.ts` and imports `hop-record.ts` by path, so
+the split stands as it was made.
+`plan/block-reader.ts` stands alone, split while `parse.ts` imported
+`src/utils/tracker.ts`, which imports `blocks.ts` back; `parse.ts` now
+reads `plan/blocker-comment.ts` instead and no core file imports the
+tracker, so the split stands as it was made.
 
 ### The cut table
 
@@ -446,15 +466,19 @@ file's package, but this sweep does not read it: its own note names the
 table as the input it is meant to take later. Until then, a cycle that
 crosses two packages but sits in one cluster passes it.
 
-**A cycle through a barrel can stay inside one cluster.**
-`src/core/adapters/index.ts` is one: `registry.ts` imports
-`src/effort/sync/select.ts` by value, and `select.ts` imports the registry
-back through the barrel. Both sit in cluster c7, so the sweep passes them,
-and a barrel over one file cannot be split to step round the cycle. A
-barrel's cycles are counted by `stronglyConnected` in
+**A cycle through a barrel can stay inside one cluster, and the adapters
+barrel's was retired by the registry seam.** Until then
+`src/core/adapters/index.ts` was one: `registry.ts` imported
+`src/effort/sync/select.ts` by value, and `select.ts` imported the registry
+back through the barrel. Both sat in cluster c7, so the sweep passed them,
+and a barrel over one file could not be split to step round the cycle. The
+composition root `src/adapter-registry.ts` now lists `sync/local` from
+`select.ts`, so `registry.ts` imports nothing above core and the cycle is
+gone. A barrel's cycles are still counted by `stronglyConnected` in
 `scripts/survey/graph-algorithms.ts`, a full read whatever the cluster.
-Its load order is checked by `src/tests/core-barrel-load-spawned.test.ts`,
-which loads each barrel first in a fresh `bun` process and expects exit 0.
+Its load order is still checked by
+`src/tests/core-barrel-load-spawned.test.ts`, which loads each barrel first
+in a fresh `bun` process and expects exit 0.
 
 ### The library boundary
 

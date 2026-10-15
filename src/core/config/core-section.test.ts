@@ -23,9 +23,8 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { DEFAULT_ROUTING } from '../../tiers/routing.js';
-
 import { CONFIG_FILE, CORE_SECTION } from './core-section.js';
+import { DEFAULT_ROUTING } from './default-routing.js';
 import { ConfigSectionError, EMPTY_CONFIG_REGISTRY, mergeConfigSections } from './section.js';
 
 /** The file `RafaConfig` is declared in. */

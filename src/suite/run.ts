@@ -166,6 +166,7 @@
  * that wrote no JUnit file holds one empty list.
  */
 import type { UnhandledError } from './unhandled.js';
+import type { SuiteFailure } from '../core/loop/index.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -183,23 +184,7 @@ export const FORCE_COLOR_ENV = 'FORCE_COLOR';
 /** The variables removed from the environment `bun test` runs in. */
 export const SUITE_ENV_REMOVED: readonly string[] = [CLAUDE_CODE_ENV, FORCE_COLOR_ENV];
 
-/** One failing test: its file, relative to the run's directory, and its full name. */
-export interface SuiteFailure {
-  readonly file: string;
-  /** Its describe names, outermost first, and its own, joined by ` > `. */
-  readonly name: string;
-  /**
-   * The first line of its JUnit failure's message; absent when the
-   * report gave none. Compared by `src/triage/inherited.ts` when present to
-   * identify inherited failures.
-   */
-  readonly message?: string;
-  /**
-   * The first lines of the error Bun printed for it on stderr, trimmed;
-   * absent when it printed none. See the module note.
-   */
-  readonly errorLines?: readonly string[];
-}
+export type { SuiteFailure };
 
 /**
  * How the JUnit file read: `read`, `missing` when Bun wrote none (no

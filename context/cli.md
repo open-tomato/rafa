@@ -14,9 +14,10 @@ module's note is the long form.
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
 | `src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
+| `src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, re-exported by `src/cli/registry.ts` |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
@@ -87,12 +88,12 @@ module's note is the long form.
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the config rows over `src/commands/doctor-config.ts` once the config is loaded, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the project rows over `src/commands/doctor-project.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-config.ts` | the config rows of `rafa doctor`, written as soon as the config is loaded: one `warn` line per config warning in the load's words, first one per YAML file a `rafa.config.ts` or `rafa.config.mjs` of its scope leaves unread, naming the fix (move its keys, remove the file), then in text mode one `note` row under `Config:` per `dangerous.*` key set off its default, read off the load's sink so a pass is never also a warning; json mode keeps every line a `warn` event, so a YAML project reads `doctor` as before (`src/tests/fixtures/config-parity/doctor.txt`) |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
-| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/utils/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
+| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `src/core/loop/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
 | `src/commands/doctor-deep-providers.ts` | the Providers reading of `--deep`: the configured tracker and pull request provider, and — when either goes through `gh` — whether `gh` answers under the environment it is handed |
 | `src/commands/doctor-deep-needs.ts` | the Stack tools and Plan needs readings of `--deep`: every unmet stack tool and, for a plan `--plan` names alone, its unmet needs over `src/plan/needs.ts` |
 | `src/commands/doctor-deep-row.ts` | the row every deep section is read into, the section holding them, and the text lines both render to; each status is `ok`, `warn` or `note`, never a failure or a `PreflightCheck` |
-| `src/utils/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, `PATH` with the running entry's `bundled/bin` in front, and every other entry handed on as it is |
+| `src/core/loop/session-env.ts` | the environment every Claude session is spawned with: `CLAUDE_CODE_ENTRYPOINT` set to `cli` over whatever `process.env` holds for it, `PATH` with the running entry's `bundled/bin` in front, and every other entry handed on as it is |
 | `src/utils/agent-shell.ts` | `isAgentShell(env)` and `AGENT_SHELL_ENV` (`CLAUDECODE`): true when the environment handed in holds that variable with a non-empty value, the reading a command takes of whether an agent runs its shell. Its one caller is `rafa config set`, which asks it of `context.env` for the `dangerous` section; a test decides the answer by the environment it builds, never by `process.env` |
 | `src/cleanup/index.ts` | the main cleanup reading module: `readCleanup` over the settings and seams reads and groups the merged, stale, not-pushed, worktree and remote-only rows (the groups read with the settings' `release` paths, the config's defaults when left out, as `rafa doctor` and `rafa status` leave them; the worktrees read after the groups, which name the merged branches a clean worktree is ticked for, then `holdBranchRows` over each branch group, unticking a branch an untickable worktree holds and naming that worktree), then the unmerged branches only on `origin` as `CleanupRead.remoteOnly` (`readRemoteOnly` of `./remote-only.ts`, over the base the groups were read against, `cleanup.keep`, the provider's open pull requests and `CleanupSettings.device`, this device's store ids, which no caller hands in yet, so every held claim branch reads as another store's; a remote listing git refuses fails the reading, and `rafa doctor` and `rafa status` pay for the reading too), then the run records `./runs.ts` lists (the notes are the fetch's, then the groups', then the remote-only reading's, then the run records'); `cleanupSteps` renders the ticked rows into deletion steps; `runCleanupSteps` and `dryRunLines` run them or show what they would do; `defaultCleanupSeams` wires the git runner, the branch and worktree readers, and the pull request provider; and `cleanupCounts` counts the merged, stale, not-pushed and worktree rows for `rafa doctor` and `rafa status`, never the remote-only branches nor the run records; `readRemoteOnly`, `remoteOnlyReason` and the reading's types are re-exported |
 | `src/cleanup/branches.ts` | reading merged, stale and not-pushed branches: over the config's `pr.base`, `cleanup.keep` and `cleanup.staleDays`; the current branch, the base, the branch `origin/HEAD` names whenever it resolves (beside a `pr.base` naming another) and every `cleanup.keep` match are never listed; merged rows are reachable from the base; stale rows have an upstream, are not merged and have no commit in the day count; not-pushed rows have no upstream or commits ahead of it; the provider tells merged from stale when the upstream is gone, and squash-merged rows are marked for `-D` instead of `-d` |
@@ -121,7 +122,7 @@ module's note is the long form.
 | `src/commands/doctor-release.ts` | the release row of `rafa doctor`, read only where `resolveReleaseEnabled` says the release is on: the version `origin/<pr.base>` declares as last fetched, the waiting fragments and their forecast (`readWaiting`, `src/commands/release/status-fragments.ts`), the latest release tag (`readTags`) and the version of the changelog's top heading (`changelogVersions`), all through `rafa release status`'s readers, the last two in its library half `src/release/status-readings.ts`; one `Release:` line, a warning in both modes naming `rafa release settle` while any fragment waits, `info` in text mode otherwise, and a `?` with an indented reason for a part it could not read |
 | `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
 | `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`, over the reading of `src/effort/sync/doctor-reading.ts`: `renderDoctorEffortSync` gives `Effort sync: ok, <strategy>`, ` (module)` added for a strategy a module serves, or `Effort sync: fail, <strategy>` with each line of the problem indented under it, and `effortSyncRefusal` the text `doctor` exits 1 with for a failing row, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
-| `src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind core holds and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
+| `src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind the composition root registers and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
 | `src/commands/doctor-description.ts` | the help description of `rafa doctor`, moved out of `src/commands/doctor.ts` to keep that module under the 800-line cap; text alone |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues and the epic labels in `labels` mode or the relationships row in their place in `native` mode (`board.relationships`, handed in by `rafa doctor`), the other mode's marks when a config layer sets `board.relationships` (`modeSet`), and the boards, read over it in that order (`readDoctorBoard`, all four null with no runner, `relations` left out in `labels` mode, `marks` left out with the key unset), the board listing made once in that mode, or in the native fields whenever the key is set, and handed to the epic labels (or the relationships), the marks and the boards, their lines joined in that order (`renderDoctorBoard`), and the json result's `relations` key, left out in `labels` mode, and `marks` key, left out with the key unset (`relationsResultOf`) |
@@ -220,7 +221,8 @@ that rafa prints omit the proposal words `hop` and `home` unless the run was
 typed with `--roadmap`.
 
 The hop record (`.rafa/hop.json`): Where a hop is under way, this per-project
-file holds the one record `src/next/hop-record.ts` defines. It names the kind
+file holds the one record `src/core/loop/hop-record.ts` defines and
+`src/next/hop-record.ts` reads and writes. It names the kind
 (`blocker` for a hop to C's epic, `dry` for a hop to the next `now` epic),
 the places the hop comes back to (the position's `home`) and leaves from,
 the issue numbers H and C (null on a dry hop), the epic and board the hop
@@ -255,7 +257,7 @@ The session record's `hop` field: When `loop start --roadmap` runs while a hop
 is `away`, its run record (`.rafa/runs/<session-id>.json`) carries the hop record
 itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
 none, and no position file stamp nothing. `parseSessionRecord`
-(`loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
+(`core/loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
 record, and every later write keeps it whole.
 
 ### `rafa next` row order
@@ -490,7 +492,7 @@ New; it replaces no earlier text. What a row or an action added to
   home, a stale one, none, and no position file stamp nothing; a file
   that is no hop record is warned about in one line and stamps nothing.
   Without the flag neither file is read and the record carries no `hop`
-  key; `parseSessionRecord` (`loop/session-record-parse.ts`) refuses a
+  key; `parseSessionRecord` (`core/loop/session-record-parse.ts`) refuses a
   `hop` key holding anything but a hop record, and every later write keeps
   it.
 - **`loop start --as-worktree` creates a new git worktree for the loop to run
@@ -734,7 +736,7 @@ New; it replaces no earlier text. What a row or an action added to
   a retry is left and the second with none: a retry-safe stop is decided
   only once its retries are spent, so its prompt offers no `retry`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
-  (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
+  (`start/session.ts`, `core/loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
   The header shows `🍅 #<n> <task>/<total>` in `task` and `🍅 #<n> <phase>`
   otherwise, never counting past the total, and `rafa loop status` and
@@ -2870,7 +2872,7 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   which `activeOutputMode()` answers. Both are held in an async scope of
   the invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`),
   beside the running command (`runAsRunningCommand`,
-  `src/cli/running.ts`): they are read inside the command's `run` and
+  `src/core/command/running.ts`): they are read inside the command's `run` and
   everything it awaits, and nothing is left once it ends, when the
   command throws too. The dispatcher sets no module-level value, so two
   invocations dispatched in one process and awaited with `Promise.all`
@@ -2955,9 +2957,10 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 ### The spends declaration
 
 A command that can start a Claude session declares it with a `spends` field
-of type `CommandSpend` (`src/cli/spends.ts`). The declaration has four forms,
-each named by `when` and carrying `what`, a short phrase describing what the
-session does:
+of type `CommandSpend` (`src/core/command/spends.ts`, exported by the
+command barrel; `src/cli/spends.ts` re-exports it for `describe.ts` and
+`help.ts`). The declaration has four forms, each named by `when` and
+carrying `what`, a short phrase describing what the session does:
 
 - `always`: the command may start a session on any run (`plan create`,
   `loop start`, `epic close`).
@@ -2981,8 +2984,10 @@ The spend guard in `src/core/loop/claude.ts` warns when the running command's
 `spends` declaration does not cover the session it starts, and starts the
 session anyway: usage is at most a warning, never a gate. The running
 command is the one the dispatcher recorded with its parsed flags
-(`src/cli/running.ts`), in the async scope of the invocation the session
-is started from, checked once per session before `Bun.spawn`:
+(`src/core/command/running.ts`, exported by the command barrel;
+`src/cli/running.ts` re-exports it for `dispatch.ts`), in the async scope
+of the invocation the session is started from, checked once per session
+before `Bun.spawn`:
 
 - A command declaring `always` or `through` covers every run.
 - A command declaring `with <flag>` covers only a run carrying that `flag`,

@@ -33,6 +33,8 @@ import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/track
 import type { GitRunner } from '../core/git/index.js';
 import type { IssueDraft, Tracker } from '../ports/index.js';
 
+import '../adapter-registry.js';
+
 import {
   existsSync,
   mkdirSync,

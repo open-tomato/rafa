@@ -27,6 +27,8 @@ import type { ReleaseStageSettings } from './release-stage.js';
 import type { ReportChange } from '../report/parse.js';
 import type { Instinct } from '../schema/instinct.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

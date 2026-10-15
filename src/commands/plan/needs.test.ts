@@ -24,6 +24,8 @@ import type { PlanSpecOptions, PlanSpecResolution } from '../../board/plan-spec.
 import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 
+import '../../adapter-registry.js';
+
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

@@ -230,7 +230,7 @@ might disagree.
 | One task inflates its lesson. | `usage_count` counts distinct sources. | No action needed. |
 | Wrap-up ignores the list. | `rafa:promoted` check reports in PR body. | Sessions must answer every id. |
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
-| Library and port drift. | Library owns types; port re-exports them. | Never re-declare them. |
+| Library and port drift. | Each declares the six types and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
 | Merge depends on order. | Property test runs in every order, over actions within `GAP`. | A failure there is a library bug; a discard followed by a confirmation is order-dependent by design. |
 
 ## Ordered by confidence, then usage, then id
