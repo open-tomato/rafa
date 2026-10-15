@@ -144,7 +144,7 @@ export interface ItemMergeSeams {
   /** The `gh` runner for the project root. */
   readonly gh: (root: string) => GhRunner;
   /** The tracker the open bugs are read from, each with the time it was filed. */
-  readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues'>;
+  readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues' | 'filedIssues'>;
   /** Waits `ms` milliseconds. */
   readonly sleep: (ms: number) => Promise<void>;
   readonly now: () => Date;

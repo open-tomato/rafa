@@ -194,7 +194,16 @@ function plant(options: CaseOptions = {}): Case {
     },
     isAlive: (pid) => pid === LOOP_PID,
     gh: () => gh,
-    tracker: () => ({ openIssues: async () => Promise.resolve([...(options.bugs ?? [])]) }),
+    tracker: () => ({
+      openIssues: async () => Promise.resolve([...(options.bugs ?? [])]),
+      filedIssues: async (_type, since) => Promise.resolve(
+        (options.bugs ?? []).flatMap(({ ref, title, body, createdAt }) => (
+          createdAt !== null && Date.parse(createdAt) > since.getTime()
+            ? [{ ref, title, body, createdAt }]
+            : []
+        )),
+      ),
+    }),
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
