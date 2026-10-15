@@ -111,6 +111,12 @@
  *     for each row's title, body and `createdAt` beside what `find` asks
  *     for. `github-open-issues.ts` holds the reading and its note, and
  *     is handed the readers `find` checks a row with.
+ *   - `filedIssues`, rafa's own reading, which the source lacks: one
+ *     `gh issue list --state all` narrowed by the `type:` label and by
+ *     a `--search` of `created:>=<since>`, asking for what `openIssues`
+ *     asks for, and refusing a row with no readable `createdAt`.
+ *     `github-filed-issues.ts` holds the reading and its note, and is
+ *     handed the readers `openIssues` is.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks:
  *     one `gh issue view --json title,body,state,labels,author`, and one
  *     `gh issue edit` with the body handed to `gh` on stdin through
@@ -139,6 +145,7 @@
  * --reason` makes no call on an issue already closed and drops the
  * changed reason; a reopen goes through `gh issue reopen`.
  */
+import type { GithubOpenIssuesReaders } from './github-open-issues.js';
 import type { GhResult, GhRunner } from '@open-tomato/rafa/core/git';
 import type {
   Issue,
@@ -156,6 +163,7 @@ import type {
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGithubEditMembers } from './github-edit.js';
+import { createGithubFiledIssues } from './github-filed-issues.js';
 import { createGithubOpenIssues } from './github-open-issues.js';
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 
@@ -560,7 +568,7 @@ function listedIssues(stdout: string): ListedIssue[] {
   return listedRows(stdout).map(listedRow);
 }
 
-/** The ref `find` and `openIssues` answer for a listed row: opt 0, and the module label when it has one. */
+/** The ref `find`, `openIssues` and `filedIssues` answer for a listed row: opt 0, and the module label when it has one. */
 function refOfRow(row: ListedIssue): IssueRef {
   const module = labelValue(row.labels, GITHUB_LABELS.modulePrefix);
   const ref: IssueRef = { opt: 0, kind: 'github', externalId: String(row.number), url: row.url };
@@ -674,6 +682,14 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
     knownLabels = new Set([...knownLabels, ...missing]);
   }
 
+  // What `openIssues` and `filedIssues` read a listing with: `find`'s own checks.
+  const listingReaders: GithubOpenIssuesReaders = {
+    run,
+    listedRows,
+    refOfRow: (row, index) => refOfRow(listedRow(row, index)),
+    typeLabel: (type) => `${GITHUB_LABELS.typePrefix}${type}`,
+  };
+
   const tracker: Tracker = {
     kind: 'github',
 
@@ -762,12 +778,9 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
       return listedIssues(stdout).map(refOfRow);
     },
 
-    openIssues: createGithubOpenIssues({
-      run,
-      listedRows,
-      refOfRow: (row, index) => refOfRow(listedRow(row, index)),
-      typeLabel: (type) => `${GITHUB_LABELS.typePrefix}${type}`,
-    }),
+    openIssues: createGithubOpenIssues(listingReaders),
+
+    filedIssues: createGithubFiledIssues(listingReaders),
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {
       const number = issueNumberOfRef(ref);
