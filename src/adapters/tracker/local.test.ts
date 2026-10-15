@@ -70,6 +70,16 @@
  * every-state case, the kept-time case and those five; and `Date.parse`
  * dropped, the month case alone.
  *
+ * Seven mutations of `filedIssues` were driven on 2026-10-15 over this
+ * file, at 139 pass before, the module restored byte-identical (sha256)
+ * after each. Closed issues left out reddened the cut-off case and the
+ * every-state case; the cut-off held exclusive, the cut-off case and the
+ * edge case; a millisecond early let through, the edge case alone; an
+ * undated issue answered, the no-time case alone; an invalid `since`
+ * read as no issues, its refusal case alone; every type kept, the
+ * every-state case alone; and the skip reported under `find`, the
+ * unreadable-file case alone.
+ *
  * Six mutations of `editable` and `edit` were driven on 2026-10-06 over
  * this file, at 111 pass before, restored byte-identical (sha256) after.
  * `open` answered true always reddened the contract's closed case and
@@ -817,6 +827,106 @@ describe('open issues over local issues', () => {
     expect(warned).toEqual([
       `local tracker: the issue at ${join(dir, '2.md')} has no YAML frontmatter block; openIssues skipped it`,
     ]);
+  });
+});
+
+describe('filed issues over local issues', () => {
+  /** A cut-off between {@link NOW} and {@link LATER}. */
+  const CUT_OFF = new Date('2026-07-28T00:00:00Z');
+
+  it('answers a done bug filed after the cut-off and leaves out an open one filed before it', async () => {
+    const dir = freshDir('filed');
+    await localTracker(dir).create(draftFixture({ opt: 0, title: 'Before', body: 'Still open.\n' }));
+    const later = localTracker(dir, { now: () => LATER });
+    const after = await later.create(draftFixture({ opt: 0, title: 'After', body: 'Closed since.\n' }));
+    await later.transition(after, 'done');
+
+    expect(await later.filedIssues?.('bug', CUT_OFF)).toStrictEqual([
+      { ref: { opt: 0, kind: 'local', externalId: '2', url: null }, title: 'After', body: 'Closed since.\n', createdAt: LATER },
+    ]);
+    expect(readIssue(dir, 1).state).toBe('todo');
+    expect(readIssue(dir, 2).state).toBe('done');
+    expect(ids((await later.filedIssues?.('bug', new Date(NOW)))?.map(({ ref }) => ref) ?? [])).toEqual(['1', '2']);
+  });
+
+  it('answers the issues of the type alone, in every state, lowest number first', async () => {
+    const dir = freshDir('filed-states');
+    const tracker = localTracker(dir, { now: () => LATER });
+    const states: readonly IssueState[] = ['backlog', 'todo', 'in-progress', 'in-review', 'done', 'released', 'cancelled'];
+    for (const state of states) {
+      const ref = await tracker.create(draftFixture({ opt: 0, title: `In ${state}` }));
+      await tracker.transition(ref, state);
+    }
+    await tracker.create(draftFixture({ opt: 0, type: 'spike', title: 'A spike' }));
+
+    expect((await tracker.filedIssues?.('bug', CUT_OFF))?.map(({ title }) => title))
+      .toEqual(states.map((state) => `In ${state}`));
+    expect(ids((await tracker.filedIssues?.('spike', CUT_OFF))?.map(({ ref }) => ref) ?? [])).toEqual(['8']);
+  });
+
+  it('answers an issue filed at the cut-off itself, and none filed a millisecond before it', async () => {
+    const dir = freshDir('filed-edge');
+    const tracker = localTracker(dir, { now: () => LATER });
+    await tracker.create(draftFixture({ opt: 0 }));
+
+    expect(ids((await tracker.filedIssues?.('bug', new Date(LATER)))?.map(({ ref }) => ref) ?? [])).toEqual(['1']);
+    expect(await tracker.filedIssues?.('bug', new Date(Date.parse(LATER) + 1))).toEqual([]);
+  });
+
+  it('skips an issue whose capturedAt is no time, reporting it as filedIssues, beside a dated issue', async () => {
+    const dir = freshDir('filed-undated');
+    const warned: string[] = [];
+    const tracker = localTracker(dir, {
+      now: () => LATER,
+      warn: (message) => {
+        warned.push(message);
+      },
+    });
+    await tracker.create(draftFixture({ opt: 0, title: 'Dated' }));
+    writeFileSync(join(dir, '2.md'), renderLocalIssue(record({ capturedAt: 'yesterday' })));
+
+    expect((await tracker.filedIssues?.('bug', CUT_OFF))?.map(({ title }) => title)).toEqual(['Dated']);
+    expect(warned).toEqual([
+      `local tracker: the issue at ${join(dir, '2.md')} has capturedAt "yesterday",`
+        + ' not an ISO 8601 date and time; filedIssues skipped it',
+    ]);
+    expect(await tracker.openIssues?.('bug')).toHaveLength(2);
+  });
+
+  it('skips an unreadable issue file, reporting it under its own name, and answers the rest', async () => {
+    const dir = freshDir('filed-corrupt');
+    const warned: string[] = [];
+    const tracker = localTracker(dir, {
+      now: () => LATER,
+      warn: (message) => {
+        warned.push(message);
+      },
+    });
+    await tracker.create(draftFixture());
+    writeFileSync(join(dir, '2.md'), 'no frontmatter\n');
+
+    expect(ids((await tracker.filedIssues?.('bug', CUT_OFF))?.map(({ ref }) => ref) ?? [])).toEqual(['1']);
+    expect(warned).toEqual([
+      `local tracker: the issue at ${join(dir, '2.md')} has no YAML frontmatter block; filedIssues skipped it`,
+    ]);
+  });
+
+  it('refuses a since that is not a valid Date, beside the same tracker answering a valid one', async () => {
+    const dir = freshDir('filed-invalid');
+    const tracker = localTracker(dir, { now: () => LATER });
+    await tracker.create(draftFixture());
+
+    await expect(tracker.filedIssues?.('bug', new Date('not a time'))).rejects.toThrow(
+      'local tracker: refused filedIssues since a time that is not a valid Date',
+    );
+    expect(ids((await tracker.filedIssues?.('bug', CUT_OFF))?.map(({ ref }) => ref) ?? [])).toEqual(['1']);
+  });
+
+  it('answers no filed issues for a directory that does not exist, creating none', async () => {
+    const dir = freshDir('filed-absent');
+
+    expect(await localTracker(dir).filedIssues?.('bug', CUT_OFF)).toEqual([]);
+    expect(existsSync(dir)).toBe(false);
   });
 });
 
