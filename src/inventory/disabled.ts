@@ -76,13 +76,14 @@
  * handed it: every path comes from {@link OverrideSeams}.
  */
 import type { InventoryKind, InventorySource, InventoryState } from './record.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { TierSeams } from '../schema/tiers.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { TierSeams } from '@open-tomato/rafa/schema/tiers';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { readFrontmatter } from '../schema/frontmatter.js';
 
 /** The Claude Code version the override and switch rules were read from. */

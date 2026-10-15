@@ -17,16 +17,16 @@
  * Between the two sits the store restored in place: the printed backup
  * is renamed back over the merged store before the write, which mints a
  * new store id and keeps the outgoing one as replaced
- * (`src/effort/store/store-replaced.ts`). The claim names that replaced
+ * (`packages/rafa/src/effort/store/store-replaced.ts`). The claim names that replaced
  * id, so the release succeeds, and its commit names the new id.
  *
  * Every case writes once before the command reads the store id, since a
  * read never mints and a read-only check passes while wrong.
  */
-import type { RuntimeIdentity } from '../../core/runtime/index.js';
-import type { StoreIdentitySeams } from '../../effort/store/store-meta.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { StoreIdentitySeams } from '@open-tomato/rafa/store/store-meta';
 
 import '../../adapter-registry.js';
 
@@ -37,13 +37,14 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { readHostId } from '@open-tomato/rafa/store/store-identity';
+import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+
 import { readDeviceStoreId } from '../../claims/device.js';
 import { makeOwnershipCommit, pushNewClaimBranch } from '../../claims/git.js';
 import { parseClaimMessage } from '../../claims/record.js';
-import { bringForward } from '../../effort/store/bring-forward.js';
-import { sqliteStorePath, withSqliteStore } from '../../effort/store/sqlite.js';
-import { readHostId } from '../../effort/store/store-identity.js';
-import { readStoreMeta } from '../../effort/store/store-meta.js';
 import { createGitRunner } from '../../pr/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { createMergeCommand } from '../effort/merge.js';

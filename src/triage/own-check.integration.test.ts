@@ -14,7 +14,7 @@
 import type { BaseRunCache } from './base-run.js';
 import type { KindCheck, KindCheckEntry } from './own-check.js';
 import type { PlanFilesReading } from './plan-commits.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createBaseRunCache, runNamedTestAt } from './base-run.js';
 import { checkKind, namedTestOf } from './own-check.js';

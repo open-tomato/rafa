@@ -64,8 +64,8 @@
  * for each, exit 0.
  */
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
-import type { ClaimsAhead } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
 
 import { planStub } from '../board/naming.js';
 import { gitSaid } from '../pr/index.js';

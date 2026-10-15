@@ -38,13 +38,16 @@ import type { IssueBoard } from '../board/issue-board.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { ReadinessGap } from '../board/readiness.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { rejectedPath } from '@open-tomato/rafa/core/plan';
 
 import {
   enforceSpecReview,
@@ -71,8 +74,6 @@ import {
   stampReviewSkipped,
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
-import { CommandExit } from '../core/command/index.js';
-import { rejectedPath } from '../core/plan/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

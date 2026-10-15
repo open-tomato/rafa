@@ -19,8 +19,8 @@ import type { CiStatusSeams } from './status.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
 import type { CiStatusReading } from '../../ci/status-reading.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

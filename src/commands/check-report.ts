@@ -70,13 +70,14 @@
  */
 import type { CheckKind } from '../check/layout.js';
 import type { CheckIssue, CheckOptions, CheckReport, DirectoryReport } from '../check/run.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { resolve } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { pathDirectories } from '../check/references.js';
 import { checkDirectory } from '../check/run.js';
-import { CommandExit } from '../core/command/index.js';
 
 /** Answers the directory a relative path on the line is resolved against. */
 export type Cwd = () => string;

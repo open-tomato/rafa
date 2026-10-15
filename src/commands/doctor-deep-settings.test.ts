@@ -28,7 +28,7 @@
  * control that a visible item is never a row.
  */
 import type { DeepSettingsSeams, HiddenItem } from './doctor-deep-settings.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +36,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_FILE } from '../core/config/index.js';
+import { CONFIG_FILE } from '@open-tomato/rafa/core/config';
+
 import { buildInventory } from '../inventory/index.js';
 import { INSTALLED_PLUGINS_PATH, PLUGINS_RECORD_VERSION } from '../inventory/plugins.js';
 

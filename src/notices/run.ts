@@ -10,12 +10,12 @@
  * (`src/plan.ts`). Each hands in the `loop.settingSources` its own
  * configuration resolved, which the danger notice names.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { homedir } from 'node:os';
 
-import { CommandExit , createLinePrompter , RAFA_VERSION } from '../core/command/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CommandExit , createLinePrompter , RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { offerNotices } from './notices.js';
 

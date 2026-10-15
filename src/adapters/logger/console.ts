@@ -45,13 +45,13 @@
  * site is written.
  */
 import type { LoggerSettings, LoggerTheme } from './settings.js';
-import type { OutputMode } from '../../core/config/sections.js';
-import type { CliEventLog, LogBindings, LogEntry, Logger, Output } from '../../ports/index.js';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEventLog, LogBindings, LogEntry, Logger, Output } from '@open-tomato/rafa/ports';
 
 import { basename } from 'node:path';
 
-import { messageOf } from '../../core/config/sections.js';
-import { activeOutput, activeOutputMode } from '../../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 
 import { exchangeLine, filterExchange, scrubUrls } from './api-filter.js';
 import { paint } from './colour.js';

@@ -163,11 +163,12 @@ import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { RoadmapOutcome, RoadmapSeams, RoadmapStop, RoadmapWalk } from './spec-source-roadmap.js';
 import type { AheadCandidate } from '../claims/ahead.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { nextUndoneLine } from '../claims/ahead.js';
-import { CommandExit } from '../core/command/index.js';
-import { activeOutput } from '../core/output/index.js';
 
 import {
   CLAIM_AHEAD_FLAG,

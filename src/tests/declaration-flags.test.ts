@@ -95,14 +95,14 @@ import type {
   AgentEffortLookup,
   ResolvedFlags,
   TaskDeclaration,
-} from '../core/plan/index.js';
+} from '@open-tomato/rafa/core/plan';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
   parseTaskDeclaration,
   resolveDeclarationFlags,
-} from '../core/plan/index.js';
+} from '@open-tomato/rafa/core/plan';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

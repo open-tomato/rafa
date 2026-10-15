@@ -81,14 +81,15 @@
  * the home and the pid probe the other follow-up reads.
  */
 import type { FollowUp } from './merge-followups.js';
-import type { PidProbe } from '../../core/loop/index.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
+import type { PidProbe } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
 import { liveLoopsOf } from '../../runtime/live-loops.js';

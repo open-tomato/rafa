@@ -92,17 +92,17 @@
  * space there, so the line stays one line.
  *
  * The check's type, its tier and its outcome are core's
- * (`src/effort/store/preflight-check.ts`), where the store's preflight
+ * (`packages/rafa/src/effort/store/preflight-check.ts`), where the store's preflight
  * writer reads them; this file re-exports them under the same names.
  */
 import type { PreflightItems } from './prerequisites-md.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
-import type { PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
-export type { CheckOutcome, PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
+export type { CheckOutcome, PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;

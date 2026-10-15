@@ -104,7 +104,7 @@ pull that fails still reads the local store.
 The adapter exports rows past a per-device cursor to the hub, and imports rows
 other devices created. Both directions act on the SQLite file in
 `RAFA_EFFORT_DIR` or `<root>/.rafa/effort/effort.sqlite`, through the wire
-format core's `src/effort/store/wire.ts` defines.
+format core's `packages/rafa/src/effort/store/wire.ts` defines.
 
 - **Push**: Exports rows this store created (identified by its origin pair)
   and sends them to the hub. Once the hub has taken them, the push cursor

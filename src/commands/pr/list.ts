@@ -70,10 +70,11 @@
  */
 import type { BaseReader, PrListForecast } from './list-forecast.js';
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { createGitRunner } from '../../pr/index.js';
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 

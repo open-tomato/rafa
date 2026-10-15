@@ -59,8 +59,8 @@ import { dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import {
   DISK_FILE_SYSTEM,

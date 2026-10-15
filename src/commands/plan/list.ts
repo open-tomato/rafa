@@ -48,10 +48,11 @@
  * The command declares no argument and the one flag `open`, and refuses
  * a line handing it an argument with exit code 1.
  */
-import type { RafaCommand } from '../../core/command/index.js';
 import type { PlanList, PlanListing } from '../../plan/list.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { formatCounts, plural } from '../../core/plan/index.js';
+import { formatCounts, plural } from '@open-tomato/rafa/core/plan';
+
 import { listPlans } from '../../plan/list.js';
 
 import {

@@ -9,7 +9,7 @@
  * never with a timer, as `src/cli/dispatch-scope.test.ts` does.
  */
 import type { LoggerSettings } from './settings.js';
-import type { LogLevel } from '../../ports/index.js';
+import type { LogLevel } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 

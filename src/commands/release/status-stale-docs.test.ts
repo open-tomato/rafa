@@ -11,7 +11,7 @@
  */
 import type { StaleDocsProject, StaleDocsReader } from './status-stale-docs.js';
 import type { OpenLinesTracker } from '../../docs/open-lines.js';
-import type { IssueDraft, OpenIssue } from '../../ports/index.js';
+import type { IssueDraft, OpenIssue } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { isMapping } from '../core/config/sections.js';
+import { isMapping } from '@open-tomato/rafa/core/config/sections';
 
 import { EPIC_GUARD_PATH, epicGuardSource, readEpicGuard, writeEpicGuard } from './epic-guard.js';
 

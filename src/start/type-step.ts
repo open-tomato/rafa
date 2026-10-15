@@ -120,8 +120,9 @@ import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { gitSaid } from '../pr/index.js';
 
 /** The suffix of the files the step checks. */

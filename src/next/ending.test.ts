@@ -57,10 +57,12 @@
  */
 import type { NextEndingSeams } from './ending.js';
 import type { NextState } from './state.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
@@ -69,7 +71,6 @@ import planCreate from '../commands/plan/create.js';
 import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
-import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep, HINT_FLAG_SPEC } from './ending.js';

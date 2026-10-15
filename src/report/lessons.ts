@@ -64,11 +64,11 @@
  *
  * Nothing here opens a file, reads a clock or changes a value passed in.
  */
-import type { ReportFinding } from './parse.js';
-import type { TaskReportInput, TaskReportRecord } from './record.js';
 import type { DescribedInstinctRecord } from '../adapters/learning/local.js';
 import type { SyncPayload } from '../learning/index.js';
 import type { InstinctDomain, InstinctEvidence } from '../schema/instinct.js';
+import type { ReportFinding } from '@open-tomato/rafa/report/parse';
+import type { TaskReportInput, TaskReportRecord } from '@open-tomato/rafa/report/record';
 
 import { createHash } from 'node:crypto';
 

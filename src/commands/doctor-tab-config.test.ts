@@ -10,7 +10,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { configFilePath } from '../core/config/index.js';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+
 import { plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 const SPAWN_TIMEOUT = 60_000;

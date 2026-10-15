@@ -70,7 +70,7 @@
 import type { LoopRetries } from '../config-schema-loop-retries.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../core/output/index.js';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { emitLoopEvent } from './loop-events.js';
 import { taskRefIn } from './pass-over.js';

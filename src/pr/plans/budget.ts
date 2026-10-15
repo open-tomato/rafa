@@ -7,7 +7,7 @@
  * `pr.resolveBudget` (`.rafa/specs/rafa-20-pr-commands.md`), and the loop
  * has exactly one way of passing that flag to a session: a task line's
  * trailing declaration block, whose `budget=<usd>` becomes
- * `--max-budget-usd <usd>` on the spawn (`src/utils/declaration.ts`).
+ * `--max-budget-usd <usd>` on the spawn (`packages/rafa/src/core/plan/declaration.ts`).
  * So the budget is not a flag this command invents and threads through
  * the loop; it is a line the plan carries, written here into the copy
  * of the pinned plan the run is about to execute. A session started by
@@ -27,7 +27,7 @@
  * deliberate: the four pinned plans carry no such block, the values
  * substituted into them are checked by `./load.ts` before they arrive,
  * and a fence-aware reader here would be a second, weaker copy of
- * `src/core/plan/blocks.ts` for a file this package ships and controls.
+ * `packages/rafa/src/core/plan/blocks.ts` for a file this package ships and controls.
  *
  * ## A declaration already there is joined, never replaced
  *
@@ -57,7 +57,7 @@
  * outcome a budget exists to prevent, so {@link budgetEntry} throws
  * instead, naming the value and the shape.
  */
-import { parseBudgetUsd } from '../../utils/declaration.js';
+import { parseBudgetUsd } from '@open-tomato/rafa/core/plan';
 
 /** The declaration key the loop reads a session's budget from. */
 export const BUDGET_KEY = 'budget';

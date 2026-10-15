@@ -30,7 +30,8 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems, withProjectRefresh } from './issue-board-refresh.js';

@@ -44,15 +44,16 @@
  */
 import type { BugRules } from './bugs/record.js';
 import type { ErrorsSettings } from './config-schema-errors.js';
-import type { ConfigSection, SettingSpec } from './core/config/index.js';
-import type { Reader, Reading } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
+
+import { listOf, refused } from '@open-tomato/rafa/core/config/sections';
 
 import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';
 import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from './bugs/title.js';
-import { listOf, refused } from './core/config/sections.js';
 import { listedCodes } from './errors/rafa-codes.js';
 
-declare module './core/config/config-schema.js' {
+declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `issues` section's fields, added to core's. */
   interface RafaConfig extends IssuesConfigSettings {}
 }

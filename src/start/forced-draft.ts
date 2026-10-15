@@ -36,9 +36,10 @@ import type { PassedOverTask } from './loop-events.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { PullRequests } from '../pr/index.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';

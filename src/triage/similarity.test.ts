@@ -5,7 +5,7 @@
  * {@link issueText}, so a change to the sections it writes that this
  * module stops reading turns these tests red.
  */
-import type { OpenIssue } from '../ports/index.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

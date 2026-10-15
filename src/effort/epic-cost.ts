@@ -41,11 +41,12 @@
  * Pure over the rows except {@link readEpicCost}, which reads the
  * `sessions` kind of the store it is handed and nothing else.
  */
-import type { EffortStore, SessionEffortRow } from './store/types.js';
+import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
+
+import { formatDuration } from '@open-tomato/rafa/core/loop/readings';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 import { boardId } from '../board/naming.js';
-import { formatDuration } from '../core/loop/readings.js';
-import { plural } from '../core/plan/index.js';
 
 import { minutesBetween } from './commits.js';
 import { formatCount } from './report-format.js';

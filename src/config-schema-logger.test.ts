@@ -7,7 +7,7 @@
  * refusal sits beside an accepting control, and every key and message is
  * SPELLED, never read off the module.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,14 +15,15 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { LOGGER_SECTION, loggerSettingsOf } from './config-schema-logger.js';
 import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
-} from './core/config/index.js';
-import { loadConfig } from './core/config/load.js';
+} from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
+import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { LOGGER_SECTION, loggerSettingsOf } from './config-schema-logger.js';
 import { projectConfigText } from './project/scaffold.js';
 import { plantProject } from './tests/cli-capture.js';
 

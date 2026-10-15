@@ -5,7 +5,7 @@
  * Copied from `createGithubTracker` in open-tomato's
  * `packages/shared/issue-tracker/src/adapters/github.ts` at commit
  * `45aaab563e5b4f4e6258e19ebf752b7cfeb67bf0` (2026-08-05), and retyped
- * against rafa's `Tracker` port, which `src/ports/index.ts` copies from
+ * against rafa's `Tracker` port, which `packages/rafa/src/ports/index.ts` copies from
  * the same commit's `port.ts`.
  *
  * ## The `gh` runner seam
@@ -139,7 +139,7 @@
  * --reason` makes no call on an issue already closed and drops the
  * changed reason; a reopen goes through `gh issue reopen`.
  */
-import type { GhResult, GhRunner } from '../../core/git/index.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa/core/git';
 import type {
   Issue,
   IssueDraft,
@@ -151,9 +151,9 @@ import type {
   Tracker,
   TrackerCapabilities,
   TransitionResult,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGithubEditMembers } from './github-edit.js';
 import { createGithubOpenIssues } from './github-open-issues.js';

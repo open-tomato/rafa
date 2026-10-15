@@ -7,11 +7,12 @@
  * The scope cases order their overlaps with gates they open themselves,
  * never with a timer, as `src/cli/dispatch-scope.test.ts` does.
  */
-import type { Logger } from '../../ports/index.js';
+import type { Logger } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { consoleHarness, keptOutput } from '../../tests/logger-harness.js';
 
 import { activeLogger, restoreActiveLogger, runWithActiveLogger, setActiveLogger } from './active.js';

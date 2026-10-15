@@ -10,7 +10,8 @@
  */
 import type { SkillsReport } from './report-skills.js';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { resolveSessionTiers } from '../start/serving.js';
 
 import { buildSkillsReport, readHeldLessons } from './report-skills.js';

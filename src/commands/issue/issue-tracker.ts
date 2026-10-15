@@ -86,19 +86,20 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { AdapterRegistry } from '../../core/adapters/index.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DoctorRefsSeams } from '../doctor-refs.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
 
 /** How the chain is resolved; see the module note. Each left out is the chain's own. */
 export interface IssueSeams {

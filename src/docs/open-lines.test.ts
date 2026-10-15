@@ -7,7 +7,7 @@
  * so a reader that kept everything, or nothing, reddens.
  */
 import type { OpenLinesTracker } from './open-lines.js';
-import type { IssueRef, IssueType, OpenIssue } from '../ports/index.js';
+import type { IssueRef, IssueType, OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

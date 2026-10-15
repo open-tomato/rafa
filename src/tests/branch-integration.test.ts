@@ -35,9 +35,9 @@
  * suite never told git about directly, and the sha the new branch ends
  * on is read back off the real ref rather than asserted from a script.
  */
-import type { Prompter } from '../core/command/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { BranchOutcome, BranchRequest, BranchSeams } from '../start/branch.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -45,8 +45,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createGitRunner } from '../pr/index.js';
 import { offerRunBranch } from '../start/branch.js';
 

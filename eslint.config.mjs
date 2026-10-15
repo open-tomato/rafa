@@ -22,12 +22,13 @@ export default [
   {
     // The learning library's boundary: `src/learning/` is a pure library
     // shipped as `@open-tomato/rafa/learning`, so it imports nothing from
-    // the rest of `src/` and touches no filesystem. `node:crypto` (for
-    // sha256) and packages such as `bun:test` stay allowed. The zone is
-    // resolved, not matched by specifier, so `../core/config/index.js` from
-    // `src/learning/` is refused while `../x.js` from a subdirectory of it
-    // is not. `src/tests/learning-boundary.test.ts` lints a file planted
-    // under `src/learning/` against this block.
+    // the rest of `src/` or from core's package, `packages/rafa/src/`, and
+    // touches no filesystem. `node:crypto` (for sha256) and packages such
+    // as `bun:test` stay allowed. The zones are resolved, not matched by
+    // specifier, so `@open-tomato/rafa/core/config` from `src/learning/`
+    // is refused while `../x.js` from a subdirectory of it is not.
+    // `src/tests/learning-boundary.test.ts` lints a file planted under
+    // `src/learning/` against this block.
     files: ['src/learning/**/*.ts'],
     rules: {
       'import/no-restricted-paths': ['error', {
@@ -36,6 +37,10 @@ export default [
           from: './src',
           except: ['./learning'],
           message: 'src/learning/ imports nothing from the rest of src/.',
+        }, {
+          target: './src/learning',
+          from: './packages/rafa/src',
+          message: 'src/learning/ imports nothing from core.',
         }],
       }],
       'no-restricted-imports': ['error', {

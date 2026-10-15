@@ -35,7 +35,8 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../core/loop/index.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 

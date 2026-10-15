@@ -55,15 +55,16 @@
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { SpecIssue } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { Prompter } from '../../core/command/index.js';
 import type { ReadyOptions, ReadyReport } from '../issue/ready.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { CommandExit } from '../../core/command/index.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 

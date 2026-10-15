@@ -10,7 +10,7 @@
  * true.
  *
  * The cases of the record's shape, field by field, and of its four states
- * moved with `asHopRecord` to `src/core/loop/hop-record.test.ts`; the
+ * moved with `asHopRecord` to `packages/rafa/src/core/loop/hop-record.test.ts`; the
  * wrong-shape cases here keep three, to show a record `asHopRecord`
  * refuses reads as a wrong shape with the file's detail.
  */

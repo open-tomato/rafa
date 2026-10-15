@@ -117,9 +117,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan , rejectedPath } from '../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan , rejectedPath } from '@open-tomato/rafa/core/plan';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

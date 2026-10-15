@@ -22,9 +22,9 @@
  *     not a runner that was never going to be asked.
  */
 import type { DoctorReleaseReading } from './doctor-release.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
 import type { Fragment } from '../release/fragment.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import '../adapter-registry.js';
 

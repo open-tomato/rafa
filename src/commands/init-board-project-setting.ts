@@ -58,12 +58,12 @@
  * directory.
  */
 import type { ProjectPart } from './init-board-project.js';
-import type { ConfigFile } from '../core/config/index.js';
+import type { ConfigFile } from '@open-tomato/rafa/core/config';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { configFilePath, parseConfigText } from '../core/config/index.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { configFilePath, parseConfigText } from '@open-tomato/rafa/core/config';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** The setting this module writes, as a row and a refusal name it. */
 export const PROJECT_NUMBER_SETTING = 'board.project.number';

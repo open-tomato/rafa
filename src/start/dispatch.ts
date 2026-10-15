@@ -97,33 +97,33 @@ import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { AdapterRegistry } from '../core/adapters/index.js';
-import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core/config/sections.js';
-import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
-import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { InjectionRequest, PlanInjection } from '../plan/index.js';
-import type { Learning } from '../ports/index.js';
-import type { TaskReportRecord } from '../report/record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { Learning } from '@open-tomato/rafa/ports';
+import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import { randomUUID } from 'crypto';
 
-import { runClaudeCaptured } from '../core/loop/index.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
-import { writeDispatch } from '../effort/store/dispatches.js';
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration, resolveDeclarationFlags , escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { describeTaskReportRecord, recordTaskReport } from '@open-tomato/rafa/report/record';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
-import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
-import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
-import { escapeBlockerText } from '../utils/tracker.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
 import { docTaskPrompt } from './doc-task.js';

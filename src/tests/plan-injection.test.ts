@@ -30,10 +30,10 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { ConfigRoots } from '../core/config/load.js';
-import type { InjectMode } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
 
 import {
   mkdirSync,
@@ -56,16 +56,17 @@ import {
   spyOn,
 } from 'bun:test';
 
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ConfigError } from '../core/config/index.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';

@@ -13,9 +13,9 @@
 import type { ClaimCommandSeams } from './release.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { DeviceStoreId } from '../../claims/device.js';
-import type { RafaCommand } from '../../core/command/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import '../../adapter-registry.js';
 

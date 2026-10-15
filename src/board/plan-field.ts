@@ -18,7 +18,7 @@
  *
  * ## The issue is written QUOTED, and it stays that way
  *
- * `issue` IS one of `PLAN_HEADER_FIELDS` (`src/core/plan/parse.ts`), and the
+ * `issue` IS one of `PLAN_HEADER_FIELDS` (`packages/rafa/src/core/plan/parse.ts`), and the
  * reader takes a whole number there as well as a string: `issue: 20`
  * reads back as `"20"`. It reads the number YAML parsed, not the digits
  * written, so `issue: 042` reads back as `"42"`. The stamp writes
@@ -55,7 +55,7 @@
  * {@link PlanFieldStamp.note} says what was in the way, for the caller to
  * warn with.
  */
-import { readRafaBlocks } from '../core/plan/block-reader.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 /** The block kind a field is recorded in. */
 const PLAN_BLOCK_KIND = 'plan';

@@ -38,9 +38,9 @@
  * sides.
  */
 import type { TestFailure } from './test-failure.js';
-import type { IssueState } from '../ports/index.js';
-import type { ReportBug } from '../report/parse.js';
 import type { SuiteFailure } from '../suite/run.js';
+import type { IssueState } from '@open-tomato/rafa/ports';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename } from 'node:path';
 

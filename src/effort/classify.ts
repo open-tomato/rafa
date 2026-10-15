@@ -56,11 +56,11 @@
  * needs it — that is a deliberate seam and the reason the two are
  * separate functions.
  */
-import type { SessionKind } from './store/session-row-types.js';
+import type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 
 import { readLines } from './session-log.js';
 
-export type { SessionKind } from './store/session-row-types.js';
+export type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 
 /**
  * The kinds rafa itself dispatches, each with a prompt shape: the loop's

@@ -129,13 +129,13 @@
  * from. A home that does not resolve is not refused: nothing can sit
  * under it, so it is no directory the walk climbs.
  */
-import type { ProjectFound, Scope } from '../core/config/index.js';
+import type { ProjectFound, Scope } from '@open-tomato/rafa/core/config';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
-import { CONFIG_FILE, SCOPE_DIR, scopeAt } from '../core/config/index.js';
-import { describeValue, messageOf } from '../core/config/sections.js';
+import { CONFIG_FILE, SCOPE_DIR, scopeAt } from '@open-tomato/rafa/core/config';
+import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 

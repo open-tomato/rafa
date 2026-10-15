@@ -48,7 +48,7 @@
 import type { ClosePullRequestOptions } from './types.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue } from '../core/config/sections.js';
+import { describeValue } from '@open-tomato/rafa/core/config/sections';
 
 /** What every refusal opens with: the prefix `./gh.ts` refuses with. */
 const PREFIX = 'gh pull requests';

@@ -71,15 +71,15 @@
  * no commit to attribute to and is counted as unparsed, which is what
  * keeps that identity exact instead of approximately true.
  */
-import type { CommitStats } from './store/commit-stats.js';
+import type { CommitStats } from '@open-tomato/rafa/store/commit-stats';
 
 import { execFileSync } from 'node:child_process';
 
-import { minutesBetween } from './store/commit-stats.js';
+import { minutesBetween } from '@open-tomato/rafa/store/commit-stats';
 
-export type { CommitStats } from './store/commit-stats.js';
+export type { CommitStats } from '@open-tomato/rafa/store/commit-stats';
 
-export { minutesBetween } from './store/commit-stats.js';
+export { minutesBetween } from '@open-tomato/rafa/store/commit-stats';
 
 /**
  * Line prefix marking a commit header inside the log capture.

@@ -114,10 +114,10 @@
  * rule read at two boundaries, and `ceiling.test.ts` measures both.
  */
 import type { NextActionId } from './state.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { BoardRelationshipMode } from '../core/config/sections.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from './actions.js';
 

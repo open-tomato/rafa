@@ -9,8 +9,8 @@
  * an issue 1 on `local` and a different issue 1 on the fake, so reading
  * the wrong tracker differs from what is held.
  */
-import type { Issue, IssueDraft } from '../../ports/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { Issue, IssueDraft } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

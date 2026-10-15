@@ -62,15 +62,16 @@
  * {@link ConfigSetResult} is the data of the terminal result event, and
  * a refusal is the `CommandExit` it is in text mode.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { CommandExit } from '../../core/command/index.js';
-import { configFilePath } from '../../core/config/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { AGENT_SHELL_ENV, isAgentShell } from '../../utils/agent-shell.js';
 import { expectOneArgument, requireProject } from '../plan/plan-files.js';
 

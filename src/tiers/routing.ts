@@ -8,7 +8,7 @@
  * from a task shape to the agent that takes it. This module holds
  * rafa's defaults for that map, `DEFAULT_ROUTES`, and the map
  * `CONFIG_DEFAULTS` answers when no layer names `routing`,
- * `DEFAULT_ROUTING`, both declared in `src/core/config/default-routing.ts`
+ * `DEFAULT_ROUTING`, both declared in `packages/rafa/src/core/config/default-routing.ts`
  * and re-exported here under the same names. How a file's value is READ is
  * `config-sections.ts`'s `routeTarget` inside `config-readers.ts`'s
  * `mapOf`, as for every other map setting.
@@ -86,16 +86,16 @@
  * the set says, since no default could have put it there.
  */
 import type { Resolution, ServedItem, TierCollision } from './resolve.js';
-import type { ConfigLayers } from '../core/config/index.js';
-import type { RouteTarget } from '../core/config/sections.js';
-import type { SkillTier } from '../schema/tiers.js';
+import type { ConfigLayers } from '@open-tomato/rafa/core/config';
+import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';
+import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 
-import { DEFAULT_ROUTING } from '../core/config/index.js';
+import { DEFAULT_ROUTING } from '@open-tomato/rafa/core/config';
 
 import { findTierItem } from './resolve.js';
 
-export type { Route } from '../core/config/index.js';
-export { DEFAULT_ROUTES, DEFAULT_ROUTING } from '../core/config/index.js';
+export type { Route } from '@open-tomato/rafa/core/config';
+export { DEFAULT_ROUTES, DEFAULT_ROUTING } from '@open-tomato/rafa/core/config';
 
 /** What one row's agent resolves to. See "Every row must resolve". */
 export type RouteAnswer =

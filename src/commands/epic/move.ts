@@ -145,8 +145,12 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { BoardRelations, RelationWrite } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { branchNameOf } from '../../board/epic-horizon.js';
@@ -162,9 +166,6 @@ import { createGhIssueBoard } from '../../board/issue-board.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';

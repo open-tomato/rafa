@@ -61,7 +61,8 @@ import type { TriageClass } from '../../pr/triage/classes.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { pinnedPlanFileName } from '../../pr/plans/load.js';
 
 /** Where under a home directory a resolve run keeps its plans and trackers. */

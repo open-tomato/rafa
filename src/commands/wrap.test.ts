@@ -43,8 +43,8 @@
  */
 import type { CommandDeclaration, PhaseZeroCommand } from './wrap.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { OutputStream } from '../core/output/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../adapter-registry.js';
 
@@ -54,9 +54,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit, commandProblem } from '@open-tomato/rafa/core/command';
+
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { CommandExit, commandProblem } from '../core/command/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { wrapPhaseZeroCommand } from './wrap.js';

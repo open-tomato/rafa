@@ -64,10 +64,11 @@
  * Everything here is pure: the callers read the plan and its
  * PREREQUISITES file and hand the text in.
  */
-import type { PlanTask } from '../core/plan/index.js';
+import type { PlanTask } from '@open-tomato/rafa/core/plan';
+
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 import { findPinnedMigrations } from '../board/readiness.js';
-import { parsePlan } from '../core/plan/index.js';
 import { parsePrerequisites } from '../preflight/prerequisites-md.js';
 
 /** Which of the three rules a problem breaks. */

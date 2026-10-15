@@ -1,0 +1,1765 @@
+/**
+ * Tests for the config reader: the phase 1 schema, its layers and its
+ * refusals.
+ *
+ * The rules are tested where they live. `parseConfigText` and
+ * `resolveConfig` are pure, so every precedence and refusal case here
+ * runs without a disk. Reading the files, from a project root and a
+ * home, is `config-load.ts`, driven in `config-load.test.ts`. The value
+ * readers are driven one by one in `config-sections.test.ts`, and the
+ * item-shape readers in `config-items.test.ts`; here each section is
+ * reached through a file's text. The schema itself — the
+ * dotted file key per setting, the sections a file may open, and the
+ * known-key index — is read off the registered sections by `section.ts`,
+ * driven in `section.test.ts`, and merged by `src/config-registry.ts`,
+ * driven in `src/config-registry.test.ts`, with core's own keys in
+ * `core-section.ts`, driven in `core-section.test.ts`; here it is
+ * reached through `config.js`, which re-exports every name a caller
+ * reads.
+ *
+ * Every precedence case plants values that DIFFER from the defaults in
+ * each layer it names, which is what lets it fail: a resolver that
+ * skipped the file would answer the defaults, never the file's values.
+ * {@link FULL} names every setting at a value other than its default,
+ * and a case holds it to that. The one case where a layer spells the
+ * default is there to pin the source record, which is the only thing
+ * that can tell a file that was read from one that was skipped.
+ *
+ * The settings, the defaults and the known keys a warning lists are
+ * spelled here, never read off the module, so a module that drops a
+ * setting or moves a default fails rather than agreeing with itself.
+ * Files are planted at the LITERAL `.rafa/config.yaml` for the same
+ * reason.
+ *
+ * One case here is a CHARACTERIZATION of bun rather than a guard of
+ * this module, and is named as such: `yes` parsing as a string where
+ * `TRUE` parses as the boolean. A second, `Bun.file().exists()`
+ * answering false for a directory, sits in `config-load.test.ts`. Each
+ * pins a measured claim the module note makes, so a bun upgrade that
+ * changes one fails and says which sentence went stale. A tab-indented
+ * child was a third until bun 1.4.2 began throwing where 1.3.14 read a
+ * top-level key; the module now refuses it before the parser runs, and
+ * the case guards that refusal.
+ *
+ * Fifty module mutations were driven against this file and
+ * `config-sections.test.ts` together, each an exact string found once,
+ * with both modules restored sha256-identical after it and the two
+ * files green either side, and on the last pass every one reddened at
+ * least one case. Twenty-five were aimed at this module: the file over
+ * the command line; three defaults moved; a default list unfrozen and
+ * the defaults unfrozen; `outputMode` taken off the command line, and
+ * every override read; a section that is no mapping skipped; the known
+ * keys always the top level's; an item index not collapsed; item extras
+ * dropped, and put before the document's; reader problems dropped;
+ * tracker kinds closed; version 2 accepted; `loop.settingSources`
+ * misspelt; a null read as a value; no section descended into; the
+ * given-twice check dropped; warnings never printed; the command line
+ * judged before the file; its label spelling the file key; the known
+ * keys not deduplicated; and command-line problems ignored.
+ *
+ * Two of those, warnings never printed and the command line judged
+ * before the file, were mutations of `loadConfig`, which has since
+ * moved to `config-load.ts` with the cases that caught them.
+ *
+ * A layer and a resolution read every setting off the sections
+ * registered with `section.ts`, so this file imports
+ * `src/config-registry.ts` for the registration its import makes. The
+ * cases under `the registered sections` register a section of their own
+ * or empty the registry, and each puts the registry it found back in a
+ * `finally`, since bun runs every test file in one process.
+ */
+import type {
+  ConfigLayer,
+  ConfigOverrides,
+  ConfigSetting,
+  ConfigSource,
+  RafaConfig,
+  RouteTarget,
+  TierPin,
+} from '@open-tomato/rafa/core/config/config';
+
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'bun:test';
+
+import {
+  CONFIG_FILE,
+  ConfigError,
+  configFilePath,
+  parseConfigDocument,
+  parseConfigText,
+  readConfigDocument,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config/config';
+import {
+  activeSections,
+  activeSettings,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  registerConfigSections,
+  restoreConfigSections,
+} from '@open-tomato/rafa/core/config/section';
+
+import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
+
+/** The label every pure case parses under. No file is read at it. */
+const PATH = '/repo/.rafa/config.yaml';
+
+/** The label a user scope file parses under. No file is read at it. */
+const USER_PATH = '/home/someone/.rafa/config.yaml';
+
+/** The known-keys tail of a warning about a top-level unknown key. */
+const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
+  + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)';
+
+/** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
+const SETTINGS: readonly ConfigSetting[] = [
+  'version',
+  'store',
+  'effortBusyTimeoutMs',
+  'effortSync',
+  'hubUrl',
+  'hubTokenSecret',
+  'hubTimeout',
+  'inject',
+  'planDir',
+  'specsDir',
+  'trackerDefault',
+  'trackerFallback',
+  'learningAdapter',
+  'learningBlessMinConfidence',
+  'learningPromoteAfter',
+  'learningPromoteMinConfidence',
+  'outputMode',
+  'prerequisitesRequired',
+  'prerequisitesOptional',
+  'trackingSpecs',
+  'trackingPlans',
+  'trackingAll',
+  'modules',
+  'allowList',
+  'settingSources',
+  'loopWorktreeDir',
+  'loopRetries',
+  'loopRetriesOnContinue',
+  'loopContinueCriteria',
+  'loopContinueCriteriaMode',
+  'loopForceWrapUpMaxNewFailures',
+  'loopWrapUpRetries',
+  'prProvider',
+  'prMergeMethod',
+  'prBase',
+  'prResolveBudget',
+  'prVersionCollision',
+  'boardTrustedAuthors',
+  'boardRelationships',
+  'boardProjectTemplate',
+  'boardProjectNumber',
+  'boardProjectRetries',
+  'boardProjectRetryWaitSeconds',
+  'boardProjectProgressSeconds',
+  'boardProjectWriteBatchSize',
+  'boardProjectWritePauseMs',
+  'roadmapIssue',
+  'claimsStaleAfter',
+  'claimsAhead',
+  'triageSimilarityThreshold',
+  'triageSimilarityCandidates',
+  'releaseEnabled',
+  'releaseVersionFile',
+  'releaseChangelog',
+  'releaseHeading',
+  'releaseFragments',
+  'releaseStrategy',
+  'releaseSettle',
+  'releaseTag',
+  'releasePublishCommand',
+  'errorsCodes',
+  'loggerKind',
+  'loggerLevel',
+  'loggerTheme',
+  'loggerModules',
+  'loggerCallSite',
+  'loggerApi',
+  'issuesTitleBug',
+  'issuesSummaryMax',
+  'issuesEnvironments',
+  'issuesVocabularyModules',
+  'issuesVocabularyActions',
+  'cleanupStaleDays',
+  'cleanupWorktreeIdleDays',
+  'cleanupKeep',
+  'dangerousAcceptStaleRefs',
+  'dangerousAcceptVersionCollision',
+  'dangerousSelfUpdateDuringLoop',
+  'statusNotice',
+  'tiersRafa',
+  'tiersSkills',
+  'tiersAgents',
+  'routing',
+  'taskSkills',
+  'taskLessons',
+  'mergeDuplicates',
+  'namingBranch',
+  'testsFullSuiteTriggers',
+  'testsIntegration',
+  'testsAlwaysRun',
+  'testsRetakeRedAlone',
+];
+
+/** The block under "Config schema" in the phase 1 spec, as defaults. */
+const DEFAULTS: RafaConfig = {
+  version: 1,
+  store: 'sqlite',
+  effortBusyTimeoutMs: 5000,
+  effortSync: 'local',
+  hubUrl: null,
+  hubTokenSecret: null,
+  hubTimeout: '3s',
+  inject: 'stage',
+  planDir: join('.rafa', 'plans'),
+  specsDir: join('.rafa', 'specs'),
+  trackerDefault: 'github',
+  trackerFallback: ['local'],
+  learningAdapter: 'local',
+  learningBlessMinConfidence: 0.5,
+  learningPromoteAfter: 3,
+  learningPromoteMinConfidence: 0.7,
+  outputMode: 'text',
+  prerequisitesRequired: [],
+  prerequisitesOptional: [],
+  trackingSpecs: false,
+  trackingPlans: false,
+  trackingAll: false,
+  modules: [],
+  allowList: [],
+  settingSources: ['project', 'local'],
+  loopWorktreeDir: join('.rafa', 'worktrees'),
+  loopRetries: false,
+  loopRetriesOnContinue: 1,
+  loopContinueCriteria: join('.rafa', 'continue-criteria.md'),
+  loopContinueCriteriaMode: 'extend',
+  loopForceWrapUpMaxNewFailures: false,
+  loopWrapUpRetries: 1,
+  prProvider: null,
+  prMergeMethod: 'squash',
+  prBase: null,
+  prResolveBudget: 2,
+  prVersionCollision: 'report',
+  boardTrustedAuthors: [],
+  boardRelationships: 'labels',
+  boardProjectTemplate: 'https://github.com/orgs/open-tomato/projects/6',
+  boardProjectNumber: null,
+  boardProjectRetries: 3,
+  boardProjectRetryWaitSeconds: 2,
+  boardProjectProgressSeconds: 10,
+  boardProjectWriteBatchSize: 20,
+  boardProjectWritePauseMs: 1000,
+  roadmapIssue: null,
+  claimsStaleAfter: '3d',
+  claimsAhead: 'off',
+  triageSimilarityThreshold: 0.3,
+  triageSimilarityCandidates: 3,
+  releaseEnabled: 'auto',
+  releaseVersionFile: 'package.json',
+  releaseChangelog: 'CHANGELOG.md',
+  releaseHeading: '## {version} — {date}, {title}',
+  releaseFragments: '.changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'push',
+  releaseTag: 'manual',
+  releasePublishCommand: 'npm publish',
+  errorsCodes: [],
+  loggerKind: 'console',
+  loggerLevel: 'warn',
+  loggerTheme: 'default',
+  loggerModules: new Map(),
+  loggerCallSite: false,
+  loggerApi: false,
+  issuesTitleBug: '?(${module}?( - ${action}): )${summary}',
+  issuesSummaryMax: 80,
+  issuesEnvironments: [],
+  issuesVocabularyModules: [],
+  issuesVocabularyActions: [],
+  cleanupStaleDays: 30,
+  cleanupWorktreeIdleDays: 7,
+  cleanupKeep: [],
+  dangerousAcceptStaleRefs: false,
+  dangerousAcceptVersionCollision: false,
+  dangerousSelfUpdateDuringLoop: false,
+  statusNotice: true,
+  tiersRafa: 'on',
+  tiersSkills: new Map(),
+  tiersAgents: new Map(),
+  routing: new Map([
+    ['prose', 'doc-updater'],
+    ['tests', 'tdd-guide'],
+    ['repair', 'build-error-resolver'],
+    ['review', 'code-reviewer'],
+    ['implementation', 'loop-implementer'],
+  ]),
+  taskSkills: 'planner',
+  taskLessons: 'on',
+  mergeDuplicates: 'warn',
+  namingBranch: 'feat/{stub}',
+  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+  testsIntegration: [
+    '**/*-integration.test.ts',
+    '**/*.integration.test.ts',
+    '**/*-spawned*.test.ts',
+    '**/*-cli.test.ts',
+  ],
+  testsAlwaysRun: ['src/**/*.sweep.test.ts'],
+  testsRetakeRedAlone: true,
+};
+
+/**
+ * A file naming every setting, each at a value other than its default
+ * but for `version` and `release.strategy`, which accept one value each.
+ */
+const FULL = [
+  'version: 1',
+  'store: ndjson',
+  'effort:',
+  '  busyTimeoutMs: 250',
+  '  sync: file',
+  'hub:',
+  '  url: https://hub.example.org',
+  '  tokenSecret: rafa-hub-token',
+  '  timeout: 10s',
+  'plan:',
+  '  inject: full',
+  '  dir: .plans',
+  'specs:',
+  '  dir: .specs',
+  'tracker:',
+  '  default: linear',
+  '  fallback: [local, github]',
+  'learning:',
+  '  adapter: remote',
+  '  bless:',
+  '    minConfidence: 0.6',
+  '  promote:',
+  '    after: 4',
+  '    minConfidence: 0.8',
+  'output:',
+  '  mode: json',
+  'prerequisites:',
+  '  required:',
+  '    - tool: bun',
+  '      probe: bun --version',
+  '    - env: GITHUB_TOKEN',
+  '  optional:',
+  '    - tool: mgrep',
+  '      probe: mgrep --version',
+  '      reason: "faster search; grep is the fallback"',
+  '    - lsp: typescript',
+  'tracking:',
+  '  specs: true',
+  '  plans: true',
+  '  all: true',
+  'modules:',
+  '  - path: ../my-output',
+  '  - github: someone/rafa-obsidian',
+  '    ref: v0.3.0',
+  'allowList: [my-output]',
+  'loop:',
+  '  settingSources: user, project',
+  '  worktreeDir: ../worktrees',
+  '  retries: 2',
+  '  retriesOnContinue: 2',
+  '  continue:',
+  '    criteria: docs/continue.md',
+  '    criteriaMode: replace',
+  '  forceWrapUp:',
+  '    maxNewFailures: 7',
+  '  wrapUp:',
+  '    retries: 2',
+  'pr:',
+  '  provider: none',
+  '  mergeMethod: rebase',
+  '  base: trunk',
+  '  resolveBudget: 0.5',
+  '  versionCollision: refuse',
+  'board:',
+  '  trustedAuthors: ["dependabot[bot]"]',
+  '  relationships: native',
+  '  project:',
+  '    template: https://github.com/orgs/acme/projects/2',
+  '    number: 6',
+  '    retries: 5',
+  '    retryWaitSeconds: 4',
+  '    progressSeconds: 30',
+  '    writeBatchSize: 7',
+  '    writePauseMs: 0',
+  'roadmap:',
+  '  issue: 31',
+  'claims:',
+  '  staleAfter: 36h',
+  '  ahead: allow',
+  'triage:',
+  '  similarity:',
+  '    threshold: 0.5',
+  '    candidates: 5',
+  'release:',
+  '  enabled: false',
+  '  versionFile: deno.json',
+  '  changelog: docs/CHANGES.md',
+  '  heading: "### {version} on {date}"',
+  '  fragments: docs/changes',
+  '  strategy: semver-by-level',
+  '  settle: pr',
+  '  tag: settle',
+  '  publishCommand: pnpm publish',
+  'errors:',
+  '  codes:',
+  '    - code: deploy:missing-secret',
+  '      description: a deploy reads an unset secret',
+  '      hint: set the secret',
+  '      level: error',
+  '      since: v1',
+  'logger:',
+  '  kind: winston',
+  '  level: debug',
+  '  theme: plain',
+  '  modules: { board: { level: error } }',
+  '  callSite: true',
+  '  api: true',
+  'issues:',
+  '  titles:',
+  '    bug: "?([${project}] )${summary}"',
+  '    summaryMax: 70',
+  '  environments: [staging]',
+  '  vocabulary:',
+  '    modules: [auth, billing]',
+  '    actions: [login]',
+  'cleanup:',
+  '  staleDays: 60',
+  '  worktreeIdleDays: 14',
+  '  keep: ["release/*", keep-me]',
+  'dangerous:',
+  '  acceptStaleRefs: true',
+  '  acceptVersionCollision: true',
+  '  selfUpdateDuringLoop: true',
+  'status:',
+  '  notice: false',
+  'tiers:',
+  '  rafa: off',
+  '  skills: { react-query: false, documentation: project }',
+  '  agents: { tdd-guide: user }',
+  'routing: { cleanup: refactor-cleaner, review: false }',
+  'task:',
+  '  skills: tag',
+  '  lessons: off',
+  'merge:',
+  '  duplicates: allow',
+  'naming:',
+  '  branch: "work/{stub}"',
+  'tests:',
+  '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
+  '  integration: []',
+  '  alwaysRun: [src/sweeps/*.test.ts]',
+  '  retakeRedAlone: false',
+  '',
+].join('\n');
+
+/**
+ * What {@link FULL} reads as. `version` and `release.strategy`, each
+ * accepting one value, are the two at their default.
+ */
+const FULL_VALUES: RafaConfig = {
+  version: 1,
+  store: 'ndjson',
+  effortBusyTimeoutMs: 250,
+  effortSync: 'file',
+  hubUrl: 'https://hub.example.org',
+  hubTokenSecret: 'rafa-hub-token',
+  hubTimeout: '10s',
+  inject: 'full',
+  planDir: '.plans',
+  specsDir: '.specs',
+  trackerDefault: 'linear',
+  trackerFallback: ['local', 'github'],
+  learningAdapter: 'remote',
+  learningBlessMinConfidence: 0.6,
+  learningPromoteAfter: 4,
+  learningPromoteMinConfidence: 0.8,
+  outputMode: 'json',
+  prerequisitesRequired: [
+    { kind: 'tool', name: 'bun', probe: 'bun --version' },
+    { kind: 'env', name: 'GITHUB_TOKEN', probe: null },
+  ],
+  prerequisitesOptional: [
+    {
+      kind: 'tool',
+      name: 'mgrep',
+      probe: 'mgrep --version',
+      reason: 'faster search; grep is the fallback',
+    },
+    { kind: 'lsp', name: 'typescript', probe: null, reason: null },
+  ],
+  trackingSpecs: true,
+  trackingPlans: true,
+  trackingAll: true,
+  modules: [
+    { kind: 'path', location: '../my-output', ref: null },
+    { kind: 'github', location: 'someone/rafa-obsidian', ref: 'v0.3.0' },
+  ],
+  allowList: ['my-output'],
+  settingSources: ['user', 'project'],
+  loopWorktreeDir: '../worktrees',
+  loopRetries: 2,
+  loopRetriesOnContinue: 2,
+  loopContinueCriteria: 'docs/continue.md',
+  loopContinueCriteriaMode: 'replace',
+  loopForceWrapUpMaxNewFailures: 7,
+  loopWrapUpRetries: 2,
+  prProvider: 'none',
+  prMergeMethod: 'rebase',
+  prBase: 'trunk',
+  prResolveBudget: 0.5,
+  prVersionCollision: 'refuse',
+  boardTrustedAuthors: ['dependabot[bot]'],
+  boardRelationships: 'native',
+  boardProjectTemplate: 'https://github.com/orgs/acme/projects/2',
+  boardProjectNumber: 6,
+  boardProjectRetries: 5,
+  boardProjectRetryWaitSeconds: 4,
+  boardProjectProgressSeconds: 30,
+  boardProjectWriteBatchSize: 7,
+  boardProjectWritePauseMs: 0,
+  roadmapIssue: 31,
+  claimsStaleAfter: '36h',
+  claimsAhead: 'allow',
+  triageSimilarityThreshold: 0.5,
+  triageSimilarityCandidates: 5,
+  releaseEnabled: false,
+  releaseVersionFile: 'deno.json',
+  releaseChangelog: 'docs/CHANGES.md',
+  releaseHeading: '### {version} on {date}',
+  releaseFragments: 'docs/changes',
+  releaseStrategy: 'semver-by-level',
+  releaseSettle: 'pr',
+  releaseTag: 'settle',
+  releasePublishCommand: 'pnpm publish',
+  errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+  loggerKind: 'winston',
+  loggerLevel: 'debug',
+  loggerTheme: 'plain',
+  loggerModules: new Map([['board', 'error']]),
+  loggerCallSite: true,
+  loggerApi: true,
+  issuesTitleBug: '?([${project}] )${summary}',
+  issuesSummaryMax: 70,
+  issuesEnvironments: ['staging'],
+  issuesVocabularyModules: ['auth', 'billing'],
+  issuesVocabularyActions: ['login'],
+  cleanupStaleDays: 60,
+  cleanupWorktreeIdleDays: 14,
+  cleanupKeep: ['release/*', 'keep-me'],
+  dangerousAcceptStaleRefs: true,
+  dangerousAcceptVersionCollision: true,
+  dangerousSelfUpdateDuringLoop: true,
+  statusNotice: false,
+  tiersRafa: 'off',
+  tiersSkills: new Map<string, TierPin>([['react-query', false], ['documentation', 'project']]),
+  tiersAgents: new Map([['tdd-guide', 'user']]),
+  routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
+  taskSkills: 'tag',
+  taskLessons: 'off',
+  mergeDuplicates: 'allow',
+  namingBranch: 'work/{stub}',
+  testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
+  testsIntegration: [],
+  testsAlwaysRun: ['src/sweeps/*.test.ts'],
+  testsRetakeRedAlone: false,
+};
+
+/**
+ * What {@link FULL} resolves to: maps merge by key over the defaults, so
+ * the file's `false` shadows the default review row rather than dropping it.
+ */
+const FULL_RESOLVED: RafaConfig = {
+  ...FULL_VALUES,
+  routing: new Map<string, RouteTarget>([
+    ...DEFAULTS.routing,
+    ['cleanup', 'refactor-cleaner'],
+    ['review', false],
+  ]),
+};
+
+/** Parses `text` as a file labelled `path`, {@link PATH} unless named. */
+function fileOf(text: string, path = PATH) {
+  return parseConfigText(text, path);
+}
+
+/** The {@link ConfigError} `run` throws. Fails when it throws none. */
+function refusal(run: () => unknown): ConfigError {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof ConfigError) return error;
+    throw error;
+  }
+  throw new Error('expected a ConfigError, and nothing was thrown');
+}
+
+/** Every setting answered by `rest`, except those `named` answers. */
+function sourcesWith(
+  named: Partial<Record<ConfigSetting, ConfigSource>>,
+  rest: ConfigSource = 'default',
+): Record<ConfigSetting, ConfigSource> {
+  const all = Object.fromEntries(SETTINGS.map((setting) => [setting, rest]));
+  return { ...all, ...named } as Record<ConfigSetting, ConfigSource>;
+}
+
+/**
+ * Holds a layer to saying nothing, with every setting still present, in
+ * the order the sections were registered.
+ */
+function expectSilent(values: ConfigLayer): void {
+  expect(Object.keys(values).sort()).toEqual([...SETTINGS].sort());
+  expect(Object.keys(values)).toEqual(Object.keys(activeSettings()));
+  expect(Object.values(values).filter((value) => value !== undefined)).toEqual([]);
+}
+
+describe('CONFIG_FILE', () => {
+  it('is .rafa/config.yaml, joined under the root it is given', () => {
+    expect(CONFIG_FILE).toBe(join('.rafa', 'config.yaml'));
+    expect(configFilePath('/r')).toBe(join('/r', '.rafa', 'config.yaml'));
+  });
+});
+
+describe('CONFIG_DEFAULTS', () => {
+  it('are the spec block defaults, with both prerequisite tiers empty', () => {
+    expect(Object.keys(CONFIG_DEFAULTS)).toEqual([...SETTINGS]);
+    expect(CONFIG_DEFAULTS).toEqual(DEFAULTS);
+  });
+
+  it('are frozen, every list in them included, so no caller can move them for the next', () => {
+    const lists = SETTINGS.map((setting) => CONFIG_DEFAULTS[setting])
+      .filter((value) => Array.isArray(value));
+
+    expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
+    expect(lists).toHaveLength(15);
+    expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
+  });
+});
+
+describe('parseConfigText', () => {
+  it('reads every setting from a file naming each', () => {
+    const file = fileOf(FULL);
+
+    expect(file.values).toEqual(FULL_VALUES);
+    expect(file.extras).toEqual([]);
+    expect(file.path).toBe(PATH);
+  });
+
+  it('names every setting but the two with one value at a value other than its default', () => {
+    const atDefault = SETTINGS.filter(
+      (setting) => Bun.deepEquals(FULL_VALUES[setting], CONFIG_DEFAULTS[setting]),
+    );
+
+    expect(atDefault).toEqual(['version', 'releaseStrategy']);
+  });
+
+  it.each([
+    ['plan.inject', 'plan.inject: task\n', 'inject', 'task'],
+    ['tracker.default', 'tracker.default: linear\n', 'trackerDefault', 'linear'],
+    ['loop.settingSources', 'loop.settingSources: local\n', 'settingSources', ['local']],
+  ] as [string, string, ConfigSetting, unknown][])(
+    'reads %s written flat as the same setting',
+    (_label, text, setting, expected) => {
+      expect<unknown>(fileOf(text).values[setting]).toEqual(expected);
+    },
+  );
+
+  it.each([
+    ['an empty file', ''],
+    ['a whitespace-only file', '  \n\n'],
+    ['a comment-only file', '# store: ndjson\n'],
+    ['a bare document marker', '---\n'],
+  ])('reads %s as a file that says nothing', (_label, text) => {
+    const file = fileOf(text);
+
+    expectSilent(file.values);
+    expect(file.extras).toEqual([]);
+  });
+
+  it('reads a null value or section as silence rather than as a problem', () => {
+    const text = [
+      'store:',
+      'plan:',
+      '  # inject: full',
+      'tracker:',
+      '  fallback:',
+      'prerequisites:',
+      '  required:',
+      'loop:',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
+
+    expectSilent(file.values);
+    expect(file.extras).toEqual([]);
+  });
+
+  it('retains an unknown key at the top, under a section and in an item, with its value', () => {
+    const text = [
+      'store: sqlite',
+      'nonesuch:',
+      '  kind: linear',
+      'plan:',
+      '  inject: stage',
+      '  depth: 3',
+      'tracker:',
+      '  kind: linear',
+      'prerequisites:',
+      '  required:',
+      '    - tool: bun',
+      '      timeout: 30',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
+
+    expect(file.values.store).toBe('sqlite');
+    expect(file.values.inject).toBe('stage');
+    expect(file.values.prerequisitesRequired).toEqual([{ kind: 'tool', name: 'bun', probe: null }]);
+    expect(file.extras).toEqual([
+      { key: 'nonesuch', value: { kind: 'linear' } },
+      { key: 'plan.depth', value: 3 },
+      { key: 'tracker.kind', value: 'linear' },
+      { key: 'prerequisites.required[0].timeout', value: 30 },
+    ]);
+  });
+
+  it('treats a key named like an Object.prototype member as unknown', () => {
+    const text = [
+      'constructor: a',
+      'toString: b',
+      '__proto__: c',
+      'plan:',
+      '  hasOwnProperty: d',
+      'tracker:',
+      '  valueOf: e',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
+
+    expectSilent(file.values);
+    expect(file.extras.map((extra) => extra.key)).toEqual([
+      'constructor',
+      'toString',
+      '__proto__',
+      'plan.hasOwnProperty',
+      'tracker.valueOf',
+    ]);
+  });
+
+  it('refuses a tab in a line\'s indentation, by line, before the parser sees it', () => {
+    const text = 'plan:\n\tinject: full\ntracking:\n  \tspecs: true\n';
+    const error = refusal(() => fileOf(text));
+
+    expect(error.problems).toEqual([
+      `${PATH}: line 2 is indented with a tab; YAML indents with spaces only`,
+      `${PATH}: line 4 is indented with a tab; YAML indents with spaces only`,
+    ]);
+    expect(error.cause).toBeUndefined();
+  });
+
+  it('parses a tab inside a value, and a tab on a blank or comment line', () => {
+    const file = fileOf('plan:\n  inject: full\t# a tab before the comment\n\t\n\t# a comment\nnote: a\tb\n');
+
+    expect(file.values.inject).toBe('full');
+    expect(file.extras).toEqual([{ key: 'note', value: 'a\tb' }]);
+  });
+
+  it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {
+    expect(Bun.YAML.parse('a: yes')).toEqual({ a: 'yes' });
+    expect(fileOf('tracking:\n  specs: TRUE\n').values.trackingSpecs).toBe(true);
+    expect(refusal(() => fileOf('tracking:\n  specs: yes\n')).problems).toEqual([
+      `${PATH}: tracking.specs is "yes", expected true or false`,
+    ]);
+  });
+
+  it('refuses malformed YAML, naming the file and keeping the cause', () => {
+    const error = refusal(() => fileOf('store: [unclosed\n'));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toStartWith(`${PATH}: not valid YAML (`);
+    expect(error.cause).toBeInstanceOf(SyntaxError);
+    expect(error.message).toStartWith('rafa config: ');
+  });
+
+  it.each([
+    ['a list', '- store\n- ndjson\n', 'a list'],
+    ['a scalar', 'sqlite\n', '"sqlite"'],
+    ['a multi-document stream', 'store: ndjson\n---\nstore: sqlite\n', 'a list'],
+  ])('refuses %s at the top level', (_label, text, found) => {
+    expect(refusal(() => fileOf(text)).problems).toEqual([
+      `${PATH}: expected a mapping at the top level, found ${found}`,
+    ]);
+  });
+
+  it('refuses every value a setting does not accept, in one error', () => {
+    const text = 'store: postgres\nplan:\n  inject: everything\ntracking:\n  all: 1\n';
+
+    expect(refusal(() => fileOf(text)).problems).toEqual([
+      `${PATH}: store is "postgres", expected one of: sqlite, ndjson`,
+      `${PATH}: plan.inject is "everything", expected one of: full, stage, task`,
+      `${PATH}: tracking.all is 1, expected true or false`,
+    ]);
+  });
+
+  describe('each section, refused by name beside an accepting control', () => {
+    const cases: readonly [string, string, string, string, ConfigSetting, unknown][] = [
+      ['version', 'version: 2', 'version is 2, expected one of: 1', 'version: 1', 'version', 1],
+      [
+        'store', 'store: postgres', 'store is "postgres", expected one of: sqlite, ndjson',
+        'store: ndjson', 'store', 'ndjson',
+      ],
+      [
+        'effort.busyTimeoutMs', 'effort:\n  busyTimeoutMs: "5000"',
+        'effort.busyTimeoutMs is "5000", expected a lock wait in milliseconds, a whole number from 1 to 60000',
+        'effort:\n  busyTimeoutMs: 60000', 'effortBusyTimeoutMs', 60_000,
+      ],
+      [
+        'effort.sync', 'effort:\n  sync: rsync',
+        'effort.sync is "rsync", expected one of: local, file, git, service, p2p',
+        'effort:\n  sync: p2p', 'effortSync', 'p2p',
+      ],
+      [
+        'hub.url', 'hub:\n  url: hub.example.org',
+        'hub.url is "hub.example.org", expected an http or https URL with no user name or password, such as https://hub.example.org',
+        'hub:\n  url: http://localhost:7373', 'hubUrl', 'http://localhost:7373',
+      ],
+      [
+        'hub.tokenSecret', 'hub:\n  tokenSecret: " "',
+        'hub.tokenSecret is " ", expected a secret store name',
+        'hub:\n  tokenSecret: team-hub', 'hubTokenSecret', 'team-hub',
+      ],
+      [
+        'hub.timeout', 'hub:\n  timeout: 0s',
+        'hub.timeout is "0s", expected a duration of whole seconds from 1s to 30s, such as 3s',
+        'hub:\n  timeout: 30s', 'hubTimeout', '30s',
+      ],
+      [
+        'plan.inject', 'plan:\n  inject: all',
+        'plan.inject is "all", expected one of: full, stage, task',
+        'plan:\n  inject: task', 'inject', 'task',
+      ],
+      [
+        'plan.dir', 'plan:\n  dir: ""', 'plan.dir is "", expected a directory path',
+        'plan:\n  dir: .plans', 'planDir', '.plans',
+      ],
+      [
+        'specs.dir', 'specs:\n  dir: 3', 'specs.dir is 3, expected a directory path',
+        'specs:\n  dir: .specs', 'specsDir', '.specs',
+      ],
+      [
+        'tracker.default', 'tracker:\n  default: [linear]',
+        'tracker.default is a list, expected a tracker kind name',
+        'tracker:\n  default: linear', 'trackerDefault', 'linear',
+      ],
+      [
+        'tracker.fallback', 'tracker:\n  fallback: local',
+        'tracker.fallback is "local", expected a list of tracker kind names',
+        'tracker:\n  fallback: [github, obsidian]', 'trackerFallback', ['github', 'obsidian'],
+      ],
+      [
+        'learning.adapter', 'learning:\n  adapter: "  "',
+        'learning.adapter is "  ", expected a learning adapter name',
+        'learning:\n  adapter: remote', 'learningAdapter', 'remote',
+      ],
+      [
+        'learning.bless.minConfidence', 'learning:\n  bless:\n    minConfidence: 0.95',
+        'learning.bless.minConfidence is 0.95, expected a confidence from 0.3 to 0.9',
+        'learning:\n  bless:\n    minConfidence: 0.6', 'learningBlessMinConfidence', 0.6,
+      ],
+      [
+        'learning.promote.after', 'learning:\n  promote:\n    after: 0',
+        'learning.promote.after is 0, expected a count, a whole number of 1 or more',
+        'learning:\n  promote:\n    after: 5', 'learningPromoteAfter', 5,
+      ],
+      [
+        'learning.promote.minConfidence', 'learning:\n  promote:\n    minConfidence: 0.2',
+        'learning.promote.minConfidence is 0.2, expected a confidence from 0.3 to 0.9',
+        'learning:\n  promote:\n    minConfidence: 0.8', 'learningPromoteMinConfidence', 0.8,
+      ],
+      [
+        'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json, events',
+        'output:\n  mode: json', 'outputMode', 'json',
+      ],
+      [
+        'prerequisites.required', 'prerequisites:\n  required:\n    - tool: bun\n      env: X',
+        'prerequisites.required[0] names tool and env, expected exactly one of: tool, env, service, lsp',
+        'prerequisites:\n  required:\n    - env: X', 'prerequisitesRequired',
+        [{ kind: 'env', name: 'X', probe: null }],
+      ],
+      [
+        'prerequisites.optional',
+        'prerequisites:\n  optional:\n    - lsp: typescript\n      reason: 4',
+        'prerequisites.optional[0].reason is 4, expected a non-empty string',
+        'prerequisites:\n  optional:\n    - lsp: typescript\n      reason: types',
+        'prerequisitesOptional', [{ kind: 'lsp', name: 'typescript', probe: null, reason: 'types' }],
+      ],
+      [
+        'tracking.specs', 'tracking:\n  specs: "true"',
+        'tracking.specs is "true", expected true or false',
+        'tracking:\n  specs: true', 'trackingSpecs', true,
+      ],
+      [
+        'tracking.plans', 'tracking:\n  plans: 1', 'tracking.plans is 1, expected true or false',
+        'tracking:\n  plans: true', 'trackingPlans', true,
+      ],
+      [
+        'tracking.all', 'tracking:\n  all: no', 'tracking.all is "no", expected true or false',
+        'tracking:\n  all: true', 'trackingAll', true,
+      ],
+      [
+        'modules', 'modules:\n  - {}', 'modules[0] names none of: npm, github, path',
+        'modules:\n  - path: ../mine', 'modules', [{ kind: 'path', location: '../mine', ref: null }],
+      ],
+      [
+        'allowList', 'allowList: mine', 'allowList is "mine", expected a list of module names',
+        'allowList: [mine]', 'allowList', ['mine'],
+      ],
+      [
+        'loop.settingSources', 'loop:\n  settingSources: project,project',
+        'loop.settingSources is "project,project", '
+          + 'expected a comma-separated subset of: user, project, local',
+        'loop:\n  settingSources: user', 'settingSources', ['user'],
+      ],
+      [
+        'loop.worktreeDir', 'loop:\n  worktreeDir: 7', 'loop.worktreeDir is 7, expected a directory path',
+        'loop:\n  worktreeDir: /tmp/trees', 'loopWorktreeDir', '/tmp/trees',
+      ],
+      [
+        'loop.retries', 'loop:\n  retries: -1',
+        'loop.retries is -1, expected false or a whole number from 1 to 3',
+        'loop:\n  retries: 1', 'loopRetries', 1,
+      ],
+      [
+        'loop.retriesOnContinue', 'loop:\n  retriesOnContinue: 0',
+        'loop.retriesOnContinue is 0, expected false or a whole number from 1 to 3',
+        'loop:\n  retriesOnContinue: 3', 'loopRetriesOnContinue', 3,
+      ],
+      [
+        'loop.continue.criteria', 'loop:\n  continue:\n    criteria: 7',
+        'loop.continue.criteria is 7, expected a file path',
+        'loop:\n  continue:\n    criteria: c.md', 'loopContinueCriteria', 'c.md',
+      ],
+      [
+        'loop.continue.criteriaMode', 'loop:\n  continue:\n    criteriaMode: merge',
+        'loop.continue.criteriaMode is "merge", expected one of: extend, replace',
+        'loop:\n  continue:\n    criteriaMode: replace', 'loopContinueCriteriaMode', 'replace',
+      ],
+      [
+        'loop.forceWrapUp.maxNewFailures', 'loop:\n  forceWrapUp:\n    maxNewFailures: 51',
+        'loop.forceWrapUp.maxNewFailures is 51, expected false or a whole number from 1 to 50',
+        'loop:\n  forceWrapUp:\n    maxNewFailures: 50', 'loopForceWrapUpMaxNewFailures', 50,
+      ],
+      [
+        'loop.wrapUp.retries', 'loop:\n  wrapUp:\n    retries: 0',
+        'loop.wrapUp.retries is 0, expected false or a whole number from 1 to 3',
+        'loop:\n  wrapUp:\n    retries: false', 'loopWrapUpRetries', false,
+      ],
+      [
+        'pr.provider', 'pr:\n  provider: github',
+        'pr.provider is "github", expected one of: gh, none',
+        'pr:\n  provider: none', 'prProvider', 'none',
+      ],
+      [
+        'pr.mergeMethod', 'pr:\n  mergeMethod: squash-merge',
+        'pr.mergeMethod is "squash-merge", expected one of: squash, merge, rebase',
+        'pr:\n  mergeMethod: merge', 'prMergeMethod', 'merge',
+      ],
+      [
+        'pr.base', 'pr:\n  base: 7', 'pr.base is 7, expected a branch name',
+        'pr:\n  base: develop', 'prBase', 'develop',
+      ],
+      [
+        'pr.resolveBudget', 'pr:\n  resolveBudget: "2"',
+        'pr.resolveBudget is "2", expected a number of US dollars above zero, '
+          + 'at most six digits either side of the point',
+        'pr:\n  resolveBudget: 1.25', 'prResolveBudget', 1.25,
+      ],
+      [
+        'pr.versionCollision', 'pr:\n  versionCollision: warn',
+        'pr.versionCollision is "warn", expected one of: allow, report, ask, refuse',
+        'pr:\n  versionCollision: ask', 'prVersionCollision', 'ask',
+      ],
+      [
+        'board.trustedAuthors', 'board:\n  trustedAuthors: [octo cat]',
+        'board.trustedAuthors[0] is "octo cat", expected a GitHub login',
+        'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
+      ],
+      [
+        'board.relationships', 'board:\n  relationships: sub-issues',
+        'board.relationships is "sub-issues", expected one of: labels, native',
+        'board:\n  relationships: native', 'boardRelationships', 'native',
+      ],
+      [
+        'board.project.template', 'board:\n  project:\n    template: https://github.com/acme',
+        'board.project.template is "https://github.com/acme", expected a GitHub project URL, '
+          + 'https://github.com/orgs/<owner>/projects/<number> or /users/<owner>/…',
+        'board:\n  project:\n    template: https://github.com/users/octocat/projects/3',
+        'boardProjectTemplate', 'https://github.com/users/octocat/projects/3',
+      ],
+      [
+        'board.project.number', 'board:\n  project:\n    number: "6"',
+        'board.project.number is "6", expected a project number, a whole number above zero',
+        'board:\n  project:\n    number: 6', 'boardProjectNumber', 6,
+      ],
+      [
+        'board.project.retries', 'board:\n  project:\n    retries: 0',
+        'board.project.retries is 0, expected false or a whole number from 1 to 10',
+        'board:\n  project:\n    retries: false', 'boardProjectRetries', false,
+      ],
+      [
+        'board.project.retryWaitSeconds', 'board:\n  project:\n    retryWaitSeconds: 61',
+        'board.project.retryWaitSeconds is 61, expected a whole number from 1 to 60',
+        'board:\n  project:\n    retryWaitSeconds: 60', 'boardProjectRetryWaitSeconds', 60,
+      ],
+      [
+        'board.project.progressSeconds', 'board:\n  project:\n    progressSeconds: -1',
+        'board.project.progressSeconds is -1, expected false or a whole number from 1 to 300',
+        'board:\n  project:\n    progressSeconds: false', 'boardProjectProgressSeconds', false,
+      ],
+      [
+        'board.project.writeBatchSize', 'board:\n  project:\n    writeBatchSize: false',
+        'board.project.writeBatchSize is false, expected a whole number from 1 to 100',
+        'board:\n  project:\n    writeBatchSize: 100', 'boardProjectWriteBatchSize', 100,
+      ],
+      [
+        'board.project.writePauseMs', 'board:\n  project:\n    writePauseMs: -1',
+        'board.project.writePauseMs is -1, expected a whole number from 0 to 60000',
+        'board:\n  project:\n    writePauseMs: 0', 'boardProjectWritePauseMs', 0,
+      ],
+      [
+        'roadmap.issue', 'roadmap:\n  issue: 0',
+        'roadmap.issue is 0, expected an issue number, a whole number above zero',
+        'roadmap:\n  issue: 31', 'roadmapIssue', 31,
+      ],
+      [
+        'claims.staleAfter', 'claims:\n  staleAfter: 0d',
+        'claims.staleAfter is "0d", expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled',
+        'claims:\n  staleAfter: disabled', 'claimsStaleAfter', 'disabled',
+      ],
+      [
+        'claims.ahead', 'claims:\n  ahead: false',
+        'claims.ahead is false, expected one of: off, allow',
+        'claims:\n  ahead: allow', 'claimsAhead', 'allow',
+      ],
+      [
+        'triage.similarity.threshold', 'triage:\n  similarity:\n    threshold: 0',
+        'triage.similarity.threshold is 0, expected false or a number above 0 and at most 1',
+        'triage:\n  similarity:\n    threshold: false', 'triageSimilarityThreshold', false,
+      ],
+      [
+        'triage.similarity.candidates', 'triage:\n  similarity:\n    candidates: 11',
+        'triage.similarity.candidates is 11, expected a whole number from 1 to 10',
+        'triage:\n  similarity:\n    candidates: 10', 'triageSimilarityCandidates', 10,
+      ],
+      [
+        'release.enabled', 'release:\n  enabled: on',
+        'release.enabled is "on", expected true, false or auto',
+        'release:\n  enabled: false', 'releaseEnabled', false,
+      ],
+      [
+        'release.versionFile', 'release:\n  versionFile: []',
+        'release.versionFile is a list, expected a file path',
+        'release:\n  versionFile: deno.json', 'releaseVersionFile', 'deno.json',
+      ],
+      [
+        'release.changelog', 'release:\n  changelog: ""',
+        'release.changelog is "", expected a file path',
+        'release:\n  changelog: docs/CHANGES.md', 'releaseChangelog', 'docs/CHANGES.md',
+      ],
+      [
+        'release.heading', 'release:\n  heading: 2',
+        'release.heading is 2, expected a changelog heading template',
+        'release:\n  heading: "### {version}"', 'releaseHeading', '### {version}',
+      ],
+      [
+        'release.fragments', 'release:\n  fragments: .rafa/changes',
+        'release.fragments is ".rafa/changes", expected a relative directory path not under .rafa/',
+        'release:\n  fragments: changes', 'releaseFragments', 'changes',
+      ],
+      [
+        'release.strategy', 'release:\n  strategy: calver',
+        'release.strategy is "calver", expected one of: semver-by-level',
+        'release:\n  strategy: semver-by-level', 'releaseStrategy', 'semver-by-level',
+      ],
+      [
+        'release.settle', 'release:\n  settle: merge',
+        'release.settle is "merge", expected one of: push, pr',
+        'release:\n  settle: pr', 'releaseSettle', 'pr',
+      ],
+      [
+        'release.tag', 'release:\n  tag: true',
+        'release.tag is true, expected one of: manual, settle',
+        'release:\n  tag: settle', 'releaseTag', 'settle',
+      ],
+      [
+        'release.publishCommand', 'release:\n  publishCommand: ""',
+        'release.publishCommand is "", expected a publish command',
+        'release:\n  publishCommand: pnpm publish', 'releasePublishCommand', 'pnpm publish',
+      ],
+      [
+        'errors.codes', 'errors:\n  codes: git:x',
+        'errors.codes is "git:x", expected a list of error code entries',
+        'errors:\n  codes:\n    - code: deploy:missing-secret\n      description: a deploy reads an unset secret\n      hint: set the secret\n      level: error\n      since: v1',
+        'errorsCodes', [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+      ],
+      [
+        'logger.kind', 'logger:\n  kind: ""',
+        'logger.kind is "", expected an adapter kind, such as console',
+        'logger:\n  kind: winston', 'loggerKind', 'winston',
+      ],
+      [
+        'logger.level', 'logger:\n  level: info',
+        'logger.level is "info", expected one of: error, warn, debug',
+        'logger:\n  level: debug', 'loggerLevel', 'debug',
+      ],
+      [
+        'logger.theme', 'logger:\n  theme: neon',
+        'logger.theme is "neon", expected one of: default, plain',
+        'logger:\n  theme: plain', 'loggerTheme', 'plain',
+      ],
+      [
+        'logger.modules', 'logger:\n  modules: { board: debug }',
+        'logger.modules.board is "debug", expected a mapping holding level',
+        'logger:\n  modules: { board: { level: debug } }', 'loggerModules', new Map([['board', 'debug']]),
+      ],
+      [
+        'logger.callSite', 'logger:\n  callSite: "yes"',
+        'logger.callSite is "yes", expected true or false',
+        'logger:\n  callSite: true', 'loggerCallSite', true,
+      ],
+      [
+        'logger.api', 'logger:\n  api: 1',
+        'logger.api is 1, expected true or false',
+        'logger:\n  api: true', 'loggerApi', true,
+      ],
+      [
+        'issues.titles.bug', 'issues:\n  titles:\n    bug: "${summary"',
+        'issues.titles.bug is "${summary", expected a title template: "${" at 0 is never closed',
+        'issues:\n  titles:\n    bug: "${summary}"', 'issuesTitleBug', '${summary}',
+      ],
+      [
+        'issues.titles.summaryMax', 'issues:\n  titles:\n    summaryMax: 19',
+        'issues.titles.summaryMax is 19, expected a whole number from 20 to 120',
+        'issues:\n  titles:\n    summaryMax: 60', 'issuesSummaryMax', 60,
+      ],
+      [
+        'issues.environments', 'issues:\n  environments: [ci]',
+        'issues.environments[0] is "ci", expected a place name in lower-case kebab-case, other than local, ci, prod and unknown',
+        'issues:\n  environments: [qa]', 'issuesEnvironments', ['qa'],
+      ],
+      [
+        'issues.vocabulary.modules', 'issues:\n  vocabulary:\n    modules: [Auth]',
+        'issues.vocabulary.modules[0] is "Auth", expected a module name in lower-case letters, digits, ".", "_" and "-", other than unknown',
+        'issues:\n  vocabulary:\n    modules: [auth]', 'issuesVocabularyModules', ['auth'],
+      ],
+      [
+        'issues.vocabulary.actions', 'issues:\n  vocabulary:\n    actions: [Login]',
+        'issues.vocabulary.actions[0] is "Login", expected an action in lower-case letters, digits, ".", "_", "-" and spaces, other than unknown',
+        'issues:\n  vocabulary:\n    actions: [login]', 'issuesVocabularyActions', ['login'],
+      ],
+      [
+        'cleanup.staleDays', 'cleanup:\n  staleDays: 0',
+        'cleanup.staleDays is 0, expected a number of days, a whole number above zero',
+        'cleanup:\n  staleDays: 90', 'cleanupStaleDays', 90,
+      ],
+      [
+        'cleanup.worktreeIdleDays', 'cleanup:\n  worktreeIdleDays: "7"',
+        'cleanup.worktreeIdleDays is "7", expected a number of days, a whole number above zero',
+        'cleanup:\n  worktreeIdleDays: 3', 'cleanupWorktreeIdleDays', 3,
+      ],
+      [
+        'cleanup.keep', 'cleanup:\n  keep: "release/*"',
+        'cleanup.keep is "release/*", expected a list of glob patterns',
+        'cleanup:\n  keep: ["hotfix/*"]', 'cleanupKeep', ['hotfix/*'],
+      ],
+      [
+        'dangerous.acceptStaleRefs', 'dangerous:\n  acceptStaleRefs: yes',
+        'dangerous.acceptStaleRefs is "yes", expected true or false',
+        'dangerous:\n  acceptStaleRefs: true', 'dangerousAcceptStaleRefs', true,
+      ],
+      [
+        'dangerous.acceptVersionCollision', 'dangerous:\n  acceptVersionCollision: "true"',
+        'dangerous.acceptVersionCollision is "true", expected true or false',
+        'dangerous:\n  acceptVersionCollision: true', 'dangerousAcceptVersionCollision', true,
+      ],
+      [
+        'dangerous.selfUpdateDuringLoop', 'dangerous:\n  selfUpdateDuringLoop: yes',
+        'dangerous.selfUpdateDuringLoop is "yes", expected true or false',
+        'dangerous:\n  selfUpdateDuringLoop: true', 'dangerousSelfUpdateDuringLoop', true,
+      ],
+      [
+        'status.notice', 'status:\n  notice: no',
+        'status.notice is "no", expected true or false',
+        'status:\n  notice: false', 'statusNotice', false,
+      ],
+      [
+        'tiers.rafa', 'tiers:\n  rafa: false',
+        'tiers.rafa is false, expected one of: on, off',
+        'tiers:\n  rafa: off', 'tiersRafa', 'off',
+      ],
+      [
+        'tiers.skills', 'tiers:\n  skills: { react-query: true }',
+        'tiers.skills.react-query is true, expected false or one of: project, rafa, user',
+        'tiers:\n  skills: { react-query: false }', 'tiersSkills', new Map([['react-query', false]]),
+      ],
+      [
+        'tiers.agents', 'tiers:\n  agents: [tdd-guide]',
+        'tiers.agents is a list, expected a mapping of names to false or a tier',
+        'tiers:\n  agents: { tdd-guide: rafa }', 'tiersAgents', new Map([['tdd-guide', 'rafa']]),
+      ],
+      [
+        'routing', 'routing: { prose: true }',
+        'routing.prose is true, expected false or an agent name',
+        'routing: { prose: tdd-guide }', 'routing', new Map([['prose', 'tdd-guide']]),
+      ],
+      [
+        'task.skills', 'task:\n  skills: Tag',
+        'task.skills is "Tag", expected one of: planner, tag, none',
+        'task:\n  skills: none', 'taskSkills', 'none',
+      ],
+      [
+        'task.lessons', 'task:\n  lessons: false',
+        'task.lessons is false, expected one of: on, off',
+        'task:\n  lessons: off', 'taskLessons', 'off',
+      ],
+      [
+        'merge.duplicates', 'merge:\n  duplicates: fail',
+        'merge.duplicates is "fail", expected one of: warn, error, allow',
+        'merge:\n  duplicates: error', 'mergeDuplicates', 'error',
+      ],
+      [
+        'naming.branch', 'naming:\n  branch: feat/{stub}-{stub}',
+        'naming.branch is "feat/{stub}-{stub}", expected a branch name template holding {stub} exactly once',
+        'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
+      ],
+      [
+        'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
+        'tests.fullSuiteTriggers is "package.json", expected a list of glob patterns',
+        'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
+      ],
+      [
+        'tests.integration', 'tests:\n  integration: ["/abs/*.test.ts"]',
+        'tests.integration[0] is "/abs/*.test.ts", expected a glob pattern relative to the repository root',
+        'tests:\n  integration: ["e2e/**"]', 'testsIntegration', ['e2e/**'],
+      ],
+      [
+        'tests.alwaysRun', 'tests:\n  alwaysRun: { sweeps: true }',
+        'tests.alwaysRun is a mapping, expected a list of glob patterns',
+        'tests:\n  alwaysRun: ["**/*.sweep.test.ts"]', 'testsAlwaysRun', ['**/*.sweep.test.ts'],
+      ],
+      [
+        'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: off',
+        'tests.retakeRedAlone is "off", expected true or false',
+        'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+      ],
+    ];
+
+    it('covers every setting once', () => {
+      expect(cases.map((row) => row[4])).toEqual([...SETTINGS]);
+    });
+
+    it.each(cases)('refuses an unusable %s', (_key, unusable, problem) => {
+      expect(refusal(() => fileOf(`${unusable}\n`)).problems).toEqual([`${PATH}: ${problem}`]);
+    });
+
+    // The file layer holds undefined for a key it did not read, so the
+    // value alone tells a read key from a skipped one, version's 1
+    // (its default, and the one value it accepts) included.
+    it.each(cases)('accepts a usable %s into the file layer', (_k, _u, _p, usable, setting, expected) => {
+      expect<unknown>(fileOf(`${usable}\n`).values[setting]).toEqual(expected);
+    });
+  });
+
+  it.each([
+    ['a different case', 'SQLite', '"SQLite"'],
+    ['a number', '3', '3'],
+    ['a boolean', 'true', 'true'],
+    ['a list', '[sqlite]', 'a list'],
+    ['a mapping', '{ backend: sqlite }', 'a mapping'],
+  ])('refuses a store given as %s', (_label, value, found) => {
+    expect(refusal(() => fileOf(`store: ${value}\n`)).problems).toEqual([
+      `${PATH}: store is ${found}, expected one of: sqlite, ndjson`,
+    ]);
+  });
+
+  it.each([
+    'plan',
+    'specs',
+    'tracker',
+    'learning',
+    'output',
+    'prerequisites',
+    'tracking',
+    'loop',
+  ])('refuses a %s section that is not a mapping', (section) => {
+    expect(refusal(() => fileOf(`${section}: linear\n`)).problems).toEqual([
+      `${PATH}: ${section} must be a mapping, found "linear"`,
+    ]);
+  });
+
+  it('retains a tiers map name spelled flat as an unknown key, not as a pin', () => {
+    const file = fileOf('tiers.skills.tdd-guide: false\n');
+
+    expect(file.extras).toEqual([{ key: 'tiers.skills.tdd-guide', value: false }]);
+    expect(file.values.tiersSkills).toBeUndefined();
+    expect(fileOf('tiers:\n  skills:\n    tdd-guide: false\n').values.tiersSkills)
+      .toEqual(new Map([['tdd-guide', false]]));
+  });
+
+  it('retains a routing shape spelled flat as an unknown key, not as a row', () => {
+    const file = fileOf('routing.cleanup: refactor-cleaner\n');
+
+    expect(file.extras).toEqual([{ key: 'routing.cleanup', value: 'refactor-cleaner' }]);
+    expect(file.values.routing).toBeUndefined();
+  });
+
+  it.each([
+    ['plan.inject', 'plan.inject: full\nplan:\n  inject: task\n'],
+    ['loop.settingSources', 'loop.settingSources: user\nloop:\n  settingSources: local\n'],
+  ])('refuses %s given both flat and nested', (key, text) => {
+    expect(refusal(() => fileOf(text)).problems).toEqual([
+      `${PATH}: ${key} is given more than once`,
+    ]);
+  });
+});
+
+describe('parseConfigDocument and readConfigDocument', () => {
+  it('are parseConfigText in two halves: the document, then the layer read off it', () => {
+    const text = 'store: ndjson\nplan:\n  inject: task\nnonesuch: 1\n';
+    const document = parseConfigDocument(text, PATH);
+
+    expect(document).toEqual({ store: 'ndjson', plan: { inject: 'task' }, nonesuch: 1 });
+    expect(readConfigDocument(document, PATH)).toEqual(parseConfigText(text, PATH));
+  });
+
+  it('parses without judging a key, and refuses a tab before the parser', () => {
+    expect(parseConfigDocument('store: postgres\n', PATH)).toEqual({ store: 'postgres' });
+    expect(() => parseConfigDocument('plan:\n\tinject: full\n', PATH)).toThrow(ConfigError);
+    expect(() => readConfigDocument({ store: 'postgres' }, PATH)).toThrow(ConfigError);
+  });
+
+  it('reads null as a file that says nothing, and refuses anything else that is not a mapping', () => {
+    expect(readConfigDocument(null, PATH).extras).toEqual([]);
+    expect(() => readConfigDocument([{ store: 'ndjson' }], PATH)).toThrow(
+      `${PATH}: expected a mapping at the top level, found a list`,
+    );
+  });
+});
+
+describe('resolveConfig', () => {
+  it('names the file and entry of each setting a file answered, and none for the command line or a default', () => {
+    const file = { ...parseConfigText('store: ndjson\nplan:\n  dir: p\n', PATH), entries: new Map<ConfigSetting, number>([['planDir', 3]]) };
+    const user = parseConfigText('plan:\n  inject: task\n', USER_PATH);
+    const resolved = resolveConfig({ cli: { specsDir: 'cli-specs' }, file, user });
+
+    expect([
+      resolved.provenance.store,
+      resolved.provenance.planDir,
+      resolved.provenance.inject,
+      resolved.provenance.specsDir,
+      resolved.provenance.trackingAll,
+    ]).toEqual([{ file: PATH, entry: 0 }, { file: PATH, entry: 3 }, { file: USER_PATH, entry: 0 }, null, null]);
+    expect(resolved.shadowed).toEqual([]);
+  });
+
+  it('merges a file\'s routing rows by key over the five defaults', () => {
+    const file = fileOf('routing: { cleanup: refactor-cleaner }\n');
+
+    expect(resolveConfig({ file }).config.routing)
+      .toEqual(new Map([...DEFAULTS.routing, ['cleanup', 'refactor-cleaner']]));
+    expect(resolveConfig({ file: fileOf('store: sqlite\n') }).config.routing)
+      .toEqual(DEFAULTS.routing);
+  });
+
+  it('answers the defaults when no layer names a setting', () => {
+    expect(resolveConfig()).toEqual({
+      config: DEFAULTS,
+      sources: sourcesWith({}),
+      path: null,
+      userPath: null,
+      extras: [],
+      userExtras: [],
+      warnings: [],
+      provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
+      shadowed: [],
+    });
+  });
+
+  it('lets the file outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ file: fileOf(FULL) });
+
+    expect(resolved.config).toEqual(FULL_RESOLVED);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
+    expect(resolved.path).toBe(PATH);
+  });
+
+  it('lets the user file outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ user: fileOf(FULL, USER_PATH) });
+
+    expect(resolved.config).toEqual(FULL_RESOLVED);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([null, USER_PATH]);
+  });
+
+  it('lets the project file outrank the user file, setting by setting', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'project-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'file' }, 'user'));
+    expect([resolved.path, resolved.userPath]).toEqual([PATH, USER_PATH]);
+  });
+
+  it('lets the command line outrank both files', () => {
+    const user = fileOf(FULL, USER_PATH);
+    const file = fileOf('plan:\n  inject: task\n  dir: project-plans\n');
+    const resolved = resolveConfig({ file, user, cli: { planDir: 'cli-plans' } });
+
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'cli-plans' });
+    expect(resolved.sources).toEqual(sourcesWith({ inject: 'file', planDir: 'cli' }, 'user'));
+  });
+
+  it('warns about the user file unknown keys first, each naming its own file', () => {
+    const user = fileOf('nonesuch: a\n', USER_PATH);
+    const file = fileOf('plan:\n  depth: 3\n');
+    const resolved = resolveConfig({ file, user });
+
+    expect(resolved.warnings).toEqual([
+      `rafa config: unknown key "nonesuch" in ${USER_PATH} has no effect in this version ${KNOWN}`,
+      `rafa config: unknown key "plan.depth" in ${PATH} has no effect in this version `
+        + '(known keys under plan: inject, dir)',
+    ]);
+    expect(resolved.userExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
+    expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
+  });
+
+  it('lets the command line outrank the file, for every setting it can name', () => {
+    const cli: Required<ConfigOverrides> = {
+      store: 'sqlite',
+      inject: 'task',
+      planDir: 'cli-plans',
+      specsDir: 'cli-specs',
+      trackerDefault: 'obsidian',
+      learningAdapter: 'mirror',
+      outputMode: 'text',
+      settingSources: 'local',
+      taskSkills: 'none',
+    };
+    const resolved = resolveConfig({ file: fileOf(FULL), cli });
+
+    expect(resolved.config).toEqual({
+      ...FULL_RESOLVED,
+      store: 'sqlite',
+      inject: 'task',
+      planDir: 'cli-plans',
+      specsDir: 'cli-specs',
+      trackerDefault: 'obsidian',
+      learningAdapter: 'mirror',
+      outputMode: 'text',
+      settingSources: ['local'],
+      taskSkills: 'none',
+    });
+    expect(resolved.sources).toEqual(sourcesWith({
+      store: 'cli',
+      inject: 'cli',
+      planDir: 'cli',
+      specsDir: 'cli',
+      trackerDefault: 'cli',
+      learningAdapter: 'cli',
+      outputMode: 'cli',
+      settingSources: 'cli',
+      taskSkills: 'cli',
+    }, 'file'));
+  });
+
+  it('reads no command-line key naming a setting only the file spells', () => {
+    const cli = { version: '2', modules: 'x', trackingAll: 'true', taskLessons: 'off' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect(resolved.config).toEqual(DEFAULTS);
+    expect(resolved.sources).toEqual(sourcesWith({}));
+  });
+
+  it('ranks each setting on its own', () => {
+    const file = fileOf('store: ndjson\nplan:\n  inject: full\n');
+    const resolved = resolveConfig({ file, cli: { inject: 'task' } });
+
+    expect(resolved.config).toEqual({ ...DEFAULTS, store: 'ndjson', inject: 'task' });
+    expect(resolved.sources).toEqual(sourcesWith({ store: 'file', inject: 'cli' }));
+  });
+
+  it('lets the command line outrank the default with no file', () => {
+    const resolved = resolveConfig({ file: null, cli: { store: 'ndjson' } });
+
+    expect(resolved.config).toEqual({ ...DEFAULTS, store: 'ndjson' });
+    expect(resolved.sources).toEqual(sourcesWith({ store: 'cli' }));
+  });
+
+  it('records a file spelling the default as the layer that answered', () => {
+    const fromFile = resolveConfig({ file: fileOf('store: sqlite\n') });
+    const fromNothing = resolveConfig();
+
+    expect(fromFile.config.store).toBe(fromNothing.config.store);
+    expect(fromFile.sources.store).toBe('file');
+    expect(fromNothing.sources.store).toBe('default');
+  });
+
+  it('treats an override of undefined as no flag given', () => {
+    const file = fileOf('plan:\n  inject: full\n');
+    const resolved = resolveConfig({ file, cli: { inject: undefined } });
+
+    expect(resolved.config.inject).toBe('full');
+    expect(resolved.sources.inject).toBe('file');
+  });
+
+  it.each([
+    ['an empty value', { inject: '' }, 'inject is ""', 'one of: full, stage, task'],
+    ['a misspelt mode', { inject: 'stag' }, 'inject is "stag"', 'one of: full, stage, task'],
+    ['a misspelt backend', { store: 'sqllite' }, 'store is "sqllite"', 'one of: sqlite, ndjson'],
+    ['an empty directory', { planDir: '' }, 'planDir is ""', 'a directory path'],
+    ['an output mode', { outputMode: 'tui' }, 'outputMode is "tui"', 'one of: text, json, events'],
+    ['an empty resolver', { taskSkills: '' }, 'taskSkills is ""', 'one of: planner, tag, none'],
+    [
+      'empty setting sources', { settingSources: '' }, 'settingSources is ""',
+      'a comma-separated subset of: user, project, local',
+    ],
+  ] as [string, ConfigOverrides, string, string][])(
+    'refuses %s on the command line',
+    (_label, cli, said, expected) => {
+      expect(refusal(() => resolveConfig({ cli })).problems).toEqual([
+        `command line: ${said}, expected ${expected}`,
+      ]);
+    },
+  );
+
+  it('names every unusable command-line value at once', () => {
+    const cli = { store: 'x', inject: 'y', settingSources: 'z' };
+
+    expect(refusal(() => resolveConfig({ cli })).problems).toHaveLength(3);
+  });
+
+  it('never downgrades an unusable command-line value to the file', () => {
+    const file = fileOf('plan:\n  inject: full\n');
+
+    expect(() => resolveConfig({ file, cli: { inject: 'bogus' } }))
+      .toThrow(ConfigError);
+  });
+
+  it('warns once per retained unknown key, listing the keys known where it sits', () => {
+    const text = [
+      'nonesuch: linear',
+      'plan:',
+      '  depth: 3',
+      '  a.b: 4',
+      'tracker:',
+      '  kind: x',
+      'prerequisites:',
+      '  optional:',
+      '    - env: A',
+      '      timeout: 30',
+      'modules:',
+      '  - npm: pkg',
+      '    ref: v1',
+      '',
+    ].join('\n');
+    const file = fileOf(text);
+    const resolved = resolveConfig({ file });
+    const warning = (key: string, known: string): string => `rafa config: unknown key "${key}" `
+      + `in ${PATH} has no effect in this version ${known}`;
+
+    expect(resolved.warnings).toEqual([
+      warning('nonesuch', KNOWN),
+      warning('plan.depth', '(known keys under plan: inject, dir)'),
+      warning('plan.a.b', '(known keys under plan: inject, dir)'),
+      warning('tracker.kind', '(known keys under tracker: default, fallback)'),
+      warning(
+        'prerequisites.optional[0].timeout',
+        '(known keys under prerequisites.optional[0]: tool, env, service, lsp, probe, reason)',
+      ),
+      warning('modules[0].ref', '(known keys under modules[0]: npm, github, path, ref)'),
+    ]);
+    expect(resolved.extras).toEqual(file.extras);
+    expect(resolved.config).toEqual({
+      ...DEFAULTS,
+      prerequisitesOptional: [{ kind: 'env', name: 'A', probe: null, reason: null }],
+      modules: [{ kind: 'npm', location: 'pkg', ref: null }],
+    });
+  });
+
+  it('warns about nothing when the file holds only known keys', () => {
+    expect(resolveConfig({ file: fileOf(FULL) }).warnings).toEqual([]);
+  });
+
+  it('answers fresh objects, so one result cannot leak into the next', () => {
+    const first = resolveConfig();
+    first.config.store = 'ndjson';
+
+    expect(resolveConfig().config.store).toBe('sqlite');
+  });
+
+  it('answers frozen lists, from the defaults and from a file alike', () => {
+    const fromDefaults = resolveConfig().config.trackerFallback as string[];
+    const fromFile = resolveConfig({ file: fileOf(FULL) }).config.allowList as string[];
+
+    expect(() => fromDefaults.push('x')).toThrow(TypeError);
+    expect(() => fromFile.push('x')).toThrow(TypeError);
+    expect(CONFIG_DEFAULTS.trackerFallback).toEqual(['local']);
+  });
+});
+
+describe('effort.sync', () => {
+  it('refuses a strategy outside the five, naming each it accepts', () => {
+    const accepted = ['local', 'file', 'git', 'service', 'p2p'].map(
+      (strategy) => fileOf(`effort:\n  sync: ${strategy}\n`).values.effortSync,
+    );
+
+    expect(accepted).toEqual(['local', 'file', 'git', 'service', 'p2p']);
+    expect(refusal(() => fileOf('effort:\n  sync: s3\n')).problems).toEqual([
+      `${PATH}: effort.sync is "s3", expected one of: local, file, git, service, p2p`,
+    ]);
+  });
+
+  it('is not a setting the command line can name', () => {
+    const cli = { effortSync: 'file' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.effortSync, resolved.sources.effortSync]).toEqual(['local', 'default']);
+  });
+
+  it('answers local when no layer names it, and a file naming it answers from the file', () => {
+    const unnamed = resolveConfig({ file: fileOf('effort:\n  busyTimeoutMs: 250\n') });
+    const named = resolveConfig({ file: fileOf('effort:\n  sync: file\n') });
+
+    expect([unnamed.config.effortSync, unnamed.sources.effortSync]).toEqual(['local', 'default']);
+    expect([named.config.effortSync, named.sources.effortSync]).toEqual(['file', 'file']);
+  });
+
+  it('uses the user scope value when the project file leaves the key out of its effort section', () => {
+    const user = fileOf('effort:\n  sync: file\n', USER_PATH);
+    const omitting = resolveConfig({ file: fileOf('effort:\n  busyTimeoutMs: 250\n'), user });
+    const naming = resolveConfig({ file: fileOf('effort:\n  sync: local\n'), user });
+
+    expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
+    expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+  });
+});
+
+describe('claims', () => {
+  it('answers 3d and off when no layer names either key', () => {
+    const resolved = resolveConfig({ file: fileOf('roadmap:\n  issue: 31\n') });
+
+    expect([resolved.config.claimsStaleAfter, resolved.sources.claimsStaleAfter]).toEqual(['3d', 'default']);
+    expect([resolved.config.claimsAhead, resolved.sources.claimsAhead]).toEqual(['off', 'default']);
+  });
+
+  it('answers each key from the file that names it, the other staying at its default', () => {
+    const stale = resolveConfig({ file: fileOf('claims:\n  staleAfter: disabled\n') });
+    const ahead = resolveConfig({ file: fileOf('claims:\n  ahead: allow\n') });
+
+    expect([stale.config.claimsStaleAfter, stale.config.claimsAhead]).toEqual(['disabled', 'off']);
+    expect([ahead.config.claimsStaleAfter, ahead.config.claimsAhead]).toEqual(['3d', 'allow']);
+  });
+
+  it('refuses a stale duration of 0 or below and an ahead value outside the two, naming each key', () => {
+    const text = 'claims:\n  staleAfter: -2h\n  ahead: yes\n';
+
+    expect(refusal(() => fileOf(text)).problems).toEqual([
+      `${PATH}: claims.staleAfter is "-2h", expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled`,
+      `${PATH}: claims.ahead is "yes", expected one of: off, allow`,
+    ]);
+  });
+
+  it('is not a pair of settings the command line can name', () => {
+    const cli = { claimsStaleAfter: '1h', claimsAhead: 'allow' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.claimsStaleAfter, resolved.config.claimsAhead]).toEqual(['3d', 'off']);
+  });
+});
+
+describe('the registered sections', () => {
+  /** Runs `run` with the registry emptied, putting the one it found back after. */
+  function withEmptyRegistry(run: () => void): void {
+    const previous = registerConfigSections([]);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      run();
+    } finally {
+      restoreConfigSections(previous);
+    }
+  }
+
+  it('runs every registered section\'s check over the resolution, refusing with every problem they report', () => {
+    const user = fileOf('effort:\n  sync: service\n', USER_PATH);
+    const file = fileOf('store: ndjson\n');
+    const seen: unknown[] = [];
+    const previous = registerConfigSections([{
+      package: 'probe',
+      settings: {},
+      defaults: {},
+      checks: [({ config, sources, path, userPath }) => {
+        seen.push([config.store, sources.store, sources.effortSync, path, userPath]);
+        return [`probe refuses store ${config.store}`];
+      }],
+    }]);
+    try {
+      expect(refusal(() => resolveConfig({ file, user })).problems).toEqual([
+        `${USER_PATH}: effort.sync is "service" and no config file names hub.url;`
+          + ' expected hub.url, the address of the hub, such as https://hub.example.org',
+        'probe refuses store ndjson',
+      ]);
+      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH]]);
+    } finally {
+      restoreConfigSections(previous);
+    }
+  });
+
+  it('resolves with no check refusing when the registered checks report nothing', () => {
+    const resolved = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
+
+    expect([resolved.config.effortSync, resolved.config.hubUrl]).toEqual(['service', 'https://hub.example.org']);
+  });
+
+  it('merges logger.modules across the user and project files through its spec\'s map flag alone', () => {
+    const user = fileOf('logger:\n  modules: { board: { level: debug }, store: { level: warn } }\n', USER_PATH);
+    const file = fileOf('logger:\n  modules: { store: { level: error } }\n');
+
+    expect(resolveConfig({ file, user }).config.loggerModules)
+      .toEqual(new Map([['board', 'debug'], ['store', 'error']]));
+
+    const unflagged = activeSections().map((section) => {
+      const spec = section.settings.loggerModules;
+      if (spec === undefined) return section;
+      return { ...section, settings: { ...section.settings, loggerModules: { ...spec, map: undefined } } };
+    });
+    const previous = registerConfigSections([]);
+    restoreConfigSections(mergeConfigSections(EMPTY_CONFIG_REGISTRY, unflagged));
+    try {
+      expect(activeSettings().loggerModules?.map).toBeUndefined();
+      expect(resolveConfig({ file, user }).config.loggerModules)
+        .toEqual(new Map([['store', 'error']]));
+    } finally {
+      restoreConfigSections(previous);
+    }
+  });
+
+  it('reads no setting with no section registered, the registry and not a literal naming the settings', () => {
+    withEmptyRegistry(() => {
+      expect(Object.keys(parseConfigText('store: ndjson\n', PATH).values)).toEqual([]);
+      expect(Object.keys(resolveConfig({ cli: { store: 'ndjson' } }).config)).toEqual([]);
+      expect(Object.keys(resolveConfig({ file: fileOf('effort:\n  sync: service\n') }).sources)).toEqual([]);
+    });
+  });
+});

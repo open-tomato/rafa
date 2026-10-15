@@ -111,8 +111,8 @@
  */
 import type { ReportSessionRow } from './report.js';
 import type { SessionUsageTotals } from './session-log.js';
-import type { SessionEffortRow } from './store/types.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 import '../adapter-registry.js';
 
@@ -129,8 +129,16 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
+import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
+import { writeTriage } from '@open-tomato/rafa/store/triage';
+
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 import { expectExit } from '../tests/cli-capture.js';
 
@@ -149,13 +157,6 @@ import {
   summariseSessions,
 } from './report.js';
 import { emptyUsageTotals } from './session-log.js';
-import { writeBugRoutes } from './store/bug-routes.js';
-import { writeDispatch } from './store/dispatches.js';
-import { openNdjsonStore, openSqliteStore } from './store/index.js';
-import { writePreflightChecks } from './store/preflight.js';
-import { writeTaskReport } from './store/reports.js';
-import { writeSkillInvocations } from './store/skill-invocations.js';
-import { writeTriage } from './store/triage.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 

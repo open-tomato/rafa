@@ -19,10 +19,18 @@ import type {
   ConfigCheckInput,
   ConfigSetting,
   ConfigSource,
-} from './core/config/index.js';
-import type { SyncStrategy, ValueAt } from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config';
+import type { SyncStrategy, ValueAt } from '@open-tomato/rafa/core/config/sections';
 
 import { describe, expect, it } from 'bun:test';
+
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
 
 import { SETTINGS } from './config-registry.js';
 import {
@@ -33,13 +41,6 @@ import {
   hubUrl,
   hubUrlProblems,
 } from './config-schema-hub.js';
-import {
-  ConfigError,
-  EMPTY_CONFIG_REGISTRY,
-  mergeConfigSections,
-  parseConfigText,
-  resolveConfig,
-} from './core/config/index.js';
 
 /** Where every reader case reads its value. */
 const AT: ValueAt = { label: 'F: hub.x', key: 'hub.x' };

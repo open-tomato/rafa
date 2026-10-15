@@ -111,7 +111,8 @@ import type { InventoryKind } from '../inventory/record.js';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
-import { isSessionId, runsDir } from '../core/loop/index.js';
+import { isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
+
 import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { checkProvenance, PROVENANCE_FIELD, readProvenance } from '../schema/provenance.js';
 

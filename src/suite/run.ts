@@ -166,8 +166,7 @@
  * that wrote no JUnit file holds one empty list.
  */
 import type { UnhandledError } from './unhandled.js';
-import type { SuiteFailure } from '../core/loop/index.js';
-import type { SpawnEnv } from '../utils/session-env.js';
+import type { SuiteFailure , SpawnEnv } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';

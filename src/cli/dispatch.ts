@@ -24,12 +24,12 @@
  *      its deprecation lines when it has any and runs in an async scope
  *      of its own (see "The scope a command runs in"), with its
  *      context's output as the active output
- *      (`src/core/output/active.ts`) in the invocation's output mode,
+ *      (`packages/rafa/src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
- *      flags (`src/core/command/running.ts`), for a reader below its
+ *      flags (`packages/rafa/src/core/command/running.ts`), for a reader below its
  *      `run` to ask, with its `dangerous` phrases beside the record
- *      (`src/core/config/dangerous.ts`), which end the loader's pass
+ *      (`packages/rafa/src/core/config/dangerous.ts`), which end the loader's pass
  *      line of each key it declares; a help
  *      request, a version request, a refusal and `no_project` run no
  *      command and record none. Its context's `registry` is the one the
@@ -68,7 +68,7 @@
  * values and put the previous ones back in a `finally`, a stack: two
  * that overlapped and ended in the order they started left the first's
  * output and record for the rest of the process, and the spend guard
- * (`src/core/loop/claude.ts`) then refused every session a later test file
+ * (`packages/rafa/src/core/loop/claude.ts`) then refused every session a later test file
  * started, naming a command that had ended. The logger and its settings
  * were the same stack: each of the two read the other's while both ran,
  * and the last to end left a logger and settings of a command that had
@@ -159,7 +159,7 @@
  * ## The project
  *
  * A command runs inside a project unless it declares
- * `needsProject: false` (`src/core/command/command.ts`), as
+ * `needsProject: false` (`packages/rafa/src/core/command/command.ts`), as
  * `module exec`, `init` and `describe` do.
  * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
@@ -213,7 +213,7 @@
  * command declares one. A help request names a command without running
  * it, and prints none.
  *
- * A flag declaring `deprecated` (`src/core/command/command.ts`) is read
+ * A flag declaring `deprecated` (`packages/rafa/src/core/command/command.ts`) is read
  * as its `use` when it is typed bare ahead of any `--`, spelled
  * `--<name>` or `-<name>`, or so for one of its aliases, which
  * `parseArgs` reads alike. The words of
@@ -225,31 +225,30 @@
  *
  *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
-import type { CliContext } from './core/types.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { LoggerResolver } from '../adapters/logger/active.js';
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
-import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '../ports/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '@open-tomato/rafa/ports';
 
 import { homedir } from 'node:os';
+
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit , versionLine , runAsRunningCommand } from '@open-tomato/rafa/core/command';
+import { runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { CommandExit , versionLine } from '../core/command/index.js';
-import { runWithDangerousPhrases } from '../core/config/index.js';
-import { runWithActiveOutput } from '../core/output/index.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
-import { runAsRunningCommand } from './running.js';
 
 /** What every refusal the dispatcher throws opens with. */
 const REFUSAL = 'dispatcher';

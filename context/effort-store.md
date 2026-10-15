@@ -1,6 +1,6 @@
 ## Effort store
 
-`src/effort/store/` holds what `rafa effort collect` and the task-report
+`packages/rafa/src/effort/store/` holds what `rafa effort collect` and the task-report
 pipeline write: the `EffortStore` port (`store/types.ts`), an NDJSON and a
 SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks one
 from `store` in the project's config, `sqlite` by default.
@@ -35,7 +35,7 @@ none (a store and `plansDir` both passed).
 
 **Both backends write under `.rafa/effort/` in the project root, unless
 `RAFA_EFFORT_DIR` names another directory.** `EFFORT_STORE_DIR` in
-`src/effort/store/ndjson-files.ts` spells the directory, and
+`packages/rafa/src/effort/store/ndjson-files.ts` spells the directory, and
 `effortStoreDir` (`store/location.ts`) resolves it once for both
 backends: `sqliteStorePath` (`store/sqlite.ts`) and the NDJSON backend's
 files join their names under it. `effortStorePath` in
@@ -58,7 +58,7 @@ parity suites name is the sibling's own store, read through
 
 **Import store code from `./store/index.js` and port types from
 `./store/types.js`, never from `./store/ndjson-files.js` or its
-re-export `./store.js`.** `src/effort/store/ndjson-files.ts` is the
+re-export `./store.js`.** `packages/rafa/src/effort/store/ndjson-files.ts` is the
 sibling loop's pre-port module, and its `openEffortStore`, `EffortRowKind`
 and `AppendResult` are different declarations under the same names.
 
@@ -100,7 +100,7 @@ versions 10 and 11 reached the store through `rafa effort collect` run from
 the branch, and the 0.18.0 loop stopped.
 
 **`rafa effort fix-schema` repairs such a store**
-(`src/effort/store/fix-schema.ts`). It decides through `planSchema`,
+(`packages/rafa/src/effort/store/fix-schema.ts`). It decides through `planSchema`,
 asked for a write: a store this rafa uses is `current` or `behind` and
 left alone, unknown additive migrations included, and it rebuilds only
 on `pre-log-unreleased`, `gate-mismatch`, `edited` and both
@@ -135,7 +135,7 @@ store with an unknown additive migration `current`, and spawns
 the swap is refused, the dry run runs. The steps around the build, from
 the in-flight journal refusal through the row-count check,
 `integrity_check`, the backup and the swap, are `rebuildAside`
-(`src/effort/store/rebuild-aside.ts`), which takes the two file names
+(`packages/rafa/src/effort/store/rebuild-aside.ts`), which takes the two file names
 and the build from its caller. A failed build is removed; a failed swap
 leaves the store unchanged and the rebuild and the backup beside it,
 both named in its `SwapFailure`. `SchemaFixRefusal` is its
@@ -143,7 +143,7 @@ both named in its `SwapFailure`. `SchemaFixRefusal` is its
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,
-`src/effort/store/copy.ts`). It copies `<root>/.rafa/effort/` into
+`packages/rafa/src/effort/store/copy.ts`). It copies `<root>/.rafa/effort/` into
 `--to`, read from the project root when relative, or into
 `<root>/.rafa/scratch/effort-<stamp>/`, and prints the directory and the
 `RAFA_EFFORT_DIR=<dir>` line to put in front of each command on the same
@@ -160,7 +160,7 @@ every file it wrote and every directory it made removed.
 
 **`rafa effort schema [--check]` says whether this rafa can use the
 store, and what to run next when it cannot** (`src/commands/effort/schema.ts`
-over `readSchemaReport`, `src/effort/store/schema-report.ts`). It opens
+over `readSchemaReport`, `packages/rafa/src/effort/store/schema-report.ts`). It opens
 the store `effortStoreDir` answers read-only, never through
 `bringForward`, and prints the applied, pending, unknown and edited
 migrations, the gate, and the verdict: `absent`, `current`, `behind`, one
@@ -176,7 +176,7 @@ with a synthetic entry pending byte-identical, and holds
 
 **`rafa effort migrate [--dry-run]` applies a migration that breaks
 older runtimes** (`src/commands/effort/migrate.ts` over `migrateStore`,
-`src/effort/store/migrate.ts`), and any other pending one with it. It
+`packages/rafa/src/effort/store/migrate.ts`), and any other pending one with it. It
 plans as the `migrate` caller, so `breaking-pending` never refuses it;
 any other refusal is passed on with its own next step, and a store with
 nothing to adopt or apply is `current` and left alone. It writes the
@@ -241,12 +241,12 @@ at a failing required item, so no session is spawned.
 has two directions: push (send the rows this store wrote, identified by
 their origin pair) and pull (merge the rows another device wrote under
 its own origin). Every adapter's pull calls `mergeStore`
-(`src/effort/store/merge-store.ts`), which implements the merge rules;
+(`packages/rafa/src/effort/store/merge-store.ts`), which implements the merge rules;
 nothing here reimplements a merge rule. A pull a loop run makes names
 the run's session id (`SyncPullRequest.sessionId`), which the adapter
 passes on as `mergeStore`'s `sessionId` parameter. The merge's live-loop
 guard receives this session id in the `liveLoop` function
-(`src/effort/store/migrate.ts`) as its `ownSessionId` parameter, and
+(`packages/rafa/src/effort/store/migrate.ts`) as its `ownSessionId` parameter, and
 uses it to filter: when looking for concurrent live loops, `liveLoop`
 returns only the first record with state `running` or `paused` whose
 session id does NOT match `ownSessionId`, so the calling run's own record
@@ -262,7 +262,7 @@ any live loop, including its own if one somehow persists.
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
 which means no sync: a device keeps its own store. The user scope's
 config under `~/.rafa/` already layers under the project's for every
-setting (`src/core/config/config.ts`), so the user default needs no reader of
+setting (`packages/rafa/src/core/config/config.ts`), so the user default needs no reader of
 its own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
 when either is read. A deployment of the `service` strategy requires
@@ -274,7 +274,7 @@ to `30s`, as `3s`). `selectSync` hands the three to the adapter as
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core's two sync adapters are registered in `CORE_ADAPTER_REGISTRY`
-(`src/core/adapters/registry.ts`) by the composition root
+(`packages/rafa/src/core/adapters/registry.ts`) by the composition root
 `src/adapter-registry.ts`: `sync/local` (no action) and `sync/file` (copy
 exchange).** The `git`, `service` and `p2p` adapters come from
 modules loaded under `src/modules/load.ts`; core ships no code for them.
@@ -296,7 +296,7 @@ database file matters. Importing each other's files in a loop is safe
 and idempotent: a repeat of the same file merges nothing new.
 
 **The `service` strategy syncs rows through a wire format over HTTP, defined
-in `src/effort/store/wire.ts`, and merged only by `mergeStore`.** Push
+in `packages/rafa/src/effort/store/wire.ts`, and merged only by `mergeStore`.** Push
 exports rows the local store wrote (identified by its origin pair) past a
 per-table, per-device cursor, building a JSON payload of every `merged`
 table's rows that have a `seq` higher than the cursor's value for that
@@ -497,7 +497,7 @@ exists on every write open.
 
 **Replaced ids stay in `store_replaced`.** When a write open mints because
 the host, path, device, or inode differs, `settleUnderLock`
-(`src/effort/store/store-meta.ts`) records the outgoing id in `store_replaced`
+(`packages/rafa/src/effort/store/store-meta.ts`) records the outgoing id in `store_replaced`
 if the host and path both stay the same (minting with reasons `file`,
 `generation`, or both). This means the file is this device's store, moved to
 another filesystem or restored from a backup, and any claim made under the
@@ -556,7 +556,7 @@ rebuild writes a new file aside with a temporary name
 `effort.sqlite.fix-<stamp>`), brings it forward through migrations,
 checks it, and backs it up with `VACUUM INTO` to `.before-*-<stamp>.bak`.
 Before the new file is renamed over the live store, `swapIn`
-(`src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
+(`packages/rafa/src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
 whether the store would keep its id. When the answer is keep, `swapIn`
 writes a new generation into the new file's `store_meta` row and into the
 side record immediately before the rename, so both match after the store
@@ -575,7 +575,7 @@ store mints once to synchronize them.
 
 ### The schema history
 
-**SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and
+**SQLITE_MIGRATIONS is defined in `packages/rafa/src/effort/store/migrations.ts` and
 re-exported from `store/sqlite.ts`.** Every entry takes a store from one
 version to the next. The entry at index `i` takes version `i` to version
 `i + 1`; the last version is the array's length, so appending a migration
@@ -600,7 +600,7 @@ failed that way once `store-meta` made the array 15.
 its `sql`.** The `id` is kebab-case and is never reused. `breaks` is `[]`
 for an additive entry, and a breaking one also carries a `contract`. The
 thirteen entries 0.23.0 to 0.24.1 shipped are all `breaks: []`.
-`src/effort/store/migrations.lock.json` holds each entry's sha256 by id,
+`packages/rafa/src/effort/store/migrations.lock.json` holds each entry's sha256 by id,
 and `migrations.test.ts` fails when an entry's SQL no longer matches its
 lock line, or when an entry has no lock line. So a new entry adds its
 lock line in the same commit. `LEGACY_GATE_OPEN` (13) and
@@ -611,7 +611,7 @@ a store holds. The open path reads the names and the gate through
 `migrateSchema` still counts by position and writes no log; no open or
 command goes through it, and tests plant pre-log stores with it.
 
-**`classifyMigration` (`src/effort/store/migration-shapes.ts`) reads what
+**`classifyMigration` (`packages/rafa/src/effort/store/migration-shapes.ts`) reads what
 an entry's SQL breaks, and `migrations.test.ts` holds every entry to it.**
 It strips comments, splits statements (a trigger body stays whole) and
 gives each one a row of the spec's additive table: a new table, nullable
@@ -642,7 +642,7 @@ read from an excerpt of that bundle committed beside it, never from
 Each rule has a near-miss control, including a planted `DROP COLUMN`
 declared `[]`.
 
-**`planSchema` (`src/effort/store/schema-plan.ts`) is the compatibility
+**`planSchema` (`packages/rafa/src/effort/store/schema-plan.ts`) is the compatibility
 decision, and every open asks it through `bringForward`;** `fix-schema`,
 `effort schema` and `effort migrate` ask it directly. It takes what a store holds (its
 `schema_migrations` rows, or none, and `user_version`), this build's
@@ -655,7 +655,7 @@ with one of the seven `REFUSAL_REASONS` and a message ending in
 store holding an unknown migration that breaks writers refuses a read
 that would apply one.
 
-**`bringForward` (`src/effort/store/bring-forward.ts`) acts on that
+**`bringForward` (`packages/rafa/src/effort/store/bring-forward.ts`) acts on that
 decision, and every open calls it.** It reads a store's
 `schema_migrations` and `user_version`, plans, and throws a refusal as
 `SchemaRefusedError` (`reason`, `nextStep`) with nothing written. With
@@ -670,8 +670,8 @@ build's package version unless the caller names another.
 **A development build never adopts or migrates a store it does not
 own.** Between the first plan and the lock, an open with anything to
 adopt or apply asks `refuseUnownedDevelopmentWrite`
-(`src/effort/store/development-build.ts`). `readRuntimeIdentity`
-(`src/core/runtime/identity.ts`) walks up from `Bun.main`, through its real
+(`packages/rafa/src/effort/store/development-build.ts`). `readRuntimeIdentity`
+(`packages/rafa/src/core/runtime/identity.ts`) walks up from `Bun.main`, through its real
 path, to the nearest `package.json` named `@open-tomato/rafa`; the build
 is a development build when that directory also holds `src/rafa.ts`, so
 `bun src/rafa.ts`, a checkout's `dist/cli.js` and every `bun test`
@@ -712,7 +712,7 @@ case of `tracker-refs.test.ts` does; one that sets a short timeout
 through `setActiveStoreSettings` puts `null` back after it.
 
 **`effort.busyTimeoutMs` reaches every open through
-`activeStoreSettings` (`src/effort/store/settings.ts`).** It is a whole
+`activeStoreSettings` (`packages/rafa/src/effort/store/settings.ts`).** It is a whole
 number of milliseconds from 1 to 60000, 5000 by default, and the reader
 refuses `0`, negatives, `60001`, fractions, quoted numbers and `false`.
 `loadConfig` hands the store the value it resolved each time it runs, so
@@ -726,7 +726,7 @@ busy timeout.
 
 ### Migrations
 
-**A migration is an entry in `src/effort/store/migrations.ts` with an id, its SQL and what it breaks.** The id is kebab-case and never reused. The array's order is only the apply order for a fresh store: a store records applied migrations by id and sha256 in `schema_migrations`, and `migrations.lock.json` freezes each entry's sha256. Never edit a shipped entry; write a new one.
+**A migration is an entry in `packages/rafa/src/effort/store/migrations.ts` with an id, its SQL and what it breaks.** The id is kebab-case and never reused. The array's order is only the apply order for a fresh store: a store records applied migrations by id and sha256 in `schema_migrations`, and `migrations.lock.json` freezes each entry's sha256. Never edit a shipped entry; write a new one.
 
 **Additive is the default, and the guard checks it.** A new table, a nullable column, a non-unique index, or a partial unique index over columns the same migration adds breaks nothing. Anything else declares `breaks` and a `contract`, ships as the second of two specs, and runs only through `rafa effort migrate`. Migrations hold DDL only; a backfill is a command. No code reads by `SELECT *` or inserts without a column list. A reader treats NULL as "written by a runtime that did not know this column".
 
@@ -752,7 +752,7 @@ store moved to another filesystem or restored from a backup, and any claim
 made under that id is still this device's. A mint with the reason `host` or
 `path` empties the table instead, because that file is a copy at a new
 location that must build its own claim history. `readReplacedStoreIds`
-(`src/effort/store/store-replaced.ts`) answers the ids, earliest first, or
+(`packages/rafa/src/effort/store/store-replaced.ts`) answers the ids, earliest first, or
 none for a store without the table or with it empty; `holdsClaim`
 (`src/claims/device.ts`) is true for the current id and each replaced one.
 The table is absent from a store an older runtime left. The
@@ -786,7 +786,7 @@ field's entry in `RECOMPUTED_COMPARISONS`. `recomputeCommitGaps`
 for each commit the union inserted and the commit right after it in
 time, ordered by `Date.parse` of the stored timestamp and by sha within
 an instant, so at most two rows are written per commit brought in.
-`src/effort/store/store-identity.ts` decides, on a write, whether to
+`packages/rafa/src/effort/store/store-identity.ts` decides, on a write, whether to
 mint, and `store-meta.ts` reads and writes the row: `withSqliteStore`
 calls `settleStoreIdentity` after `bringForward`, so a `write` open
 mints when the row is absent or a fact moved, under `BEGIN IMMEDIATE`
@@ -1023,7 +1023,7 @@ and task line (null for plan CI), field name, and the field's whole `text`.
 
 **`out_of_scope_bugs.scope` is read, not copied.** Every other column of
 these tables holds what a report wrote; `scope` holds what
-`src/effort/store/machine-fault.ts` reads off the bug's `what` and
+`packages/rafa/src/effort/store/machine-fault.ts` reads off the bug's `what` and
 `artifact`, which `store/triage.ts` calls for each bug it stores:
 `machine` for a fault of the machine the session ran on, `rafa`
 otherwise, and never NULL. It arrived at schema version 9 as an `ALTER TABLE ... ADD COLUMN`,
@@ -1059,9 +1059,9 @@ beside two `[]` offers. No column holds the outcome: `task_reports` and
 The declaration a write carries is a `DispatchDeclaration`, declared in
 `store/dispatches.ts` from the six fields of the parser's
 `TaskDeclaration` it stores (`raw`, `agent`, `model`, `effort`, `budget`,
-`tools`), so the store imports nothing of `src/core/plan/declaration.ts`; its
+`tools`), so the store imports nothing of `packages/rafa/src/core/plan/declaration.ts`; its
 `effort` is typed by `EffortLevel`, which `store/effort-levels.ts` holds
-with `EFFORT_LEVELS`, both re-exported by `src/core/plan/declaration.ts`.
+with `EFFORT_LEVELS`, both re-exported by `packages/rafa/src/core/plan/declaration.ts`.
 
 **`dispatches.resolver`, `skills_offered` and `lessons_offered` arrived
 at schema version 10**, a second `ADD COLUMN` migration, so a row a
@@ -1180,7 +1180,7 @@ before the store is opened, for a dispatch or outcome `checkDispatch`
 refuses or a `kind` outside the set; an entry whose `what` or `where`
 cannot be stored is refused alone and answered in `rejected`, as
 `writeChanges` answers a note. `recordTaskReport`
-(`src/report/record.ts`) calls it for every task report, after
+(`packages/rafa/src/report/record.ts`) calls it for every task report, after
 `writeTriage` and before `writeChanges`, always under `sighting`, and
 its counts join the record's summary line as `stale docs`.
 `readStaleDocsForPlan` answers the rows
@@ -1202,7 +1202,7 @@ its `what` (`NOT NULL`, non-empty), and the origin pair with
 an entry with no `kind` key or a value none of the six; `kind` is the
 kind the loop routed it under; `route` is where it went, as
 `start/triage-kinds.ts` maps a triage's answer to it. The CHECKs admit the six `BUG_KINDS`
-(`src/report/parse.ts`) in `said` and `kind` and the eight `BUG_ROUTES`
+(`packages/rafa/src/report/parse.ts`) in `said` and `kind` and the eight `BUG_ROUTES`
 in `route`, and nothing else. `plan_stub` is NULL for a row written
 under no plan. `bug_routes_by_entry` is unique over `session_id`,
 `entry_index` and `what`, so a triage repeated on a resumed run writes
@@ -1233,7 +1233,7 @@ stored field — `level`, `area` and `summary` — as `triage` dedupes, not
 by an artifact.
 
 **`task_reports.outcome` holds `done` or `blocked` and nothing else.**
-`recordTaskReport` (`src/report/record.ts`) writes only that closed-set
+`recordTaskReport` (`packages/rafa/src/report/record.ts`) writes only that closed-set
 status into the column; a report's free-text `feedback` reaches no
 queryable table at all. To recover what a past task actually said — the
 exit codes it captured, the commands it ran — read `session_id` off its
@@ -1306,13 +1306,13 @@ over rafa-63: 210 rows under the stub, 12 of them null-`kind`.
 
 ### Attribution
 
-**`planStubFromPrompt` (`src/core/plan/plan-stamp.ts`) answers the FIRST
+**`planStubFromPrompt` (`packages/rafa/src/core/plan/plan-stamp.ts`) answers the FIRST
 `ralph:plan=` stamp in a prompt.** Task and wrap-up prompts carry plan
 text above the stamp the loop appends, so a plan that quotes a stamp
 attributes its sessions to the quoted stub.
 
 **A branch stub is not a queue id.** `QUEUE_ID` in
-`src/effort/store/plan-stubs.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
+`packages/rafa/src/effort/store/plan-stubs.ts` is `/^(q\d+[a-z]?)(?:-|$)/`, so only a
 `q`-prefixed leading token is read as one. A `rafa-<n>` stub carries
 none and resolves by exact match alone, which is why the branch
 `feat/rafa-21` matches no plan called `rafa-21-changelog-and-release`.

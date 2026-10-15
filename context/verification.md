@@ -311,7 +311,7 @@ process, one after another, so a module-level value one test file
 leaves behind is read by every file after it. A file failed that way
 is green from a shell and green in the repair session handed it: on
 2026-10-10 one run inserted five repair tasks for
-`src/core/loop/claude.test.ts`, 21 cases red in the runner's steps only,
+`src/tests/core-coupled/core/loop/claude.test.ts`, 21 cases red in the runner's steps only,
 and each repair session reran it, found it green and changed nothing.
 So a task, stage or pre-wrap-up step that reads new failures runs each
 newly red test file alone, as `bun test ./<file>`, one process per
@@ -573,7 +573,7 @@ compare against the base before attributing one to the diff: TS2769 where a
 `src/commands/index.test.ts`), and on the
 `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in
-`src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
+`src/tests/core-coupled/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
 
 **Test-file type-error backlog:** A scratch tsconfig over every `*.test.ts`
 with the recipe above reported 460 errors in 144 files at commit
@@ -688,7 +688,7 @@ the reference example. This section replaces nothing.
 - `runRafa` also sets `RAFA_TEST=1` and the suite's own `TMPDIR` on the
   child, ahead of the case's `env`, so a case naming either overrides it.
   `RAFA_TEST=1` makes the child a test process to the effort store's test
-  guard (`src/effort/store/location.ts`), and the `TMPDIR` lets that guard
+  guard (`packages/rafa/src/effort/store/location.ts`), and the `TMPDIR` lets that guard
   judge the scratch project by the directory the suite built it under.
   This replaces nothing.
 - macOS keeps `cat`, `mkdir`, `rm` and `sleep` in `/bin` alone, and

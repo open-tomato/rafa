@@ -38,14 +38,15 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+
 import { oneLine, padKind } from '../adapters/output/events.js';
-import { messageOf } from '../core/config/sections.js';
-import { isSessionId, runsDir } from '../core/loop/index.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { readSessionLog } from '../effort/session-log.js';
 import { parsePlan } from '../plan/index.js';
-import { parseTaskDeclaration } from '../utils/declaration.js';
 import { listTrackerTasks } from '../utils/tracker.js';
 
 import { isRepairTask } from './suite-blocker.js';

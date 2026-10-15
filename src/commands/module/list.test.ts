@@ -10,8 +10,8 @@
  * held to rafa 0.1.0 through the manifest seams, handed to the loader and
  * to the command alike.
  */
-import type { OutputStream } from '../../core/output/index.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../../adapter-registry.js';
 
@@ -21,9 +21,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+
 import { dispatch } from '../../cli/dispatch.js';
 import { createCommandRegistry } from '../../cli/registry.js';
-import { PORT_VERSIONS } from '../../core/adapters/index.js';
 import { loadInvocationModules } from '../../modules/load.js';
 import { eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { CORE_COMMANDS, CORE_SUBJECTS } from '../index.js';

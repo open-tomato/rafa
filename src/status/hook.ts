@@ -45,10 +45,10 @@
 import type { SeenConfig, SeenInput, SeenReading, SeenSnapshot } from './seen.js';
 import type { CommandHook } from '../cli/dispatch.js';
 import type { CommandRoute } from '../cli/route.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { noticeLine } from './notice.js';
 import { readSeenFile, takeSeenSnapshot, writeSeenFile } from './seen.js';

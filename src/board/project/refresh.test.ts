@@ -42,7 +42,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';

@@ -40,12 +40,12 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
-} from '../core/config/index.js';
-import type { ConfigRoots } from '../core/config/load.js';
+} from '@open-tomato/rafa/core/config';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type {
   RouteTarget,
   TierPin,
-} from '../core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,17 +53,18 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 import {
   ConfigError,
   ConfigSectionError,
   CORE_SECTION,
   registerConfigSections,
   restoreConfigSections,
-} from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { setActiveStoreSettings } from '../effort/store/settings.js';
+} from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
+
+import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
+import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));
 let planted = 0;

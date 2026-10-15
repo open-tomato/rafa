@@ -4,7 +4,7 @@
  *
  * The rule: a file outside core imports a barrel that
  * `scripts/survey/core-moves.ts` lists and nothing deeper under
- * `src/core/`: static, `import type`, `export … from`, dynamic
+ * `packages/rafa/src/core/`: static, `import type`, `export … from`, dynamic
  * `import()` or `require()`. `scripts/survey/core-barrels.ts`
  * (`readCoreImports`) does the reading; its own unit tests cover it over
  * planted trees. This file is the other half: it runs it over every code
@@ -25,9 +25,9 @@
  * The count and the files read are printed once, at load time, before
  * any assertion runs, so a run that silently read nothing cannot pass by
  * reporting an empty list for the wrong reason. Until a file has moved,
- * `src/core/` does not exist and zero deep imports is the true reading
+ * `packages/rafa/src/core/` does not exist and zero deep imports is the true reading
  * of a rule nothing can break yet. The third case below is the control
- * that switches itself on with the first move: once `src/core/` holds a
+ * that switches itself on with the first move: once `packages/rafa/src/core/` holds a
  * code file, a scan that finds no import of a barrel from outside it is
  * not seeing the folder.
  */

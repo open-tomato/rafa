@@ -34,7 +34,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, test } from 'bun:test';
 
-import { FINDING_KINDS, FINDING_SIGNALS } from '../report/parse.js';
+import { FINDING_KINDS, FINDING_SIGNALS } from '@open-tomato/rafa/report/parse';
 
 import { renderFrontmatter } from './frontmatter.js';
 import {

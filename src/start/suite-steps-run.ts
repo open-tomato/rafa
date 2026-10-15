@@ -127,10 +127,11 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration, readTestScope } from '@open-tomato/rafa/core/plan';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { parseTaskDeclaration, readTestScope } from '../utils/declaration.js';
 
 import { baselineHaltLines } from './suite-outside-case.js';
 import {

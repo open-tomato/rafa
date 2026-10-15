@@ -54,7 +54,7 @@ function trackerBody(done: number, open: number): string {
 /**
  * Plants a project root holding one run record for {@link BRANCH}, alive
  * under this test's own pid, and a tracker with `done` of `total` ticked.
- * The record is written as `src/core/loop/sessions.ts` writes one, two-space
+ * The record is written as `packages/rafa/src/core/loop/sessions.ts` writes one, two-space
  * JSON, since the plugin reads it with regexes over that text.
  */
 async function plantProject(run: PlantedRun, done: number, total: number): Promise<string> {

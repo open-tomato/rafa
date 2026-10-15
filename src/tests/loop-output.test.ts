@@ -13,7 +13,7 @@
  * `src/start/forced-draft.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
- * `src/start/pr-lifecycle.ts`, `src/core/loop/claude.ts` and
+ * `src/start/pr-lifecycle.ts`, `packages/rafa/src/core/loop/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`, or `activeLogger()`,
  * whose console logger writes through the active output. Each is parsed with
@@ -147,7 +147,7 @@
  *     and the source case of `start/dispatch.ts`.
  */
 import type { Planting, Scratch } from './loop-scratch.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -156,8 +156,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { preserveProgress } from '../start/wrap-up.js';
 
@@ -191,7 +192,7 @@ const ROUTED_MODULES: string[] = [
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
-  'core/loop/claude.ts',
+  '../packages/rafa/src/core/loop/claude.ts',
   'utils/schedule.ts',
 ];
 

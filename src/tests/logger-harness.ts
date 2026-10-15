@@ -5,8 +5,8 @@
  */
 import type { LoggerHarness } from '../adapters/logger/contract.js';
 import type { LoggerSettings } from '../adapters/logger/settings.js';
-import type { OutputMode } from '../core/config/sections.js';
-import type { CliEvent, Logger, Output } from '../ports/index.js';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEvent, Logger, Output } from '@open-tomato/rafa/ports';
 
 import { createConsoleLogger } from '../adapters/logger/console.js';
 

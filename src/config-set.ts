@@ -6,7 +6,7 @@
  *
  * The text is edited and never re-serialised, so every comment `rafa
  * init` wrote, and every comment an operator added, survives: the rule
- * `src/release/setting.ts` and `src/effort/store/move.ts` follow for
+ * `src/release/setting.ts` and `packages/rafa/src/effort/store/move.ts` follow for
  * their one key each. This module is the same edit for any key the
  * schema knows, one or two levels deep.
  *
@@ -72,11 +72,12 @@
  * itself reads back right. It is the control that makes a hand-written
  * line edit safe to write.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
+
+import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { knownKeysAbove, SECTIONS, SETTING_BY_KEY, SETTING_NAMES } from './config-registry.js';
-import { parseConfigText } from './core/config/index.js';
-import { isMapping, messageOf } from './core/config/sections.js';
 
 /** The deepest key, in dotted parts, this edit sets. */
 export const CONFIG_SET_MAX_DEPTH = 2;

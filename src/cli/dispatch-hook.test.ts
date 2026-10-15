@@ -29,9 +29,9 @@
  */
 import type { CommandHook, DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { CommandRoute } from './route.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { OutputStream } from '../core/output/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../adapter-registry.js';
 
@@ -41,9 +41,10 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit, restoreRunningCommand } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CommandExit, restoreRunningCommand } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';

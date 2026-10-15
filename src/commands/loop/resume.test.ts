@@ -13,8 +13,8 @@
  * write refused. That change is made by the pid probe, which runs after
  * the records are read.
  */
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../core/loop/readings.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import '../../adapter-registry.js';
 
@@ -24,7 +24,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sessionFilePath, updateSession } from '../../core/loop/index.js';
+import { sessionFilePath, updateSession } from '@open-tomato/rafa/core/loop';
+
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   LOOP_SUBJECTS,

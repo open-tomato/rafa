@@ -17,8 +17,8 @@
 import type { SkillDelivery } from './delivery.js';
 import type { TierRow, TierSettings } from './resolve.js';
 import type { AgentDefinition, ServedSet } from './serve.js';
-import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
+import type { TierPin } from '@open-tomato/rafa/core/config/sections';
 
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

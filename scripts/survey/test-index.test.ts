@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from './core-moves';
+import { CORE_FOLDER, CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from './core-moves';
 import {
   BASELINE_PATH,
   CORE_PACKAGE_UNIT,
@@ -30,6 +30,13 @@ import {
   renderTestIndexMarkdown,
   spawnApis,
 } from './test-index';
+
+/**
+ * Core's `core/` folder before it moved into its package (#1090). The
+ * planted trees of the comparison's rules read it as the one folder it
+ * was then, through `coreRules`' planted folder.
+ */
+const PRE_PACKAGE_CORE = 'src/core/';
 
 /** A graph over `files` with `value` edges `[from, to]`, every file read but `unread`. */
 function plantedGraph(files: readonly string[], links: readonly (readonly [string, string])[], unread: readonly string[] = []): ImportGraph {
@@ -264,7 +271,7 @@ describe('the rules of the comparison', () => {
       [SPAWN_HELPER, 'import { execFileSync } from \'node:child_process\';\n'],
     ]),
   };
-  const held = computeTestIndex(input, coreRules([BARREL]));
+  const held = computeTestIndex(input, coreRules([BARREL], PRE_PACKAGE_CORE));
   const surveyed = computeTestIndex(input);
 
   it('stop the walk at a core barrel, which is reached, not counted, and listed with what lies behind it', () => {
@@ -294,7 +301,7 @@ describe('the rules of the comparison', () => {
 
   it('set aside the listed barrels alone: any other index file under src/core/ is counted and walked past', () => {
     expect(entryOf(held, THROUGH_INDEX)).toMatchObject({ folders: ['src/core'], index: 1, support: [] });
-    const all = computeTestIndex(input, coreRules([BARREL, UNLISTED_INDEX]));
+    const all = computeTestIndex(input, coreRules([BARREL, UNLISTED_INDEX], PRE_PACKAGE_CORE));
     expect(entryOf(all, THROUGH_INDEX)).toMatchObject({ folders: [], index: 0, support: [UNLISTED_INDEX] });
   });
 
@@ -303,13 +310,14 @@ describe('the rules of the comparison', () => {
   });
 
   it('count every file under the package source as the package, src/core/ included once it lies there', () => {
-    const today = coreRules([]);
+    const today = coreRules([], PRE_PACKAGE_CORE);
     expect(today.folderOf(`${CORE_SOURCE}effort/store/settings.ts`)).toBe(CORE_PACKAGE_UNIT);
     expect(today.folderOf(`${CORE_SOURCE}report/parse.ts`)).toBe(CORE_PACKAGE_UNIT);
     expect(today.folderOf('src/core/config/config.ts')).toBe('src/core');
     expect(today.folderOf('src/effort/store/settings.ts')).toBe('src/effort/store');
     // After the flip, src/core/ lies under the package: the package is read first, so it is not a unit of its own.
-    const moved = coreRules([], `${CORE_SOURCE}core/`);
+    expect(CORE_FOLDER).toBe(`${CORE_SOURCE}core/`);
+    const moved = coreRules([]);
     expect(moved.folderOf(`${CORE_SOURCE}core/config/config.ts`)).toBe(CORE_PACKAGE_UNIT);
     expect(moved.folderOf('src/core/config/config.ts')).toBe('src/core/config');
     expect(CORE_PACKAGE_UNIT).toBe('packages/rafa');
@@ -379,7 +387,7 @@ describe('the comparison against a baseline', () => {
       ),
       sources: new Map([[SPAWNS_LATER, 'Bun.spawnSync([\'git\', \'init\']);\n']]),
     },
-    coreRules([BARREL]),
+    coreRules([BARREL], PRE_PACKAGE_CORE),
   );
   const comparison = compareToBaseline(after, baseline, moves);
 
@@ -766,7 +774,7 @@ function runAgainst(root: string, baseline: string): { exitCode: number; stderr:
 describe('the comparing mode over a scratch repository', () => {
   let root = '';
   let head = '';
-  // `src/pr/git.ts` and its test are a move `core-moves.ts` lists, to `src/core/git/`, behind the barrel `index.ts`.
+  // `src/pr/git.ts` and its test are a move `core-moves.ts` lists, to `packages/rafa/src/core/git/`, behind the barrel `index.ts`.
   const files: Record<string, string> = {
     'src/a/one.test.ts': 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
       + 'it(\'x\', () => expect(x).toBe(1));\n',
@@ -810,36 +818,36 @@ describe('the comparing mode over a scratch repository', () => {
   });
 
   it('holds a moved test file under its old path, and a test file that reaches the moved file through its barrel', async () => {
-    mkdirSync(join(root, 'src/core/git'), { recursive: true });
-    git(root, ['mv', 'src/pr/git.ts', 'src/core/git/git.ts']);
-    git(root, ['mv', 'src/pr/git.test.ts', 'src/core/git/git.test.ts']);
+    mkdirSync(join(root, `${CORE_FOLDER}git`), { recursive: true });
+    git(root, ['mv', 'src/pr/git.ts', `${CORE_FOLDER}git/git.ts`]);
+    git(root, ['mv', 'src/pr/git.test.ts', `${CORE_FOLDER}git/git.test.ts`]);
     // The barrel is untracked, as a move task leaves it until the loop commits.
-    plant(root, 'src/core/git/index.ts', 'export { git } from \'./git.js\';\n');
-    plant(root, 'src/pr/merge.ts', 'import { git } from \'../core/git/index.js\';\nexport const merge = git;\n');
+    plant(root, `${CORE_FOLDER}git/index.ts`, 'export { git } from \'./git.js\';\n');
+    plant(root, 'src/pr/merge.ts', `import { git } from '../../${CORE_FOLDER}git/index.js';\nexport const merge = git;\n`);
     const comparison = await against(root, join(root, BASELINE_PATH));
     expect(comparison).toMatchObject({ added: [], commit: head, fallen: [], gone: [], risen: [], unread: [] });
     expect(comparison.equal).toEqual([
-      { after: 1, baselineTest: 'src/a/one.test.ts', before: 1, gained: [], lost: [], spawnsSince: [], test: 'src/a/one.test.ts' },
       {
         after: 1,
         baselineTest: 'src/pr/git.test.ts',
         before: 1,
-        gained: ['src/core'],
+        gained: [CORE_PACKAGE_UNIT],
         lost: ['src/pr'],
         spawnsSince: [],
-        test: 'src/core/git/git.test.ts',
+        test: `${CORE_FOLDER}git/git.test.ts`,
       },
+      { after: 1, baselineTest: 'src/a/one.test.ts', before: 1, gained: [], lost: [], spawnsSince: [], test: 'src/a/one.test.ts' },
       { after: 1, baselineTest: 'src/pr/merge.test.ts', before: 1, gained: [], lost: [], spawnsSince: [], test: 'src/pr/merge.test.ts' },
     ]);
   });
 
   it('names a test file as risen when the import goes deeper than the barrel, the control', async () => {
-    plant(root, 'src/pr/merge.ts', 'import { git } from \'../core/git/git.js\';\nexport const merge = git;\n');
+    plant(root, 'src/pr/merge.ts', `import { git } from '../../${CORE_FOLDER}git/git.js';\nexport const merge = git;\n`);
     const comparison = await against(root, BASELINE_PATH);
     expect(comparison.risen).toEqual([
-      { after: 2, baselineTest: 'src/pr/merge.test.ts', before: 1, gained: ['src/core'], lost: [], spawnsSince: [], test: 'src/pr/merge.test.ts' },
+      { after: 2, baselineTest: 'src/pr/merge.test.ts', before: 1, gained: [CORE_PACKAGE_UNIT], lost: [], spawnsSince: [], test: 'src/pr/merge.test.ts' },
     ]);
-    plant(root, 'src/pr/merge.ts', 'import { git } from \'../core/git/index.js\';\nexport const merge = git;\n');
+    plant(root, 'src/pr/merge.ts', `import { git } from '../../${CORE_FOLDER}git/index.js';\nexport const merge = git;\n`);
     expect((await against(root, BASELINE_PATH)).risen).toEqual([]);
   });
 

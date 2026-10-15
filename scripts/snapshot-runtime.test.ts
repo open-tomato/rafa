@@ -1,4 +1,4 @@
-import type { SessionRecord } from '../src/core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

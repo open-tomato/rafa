@@ -5,7 +5,7 @@
  * ## The rule, from its measurement
  *
  * A task declaring `budget=<usd>` is spawned with `--max-budget-usd`
- * (`utils/declaration.ts`). Measured on Claude Code 2.1.268, `claude -p
+ * (`core/plan/declaration.ts`). Measured on Claude Code 2.1.268, `claude -p
  * "Say hello" --max-budget-usd 0.01` in the default text output mode
  * exited 1, wrote exactly `Error: Exceeded USD budget (0.01)` to stdout
  * with no newline after it, and wrote nothing to stderr. The amount in
@@ -46,8 +46,9 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../core/output/index.js';
-import { BUDGET_FLAG } from '../utils/declaration.js';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { BUDGET_FLAG } from '@open-tomato/rafa/core/plan';
+
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 
 /** The blocker text a task that ran out of its budget is marked with. */

@@ -41,8 +41,8 @@
  */
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimState } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '../claims/git.js';
 import { readClaimState } from '../claims/stale.js';

@@ -36,10 +36,11 @@
  * half counts its own. The write itself is not caught: every value it
  * refuses comes from code, so a refusal is a fault, not a reading.
  */
-import type { SkillUseReading } from './store/skill-invocations.js';
+import type { SkillUseReading } from '@open-tomato/rafa/store/skill-invocations';
+
+import { readSkillInvocations, UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 
 import { readSkillUse } from './skill-use.js';
-import { readSkillInvocations, UNKNOWN_SKILL_COUNT, writeSkillInvocations } from './store/skill-invocations.js';
 
 /** The sessions the skill half reads: the ones this run appended, or every one the store holds. */
 export type SkillScope = 'appended' | 'held';

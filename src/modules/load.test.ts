@@ -13,7 +13,7 @@
  * with that one thing put back.
  */
 import type { ModuleSettings } from './load.js';
-import type { ModuleSource } from '../core/config/index.js';
+import type { ModuleSource } from '@open-tomato/rafa/core/config';
 
 import '../adapter-registry.js';
 
@@ -23,8 +23,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../core/adapters/index.js';
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
 import { loadInvocationModules, loadModules, moduleSettings } from './load.js';
 

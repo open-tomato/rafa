@@ -14,8 +14,8 @@
  * the pid probe, which runs after the records are read, as a run writing
  * its end at that moment would.
  */
-import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../core/loop/readings.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import '../../adapter-registry.js';
 
@@ -25,7 +25,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { updateSession } from '../../core/loop/index.js';
+import { updateSession } from '@open-tomato/rafa/core/loop';
+
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER_PATH,

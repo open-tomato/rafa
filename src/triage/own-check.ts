@@ -55,7 +55,7 @@
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { PlanFilesReading } from './plan-commits.js';
-import type { BugKind, ReportBug } from '../report/parse.js';
+import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename, isAbsolute } from 'node:path';
 

@@ -12,8 +12,8 @@
  * that never reads.
  */
 import type { RoutedEntry } from './report-kinds.js';
-import type { BugRouteEntry } from './store/bug-routes.js';
-import type { BugKind } from '../report/parse.js';
+import type { BugKind } from '@open-tomato/rafa/report/parse';
+import type { BugRouteEntry } from '@open-tomato/rafa/store/bug-routes';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,12 +21,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BUG_KINDS } from '../report/parse.js';
+import { BUG_KINDS } from '@open-tomato/rafa/report/parse';
+import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { writeTriage } from '@open-tomato/rafa/store/triage';
 
 import { countBugKinds, readBugKinds } from './report-kinds.js';
-import { writeBugRoutes } from './store/bug-routes.js';
-import { sqliteStorePath } from './store/sqlite.js';
-import { writeTriage } from './store/triage.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-report-kinds-'));
 let planted = 0;

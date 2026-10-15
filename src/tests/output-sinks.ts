@@ -1,6 +1,6 @@
 /**
  * An Output a test reads, level by level, for a module that writes
- * through the active output (`src/core/output/active.ts`).
+ * through the active output (`packages/rafa/src/core/output/active.ts`).
  *
  * A case sets one with `setActiveOutput`, drives the module, and sets
  * `null` after it. The active output is module state and bun runs every
@@ -13,7 +13,7 @@
  * too, any other event to `event`, and a payload to `result`. What has
  * no sink is dropped, so `sinkOutput({})` silences a module.
  */
-import type { CliEvent, CliEventLog, Output } from '../ports/index.js';
+import type { CliEvent, CliEventLog, Output } from '@open-tomato/rafa/ports';
 
 /** A sink for the lines of one level. */
 type LineSink = (message: string) => void;

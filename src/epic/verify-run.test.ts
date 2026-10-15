@@ -11,8 +11,8 @@
  */
 import type { CriterionCheck } from './verify-plan.js';
 import type { CheckAnswered, CheckResult, VerifyRunOptions, VerifyRunRan } from './verify-run.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,8 +21,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
-import { claudeArgs } from '../core/loop/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { claudeArgs } from '@open-tomato/rafa/core/loop';
+
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { SESSION_ID_FLAG } from '../start/dispatch.js';
 

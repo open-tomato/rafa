@@ -76,7 +76,7 @@ import type { NextActionId } from './state.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { NEXT_COMMAND_ACTIONS } from './actions.js';
 import {

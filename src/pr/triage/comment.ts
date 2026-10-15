@@ -81,7 +81,7 @@
  *
  * ## The fences
  *
- * The body is read back by `readRafaBlocks` (`src/core/plan/blocks.ts`), the
+ * The body is read back by `readRafaBlocks` (`packages/rafa/src/core/plan/blocks.ts`), the
  * reader that already tells a real block from a comment illustrating the
  * format, so a comment quoting a triage inside a longer fence
  * contributes no reading. Both fences this module writes — the block and
@@ -128,11 +128,12 @@ import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
 import type { FailedLogEvidence } from './evidence.js';
 import type { FollowUpPullRequest } from './follow-up.js';
-import type { Mapping } from '../../core/config/sections.js';
 import type { PullRequestComment, PullRequests } from '../types.js';
+import type { Mapping } from '@open-tomato/rafa/core/config/sections';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { readRafaBlocks } from '../../core/plan/block-reader.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+
 import { readUnchecked, skipChecksCommand } from '../unchecked.js';
 
 import { buildFollowUpPrompt, excerptCaption, excerptLines, fencedBlock } from './follow-up.js';

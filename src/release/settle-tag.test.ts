@@ -13,8 +13,8 @@ import type { Fragment } from './fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
-import type { ReleaseTagMode } from '../core/config/sections.js';
 import type { GitResult, GitRunner, PullRequestSummary } from '../pr/index.js';
+import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';

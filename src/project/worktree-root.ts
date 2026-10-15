@@ -40,14 +40,14 @@
  * The directory is refused unless it is absolute, since running git in
  * a relative one would read the process's working directory. Git is
  * reached through a {@link GitRunner} opened for the directory,
- * `createGitRunner` from `src/core/git/git.ts` when left out, which already
+ * `createGitRunner` from `packages/rafa/src/core/git/git.ts` when left out, which already
  * sets `LC_ALL=C` so the refusal line matched is git's untranslated one.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { isAbsolute } from 'node:path';
 
-import { createGitRunner, gitSaid } from '../core/git/index.js';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 
 /**
  * The start of the line git prints when no directory at or above holds

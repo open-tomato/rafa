@@ -53,7 +53,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../core/loop/index.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
 
 import { expectExit } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

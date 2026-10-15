@@ -64,7 +64,7 @@ holds one under `packages/`.
 - **A command's default export takes the `const command: RafaCommand`
   form**: `const command: RafaCommand = createNextCommand();` and then
   `export default command;`, as `src/commands/next.ts` does. `RafaCommand`
-  comes from the command barrel, `src/core/command/index.ts`. Where the
+  comes from the command barrel, `packages/rafa/src/core/command/index.ts`. Where the
   expression is not assignable to `RafaCommand`, fix the factory's
   declared return type rather than the annotation.
 - **An annotation adds `import type` only, never a value import.** A
@@ -86,7 +86,7 @@ holds one under `packages/`.
 
 ### Core and its barrels
 
-**Core is `src/core/`, the code every part of rafa reads.** The nineteen
+**Core is `packages/rafa/src/core/`, the code every part of rafa reads.** The nineteen
 files that #905 moves there are the connective tissue of the codebase:
 graph analysis calls such files high-betweenness nodes, since many paths
 between the rest of the tree run through them. A twentieth,
@@ -107,16 +107,16 @@ lists those paths, today `src/runtime/identity.ts`.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it
-moved to `src/core/git/`. `src/report/parse.ts` reads like the run's
+moved to `packages/rafa/src/core/git/`. `packages/rafa/src/report/parse.ts` reads like the run's
 report code, but the effort store reads it, so it is core. Core is also
-`src/ports/`, the effort store under `src/effort/store/` and
-`src/report/record.ts`: core by assignment, kept where they are.
+`packages/rafa/src/ports/`, the effort store under `packages/rafa/src/effort/store/` and
+`packages/rafa/src/report/record.ts`: core by assignment, kept where they are.
 `CORE_FOLDERS` and `CORE_NAMED_FILES` of `scripts/survey/core-moves.ts`
 list core's folders and named files, and `isCoreFile` reads them: the
 one place a sweep, a survey script or a spawned loader takes core's
 location from.
 
-**A subject's barrel is the only file under `src/core/` that a file
+**A subject's barrel is the only file under `packages/rafa/src/core/` that a file
 outside it may import.** There are thirteen, all listed in `CORE_BARRELS` of
 `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
 five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
@@ -124,11 +124,11 @@ five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
 it and no more. The barrels are the declared exports until the cut names
 real subpaths (#808).
 
-**Outside `src/core/`, a file imports a barrel by relative path and
-nothing deeper.** In a file outside `src/core/`, no static import,
+**Outside `packages/rafa/src/core/`, a file imports a barrel by relative path and
+nothing deeper.** In a file outside `packages/rafa/src/core/`, no static import,
 `import type`, `export … from` or dynamic `import()` names a file behind a
 barrel.
-Inside `src/core/`, a file imports the files it needs by path, siblings
+Inside `packages/rafa/src/core/`, a file imports the files it needs by path, siblings
 and other subjects' files alike, and never a barrel. A grep at this
 commit found no barrel imported from inside, but no sweep measures that
 half.
@@ -138,10 +138,10 @@ half.
 would hold, tracked or untracked and not ignored, under `src/`, `scripts/`
 and `packages/` and at the root, test files included, less core's own
 files and its parked tests: the paths `isCoreRead` of
-`scripts/survey/core-moves.ts` holds, today `src/core/`,
-`src/effort/store/`, `src/ports/`, the four named files and
+`scripts/survey/core-moves.ts` holds, today `packages/rafa/src/core/`,
+`packages/rafa/src/effort/store/`, `packages/rafa/src/ports/`, the four named files and
 `src/tests/core-coupled/`, are named and not read. It fails on any
-import from outside core that reaches a file inside `src/core/` other
+import from outside core that reaches a file inside `packages/rafa/src/core/` other
 than a listed barrel. The reading is `readCoreImports` in
 `scripts/survey/core-barrels.ts`, over the specifiers `textImports` finds,
 so an `import type`, an `export … from`, a dynamic `import()` and a
@@ -153,7 +153,7 @@ seen: an `import()` or `require()` whose argument is not a string literal,
 a `mock.module()` call, and a path built for a spawned process or a file
 read. The sweep prints the files it read at load, so an empty read cannot
 pass. A module augmentation is no import: a `declare module` naming
-`src/core/config/config-schema.ts`, which each `src/config-schema-*.ts`
+`packages/rafa/src/core/config/config-schema.ts`, which each `src/config-schema-*.ts`
 file writes to add its fields to `RafaConfig`, is answered under
 `augment` and passes. It has to name the declaring file: spelled through
 the config barrel, two augmentations merged with each other and not with
@@ -161,13 +161,13 @@ the config barrel, two augmentations merged with each other and not with
 core package will have to export (#808).
 
 **The config sections are handed in, never imported.** Core declares the
-section contract in `src/core/config/section.ts`: a `ConfigSection` carries its
+section contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection` carries its
 `package` name, its `settings`, its `defaults` and its cross-key `checks`. Core
 names no section. The twelve are listed in `src/config-registry.ts`, which sits
-outside `src/core/`: core's own (`core-section.ts`) and the eleven
+outside `packages/rafa/src/core/`: core's own (`core-section.ts`) and the eleven
 `src/config-schema-*.ts` files. Importing that module registers the twelve with
 core once, and `src/rafa.ts` and `src/index.ts` import it ahead of anything
-that loads a config. A file outside `src/core/` takes the merged `SETTINGS`,
+that loads a config. A file outside `packages/rafa/src/core/` takes the merged `SETTINGS`,
 `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
 `knownKeysAbove` from the registry, never from the core barrel, which exports
 none of them; core reads the same through the `active*` functions of
@@ -178,10 +178,10 @@ defines under another setting name, which names both setting names too, or a
 naming both packages.
 
 **The adapters are handed in, never imported.** Core declares the adapter
-registry in `src/core/adapters/registry.ts`, and that file imports no
-adapter: core's adapters sit under `src/adapters/`, `src/effort/store/` and
+registry in `packages/rafa/src/core/adapters/registry.ts`, and that file imports no
+adapter: core's adapters sit under `src/adapters/`, `packages/rafa/src/effort/store/` and
 `src/effort/sync/`, above core. `src/adapter-registry.ts`, outside
-`src/core/`, lists them and hands them to `registerAdapters` as it is
+`packages/rafa/src/core/`, lists them and hands them to `registerAdapters` as it is
 imported. `src/rafa.ts` and `src/index.ts` import it right after
 `src/config-registry.ts`, before anything resolves an adapter, so the two
 composition roots are the two entries' imports. Until the root is imported,
@@ -190,7 +190,7 @@ reads core's adapters off the registry imports the root for its effect, as
 the entries do.
 
 **A section adds its keys to `RafaConfig` by `declare module`.**
-`RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
+`RafaConfig` stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's
 keys. Each section file adds its own by a `declare module` naming that file,
 `'./core/config/config-schema.js'`, and not the config barrel, for the reason
 the augment note in the deep-import sweep paragraph above gives. So
@@ -202,7 +202,7 @@ section file exports an interface of the keys a file writes for it
 part of a namespace it shares with core as an interface of its own:
 `LoopRetriesShape`, `LoopContinueShape` and `WrapUpShape` for `loop`,
 `BoardProjectLimitsShape` for `board.project`, `ReleaseDangerousShape`
-for `dangerous`. `src/config/shape.ts`, outside `src/core/`, holds core's
+for `dangerous`. `src/config/shape.ts`, outside `packages/rafa/src/core/`, holds core's
 keys and composes `ConfigShape`, `LoopShape`, `BoardProjectShape` and
 `DangerousShape` from those interfaces by `extends`, through `import type`.
 Each section's `declare module` on `shape.ts`, the form this replaced,
@@ -215,14 +215,14 @@ memory.
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under
-`src/core/` and fails on any import of a `src/config-schema-*.ts` file, by any
+`packages/rafa/src/core/` and fails on any import of a `src/config-schema-*.ts` file, by any
 specifier `textImports` finds, so a dynamic `import()` or a `require()` counts
 as much as a static import. Like the barrel sweep, it does not see an
 argument that is not a string literal. A second `describe` holds `loadConfig`
 with no section registered to a refusal naming `src/config-registry.ts`.
 
 **A barrel is split, never widened, when it closes a runtime cycle.** A
-barrel that groups a file with one outside `src/core/` that imports the
+barrel that groups a file with one outside `packages/rafa/src/core/` that imports the
 barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
 proves nothing about it. The five barrels beyond the subject indexes are
@@ -231,9 +231,9 @@ the splits made so far. `config/sections.ts` holds the leaf pair
 `config-merged.ts` imported section files that import the pair back;
 that file is retired and nothing behind `config/index.ts` imports a
 section file now, so the split stands as it was made. `config/load.ts` stands
-alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
+alone, because `config-load.ts` reaches `packages/rafa/src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
-because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
+because `session-readings.ts` reaches `packages/rafa/src/effort/store/task-finishes.ts`,
 from which `development-build.ts` imports `loop/index.ts` back.
 `loop/hops.ts` stands alone over `hop-record.ts`, split while
 `src/next/hop-record.ts` imported it back by value and the session record
@@ -271,7 +271,7 @@ end, so it is never upward. Inside `src/schema/` the placement is per file,
 as the Packages section below lists.
 
 **The counts rank options and do not certify a cut.** An upward edge from
-`src/core/config/` into a `src/config-schema-<section>.ts` file is marked
+`packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is marked
 as cleared by #118, which makes each package own its config section. It
 still counts as upward: the table's `remaining` column is the count less
 the cleared edges. A count is only as current as the graph it was read
@@ -288,7 +288,7 @@ certifies a cut.
 - **A package imports core only as `@open-tomato/rafa/store` or
   `@open-tomato/rafa/ports`**, never `../../src/...` and never another
   subpath. What a package needs from core is exported from one of those
-  two entries first (`src/effort/store/index.ts`, `src/ports/index.ts`).
+  two entries first (`packages/rafa/src/effort/store/index.ts`, `packages/rafa/src/ports/index.ts`).
 - **The two subpaths resolve through `paths`, not `node_modules`.**
   `tsconfig.packages.json` maps each to the source file the build
   compiles into its `exports` target, and each package's `tsconfig.json`
@@ -386,16 +386,16 @@ a thing to split.
 ### Adding a setting
 
 **A new key in `SETTINGS` reaches the files below beyond the schema,
-sections and `init` scaffold.** `src/core/config/config.ts` is not one:
+sections and `init` scaffold.** `packages/rafa/src/core/config/config.ts` is not one:
 it builds a layer by a loop over the names registered with
-`src/core/config/section.ts`, so it names no setting.
+`packages/rafa/src/core/config/section.ts`, so it names no setting.
 `src/config-registry.test.ts` pins the key set as closed lists (`KEYS`,
 `TOP`, `SECTIONS`, `knownKeysAbove`), and a core key
-is also spelled in `src/core/config/core-section.test.ts` and takes its
+is also spelled in `packages/rafa/src/core/config/core-section.test.ts` and takes its
 place in one of the runs of core's names that `src/config-registry.ts`
 spells. Both config suites
 also check that every setting appears exactly once:
-`src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
+`src/tests/core-coupled/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
 `FULL_VALUES`, its cases and `KNOWN`) and
 `src/tests/config-layers.test.ts` (the PROJECT and USER text and values,
 and `SECTION_CASES`). `check-types` never reads the two suites, so only
@@ -453,7 +453,7 @@ unplaced and the sweep does not fail on it: a cycle through it is still
 found, and the file counts toward no cluster. The sweep prints the file
 coverage line, a count of files placed by folder majority, and a count
 of the unplaced ones; a new survey run that extends the map places them.
-The move of #905 renamed the map's keys to the `src/core/` paths and kept
+The move of #905 renamed the map's keys to the `packages/rafa/src/core/` paths and kept
 each keyed file's cluster. Two moved files were never keyed,
 `plan-files.ts` and `session-readings.ts`, so the sweep places them by
 their folder.
@@ -476,7 +476,7 @@ crosses two packages but sits in one cluster passes it.
 
 **A cycle through a barrel can stay inside one cluster, and the adapters
 barrel's was retired by the registry seam.** Until then
-`src/core/adapters/index.ts` was one: `registry.ts` imported
+`packages/rafa/src/core/adapters/index.ts` was one: `registry.ts` imported
 `src/effort/sync/select.ts` by value, and `select.ts` imported the registry
 back through the barrel. Both sat in cluster c7, so the sweep passed them,
 and a barrel over one file could not be split to step round the cycle. The
@@ -497,7 +497,7 @@ target is inside it — not static `import`, not `import type`, not
 `export … from`, and not dynamic `import()`. This rule forces every
 feature that more than one command might want into the library half
 first, before a second command is even written. Library code every part
-of rafa reads goes into `src/core/`, behind its barrels (Core and its
+of rafa reads goes into `packages/rafa/src/core/`, behind its barrels (Core and its
 barrels, above).
 
 **Two files are exempt by name:** `src/rafa.ts` (the bin entry, which
@@ -512,7 +512,7 @@ folder.** `src/commands/plan/plan-files.ts` is the command half of the
 plan readers: the first command that needed them (`rafa plan create`)
 wrote them there, and ten non-test files import it at this commit. Its
 library half, the readings that take no command context, is
-`src/core/plan/plan-files.ts`, which command modules reach through the
+`packages/rafa/src/core/plan/plan-files.ts`, which command modules reach through the
 plan barrel. When a second command wants a reader, the reader moves to
 the library half and the command file imports it from there. The sweep
 reads the move with the list: a command file that exports its own library

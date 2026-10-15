@@ -12,7 +12,7 @@
  * of the README and asserts the comparison then fails, so a passing case
  * above is proof the table was actually checked and not merely present.
  */
-import type { CommandSpend } from '../core/command/index.js';
+import type { CommandSpend } from '@open-tomato/rafa/core/command';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

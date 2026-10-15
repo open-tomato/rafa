@@ -191,26 +191,28 @@ import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } fr
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
-import type { RafaConfig, ResolvedConfig } from '../core/config/index.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
 import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '../project/roots.js';
 import type { ScopeWrite, ScopeWriteChange } from '../project/scaffold.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { ConfigError, configFilePath } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
+
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { commandProgressFeed } from '../board/project/progress.js';
 import { commandRetrySeams } from '../board/project/project-runner.js';
-import { CommandExit , createLinePrompter } from '../core/command/index.js';
-import { ConfigError, configFilePath } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { messageOf } from '../core/config/sections.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { readBinPath } from '../project/bin-path.js';
 import {
@@ -223,7 +225,6 @@ import {
 import { candidateLines, firstCandidate, namedRoot, promptForRoot } from '../project/root-choice.js';
 import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/roots.js';
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
-import { gitRemoteUrl } from '../schema/project-id.js';
 
 import { projectStepChanged, renderProjectStep, runProjectStep } from './init-board-project.js';
 import {

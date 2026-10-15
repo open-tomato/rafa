@@ -22,7 +22,7 @@
  * whose run says the row was not stored.
  */
 import type { SearchCommandResult } from './search.js';
-import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import '../../adapter-registry.js';
 

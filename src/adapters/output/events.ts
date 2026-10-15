@@ -12,8 +12,8 @@
  *
  * @module adapters/output/events
  */
-import type { OutputStream } from './stream.js';
-import type { CliEvent, Output } from '../../ports/index.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
 /** The prefix every line this output writes starts with. */
 export const EVENT_PREFIX = 'rafa· ';

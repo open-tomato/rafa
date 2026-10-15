@@ -6,7 +6,7 @@
  * The line announcing the deferral goes through the active output's `info`
  * (`core/output/active.ts`), so json mode reads it as a `log` event.
  */
-import { activeOutput } from '../core/output/index.js';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 /** Parses `HH:MM` (24h) into a delay in milliseconds from `now`. */
 export function msUntil(startAt: string, now: Date = new Date()): number {

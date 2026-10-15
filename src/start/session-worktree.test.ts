@@ -17,7 +17,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSession } from '../core/loop/index.js';
+import { readSession } from '@open-tomato/rafa/core/loop';
 
 import { openRunSession } from './session.js';
 

@@ -33,10 +33,11 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { SPEC_LABEL } from '../board/issue.js';
 import { branchName, planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';

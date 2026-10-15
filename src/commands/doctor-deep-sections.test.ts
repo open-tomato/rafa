@@ -20,7 +20,7 @@
  * the environment. No case reads the real `PATH`, home or `origin`.
  */
 import type { DeepSection } from './doctor-deep-row.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

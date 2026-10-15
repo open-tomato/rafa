@@ -113,16 +113,6 @@
       "upwardEdgesIn": 0
     },
     {
-      "kind": "source",
-      "path": "src/adapters/output/stream.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/adapters/output/text.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "test",
       "path": "src/adapters/planner/claude.test.ts",
       "upwardEdgesIn": 0
@@ -1693,11 +1683,6 @@
       "upwardEdgesIn": 1
     },
     {
-      "kind": "source",
-      "path": "src/loop/session-record-parse.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "test",
       "path": "src/loop/wait-reasons.test.ts",
       "upwardEdgesIn": 0
@@ -2143,6 +2128,11 @@
       "upwardEdgesIn": 1
     },
     {
+      "kind": "source",
+      "path": "src/ports/index.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test",
       "path": "src/project/bin-path.test.ts",
       "upwardEdgesIn": 0
@@ -2286,11 +2276,6 @@
       "kind": "source",
       "path": "src/report/lessons.ts",
       "upwardEdgesIn": 1
-    },
-    {
-      "kind": "source",
-      "path": "src/runtime/identity.ts",
-      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -2529,11 +2514,6 @@
     },
     {
       "kind": "test",
-      "path": "src/tests/command-reexports.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/tests/commands-direction.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -2579,12 +2559,162 @@
     },
     {
       "kind": "test",
-      "path": "src/tests/core-reexport-bindings.test.ts",
+      "path": "src/tests/core-coupled/core/command/version.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "test",
-      "path": "src/tests/core-reexports.test.ts",
+      "path": "src/tests/core-coupled/core/config/config-load.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/config/config-schema-board.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/config/config.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/config/dangerous.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/config/section.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/loop/claude.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/loop/sessions-hop.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/output/active.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/output/index.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/plan/parse.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/core/runtime/identity.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/changes.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/fixture-extract.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/forward-compat.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/index.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/location.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/merge-commit-gaps.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/merge-rules.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/migrations.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/move.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/origins.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/preflight.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/search-row.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/settings.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/stale-docs.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/store-sources.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/tracker-refs.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/ports/index.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/report/parse.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-coupled/schema/project-id.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/core-package.sweep.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -2883,11 +3013,6 @@
       "upwardEdgesIn": 0
     },
     {
-      "kind": "test",
-      "path": "src/tests/loop-reexports.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
       "kind": "test-support",
       "path": "src/tests/loop-scratch.ts",
       "upwardEdgesIn": 0
@@ -3095,11 +3220,6 @@
     {
       "kind": "test",
       "path": "src/tests/plan-needs.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/tests/plan-reexport-bindings.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3548,11 +3668,6 @@
       "upwardEdgesIn": 0
     },
     {
-      "kind": "source",
-      "path": "src/utils/declaration.ts",
-      "upwardEdgesIn": 15
-    },
-    {
       "kind": "test",
       "path": "src/utils/git.test.ts",
       "upwardEdgesIn": 0
@@ -3560,11 +3675,6 @@
     {
       "kind": "source",
       "path": "src/utils/git.ts",
-      "upwardEdgesIn": 3
-    },
-    {
-      "kind": "source",
-      "path": "src/utils/plan-stamp.ts",
       "upwardEdgesIn": 3
     },
     {
@@ -3583,11 +3693,6 @@
       "upwardEdgesIn": 0
     },
     {
-      "kind": "source",
-      "path": "src/utils/session-env.ts",
-      "upwardEdgesIn": 2
-    },
-    {
       "kind": "test",
       "path": "src/utils/tracker-open-tasks.test.ts",
       "upwardEdgesIn": 0
@@ -3600,7 +3705,7 @@
     {
       "kind": "source",
       "path": "src/utils/tracker.ts",
-      "upwardEdgesIn": 21
+      "upwardEdgesIn": 18
     }
   ],
   "order": [
@@ -3621,261 +3726,221 @@
       "edges": [],
       "fileCounts": {
         "source": 115,
-        "test": 116,
+        "test": 85,
         "testSupport": 2
       },
       "files": [
-        "src/core/adapters/index.test.ts",
-        "src/core/adapters/index.ts",
-        "src/core/adapters/registry.test.ts",
-        "src/core/adapters/registry.ts",
-        "src/core/command/command.test.ts",
-        "src/core/command/command.ts",
-        "src/core/command/confirm.test.ts",
-        "src/core/command/confirm.ts",
-        "src/core/command/index.test.ts",
-        "src/core/command/index.ts",
-        "src/core/command/registry-types.ts",
-        "src/core/command/running.test.ts",
-        "src/core/command/running.ts",
-        "src/core/command/spends.test.ts",
-        "src/core/command/spends.ts",
-        "src/core/command/types.test.ts",
-        "src/core/command/types.ts",
-        "src/core/command/version.test.ts",
-        "src/core/command/version.ts",
-        "src/core/config/config-items.test.ts",
-        "src/core/config/config-items.ts",
-        "src/core/config/config-load.test.ts",
-        "src/core/config/config-load.ts",
-        "src/core/config/config-origins.test.ts",
-        "src/core/config/config-origins.ts",
-        "src/core/config/config-readers.test.ts",
-        "src/core/config/config-readers.ts",
-        "src/core/config/config-schema-board.test.ts",
-        "src/core/config/config-schema.ts",
-        "src/core/config/config-sections.test.ts",
-        "src/core/config/config-sections.ts",
-        "src/core/config/config.test.ts",
-        "src/core/config/config.ts",
-        "src/core/config/core-section.test.ts",
-        "src/core/config/core-section.ts",
-        "src/core/config/dangerous.test.ts",
-        "src/core/config/dangerous.ts",
-        "src/core/config/default-routing.ts",
-        "src/core/config/index.test.ts",
-        "src/core/config/index.ts",
-        "src/core/config/load.test.ts",
-        "src/core/config/load.ts",
-        "src/core/config/scope.ts",
-        "src/core/config/section.test.ts",
-        "src/core/config/section.ts",
-        "src/core/config/sections.test.ts",
-        "src/core/config/sections.ts",
-        "src/core/config/standard-schema.test.ts",
-        "src/core/config/standard-schema.ts",
-        "src/core/git/commit.test.ts",
-        "src/core/git/commit.ts",
-        "src/core/git/gh-runner.ts",
-        "src/core/git/git.test.ts",
-        "src/core/git/git.ts",
-        "src/core/git/index.test.ts",
-        "src/core/git/index.ts",
-        "src/core/loop/claude.test.ts",
-        "src/core/loop/claude.ts",
-        "src/core/loop/hop-record.test.ts",
-        "src/core/loop/hop-record.ts",
-        "src/core/loop/hops.test.ts",
-        "src/core/loop/hops.ts",
-        "src/core/loop/index.test.ts",
-        "src/core/loop/index.ts",
-        "src/core/loop/readings.test.ts",
-        "src/core/loop/readings.ts",
-        "src/core/loop/session-env.test.ts",
-        "src/core/loop/session-env.ts",
-        "src/core/loop/session-readings.ts",
-        "src/core/loop/session-record-parse.test.ts",
-        "src/core/loop/session-record-parse.ts",
-        "src/core/loop/sessions-decisions.test.ts",
-        "src/core/loop/sessions-hop.test.ts",
-        "src/core/loop/sessions-phase.test.ts",
-        "src/core/loop/sessions-steps.test.ts",
-        "src/core/loop/sessions-worktree.test.ts",
-        "src/core/loop/sessions.test.ts",
-        "src/core/loop/sessions.ts",
-        "src/core/loop/suite-failure.ts",
-        "src/core/output/active.test.ts",
-        "src/core/output/active.ts",
-        "src/core/output/index.test.ts",
-        "src/core/output/index.ts",
-        "src/core/output/stream.ts",
-        "src/core/output/text.test.ts",
-        "src/core/output/text.ts",
-        "src/core/plan/block-reader.test.ts",
-        "src/core/plan/block-reader.ts",
-        "src/core/plan/blocker-comment.test.ts",
-        "src/core/plan/blocker-comment.ts",
-        "src/core/plan/blocks.test.ts",
-        "src/core/plan/blocks.ts",
-        "src/core/plan/declaration.test.ts",
-        "src/core/plan/declaration.ts",
-        "src/core/plan/index.test.ts",
-        "src/core/plan/index.ts",
-        "src/core/plan/parse.test.ts",
-        "src/core/plan/parse.ts",
-        "src/core/plan/plan-files.ts",
-        "src/core/plan/plan-stamp.ts",
-        "src/core/plan/tracker-path.test.ts",
-        "src/core/plan/tracker-path.ts",
-        "src/core/runtime/identity.test.ts",
-        "src/core/runtime/identity.ts",
-        "src/core/runtime/index.test.ts",
-        "src/core/runtime/index.ts",
-        "src/effort/store/absences.test.ts",
-        "src/effort/store/absences.ts",
-        "src/effort/store/bring-forward.test.ts",
-        "src/effort/store/bring-forward.ts",
-        "src/effort/store/bug-routes-migration.test.ts",
-        "src/effort/store/bug-routes.test.ts",
-        "src/effort/store/bug-routes.ts",
-        "src/effort/store/changes.test.ts",
-        "src/effort/store/changes.ts",
-        "src/effort/store/check-rows.test.ts",
-        "src/effort/store/check-rows.ts",
-        "src/effort/store/commit-stats.ts",
-        "src/effort/store/contract.test.ts",
-        "src/effort/store/copy-origins.test.ts",
-        "src/effort/store/copy.test.ts",
-        "src/effort/store/copy.ts",
-        "src/effort/store/development-build.test.ts",
-        "src/effort/store/development-build.ts",
-        "src/effort/store/dispatches.test.ts",
-        "src/effort/store/dispatches.ts",
-        "src/effort/store/effort-levels.test.ts",
-        "src/effort/store/effort-levels.ts",
-        "src/effort/store/findings.test.ts",
-        "src/effort/store/findings.ts",
-        "src/effort/store/fix-schema.test.ts",
-        "src/effort/store/fix-schema.ts",
-        "src/effort/store/fixture-extract.test.ts",
-        "src/effort/store/fixture-extract.ts",
-        "src/effort/store/forward-compat.test.ts",
-        "src/effort/store/index.test.ts",
-        "src/effort/store/index.ts",
-        "src/effort/store/legacy.test.ts",
-        "src/effort/store/legacy.ts",
-        "src/effort/store/location.test.ts",
-        "src/effort/store/location.ts",
-        "src/effort/store/machine-fault.test.ts",
-        "src/effort/store/machine-fault.ts",
-        "src/effort/store/merge-commit-gaps.test.ts",
-        "src/effort/store/merge-commit-gaps.ts",
-        "src/effort/store/merge-conflicts.test.ts",
-        "src/effort/store/merge-conflicts.ts",
-        "src/effort/store/merge-rules.sweep.test.ts",
-        "src/effort/store/merge-rules.ts",
-        "src/effort/store/merge-scenarios.test.ts",
-        "src/effort/store/merge-store.test.ts",
-        "src/effort/store/merge-store.ts",
-        "src/effort/store/merge-union.test.ts",
-        "src/effort/store/merge-union.ts",
-        "src/effort/store/migrate.ts",
-        "src/effort/store/migration-shapes.ts",
-        "src/effort/store/migrations.test.ts",
-        "src/effort/store/migrations.ts",
-        "src/effort/store/move.test.ts",
-        "src/effort/store/move.ts",
-        "src/effort/store/ndjson-files.test.ts",
-        "src/effort/store/ndjson-files.ts",
-        "src/effort/store/ndjson.test.ts",
-        "src/effort/store/ndjson.ts",
-        "src/effort/store/origins.test.ts",
-        "src/effort/store/origins.ts",
-        "src/effort/store/plan-ci.test.ts",
-        "src/effort/store/plan-ci.ts",
-        "src/effort/store/plan-stubs.ts",
-        "src/effort/store/preflight-check.test.ts",
-        "src/effort/store/preflight-check.ts",
-        "src/effort/store/preflight.test.ts",
-        "src/effort/store/preflight.ts",
-        "src/effort/store/rebuild-aside.test.ts",
-        "src/effort/store/rebuild-aside.ts",
-        "src/effort/store/rebuild-identity.test.ts",
-        "src/effort/store/refusal.test.ts",
-        "src/effort/store/reports.test.ts",
-        "src/effort/store/reports.ts",
-        "src/effort/store/row-fields.test.ts",
-        "src/effort/store/schema-plan.test.ts",
-        "src/effort/store/schema-plan.ts",
-        "src/effort/store/schema-report.ts",
-        "src/effort/store/search-row.test.ts",
-        "src/effort/store/session-row-types.ts",
-        "src/effort/store/session-worktree.test.ts",
-        "src/effort/store/settings.test.ts",
-        "src/effort/store/settings.ts",
-        "src/effort/store/skill-invocations.test.ts",
-        "src/effort/store/skill-invocations.ts",
-        "src/effort/store/sqlite.test.ts",
-        "src/effort/store/sqlite.ts",
-        "src/effort/store/stale-docs-migration.test.ts",
-        "src/effort/store/stale-docs.test.ts",
-        "src/effort/store/stale-docs.ts",
-        "src/effort/store/store-generation.test.ts",
-        "src/effort/store/store-generation.ts",
-        "src/effort/store/store-identity.test.ts",
-        "src/effort/store/store-identity.ts",
-        "src/effort/store/store-lifecycle.test.ts",
-        "src/effort/store/store-meta.test.ts",
-        "src/effort/store/store-meta.ts",
-        "src/effort/store/store-replaced.test.ts",
-        "src/effort/store/store-replaced.ts",
-        "src/effort/store/store-sources.sweep.test.ts",
-        "src/effort/store/task-finishes.test.ts",
-        "src/effort/store/task-finishes.ts",
-        "src/effort/store/testdata/merge-scenarios.test.ts",
-        "src/effort/store/testdata/merge-scenarios.ts",
-        "src/effort/store/testdata/store-rows.test.ts",
-        "src/effort/store/testdata/store-rows.ts",
-        "src/effort/store/tracker-refs.test.ts",
-        "src/effort/store/tracker-refs.ts",
-        "src/effort/store/triage.test.ts",
-        "src/effort/store/triage.ts",
-        "src/effort/store/trusted-permissions.ts",
-        "src/effort/store/types.test.ts",
-        "src/effort/store/types.ts",
-        "src/effort/store/wire.test.ts",
-        "src/effort/store/wire.ts",
-        "src/ports/index.test.ts",
-        "src/ports/index.ts",
-        "src/ports/learning.ts",
-        "src/ports/log-level.ts",
-        "src/ports/spec-review.ts",
-        "src/report/parse.test.ts",
-        "src/report/parse.ts",
-        "src/report/record.test.ts",
-        "src/report/record.ts",
-        "src/schema/project-id.test.ts",
-        "src/schema/project-id.ts",
-        "src/schema/tiers.test.ts",
-        "src/schema/tiers.ts"
+        "packages/rafa/src/core/adapters/index.test.ts",
+        "packages/rafa/src/core/adapters/index.ts",
+        "packages/rafa/src/core/adapters/registry.test.ts",
+        "packages/rafa/src/core/adapters/registry.ts",
+        "packages/rafa/src/core/command/command.test.ts",
+        "packages/rafa/src/core/command/command.ts",
+        "packages/rafa/src/core/command/confirm.test.ts",
+        "packages/rafa/src/core/command/confirm.ts",
+        "packages/rafa/src/core/command/index.test.ts",
+        "packages/rafa/src/core/command/index.ts",
+        "packages/rafa/src/core/command/registry-types.ts",
+        "packages/rafa/src/core/command/running.test.ts",
+        "packages/rafa/src/core/command/running.ts",
+        "packages/rafa/src/core/command/spends.test.ts",
+        "packages/rafa/src/core/command/spends.ts",
+        "packages/rafa/src/core/command/types.test.ts",
+        "packages/rafa/src/core/command/types.ts",
+        "packages/rafa/src/core/command/version.ts",
+        "packages/rafa/src/core/config/config-items.test.ts",
+        "packages/rafa/src/core/config/config-items.ts",
+        "packages/rafa/src/core/config/config-load.ts",
+        "packages/rafa/src/core/config/config-origins.test.ts",
+        "packages/rafa/src/core/config/config-origins.ts",
+        "packages/rafa/src/core/config/config-readers.test.ts",
+        "packages/rafa/src/core/config/config-readers.ts",
+        "packages/rafa/src/core/config/config-schema.ts",
+        "packages/rafa/src/core/config/config-sections.test.ts",
+        "packages/rafa/src/core/config/config-sections.ts",
+        "packages/rafa/src/core/config/config.ts",
+        "packages/rafa/src/core/config/core-section.test.ts",
+        "packages/rafa/src/core/config/core-section.ts",
+        "packages/rafa/src/core/config/dangerous.ts",
+        "packages/rafa/src/core/config/default-routing.ts",
+        "packages/rafa/src/core/config/index.test.ts",
+        "packages/rafa/src/core/config/index.ts",
+        "packages/rafa/src/core/config/load.test.ts",
+        "packages/rafa/src/core/config/load.ts",
+        "packages/rafa/src/core/config/scope.ts",
+        "packages/rafa/src/core/config/section.ts",
+        "packages/rafa/src/core/config/sections.test.ts",
+        "packages/rafa/src/core/config/sections.ts",
+        "packages/rafa/src/core/config/standard-schema.test.ts",
+        "packages/rafa/src/core/config/standard-schema.ts",
+        "packages/rafa/src/core/git/commit.test.ts",
+        "packages/rafa/src/core/git/commit.ts",
+        "packages/rafa/src/core/git/gh-runner.ts",
+        "packages/rafa/src/core/git/git.test.ts",
+        "packages/rafa/src/core/git/git.ts",
+        "packages/rafa/src/core/git/index.test.ts",
+        "packages/rafa/src/core/git/index.ts",
+        "packages/rafa/src/core/loop/claude.ts",
+        "packages/rafa/src/core/loop/hop-record.test.ts",
+        "packages/rafa/src/core/loop/hop-record.ts",
+        "packages/rafa/src/core/loop/hops.test.ts",
+        "packages/rafa/src/core/loop/hops.ts",
+        "packages/rafa/src/core/loop/index.test.ts",
+        "packages/rafa/src/core/loop/index.ts",
+        "packages/rafa/src/core/loop/readings.test.ts",
+        "packages/rafa/src/core/loop/readings.ts",
+        "packages/rafa/src/core/loop/session-env.test.ts",
+        "packages/rafa/src/core/loop/session-env.ts",
+        "packages/rafa/src/core/loop/session-readings.ts",
+        "packages/rafa/src/core/loop/session-record-parse.test.ts",
+        "packages/rafa/src/core/loop/session-record-parse.ts",
+        "packages/rafa/src/core/loop/sessions-decisions.test.ts",
+        "packages/rafa/src/core/loop/sessions-phase.test.ts",
+        "packages/rafa/src/core/loop/sessions-steps.test.ts",
+        "packages/rafa/src/core/loop/sessions-worktree.test.ts",
+        "packages/rafa/src/core/loop/sessions.test.ts",
+        "packages/rafa/src/core/loop/sessions.ts",
+        "packages/rafa/src/core/loop/suite-failure.ts",
+        "packages/rafa/src/core/output/active.ts",
+        "packages/rafa/src/core/output/index.ts",
+        "packages/rafa/src/core/output/stream.ts",
+        "packages/rafa/src/core/output/text.test.ts",
+        "packages/rafa/src/core/output/text.ts",
+        "packages/rafa/src/core/plan/block-reader.test.ts",
+        "packages/rafa/src/core/plan/block-reader.ts",
+        "packages/rafa/src/core/plan/blocker-comment.test.ts",
+        "packages/rafa/src/core/plan/blocker-comment.ts",
+        "packages/rafa/src/core/plan/blocks.test.ts",
+        "packages/rafa/src/core/plan/blocks.ts",
+        "packages/rafa/src/core/plan/declaration.test.ts",
+        "packages/rafa/src/core/plan/declaration.ts",
+        "packages/rafa/src/core/plan/index.test.ts",
+        "packages/rafa/src/core/plan/index.ts",
+        "packages/rafa/src/core/plan/parse.ts",
+        "packages/rafa/src/core/plan/plan-files.ts",
+        "packages/rafa/src/core/plan/plan-stamp.ts",
+        "packages/rafa/src/core/plan/tracker-path.test.ts",
+        "packages/rafa/src/core/plan/tracker-path.ts",
+        "packages/rafa/src/core/runtime/identity.ts",
+        "packages/rafa/src/core/runtime/index.test.ts",
+        "packages/rafa/src/core/runtime/index.ts",
+        "packages/rafa/src/effort/store/absences.test.ts",
+        "packages/rafa/src/effort/store/absences.ts",
+        "packages/rafa/src/effort/store/bring-forward.test.ts",
+        "packages/rafa/src/effort/store/bring-forward.ts",
+        "packages/rafa/src/effort/store/bug-routes-migration.test.ts",
+        "packages/rafa/src/effort/store/bug-routes.test.ts",
+        "packages/rafa/src/effort/store/bug-routes.ts",
+        "packages/rafa/src/effort/store/changes.ts",
+        "packages/rafa/src/effort/store/check-rows.test.ts",
+        "packages/rafa/src/effort/store/check-rows.ts",
+        "packages/rafa/src/effort/store/commit-stats.ts",
+        "packages/rafa/src/effort/store/contract.test.ts",
+        "packages/rafa/src/effort/store/copy-origins.test.ts",
+        "packages/rafa/src/effort/store/copy.test.ts",
+        "packages/rafa/src/effort/store/copy.ts",
+        "packages/rafa/src/effort/store/development-build.test.ts",
+        "packages/rafa/src/effort/store/development-build.ts",
+        "packages/rafa/src/effort/store/dispatches.test.ts",
+        "packages/rafa/src/effort/store/dispatches.ts",
+        "packages/rafa/src/effort/store/effort-levels.test.ts",
+        "packages/rafa/src/effort/store/effort-levels.ts",
+        "packages/rafa/src/effort/store/findings.test.ts",
+        "packages/rafa/src/effort/store/findings.ts",
+        "packages/rafa/src/effort/store/fix-schema.test.ts",
+        "packages/rafa/src/effort/store/fix-schema.ts",
+        "packages/rafa/src/effort/store/fixture-extract.ts",
+        "packages/rafa/src/effort/store/index.ts",
+        "packages/rafa/src/effort/store/legacy.test.ts",
+        "packages/rafa/src/effort/store/legacy.ts",
+        "packages/rafa/src/effort/store/location.ts",
+        "packages/rafa/src/effort/store/machine-fault.test.ts",
+        "packages/rafa/src/effort/store/machine-fault.ts",
+        "packages/rafa/src/effort/store/merge-commit-gaps.ts",
+        "packages/rafa/src/effort/store/merge-conflicts.test.ts",
+        "packages/rafa/src/effort/store/merge-conflicts.ts",
+        "packages/rafa/src/effort/store/merge-rules.ts",
+        "packages/rafa/src/effort/store/merge-scenarios.test.ts",
+        "packages/rafa/src/effort/store/merge-store.test.ts",
+        "packages/rafa/src/effort/store/merge-store.ts",
+        "packages/rafa/src/effort/store/merge-union.test.ts",
+        "packages/rafa/src/effort/store/merge-union.ts",
+        "packages/rafa/src/effort/store/migrate.ts",
+        "packages/rafa/src/effort/store/migration-shapes.ts",
+        "packages/rafa/src/effort/store/migrations.ts",
+        "packages/rafa/src/effort/store/move.ts",
+        "packages/rafa/src/effort/store/ndjson-files.test.ts",
+        "packages/rafa/src/effort/store/ndjson-files.ts",
+        "packages/rafa/src/effort/store/ndjson.test.ts",
+        "packages/rafa/src/effort/store/ndjson.ts",
+        "packages/rafa/src/effort/store/origins.ts",
+        "packages/rafa/src/effort/store/plan-ci.test.ts",
+        "packages/rafa/src/effort/store/plan-ci.ts",
+        "packages/rafa/src/effort/store/plan-stubs.ts",
+        "packages/rafa/src/effort/store/preflight-check.test.ts",
+        "packages/rafa/src/effort/store/preflight-check.ts",
+        "packages/rafa/src/effort/store/preflight.ts",
+        "packages/rafa/src/effort/store/rebuild-aside.test.ts",
+        "packages/rafa/src/effort/store/rebuild-aside.ts",
+        "packages/rafa/src/effort/store/rebuild-identity.test.ts",
+        "packages/rafa/src/effort/store/refusal.test.ts",
+        "packages/rafa/src/effort/store/reports.test.ts",
+        "packages/rafa/src/effort/store/reports.ts",
+        "packages/rafa/src/effort/store/row-fields.test.ts",
+        "packages/rafa/src/effort/store/schema-plan.test.ts",
+        "packages/rafa/src/effort/store/schema-plan.ts",
+        "packages/rafa/src/effort/store/schema-report.ts",
+        "packages/rafa/src/effort/store/session-row-types.ts",
+        "packages/rafa/src/effort/store/session-worktree.test.ts",
+        "packages/rafa/src/effort/store/settings.ts",
+        "packages/rafa/src/effort/store/skill-invocations.test.ts",
+        "packages/rafa/src/effort/store/skill-invocations.ts",
+        "packages/rafa/src/effort/store/sqlite.test.ts",
+        "packages/rafa/src/effort/store/sqlite.ts",
+        "packages/rafa/src/effort/store/stale-docs-migration.test.ts",
+        "packages/rafa/src/effort/store/stale-docs.ts",
+        "packages/rafa/src/effort/store/store-generation.test.ts",
+        "packages/rafa/src/effort/store/store-generation.ts",
+        "packages/rafa/src/effort/store/store-identity.test.ts",
+        "packages/rafa/src/effort/store/store-identity.ts",
+        "packages/rafa/src/effort/store/store-lifecycle.test.ts",
+        "packages/rafa/src/effort/store/store-meta.test.ts",
+        "packages/rafa/src/effort/store/store-meta.ts",
+        "packages/rafa/src/effort/store/store-replaced.test.ts",
+        "packages/rafa/src/effort/store/store-replaced.ts",
+        "packages/rafa/src/effort/store/task-finishes.test.ts",
+        "packages/rafa/src/effort/store/task-finishes.ts",
+        "packages/rafa/src/effort/store/testdata/merge-scenarios.test.ts",
+        "packages/rafa/src/effort/store/testdata/merge-scenarios.ts",
+        "packages/rafa/src/effort/store/testdata/store-rows.test.ts",
+        "packages/rafa/src/effort/store/testdata/store-rows.ts",
+        "packages/rafa/src/effort/store/tracker-refs.ts",
+        "packages/rafa/src/effort/store/triage.test.ts",
+        "packages/rafa/src/effort/store/triage.ts",
+        "packages/rafa/src/effort/store/trusted-permissions.ts",
+        "packages/rafa/src/effort/store/types.test.ts",
+        "packages/rafa/src/effort/store/types.ts",
+        "packages/rafa/src/effort/store/wire.test.ts",
+        "packages/rafa/src/effort/store/wire.ts",
+        "packages/rafa/src/ports/index.ts",
+        "packages/rafa/src/ports/learning.ts",
+        "packages/rafa/src/ports/log-level.ts",
+        "packages/rafa/src/ports/spec-review.ts",
+        "packages/rafa/src/report/parse.ts",
+        "packages/rafa/src/report/record.test.ts",
+        "packages/rafa/src/report/record.ts",
+        "packages/rafa/src/schema/project-id.ts",
+        "packages/rafa/src/schema/tiers.test.ts",
+        "packages/rafa/src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 106,
-        "src/effort/store/": 114,
-        "src/ports/": 5
+        "packages/rafa/": 202
       },
       "folders": [
-        "src/core/",
-        "src/effort/store/",
-        "src/ports/"
+        "packages/rafa/"
       ],
       "name": "@open-tomato/rafa",
-      "named": [
-        "src/report/parse.ts",
-        "src/report/record.ts",
-        "src/schema/project-id.ts",
-        "src/schema/tiers.ts"
-      ],
+      "named": [],
       "rank": 1,
       "remaining": 0,
       "upwardEdges": 0
@@ -3895,13 +3960,6 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/agents/roster.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "type",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -4202,8 +4260,8 @@
       "name": "rafa-inventory",
       "named": [],
       "rank": 2,
-      "remaining": 26,
-      "upwardEdges": 26
+      "remaining": 25,
+      "upwardEdges": 25
     },
     {
       "clearedByIssue118": 0,
@@ -5256,13 +5314,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/pr/plans/budget.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
@@ -5340,13 +5391,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/triage/base-run.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/utils/session-env.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
@@ -5365,13 +5409,6 @@
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/triage/leftover-repair.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -5397,7 +5434,7 @@
         }
       ],
       "fileCounts": {
-        "source": 76,
+        "source": 75,
         "test": 99,
         "testSupport": 2
       },
@@ -5558,7 +5595,6 @@
         "src/triage/leftover-repair.ts",
         "src/triage/local-paths.test.ts",
         "src/triage/local-paths.ts",
-        "src/triage/machine-fault.ts",
         "src/triage/own-check.integration.test.ts",
         "src/triage/own-check.test.ts",
         "src/triage/own-check.ts",
@@ -5583,7 +5619,7 @@
       "filesByFolder": {
         "src/commands/pr/": 73,
         "src/pr/": 65,
-        "src/triage/": 37
+        "src/triage/": 36
       },
       "folders": [
         "src/commands/pr/",
@@ -5595,8 +5631,8 @@
         "src/pr/index.ts"
       ],
       "rank": 4,
-      "remaining": 48,
-      "upwardEdges": 48
+      "remaining": 45,
+      "upwardEdges": 45
     },
     {
       "clearedByIssue118": 0,
@@ -5627,20 +5663,6 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/preflight/first-dispatch.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/budget.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -5675,13 +5697,6 @@
           "from": "src/start/commit.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/commit.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
           "to": "src/utils/tracker.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -5694,13 +5709,6 @@
         },
         {
           "from": "src/start/continue-run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/convention-body.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
@@ -5752,20 +5760,13 @@
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/dispatch.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
           "to": "src/utils/progress.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
-          "kind": "value",
+          "kind": "type",
           "to": "src/utils/tracker.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -5784,31 +5785,10 @@
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
-          "from": "src/start/doc-task.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/follow-ups.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/start/handout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/handout.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -5850,21 +5830,7 @@
           "from": "src/start/loop-events.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/loop-events.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/pass-over.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -5886,13 +5852,6 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/git.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/preflight-claim.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/plan-stamp.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -6066,13 +6025,6 @@
         {
           "from": "src/start/session.ts",
           "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/session.ts",
-          "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
           "toPackage": "@open-tomato/rafa-cli"
@@ -6127,20 +6079,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/start/stale-docs.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/stamp.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/plan-stamp.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/start/suite-blocker.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
@@ -6157,22 +6095,8 @@
         {
           "from": "src/start/suite-step.ts",
           "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/utils/declaration.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/suite-step.ts",
-          "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/start/suite-steps-run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
         {
@@ -6236,20 +6160,6 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/git.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/suite/run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/utils/session-env.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/suite/scope.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/utils/declaration.ts",
           "toPackage": "@open-tomato/rafa-cli"
         }
       ],
@@ -6500,8 +6410,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 5,
-      "remaining": 93,
-      "upwardEdges": 93
+      "remaining": 75,
+      "upwardEdges": 75
     },
     {
       "clearedByIssue118": 0,
@@ -6668,13 +6578,6 @@
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/effort/attribution.ts",
-          "fromPackage": "rafa-effort",
-          "kind": "value",
-          "to": "src/utils/plan-stamp.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
           "from": "src/effort/collect.ts",
           "fromPackage": "rafa-effort",
           "kind": "value",
@@ -6765,7 +6668,7 @@
         "src/effort/skill-signals.ts",
         "src/effort/skill-use.test.ts",
         "src/effort/skill-use.ts",
-        "src/effort/store.ts",
+        "src/effort/store/index.ts",
         "src/effort/sync/contact.test.ts",
         "src/effort/sync/contact.ts",
         "src/effort/sync/doctor-reading.test.ts",
@@ -6791,8 +6694,8 @@
         "src/schema/frontmatter.ts"
       ],
       "rank": 7,
-      "remaining": 5,
-      "upwardEdges": 5
+      "remaining": 4,
+      "upwardEdges": 4
     },
     {
       "clearedByIssue118": 0,
@@ -6883,8 +6786,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 264,
-        "test": 468,
+        "source": 255,
+        "test": 495,
         "testSupport": 27
       },
       "files": [
@@ -6910,8 +6813,6 @@
         "src/adapters/output/events.ts",
         "src/adapters/output/json.test.ts",
         "src/adapters/output/json.ts",
-        "src/adapters/output/stream.ts",
-        "src/adapters/output/text.ts",
         "src/adapters/planner/claude.test.ts",
         "src/adapters/planner/claude.ts",
         "src/bugs/closest.test.ts",
@@ -6951,7 +6852,6 @@
         "src/cli/core/assembleContext.ts",
         "src/cli/core/parseArgs.test.ts",
         "src/cli/core/parseArgs.ts",
-        "src/cli/core/types.ts",
         "src/cli/describe.test.ts",
         "src/cli/describe.ts",
         "src/cli/dispatch-hook.test.ts",
@@ -6978,9 +6878,7 @@
         "src/cli/registry.ts",
         "src/cli/route.test.ts",
         "src/cli/route.ts",
-        "src/cli/running.ts",
         "src/cli/spends-roster.test.ts",
-        "src/cli/spends.ts",
         "src/commands/agent/list.test.ts",
         "src/commands/agent/list.ts",
         "src/commands/agent/search.ts",
@@ -7262,7 +7160,6 @@
         "src/loop/blocked-tasks.ts",
         "src/loop/events-file.test.ts",
         "src/loop/events-file.ts",
-        "src/loop/session-record-parse.ts",
         "src/loop/wait-reasons.test.ts",
         "src/loop/wait-reasons.ts",
         "src/modules/load.test.ts",
@@ -7352,6 +7249,7 @@
         "src/plan/store-rules.test.ts",
         "src/plan/store-rules.ts",
         "src/plan/validate.ts",
+        "src/ports/index.ts",
         "src/project/bin-path.test.ts",
         "src/project/bin-path.ts",
         "src/project/gitignore.test.ts",
@@ -7382,7 +7280,6 @@
         "src/rafa.ts",
         "src/report/lessons.test.ts",
         "src/report/lessons.ts",
-        "src/runtime/identity.ts",
         "src/runtime/install.test.ts",
         "src/runtime/install.ts",
         "src/runtime/live-loops.test.ts",
@@ -7432,7 +7329,6 @@
         "src/tests/cli-capture.ts",
         "src/tests/cli-surface.test.ts",
         "src/tests/command-output.test.ts",
-        "src/tests/command-reexports.test.ts",
         "src/tests/commands-direction.sweep.test.ts",
         "src/tests/commit-refusals.test.ts",
         "src/tests/config-code-spawned.test.ts",
@@ -7442,8 +7338,38 @@
         "src/tests/core-barrel-load-spawned.test.ts",
         "src/tests/core-barrels.sweep.test.ts",
         "src/tests/core-config-sections.sweep.test.ts",
-        "src/tests/core-reexport-bindings.test.ts",
-        "src/tests/core-reexports.test.ts",
+        "src/tests/core-coupled/core/command/version.test.ts",
+        "src/tests/core-coupled/core/config/config-load.test.ts",
+        "src/tests/core-coupled/core/config/config-schema-board.test.ts",
+        "src/tests/core-coupled/core/config/config.test.ts",
+        "src/tests/core-coupled/core/config/dangerous.test.ts",
+        "src/tests/core-coupled/core/config/section.test.ts",
+        "src/tests/core-coupled/core/loop/claude.test.ts",
+        "src/tests/core-coupled/core/loop/sessions-hop.test.ts",
+        "src/tests/core-coupled/core/output/active.test.ts",
+        "src/tests/core-coupled/core/output/index.test.ts",
+        "src/tests/core-coupled/core/plan/parse.test.ts",
+        "src/tests/core-coupled/core/runtime/identity.test.ts",
+        "src/tests/core-coupled/effort/store/changes.test.ts",
+        "src/tests/core-coupled/effort/store/fixture-extract.test.ts",
+        "src/tests/core-coupled/effort/store/forward-compat.test.ts",
+        "src/tests/core-coupled/effort/store/index.test.ts",
+        "src/tests/core-coupled/effort/store/location.test.ts",
+        "src/tests/core-coupled/effort/store/merge-commit-gaps.test.ts",
+        "src/tests/core-coupled/effort/store/merge-rules.sweep.test.ts",
+        "src/tests/core-coupled/effort/store/migrations.test.ts",
+        "src/tests/core-coupled/effort/store/move.test.ts",
+        "src/tests/core-coupled/effort/store/origins.test.ts",
+        "src/tests/core-coupled/effort/store/preflight.test.ts",
+        "src/tests/core-coupled/effort/store/search-row.test.ts",
+        "src/tests/core-coupled/effort/store/settings.test.ts",
+        "src/tests/core-coupled/effort/store/stale-docs.test.ts",
+        "src/tests/core-coupled/effort/store/store-sources.sweep.test.ts",
+        "src/tests/core-coupled/effort/store/tracker-refs.test.ts",
+        "src/tests/core-coupled/ports/index.test.ts",
+        "src/tests/core-coupled/report/parse.test.ts",
+        "src/tests/core-coupled/schema/project-id.test.ts",
+        "src/tests/core-package.sweep.test.ts",
         "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
         "src/tests/declaration-flags.test.ts",
@@ -7503,7 +7429,6 @@
         "src/tests/loop-events-file-integration.test.ts",
         "src/tests/loop-events-output.test.ts",
         "src/tests/loop-output.test.ts",
-        "src/tests/loop-reexports.test.ts",
         "src/tests/loop-scratch.ts",
         "src/tests/loop-session-fixtures.ts",
         "src/tests/loop-sessions.test.ts",
@@ -7546,7 +7471,6 @@
         "src/tests/plan-format-source.test.ts",
         "src/tests/plan-injection.test.ts",
         "src/tests/plan-needs.test.ts",
-        "src/tests/plan-reexport-bindings.test.ts",
         "src/tests/plan-risk.test.ts",
         "src/tests/plan-stamp.test.ts",
         "src/tests/plan-worktree-integration.test.ts",
@@ -7636,20 +7560,17 @@
         "src/utils/agent-definition.ts",
         "src/utils/agent-shell.test.ts",
         "src/utils/agent-shell.ts",
-        "src/utils/declaration.ts",
         "src/utils/git.test.ts",
         "src/utils/git.ts",
-        "src/utils/plan-stamp.ts",
         "src/utils/progress.test.ts",
         "src/utils/progress.ts",
         "src/utils/schedule.ts",
-        "src/utils/session-env.ts",
         "src/utils/tracker-open-tasks.test.ts",
         "src/utils/tracker.test.ts",
         "src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 34
+        "src/cli/": 31
       },
       "folders": [
         "src/cli/"
@@ -7667,12 +7588,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2007,
-    "leftToPlace": 720,
-    "nonTestEdges": 4452,
+    "files": 1993,
+    "leftToPlace": 741,
+    "nonTestEdges": 4422,
     "unassignedFiles": 28,
-    "unrankedEdges": 78,
-    "upwardEdges": 252
+    "unrankedEdges": 77,
+    "upwardEdges": 229
   },
   "unassigned": [
     {
@@ -7744,7 +7665,6 @@
       },
       "importsFrom": {
         "@open-tomato/rafa": 10,
-        "@open-tomato/rafa-cli": 1,
         "rafa-board": 1,
         "rafa-pr": 1,
         "rafa-release": 1,

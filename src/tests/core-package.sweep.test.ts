@@ -15,19 +15,33 @@
  * `@open-tomato/rafa/` specifier inside core fails even when it would
  * land inside.
  *
+ * One import inside core lands outside it on purpose:
+ * `core/command/version.ts` reads the `version` of the root
+ * `package.json`, the manifest `release.versionFile` bumps, until #808
+ * publishes core under rafa's name ({@link ROOT_MANIFEST_READ}). The
+ * half sets it aside by its importer, specifier and landing, and fails
+ * when it is gone, so the exception cannot outlive the read.
+ *
  * Both read the files `git add -A` would commit, as the barrels sweep
  * does, and print their counts at load time so an empty read cannot pass.
  * A planted tree holds a control for each failure.
+ *
+ * A third case holds the two names' maps to the same files: each entry
+ * of the `paths` map of `tsconfig.packages.json` names one existing
+ * target under `CORE_SOURCE`, and each `exports` key of core's manifest,
+ * `packages/rafa/package.json`, resolves through that map to the file
+ * its `exports` target names.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test';
+import ts from 'typescript';
 
 import { isCodeFile } from '../../scripts/survey/core-barrels.js';
-import { CORE_FOLDERS, CORE_SOURCE, isCoreFile } from '../../scripts/survey/core-moves.js';
+import { barrelPaths, CORE_FOLDER, CORE_FOLDERS, CORE_PACKAGE, CORE_SOURCE, isCoreFile } from '../../scripts/survey/core-moves.js';
 import { bunResolver, textImports } from '../../scripts/survey/import-graph.js';
 
 import { SWEEP_TIMEOUT } from './sweep-timeout.js';
@@ -38,6 +52,12 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** The prefix of a specifier that names core by its package. */
 const PACKAGE_PREFIX = '@open-tomato/rafa/';
+
+/** The file holding the `paths` map every `tsconfig.json` of the repository extends. */
+const PATHS_FILE = 'tsconfig.packages.json';
+
+/** Core's own manifest. */
+const CORE_MANIFEST = `${CORE_PACKAGE}package.json`;
 
 /** One specifier that breaks the rule, with where it landed. */
 interface Violation {
@@ -168,12 +188,53 @@ console.log(
 
 /**
  * Whether core is its workspace package yet. Until the move, core's folders
- * hold colocated tests that import files above core, and two files that
- * read the root `package.json`; the codemod parks the tests and the move
- * task rewrites the rest, so the inside half has nothing to hold before it.
- * It switches itself on with `CORE_FOLDERS` naming `CORE_SOURCE`.
+ * held colocated tests that import files above core, and two files that
+ * read the root `package.json`; the codemod parked the tests and the move
+ * task rewrote the name read, so the inside half had nothing to hold
+ * before it. It switches itself on with `CORE_FOLDERS` naming `CORE_SOURCE`.
  */
 const coreIsPackage = CORE_FOLDERS.includes(CORE_SOURCE);
+
+/**
+ * The one import inside core that lands outside it on purpose: the
+ * version `rafa --version` answers is the root manifest's, the one
+ * `release.versionFile` bumps, and not that of core's manifest beside it,
+ * until #808 publishes core under rafa's name and its manifest carries the
+ * version.
+ */
+const ROOT_MANIFEST_READ: Violation = {
+  from: `${CORE_FOLDER}command/version.ts`,
+  landed: 'package.json',
+  specifier: '../../../../../package.json',
+};
+
+/**
+ * Whether a violation is {@link ROOT_MANIFEST_READ}.
+ *
+ * @param violation - A violation of the inside half.
+ * @returns `true` for that read alone.
+ */
+function isRootManifestRead(violation: Violation): boolean {
+  return violation.from === ROOT_MANIFEST_READ.from
+    && violation.specifier === ROOT_MANIFEST_READ.specifier
+    && violation.landed === ROOT_MANIFEST_READ.landed;
+}
+
+/**
+ * Reads a JSON file of the repository, comments and trailing commas
+ * allowed, as `tsc` reads a `tsconfig.json`.
+ *
+ * @param path - A repository-relative path.
+ * @returns What it holds.
+ * @throws When it is not JSON of that kind.
+ */
+function readJsonc(path: string): unknown {
+  const read = ts.parseConfigFileTextToJson(path, readFileSync(join(REPO_ROOT, path), 'utf8'));
+  if (read.error !== undefined) {
+    throw new Error(`${path} is not JSON: ${ts.flattenDiagnosticMessageText(read.error.messageText, '\n')}`);
+  }
+  return read.config;
+}
 
 const planted: string[] = [];
 
@@ -227,8 +288,74 @@ describe('the core-package sweep', () => {
       expect(live.insideRead).toBeGreaterThan(0);
       return;
     }
-    const lines = live.insideViolations.map((violation) => violationLine(violation));
+    // The set-aside read is still there: an exception with no read to cover is stale.
+    expect(live.insideViolations.filter(isRootManifestRead)).toEqual([ROOT_MANIFEST_READ]);
+    const lines = live.insideViolations
+      .filter((violation) => !isRootManifestRead(violation))
+      .map((violation) => violationLine(violation));
     expect(lines, `specifier(s) inside core that break the rule:\n${lines.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('the paths map and core\'s manifest', () => {
+  const paths = (readJsonc(PATHS_FILE) as { compilerOptions: { paths: Record<string, readonly string[]> } })
+    .compilerOptions.paths;
+  const manifest = readJsonc(CORE_MANIFEST) as { exports: Record<string, string> };
+  const resolve = bunResolver(REPO_ROOT);
+
+  /** Where a specifier of the package name lands, read from a root file as the root's code reads it. */
+  const landing = (specifier: string): string | undefined => resolve(specifier, 'src/index.ts');
+
+  it('maps each paths entry to one existing target under the package source', () => {
+    const entries = Object.entries(paths);
+    expect(entries.map(([key]) => key)).toEqual([
+      `${PACKAGE_PREFIX}store`,
+      `${PACKAGE_PREFIX}ports`,
+      `${PACKAGE_PREFIX}store/*`,
+      `${PACKAGE_PREFIX}*`,
+    ]);
+    for (const [key, targets] of entries) {
+      expect([key, targets.length]).toEqual([key, 1]);
+      const target = posix.normalize(targets[0] ?? '');
+      expect([key, target.startsWith(CORE_SOURCE)]).toEqual([key, true]);
+      const exists = key.endsWith('*')
+        ? target.endsWith('/*') && statSync(join(REPO_ROOT, target.slice(0, -1))).isDirectory()
+        : existsSync(join(REPO_ROOT, target));
+      expect([key, exists]).toEqual([key, true]);
+    }
+  });
+
+  it('resolves each exports key of core\'s manifest to the file its exports target names', () => {
+    let held = 0;
+    for (const [key, target] of Object.entries(manifest.exports)) {
+      const subpath = key.slice('./'.length);
+      if (!subpath.endsWith('/*')) {
+        held += 1;
+        expect([key, landing(`${PACKAGE_PREFIX}${subpath}`)]).toEqual([key, posix.join(CORE_PACKAGE, target)]);
+        continue;
+      }
+      const folder = posix.join(CORE_PACKAGE, posix.dirname(target));
+      const stems = readdirSync(join(REPO_ROOT, folder))
+        .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+        .map((name) => name.slice(0, -'.ts'.length));
+      expect([key, stems.length > 0]).toEqual([key, true]);
+      for (const stem of stems) {
+        held += 1;
+        const specifier = `${PACKAGE_PREFIX}${subpath.slice(0, -1)}${stem}`;
+        expect([specifier, landing(specifier)]).toEqual([specifier, posix.join(CORE_PACKAGE, target.replace('*', stem))]);
+      }
+    }
+    console.log(`core-package: held ${held} subpath(s) of ${CORE_MANIFEST} to the ${PATHS_FILE} map`);
+    expect(held).toBeGreaterThan(Object.keys(manifest.exports).length);
+  });
+
+  it('exports every core barrel, and lands a subpath core does not export on no file, the control', () => {
+    const targets = new Set(Object.values(manifest.exports).map((target) => posix.join(CORE_PACKAGE, target)));
+    for (const barrel of barrelPaths()) {
+      expect([barrel, targets.has(barrel)]).toEqual([barrel, true]);
+    }
+    expect(landing(`${PACKAGE_PREFIX}core/absent`)).toBeUndefined();
+    expect(landing(`${PACKAGE_PREFIX}store/absent`)).toBeUndefined();
   });
 });
 

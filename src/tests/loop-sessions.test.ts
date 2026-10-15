@@ -58,7 +58,7 @@
  */
 import type { SessionStatus } from '../commands/loop/status.js';
 import type { StopResult } from '../commands/loop/stop.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -78,8 +78,9 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../core/loop/index.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';

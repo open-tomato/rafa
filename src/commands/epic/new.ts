@@ -134,10 +134,13 @@ import type { ChecklistEditResult } from '../../board/epic-checklist.js';
 import type { CreatedIssue, IssueBoard } from '../../board/issue-board.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { LineFlags } from '../issue/issue-tracker.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { appendLine, editChecklist } from '../../board/epic-checklist.js';
@@ -151,8 +154,6 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { LABEL_LIST_LIMIT, listBoardLabels } from '../../board/setup.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 

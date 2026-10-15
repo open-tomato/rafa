@@ -35,11 +35,11 @@
  * distinguishes which of two equals won.
  */
 import type { ReleaseLevelNote } from './level.js';
-import type { PlanChange } from '../effort/store/changes.js';
+import type { PlanChange } from '@open-tomato/rafa/store/changes';
 
 import { describe, expect, it } from 'bun:test';
 
-import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
+import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
 
 import { RELEASE_LEVEL_RANK, highestChangeLevel, releaseLevelReport, resolveReleaseLevel } from './level.js';
 

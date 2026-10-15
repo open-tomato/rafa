@@ -47,12 +47,13 @@
  */
 import type { DescribedAction, DescribeDocument } from './describe.js';
 import type { CommandRegistry } from './registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
+
 import { CORE_REGISTRY } from '../commands/index.js';
-import { commandSpelling, isTopLevel } from '../core/command/index.js';
 
 import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from './describe.js';
 import { createCommandRegistry, mountKey } from './registry.js';

@@ -2,7 +2,7 @@
  * Tests for the merged loop's new pieces: --start-at time math,
  * plan-prompt templating, and where the plan format the prompt inlines
  * is read from. The per-plan tracker derivation, `trackerPathFor`, is
- * held by `src/core/plan/tracker-path.test.ts`.
+ * held by `packages/rafa/src/core/plan/tracker-path.test.ts`.
  *
  * Every file a `readPlanFormat` case plants sits under this file's own
  * temporary directory. The one case reading outside it reads this
@@ -29,7 +29,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import {
   buildPlanPrompt,
   formatProgressSection,

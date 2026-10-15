@@ -75,12 +75,12 @@ interface SplitModule {
  * "most-imported readers" and "remaining modules" stages.
  *
  * The library half of `src/commands/loop/loop-sessions.ts` is
- * `src/core/loop/session-readings.ts`, and its row names the barrel over
- * it, `src/core/loop/readings.ts`. A file outside `src/core/` imports the
+ * `packages/rafa/src/core/loop/session-readings.ts`, and its row names the barrel over
+ * it, `packages/rafa/src/core/loop/readings.ts`. A file outside `packages/rafa/src/core/` imports the
  * barrel and nothing deeper, so the barrel is what an `export … from` of
  * that half resolves to, and a row naming the file behind it would hold
  * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
- * half is `src/core/plan/plan-files.ts` behind `src/core/plan/index.ts`.
+ * half is `packages/rafa/src/core/plan/plan-files.ts` behind `packages/rafa/src/core/plan/index.ts`.
  * Both barrels are spelled under the subject folders of
  * `scripts/survey/core-moves.ts`, so the rows follow core when it moves.
  */

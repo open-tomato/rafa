@@ -30,7 +30,7 @@
  * does an empty message. A fenced line is a quote (a log, a code sample)
  * rather than what the session said it was doing, so it answers nothing.
  */
-import { parseReport } from '../report/parse.js';
+import { parseReport } from '@open-tomato/rafa/report/parse';
 
 /** The longest stretch of the waiting line a hold quotes. */
 const WAIT_LINE_CAP = 200;

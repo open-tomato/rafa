@@ -38,7 +38,7 @@
  * the {@link PrRetargetResult} is the data of the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { retargetedLine } from '../../start/pr-retarget.js';
 import { readRequiredFlag } from '../issue/issue-tracker.js';

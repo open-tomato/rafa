@@ -1,5 +1,5 @@
 import type { PhaseReporterOptions } from './progress.js';
-import type { CliEvent } from '../../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { describe, expect, test } from 'bun:test';
 

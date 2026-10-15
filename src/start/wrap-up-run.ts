@@ -114,15 +114,16 @@ import type { RunSession } from './session.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js';
 import type { PullRequestSummary } from '../pr/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 

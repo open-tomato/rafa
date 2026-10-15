@@ -35,8 +35,8 @@
  * frozen, the refusal naming the last failure only, and a rejecting
  * preflight's reason left unprefixed.
  */
-import type { AnyAdapter } from '../../core/adapters/index.js';
-import type { PreflightResult, Tracker } from '../../ports/index.js';
+import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { PreflightResult, Tracker } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -46,8 +46,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry } from '../../core/adapters/index.js';
-import { createTextOutput, setActiveOutput } from '../../core/output/index.js';
+import { createAdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../logger/settings.js';
 
 import { draftFixture } from './contract.js';

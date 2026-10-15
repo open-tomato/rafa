@@ -12,9 +12,9 @@
  * drives the same function through the follow-ups it decides.
  */
 import type { SettleWaitingPlace } from './settle-waiting.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Fragment } from '../release/fragment.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { serializeFragment } from '../release/fragment.js';
 
 import { SETTLE_REMOTE, settleWaitingOn } from './settle-waiting.js';

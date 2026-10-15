@@ -76,7 +76,7 @@
 import type { ProgressFeed } from './progress.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 
-import { isMapping } from '../../core/config/sections.js';
+import { isMapping } from '@open-tomato/rafa/core/config/sections';
 
 import {
   graphqlArgs,

@@ -1,6 +1,5 @@
 import fs from 'fs';
 
-import { readRafaBlocks } from '../core/plan/block-reader.js';
 import {
   BLOCKER_GAP,
   blockerComment,
@@ -8,24 +7,8 @@ import {
   keptRepairs,
   repairsComment,
   splitTrailingComments,
-} from '../core/plan/index.js';
-
-/*
- * The blocker-comment family and `trackerPathFor` moved to
- * `src/core/plan/blocker-comment.ts` and `src/core/plan/tracker-path.ts`.
- * They are re-exported here under the same names for the importers
- * outside core; the third step of core's move into its package (#1090)
- * removes the re-export.
- */
-export type { BlockerSplit } from '../core/plan/index.js';
-export {
-  blockerComment,
-  escapeBlockerText,
-  repairsComment,
-  splitBlockerComment,
-  trackerPathFor,
-  unescapeBlockerText,
-} from '../core/plan/index.js';
+} from '@open-tomato/rafa/core/plan';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 export interface TaskInfo {
   task: string;
@@ -149,7 +132,7 @@ const NO_LINES: ReadonlySet<number> = new Set();
  * operator log, the commit subject and the commit body — quotes the text
  * this function answers, so this is where the declaration strip rule
  * reaches `rafa:*` blocks. A declaration sits ON a task line, and each
- * quoting site takes it off (`utils/declaration.ts`). A block sits AROUND
+ * quoting site takes it off (`core/plan/declaration.ts`). A block sits AROUND
  * lines, and only a reader holding the whole document can tell that a
  * line is its body. Without this rule a `- [ ] ` at column 0 in a
  * `rafa:context` body was dispatched as a task, and its text reached all

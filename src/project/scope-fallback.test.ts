@@ -48,7 +48,7 @@
  * and a checkout holding the file answered as none.
  */
 import type { ScopeFileSystem, ScopeResolution } from './scope.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

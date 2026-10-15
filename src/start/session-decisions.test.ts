@@ -11,7 +11,7 @@
  * branch's, a running one, an older one behind a newer run with no list.
  */
 import type { RunSessionOptions } from './session.js';
-import type { SessionDecision, SessionRecord } from '../core/loop/index.js';
+import type { SessionDecision, SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import {
   mkdirSync,
@@ -24,8 +24,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSession, runsDir, sessionFilePath } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { readSession, runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { eventsFileOf } from '../loop/events-file.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

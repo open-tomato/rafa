@@ -27,7 +27,8 @@ import type { MergeSeams } from './merge.js';
 import type { PrContext } from './pr-context.js';
 import type { ChecksReading, GitRunner, PullRequestDetail, WorktreeEntry } from '../../pr/index.js';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import {
   createGitRunner,
   gitSaid,

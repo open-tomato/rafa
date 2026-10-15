@@ -10,8 +10,8 @@
  * in the one input, so a module that never wrote, or always did, reddens.
  */
 import type { StaleDocsTracker } from './release-issue.js';
-import type { IssueDraft, IssueEdit, IssueRef, OpenIssue, Tracker } from '../ports/index.js';
 import type { SettleForecast } from '../release/forecast.js';
+import type { IssueDraft, IssueEdit, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,8 +19,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { escapeBlockerText } from '../utils/tracker.js';
 
 import {
   addStaleDocLine,

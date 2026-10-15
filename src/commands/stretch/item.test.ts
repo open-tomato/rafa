@@ -21,7 +21,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../core/loop/index.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+
 import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

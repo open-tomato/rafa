@@ -22,8 +22,8 @@
 import type { StatusHookConfig, StatusHookSeams } from './hook.js';
 import type { SeenInput, SeenReading, SeenSnapshot } from './seen.js';
 import type { CommandRoute } from '../cli/route.js';
-import type { RafaCommand } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

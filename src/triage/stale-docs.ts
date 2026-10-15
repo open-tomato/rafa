@@ -48,7 +48,7 @@
  * break would no longer match a text already joined.
  */
 import type { BugTriage } from './triage.js';
-import type { ReportStaleDoc } from '../report/parse.js';
+import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 
 import { hasText } from './bug-key.js';
 

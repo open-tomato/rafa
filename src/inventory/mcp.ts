@@ -80,11 +80,11 @@
  * handed it: every path comes from {@link McpSeams}.
  */
 import type { OverrideSeams } from './disabled.js';
-import type { ClaudeSettingSource, Mapping } from '../core/config/sections.js';
+import type { ClaudeSettingSource, Mapping } from '@open-tomato/rafa/core/config/sections';
 
 import { join } from 'node:path';
 
-import { describeValue, isMapping } from '../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
 import { overrideSettingsPath, readSettings } from './disabled.js';
 

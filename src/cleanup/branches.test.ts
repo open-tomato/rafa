@@ -5,7 +5,7 @@
  * git itself rather than from this file's script.
  */
 import type { ParsedLine } from './branches.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -14,7 +14,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

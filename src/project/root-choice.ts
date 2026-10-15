@@ -8,7 +8,7 @@
  * `roots.ts` answers the candidates and each refusal; this module reads a
  * choice among them. {@link firstCandidate} is `--yes`, {@link namedRoot}
  * is `--root=<path>`, and {@link promptForRoot} lists the candidates
- * through a {@link Prompter} (`src/core/command/confirm.ts`) and reads answers until one names a root a
+ * through a {@link Prompter} (`packages/rafa/src/core/command/confirm.ts`) and reads answers until one names a root a
  * project may take, or the input ends. Whether to prompt at all is the
  * command's decision, since only a terminal can answer.
  *
@@ -42,7 +42,7 @@ import type {
   RootCandidate,
   RootCandidates,
 } from './roots.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { resolve } from 'node:path';
 

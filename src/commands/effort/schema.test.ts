@@ -6,9 +6,9 @@
  * migration pending left byte-identical, and the list of reasons held
  * to the list of `nextStep` values.
  */
-import type { SqliteMigration } from '../../effort/store/migrations.js';
-import type { SchemaReport } from '../../effort/store/schema-report.js';
 import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
+import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
+import type { SchemaReport } from '@open-tomato/rafa/store/schema-report';
 
 import '../../adapter-registry.js';
 
@@ -20,11 +20,12 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runningCommand } from '../../core/command/index.js';
-import { bringForward } from '../../effort/store/bring-forward.js';
-import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
-import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
-import { readStoreMeta } from '../../effort/store/store-meta.js';
+import { runningCommand } from '@open-tomato/rafa/core/command';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { REFUSAL_REASONS } from '@open-tomato/rafa/store/schema-plan';
+import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
@@ -421,7 +422,7 @@ describe('the refusal reasons and their next steps', () => {
     ];
     const reports = await Promise.all(cases.map(async ({ plant, migrations }) => jsonReport(plant, migrations)));
 
-    // The dispatch scope of src/core/command/running.ts
+    // The dispatch scope of packages/rafa/src/core/command/running.ts
     // (runAsRunningCommand) holds each dispatch's record to itself, so
     // none leaks once all seven settle.
     expect(runningCommand()).toBeNull();

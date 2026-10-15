@@ -22,8 +22,8 @@
  *
  * ## Which block is read
  *
- * Blocks are found by `readRafaBlocks` (`src/core/plan/blocks.ts`), under
- * the rules `parseReport` (`src/report/parse.ts`) reads a report by:
+ * Blocks are found by `readRafaBlocks` (`packages/rafa/src/core/plan/blocks.ts`), under
+ * the rules `parseReport` (`packages/rafa/src/report/parse.ts`) reads a report by:
  * only the LAST `rafa:search` block counts, an earlier one being a
  * draft or the session quoting the format, and when the last one cannot
  * be read no earlier one is read in its place. Blocks of every other
@@ -68,9 +68,9 @@
  * cuts a value short, and `line: "41"` reads as a string, which is
  * refused rather than turned into a number.
  */
-import type { RafaBlock } from '../../core/plan/block-reader.js';
+import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 
-import { readRafaBlocks } from '../../core/plan/block-reader.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 import { SEARCH_BLOCK_FENCE } from './prompt.js';
 

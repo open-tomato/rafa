@@ -48,11 +48,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { parseSessionRecord, runsDir } from '@open-tomato/rafa/core/loop';
+
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { parseSessionRecord, runsDir } from '../core/loop/index.js';
 import { hopFilePath, readHopRecord } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -210,7 +211,7 @@ function buildProbe(prlistFile: string): string {
     'import { mkdirSync, writeFileSync } from "node:fs";',
     'import { join } from "node:path";',
     `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
-    `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
+    `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
@@ -221,7 +222,7 @@ function buildProbe(prlistFile: string): string {
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
     `import { openRunSession } from ${JSON.stringify(join(SRC_DIR, 'start', 'session.ts'))};`,
-    `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, 'utils', 'plan-stamp.ts'))};`,
+    `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',

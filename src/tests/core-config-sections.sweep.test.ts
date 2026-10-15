@@ -1,5 +1,5 @@
 /**
- * The core-config-sections sweep: no code file under `src/core/` imports a
+ * The core-config-sections sweep: no code file under `packages/rafa/src/core/` imports a
  * `src/config-schema-*.ts` file, by any specifier `textImports` finds, and
  * `loadConfig` with no section registered refuses naming the registry.
  */
@@ -11,11 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
+import { activeSettings, CORE_SECTION, EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { CORE_FOLDER } from '../../scripts/survey/core-moves.js';
 import { textImports } from '../../scripts/survey/import-graph.js';
 import { SETTING_NAMES } from '../config-registry.js';
-import { activeSettings, CORE_SECTION, EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
 
 import { SWEEP_TIMEOUT } from './sweep-timeout.js';
 
@@ -34,7 +35,7 @@ function codeFilesUnder(dir: string): string[] {
 describe('core imports no config-schema section', () => {
   const files = codeFilesUnder(CORE_DIR);
 
-  it('reads the files of src/core/', () => {
+  it('reads the files of packages/rafa/src/core/', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
@@ -89,7 +90,7 @@ describe('core spells no setting name its own section does not define', () => {
     expect(foreign).toContain('loggerModules');
   });
 
-  it('uses none of them in a code file of src/core/ that is no test', () => {
+  it('uses none of them in a code file of packages/rafa/src/core/ that is no test', () => {
     const offending = codeFilesUnder(CORE_DIR).filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file))
       .flatMap((file) => {
         const used = namesUsedIn(readFileSync(file, 'utf8'));

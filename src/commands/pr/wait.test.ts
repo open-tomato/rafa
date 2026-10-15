@@ -55,8 +55,6 @@
  * to come from the read at the ending.
  */
 import type { PrWaitReading, PrWaitSeams } from './wait.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,
   ChecksReading,
@@ -65,6 +63,8 @@ import type {
   PullRequestSummary,
 } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 

@@ -32,7 +32,7 @@
  * session: the log then exists, so the stand-in is what a session in that
  * planting reaches, and its absence after `validate` is a reading.
  */
-import type { CliEvent } from '../../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -42,9 +42,10 @@ import { join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { issueLine } from '@open-tomato/rafa/core/plan';
+
 import { createCommandRegistry } from '../../cli/registry.js';
-import { CommandExit } from '../../core/command/index.js';
-import { issueLine } from '../../core/plan/index.js';
 import { parsePlan } from '../../plan/index.js';
 import { validatePlan } from '../../plan/validate.js';
 import {

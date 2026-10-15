@@ -19,8 +19,8 @@
  */
 import type { EditRequest } from './edit-run.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { EditableIssue, IssueDraft, IssueEdit, IssuePriority, IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { EditableIssue, IssueDraft, IssueEdit, IssuePriority, IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -30,6 +30,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
 import { renderUpdateBlock } from '../../board/issue-edit-body.js';
 import { SPEC_LABEL } from '../../board/issue.js';
@@ -37,7 +39,6 @@ import { branchName } from '../../board/naming.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { createGhEditorLogin, ghBoardTrust } from '../../board/trust.js';
 import { IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
-import { CommandExit } from '../../core/command/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

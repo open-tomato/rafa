@@ -18,8 +18,8 @@
  * carries a rafa entry of its own, so the checkout's `src/bundled/agents`
  * is never the rafa tier a case reads.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { TierSettings } from '../tiers/resolve.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

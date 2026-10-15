@@ -50,12 +50,13 @@
  */
 import type { NextHintSeams } from './hint.js';
 import type { NextState } from './state.js';
-import type { RafaContext } from '../core/command/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createCommandRegistry } from '../cli/registry.js';
-import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { actionInvocation } from './actions.js';

@@ -69,11 +69,12 @@ import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { SettleDelivered } from '../../release/settle-tag.js';
 
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 
 /** How many commits one pull request query names. */
 export const COMMIT_BATCH = 20;

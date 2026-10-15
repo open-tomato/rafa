@@ -24,8 +24,8 @@
  * and widens {@link SettleWaitingPlace} into its own follow-up place.
  * Nothing here imports from `src/commands/`.
  */
-import type { GitRunner } from '../core/git/index.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { resolveReleaseEnabled } from '../release/enabled.js';
 import { readSettle } from '../release/settle.js';

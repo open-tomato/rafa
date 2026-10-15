@@ -51,8 +51,8 @@ import type { Forecast } from './forecast.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { FoldFragment } from './strategy.js';
 import type { ReleaseVerified } from './verify.js';
-import type { ReleaseStrategy } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { posix } from 'node:path';
 

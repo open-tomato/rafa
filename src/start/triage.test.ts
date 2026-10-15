@@ -60,9 +60,9 @@ import type {
   TaskTriageInput,
 } from './triage.js';
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { FindingOutcome } from '../effort/store/findings.js';
-import type { IssueRef, Tracker } from '../ports/index.js';
 import type { TriageResult } from '../triage/triage.js';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import '../adapter-registry.js';
 
@@ -87,10 +87,11 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { bugKeyOf, createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';

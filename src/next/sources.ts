@@ -252,13 +252,19 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { ConfigRoots } from '../core/config/load.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
@@ -267,11 +273,6 @@ import { createGhSpecIssueReader } from '../board/issue.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { readCurrentPlace } from '../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { readRecords, resolveLoopSeams } from '../core/loop/readings.js';
-import { plansDirAt } from '../core/plan/index.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { readEpicEndRelease } from './epic-end.js';

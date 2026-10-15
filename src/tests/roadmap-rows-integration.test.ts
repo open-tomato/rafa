@@ -12,7 +12,7 @@
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { RoadmapRow, RoadmapRowsOptions } from '../board/roadmap-rows.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

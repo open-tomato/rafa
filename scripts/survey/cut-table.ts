@@ -14,10 +14,12 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/report/parse.test.ts` goes where `src/report/parse.ts` goes;
+ *      `src/start/branch-decision.test.ts` goes where
+ *      `src/start/branch-decision.ts` goes;
  *   2. otherwise the longest folder that holds it decides, among the
- *      packages' folders and the unassigned folders. `src/effort/store/`
- *      (core) is longer than `src/effort/` (`rafa-effort`);
+ *      packages' folders and the unassigned folders. A folder closes
+ *      with its `/`, so `packages/rafa/` (core) does not hold
+ *      `packages/rafa-hub/src/bin.ts`;
  *   3. otherwise the file is left to place, and counts as a file of the
  *      package named under `rest`, `@open-tomato/rafa-cli`, which takes
  *      every file no line above holds.
@@ -37,7 +39,7 @@
  * never upward; it is counted on the folder instead, by the package at
  * its other end.
  *
- * An upward edge from a file under `src/core/config/` into a
+ * An upward edge from a file under `packages/rafa/src/core/config/` into a
  * `src/config-schema-<section>.ts` file is marked as cleared by #118,
  * which makes each package own its config section. It still counts as
  * upward: `remaining` is the count less the cleared edges.
@@ -56,7 +58,7 @@ import type { EdgeKind, ImportEdge } from './import-graph';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
-import { CORE_FOLDERS, CORE_NAMED_FILES, subjectFolder } from './core-moves';
+import { CORE_PACKAGE as CORE_PACKAGE_FOLDER, subjectFolder } from './core-moves';
 import { OUTPUT_DIR, stableJson } from './import-graph';
 
 /** The files and folders one future package holds by rule. */
@@ -256,16 +258,16 @@ export const BOARD_FILES_OF_C6: readonly string[] = [
 
 /**
  * The ten packages, lowest first, seeded from the survey's cluster order,
- * with the three folders left for the second architect pass. Core's
- * folders and named files are `CORE_FOLDERS` and `CORE_NAMED_FILES` of
- * `core-moves.ts`, which spells where core is.
+ * with the three folders left for the second architect pass. Core is its
+ * workspace package, `CORE_PACKAGE` of `core-moves.ts`, which spells
+ * where core is: one folder and no named file, as each service's rule.
  */
 export const CUT_RULES: CutRules = {
   packages: [
     {
-      folders: CORE_FOLDERS,
+      folders: [CORE_PACKAGE_FOLDER],
       name: CORE_PACKAGE,
-      named: CORE_NAMED_FILES,
+      named: [],
     },
     {
       folders: [
@@ -427,7 +429,7 @@ export function placeFile(path: string, rules: CutRules = CUT_RULES): FilePlace 
 
 /**
  * Whether #118 clears an upward edge: it leaves a file under
- * `src/core/config/` and ends on a config section file.
+ * `packages/rafa/src/core/config/` and ends on a config section file.
  *
  * @param edge - An upward edge.
  * @returns `true` when #118 clears it.

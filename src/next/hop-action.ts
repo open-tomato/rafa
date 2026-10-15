@@ -60,9 +60,10 @@ import type { Place, Position } from '../project/position.js';
 
 import { rmSync } from 'node:fs';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { samePlace } from '../board/place.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
 import { goHome, positionAt, positionFilePath, readPositionFile, writePositionFile } from '../project/position.js';
 
 import { hopMoveSentence } from './hop-chain.js';

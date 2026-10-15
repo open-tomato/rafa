@@ -84,10 +84,10 @@
  * project it acts on, which behind the terminal is the nearest directory
  * at or above the working directory holding a project config, and
  * prints what the command prints. Each writes through the active output
- * (`src/core/output/active.ts`), the `text` adapter on
+ * (`packages/rafa/src/core/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
  * `process.exit`: a refusal throws `CommandExit`
- * (`src/core/command/command.ts`)
+ * (`packages/rafa/src/core/command/command.ts`)
  * with the refusal as its message, which the command leaves to its caller
  * to print. `planCommand` also throws it with the exit code a `claude`
  * planner's rejection carries, and `startCommand` with exit code 0 once
@@ -136,8 +136,8 @@ export type {
   AdapterRegistry,
   AnyAdapter,
   PortImplementations,
-} from './core/adapters/index.js';
-export type { ConfigRoots } from './core/config/load.js';
+} from '@open-tomato/rafa/core/adapters';
+export type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -154,7 +154,7 @@ export type {
   PrerequisiteScope,
   RafaConfig,
   ResolvedConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
 export type {
   BoardRelationshipMode,
   ClaudeSettingSource,
@@ -166,7 +166,7 @@ export type {
   ReleaseEnabled,
   StoreBackend,
   SyncStrategy,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 export type {
   AppendResult,
   CommitEffortRow,
@@ -192,7 +192,7 @@ export type {
   WirePayload,
   WireRow,
   WireValue,
-} from './effort/store/index.js';
+} from '@open-tomato/rafa/store';
 export type {
   AdapterProvision,
   CommandsProvision,
@@ -275,8 +275,8 @@ export {
   PORT_VERSIONS,
   registerAdapters,
   restoreAdapters,
-} from './core/adapters/index.js';
-export { loadConfig, readConfigFile } from './core/config/load.js';
+} from '@open-tomato/rafa/core/adapters';
+export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
 export { CONFIG_DEFAULTS } from './config-registry.js';
 export {
   CONFIG_FILE,
@@ -286,7 +286,7 @@ export {
   parseConfigText,
   PREREQUISITE_KINDS,
   resolveConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
 export {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -298,7 +298,7 @@ export {
   RELEASE_AUTO,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 export { default as effortCollectCommand } from './effort/collect.js';
 export { default as effortReportCommand } from './effort/report.js';
 export {
@@ -316,7 +316,7 @@ export {
   WIRE_VERSION,
   WireExportRefusal,
   WireFormatError,
-} from './effort/store/index.js';
+} from '@open-tomato/rafa/store';
 export {
   FEATURE_TYPES,
   MANIFEST_VERSION,

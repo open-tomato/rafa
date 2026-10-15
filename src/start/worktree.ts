@@ -188,8 +188,9 @@ import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
 import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { createGitRunner, gitSaid, parseWorktrees } from '../pr/index.js';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';

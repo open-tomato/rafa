@@ -20,9 +20,9 @@
  * holding the project config the helper reads.
  */
 import type { HubContactSeams } from './contact.js';
-import type { AdapterContext } from '../../core/adapters/index.js';
-import type { ResolvedConfig } from '../../core/config/index.js';
-import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { Sync, SyncPullRequest, SyncPushRequest } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -33,9 +33,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
-import { ConfigError, parseConfigText, resolveConfig } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { ConfigError, parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import {
   createHubContact,

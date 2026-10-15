@@ -11,8 +11,8 @@
  * for it.
  */
 import type { RemoteOnlyRead, RemoteOnlyReading, RemoteOnlySettings } from './remote-only.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { PullRequestSummary } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,8 +21,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { formatClaimMessage } from '../claims/record.js';
-import { createGitRunner } from '../core/git/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

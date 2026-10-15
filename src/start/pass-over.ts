@@ -57,8 +57,9 @@
 import type { ContinueDecision } from './decision-parse.js';
 import type { TaskInfo, TrackerTask } from '../utils/tracker.js';
 
-import { stripTaskDeclaration } from '../utils/declaration.js';
-import { listOpenTasks, listTrackerTasks, splitBlockerComment } from '../utils/tracker.js';
+import { stripTaskDeclaration , splitBlockerComment } from '@open-tomato/rafa/core/plan';
+
+import { listOpenTasks, listTrackerTasks } from '../utils/tracker.js';
 
 /** A task as an entry names it: its identity and the line it was last read at. */
 export interface TaskRef {

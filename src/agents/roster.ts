@@ -177,7 +177,7 @@
  *     it. No vendor command is named: `rafa agent vendor` copies agents.
  *
  * {@link unresolvedSkillLine} words each for the same two callers.
- * `parseSkillList` in `utils/declaration.ts` still leaves membership
+ * `parseSkillList` in `core/plan/declaration.ts` still leaves membership
  * unchecked, since it reads one declaration and no tier; the refusal is
  * this module's, where the tiers are read. A rafa-tier winner the served
  * directory would skip (`serveVerdict` in `tiers/serve.ts`) is not
@@ -190,18 +190,19 @@
  * `.claude/agents` holding a README contributes no agent named after
  * it.
  */
-import type { SkillTier } from '../schema/tiers.js';
 import type { Resolution, TierCollision, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 import type { Dirent } from 'node:fs';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parsePlan } from '../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
+
 import { readTrees } from '../inventory/trees.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
-import { isSkillTier, SKILL_TIERS } from '../schema/tiers.js';
 import { collisionMessage, findTierItem, pinKey, pinLine, readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveVerdict } from '../tiers/serve.js';
 import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';

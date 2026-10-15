@@ -47,8 +47,8 @@
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
 import type { MoveProjectOptions } from './move-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { IssueRef, IssueState } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueRef, IssueState } from '@open-tomato/rafa/ports';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES } from '../../adapters/tracker/issue-values.js';

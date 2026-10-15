@@ -70,9 +70,9 @@
  */
 import type { Recurrence } from './recurrence.js';
 import type { SkillFact } from './skill-facts.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
-import { UNKNOWN_SKILL_COUNT } from './store/skill-invocations.js';
+import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 
 /** The skill signals, in the order they are checked. */
 export const SKILL_SIGNALS = ['recurring', 'unmeasured', 'earning', 'ignored'] as const;

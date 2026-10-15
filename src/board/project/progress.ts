@@ -65,8 +65,8 @@
  * system's own when left out.
  */
 import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
-import type { OutputMode } from '../../core/config/sections.js';
-import type { CliEventNamed, Output } from '../../ports/index.js';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEventNamed, Output } from '@open-tomato/rafa/ports';
 
 /** The name of the json event a progress line is emitted as. */
 export const PROGRESS_EVENT = 'progress';

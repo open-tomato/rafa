@@ -14,7 +14,7 @@
  *   doing.
  */
 import type { EpicCriterion } from '../../epic/verify-plan.js';
-import type { OpenIssue, Tracker } from '../../ports/index.js';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,9 +22,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+
 import { createLocalTracker } from '../../adapters/tracker/local.js';
 import { staleDocsTitle } from '../../docs/release-issue.js';
-import { readStaleDocsForPlan } from '../../effort/store/stale-docs.js';
 
 import { docsOnlyWhat, isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 

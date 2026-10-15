@@ -16,7 +16,7 @@
  *
  * {@link selectSync} takes the `config` field of a resolved config and
  * never reads a `.rafa/config.yaml` itself, for the reason
- * `selectEffortStore` gives (`src/effort/store/index.ts`): resolution
+ * `selectEffortStore` gives (`packages/rafa/src/effort/store/index.ts`): resolution
  * has one owner, the config. It resolves `effortSync` as a `sync` kind
  * through the registry it is handed, `CORE_ADAPTER_REGISTRY` when none
  * is, and makes the adapter with the repository root and, when the
@@ -54,7 +54,7 @@
  * ## No import cycle
  *
  * This module imports `CORE_ADAPTER_REGISTRY` through the barrel over
- * the registry, `src/core/adapters/index.ts`, and the registry imports
+ * the registry, `packages/rafa/src/core/adapters/index.ts`, and the registry imports
  * nothing back: {@link createLocalSync} is imported by the composition
  * root `src/adapter-registry.ts`, which `registry.ts` never imports. The
  * cycle `registry.ts` and this module once made is gone. This module
@@ -62,17 +62,18 @@
  * it evaluates, so it loads before the root registers anything.
  * `select.test.ts` imports this module and the barrel each first in a
  * child `bun`, the root after them, and resolves `sync/local` there, and
- * `src/core/adapters/index.test.ts` does the same with `registry.ts`
+ * `packages/rafa/src/core/adapters/index.test.ts` does the same with `registry.ts`
  * first.
  */
-import type { AdapterContext, AdapterRegistry } from '../../core/adapters/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { SyncStrategy } from '../../core/config/sections.js';
-import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
+import type { AdapterContext, AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { SyncStrategy } from '@open-tomato/rafa/core/config/sections';
+import type { Sync, SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
+
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { describeValue, SYNC_STRATEGIES } from '@open-tomato/rafa/core/config/sections';
 
 import { hubContextOf } from '../../config-schema-hub.js';
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { describeValue, SYNC_STRATEGIES } from '../../core/config/sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync';

@@ -6,8 +6,8 @@
  * `project,local`.
  */
 import type { TierRow, TierSettings } from './resolve.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { InventorySeams } from '../inventory/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

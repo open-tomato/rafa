@@ -30,8 +30,8 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DoctorSeams } from '../commands/doctor.js';
-import type { Prompter } from '../core/command/index.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import '../adapter-registry.js';
 

@@ -41,7 +41,7 @@
  * it lacks.
  */
 import type { GhResult, GhRunner } from './github.js';
-import type { IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
+import type { IssueEdit, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

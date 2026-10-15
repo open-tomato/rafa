@@ -39,11 +39,12 @@
  *
  * @module loop/events-file
  */
-import type { SessionRecord } from '../core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
 
-import { errorCode } from '../core/loop/index.js';
+import { errorCode } from '@open-tomato/rafa/core/loop';
+
 import { eventsFilePath } from '../start/loop-events.js';
 
 /** The newline byte every line of the events file ends with. */
