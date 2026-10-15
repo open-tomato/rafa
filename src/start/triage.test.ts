@@ -53,12 +53,25 @@
  * Three mutations of `src/start.ts`, restored sha256-identical, each changed
  * its reading: the call dropped, the triage run before the store (the
  * finding's trigger and what lost), and the task line off by one.
+ *
+ * {@link CONFIG} leaves `board.project.number` unset, so no case above the
+ * project's own sends a project call. Those cases set it, and route every
+ * `gh` call through one runner that answers the repository read itself
+ * and hands the rest to the project fake (`board/project/project-fake.ts`)
+ * and the facts fake (`board/project/facts-fake.ts`), as
+ * `board/project/add-filed.test.ts` builds it, so the real refresh fills
+ * the added item and no case reaches `gh`. Their public tracker is a
+ * `local` one spied as kind `github`, whose `create` answers a GitHub ref
+ * to an issue the fake repository holds. A refused add is read beside the
+ * same report with the number unset, whose tracker file and stored
+ * reference it matches.
  */
 import type {
   StartTriage,
   StartTriageOptions,
   TaskTriageInput,
 } from './triage.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { GitRunner } from '../core/git/index.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
@@ -90,6 +103,10 @@ import {
 
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { createFakeFactsGh } from '../board/project/facts-fake.js';
+import { createGhProjectPort } from '../board/project/gh.js';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
+import { scopeWarning } from '../board/project/refresh-warnings.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { RAFA_VERSION } from '../core/command/index.js';
 import { setActiveOutput } from '../core/output/index.js';
@@ -148,6 +165,14 @@ const CONFIG: StartTriageOptions['config'] = {
   triageSimilarityCandidates: 3,
   ...ISSUES_DEFAULTS,
   errorsCodes: [],
+  boardProjectNumber: null,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
+  boardRelationships: 'labels',
+  roadmapIssue: null,
+  releaseFragments: '.changes',
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
@@ -1096,5 +1121,169 @@ describe('what each triageReport is handed', () => {
     expect(filed?.contents).not.toContain('.rafa/worktrees/demo-stub');
     const [control] = issueFiles(plain.publicDir);
     expect(control?.contents).toContain('.rafa/worktrees/demo-stub/src/parse.ts');
+  });
+});
+
+/** The owner of the fake repository and of its project. */
+const PROJECT_OWNER = 'open-tomato';
+
+/** The project's number, set in {@link PROJECT_CONFIG}. */
+const PROJECT_NUMBER = 6;
+
+/** The issue the `github` public tracker files a bug as: one the fake repository holds. */
+const FILED_ISSUE = 41;
+
+/** {@link CONFIG} with `board.project.number` set. */
+const PROJECT_CONFIG: StartTriageOptions['config'] = { ...CONFIG, boardProjectNumber: PROJECT_NUMBER };
+
+/** GitHub's documented refusal for a token with no project scope, as `board/project/add-issue.test.ts` plants it; NOT a reading. */
+const SCOPE_STDERR = 'gh: Your token has not been granted the required scopes to execute this query. The \'projectV2\' field requires one of the following scopes: [\'read:project\'], but your token has only been granted the: [\'repo\'] scopes.\n';
+
+/** The bug every project case's report lists, public, with an artifact. */
+const PROJECT_BUG: BugEntry = ['The parser drops a line', 'ERR_ONE', false];
+
+function answered(value: unknown): GhResult {
+  return { ok: true, stdout: JSON.stringify(value), stderr: '' };
+}
+
+/** The ref the `github` public tracker answers for each bug it files. */
+const FILED_REF: IssueRef = {
+  opt: 0,
+  kind: 'github',
+  externalId: String(FILED_ISSUE),
+  url: `https://github.com/${FAKE_PROJECT_REPOSITORY}/issues/${String(FILED_ISSUE)}`,
+};
+
+/** One case's fixture, its `github` public tracker, the project fake and the runner routing to it. */
+interface ProjectScene {
+  readonly f: Fixture;
+  readonly github: Spied;
+  readonly project: ReturnType<typeof createFakeProjectGh>;
+  readonly gh: GhRunner;
+}
+
+/**
+ * A fresh fixture whose public tracker is of kind `github` and files every
+ * bug as {@link FILED_ISSUE}, beside a project holding no item and a
+ * runner answering the repository read and the board listing itself and
+ * routing every `gh api` call to the facts or the project fake.
+ */
+function projectScene(): ProjectScene {
+  const f = fixture();
+  const github = spy(createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK }), {
+    kind: 'github',
+    create: () => Promise.resolve(FILED_REF),
+  });
+  const project = createFakeProjectGh({
+    projects: [{ owner: PROJECT_OWNER, number: PROJECT_NUMBER, items: [] }],
+    owners: [PROJECT_OWNER],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [FILED_ISSUE] }],
+  });
+  const facts = createFakeFactsGh({
+    issues: [
+      { number: 1, state: 'OPEN', labels: ['type:roadmap'] },
+      { number: FILED_ISSUE, state: 'OPEN', labels: ['type:bug'] },
+    ],
+  });
+  const listed = (number: number, labels: readonly string[], body: string): Readonly<Record<string, unknown>> => ({
+    number,
+    title: `#${String(number)}`,
+    body,
+    state: 'OPEN',
+    stateReason: '',
+    labels: labels.map((name) => ({ name })),
+  });
+  const roadmap = listed(1, ['type:roadmap'], '');
+  const gh: GhRunner = (args) => {
+    const line = args.join(' ');
+    if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
+    if (line.startsWith('issue list --label type:roadmap --state open')) return Promise.resolve(answered([roadmap]));
+    if (line.startsWith('issue list --state all')) return Promise.resolve(answered([roadmap, listed(FILED_ISSUE, ['type:bug'], '')]));
+    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api') return project.gh(args);
+    return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
+  };
+  return { f, github, project, gh };
+}
+
+/** The Stage each issue's item on the project holds, by issue number, read through the project port. */
+async function projectStages(gh: GhRunner): Promise<Readonly<Record<number, string | null>>> {
+  const port = createGhProjectPort(gh);
+  const found = await port.find({ owner: PROJECT_OWNER, number: PROJECT_NUMBER });
+  const items = await port.items(found?.id ?? '');
+  return Object.fromEntries(items.flatMap(({ content, values }) => {
+    if (content.kind !== 'issue') return [];
+    const stage = values.get('Stage');
+    return [[content.number, stage?.kind === 'option'
+      ? stage.name
+      : null] as const];
+  }));
+}
+
+/** One line the active output was handed, with its level, in the order handed. */
+type OrderedLine = readonly [level: 'info' | 'warn', message: string];
+
+/** Sets a sink output as the active output, answering its info and warn lines in one list, in order. */
+function captureOrdered(): OrderedLine[] {
+  const lines: OrderedLine[] = [];
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      lines.push(['info', message]);
+    },
+    warn: (message) => {
+      lines.push(['warn', message]);
+    },
+  }));
+  return lines;
+}
+
+/** The scene's triage, its chain landing on the `github` tracker and every project call routed to the fakes. */
+function projectTriage(scene: ProjectScene, config: StartTriageOptions['config'] = PROJECT_CONFIG): StartTriage {
+  return triageFor(scene.f, chainLanding(scene.github.tracker), {
+    config,
+    project: { gh: scene.gh, sleep: () => Promise.resolve() },
+  });
+}
+
+describe('a bug filed on the public github tracker, onto the project', () => {
+  it('is added to the project with its Stage set, the filed note printed and no warning', async () => {
+    const lines = captureOrdered();
+    const scene = projectScene();
+
+    const result = await projectTriage(scene)(taskInput(scene.f, sessionOutput({ bugs: [PROJECT_BUG] })));
+
+    expect(result?.bugs.map((bug) => [bug.channel, bug.action, bug.ref])).toEqual([['public', 'filed', FILED_REF]]);
+    expect(await projectStages(scene.gh)).toEqual({ [FILED_ISSUE]: 'Backlog' });
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([]);
+    expect(lines).toContainEqual(['info', `   Triage: out_of_scope_bugs[0]: filed on the public tracker as ${FILED_REF.url ?? ''}.`]);
+  });
+
+  it('is refused for the project scope: the tracker line and stored reference stand as with no project, the filed note then the scope warning printed', async () => {
+    const report = sessionOutput({ blockers: ['The hook refused the commit'], bugs: [PROJECT_BUG] });
+
+    const lines = captureOrdered();
+    const refused = projectScene();
+    refused.project.failNext(SCOPE_STDERR);
+    const result = await projectTriage(refused)(taskInput(refused.f, report));
+
+    captureLines();
+    const unset = projectScene();
+    await projectTriage(unset, CONFIG)(taskInput(unset.f, report));
+
+    expect(result?.bugs.map((bug) => bug.action)).toEqual(['filed']);
+    const tracker = readFileSync(refused.f.trackerPath, 'utf8');
+    expect(tracker).not.toBe(TRACKER_TEXT);
+    expect(tracker).toBe(readFileSync(unset.f.trackerPath, 'utf8'));
+    const refs = (root: string): string[] => refRows(root).map((row) => row.tracker_ref);
+    expect(refs(refused.f.root)).toHaveLength(1);
+    expect(refs(refused.f.root)).toEqual(refs(unset.f.root));
+    expect(await projectStages(refused.gh)).toEqual({});
+
+    const filedNote: OrderedLine = ['info', `   Triage: out_of_scope_bugs[0]: filed on the public tracker as ${FILED_REF.url ?? ''}.`];
+    const scope: OrderedLine = ['warn', `   Triage: ${scopeWarning()}`];
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([scope]);
+    expect(lines.at(-1)).toEqual(scope);
+    expect(lines.findIndex((line) => line[0] === filedNote[0] && line[1] === filedNote[1])).toBeGreaterThanOrEqual(0);
+    expect(lines.findIndex((line) => line[0] === filedNote[0] && line[1] === filedNote[1])).toBeLessThan(lines.length - 1);
   });
 });

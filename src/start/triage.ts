@@ -161,10 +161,38 @@
  * Every line goes through the active output (`core/output/active.ts`):
  * what was written, filed or commented on through `info`, and everything
  * that was not through `warn`.
+ *
+ * ## A filed bug, onto the project
+ *
+ * Once a report's lines are printed and its routes stored, each bug it
+ * filed on the public `github` tracker is added to the repository's
+ * project and filled, through `addFiledBugs`
+ * (`board/project/add-filed.ts`), in the order filed. Every line that add
+ * answers is printed last, as a warning under the `Triage: ` prefix,
+ * redacted of the named secrets, so it follows the bug's `filed` note
+ * whatever the task's own output does. Nothing is sent with
+ * `board.project.number` unset, nor for a bug commented on, inherited,
+ * failed, skipped, routed elsewhere, filed on another kind of tracker or
+ * filed privately.
+ *
+ * The runner every project call goes through is
+ * {@link StartTriageProjectSeams.gh}, or a `gh` runner in the repo root
+ * when left out, opened retrying (`board/project/project-runner.ts`) with
+ * each retry reported to the active output. It is opened at most once per
+ * run, and only once a report filed a bug the add sends calls for.
+ *
+ * The add never rejects: a project the token may not read, a number
+ * naming no project, or a refresh that failed is each a warning line, and
+ * the task's tracker line and stored reference stand as the triage left
+ * them. A throw from it all the same is the `nothing more was triaged`
+ * warning above, never a rejection to `start()`.
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { RefreshAddedItems } from '../board/project/add-issue.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
 import type { IssuesConfigSettings } from '../config-schema-issues.js';
 import type { RafaConfig } from '../core/config/index.js';
 import type { GitRunner } from '../core/git/index.js';
@@ -178,7 +206,10 @@ import type { BugTriage, SecretEnvironment, TriageOptions, TriageResult } from '
 
 import { homedir } from 'node:os';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { addFiledBugs } from '../board/project/add-filed.js';
+import { openProjectRunner } from '../board/project/project-runner.js';
 import { bugRulesOf } from '../config-schema-issues.js';
 import { messageOf } from '../core/config/sections.js';
 import { createGitRunner } from '../core/git/index.js';
@@ -230,6 +261,19 @@ function foundByText(bug: BugTriage): string {
     : `${found} (score ${scoreText(bug.score)})`;
 }
 
+/**
+ * How the add of a filed bug reaches the project, the shape of an epic
+ * action's seams; see the module note.
+ */
+export interface StartTriageProjectSeams {
+  /** Runs every project call; a `gh` runner in the repo root when left out. */
+  readonly gh?: GhRunner;
+  /** The refresh of each added issue; `refreshProjectItems` when left out. */
+  readonly projectRefresh?: RefreshAddedItems;
+  /** The wait before a retried call and between two writes; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
 /** What the run's triage is made with. */
 export interface StartTriageOptions {
   /** The repo root: where the store and both issue directories live, and the chain's context. */
@@ -237,8 +281,10 @@ export interface StartTriageOptions {
   /**
    * The run's resolved config: `tracker.default` and `tracker.fallback` for
    * the chain, the prerequisite tiers whose `env` items name secrets, and
-   * the `triage.similarity` settings, and the `issues` keys and
-   * `errors.codes` the bug record's rules are read from.
+   * the `triage.similarity` settings, the `issues` keys and
+   * `errors.codes` the bug record's rules are read from, and the
+   * `board.project` keys and the rest of what the project refresh reads,
+   * for the add of each filed bug.
    */
   readonly config: Pick<
     RafaConfig,
@@ -250,6 +296,7 @@ export interface StartTriageOptions {
     | 'triageSimilarityCandidates'
     | keyof IssuesConfigSettings
     | 'errorsCodes'
+    | keyof RefreshConfig
   >;
   /**
    * The environment the secrets' values are read from, handed to every
@@ -280,6 +327,8 @@ export interface StartTriageOptions {
    * existed.
    */
   readonly kinds?: StartKindOptions;
+  /** How each filed bug's add reaches the project; see the module note. */
+  readonly project?: StartTriageProjectSeams;
 }
 
 /** One task whose report `start()` has just stored. */
@@ -604,6 +653,26 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
     : createKindReader(options.kinds);
   let publicTracker: Promise<Tracker> | null = null;
   let inherited: InheritedTriage | null = null;
+  let projectGh: GhRunner | null = null;
+  const project = options.project ?? {};
+
+  const openProjectGh = (): GhRunner => {
+    projectGh ??= openProjectRunner(project.gh ?? createGhRunner({ cwd: options.repoRoot }), options.config, project.sleep === undefined
+      ? {}
+      : { sleep: project.sleep });
+    return projectGh;
+  };
+
+  const addToProject = (result: TriageResult): Promise<readonly string[]> => addFiledBugs({
+    config: options.config,
+    openGh: openProjectGh,
+    ...(project.projectRefresh === undefined
+      ? {}
+      : { refresh: project.projectRefresh }),
+    ...(project.sleep === undefined
+      ? {}
+      : { sleep: project.sleep }),
+  }, result);
 
   const inheritedFor = (trackerPath: string): InheritedTriage => {
     inherited ??= { failures: runStartFailures(trackerPath), commented: new Set() };
@@ -662,6 +731,8 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
     for (const warning of warnings) activeOutput().warn(`${INDENT}${warning}`);
     for (const warning of unstored) activeOutput().warn(`${INDENT}${LINE_PREFIX}${redact(warning)}`);
     for (const failure of named.values()) emitLoopEvent({ kind: 'inherited', file: failure.file, name: failure.name });
+    const added = await addToProject(result);
+    for (const warning of added) activeOutput().warn(`${INDENT}${LINE_PREFIX}${redact(warning)}`);
     return result;
   };
 

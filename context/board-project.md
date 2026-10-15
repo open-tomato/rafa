@@ -209,6 +209,11 @@ Commands that call the refresh outside the label wrapper:
 - `rafa issue create` — add the new issue, then refresh it with the item the
   add answered as a known item, and print `#<n> added but not filled:
   <reason>` when the refresh did not fill it
+- `rafa start` (each task's triage) — add each bug the task's report filed
+  on the public `github` tracker, then refresh it the way `rafa issue
+  create` does, every line a `Triage: ` warning after the triage's own
+  (`addFiledBugs`, `src/board/project/add-filed.ts`, called from
+  `src/start/triage.ts`)
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
   issues they were blocking; an epic whose member it closes is not
