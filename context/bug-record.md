@@ -28,9 +28,11 @@ dispatch and the checkout:
   else `unknown`, with the word kept in `Reported module` or
   `Reported action`.
 - **Environment**: `ci` when `CI` is set, else `local`.
-- **Summary, error line, artifact, versions and rerun**: from the
-  reported `what`, the artifact and the checkout. A rerun is written
-  only for a test failure naming its file and case.
+- **Summary, artifact, versions and rerun**: the summary from the reported
+  `what`; the artifact as reported, local paths taken out and not cut to 60
+  lines; versions from the artifact's file and the checkout. No error line
+  is written. A rerun is written only for a test failure naming its file
+  and case.
 
 Every free text is redacted, local paths then named secrets, before it
 is written. The record's sections follow the body's `Feedback`, and
@@ -60,8 +62,8 @@ them.
 | description | `--body`, `--body-file` | `What` | the filer; the summary when left out | the reported `what`, redacted | no |
 | reproduce | `--reproduce` | `Reproduce` | the filer | the session's word, else "seen while running" its task line and plan, or the command that ran | yes, never `unknown` |
 | rerun | `--rerun` | `Rerun` | the filer | the test command that runs the case again, for a failure naming its file and case; none otherwise | no |
-| error line | none | `Error line` | rafa, from the artifact's first line | the same | no |
-| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | the same, cut to 60 lines | no |
+| error line | none | `Error line` | rafa, from the artifact's first line | none; the loop's record leaves it out | no |
+| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | the reported one, local paths taken out, not cut | no |
 | cause | `--cause` | `Cause` | the filer, from `rafa bug codes` | the cause rule's reading: a listed code, or `<family>:new-context`, or `unknown:new-context` | yes, `<family>:new-context` allowed |
 | proposed | `--proposed` | `Proposed cause` | the filer | the session's code, when shaped and no code of the list, beside a `new-context` cause | no, read only beside a `new-context` cause |
 | suspected cause | none | `Suspected cause` | the filer | the session's words, when they are no code | no |

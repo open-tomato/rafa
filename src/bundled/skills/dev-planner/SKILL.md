@@ -328,10 +328,10 @@ Out-of-scope bug entry fields:
 | `artifact` | string | no | none | Error message or diagnostic output |
 | `security` | boolean | yes | none | Whether this is a security issue; never defaulted when missing |
 | `kind` | string | no | `bug` | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
-| `module` | string | no | `unknown` | The module the bug is in |
-| `action` | string | no | `unknown` | What was running: a command, a step, a test |
-| `reproduce` | string | no | "seen while running task <task line> of plan <stub>" | The steps, or the condition that revealed it. Double-quote it |
-| `cause` | string | no | `unknown:new-context` | A cause code from `rafa bug codes`, or the cause in words. Double-quote it |
+| `module` | string | no | `unknown` | The module the bug is in. Checked against the project's `issues.vocabulary.modules` when that is set, and read as any name of the shape when it is empty. A name outside the set is filed as `unknown`, with the word kept in the bug's record as `Reported module`; triage never refuses a bug over it |
+| `action` | string | no | `unknown` | What was running: a command, a step, a test. Checked against `issues.vocabulary.actions` the same way, the word kept as `Reported action` |
+| `reproduce` | string | no | "seen while running task <task line> of plan <stub>", or "seen while running `<command>`" for a dispatch with no plan stub | The steps, or the condition that revealed it. Double-quote it. A blank value or `unknown` takes the default: the bug record never holds `unknown` here |
+| `cause` | string | no | `unknown:new-context` | A cause code from `rafa bug codes`, or the cause in words. Double-quote it. A code the list lacks is filed as `<family>:new-context`, with the code kept as proposed, or as `unknown:new-context` when its family is unlisted; words that are no code are filed as `unknown:new-context`, with the words kept as the suspected cause |
 
 Out-of-scope entry kinds:
 

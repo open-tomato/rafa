@@ -39,10 +39,14 @@ family the list uses has one line in `FAMILY_DESCRIPTIONS`.
 The list grows from fixes. A bug filed as `<family>:new-context` gets its
 code added by the change that fixes it.
 
-A bug's cause is held to the list when it is filed: `rafa issue create
---type=bug` refuses a `--cause` the list lacks and names the line to file
-it with instead, `--cause=<family>:new-context --proposed=<the code>`
-(`context/bug-record.md`).
+A bug a person files is held to the list: `rafa issue create --type=bug`
+refuses a `--cause` the list lacks and names the line to file it with
+instead, `--cause=<family>:new-context --proposed=<the code>`
+(`context/bug-record.md`). A bug the loop files is never refused over its
+cause. The cause rule (`src/bugs/cause-rule.ts`) files a shaped code the
+list lacks as `<family>:new-context`, with the code kept as `proposed`, and
+any other text as `unknown:new-context`, with the words kept as `suspected`
+(`context/triage.md`).
 
 ### The older unions and the drift guard
 

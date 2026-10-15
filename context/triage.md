@@ -140,15 +140,17 @@ as a `sighting` row whose `where` is the first path its `what`, then its
 A bug the loop files carries the bug record (`context/bug-record.md`), built
 by `bugFilingOf` (`src/triage/bug-filing.ts`) from the session's report, the
 dispatch it ran under and the checkout. Its body opens with the sentence
-saying where it came from, then `What`, `Artifact`, `Refs` when the artifact
-names a path or a symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`.
+saying where it came from, then a `Supersedes` section when the bug came
+back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
+symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`.
 The sections above `Feedback` are the ones `./bug-key.ts` and
 `./similarity.ts` read, and the record adds nothing to them. After `Feedback`
 come the record's sections, one per field holding a value, in `BUG_FIELDS`
 order: `Reproduce`, `Rerun`, `Cause`, `Proposed cause`, `Suspected cause`,
 `Module`, `Action`, `Project`, `Environment` and `Versions`. Last are
 `Reported module` and `Reported action`, the session's word for a `Module` or
-`Action` the record holds as `unknown`.
+`Action` the record holds as `unknown`. A new issue's `Possible duplicates`
+section, when the similarity step filed one, comes after those two.
 
 `Reproduce` is the session's word, else `seen while running task <line> of
 plan <stub>`, or ``seen while running `<command>` `` for a dispatch with no
