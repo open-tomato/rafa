@@ -1,19 +1,43 @@
 ## The bug record
 
-Every bug filed through `rafa issue create --type=bug` has the same
-fields under the same headings, and a title rendered from them (#951).
-`src/bugs/` holds the record, `src/commands/issue/create-bug.ts` reads a
-line into it, and `context/error-codes.md` is the authority for the cause
-codes it carries.
+Every bug has the same fields under the same headings, and a title
+rendered from them (#951). Two writers build the record. `rafa issue
+create --type=bug` reads its flags into one (`src/bugs/`, and
+`src/commands/issue/create-bug.ts`) and refuses a record missing a
+required field, naming it. Triage builds the same record for a bug the
+loop files, from a session's report, in `src/triage/bug-filing.ts`
+(#991), and never refuses one over its fields: a value it cannot use is
+filed as `unknown` or `unknown:new-context`, and the session's own word
+is kept in the body. `context/error-codes.md` is the authority for the
+cause codes both carry, and `context/triage.md` for the body the loop
+writes.
 
-The loop's own filing (`context/triage.md`) builds the same record from
-a session's report (`src/triage/bug-filing.ts`, #991): the title is
-rendered through the same template, the draft carries the record's
-module, `unassigned` for `unknown`, and its cause, and the record's
-sections follow the body's `Feedback`. A recurrence's comment gains the
-`Versions` it was seen again on and no other field. The two bodies share
-their `What` and `Artifact` sections, so either is read by the other's
-code.
+Triage fills what the session does not give, or cannot give, from the
+dispatch and the checkout:
+
+- **Reproduce**, when the session gives none or `unknown`: "seen while
+  running task <line> of plan <stub>", or "seen while running `<the
+  command>`" for a dispatch with no plan stub.
+- **Cause**, by the cause rule (`src/bugs/cause-rule.ts`): a code of the
+  list is kept as written; a shaped code the list lacks is
+  `<family>:new-context` with the code as `proposed`, or
+  `unknown:new-context` when its family is unlisted; any other text is
+  `unknown:new-context` with the words as `suspected`. No cause at all
+  is `unknown:new-context`.
+- **Module and action**: the session's word when it is a checked name,
+  else `unknown`, with the word kept in `Reported module` or
+  `Reported action`.
+- **Environment**: `ci` when `CI` is set, else `local`.
+- **Summary, error line, artifact, versions and rerun**: from the
+  reported `what`, the artifact and the checkout. A rerun is written
+  only for a test failure naming its file and case.
+
+Every free text is redacted, local paths then named secrets, before it
+is written. The record's sections follow the body's `Feedback`, and
+`Reported module` and `Reported action` come last; the record reads no
+field from them. A recurrence's comment gains the `Versions` it was
+seen again on and no other field. The two bodies share their `What` and
+`Artifact` sections, so either is read by the other's code.
 
 ### Three axes
 
@@ -30,22 +54,24 @@ them.
 
 ### The fields
 
-| Field | Flag | Section | Filled by | Required |
-|---|---|---|---|---|
-| summary | `--summary` | none, the title holds it | the filer | yes, one line, at most `issues.titles.summaryMax` |
-| description | `--body`, `--body-file` | `What` | the filer; the summary when left out | no |
-| reproduce | `--reproduce` | `Reproduce` | the filer | yes, never `unknown` |
-| rerun | `--rerun` | `Rerun` | the filer | no |
-| error line | none | `Error line` | rafa, from the artifact's first line | no |
-| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | no |
-| cause | `--cause` | `Cause` | the filer, from `rafa bug codes` | yes, `<family>:new-context` allowed |
-| proposed | `--proposed` | `Proposed cause` | the filer | no, read only beside a `new-context` cause |
-| suspected cause | none | `Suspected cause` | the filer | no |
-| module | `--module` | `Module` | the filer | yes, `unknown` allowed |
-| action | `--action` | `Action` | the filer | yes, `unknown` allowed |
-| project | `--project` | `Project` | the filer | no |
-| place | `--env` | `Environment` | rafa suggests, the filer corrects | yes, `unknown` allowed |
-| versions | `--path` names the file | `Versions` | rafa | always written |
+| Field | Flag | Section | Filled by | Filled by the loop | Required |
+|---|---|---|---|---|---|
+| summary | `--summary` | none, the title holds it | the filer | the reported `what`, redacted, on one line, cut to `issues.titles.summaryMax` | yes, one line, at most `issues.titles.summaryMax` |
+| description | `--body`, `--body-file` | `What` | the filer; the summary when left out | the reported `what`, redacted | no |
+| reproduce | `--reproduce` | `Reproduce` | the filer | the session's word, else "seen while running" its task line and plan, or the command that ran | yes, never `unknown` |
+| rerun | `--rerun` | `Rerun` | the filer | the test command that runs the case again, for a failure naming its file and case; none otherwise | no |
+| error line | none | `Error line` | rafa, from the artifact's first line | the same | no |
+| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | the same, cut to 60 lines | no |
+| cause | `--cause` | `Cause` | the filer, from `rafa bug codes` | the cause rule's reading: a listed code, or `<family>:new-context`, or `unknown:new-context` | yes, `<family>:new-context` allowed |
+| proposed | `--proposed` | `Proposed cause` | the filer | the session's code, when shaped and no code of the list, beside a `new-context` cause | no, read only beside a `new-context` cause |
+| suspected cause | none | `Suspected cause` | the filer | the session's words, when they are no code | no |
+| module | `--module` | `Module` | the filer | the session's module when a checked name, else `unknown` | yes, `unknown` allowed |
+| action | `--action` | `Action` | the filer | the session's action when a checked name, else `unknown` | yes, `unknown` allowed |
+| reported module | none | `Reported module` | none; the command refuses instead | the session's word, when `Module` is `unknown` | no |
+| reported action | none | `Reported action` | none; the command refuses instead | the session's word, when `Action` is `unknown` | no |
+| project | `--project` | `Project` | the filer | none; the report names no project | no |
+| place | `--env` | `Environment` | rafa suggests, the filer corrects | `ci` when `CI` is set, else `local`, not corrected | yes, `unknown` allowed |
+| versions | `--path` names the file | `Versions` | rafa | the same | always written |
 
 A flag wins over its section. A `--title` is read back through the
 template: a field only the title gives is taken from it, the project
