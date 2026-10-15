@@ -121,6 +121,9 @@ its change reaches:
   named in `[test] preload` of `bunfig.toml`)
 - `tests.integration` (glob list, defaults to `**/*-integration.test.ts`,
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
+- `tests.contract` (glob list, defaults to `**/*.contract.test.ts`) — the
+  contract tests, each checking the promise a package makes to others with
+  a fixture; no step reads this key yet
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a

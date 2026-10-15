@@ -16,9 +16,9 @@ import { FIXTURE_INDENT, scrubbedFilings, serializeFixture } from './extract-sco
  * The pieces of `scripts/extract-scoring-fixture.ts` that run without the
  * board: the filings it reads, each value through the fixture scrub of
  * `src/fixtures/scrub.ts`, and the fixture serializer, whose text passes
- * the `jsonc/indent` rule `eslint.base.mjs` applies to `.json` files and
- * holds both fixture files under `src/triage/testdata/`. No case runs the
- * extract itself, which reads the live board with `gh`.
+ * the `jsonc/indent` rule `packages/eslint-config/base.mjs` applies to
+ * `.json` files and holds both fixture files under `src/triage/testdata/`.
+ * No case runs the extract itself, which reads the live board with `gh`.
  */
 
 const ROOT = resolve(import.meta.dir, '..');
