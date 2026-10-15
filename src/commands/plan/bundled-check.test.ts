@@ -4,11 +4,17 @@
  * temp root with its own `src/bundled/` and `.claude/` links, so no case
  * reads this checkout's bundle or this machine's `~/.claude`.
  *
+ * `notePlanBundledEdits` is read over a `GeneratedPlan` whose plan IS on
+ * disk under a planted project, as `store-check.test.ts` reads
+ * `enforceStoreRules`, since the fixture planner `src/plan.test.ts`
+ * resolves answers a path it never writes.
+ *
  * Each case that answers nothing names, in the same plan or over the
  * same project, a path that does answer, so a reading that never looked
  * cannot pass for one that looked and found nothing.
  */
 import type { BundledEdit } from './bundled-check.js';
+import type { GeneratedPlan } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,8 +24,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { findStoreRuleProblems } from '../../plan/store-rules.js';
 import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
+import { sinkOutput } from '../../tests/output-sinks.js';
 
-import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
+import { bundledEditLine, findBundledEdits, notePlanBundledEdits, writeTierPins } from './bundled-check.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-bundled-check-'));
 
@@ -346,5 +353,98 @@ describe('bundledEditLine', () => {
         + ' each clone that merges it needs the pin `tiers.skills: { dev-planner: project }`',
     );
     expect(bundledEditLine('plans/PLAN-x.md', { ...edit, lines: [5] })).toStartWith('plans/PLAN-x.md:5: a task');
+  });
+});
+
+/** The plan `plan create` answers in {@link plantPlan}. */
+const DEMO_PLAN = 'plans/PLAN-demo.md';
+
+/** The prerequisites file beside {@link DEMO_PLAN}. */
+const DEMO_PREREQUISITES = 'plans/PREREQUISITES-demo.md';
+
+/** A plan editing the bundled agent `doc-updater`. */
+const EDITING_PLAN = planOf('- [ ] Rewrite `src/bundled/agents/doc-updater.md` to read the changes fragment');
+
+/** A fresh project holding {@link DEMO_PLAN} as `plan`, and {@link DEMO_PREREQUISITES} as `prerequisites` when given. */
+function plantPlan(plan: string, prerequisites: string | null): { root: string; generated: GeneratedPlan } {
+  const root = plantProject();
+  mkdirSync(join(root, 'plans'));
+  writeFileSync(join(root, DEMO_PLAN), plan);
+  if (prerequisites !== null) writeFileSync(join(root, DEMO_PREREQUISITES), prerequisites);
+  const prerequisitesPath = prerequisites === null
+    ? null
+    : DEMO_PREREQUISITES;
+  return { root, generated: { planPath: DEMO_PLAN, prerequisitesPath } };
+}
+
+/** What `notePlanBundledEdits` answered over `generated` under `root`, with the lines it wrote. */
+function note(root: string, generated: GeneratedPlan): { answered: GeneratedPlan; info: string[]; warn: string[] } {
+  const info: string[] = [];
+  const warn: string[] = [];
+  const output = sinkOutput({ info: (line) => info.push(line), warn: (line) => warn.push(line) });
+  return { answered: notePlanBundledEdits(root, generated, output), info, warn };
+}
+
+describe('notePlanBundledEdits over the plan rafa plan create generated', () => {
+  it('writes the pin into the derived file when the planner answered none, naming it, and a second run adds nothing', () => {
+    const { root, generated } = plantPlan(EDITING_PLAN, null);
+
+    const first = note(root, generated);
+
+    expect(first.info).toEqual([
+      `ℹ️  ${DEMO_PLAN}:${FIRST_TASK}: a task edits the bundled agent \`doc-updater\``
+        + ' (`src/bundled/agents/doc-updater.md`); each clone that merges it needs the pin'
+        + ` \`tiers.agents: { doc-updater: project }\`, written to ${DEMO_PREREQUISITES} as a [human] prerequisite.`,
+    ]);
+    expect(first.warn).toEqual([]);
+    expect(first.answered).toEqual({ planPath: DEMO_PLAN, prerequisitesPath: DEMO_PREREQUISITES });
+    const text = readFileSync(join(root, DEMO_PREREQUISITES), 'utf8');
+    expect(text).toStartWith('# Prerequisites\n');
+    expect(parsePrerequisites(text).map(({ tag, probe, description }) => ({ tag, probe, description }))).toEqual([
+      { tag: 'human', probe: null, description: expect.stringContaining('`tiers.agents: { doc-updater: project }`') },
+    ]);
+
+    const second = note(root, first.answered);
+
+    expect(second.info).toHaveLength(1);
+    expect(second.info[0]).toEndWith(`, already held by ${DEMO_PREREQUISITES}.`);
+    expect(readFileSync(join(root, DEMO_PREREQUISITES), 'utf8')).toBe(text);
+  });
+
+  it('adds the pin to the prerequisites file the planner wrote and keeps its lines', () => {
+    const planned = '# Prerequisites\n\n## Store [auto]\n'
+      + '- [ ] The installed rafa can read and write the live store: `rafa effort schema --check`\n';
+    const { root, generated } = plantPlan(EDITING_PLAN, planned);
+
+    const { answered, info } = note(root, generated);
+
+    expect(answered).toBe(generated);
+    expect(info).toHaveLength(1);
+    expect(info[0]).toEndWith(`, written to ${DEMO_PREREQUISITES} as a [human] prerequisite.`);
+    const text = readFileSync(join(root, DEMO_PREREQUISITES), 'utf8');
+    expect(text).toStartWith(planned);
+    expect(parsePrerequisites(text).map(({ tag }) => tag)).toEqual(['auto', 'human']);
+  });
+
+  it('prints nothing and writes nothing for a plan naming no bundled item', () => {
+    const { root, generated } = plantPlan(planOf('- [ ] Add a `plan_ci` column reader to the report'), null);
+
+    const { answered, info, warn } = note(root, generated);
+
+    expect(answered).toBe(generated);
+    expect([...info, ...warn]).toEqual([]);
+    expect(existsSync(join(root, DEMO_PREREQUISITES))).toBe(false);
+  });
+
+  it('returns quietly on a plan not on disk, where the same plan on disk is noted', () => {
+    const { root, generated } = plantPlan(EDITING_PLAN, null);
+    const absent: GeneratedPlan = { planPath: 'plans/PLAN-absent.md', prerequisitesPath: null };
+
+    const { answered, info, warn } = note(root, absent);
+
+    expect(answered).toBe(absent);
+    expect([...info, ...warn]).toEqual([]);
+    expect(existsSync(join(root, 'plans', 'PREREQUISITES-absent.md'))).toBe(false);
+    expect(note(root, generated).info).toHaveLength(1);
   });
 });

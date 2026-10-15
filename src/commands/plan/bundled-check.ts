@@ -72,20 +72,35 @@
  *
  * `rafa plan validate` (`./validate.ts`) reads the edits over the
  * project it was handed, prints one {@link bundledEditLine} per edit as a
- * note and, when nothing refuses the plan, writes the pins;
- * `rafa plan create` is the other caller the spec names.
+ * note and, when nothing refuses the plan, writes the pins.
+ *
+ * `rafa plan create` (`src/plan.ts`) calls {@link notePlanBundledEdits}
+ * straight after `enforceStoreRules` (`./store-check.ts`), so a plan the
+ * store rules refuse was moved away and is read no further. It reads the
+ * plan the planner answered, against the root `plan create` runs in,
+ * prints one note per edit and writes the pins into the prerequisites
+ * file the planner answered, or into the `PREREQUISITES-<stub>.md`
+ * `prerequisitesPathForPlan` derives beside the plan when the planner
+ * wrote none. A plan that is not on disk is not read, for the reason
+ * `./store-check.ts` gives: the fixture planner `src/plan.test.ts`
+ * resolves answers a path it never writes. A pin that cannot be written
+ * is warned about and refuses nothing, as no edit does.
  */
 import type { InventoryKind } from '../../inventory/record.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
+import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
 
 import { readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { isFile, parsePlan } from '@open-tomato/rafa/core/plan';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
 import { readAgentDirectory } from '../../agents/roster.js';
 import { BUNDLED_AGENTS_DIR } from '../../inventory/trees.js';
+import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 import { pinLine } from '../../tiers/resolve.js';
 import { SKILL_FILE } from '../../tiers/serve.js';
 
@@ -355,4 +370,50 @@ export function writeTierPins(
     : existing.replace(/\n$/u, '').split('\n');
   writeFileSync(prerequisitesPath, `${withItems(lines, items).join('\n')}\n`);
   return written;
+}
+
+/** What became of one edit's pin on `plan create`, as the tail of its note. */
+function createPinTail(edit: BundledEdit, file: string | null, written: readonly BundledEdit[] | null): string {
+  if (file === null) return 'not written, since a plan not named PLAN-<stub>.md has no PREREQUISITES file';
+  if (written === null) return `not written to ${file}`;
+  return written.includes(edit)
+    ? `written to ${file} as a [human] prerequisite`
+    : `already held by ${file}`;
+}
+
+/**
+ * Notes the bundled agents and skills the plan `plan create` generated
+ * edits, and writes their pins as `[human]` prerequisites; see the
+ * module note. Paths are read against `repoRoot`. Answers `generated`,
+ * its `prerequisitesPath` naming the file the pins went into when the
+ * planner answered none and this call created one; `generated` as it
+ * came for a plan not on disk, one naming no bundled item, and one whose
+ * pins went nowhere new.
+ */
+export function notePlanBundledEdits(
+  repoRoot: string,
+  generated: GeneratedPlan,
+  output: Output = activeOutput(),
+): GeneratedPlan {
+  const planFile = resolve(repoRoot, generated.planPath);
+  if (!isFile(planFile)) return generated;
+  const edits = findBundledEdits(readFileSync(planFile, 'utf8'), { repoRoot });
+  if (edits.length === 0) return generated;
+
+  const file = generated.prerequisitesPath ?? prerequisitesPathForPlan(generated.planPath);
+  let written: readonly BundledEdit[] | null = [];
+  if (file !== null) {
+    try {
+      written = writeTierPins(resolve(repoRoot, file), basename(generated.planPath), edits);
+    } catch (error) {
+      output.warn(`${file}: the tier pins could not be written: ${messageOf(error)}`);
+      written = null;
+    }
+  }
+  for (const edit of edits) {
+    output.info(`ℹ️  ${bundledEditLine(generated.planPath, edit)}, ${createPinTail(edit, file, written)}.`);
+  }
+  return file !== null && generated.prerequisitesPath === null && isFile(resolve(repoRoot, file))
+    ? { ...generated, prerequisitesPath: file }
+    : generated;
 }

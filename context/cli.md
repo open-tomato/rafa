@@ -872,6 +872,9 @@ New; it replaces no earlier text. What a row or an action added to
   `tiers.agents` or `tiers.skills` pin a clone that merges the plan
   needs; when nothing refuses the plan, `writeTierPins` writes each pin
   as a `[human]` item of the `PREREQUISITES-<stub>.md` beside it, once.
+  `plan create` does the same through `notePlanBundledEdits`, straight
+  after its store check, into the prerequisites file the planner wrote
+  or the one derived beside the plan, and refuses nothing for it.
   The roster is the project the dispatcher found and the config that
   resolves there, and the bundle is that project's; handed no project it
   says so, checks no agent and no skill and reads no bundled edit.
