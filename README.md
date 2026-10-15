@@ -409,7 +409,12 @@ writes it; you can change it.
   `project` pin while a loaded user tier does; pin the tier the refusal
   names, or delete or rename the copy it names. `loop start` refuses a
   plan that names an agent or a skill it cannot resolve before any
-  session is paid for.
+  session is paid for. `rafa plan validate` names a plan whose task edits
+  an agent or a skill rafa bundles, with the pin that item needs, and
+  writes the pin as a `[human]` prerequisite of the plan, so a clone that
+  merges the plan sets the pin itself; that note is never a refusal. The
+  pin is not set at merge, since a pin is per clone and gitignored, and
+  one set unasked would hide the drift `doctor` shows.
 - User-tier items are invisible unless `loop.settingSources` includes
   `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
   <name>` copies one in or updates it, and `rafa skill check .claude/skills

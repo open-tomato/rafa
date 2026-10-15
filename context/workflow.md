@@ -36,7 +36,8 @@ edit. This repository's `.claude/agents/<name>.md` for each is a
 symbolic link into it, and `dev-planner`, `git-workflow` and the
 `documentation` skill's `SKILL.md` under `.claude/skills/` are linked
 the same way into `src/bundled/skills/`. The five tracked rows
-travel with the package.
+travel with the package. A plan task that edits one of them gets the note
+and the `[human]` pin described in the preflight paragraph below.
 
 **The defaults carry no user-level agent.** `cleanup` →
 `refactor-cleaner` and a TypeScript review → `typescript-reviewer`
@@ -75,7 +76,11 @@ with different contents refuses the run too, naming both paths and its
 `tiers.skills` pin line, and so does one the resolution resolves to no
 winner, exactly as an agent does: one no tier holds, one `tiers.skills`
 switches off, or one only an unloaded tier holds.
-`rafa plan validate` runs the same check and exits 1 on the same plan.
+`rafa plan validate` runs the same check and exits 1 on the same plan. A
+task that edits a bundled agent or skill is no part of that check:
+`rafa plan validate` and `rafa plan create` note the edit and write its pin
+as a `[human]` prerequisite of the plan, and refuse nothing for it
+(`src/commands/plan/bundled-check.ts`).
 
 **`agent=` outranks `model` and `tools` because routing supplies both.** A
 declaration carrying an agent never passes `--model` or `--tools`: the agent
