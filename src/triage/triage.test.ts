@@ -58,6 +58,7 @@
  * the same report without `checkout` beside it as its control.
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
@@ -84,6 +85,7 @@ import { RAFA_VERSION } from '../core/command/index.js';
 import { writeFindings } from '../effort/store/findings.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
+import { RAFA_CODES } from '../errors/rafa-codes.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { DEFAULT_BUG_RULES } from './bug-filing.js';
@@ -235,7 +237,7 @@ function reportWith(parts: Partial<TaskReport> = {}): TaskReport {
 }
 
 function bug(what: string | null, artifact: string | null, security: boolean | null): ReportBug {
-  return { what, artifact, security, kind: 'bug', extras: [] };
+  return { what, artifact, security, kind: 'bug', module: null, action: null, reproduce: null, cause: null, extras: [] };
 }
 
 function blocker(what: string | null): ReportBlocker {
@@ -1541,5 +1543,158 @@ describe('the Refs section', () => {
     expect(onlyIssue(f.publicDir).draft.body).toContain(`- path \`src/a.ts\`: \`blob:${sha}\``);
     // Control: read in the root, which is no repository, the same path is unread.
     expect(onlyIssue(control.publicDir).draft.body).toContain('- path `src/a.ts`: `unread`');
+  });
+});
+
+describe('the bug record of a filed bug', () => {
+  /** A known code of the `git` family. */
+  const KNOWN_CODE = RAFA_CODES.find((entry) => entry.code.startsWith('git:'))!.code;
+
+  /** The versions a body shows with no package and the commit `abc1234`. */
+  const VERSIONS = fence(`rafa: ${RAFA_VERSION}\ncode: abc1234`);
+
+  /** A git runner answering one clean commit. */
+  const GIT: GitRunner = (args) => args[0] === 'rev-parse'
+    ? { ok: true, stdout: 'abc1234\n', stderr: '' }
+    : { ok: true, stdout: '', stderr: '' };
+
+  /** The options every case files under: a quiet environment, so the place reads `local` whatever `CI` the suite runs under. */
+  const CONTEXT: Partial<TriageOptions> = { env: {}, git: GIT };
+
+  /** A bug with the four keys, and anything else, set. */
+  function keyed(what: string, artifact: string | null, security: boolean, keys: Partial<ReportBug>): ReportBug {
+    return { ...bug(what, artifact, security), ...keys };
+  }
+
+  /** The sections of a filed body that follow `Feedback`, each as its own block. */
+  function afterFeedback(body: string): string {
+    const marker = '## Feedback\n\n';
+    const start = body.indexOf(marker);
+    expect(start).toBeGreaterThan(-1);
+    const fenceEnd = body.indexOf('\n```\n', start + marker.length + 3);
+    return body.slice(fenceEnd + '\n```\n'.length).trimStart();
+  }
+
+  /** The headings of a body's sections, in order. */
+  function headingsOf(body: string): string[] {
+    return body.split('\n').filter((line) => line.startsWith('## '))
+      .map((line) => line.slice('## '.length));
+  }
+
+  it('of a four-key entry files the title the template renders, the module and cause on the draft, and every record section after Feedback', async () => {
+    const f = fixture();
+    const entry = keyed('Parser drops the last line', ARTIFACT, false, {
+      module: 'loop',
+      action: 'start',
+      reproduce: 'rafa loop start --continue',
+      cause: KNOWN_CODE,
+    });
+
+    await triage(f, reportWith({ outOfScopeBugs: [entry] }), CONTEXT);
+
+    const { draft } = onlyIssue(f.publicDir);
+    expect(draft.title).toBe('loop - start: Parser drops the last line');
+    expect(draft.module).toBe('loop');
+    expect(draft.cause).toBe(KNOWN_CODE);
+    expect(afterFeedback(draft.body)).toBe([
+      `## Reproduce\n\n${fence('rafa loop start --continue')}`,
+      `## Cause\n\n${KNOWN_CODE}`,
+      '## Module\n\nloop',
+      '## Action\n\nstart',
+      '## Environment\n\nlocal',
+      `## Versions\n\n${VERSIONS}`,
+    ].join('\n\n') + '\n');
+    // The sections above Feedback keep their text.
+    expect(draft.body).toContain(`## What\n\n${fence('Parser drops the last line')}\n\n## Artifact\n\n${fence(ARTIFACT)}`);
+    expect(draft.body).toContain(`## Recurrence key\n\n${fence(KEY)}`);
+    // Control: a keyless entry on the same fixture shape has no module prefix.
+    const control = fixture();
+    await triage(control, reportWith({ outOfScopeBugs: [keyed('Parser drops the last line', ARTIFACT, false, {})] }), CONTEXT);
+    expect(onlyIssue(control.publicDir).draft.title).toBe('Parser drops the last line');
+  });
+
+  it('of a keyless entry files the cut summary alone, cause unknown:new-context and module unassigned', async () => {
+    const f = fixture();
+    const what = `${'w'.repeat(DEFAULT_BUG_RULES.summaryMax + 40)}`;
+
+    await triage(f, reportWith({ outOfScopeBugs: [keyed(what, null, false, {})] }), CONTEXT);
+
+    const { draft } = onlyIssue(f.publicDir);
+    expect(Array.from(draft.title)).toHaveLength(DEFAULT_BUG_RULES.summaryMax);
+    expect(draft.title).toBe(`${'w'.repeat(DEFAULT_BUG_RULES.summaryMax - 3)}...`);
+    expect(draft.title).not.toContain(' - ');
+    expect(draft.cause).toBe('unknown:new-context');
+    expect(draft.module).toBe('unassigned');
+    expect(headingsOf(afterFeedback(draft.body))).toEqual(['Reproduce', 'Cause', 'Module', 'Action', 'Environment', 'Versions']);
+    expect(afterFeedback(draft.body)).toContain('## Module\n\nunknown\n');
+    // The What section keeps the whole text the cut shortened.
+    expect(draft.body).toContain(`## What\n\n${fence(what)}`);
+  });
+
+  it('of a cause in words files Suspected cause, beside the cause unknown:new-context', async () => {
+    const f = fixture();
+    const words = 'the parser trusts the caller to pass a line';
+
+    await triage(f, reportWith({ outOfScopeBugs: [keyed('Parser drops the last line', null, false, { cause: words })] }), CONTEXT);
+
+    const { draft } = onlyIssue(f.publicDir);
+    expect(draft.cause).toBe('unknown:new-context');
+    expect(afterFeedback(draft.body)).toContain(`## Suspected cause\n\n${fence(words)}`);
+    expect(headingsOf(draft.body)).not.toContain('Proposed cause');
+    // Control: a known code files no Suspected cause.
+    const control = fixture();
+    await triage(control, reportWith({ outOfScopeBugs: [keyed('Parser drops the last line', null, false, { cause: KNOWN_CODE })] }), CONTEXT);
+    expect(headingsOf(onlyIssue(control.publicDir).draft.body)).not.toContain('Suspected cause');
+  });
+
+  it('of the module Loop Start files unknown, the word kept in a Reported module section', async () => {
+    const f = fixture();
+
+    await triage(f, reportWith({ outOfScopeBugs: [keyed('Parser drops the last line', null, false, { module: 'Loop Start' })] }), CONTEXT);
+
+    const { draft } = onlyIssue(f.publicDir);
+    expect(draft.title).toBe('Parser drops the last line');
+    expect(draft.module).toBe('unassigned');
+    const after = afterFeedback(draft.body);
+    expect(after).toContain('## Module\n\nunknown');
+    expect(after).toEndWith(`## Reported module\n\n${fence('Loop Start')}\n`);
+    expect(headingsOf(after)).not.toContain('Reported action');
+  });
+
+  it('of a test-failure artifact files a Rerun section after Reproduce', async () => {
+    const f = fixture();
+    const artifact = 'src/a.test.ts:\n(fail) outer > inner reads the case [0.19ms]';
+
+    await triage(f, reportWith({ outOfScopeBugs: [keyed('A test went red', artifact, false, {})] }), CONTEXT);
+
+    const { draft } = onlyIssue(f.publicDir);
+    expect(headingsOf(afterFeedback(draft.body)).slice(0, 2)).toEqual(['Reproduce', 'Rerun']);
+    expect(draft.body).toContain(`## Rerun\n\n${fence('bun test src/a.test.ts -t "outer inner reads the case"')}`);
+    // The artifact is kept whole beside it.
+    expect(draft.body).toContain(`## Artifact\n\n${fence(artifact)}`);
+    // Control: an artifact naming no case files no Rerun.
+    const control = fixture();
+    await triage(control, reportWith({ outOfScopeBugs: [keyed('A test went red', ARTIFACT, false, {})] }), CONTEXT);
+    expect(headingsOf(onlyIssue(control.publicDir).draft.body)).not.toContain('Rerun');
+  });
+
+  it('of a security entry is carried by the private tracker\'s issue, the public one never asked', async () => {
+    const f = fixture();
+    const entry = keyed('Token printed to the log', ARTIFACT, true, {
+      module: 'loop',
+      action: 'start',
+      reproduce: 'rafa loop start --continue',
+      cause: KNOWN_CODE,
+    });
+
+    await triage(f, reportWith({ outOfScopeBugs: [entry] }), CONTEXT);
+
+    expect(f.publicSpy.calls).toEqual([]);
+    const { draft } = onlyIssue(f.privateDir);
+    expect(draft.title).toBe('loop - start: Token printed to the log');
+    expect(draft.module).toBe('loop');
+    expect(draft.cause).toBe(KNOWN_CODE);
+    expect(headingsOf(afterFeedback(draft.body))).toEqual(['Reproduce', 'Cause', 'Module', 'Action', 'Environment', 'Versions']);
+    expect(draft.body).toContain(`## Versions\n\n${VERSIONS}`);
   });
 });
