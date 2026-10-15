@@ -17,9 +17,9 @@
  *     outside the order and has its own key.
  *   - `logger.modules` gives one module a level of its own, over
  *     `logger.level`: `modules: { board: { level: debug } }`. It is one
- *     of the map settings `config.ts` merges across layers, so the
- *     user's and the project's maps are joined by module name, the
- *     project's entry winning for a module both name. A module's mapping
+ *     of the map settings `config.ts` merges across layers (its spec
+ *     sets `map`), so the user's and the project's maps are joined by
+ *     module name, the project's entry winning for a module both name. A module's mapping
  *     holds `level` today, and any other key is kept and warned about.
  *   - `logger.api` turns on `api` entries, the metadata of each request
  *     to a service. Off by default.
@@ -115,7 +115,7 @@ export const LOGGER_SETTINGS: { readonly [K in keyof LoggerConfigSettings]: Sett
   loggerKind: { key: 'logger.kind', read: text('an adapter kind, such as console'), cli: false },
   loggerLevel: { key: 'logger.level', read: oneOf(LOG_LEVELS), cli: false },
   loggerTheme: { key: 'logger.theme', read: oneOf(LOGGER_THEMES), cli: false },
-  loggerModules: { key: 'logger.modules', read: mapOf(moduleLevel, MODULE_EXPECTED), cli: false },
+  loggerModules: { key: 'logger.modules', read: mapOf(moduleLevel, MODULE_EXPECTED), cli: false, map: true },
   loggerCallSite: { key: 'logger.callSite', read: flag, cli: false },
   loggerApi: { key: 'logger.api', read: flag, cli: false },
 };

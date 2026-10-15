@@ -548,13 +548,14 @@ export function readConfigDocument(parsed: unknown, path: string): ConfigFile {
   return { path, values: read.layer, extras: [...sorted.extras, ...read.extras] };
 }
 
-/** The settings whose value is a map, merged by key across layers. */
-const MAP_SETTINGS: ReadonlySet<ConfigSetting> = new Set<ConfigSetting>([
-  'tiersSkills',
-  'tiersAgents',
-  'routing',
-  'loggerModules',
-]);
+/**
+ * Whether `setting` is a map merged by key across layers: its registered
+ * spec sets `map`. Read off the active registry, so core names no
+ * section's map setting.
+ */
+function isMapSetting(setting: ConfigSetting): boolean {
+  return specOf(setting).map === true;
+}
 
 /**
  * Merges map layers by key, later layers over earlier ones. A `false`
@@ -639,7 +640,7 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     if (fromCli !== undefined) return { value: fromCli, source: 'cli' };
     const fromFile = file?.values[setting];
     const fromUser = user?.values[setting];
-    if (MAP_SETTINGS.has(setting)) {
+    if (isMapSetting(setting)) {
       const merged = mergeMaps(defaults[setting], fromUser, fromFile);
       const source = fromFile !== undefined
         ? 'file'
