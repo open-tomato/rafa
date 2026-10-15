@@ -2,7 +2,7 @@
 
 Coverage: 2005 of 2005 tracked files read (src/ and packages/*/src/).
 
-2005 files, 10390 edges (8153 value, 2237 type), 26 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
+2005 files, 10389 edges (8153 value, 2236 type), 26 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
 
 ## Clusters by size
 
@@ -39,36 +39,36 @@ Coverage: 2005 of 2005 tracked files read (src/ and packages/*/src/).
 
 | Rank | File | Betweenness | Cluster |
 | --- | --- | --- | --- |
-| 1 | `src/ports/index.ts` | 53900.324467 | `c02-index` |
-| 2 | `src/effort/store/merge-store.ts` | 43899.869991 | `c04-sqlite` |
-| 3 | `src/config-registry.ts` | 24212.851893 | `c06-index` |
-| 4 | `src/tests/cli-capture.ts` | 22552.136211 | `c05-cli-capture` |
-| 5 | `src/core/command/index.ts` | 19366.579948 | `c03-index` |
-| 6 | `src/board/roadmap.ts` | 18289.824986 | `c01-github` |
-| 7 | `src/core/config/index.ts` | 17950.872632 | `c06-index` |
-| 8 | `src/adapters/tracker/github.ts` | 15542.98635 | `c01-github` |
-| 9 | `src/core/loop/index.ts` | 15261.107382 | `c05-cli-capture` |
-| 10 | `src/commands/index.ts` | 14767.740724 | `c03-index` |
-| 11 | `src/start/dispatch.ts` | 12664.200326 | `c02-index` |
-| 12 | `src/board/relations/labels.ts` | 12591.216858 | `c01-github` |
-| 13 | `src/pr/index.ts` | 12273.438894 | `c03-index` |
-| 14 | `src/board/setup.ts` | 12244.976965 | `c01-github` |
-| 15 | `src/start/loop-events.ts` | 11979.592705 | `c02-index` |
-| 16 | `src/next/sources.ts` | 11931.732871 | `c01-github` |
-| 17 | `src/adapter-registry.ts` | 11360.74178 | `c03-index` |
-| 18 | `src/project/scaffold.ts` | 10346.833629 | `c05-cli-capture` |
-| 19 | `src/config-schema-issues.ts` | 9725.484908 | `c06-index` |
-| 20 | `src/board/gate.ts` | 9495.598843 | `c08-index` |
-| 21 | `src/effort/store/sqlite.ts` | 9492.604919 | `c04-sqlite` |
-| 22 | `src/board/project/refresh.ts` | 9374.885593 | `c01-github` |
-| 23 | `src/core/config/scope.ts` | 8406.294744 | `c06-index` |
-| 24 | `src/effort/store/development-build.ts` | 8387.006685 | `c04-sqlite` |
-| 25 | `src/core/output/active.ts` | 7751.914188 | `c02-index` |
-| 26 | `src/effort/collect.ts` | 7737.558868 | `c04-sqlite` |
-| 27 | `src/core/config/config-load.ts` | 7393.348689 | `c06-index` |
-| 28 | `src/refs/extract.ts` | 7141.175336 | `c12-verify` |
-| 29 | `src/board/issue.ts` | 6829.144912 | `c01-github` |
-| 30 | `src/core/command/types.ts` | 6526.667349 | `c06-index` |
+| 1 | `src/ports/index.ts` | 50619.910016 | `c02-index` |
+| 2 | `src/effort/store/merge-store.ts` | 43894.869991 | `c04-sqlite` |
+| 3 | `src/config-registry.ts` | 24424.49475 | `c06-index` |
+| 4 | `src/tests/cli-capture.ts` | 22275.867496 | `c05-cli-capture` |
+| 5 | `src/core/command/index.ts` | 18895.134436 | `c03-index` |
+| 6 | `src/board/roadmap.ts` | 18376.508644 | `c01-github` |
+| 7 | `src/core/config/index.ts` | 17814.103584 | `c06-index` |
+| 8 | `src/core/loop/index.ts` | 15151.115715 | `c05-cli-capture` |
+| 9 | `src/adapters/tracker/github.ts` | 14924.344528 | `c01-github` |
+| 10 | `src/commands/index.ts` | 14784.382684 | `c03-index` |
+| 11 | `src/board/relations/labels.ts` | 12839.034968 | `c01-github` |
+| 12 | `src/board/setup.ts` | 12810.842296 | `c01-github` |
+| 13 | `src/start/dispatch.ts` | 12679.146754 | `c02-index` |
+| 14 | `src/pr/index.ts` | 12176.75437 | `c03-index` |
+| 15 | `src/start/loop-events.ts` | 12012.641515 | `c02-index` |
+| 16 | `src/next/sources.ts` | 11969.398419 | `c01-github` |
+| 17 | `src/adapter-registry.ts` | 11605.231729 | `c03-index` |
+| 18 | `src/project/scaffold.ts` | 10503.033629 | `c05-cli-capture` |
+| 19 | `src/board/gate.ts` | 10210.33135 | `c08-index` |
+| 20 | `src/config-schema-issues.ts` | 9931.937288 | `c06-index` |
+| 21 | `src/board/project/refresh.ts` | 9443.264164 | `c01-github` |
+| 22 | `src/effort/store/sqlite.ts` | 9386.521586 | `c04-sqlite` |
+| 23 | `src/effort/store/development-build.ts` | 8373.406685 | `c04-sqlite` |
+| 24 | `src/core/config/scope.ts` | 8236.525697 | `c06-index` |
+| 25 | `src/effort/collect.ts` | 7733.892202 | `c04-sqlite` |
+| 26 | `src/core/output/active.ts` | 7396.177284 | `c02-index` |
+| 27 | `src/refs/extract.ts` | 7277.958669 | `c12-verify` |
+| 28 | `src/core/config/config-load.ts` | 7203.746308 | `c06-index` |
+| 29 | `src/board/issue.ts` | 6900.144912 | `c01-github` |
+| 30 | `src/bugs/record.ts` | 6715.169841 | `c02-index` |
 
 ## Unresolved imports
 

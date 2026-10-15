@@ -17,7 +17,7 @@
  * The entry exports no runtime value, so importing it runs nothing and
  * adds nothing to a service's bundle. Its imports are `import type`
  * lines, which the bundler erases, so naming {@link GeneratedPlan}'s
- * review type pulls `src/board/spec-review.ts` into no bundle. That
+ * review type pulls `./spec-review.ts` into no bundle. That
  * keeps three things a port could otherwise carry out of this module:
  *
  *   - The store's key projection, `EFFORT_KEY_PROJECTIONS`, which is a
@@ -114,7 +114,7 @@
  */
 import type { BlessedBundle, MergeResult, SyncPayload } from './learning.js';
 import type { LogLevel } from './log-level.js';
-import type { SpecReviewReading } from '../board/spec-review.js';
+import type { SpecReviewReading } from './spec-review.js';
 import type { MergeResult as StoreMergeResult } from '../effort/store/merge-store.js';
 
 export type { LogLevel } from './log-level.js';

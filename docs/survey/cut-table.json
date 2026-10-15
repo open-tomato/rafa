@@ -3613,15 +3613,7 @@
   "packages": [
     {
       "clearedByIssue118": 0,
-      "edges": [
-        {
-          "from": "src/ports/index.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
-          "to": "src/board/spec-review.ts",
-          "toPackage": "rafa-board"
-        }
-      ],
+      "edges": [],
       "fileCounts": {
         "source": 114,
         "test": 116,
@@ -3879,8 +3871,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 1,
-      "upwardEdges": 1
+      "remaining": 0,
+      "upwardEdges": 0
     },
     {
       "clearedByIssue118": 0,
@@ -7670,10 +7662,10 @@
     "clearedByIssue118": 0,
     "files": 2005,
     "leftToPlace": 719,
-    "nonTestEdges": 4450,
+    "nonTestEdges": 4449,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 253
+    "upwardEdges": 252
   },
   "unassigned": [
     {

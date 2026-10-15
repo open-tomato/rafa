@@ -467,6 +467,7 @@
     "src/plan/risk/patterns.ts": "c4",
     "src/plan/risk/secrets.ts": "c4",
     "src/plan/store-rules.ts": "c3",
+    "src/ports/spec-review.ts": "c6",
     "src/pr/checks.ts": "c1",
     "src/pr/conflict-sentence.ts": "c3",
     "src/pr/gh-closing-issues.ts": "c1",
