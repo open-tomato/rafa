@@ -3619,13 +3619,6 @@
         {
           "from": "src/core/command/command.ts",
           "fromPackage": "@open-tomato/rafa",
-          "kind": "value",
-          "to": "src/cli/spends.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/command/command.ts",
-          "fromPackage": "@open-tomato/rafa",
           "kind": "type",
           "to": "src/project/scope.ts",
           "toPackage": "@open-tomato/rafa-cli"
@@ -3758,8 +3751,8 @@
         }
       ],
       "fileCounts": {
-        "source": 99,
-        "test": 107,
+        "source": 100,
+        "test": 108,
         "testSupport": 2
       },
       "files": [
@@ -3773,6 +3766,8 @@
         "src/core/command/confirm.ts",
         "src/core/command/index.test.ts",
         "src/core/command/index.ts",
+        "src/core/command/spends.test.ts",
+        "src/core/command/spends.ts",
         "src/core/command/types.test.ts",
         "src/core/command/types.ts",
         "src/core/command/version.test.ts",
@@ -3973,7 +3968,7 @@
         "src/schema/tiers.ts"
       ],
       "filesByFolder": {
-        "src/core/": 83,
+        "src/core/": 85,
         "src/effort/store/": 114,
         "src/ports/": 3
       },
@@ -3990,8 +3985,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 21,
-      "upwardEdges": 21
+      "remaining": 20,
+      "upwardEdges": 20
     },
     {
       "clearedByIssue118": 0,
@@ -6997,7 +6992,7 @@
       "edges": [],
       "fileCounts": {
         "source": 264,
-        "test": 468,
+        "test": 467,
         "testSupport": 27
       },
       "files": [
@@ -7094,7 +7089,6 @@
         "src/cli/running.test.ts",
         "src/cli/running.ts",
         "src/cli/spends-roster.test.ts",
-        "src/cli/spends.test.ts",
         "src/cli/spends.ts",
         "src/commands/agent/list.test.ts",
         "src/commands/agent/list.ts",
@@ -7762,7 +7756,7 @@
         "src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 36
+        "src/cli/": 35
       },
       "folders": [
         "src/cli/"
@@ -7780,12 +7774,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1982,
+    "files": 1983,
     "leftToPlace": 718,
-    "nonTestEdges": 4425,
+    "nonTestEdges": 4427,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 273
+    "upwardEdges": 272
   },
   "unassigned": [
     {

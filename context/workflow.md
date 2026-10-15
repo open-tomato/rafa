@@ -658,8 +658,9 @@ structure, running any custom checks, and reporting every failure. If all
 checks pass, the person is offered the result: a yes confirms the action
 and the command ends successfully, a no discards it and the command exits
 with no state written, asking why only in a test. Commands that read a
-form declare their own `spends` on their `RafaCommand` (`src/cli/spends.ts`)
-for the one session they will start if the person reaches the form. No
+form declare their own `spends` on their `RafaCommand`
+(`src/core/command/spends.ts`) for the one session they will start if the
+person reaches the form. No
 command spawns a second Claude session, no prompt asks the person to
 continue in Claude Code, and no runtime dependency enters the package:
 the prompt kit runs in raw mode on `stdio` and every session reads the

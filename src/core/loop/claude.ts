@@ -154,10 +154,10 @@
  * ## The spend guard
  *
  * Both doors warn when the running command's `spends` declaration
- * (`src/cli/spends.ts`) does not cover the session they start, and start
- * it anyway: usage is never a gate. The running command is the one the
- * dispatcher recorded with its parsed flags (`src/cli/running.ts`). The
- * check runs once per session, before `Bun.spawn`: {@link spawnClaude}
+ * (`src/core/command/spends.ts`) does not cover the session they start,
+ * and start it anyway: usage is never a gate. The running command is the
+ * one the dispatcher recorded with its parsed flags (`src/cli/running.ts`).
+ * The check runs once per session, before `Bun.spawn`: {@link spawnClaude}
  * in json mode hands its session to the same unchecked spawner
  * {@link spawnClaudeCaptured} uses rather than to that door, and so does
  * not warn a second time.

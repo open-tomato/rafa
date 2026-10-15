@@ -2955,9 +2955,10 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 ### The spends declaration
 
 A command that can start a Claude session declares it with a `spends` field
-of type `CommandSpend` (`src/cli/spends.ts`). The declaration has four forms,
-each named by `when` and carrying `what`, a short phrase describing what the
-session does:
+of type `CommandSpend` (`src/core/command/spends.ts`, exported by the
+command barrel; `src/cli/spends.ts` re-exports it for `describe.ts` and
+`help.ts`). The declaration has four forms, each named by `when` and
+carrying `what`, a short phrase describing what the session does:
 
 - `always`: the command may start a session on any run (`plan create`,
   `loop start`, `epic close`).

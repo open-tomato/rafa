@@ -1,23 +1,24 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name `command.ts`,
- * `confirm.ts`, `types.ts` and `version.ts` export, each once, as the
- * same binding, and no other name.
+ * `confirm.ts`, `spends.ts`, `types.ts` and `version.ts` export, each
+ * once, as the same binding, and no other name.
  *
- * The barrel spells its names, so a name added to one of the four files
+ * The barrel spells its names, so a name added to one of the five files
  * and not to the barrel is a name no file outside `src/core/` can import.
  * Nothing here is spelled a second time: both sides are read off the
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `src/core/config/sections.test.ts`
  * reads its barrel.
  *
- * The four files hold no name in common, which the second case holds on
+ * The five files hold no name in common, which the second case holds on
  * its own: were one name on two files, the barrel could export one of
  * the two bindings only, and the joined list below would hide which.
  *
- * Five names are held by name, so a reading that came back empty, or one
- * that saw runtime names alone, fails rather than agreeing with itself:
- * `RafaCommand`, a type of `command.ts`; `Prompter`, a type of
- * `confirm.ts`; `CliContext`, a type of `types.ts`, which exports no
+ * Seven names are held by name, so a reading that came back empty, or
+ * one that saw runtime names alone, fails rather than agreeing with
+ * itself: `RafaCommand`, a type of `command.ts`; `Prompter`, a type of
+ * `confirm.ts`; `CommandSpend`, a type of `spends.ts`, and `spendsMark`,
+ * a function of it; `CliContext`, a type of `types.ts`, which exports no
  * runtime name; `versionLine`, a function of `version.ts`, which exports
  * no type; and `CommandExit`, the class every command refuses with.
  */
@@ -28,6 +29,7 @@ import ts from 'typescript';
 
 import * as command from './command.js';
 import * as confirm from './confirm.js';
+import * as spends from './spends.js';
 import * as types from './types.js';
 import * as version from './version.js';
 
@@ -38,6 +40,7 @@ const ROOT = resolve(import.meta.dir, '../../..');
 const BARREL = 'src/core/command/index.ts';
 const COMMAND = 'src/core/command/command.ts';
 const CONFIRM = 'src/core/command/confirm.ts';
+const SPENDS = 'src/core/command/spends.ts';
 const TYPES = 'src/core/command/types.ts';
 const VERSION = 'src/core/command/version.ts';
 
@@ -83,36 +86,40 @@ function onTwo(lists: readonly (readonly string[])[]): string[] {
   return [...new Set(all.filter((name, index) => all.indexOf(name) !== index))].sort();
 }
 
-/** The runtime bindings of the four files; the second case holds that no name is lost to the spread. */
-const BEHIND: Readonly<Record<string, unknown>> = { ...command, ...confirm, ...types, ...version };
+/** The runtime bindings of the five files; the second case holds that no name is lost to the spread. */
+const BEHIND: Readonly<Record<string, unknown>> = { ...command, ...confirm, ...spends, ...types, ...version };
 
 describe('the command barrel', () => {
-  it('exports the runtime names of the four files, each once, and no other', () => {
+  it('exports the runtime names of the five files, each once, and no other', () => {
     const expected = [
       ...Object.keys(command),
       ...Object.keys(confirm),
+      ...Object.keys(spends),
       ...Object.keys(types),
       ...Object.keys(version),
     ].sort();
 
     expect(Object.keys(command)).toContain('CommandExit');
     expect(Object.keys(confirm)).toContain('createLinePrompter');
+    expect(Object.keys(spends)).toContain('spendsMark');
     expect(Object.keys(types)).toEqual([]);
     expect(Object.keys(version)).toContain('versionLine');
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
-  it('reads four files that hold no name in common, type or runtime', () => {
-    const names = readExportNames([COMMAND, CONFIRM, TYPES, VERSION]);
+  it('reads five files that hold no name in common, type or runtime', () => {
+    const names = readExportNames([COMMAND, CONFIRM, SPENDS, TYPES, VERSION]);
 
     expect(names[COMMAND]?.length).toBeGreaterThan(0);
     expect(names[CONFIRM]?.length).toBeGreaterThan(0);
+    expect(names[SPENDS]?.length).toBeGreaterThan(0);
     expect(names[TYPES]?.length).toBeGreaterThan(0);
     expect(names[VERSION]?.length).toBeGreaterThan(0);
     expect(onTwo([['a', 'b'], ['b', 'c'], ['c']])).toEqual(['b', 'c']);
     expect(onTwo([
       names[COMMAND] ?? [],
       names[CONFIRM] ?? [],
+      names[SPENDS] ?? [],
       names[TYPES] ?? [],
       names[VERSION] ?? [],
     ])).toEqual([]);
@@ -127,21 +134,24 @@ describe('the command barrel', () => {
     }
   });
 
-  it('exports the type names of the four files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, COMMAND, CONFIRM, TYPES, VERSION]);
+  it('exports the type names of the five files with the runtime ones, each once, and no other', () => {
+    const names = readExportNames([BARREL, COMMAND, CONFIRM, SPENDS, TYPES, VERSION]);
     const expected = [
       ...(names[COMMAND] ?? []),
       ...(names[CONFIRM] ?? []),
+      ...(names[SPENDS] ?? []),
       ...(names[TYPES] ?? []),
       ...(names[VERSION] ?? []),
     ].sort();
 
     expect(names[COMMAND]).toContain('RafaCommand');
     expect(names[CONFIRM]).toContain('Prompter');
+    expect(names[SPENDS]).toContain('CommandSpend');
     expect(names[TYPES]).toContain('CliContext');
     expect(names[VERSION]).toContain('versionLine');
     expect(Object.keys(command)).not.toContain('RafaCommand');
     expect(Object.keys(confirm)).not.toContain('Prompter');
+    expect(Object.keys(spends)).not.toContain('CommandSpend');
     expect(names[BARREL]).toEqual(expected);
   });
 });

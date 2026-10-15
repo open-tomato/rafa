@@ -60,7 +60,7 @@
  * The registry refuses a core command it answers for, and the module
  * loader skips the file of a module command it answers for.
  *
- * `spends` is checked last, by `spendsProblem` (`src/cli/spends.ts`),
+ * `spends` is checked last, by `spendsProblem` (`spends.ts` beside this file),
  * whose sentence names the field inside it: `spends.flag is "resolve",
  * expected a flag as typed, starting with --`. A module entry declaring a
  * malformed `spends` is therefore skipped like any other bad shape.
@@ -86,14 +86,15 @@
  * The field is declared here rather than on `FlagSpec`, so the copy of
  * `cli-core`'s contracts in `types.ts` keeps the source's shape.
  */
+import type { CommandSpend } from './spends.js';
 import type { CliCommand, CliContext, FlagSpec } from './types.js';
 import type { CommandRegistry } from '../../cli/registry.js';
-import type { CommandSpend } from '../../cli/spends.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DangerousPhrases } from '../config/dangerous.js';
 
-import { spendsProblem } from '../../cli/spends.js';
 import { describeValue } from '../config/config-sections.js';
+
+import { spendsProblem } from './spends.js';
 
 /** What an action can render: text a person reads, NDJSON events, one line per loop event, or the TUI. */
 export const COMMAND_OUTPUTS = ['text', 'json', 'events', 'tui'] as const;
@@ -188,8 +189,8 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
   readonly needsProject?: boolean;
   /**
    * Whether running the command can start a Claude Code session, and
-   * under what condition; absent, it spends nothing. See
-   * `src/cli/spends.ts`.
+   * under what condition; absent, it spends nothing. See `spends.ts`
+   * beside this file.
    */
   readonly spends?: CommandSpend;
   /**

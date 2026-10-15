@@ -75,8 +75,7 @@
  * one line that named `rafa plan waits`, and `cli/running.ts` was
  * restored sha256-identical.
  */
-import type { CommandSpend } from '../cli/spends.js';
-import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
+import type { CommandSpend, RafaCommand, RafaFlagSpec } from '../core/command/index.js';
 import type { OutputStream } from '../core/output/index.js';
 
 import '../adapter-registry.js';

@@ -164,9 +164,9 @@ import type {
   CapturingSpawner,
   ClaudeSpawner,
 } from './claude.js';
-import type { CommandSpend } from '../../cli/spends.js';
 import type { AgentEffortLookup } from '../../utils/declaration.js';
 import type { RafaCommand } from '../command/command.js';
+import type { CommandSpend } from '../command/spends.js';
 import type { ClaudeSettingSource } from '../config/config-sections.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
