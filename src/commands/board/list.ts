@@ -176,7 +176,7 @@ export async function readBoardList(context: RafaContext, seams: BoardListSeams)
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const listing = await readListing(gh);
   const defaultBoard = defaultBoardOnce(config, gh, listing);

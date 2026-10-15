@@ -111,10 +111,12 @@
  *     plan` has today. The webhook adapter phase 6 adds lands a plan on a
  *     branch, which may widen the answer.
  */
+import type { LogLevel } from './log-level.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
 import type { MergeResult as StoreMergeResult } from '../effort/store/merge-store.js';
 import type { BlessedBundle, MergeResult, SyncPayload } from '../learning/types.js';
 
+export type { LogLevel } from './log-level.js';
 export type {
   BlessedBundle,
   InstinctRecord,
@@ -545,14 +547,6 @@ export interface Output {
 // ---------------------------------------------------------------------
 // Logger
 // ---------------------------------------------------------------------
-
-/**
- * How loud a log entry is, or `api` for the metadata of one request and
- * its response. `error`, `warn` and `debug` are ordered, quietest first;
- * `api` sits outside that order and is turned on by itself. There is no
- * `info`: that is a command's own text, which goes through {@link Output}.
- */
-export type LogLevel = 'error' | 'warn' | 'debug' | 'api';
 
 /** One request to a service and what came back, as metadata only: never a body. */
 export interface ApiExchange {

@@ -213,6 +213,11 @@ export interface WorktreeRequest {
   readonly planStub: string | null;
   /** The base the branch is cut from, as `origin/<base>`. */
   readonly base: string;
+  /**
+   * `naming.branch`, the template the plan's branch is named from
+   * (`branchNameFor`); `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** How this module reaches git, and how it waits between two tries of the upstream step. */
@@ -634,11 +639,13 @@ export function addRunWorktree(
   const git = gitIn(request.projectRoot);
   const stub = request.planStub?.trim() ?? '';
   if (stub === '') {
-    throw new CommandExit(1, '\n❌ Cannot add a worktree for a plan with no stub: its branch would be feat/ alone.');
+    const bare = branchNameFor('', request.branchTemplate);
+    throw new CommandExit(1, `\n❌ Cannot add a worktree for a plan with no stub: its branch would be ${bare} alone.`);
   }
+  const branch = branchNameFor(stub, request.branchTemplate);
   const path = worktreePathFor(request.projectRoot, request.worktreeDir, stub);
   const worktreeGit = (): GitRunner => gitIn(path);
-  const reused = reuseExisting(git, branchNameFor(stub), path);
+  const reused = reuseExisting(git, branch, path);
   if (reused !== null) {
     const catchUp = catchUpExisting(git, worktreeGit, { branch: reused.branch, base: request.base }, path);
     return Object.freeze({ ...reused, catchUp });
@@ -649,8 +656,9 @@ export function addRunWorktree(
     anyBranch: false,
     createBranch: true,
     canAsk: false,
-    localBranch: refExists(git, localRef(branchNameFor(stub))),
-    remoteBranch: refExists(git, remoteTrackingRef(branchNameFor(stub))),
+    branchTemplate: request.branchTemplate,
+    localBranch: refExists(git, localRef(branch)),
+    remoteBranch: refExists(git, remoteTrackingRef(branch)),
   });
   if (offer.kind !== 'take') throw new Error(`the branch decision answered ${offer.kind} under --create-branch`);
 

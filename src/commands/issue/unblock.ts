@@ -184,7 +184,7 @@ export async function unblockIssues(context: RafaContext, seams: UnblockSeams): 
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
 
   // Its warnings dropped, as `unblockRelationshipsMode` drops them when the run reads the mode.
-  const config = issueSubjectConfig(issueProject(context), () => undefined);
+  const config = await issueSubjectConfig(issueProject(context), () => undefined);
   const gh = openGh(root);
   const prompter = lazyPrompter(openPrompter);
   try {
@@ -224,11 +224,11 @@ function writeReport(context: RafaContext, report: UnblockReport): void {
 }
 
 /** The native-mode refresh's config, runner and warn, from `context` and `seams`. */
-function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): NativeUnblockRefreshOptions {
+async function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): Promise<NativeUnblockRefreshOptions> {
   const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
   return {
     // Its warnings dropped, as `unblockRelationshipsMode` drops them.
-    config: issueSubjectConfig(issueProject(context), () => undefined),
+    config: await issueSubjectConfig(issueProject(context), () => undefined),
     openGh: () => openGh(projectRoot(context)),
     warn: (message) => {
       context.output.warn(message);
@@ -281,10 +281,10 @@ export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_
     outputs: ['text', 'json'],
     run: async (context) => {
       const line = readUnblockLine(context);
-      if (unblockRelationshipsMode(issueProject(context)) === 'native') {
+      if (await unblockRelationshipsMode(issueProject(context)) === 'native') {
         if (context.outputMode === 'json') context.output.result(nativeUnblockReport());
         else context.output.info(NATIVE_UNBLOCK_LINE);
-        await refreshNativeUnblock(line.issues, nativeRefreshOptions(context, seams));
+        await refreshNativeUnblock(line.issues, await nativeRefreshOptions(context, seams));
         return;
       }
       const report = await unblockIssues(context, seams);

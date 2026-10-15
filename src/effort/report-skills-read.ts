@@ -36,9 +36,9 @@ export interface SkillsReportOptions {
  * Throws a `ConfigError`, having read no row, when a config file under
  * the repo root or the home is one the loop cannot run on.
  */
-export function readSkillsReport(options: SkillsReportOptions): SkillsReport {
+export async function readSkillsReport(options: SkillsReportOptions): Promise<SkillsReport> {
   const { repoRoot: root, home, entry } = options;
-  const { config } = loadConfig({ root, home });
+  const { config } = await loadConfig({ root, home });
   const pinned = entry === undefined
     ? {}
     : { entry };

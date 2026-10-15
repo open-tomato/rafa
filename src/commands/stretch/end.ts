@@ -339,7 +339,7 @@ export async function runStretchEnd(context: RafaContext, seams: StretchEndSeams
   const line = readEndLine(context);
   const project = requireProject(context, COMMAND_NAME);
   const { root } = project;
-  const config = resolveProjectConfig(project, COMMAND_NAME, (text) => context.output.warn(text));
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (text) => context.output.warn(text));
   const n = requireStretchBase(config.prBase);
   const report = readReport(root, n);
   const closes = closesLines(ledgerItems(context, root, n));
@@ -350,7 +350,7 @@ export async function runStretchEnd(context: RafaContext, seams: StretchEndSeams
     + ` Closes line(s) from the ledger${line.dryRun
       ? ', dry run: each step is printed and none is run'
       : ''}`);
-  const pr = openPrContext(context, seams.pr);
+  const pr = await openPrContext(context, seams.pr);
   const merges = await onProvider('read the merged pull requests', () => pr.pulls.listMerged());
   const input: EndInput = { root, n, defaultBranch, record, dryRun: line.dryRun };
   const merged = merges.find((pull) => pull.headRefName === stretchBranch(n));

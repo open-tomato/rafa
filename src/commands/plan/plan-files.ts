@@ -59,25 +59,25 @@ export function requireProject(context: RafaContext, command: string): ProjectFo
  * that resolves there; a refusal with exit code 1 naming `command` for a
  * config `loadConfig` refuses. See the module note.
  */
-export function resolvePlansDir(
+export async function resolvePlansDir(
   project: ProjectFound,
   command: string,
   warn: (message: string) => void,
-): PlansDir {
-  return plansDirAt(project.root, resolveProjectConfig(project, command, warn).planDir);
+): Promise<PlansDir> {
+  return plansDirAt(project.root, (await resolveProjectConfig(project, command, warn)).planDir);
 }
 
 /**
  * The config that resolves for `project`; a refusal with exit code 1
  * naming `command` and every problem for a config `loadConfig` refuses.
  */
-export function resolveProjectConfig(
+export async function resolveProjectConfig(
   project: ProjectFound,
   command: string,
   warn: (message: string) => void,
-): RafaConfig {
+): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [

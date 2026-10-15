@@ -1,11 +1,11 @@
 /**
- * The readers `config-schema.ts` and `config-schema-release.ts` build
+ * The readers `core-section.ts` and `config-schema-release.ts` build
  * their settings from, beyond the value readers `config-sections.ts`
  * exports whole: {@link mapOf}, and
  * the named readers the schema's settings are read through, each built
  * on `mapOf` or on `config-sections.ts`'s `text` or `oneOf`. The readers a single
  * setting spells inline, such as `oneOf(STORE_BACKENDS)`, stay beside
- * their key in `config-schema.ts`, or in `config-schema-release.ts` for
+ * their key in `core-section.ts`, or in `config-schema-release.ts` for
  * a `pr` or `release` key.
  *
  * They sat in `config-schema.ts` until that module reached the 800-line
@@ -69,6 +69,19 @@
  *     `Map` cannot be frozen the way a list is — `Object.freeze` leaves
  *     `set` working — so the promise that no caller edits a value for
  *     the next is kept by building a new one each time.
+ *
+ * ## The branch template
+ *
+ * `naming.branch` is the template a plan's branch is named from: it
+ * holds {@link BRANCH_STUB} exactly once, and the branch is the template
+ * with that marker replaced by the plan's stub
+ * ({@link branchFromTemplate}). The default,
+ * {@link DEFAULT_BRANCH_TEMPLATE}, names the `feat/<stub>` branch every
+ * run created before the key existed. Exactly once, because a template
+ * without the marker names one branch for every plan, and one holding it
+ * twice leaves a guess which of the two a reader of the branch takes the
+ * stub from. Nothing else is checked: what git takes as a ref name is
+ * git's to refuse when the branch is created, naming the branch.
  */
 import type { Reader, Reading, RouteTarget, TierPin } from './config-sections.js';
 
@@ -78,6 +91,7 @@ import {
   describeValue,
   isMapping,
   oneOf,
+  refused,
   routeTarget,
   text,
   tierPin,
@@ -214,3 +228,24 @@ export const fragmentsDirectory: Reader<string> = (raw, at) => {
   const problem = `${at.label} is ${describeValue(raw)}, expected ${FRAGMENTS_EXPECTED}`;
   return { value: undefined, problems: [problem], extras: [] };
 };
+
+/** The marker a branch template holds once, where the plan's stub goes. */
+export const BRANCH_STUB = '{stub}';
+
+/** What `naming.branch` resolves to when no layer names it. */
+export const DEFAULT_BRANCH_TEMPLATE: string = `feat/${BRANCH_STUB}`;
+
+/** True when `raw` is a string holding {@link BRANCH_STUB} exactly once; see "The branch template". */
+export function isBranchTemplate(raw: unknown): raw is string {
+  return typeof raw === 'string' && raw.split(BRANCH_STUB).length === 2;
+}
+
+/** The reader of `naming.branch`: a template {@link isBranchTemplate} accepts, kept as written. */
+export const branchTemplate: Reader<string> = (raw, at) => isBranchTemplate(raw)
+  ? { value: raw, problems: [], extras: [] }
+  : refused(at, raw, `a branch name template holding ${BRANCH_STUB} exactly once`);
+
+/** The branch `template` names for a plan with this stub. */
+export function branchFromTemplate(template: string, stub: string): string {
+  return template.replace(BRANCH_STUB, () => stub);
+}

@@ -337,6 +337,16 @@ export type ReleaseEnabled = boolean | 'auto';
 /** The value of `release.enabled` that defers to the two files. */
 export const RELEASE_AUTO = 'auto';
 
+/**
+ * What `merge.duplicates` takes: how two entries of one config file
+ * setting one key are reported. `warn` prints each, `error` refuses the
+ * load with every one, `allow` drops them.
+ */
+export const DUPLICATE_LEVELS = ['warn', 'error', 'allow'] as const;
+
+/** One of {@link DUPLICATE_LEVELS}. */
+export type DuplicatesLevel = (typeof DUPLICATE_LEVELS)[number];
+
 /** What `tiers.rafa` takes: the words, not the booleans. */
 export const TIER_SWITCHES = ['on', 'off'] as const;
 
@@ -571,6 +581,9 @@ export const releaseEnabled: Reader<ReleaseEnabled> = (raw, at) => typeof raw ==
   || raw === RELEASE_AUTO
   ? accepted(raw)
   : refused(at, raw, `true, false or ${RELEASE_AUTO}`);
+
+/** Accepts one of {@link DUPLICATE_LEVELS}, as words. */
+export const duplicatesLevel: Reader<DuplicatesLevel> = oneOf(DUPLICATE_LEVELS);
 
 /** Accepts `on` or `off`, as words; see "The `tiers` section". */
 export const tierSwitch: Reader<TierSwitch> = oneOf(TIER_SWITCHES);

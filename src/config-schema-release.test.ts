@@ -17,21 +17,23 @@
  * value is reported with a `ConfigError` naming it, as every other
  * unusable value is.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigFile, ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
   PR_DEFAULTS,
   RELEASE_DEFAULTS,
+  RELEASE_SECTION,
 } from './config-schema-release.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
 } from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
@@ -55,7 +57,7 @@ function readAs(setting: ConfigSetting, raw: unknown) {
 
 /** Holds `setting` to accepting `raw` as itself, with nothing to report. */
 function expectAccepted(setting: ConfigSetting, raw: unknown): void {
-  expect(readAs(setting, raw)).toEqual({ value: raw, problems: [], extras: [] });
+  expect(readAs(setting, raw)).toEqual({ value: raw as never, problems: [], extras: [] });
 }
 
 /** Holds `setting` to refusing `raw` with exactly `problem`, and no value. */
@@ -81,8 +83,8 @@ describe('the six keys', () => {
   });
 
   it.each(SIX)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
-    expect(CONFIG_DEFAULTS[setting]).toEqual(value);
-    expect(resolveConfig().config[setting]).toEqual(value);
+    expect(CONFIG_DEFAULTS[setting]).toEqual(value as never);
+    expect(resolveConfig().config[setting]).toEqual(value as never);
     expect(resolveConfig().sources[setting]).toBe('default');
   });
 
@@ -287,7 +289,7 @@ describe('an unusable value of the six', () => {
 
   it.each(UNUSABLE)('leaves %s at its default: a refused reading is silence', (setting, raw) => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, [setting]: readAs(setting, raw).value }, extras: [], path: PATH };
+    const file: ConfigFile = { values: { ...values, [setting]: readAs(setting, raw).value } as ConfigFile['values'], extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config[setting]).toEqual(CONFIG_DEFAULTS[setting]);
@@ -296,7 +298,7 @@ describe('an unusable value of the six', () => {
 
   it('answers the file, as the control, when the value it carries is usable', () => {
     const { values } = parseConfigText('', PATH);
-    const file = { values: { ...values, releaseTag: readAs('releaseTag', 'settle').value }, extras: [], path: PATH };
+    const file: ConfigFile = { values: { ...values, releaseTag: 'settle' }, extras: [], path: PATH };
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.releaseTag).toBe('settle');
@@ -305,5 +307,66 @@ describe('an unusable value of the six', () => {
 
   it.each(UNUSABLE)('reports %s in a file the way every unusable value is', (_setting, _raw, text, problem) => {
     expect(refusal(() => parseConfigText(`${text}\n`, PATH)).problems).toEqual([`${PATH}: ${problem}`]);
+  });
+});
+
+describe('the section', () => {
+  it('is package release, defining its keys in this order with these defaults, with no check', () => {
+    expect(RELEASE_SECTION.package).toBe('release');
+    expect(Object.entries(RELEASE_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['prProvider', 'pr.provider'],
+      ['prMergeMethod', 'pr.mergeMethod'],
+      ['prBase', 'pr.base'],
+      ['prResolveBudget', 'pr.resolveBudget'],
+      ['prVersionCollision', 'pr.versionCollision'],
+      ['releaseEnabled', 'release.enabled'],
+      ['releaseVersionFile', 'release.versionFile'],
+      ['releaseChangelog', 'release.changelog'],
+      ['releaseHeading', 'release.heading'],
+      ['releaseFragments', 'release.fragments'],
+      ['releaseStrategy', 'release.strategy'],
+      ['releaseSettle', 'release.settle'],
+      ['releaseTag', 'release.tag'],
+      ['releasePublishCommand', 'release.publishCommand'],
+      ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
+    ]);
+    expect(RELEASE_SECTION.defaults).toEqual({
+      prProvider: null,
+      prMergeMethod: 'squash',
+      prBase: null,
+      prResolveBudget: 2,
+      prVersionCollision: 'report',
+      releaseEnabled: 'auto',
+      releaseVersionFile: 'package.json',
+      releaseChangelog: 'CHANGELOG.md',
+      releaseHeading: '## {version} — {date}, {title}',
+      releaseFragments: '.changes',
+      releaseStrategy: 'semver-by-level',
+      releaseSettle: 'push',
+      releaseTag: 'manual',
+      releasePublishCommand: 'npm publish',
+      dangerousAcceptVersionCollision: false,
+    });
+    expect(RELEASE_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(RELEASE_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(RELEASE_SECTION)).toBe(true);
+    expect(Object.isFrozen(RELEASE_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(RELEASE_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [RELEASE_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['release']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(RELEASE_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(RELEASE_SECTION.settings).sort());
   });
 });

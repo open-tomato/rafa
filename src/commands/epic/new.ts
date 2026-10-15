@@ -257,10 +257,10 @@ export function nativeEpicIssueLabels(horizon: Horizon): readonly string[] {
  * `loadConfig` refuses, which the labels run then refuses as before. See
  * the module note.
  */
-export function epicNewMode(context: RafaContext): BoardRelationshipMode {
+export async function epicNewMode(context: RafaContext): Promise<BoardRelationshipMode> {
   if (context.project === null) return 'labels';
   try {
-    return issueSubjectConfig(context.project, () => undefined).boardRelationships;
+    return (await issueSubjectConfig(context.project, () => undefined)).boardRelationships;
   } catch (error) {
     if (error instanceof CommandExit) return 'labels';
     throw error;
@@ -403,7 +403,7 @@ async function openBoard(context: RafaContext, seams: EpicNewSeams): Promise<Ope
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const listing = await readOrRefuse('the board', () => createGhBoardListing({ gh })());
   return { config, gh, listing, warn };
@@ -451,7 +451,7 @@ async function createNativeEpic(context: RafaContext, seams: EpicNewSeams): Prom
 
 /** Reads the board, refuses what the module note refuses, and makes the writes of the mode it reads; see the module note. */
 export async function createEpic(context: RafaContext, seams: EpicNewSeams): Promise<EpicNewResult> {
-  if (epicNewMode(context) === 'native') return createNativeEpic(context, seams);
+  if (await epicNewMode(context) === 'native') return createNativeEpic(context, seams);
   const draft = readEpicDraft(context.args, context.flags);
   const body = epicBody();
   const opened = await openBoard(context, seams);

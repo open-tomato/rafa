@@ -58,7 +58,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
 import { setActiveOutput } from '../../core/output/index.js';
 import { actionHash } from '../../learning/index.js';
 import { parseInstinct, writeInstinct } from '../../schema/instinct.js';

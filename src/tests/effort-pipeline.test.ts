@@ -573,7 +573,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     const result = await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const report = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     const commits = readStoreRows(result.commits?.storePath ?? '');
 
     expect(commits.rows).toHaveLength(COMMIT_SHAS.length);
@@ -585,7 +585,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const report = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     const q19 = groupFor(report, Q19_PLAN);
     const branch = groupFor(report, NO_PLAN_BRANCH);
 
@@ -601,7 +601,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const report = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     const q03 = groupFor(report, Q03_PLAN);
 
     expect(q03.kind).toBe('plan');
@@ -615,7 +615,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const report = await buildReport({ home: fixture.home, repoRoot: fixture.root });
 
     expect(groupFor(report, MAIN_BRANCH).sessions).toBe(1);
     expect(groupFor(report, Q19_PLAN).assistantTurns)
@@ -626,7 +626,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const report = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     const turns = plantedTurns(() => true);
 
     expect(report.totals.assistantTurns).toBe(turns);
@@ -644,7 +644,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({
+    const report = await buildReport({
       home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
@@ -661,8 +661,8 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const byKind = buildReport({ home: fixture.home, repoRoot: fixture.root, kinds: ['task'] });
-    const byBoth = buildReport({
+    const byKind = await buildReport({ home: fixture.home, repoRoot: fixture.root, kinds: ['task'] });
+    const byBoth = await buildReport({
       home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
@@ -684,7 +684,7 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const report = buildReport({
+    const report = await buildReport({
       home: fixture.home,
       repoRoot: fixture.root,
       kinds: ['task'],
@@ -714,11 +714,11 @@ describe('collect then report over a planted log tree', () => {
     const fixture = makeFixture();
     await collectEffort(optionsFor(fixture));
 
-    const perKind = SESSION_KINDS.map((kind) => buildReport({
+    const perKind = await Promise.all(SESSION_KINDS.map(async (kind) => (await buildReport({
       home: fixture.home,
       repoRoot: fixture.root,
       kinds: [kind],
-    }).totals.sessions);
+    })).totals.sessions));
     const total = perKind.reduce((sum, count) => sum + count, 0);
 
     expect(total).toBe(SESSIONS.length);
@@ -758,10 +758,10 @@ describe('a second collect run', () => {
     const fixture = makeFixture();
     const options = optionsFor(fixture);
     await collectEffort(options);
-    const before = formatReport(buildReport({ home: fixture.home, repoRoot: fixture.root }));
+    const before = formatReport(await buildReport({ home: fixture.home, repoRoot: fixture.root }));
 
     await collectEffort(options);
-    const after = formatReport(buildReport({ home: fixture.home, repoRoot: fixture.root }));
+    const after = formatReport(await buildReport({ home: fixture.home, repoRoot: fixture.root }));
 
     // A byte-identical pair of EMPTY renders would be vacuous, so the
     // line count is held against the fixture: one header line, a
@@ -778,11 +778,11 @@ describe('a second collect run', () => {
     const fixture = makeFixture();
     const options = optionsFor(fixture);
     await collectEffort(options);
-    const before = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const before = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     writeSession(fixture.logDir, LATE_SESSION);
 
     const third = await collectEffort(options);
-    const after = buildReport({ home: fixture.home, repoRoot: fixture.root });
+    const after = await buildReport({ home: fixture.home, repoRoot: fixture.root });
     const added = LATE_SESSION.turns.length;
 
     expect(third.sessions?.read).toBe(1);

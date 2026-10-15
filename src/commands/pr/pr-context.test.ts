@@ -155,8 +155,8 @@ function probe(action: string, run: RafaCommand['run']): RafaCommand {
 
 /** A probe opening the context and giving what it read. */
 function contextProbe(seams: PrSeams): RafaCommand {
-  return probe('context', (context) => {
-    const pr = openPrContext(context, seams);
+  return probe('context', async (context) => {
+    const pr = await openPrContext(context, seams);
     context.output.result({
       provider: pr.reading.provider,
       source: pr.reading.source,
@@ -172,7 +172,7 @@ function contextProbe(seams: PrSeams): RafaCommand {
 function pickProbe(seams: PrSeams): RafaCommand {
   return probe('pick', async (context) => {
     const asked = readPullArgument(context.args, USAGE);
-    const pr = openPrContext(context, seams);
+    const pr = await openPrContext(context, seams);
     const pick = await pickPullRequest(pr, asked, USAGE);
     context.output.result({
       number: pick.number,
@@ -233,7 +233,7 @@ describe('the usage lines', () => {
 
   it('puts every flag after the number, so the usage line is the order that works', () => {
     expect(PR_USAGE.merge).toBe('rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]');
-    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]');
+    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]');
     expect(PR_USAGE.wait).toBe('rafa pr wait [<n>] [--timeout=<minutes>]');
     expect(PR_USAGE.close).toBe('rafa pr close <n> --reason=<text> [--delete-branch] [--yes]');
   });

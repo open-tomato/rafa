@@ -1,13 +1,19 @@
 /**
  * The `pr` and `release` sections of the config schema, and the one
  * `dangerous` key the release plan adds: each setting's field, its
- * default and its spec. `config-schema.ts`'s `RafaConfig` extends
- * {@link PrSettings}, {@link ReleaseSettings} and
- * {@link DangerousReleaseSettings}, and its `CONFIG_DEFAULTS` and
- * `SETTINGS` spread the objects below at the places the two sections
- * always sat, and the `dangerous` key right after
- * `dangerous.acceptStaleRefs`, so the order settings are reported in,
- * and the order a warning lists keys in, holds each key's section.
+ * default and its spec. {@link RELEASE_SECTION} hands them to core as
+ * one `ConfigSection`, package `release`, and the `declare module` below
+ * adds {@link PrSettings}, {@link ReleaseSettings} and
+ * {@link DangerousReleaseSettings} to `RafaConfig`.
+ * {@link ReleaseShape} holds the keys a file writes and
+ * {@link ReleaseDangerousShape} its part of the shared `dangerous`
+ * namespace, which `src/config/shape.ts` composes into `ConfigShape`,
+ * the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below at the places the two sections always sat,
+ * and the `dangerous` key right after `dangerous.acceptStaleRefs`, so
+ * the order settings are reported in, and the order a warning lists keys
+ * in, holds each key's section.
  *
  * They moved out of `config-schema.ts` when that module stood at 780
  * lines, measured with `wc -l`, before the release plan's six keys
@@ -15,8 +21,8 @@
  * the 800-line cap of `context/source.md` would be paid for by
  * rewrapping prose. The six keys then joined here. Every rule the schema module states about a KEY
  * still holds here, and `config-sections.ts` still holds every rule
- * about a VALUE. Only `config-schema.ts` imports this file; a caller
- * reads these settings off the resolved `RafaConfig`.
+ * about a VALUE. `config-registry.ts` imports this file to spread it; a
+ * caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The `pr` section
  *
@@ -131,7 +137,7 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type {
   MergeMethod,
   PrProvider,
@@ -158,6 +164,45 @@ import {
   usdAmount,
   versionCollisionMode,
 } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `release` section's fields, added to core's. */
+  interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
+}
+
+/**
+ * The `pr` and `release` keys a file writes, both namespaces this
+ * section's alone; `src/config/shape.ts` composes them into `ConfigShape`.
+ */
+export interface ReleaseShape {
+  readonly pr: {
+    readonly provider: PrProvider;
+    readonly mergeMethod: MergeMethod;
+    readonly base: string;
+    readonly resolveBudget: number;
+    readonly versionCollision: VersionCollisionMode;
+  };
+  readonly release: {
+    readonly enabled: ReleaseEnabled;
+    readonly versionFile: string;
+    readonly changelog: string;
+    readonly heading: string;
+    readonly fragments: string;
+    readonly strategy: ReleaseStrategy;
+    readonly settle: ReleaseSettleMode;
+    readonly tag: ReleaseTagMode;
+    readonly publishCommand: string;
+  };
+}
+
+/**
+ * `dangerous.acceptVersionCollision`, the section's part of the shared
+ * `dangerous` namespace; `src/config/shape.ts` composes it into
+ * `DangerousShape` beside core's consents.
+ */
+export interface ReleaseDangerousShape {
+  readonly acceptVersionCollision: boolean;
+}
 
 /** The `pr` section's settings, resolved. */
 export interface PrSettings {
@@ -311,3 +356,10 @@ export const DANGEROUS_RELEASE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `release` section: the `pr` and `release` keys and `dangerous.acceptVersionCollision`, with their defaults and no check. */
+export const RELEASE_SECTION: ConfigSection = Object.freeze({
+  package: 'release',
+  settings: Object.freeze({ ...PR_SETTINGS, ...RELEASE_SETTINGS, ...DANGEROUS_RELEASE_SETTINGS }),
+  defaults: Object.freeze({ ...PR_DEFAULTS, ...RELEASE_DEFAULTS, ...DANGEROUS_RELEASE_DEFAULTS }),
+});

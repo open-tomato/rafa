@@ -251,7 +251,7 @@ export async function runBoardSync(context: RafaContext, seams: BoardSyncSeams):
     throw lineRefusal(`Expected no arguments, got ${String(context.args.length)}: ${context.args.join(' ')}`, USAGE);
   }
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => {
+  const config = await issueSubjectConfig(project, (message) => {
     context.output.warn(message);
   });
   if (config.boardProjectNumber === null) {

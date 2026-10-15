@@ -81,10 +81,10 @@ describe('CORE_MOVES', () => {
     }
   });
 
-  it('holds 24 test files, with none for plan-files.ts and session-readings.ts', () => {
+  it('holds 23 test files, with none for plan-files.ts and session-readings.ts', () => {
     const without = CORE_MOVES.filter((move) => move.tests.length === 0).map((move) => move.from);
 
-    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(24);
+    expect(CORE_MOVES.flatMap((move) => move.tests)).toHaveLength(23);
     expect(without).toEqual(['src/loop/session-readings.ts', 'src/plan/plan-files.ts']);
   });
 
@@ -141,10 +141,10 @@ describe('CORE_BARRELS', () => {
 });
 
 describe('movedPaths and movedTo', () => {
-  it('spreads the moves into 44 paths, a file first and its test files after it', () => {
+  it('spreads the moves into 43 paths, a file first and its test files after it', () => {
     const paths = movedPaths();
 
-    expect(paths).toHaveLength(44);
+    expect(paths).toHaveLength(43);
     expect(paths.slice(0, 2)).toEqual([
       { from: 'src/adapters/output/active.ts', to: 'src/core/output/active.ts' },
       { from: 'src/adapters/output/active.test.ts', to: 'src/core/output/active.test.ts' },

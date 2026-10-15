@@ -79,7 +79,7 @@ export function readRetargetLine(args: readonly string[], flags: LineFlags): PrR
 /** Retargets the pull request a line names, or answers that it is already on the base; see the module note. */
 export async function retargetPull(context: RafaContext, seams: PrSeams): Promise<PrRetargetResult> {
   const { number, base } = readRetargetLine(context.args, context.flags);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
 
   const pull = await onProvider(`read pull request #${String(number)}`, () => pr.pulls.get(number));
   if (pull === null) {

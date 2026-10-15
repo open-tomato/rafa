@@ -1,8 +1,12 @@
 /**
  * The `issues` section of the config schema: the five keys a bug record
  * is filed and listed with (#951), each one's field, its default, its
- * spec and its reader. `config-schema.ts`'s `RafaConfig` extends
- * {@link IssuesConfigSettings}, and its `CONFIG_DEFAULTS` and `SETTINGS`
+ * spec and its reader. {@link ISSUES_SECTION} hands them to core as one
+ * `ConfigSection`, package `issues`, and the `declare module` below adds
+ * {@link IssuesConfigSettings} to `RafaConfig`.
+ * {@link IssuesShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
  * spread the objects below right after the `logger` section. It has its
  * own module for the reason `config-schema-errors.ts` gives.
  *
@@ -40,13 +44,33 @@
  */
 import type { BugRules } from './bugs/record.js';
 import type { ErrorsSettings } from './config-schema-errors.js';
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader, Reading } from './core/config/sections.js';
 
 import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';
 import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from './bugs/title.js';
 import { listOf, refused } from './core/config/sections.js';
 import { listedCodes } from './errors/rafa-codes.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `issues` section's fields, added to core's. */
+  interface RafaConfig extends IssuesConfigSettings {}
+}
+
+/** The `issues` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface IssuesShape {
+  readonly issues: {
+    readonly titles: {
+      readonly bug: string;
+      readonly summaryMax: number;
+    };
+    readonly environments: readonly string[];
+    readonly vocabulary: {
+      readonly modules: readonly string[];
+      readonly actions: readonly string[];
+    };
+  };
+}
 
 /** The `issues` settings. */
 export interface IssuesConfigSettings {
@@ -150,6 +174,13 @@ export const ISSUES_SETTINGS: { readonly [K in keyof IssuesConfigSettings]: Sett
   issuesVocabularyModules: { key: 'issues.vocabulary.modules', read: listOf(moduleName, 'module names'), cli: false },
   issuesVocabularyActions: { key: 'issues.vocabulary.actions', read: listOf(actionName, 'actions'), cli: false },
 };
+
+/** The `issues` section: the five `issues` keys, with their defaults and no check. */
+export const ISSUES_SECTION: ConfigSection = Object.freeze({
+  package: 'issues',
+  settings: Object.freeze(ISSUES_SETTINGS),
+  defaults: ISSUES_DEFAULTS,
+});
 
 /** The rules a bug record is checked against, from a resolved config; see the module note. */
 export function bugRulesOf(config: IssuesConfigSettings & ErrorsSettings): BugRules {

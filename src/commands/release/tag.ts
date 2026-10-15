@@ -562,9 +562,9 @@ export interface TagSettings {
 }
 
 /** The four settings this action reads, refusing a config `loadConfig` refuses. */
-function tagConfig(project: ProjectFound, warn: (message: string) => void): TagSettings {
+async function tagConfig(project: ProjectFound, warn: (message: string) => void): Promise<TagSettings> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
     return {
       versionFile: config.releaseVersionFile,
       changelog: config.releaseChangelog,
@@ -649,11 +649,11 @@ export function renderTagged(
 }
 
 /** One whole run: the readings, the decision, the write it may make, and the lines. */
-export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): ReleaseTagResult {
+export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): Promise<ReleaseTagResult> {
   expectNoArgument(context.args, RELEASE_TAG_USAGE);
   const push = readSwitch(PUSH_FLAG, context.flags[PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
   const project = projectOf(context);
-  const config = tagConfig(project, (message: string) => {
+  const config = await tagConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const git = (seams.git ?? createGitRunner)(project.root);
@@ -728,7 +728,7 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      const result = runTag(context, seams);
+      const result = await runTag(context, seams);
       const past = pastReleaseWarning(result.written, result.inputs.releaseBranch);
       if (past !== null) context.output.warn(past);
       if (context.outputMode === 'json') {

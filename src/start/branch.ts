@@ -129,6 +129,11 @@ export interface BranchRequest {
   readonly anyBranch: boolean;
   /** True when `--create-branch` was passed, which answers the question yes. */
   readonly createBranch: boolean;
+  /**
+   * `naming.branch`, the template the plan's branch is named from
+   * (`branchNameFor`); `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** How this module reaches git and the terminal; see the module note. */
@@ -184,7 +189,7 @@ function readOffer(request: BranchRequest, git: GitRunner, seams: BranchSeams): 
   const stub = request.planStub?.trim() ?? '';
   const branch = anyBranchStandsAside(request) || stub === ''
     ? null
-    : branchNameFor(stub);
+    : branchNameFor(stub, request.branchTemplate);
   return readBranchOffer({
     planStub: request.planStub,
     base: request.base,
@@ -192,6 +197,7 @@ function readOffer(request: BranchRequest, git: GitRunner, seams: BranchSeams): 
     anyBranch: request.anyBranch,
     createBranch: request.createBranch,
     canAsk: terminalReading(seams)(),
+    branchTemplate: request.branchTemplate,
     localBranch: branch !== null && refExists(git, localRef(branch)),
     remoteBranch: branch !== null && refExists(git, remoteTrackingRef(branch)),
   });

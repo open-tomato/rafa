@@ -190,7 +190,7 @@ export function createPlanRiskCommand(seams: PlanRiskSeams = {}): RafaCommand {
       const strict = readSwitch('strict', context.flags['strict'], STRICT_HINT);
       const typed = expectAtMostOneArgument(context.args, USAGE);
       const project = requireProject(context, COMMAND);
-      const config = resolveProjectConfig(project, COMMAND, (message) => {
+      const config = await resolveProjectConfig(project, COMMAND, (message) => {
         context.output.warn(message);
       });
       const path = riskPlanPath(project.root, config.planDir, typed);

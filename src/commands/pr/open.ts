@@ -112,7 +112,7 @@ export async function readOpenBody(path: string): Promise<string> {
 export async function openPull(context: RafaContext, seams: PrSeams): Promise<PrOpenResult> {
   const line = readOpenLine(context.args, context.flags);
   const body = await readOpenBody(line.bodyFile);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const { head, base } = line;
 
   const open = await onProvider(

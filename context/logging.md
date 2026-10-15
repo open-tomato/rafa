@@ -15,7 +15,8 @@ It sits beside `Output`, and the two never share a job.
 
 ### The port
 
-`src/ports/index.ts` declares it:
+`src/ports/index.ts` declares it, and re-exports its `LogLevel` from the
+leaf `src/ports/log-level.ts`:
 
 - `log(entry)` writes a `LogEntry`: `level`, `message`, and optionally
   `module`, `action`, `code` (a cause code, `context/error-codes.md`),

@@ -1,7 +1,8 @@
 /**
  * Tests for check 4 of the readiness gate (`src/board/refs-gate.ts`):
  * the flag read off a command line, the acceptance a run holds, the
- * start-of-run pass line, and what each reference state does to a run —
+ * one line `dangerous.acceptStaleRefs` prints, and what each reference
+ * state does to a run —
  * refused, listed, noted, or let through — with and without an
  * acceptance.
  *
@@ -15,7 +16,7 @@
  * acceptance, and after one, under none — so the refusal is the state's
  * and not a gate that refuses everything, and the stamps an acceptance
  * writes are the ones the next plain run reads. The pass line is paired
- * with the setting off printing nothing, and the memoised verifier with
+ * with the setting at its default printing nothing, and the memoised verifier with
  * a count of reads that a double reading would have doubled. A copy of
  * `new` rows passing is paired with a stamped path deleted beside one,
  * refused by the deleted path's name alone.
@@ -30,8 +31,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CREATE_DANGEROUS_PHRASES } from '../commands/plan/refs-check.js';
+import { SETTINGS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { SETTINGS } from '../core/config/index.js';
+import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '../core/config/index.js';
 import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -40,8 +43,6 @@ import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import {
   ACCEPT_REFS_FLAG,
   ACCEPT_STALE_REFS_KEY,
-  acceptStaleRefsPassLine,
-  announceAcceptStaleRefs,
   enforceRefsGate,
   newRowLine,
   readAcceptRefsFlag,
@@ -54,6 +55,13 @@ const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-gate-')));
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/**
+ * The words the start-of-run line printed for `dangerous.acceptStaleRefs`
+ * before it was folded into the loader's pass line, written out rather
+ * than read off the source.
+ */
+const ACCEPT_STALE_REFS_WORDS = 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run';
 
 /** The spec's own issue number, which a resolved row's unblock command names. */
 const SPEC = 20;
@@ -165,24 +173,20 @@ describe('refsAcceptance', () => {
   });
 });
 
-describe('announceAcceptStaleRefs', () => {
+describe('the dangerous.acceptStaleRefs line', () => {
   it('names the setting as SETTINGS spells it', () => {
     expect(ACCEPT_STALE_REFS_KEY).toBe(SETTINGS.dangerousAcceptStaleRefs.key);
     expect(ACCEPT_STALE_REFS_KEY).toBe('dangerous.acceptStaleRefs');
   });
 
-  it('prints one pass line when the setting is on', () => {
-    const { lines, output } = capture();
-    announceAcceptStaleRefs(true, output);
-    expect(lines.warn).toEqual([acceptStaleRefsPassLine()]);
-    expect(lines.warn[0]).toContain('dangerous.acceptStaleRefs is on');
-    expect(lines.info).toEqual([]);
-  });
+  it('is one line, the loader\'s pass line under plan create\'s phrase, ending with the words the removed start-of-run line said', () => {
+    const resolved = resolveConfig();
+    const on = { ...resolved, config: { ...resolved.config, dangerousAcceptStaleRefs: true } };
 
-  it('prints nothing when the setting is off', () => {
-    const { lines, output } = capture();
-    announceAcceptStaleRefs(false, output);
-    expect(lines).toEqual({ info: [], warn: [] });
+    const lines = runWithDangerousPhrases(CREATE_DANGEROUS_PHRASES, () => dangerousPassLines(on));
+
+    expect(lines).toEqual([`${ACCEPT_STALE_REFS_KEY}: true (command line); ${ACCEPT_STALE_REFS_WORDS}`]);
+    expect(runWithDangerousPhrases(CREATE_DANGEROUS_PHRASES, () => dangerousPassLines(resolved))).toEqual([]);
   });
 });
 

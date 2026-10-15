@@ -779,7 +779,7 @@ export async function editIssue(context: RafaContext, seams: EditSeams): Promise
   const { tracker, data } = await resolveIssueTracker(context, seams);
   const editing = requireEditingTracker(tracker);
   // The chain read the config and wrote its warnings once; this read is for two keys and stays quiet.
-  const config = issueSubjectConfig(project, () => undefined);
+  const config = await issueSubjectConfig(project, () => undefined);
   const gh: GhRunner = seams.gh ?? createGhRunner({ cwd: project.root });
   const openGit = seams.openGit ?? createGitRunner;
 

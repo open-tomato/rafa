@@ -355,7 +355,7 @@ export async function readEpicsView(context: RafaContext, seams: EpicShowSeams):
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const read = rowSeams(context, seams, config, gh);
   const roadmap = asked === null

@@ -128,8 +128,8 @@ import type {
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { runClaude, spawnClaude } from '../core/loop/index.js';
 import { activeOutput } from '../core/output/index.js';

@@ -16,8 +16,12 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
-import { loggerSettingsOf } from './config-schema-logger.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './core/config/index.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { LOGGER_SECTION, loggerSettingsOf } from './config-schema-logger.js';
+import {
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+} from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';
 import { projectConfigText } from './project/scaffold.js';
 import { plantProject } from './tests/cli-capture.js';
@@ -117,11 +121,11 @@ describe('the logger defaults', () => {
 });
 
 describe('loadConfig', () => {
-  it('hands the file\'s logger settings to the logger', () => {
+  it('hands the file\'s logger settings to the logger', async () => {
     const text = `${projectConfigText()}\nlogger:\n  level: error\n  api: true\n  modules:\n    board: { level: debug }\n`;
     const project = plantProject(mkdtempSync(join(tempBase, 'case-')), text);
 
-    loadConfig({ root: project.root, home: project.home }, {}, () => {});
+    await loadConfig({ root: project.root, home: project.home }, {}, () => {});
 
     expect(activeLoggerSettings()).toEqual({
       kind: 'console',
@@ -133,15 +137,66 @@ describe('loadConfig', () => {
     });
   });
 
-  it('sets them before it prints the load\'s own warnings', () => {
+  it('sets them before it prints the load\'s own warnings', async () => {
     const text = `${projectConfigText()}\nlogger:\n  level: error\nnonesuch: 1\n`;
     const project = plantProject(mkdtempSync(join(tempBase, 'case-')), text);
     const levels: string[] = [];
 
-    loadConfig({ root: project.root, home: project.home }, {}, () => {
+    await loadConfig({ root: project.root, home: project.home }, {}, () => {
       levels.push(activeLoggerSettings().level);
     });
 
     expect(levels).toEqual(['error']);
+  });
+});
+
+describe('the section', () => {
+  it('is package logger, defining its keys in this order with these defaults, with no check', () => {
+    expect(LOGGER_SECTION.package).toBe('logger');
+    expect(Object.entries(LOGGER_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['loggerKind', 'logger.kind'],
+      ['loggerLevel', 'logger.level'],
+      ['loggerTheme', 'logger.theme'],
+      ['loggerModules', 'logger.modules'],
+      ['loggerCallSite', 'logger.callSite'],
+      ['loggerApi', 'logger.api'],
+    ]);
+    expect(LOGGER_SECTION.defaults).toEqual({
+      loggerKind: 'console',
+      loggerLevel: 'warn',
+      loggerTheme: 'default',
+      loggerModules: new Map(),
+      loggerCallSite: false,
+      loggerApi: false,
+    });
+    expect(LOGGER_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(LOGGER_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(LOGGER_SECTION)).toBe(true);
+    expect(Object.isFrozen(LOGGER_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(LOGGER_SECTION.defaults)).toBe(true);
+  });
+
+  it('flags logger.modules as a map merged by key, and no other of its settings', () => {
+    const flagged = Object.entries(LOGGER_SECTION.settings)
+      .filter(([, spec]) => spec?.map === true)
+      .map(([setting]) => setting);
+
+    expect(flagged).toEqual(['loggerModules']);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [LOGGER_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['logger']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(LOGGER_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(LOGGER_SECTION.settings).sort());
   });
 });

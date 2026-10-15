@@ -14,8 +14,10 @@
  * ## What it checks, in order
  *
  *   1. **The config**, as `loop start` resolves it (`config-load.ts`): the
- *      project's `.rafa/config.yaml` over the user scope's, over the
- *      defaults. A config `loadConfig` refuses is refused.
+ *      project's config over the user scope's, over the defaults. A config
+ *      `loadConfig` refuses is refused. Its rows follow the load
+ *      (`./doctor-config.ts`): a `warn` per warning, a shadowed
+ *      YAML file's included, and a `note` per `dangerous.*` key passed.
  *   2. **The plan**: the file `--plan=<file>` names, resolved against the
  *      project root, or the default plan `loop start` falls back to
  *      (`start/plan-path.ts`). A plan named on the line that is no file is
@@ -209,7 +211,8 @@
  *
  * In text mode, `rafa <version>` (`src/core/command/version.ts`) first,
  * printed before anything is checked so a person reads which build
- * answered whatever the preflight then does; then {@link renderDoctor}'s
+ * answered whatever the preflight then does; then the config rows, when
+ * the load warned or passed a `dangerous.*` key; then {@link renderDoctor}'s
  * lines (`./doctor-render.ts`): a head naming the plan, or where none was
  * found, and the PREREQUISITES file merged in; one line per check; the
  * line naming the start-only items a resume passed over; the steps that
@@ -294,6 +297,7 @@ import { trackerPathFor } from '../utils/tracker.js';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
+import { loadDoctorConfig } from './doctor-config.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
 import { DOCTOR_DESCRIPTION } from './doctor-description.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
@@ -463,9 +467,9 @@ export function readDeepFlag(value: string | boolean | undefined): boolean {
 }
 
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
-function resolvedConfig(project: ProjectFound, warn: (message: string) => void): ResolvedConfig {
+async function resolvedConfig(project: ProjectFound, warn: (message: string) => void): Promise<ResolvedConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn);
+    return await loadConfig({ root: project.root, home: project.home }, {}, warn);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw refusal(['rafa doctor: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)]);
@@ -585,7 +589,7 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const resolved = resolvedConfig(project, warn);
+  const resolved = await loadDoctorConfig(context, async (sink) => resolvedConfig(project, sink));
   const { config } = resolved;
   const { plan, lookedFor } = choosePlan(project.root, config, named);
   const items = await loadItems(plan, config);
@@ -707,7 +711,7 @@ async function announceRisk(context: RafaContext, preflight: DoctorPreflight, se
 async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void> {
   const project = projectOf(context);
   if (context.outputMode !== 'json') context.output.info(versionLine());
-  const install = readInstall(context, project);
+  const install = await readInstall(context, project);
   try {
     const preflight = await checkPreflight(context, project, seams);
     const gh = boardRunner(preflight.provider, preflight.root, seams);

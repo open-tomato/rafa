@@ -26,7 +26,7 @@
  * that answered.
  *
  * No branch is treated like the default branch. A run started on a
- * detached HEAD is offered `feat/<stub>` as a run on `main` is, cut from
+ * detached HEAD is offered the plan's branch as a run on `main` is, cut from
  * the latest `origin/<base>` of the base its caller read for it, and
  * `--create-branch` answers that yes. Where the offer is not taken the
  * run is still on no branch, which {@link resolveRunBranch} answers as
@@ -36,6 +36,12 @@
  * changes none of it: the flag waives WHICH branch the run is on, not
  * that it is on one. The refusal is thrown before `start()` opens the
  * session record, so a refused run leaves nothing under `.rafa/runs/`.
+ *
+ * Every branch name the guard writes, in either refusal and in the
+ * convention warning, is rendered from `naming.branch`, the template
+ * `start()` hands it beside the one it hands the offer, so a project
+ * whose template is `work/{stub}` is told `work/<stub>` and never
+ * `feat/<stub>`; the template is `feat/{stub}` when left out.
  *
  * The guard's two warnings go through the active output
  * (`core/output/active.ts`), and its refusals are thrown as a
@@ -173,6 +179,11 @@ export interface RunBranchRequest {
   readonly standing?: RunStanding;
   /** The words of the run's line, which the two branch flags are read from. */
   readonly args: readonly string[];
+  /**
+   * `naming.branch`, the template the plan's branch is named from;
+   * `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /**
@@ -218,6 +229,7 @@ export async function resolveRunBranch(
     standing,
     anyBranch: args.includes(ANY_BRANCH_FLAG),
     createBranch: args.includes(CREATE_BRANCH_FLAG),
+    branchTemplate: request.branchTemplate,
   }, seams);
 
   if (outcome.kind === 'moved') return outcome.branch;
@@ -230,18 +242,23 @@ export async function resolveRunBranch(
  * The middle of the refusal: how to get onto the plan's branch. Named
  * after the plan's stub when there is one, and the `git` line when there
  * is not; see {@link guardRunBranch}. `base` is the branch the plan's
- * own is created from on {@link REMOTE}, or {@link UNREAD_BASE}.
+ * own is created from on {@link REMOTE}, or {@link UNREAD_BASE}, and
+ * `branchTemplate` is `naming.branch`, which renders the branch named.
  */
-function branchOffer(planStub: string | null, base: string): readonly string[] {
+function branchOffer(
+  planStub: string | null,
+  base: string,
+  branchTemplate: string | undefined,
+): readonly string[] {
   if (planStub === null) {
     return [
-      `\n   git checkout -b ${branchNameFor(UNNAMED_PLAN)}`,
+      `\n   git checkout -b ${branchNameFor(UNNAMED_PLAN, branchTemplate)}`,
       `   ${CREATE_BRANCH_FLAG} names the branch after the plan's stub, as`,
       '   `PLAN-<stub>.md` spells it, and this plan file spells none.',
     ];
   }
   return [
-    `\n   Pass ${CREATE_BRANCH_FLAG} to create ${branchNameFor(planStub)} from the latest`,
+    `\n   Pass ${CREATE_BRANCH_FLAG} to create ${branchNameFor(planStub, branchTemplate)} from the latest`,
     `   ${REMOTE}/${base} and run there.`,
     '   On a terminal the run asks that as a question instead of refusing.',
   ];
@@ -255,11 +272,12 @@ function branchOffer(planStub: string | null, base: string): readonly string[] {
  * (`start/worktree.ts`): it gets the `git` line alone, which cuts a
  * branch where HEAD stands.
  */
-function refuseNoBranch(planStub: string | null): never {
+function refuseNoBranch(planStub: string | null, branchTemplate: string | undefined): never {
   const worktreeFlag = planStub === null
     ? null
     : AS_WORKTREE_FLAG;
-  const refusal = detachedHeadRefusal(branchOffer(planStub, UNREAD_BASE), worktreeFlag);
+  const offer = branchOffer(planStub, UNREAD_BASE, branchTemplate);
+  const refusal = detachedHeadRefusal(offer, worktreeFlag);
   throw new CommandExit(1, `${refusal}\n${NOTHING_DISPATCHED}`);
 }
 
@@ -272,7 +290,7 @@ function refuseNoBranch(planStub: string | null): never {
  * line, `--any-branch` included: the flag waives which branch the run is
  * on, and a run commits to, pushes and opens its pull request from one.
  * The refusal is {@link refuseNoBranch}'s. It is reached only where the
- * offer of `feat/<stub>` was not taken ({@link resolveRunBranch}).
+ * offer of the plan's branch was not taken ({@link resolveRunBranch}).
  *
  * Measured: one run executed on `main`. It produced 21 commits and 74
  * sessions and cost three things — no PR, so the wrap-up's CI stage
@@ -304,6 +322,12 @@ function refuseNoBranch(planStub: string | null): never {
  * Attribution no longer depends on it either, the stamp having taken
  * that job over.
  *
+ * `branchTemplate` is `naming.branch`, the template the offer named the
+ * plan's branch from ({@link RunBranchRequest.branchTemplate}): both
+ * refusals name the branch `--create-branch` would make through it, and
+ * the convention warning spells the convention through it, with
+ * `<plan-stub>` for the stub. `feat/{stub}` when left out.
+ *
  * Either refusal is thrown as a `CommandExit` with exit code 1 whose
  * message is the whole refusal, the lines the guard printed before it
  * threw, joined. Both warnings go through the active output.
@@ -312,8 +336,9 @@ export function guardRunBranch(
   planStub: string | null,
   branch: string | null,
   args: readonly string[],
+  branchTemplate?: string,
 ): asserts branch is string {
-  if (branch === null) refuseNoBranch(planStub);
+  if (branch === null) refuseNoBranch(planStub, branchTemplate);
 
   if (args.includes(ANY_BRANCH_FLAG)) {
     activeOutput().warn(`\n⚠️  ${ANY_BRANCH_FLAG}: running on \`${branch}\` without the branch check.`);
@@ -326,14 +351,15 @@ export function guardRunBranch(
       '   A plan run needs its own branch: that is what gives it a PR to',
       '   review, and what lets the wrap-up\'s CI stage have something to',
       '   wait on. Run on main and both are silently skipped.',
-      ...branchOffer(planStub, branch),
+      ...branchOffer(planStub, branch, branchTemplate),
       `\n   Pass ${ANY_BRANCH_FLAG} to run here anyway.`,
     ].join('\n'));
   }
 
   if (planStub !== null && !branch.includes('/')) {
     activeOutput().warn(`\n⚠️  Branch \`${branch}\` carries no \`<type>/\` prefix.`);
-    activeOutput().warn('   The run proceeds; the convention is `feat/<plan-stub>`.');
+    const convention = branchNameFor('<plan-stub>', branchTemplate);
+    activeOutput().warn(`   The run proceeds; the convention is \`${convention}\`.`);
   }
 }
 

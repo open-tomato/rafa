@@ -722,9 +722,9 @@ function plantStore(rows: readonly unknown[]): string {
 }
 
 /** What a call threw, or null when it returned. */
-function thrownBy(call: () => unknown): unknown {
+async function thrownBy(call: () => unknown): Promise<unknown> {
   try {
-    call();
+    await call();
   } catch (error) {
     return error;
   }
@@ -732,35 +732,35 @@ function thrownBy(call: () => unknown): unknown {
 }
 
 describe('buildReport', () => {
-  it('answers an empty report when no store exists', () => {
-    const report = buildReport({ home: HOME, repoRoot: join(tempRoot, 'nothing-here') });
+  it('answers an empty report when no store exists', async () => {
+    const report = await buildReport({ home: HOME, repoRoot: join(tempRoot, 'nothing-here') });
 
     expect(report.rowsRead).toBe(0);
     expect(report.groups).toEqual([]);
   });
 
-  it('rolls up the rows a store holds', () => {
-    const report = buildReport({ home: HOME, repoRoot: plantStore(ROWS) });
+  it('rolls up the rows a store holds', async () => {
+    const report = await buildReport({ home: HOME, repoRoot: plantStore(ROWS) });
 
     expect(report.rowsRead).toBe(ROWS.length);
     expect(report.groups).toHaveLength(4);
     expect(report.totals.assistantTurns).toBe(21);
   });
 
-  it('applies its filters to what the store held', () => {
+  it('applies its filters to what the store held', async () => {
     const root = plantStore(ROWS);
-    const report = buildReport({ home: HOME, repoRoot: root, kinds: ['task'] });
+    const report = await buildReport({ home: HOME, repoRoot: root, kinds: ['task'] });
 
     expect(report.totals.sessions).toBe(4);
     expect(report.filters.kinds).toEqual(['task']);
   });
 
-  it('reads a legacy row with no effort field at all', () => {
+  it('reads a legacy row with no effort field at all', async () => {
     const root = plantStore([{
       ...plantRow({ sessionId: 'legacy', branch: 'feat/x' }),
       effortCounts: undefined,
     }]);
-    const report = buildReport({ home: HOME, repoRoot: root });
+    const report = await buildReport({ home: HOME, repoRoot: root });
 
     expect(report.totals.sessionsWithoutEffort).toBe(1);
   });
@@ -782,8 +782,8 @@ function plantBothBackends(config: string | null): string {
 }
 
 describe('the store a report reads', () => {
-  it('reads the SQLite store when no config names one', () => {
-    const report = buildReport({ home: HOME, repoRoot: plantBothBackends(null) });
+  it('reads the SQLite store when no config names one', async () => {
+    const report = await buildReport({ home: HOME, repoRoot: plantBothBackends(null) });
 
     expect(report.rowsRead).toBe(SQLITE_ROWS.length);
     expect(report.groups.map((group) => group.key))
@@ -793,33 +793,33 @@ describe('the store a report reads', () => {
   it.each([
     ['sqlite', SQLITE_ROWS.length],
     ['ndjson', NDJSON_ROWS.length],
-  ])('reads the rows of the backend store: %s selects', (backend, rows) => {
+  ])('reads the rows of the backend store: %s selects', async (backend, rows) => {
     const root = plantBothBackends(`store: ${backend}\n`);
 
-    const report = buildReport({ home: HOME, repoRoot: root });
+    const report = await buildReport({ home: HOME, repoRoot: root });
 
     expect(report.rowsRead).toBe(rows);
   });
 
-  it('rolls the same rows up to the same bytes from either backend', () => {
+  it('rolls the same rows up to the same bytes from either backend', async () => {
     const sqliteRoot = freshRoot();
     appendSqliteSessions(sqliteRoot, ROWS);
     const ndjsonRoot = plantStore(ROWS);
 
-    const fromSqlite = buildReport({ home: HOME, repoRoot: sqliteRoot });
-    const fromNdjson = buildReport({ home: HOME, repoRoot: ndjsonRoot });
+    const fromSqlite = await buildReport({ home: HOME, repoRoot: sqliteRoot });
+    const fromNdjson = await buildReport({ home: HOME, repoRoot: ndjsonRoot });
 
     expect(fromSqlite.rowsRead).toBe(ROWS.length);
     expect(fromSqlite.totals.sessionsWithoutEffort).toBe(1);
     expect(JSON.stringify(fromSqlite)).toBe(JSON.stringify(fromNdjson));
   });
 
-  it('never reads the config when a store is passed', () => {
+  it('never reads the config when a store is passed', async () => {
     // The config names a store no backend opens, so a report that read
     // it at all would refuse; the one below reads the store it was given.
     const root = plantBothBackends('store: postgres\n');
 
-    const report = buildReport({
+    const report = await buildReport({
       home: HOME,
       repoRoot: root,
       store: openNdjsonStore(root),
@@ -828,10 +828,10 @@ describe('the store a report reads', () => {
     expect(report.rowsRead).toBe(NDJSON_ROWS.length);
   });
 
-  it('refuses a config it cannot run on', () => {
+  it('refuses a config it cannot run on', async () => {
     const root = plantBothBackends('store: postgres\n');
 
-    const refusal = thrownBy(() => buildReport({ home: HOME, repoRoot: root }));
+    const refusal = await thrownBy(() => buildReport({ home: HOME, repoRoot: root }));
 
     expect(refusal).toBeInstanceOf(ConfigError);
     expect((refusal as ConfigError).problems).toEqual([
@@ -855,12 +855,12 @@ function plantTaskReport(
 }
 
 describe('the task reports a report carries', () => {
-  it('carries the tallies under the root beside the session rows the config selects', () => {
+  it('carries the tallies under the root beside the session rows the config selects', async () => {
     const root = plantStore(ROWS);
     plantTaskReport(root, 'q19-a', 'done', 'blocked');
     plantTaskReport(root, 'q19-b', 'done', 'done');
 
-    const report = buildReport({ home: HOME, repoRoot: root });
+    const report = await buildReport({ home: HOME, repoRoot: root });
 
     expect(report.rowsRead).toBe(ROWS.length);
     expect(report.taskReports).toEqual([
@@ -869,17 +869,17 @@ describe('the task reports a report carries', () => {
     ]);
   });
 
-  it('carries them unfiltered, and none from a root that stores none', () => {
+  it('carries them unfiltered, and none from a root that stores none', async () => {
     const root = plantStore(ROWS);
     plantTaskReport(root, 'q19-a', 'blocked', 'blocked');
 
-    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+    const filtered = await buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     expect(filtered.totals.sessions).toBe(2);
     expect(filtered.taskReports).toHaveLength(1);
 
     // The control: the same session rows with no task report stored.
-    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).taskReports).toEqual([]);
+    expect((await buildReport({ home: HOME, repoRoot: plantStore(ROWS) })).taskReports).toEqual([]);
   });
 });
 
@@ -911,12 +911,12 @@ function plantPreflight(root: string, runId: string, tier: 'required' | 'optiona
 }
 
 describe('the preflight halts a report carries', () => {
-  it('carries the halted runs under the root, unfiltered, and no run that only warned', () => {
+  it('carries the halted runs under the root, unfiltered, and no run that only warned', async () => {
     const root = plantStore(ROWS);
     plantPreflight(root, 'run-halted', 'required');
     plantPreflight(root, 'run-warned', 'optional');
 
-    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+    const filtered = await buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     expect(filtered.totals.sessions).toBe(2);
     expect(filtered.preflightHalts).toEqual([{
@@ -934,7 +934,7 @@ describe('the preflight halts a report carries', () => {
     }]);
 
     // The control: the same session rows with no preflight stored.
-    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).preflightHalts).toEqual([]);
+    expect((await buildReport({ home: HOME, repoRoot: plantStore(ROWS) })).preflightHalts).toEqual([]);
   });
 });
 
@@ -957,13 +957,13 @@ function plantDispatch(root: string, sessionId: string, budget: number | null): 
 }
 
 describe('the budgets a report carries', () => {
-  it('carries each budgeted session under the root beside its row, unfiltered', () => {
+  it('carries each budgeted session under the root beside its row, unfiltered', async () => {
     const root = plantStore(ROWS);
     plantDispatch(root, 'q19-a', 0.5);
     plantDispatch(root, 'q19-b', null);
     plantDispatch(root, 'uncollected', 2);
 
-    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+    const filtered = await buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     // `q19-a` is a task session the filter leaves out of the table.
     expect(filtered.totals.sessions).toBe(2);
@@ -986,7 +986,7 @@ describe('the budgets a report carries', () => {
     ]);
 
     // The control: the same session rows with no dispatch stored.
-    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).budgets).toEqual([]);
+    expect((await buildReport({ home: HOME, repoRoot: plantStore(ROWS) })).budgets).toEqual([]);
   });
 });
 
@@ -1007,22 +1007,22 @@ function plantBugs(root: string, sessionId: string): void {
 }
 
 describe('the doc-only bug count a report carries', () => {
-  it('carries the count under the root, unfiltered, and zeroes from a root that stores no bug', () => {
+  it('carries the count under the root, unfiltered, and zeroes from a root that stores no bug', async () => {
     const root = plantStore(ROWS);
     plantBugs(root, 'q19-a');
 
-    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+    const filtered = await buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     expect(filtered.totals.sessions).toBe(2);
     expect(filtered.docOnlyBugs).toEqual({ bugs: 2, docOnly: 1 });
 
     // The control: the same session rows with no bug stored.
-    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).docOnlyBugs).toEqual({ bugs: 0, docOnly: 0 });
+    expect((await buildReport({ home: HOME, repoRoot: plantStore(ROWS) })).docOnlyBugs).toEqual({ bugs: 0, docOnly: 0 });
   });
 });
 
 describe('the bug kinds a report carries', () => {
-  it('carries the routed entries under the root, unfiltered, and none from a root that stores no route', () => {
+  it('carries the routed entries under the root, unfiltered, and none from a root that stores no route', async () => {
     const root = plantStore(ROWS);
     writeBugRoutes(root, {
       dispatch: { sessionId: 'q19-a', planStub: 'q19-loop-economics', taskLine: 'A task' },
@@ -1032,14 +1032,14 @@ describe('the bug kinds a report carries', () => {
       ],
     });
 
-    const filtered = buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
+    const filtered = await buildReport({ home: HOME, repoRoot: root, kinds: ['other'] });
 
     expect(filtered.bugKinds.problem).toBeNull();
     expect(filtered.bugKinds.plans.map((plan) => [plan.planStub, plan.entries, plan.filed]))
       .toEqual([['q19-loop-economics', 2, 1]]);
 
     // The control: the same session rows with no route stored.
-    expect(buildReport({ home: HOME, repoRoot: plantStore(ROWS) }).bugKinds).toEqual({ plans: [], problem: null });
+    expect((await buildReport({ home: HOME, repoRoot: plantStore(ROWS) })).bugKinds).toEqual({ plans: [], problem: null });
   });
 });
 
@@ -1224,9 +1224,9 @@ describe('the report command', () => {
     ]);
   });
 
-  it('prints a config it cannot run on as one refusal per problem', () => {
+  it('prints a config it cannot run on as one refusal per problem', async () => {
     const root = makeRepo(TWO_PROBLEM_CONFIG);
-    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
+    const refusal = await thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
 
     const run = runReport(root, []);
 
@@ -1241,9 +1241,9 @@ describe('the report command', () => {
     expect(run.stdout).toBe('');
   });
 
-  it('carries the same refusal in the terminal result in json mode, writing nothing to stderr', () => {
+  it('carries the same refusal in the terminal result in json mode, writing nothing to stderr', async () => {
     const root = makeRepo(TWO_PROBLEM_CONFIG);
-    const refusal = thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
+    const refusal = await thrownBy(() => loadConfig({ root, home: HOME })) as ConfigError;
 
     const run = runReport(root, ['--output=json']);
 
@@ -1342,10 +1342,10 @@ function skillsRepo(plant: { skill?: boolean; lesson?: boolean } = {}): string {
 }
 
 describe('readSkillsReport', () => {
-  it('reads the served skill\'s strings and the held lesson\'s artifact under the root', () => {
+  it('reads the served skill\'s strings and the held lesson\'s artifact under the root', async () => {
     const root = skillsRepo();
 
-    const [plan] = readSkillsReport({ repoRoot: root, home: HOME }).plans;
+    const [plan] = (await readSkillsReport({ repoRoot: root, home: HOME })).plans;
     const [arm] = plan?.resolvers ?? [];
 
     expect(plan?.planStub).toBe(SKILLS_PLAN);
@@ -1353,28 +1353,28 @@ describe('readSkillsReport', () => {
     expect(arm?.lessons.map(({ id, artifact }) => [id, artifact])).toEqual([['lesson-lint', 'lint / eslint']]);
   });
 
-  it('reads the skill as unmeasured and the lesson as unresolved when neither is planted, the control', () => {
+  it('reads the skill as unmeasured and the lesson as unresolved when neither is planted, the control', async () => {
     const root = skillsRepo({ skill: false, lesson: false });
 
-    const [arm] = readSkillsReport({ repoRoot: root, home: HOME }).plans[0]?.resolvers ?? [];
+    const [arm] = (await readSkillsReport({ repoRoot: root, home: HOME })).plans[0]?.resolvers ?? [];
 
     expect(arm?.skills.map(({ signal }) => signal)).toEqual(['unmeasured']);
     expect(arm?.lessons.map(({ artifact }) => artifact)).toEqual([null]);
   });
 
-  it('narrows to the plans named, a stub the store holds no row for reading as no plan', () => {
+  it('narrows to the plans named, a stub the store holds no row for reading as no plan', async () => {
     const root = skillsRepo();
 
-    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: [SKILLS_PLAN] }).plans).toHaveLength(1);
-    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: ['no-such-plan'] })).toEqual({ plans: [] });
-    expect(readSkillsReport({ repoRoot: root, home: HOME, plans: null }).plans).toHaveLength(1);
+    expect((await readSkillsReport({ repoRoot: root, home: HOME, plans: [SKILLS_PLAN] })).plans).toHaveLength(1);
+    expect(await readSkillsReport({ repoRoot: root, home: HOME, plans: ['no-such-plan'] })).toEqual({ plans: [] });
+    expect((await readSkillsReport({ repoRoot: root, home: HOME, plans: null })).plans).toHaveLength(1);
   });
 
-  it('throws the ConfigError of a config the loop cannot run on', () => {
+  it('throws the ConfigError of a config the loop cannot run on', async () => {
     const root = skillsRepo();
     writeConfig(root, TWO_PROBLEM_CONFIG);
 
-    expect(thrownBy(() => readSkillsReport({ repoRoot: root, home: HOME }))).toBeInstanceOf(ConfigError);
+    expect(await thrownBy(() => readSkillsReport({ repoRoot: root, home: HOME }))).toBeInstanceOf(ConfigError);
   });
 });
 
@@ -1424,9 +1424,9 @@ function twoResolverRepo(): string {
 }
 
 describe('the report command with --skills over a plan run under two resolvers', () => {
-  it('holds a plan dispatched half under planner and half under tag to two resolver tables, each with its own M1 and M2', () => {
+  it('holds a plan dispatched half under planner and half under tag to two resolver tables, each with its own M1 and M2', async () => {
     const root = twoResolverRepo();
-    const expected = readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
+    const expected = await readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
 
     const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
     const text = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`]);
@@ -1456,9 +1456,9 @@ describe('the report command with --skills over a plan run under two resolvers',
 });
 
 describe('the report command with --skills', () => {
-  it('writes the skills report as the result in json mode and as the formatter\'s lines in text mode', () => {
+  it('writes the skills report as the result in json mode and as the formatter\'s lines in text mode', async () => {
     const root = skillsRepo();
-    const expected = readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
+    const expected = await readSkillsReport({ repoRoot: root, home: HOME, entry: RAFA_ENTRY });
 
     const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
     const text = runReport(root, ['--skills']);

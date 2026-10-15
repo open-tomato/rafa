@@ -1,19 +1,23 @@
 /**
  * The `tests` section of the config schema: the three settings the
  * runner reads when it chooses which tests a recorded step runs, and the
- * one that says whether a step reruns a newly red file alone, each
- * one's field, its default, its spec and its reader. `config-schema.ts`'s
- * `RafaConfig` extends {@link TestsSettings}, and its `CONFIG_DEFAULTS`
- * and `SETTINGS` spread the objects below last, after the `task`
- * section, so the order settings are reported in holds the section.
+ * one that says whether a step reruns a newly red file alone, each one's
+ * field, its default, its spec and its reader. {@link TESTS_SECTION}
+ * hands them to core as one `ConfigSection`, package `tests`, and the
+ * `declare module` below adds {@link TestsSettings} to `RafaConfig`.
+ * {@link TestsShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below last, after the `task` section, so the order
+ * settings are reported in holds the section.
  *
  * The section has its own module, as `config-schema-release.ts` does,
  * because `config-sections.ts` stood at 699 lines, measured with
  * `wc -l`, when these keys were added, and takes nothing new under the
  * 800-line cap of `context/source.md`. The one reader the three glob keys
  * share, {@link globList}, is a rule about a VALUE and sits here all the
- * same, for that reason. Only `config-schema.ts` imports this file; a
- * caller reads these settings off the resolved `RafaConfig`.
+ * same, for that reason. `config-registry.ts` imports this file to spread
+ * it; a caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The three glob keys
  *
@@ -98,12 +102,27 @@
  * (`config-schema-readings.ts`): a global flag nobody typed would be one
  * this module invented.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { isAbsolute } from 'node:path';
 
 import { flag, listOf, refused, text } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `tests` section's fields, added to core's. */
+  interface RafaConfig extends TestsSettings {}
+}
+
+/** The `tests` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface TestsShape {
+  readonly tests: {
+    readonly fullSuiteTriggers: readonly string[];
+    readonly integration: readonly string[];
+    readonly alwaysRun: readonly string[];
+    readonly retakeRedAlone: boolean;
+  };
+}
 
 /** The `tests` section's settings, resolved. */
 export interface TestsSettings {
@@ -178,3 +197,10 @@ export const TESTS_SETTINGS: {
   testsAlwaysRun: { key: 'tests.alwaysRun', read: globList, cli: false },
   testsRetakeRedAlone: { key: 'tests.retakeRedAlone', read: flag, cli: false },
 };
+
+/** The `tests` section: the four `tests` keys, with their defaults and no check. */
+export const TESTS_SECTION: ConfigSection = Object.freeze({
+  package: 'tests',
+  settings: Object.freeze(TESTS_SETTINGS),
+  defaults: TESTS_DEFAULTS,
+});

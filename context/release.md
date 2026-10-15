@@ -76,7 +76,8 @@ delivered. A protected branch (GitHub's `GH006`) is answered `protected`, and a
 repository rule (GitHub's `GH013`, a ruleset requiring a status check or a
 review) is answered `rule`, in one line naming the rule GitHub gave, such as
 `Required status check "verify" is expected.`, and
-`set release.settle: pr in .rafa/config.yaml`. No refusal prints a success line:
+`set release.settle: pr in .rafa/config.yaml`, the file named being the project
+scope's own config file (`rafa.config.ts` in a project that holds one). No refusal prints a success line:
 `git push --porcelain` ends its output on `Done` even when it refuses, and settle
 drops that line from what it quotes (#765).
 

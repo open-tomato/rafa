@@ -137,17 +137,17 @@ export function totalsOf(report: EffortReport): TotalsWidget {
  * Reads every widget. Throws a `ConfigError`, as each report does, when a
  * config file under the repo root or the home is one the loop cannot run on.
  */
-export function readDashboard(options: DashboardOptions): Dashboard {
+export async function readDashboard(options: DashboardOptions): Promise<Dashboard> {
   const { repoRoot, home, now } = options;
-  const inputs = readTrendInputs(repoRoot, home);
+  const inputs = await readTrendInputs(repoRoot, home);
   const trend = trendReportOf(inputs, options.trend);
-  const skills = readSkillsReport({ repoRoot, home });
+  const skills = await readSkillsReport({ repoRoot, home });
   return {
     generatedAt: now.toISOString(),
     status: readStatusWidget(repoRoot, { loopRows: everyLoopRow(inputs), now }),
     trend: trend.trend,
     loops: trend.loops,
     skills: { plans: summariseSkills(skills), report: skills },
-    totals: totalsOf(buildReport({ repoRoot, home })),
+    totals: totalsOf(await buildReport({ repoRoot, home })),
   };
 }

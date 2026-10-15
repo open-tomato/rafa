@@ -15,7 +15,7 @@
  * Nothing here reads the disk, the clock or the environment: the three
  * exports are constants built once from the defaults.
  */
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 /**
  * The commented lines the config `rafa init` writes carries for the

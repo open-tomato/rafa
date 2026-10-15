@@ -569,8 +569,8 @@ naming `<repo>/node_modules/@types` absolutely (left out, every file
 reports `Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc
 -p` on it. Test files already carry errors no gate ever reported, so
 compare against the base before attributing one to the diff: TS2769 where a
-`readonly` array reaches `toEqual` (`src/core/config/config-schema.test.ts`,
-`src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
+`readonly` array reaches `toEqual` (`src/project/scaffold.test.ts`,
+`src/commands/index.test.ts`), and on the
 `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in
 `src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.

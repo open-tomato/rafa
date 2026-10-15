@@ -215,10 +215,10 @@ function findOffer(readings: readonly ClaimBranchReading[], issue: number, devic
 }
 
 /** Accepts the handover of the issue the line names to this device; see the module note. */
-export function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): ClaimAcceptResult {
+export async function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): Promise<ClaimAcceptResult> {
   const issue = readIssueArgument(context.args, USAGE);
   const project = requireProject(context, COMMAND);
-  const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
+  const config = await resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
@@ -270,7 +270,7 @@ export function createClaimAcceptCommand(makeSeams: ClaimSeamsFactory = DEFAULT_
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      const result = acceptClaim(context, makeSeams);
+      const result = await acceptClaim(context, makeSeams);
       if (context.outputMode === 'json') {
         context.output.result(result);
       } else {

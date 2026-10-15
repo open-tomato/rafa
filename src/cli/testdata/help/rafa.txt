@@ -64,8 +64,8 @@ Subjects:
              or withdraw the offer; accept a handover; take over a stale claim
   update     bring this project to the installed rafa; the other updates are in
              development
-  config     set one key in the project's config, keeping every comment, and
-             print its old and new values
+  config     show every setting and where it came from; set one key in the
+             project's config, keeping every comment
   ci         read the newest CI run on a branch: its state, its commit and the
              cases it failed
   stretch    open a stretch: its integration branch, pr.base pointed at it, and

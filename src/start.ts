@@ -25,7 +25,7 @@
  * (`plan/inject.ts`): `full` hands over the plan as it stands, `stage` the plan
  * context plus the task's stage, `task` the plan context plus the task line.
  * The mode is resolved once, before the run is deferred, from `--inject=`
- * over `.rafa/config.yaml` over the default (`config.ts`), and a value no mode
+ * over the project's config over the default (`config.ts`), and a value no mode
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start. `start/run-config.ts`
  * does both. The same resolution names the setting sources every session the
@@ -466,7 +466,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // config then has lost the night, where refusing now costs one command.
   let runConfig: ResolvedConfig;
   try {
-    runConfig = loadRunConfig({ root: repoRoot, home: homedir() }, args);
+    runConfig = await loadRunConfig({ root: repoRoot, home: homedir() }, args);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -514,8 +514,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     prBase: runConfig.config.prBase,
     planStub,
     args,
+    branchTemplate: runConfig.config.namingBranch,
   });
-  guardRunBranch(planStub, branch, args);
+  guardRunBranch(planStub, branch, args, runConfig.config.namingBranch);
   // What the loop guard holds the checkout to: its branch at the HEAD it
   // starts from, moved on by each task commit (`start/checkout-watch.ts`).
   let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });

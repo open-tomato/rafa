@@ -35,6 +35,19 @@
  * built for a spawned process or a file read. Nothing inside a comment or
  * a string is seen either.
  *
+ * One specifier `textImports` finds is not an import: the name of a
+ * module augmentation, a `declare module '<specifier>'` block at the top
+ * level of the file ({@link augmentedModules}). It loads nothing and
+ * takes no binding; it adds fields to an interface the named module
+ * declares, and it has to name the DECLARING module: measured with `tsc`
+ * when the config sections took their fields into `RafaConfig`, two
+ * augmentations spelled through the config barrel merged with each other
+ * and not with the interface, whose `keyof` missed both. So an
+ * augmentation is answered under `augment` and never under `barrel` or
+ * `deep`, and the module it names is one more path the core package
+ * will have to export. A file that both imports and augments a module
+ * has the import read as any other.
+ *
  * Each specifier is resolved by the resolver handed in. A target under
  * `src/core/` that is a listed barrel is answered under `barrel`, any
  * other target under `src/core/` under `deep`, and a target outside it
@@ -50,6 +63,8 @@
  */
 
 import type { ResolveImport } from './import-graph';
+
+import ts from 'typescript';
 
 import { barrelPaths, CORE_FOLDER } from './core-moves';
 import { textImports } from './import-graph';
@@ -86,6 +101,8 @@ export interface CoreImports {
   readonly barrel: readonly CoreImport[];
   /** Every import that reaches past the barrels, sorted by line, free of duplicates. */
   readonly deep: readonly CoreImport[];
+  /** Every module augmentation that names a file under `src/core/`, sorted by line, free of duplicates. */
+  readonly augment: readonly CoreImport[];
   /** The code files under `src/core/` that were handed in and left unread, sorted. */
   readonly inside: readonly string[];
   /** The files that should have been read and had no source text, sorted. */
@@ -164,14 +181,47 @@ function sortedByLine(byLine: ReadonlyMap<string, CoreImport>): readonly CoreImp
 }
 
 /**
+ * The modules a file augments: the specifier of each `declare module`
+ * block named by a string at the top level of its text, in source order.
+ *
+ * @param path - The file's path, which tells TypeScript from JSX.
+ * @param text - The file's source text.
+ * @returns The specifiers, one per block.
+ */
+export function augmentedModules(path: string, text: string): string[] {
+  const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest);
+  return source.statements.flatMap((statement) => ts.isModuleDeclaration(statement) && ts.isStringLiteral(statement.name)
+    ? [statement.name.text]
+    : []);
+}
+
+/**
+ * The specifiers of `imports` left once each augmented module is taken
+ * out of them, one occurrence for each block.
+ *
+ * @param imports - Every specifier `textImports` found.
+ * @param augments - The specifiers {@link augmentedModules} found.
+ * @returns The specifiers that import.
+ */
+function withoutAugments(imports: readonly string[], augments: readonly string[]): string[] {
+  const left = [...imports];
+  for (const specifier of augments) {
+    const at = left.indexOf(specifier);
+    if (at >= 0) left.splice(at, 1);
+  }
+  return left;
+}
+
+/**
  * Reads every import from a code file outside `src/core/` into it, and
  * splits them into those that reach a barrel and those that reach deeper
  * (see the module note for which files and which imports). Pure: the
  * caller lists the files, reads their text and supplies the resolver.
  *
  * @param input - The files, their texts, a resolver, and the barrels when a test plants its own.
- * @returns The barrel imports, the deep imports, the files read, the
- *   files inside `src/core/` left unread, and the files with no text.
+ * @returns The barrel imports, the deep imports, the augmentations, the
+ *   files read, the files inside `src/core/` left unread, and the files
+ *   with no text.
  */
 export function readCoreImports(input: CoreImportsInput): CoreImports {
   const barrels = new Set(input.barrels ?? barrelPaths());
@@ -182,18 +232,37 @@ export function readCoreImports(input: CoreImportsInput): CoreImports {
   const missing = covered.filter((path) => !input.sources.has(path));
   const barrel = new Map<string, CoreImport>();
   const deep = new Map<string, CoreImport>();
+  const augment = new Map<string, CoreImport>();
+  const intoCore = (specifier: string, path: string): CoreImport | undefined => {
+    const target = input.resolve(specifier, path);
+    return target === undefined || !target.startsWith(CORE_FOLDER)
+      ? undefined
+      : { from: path, to: target };
+  };
   for (const path of read) {
-    for (const specifier of textImports(input.sources.get(path) ?? '')) {
-      const target = input.resolve(specifier, path);
-      if (target === undefined || !target.startsWith(CORE_FOLDER)) {
+    const text = input.sources.get(path) ?? '';
+    const augments = augmentedModules(path, text);
+    for (const specifier of withoutAugments(textImports(text), augments)) {
+      const edge = intoCore(specifier, path);
+      if (edge === undefined) {
         continue;
       }
-      const edge: CoreImport = { from: path, to: target };
-      const edges = barrels.has(target)
+      const edges = barrels.has(edge.to)
         ? barrel
         : deep;
       edges.set(importLine(edge), edge);
     }
+    for (const specifier of augments) {
+      const edge = intoCore(specifier, path);
+      if (edge !== undefined) augment.set(importLine(edge), edge);
+    }
   }
-  return { barrel: sortedByLine(barrel), deep: sortedByLine(deep), inside, missing, read };
+  return {
+    barrel: sortedByLine(barrel),
+    deep: sortedByLine(deep),
+    augment: sortedByLine(augment),
+    inside,
+    missing,
+    read,
+  };
 }

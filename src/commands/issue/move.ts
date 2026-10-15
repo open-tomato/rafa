@@ -91,11 +91,11 @@ export async function moveIssue(context: RafaContext, seams: IssueSeams): Promis
 }
 
 /** The refresh's options for the project the line runs in; its config warnings are dropped, as the chain's reading already printed them. */
-function moveProjectOptions(context: RafaContext, seams: IssueSeams): MoveProjectOptions {
+async function moveProjectOptions(context: RafaContext, seams: IssueSeams): Promise<MoveProjectOptions> {
   const project = issueProject(context);
   const { gh } = seams;
   return {
-    config: issueSubjectConfig(project, () => undefined),
+    config: await issueSubjectConfig(project, () => undefined),
     openGh: (): GhRunner => gh ?? createGhRunner({ cwd: project.root }),
   };
 }
@@ -142,7 +142,7 @@ export function createIssueMoveCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
     outputs: ['text', 'json'],
     run: async (context) => {
       const moved = await moveIssue(context, seams);
-      const refreshed = await refreshMovedIssue(moved.tracker.kind, moved.ref.externalId, moveProjectOptions(context, seams));
+      const refreshed = await refreshMovedIssue(moved.tracker.kind, moved.ref.externalId, await moveProjectOptions(context, seams));
       const warn = (): void => {
         if (moved.warning !== null) context.output.warn(`${issueName(moved.ref)}: ${moved.warning}`);
         for (const line of refreshed) context.output.warn(line);

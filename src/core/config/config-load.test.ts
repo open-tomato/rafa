@@ -1,50 +1,64 @@
 /**
- * Tests for the disk half of the config: reading one config file, and
- * loading the project's and the user scope's through the home seam.
+ * Tests for the disk half of the config: reading one YAML file, and
+ * loading each scope's one file through the home seam, a module file
+ * (`rafa.config.ts`, `rafa.config.mjs`) ahead of the YAML file.
  *
  * Every case plants its project root and its home side by side under
  * this file's temporary root, and none reads the real home: `loadConfig`
  * takes no default home, and a case that resolves the user file holds
- * its path to sit under that root. Most machines have no
- * `~/.rafa/config.yaml`, so a case that read the real one would pass on
- * them and fail only where one exists; the containment assertion fails
- * here.
+ * its path to sit under that root. Most machines have no `~/.rafa/`
+ * config, so a case that read the real one would pass on them and fail
+ * only where one exists; the containment assertion fails here.
  *
  * Precedence over every setting at once is `config.test.ts`'s, driven
  * through the pure `resolveConfig`. What is pinned here is the wiring:
- * which directory each file is read from, which layer it lands in, the
- * order the two are judged in, and that a root that is the home is read
- * once. Each layering case plants values that DIFFER between the user
- * file, the project file and the default, so a loader that swapped the
- * two files, or dropped one, answers something else.
+ * which file each scope is read from, which layer it lands in, the order
+ * the two are judged in, and that a root that is the home is read once.
+ * Each layering case plants values that DIFFER between the user file,
+ * the project file and the default, so a loader that swapped the two
+ * files, or dropped one, answers something else.
  *
  * Every refusal and every exclusion is paired with the acceptance that
  * makes it a reading: the user file judged first beside the same
  * project file refused alone, a refused home beside the same project
  * warning under a usable one, a missing home beside the same root
- * resolving with one, and a home read once beside the same text read
- * from two directories.
+ * resolving with one, a home read once beside the same text read from
+ * two directories, a `flows` refused in the user layer beside the same
+ * key warned about in the project's, a value import refused beside the
+ * same file importing types alone, a shadowed YAML file beside the same
+ * file read where no module file stands, and a duplicate refused at
+ * `error` beside the same file warning at the default.
  *
- * Twenty-one module mutations were driven against this file,
- * `config.test.ts` and `tests/plan-injection.test.ts` together, one at a
- * time, each an exact string found once, with `config.ts`,
- * `config-load.ts` and `start/run-config.ts` restored sha256-identical
- * after it. Twenty reddened at least one case on the first pass: the
- * user file ranked over the project's, dropped by the resolver, labelled
- * `file`, its warnings dropped or put after the project's, its path
- * taken from the project file, its extras dropped; the user file read
- * under the root, not handed on, swapped with the project's, or judged
- * second; a relative home accepted; the home never the root, or the two
- * compared as strings, in either of two places; a default home put
- * back; warnings never printed; the command line judged before the
- * files; and the user source labelled the default, or the project's
- * labelled with the user path. The one green, a path that does not
- * resolve read as the same directory, reddens the missing-root case,
- * which was added for it.
+ * Module files are planted at a path no other case uses: `import()`
+ * keeps a module per path and content, so a case reusing a path would
+ * read what an earlier case planted unless the loader reloads it, which
+ * the reload case holds on its own.
+ *
+ * Eighteen mutations of `config-load.ts` were driven against this file,
+ * one at a time, each an exact string found once, with the module
+ * restored sha256-identical after. Seventeen reddened at least one case:
+ * no `false` set back, no later entry wiping it, every `false` at a map
+ * id set back, none set back, the user file's
+ * duplicate level over the project's, `flows` let into the user layer,
+ * no shadowed file, its warning dropped, no entry recorded, the missing
+ * module unmatched, the user scope looked up at `.rafa/.rafa/`, no
+ * reload, no refusal of a directory at a lookup name, no cause read for
+ * an unreadable file, `error` ignored, the project scope judged first,
+ * and a YAML file read as merged entries. The green one turns off the
+ * refusal on a schema issue, which no file reaches; the module note of
+ * `config-load.ts` argues it.
+ *
+ * The settings are the sections `src/config-registry.ts` registers when
+ * it is imported, as this file imports it. That import also sets the
+ * load hook `loadConfig` hands every resolved config to; the cases on
+ * the hook set one of their own, or clear it, and put the one they
+ * found back in a `finally`.
  *
  * The defaults are read off `CONFIG_DEFAULTS` here, because
  * `config.test.ts` spells them and holds the module to them. Files are
- * planted at the LITERAL `.rafa/config.yaml`.
+ * planted at LITERAL paths: `.rafa/config.yaml` and `rafa.config.ts`
+ * under the root, `config.yaml` and `rafa.config.ts` under the home's
+ * `.rafa/`.
  */
 import type { ConfigRoots } from './config-load.js';
 import type { ConfigSetting, ConfigSource } from './config.js';
@@ -60,18 +74,21 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '../../adapters/logger/settings.js';
+import { CONFIG_DEFAULTS } from '../../config-registry.js';
 import { activeStoreSettings, setActiveStoreSettings } from '../../effort/store/settings.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { setActiveOutput } from '../output/active.js';
 
 import { loadConfig, readConfigFile } from './config-load.js';
-import { CONFIG_DEFAULTS, ConfigError } from './config.js';
+import { ConfigError } from './config.js';
+import { activeConfigLoadHook, setConfigLoadHook } from './section.js';
 
-/** Chmod cannot deny a read to root; see the unreadable-file case. */
+/** Chmod cannot deny a read to root; see the unreadable-file cases. */
 const isRoot = process.getuid?.() === 0;
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-load-'));
@@ -99,14 +116,35 @@ function literalPath(dir: string): string {
   return join(dir, '.rafa', 'config.yaml');
 }
 
+/** The literal path of a module file under a project root. */
+function projectModulePath(root: string, name = 'rafa.config.ts'): string {
+  return join(root, name);
+}
+
+/** The literal path of a module file in the user scope under a home. */
+function userModulePath(home: string, name = 'rafa.config.ts'): string {
+  return join(home, '.rafa', name);
+}
+
+/** Writes `text` at `path`, creating its directory, and answers `path`. */
+function write(path: string, text: string): string {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+  return path;
+}
+
 /** Plants `text` at `.rafa/config.yaml` under `dir`, and answers `dir`. */
 function plant(dir: string, text: string): string {
-  mkdirSync(join(dir, '.rafa'), { recursive: true });
-  writeFileSync(literalPath(dir), text);
+  write(literalPath(dir), text);
   return dir;
 }
 
-/** A project root and a home side by side, each holding its text if given. */
+/** A module file's text: `export default` of `entries` as JSON. */
+function moduleText(entries: unknown): string {
+  return `export default ${JSON.stringify(entries)};\n`;
+}
+
+/** A project root and a home side by side, each holding its YAML text if given. */
 function scopes(project: string | null, user: string | null): ConfigRoots {
   const root = freshDir('project');
   const home = freshDir('home');
@@ -124,15 +162,15 @@ function sink(): { lines: string[]; warn: (line: string) => void } {
 /** A warning sink that keeps nothing. */
 function quiet(): void {}
 
-/** The {@link ConfigError} `run` throws. Fails when it throws none. */
-function refusal(run: () => unknown): ConfigError {
+/** The {@link ConfigError} `run` rejects with. Fails when it settles otherwise. */
+async function refusal(run: () => Promise<unknown>): Promise<ConfigError> {
   try {
-    run();
+    await run();
   } catch (error) {
     if (error instanceof ConfigError) return error;
     throw error;
   }
-  throw new Error('expected a ConfigError, and nothing was thrown');
+  throw new Error('expected a ConfigError, and the load resolved');
 }
 
 /** Every setting answered by `rest`, except those `named` answers. */
@@ -145,8 +183,13 @@ function sourcesWith(
 }
 
 /** The opening of the warning about one unknown key in one file. */
-function warningAbout(key: string, dir: string): string {
-  return `rafa config: unknown key "${key}" in ${literalPath(dir)} has no effect`;
+function warningAbout(key: string, path: string): string {
+  return `rafa config: unknown key "${key}" in ${path} has no effect`;
+}
+
+/** The lines of `lines` about a key set twice in one file. */
+function duplicateLines(lines: readonly string[]): string[] {
+  return lines.filter((line) => line.includes('is set more than once'));
 }
 
 describe('readConfigFile', () => {
@@ -168,10 +211,14 @@ describe('readConfigFile', () => {
   it('refuses a directory at the config path rather than reading it as absent', () => {
     const dir = freshDir('directory');
     mkdirSync(literalPath(dir), { recursive: true });
-    const error = refusal(() => readConfigFile(dir));
 
-    expect(error.problems).toHaveLength(1);
-    expect(error.problems[0]).toStartWith(`${literalPath(dir)}: cannot be read (`);
+    expect(() => readConfigFile(dir)).toThrow(ConfigError);
+    try {
+      readConfigFile(dir);
+    } catch (error) {
+      expect((error as ConfigError).problems).toHaveLength(1);
+      expect((error as ConfigError).problems[0]).toStartWith(`${literalPath(dir)}: cannot be read (`);
+    }
   });
 
   it('characterizes Bun.file().exists() as false for a directory', async () => {
@@ -182,44 +229,75 @@ describe('readConfigFile', () => {
     expect(await Bun.file(literalPath(dir)).exists()).toBe(false);
   });
 
-  it.skipIf(isRoot)('refuses a config file it cannot read', () => {
+  it.skipIf(isRoot)('refuses a config file it cannot read', async () => {
     const dir = plant(freshDir('unreadable'), 'store: ndjson\n');
     chmodSync(literalPath(dir), 0o000);
-    const error = refusal(() => readConfigFile(dir));
+    const error = await refusal(async () => readConfigFile(dir));
 
     expect(error.problems[0]).toStartWith(`${literalPath(dir)}: cannot be read (`);
     expect(error.cause).toMatchObject({ code: 'EACCES' });
   });
 
-  it('passes the parser refusals through', () => {
+  it('passes the parser refusals through', async () => {
     const dir = plant(freshDir('refused'), 'store: postgres\n');
 
-    expect(refusal(() => readConfigFile(dir)).problems).toEqual([
+    expect((await refusal(async () => readConfigFile(dir))).problems).toEqual([
       `${literalPath(dir)}: store is "postgres", expected one of: sqlite, ndjson`,
     ]);
   });
 });
 
-describe('loadConfig', () => {
-  it('resolves the defaults silently when neither directory holds a config, creating nothing', () => {
+describe('loadConfig over YAML files', () => {
+  it('hands the load hook the config it resolved, before printing a warning', async () => {
+    const held = activeConfigLoadHook();
+    const events: unknown[] = [];
+    try {
+      setConfigLoadHook((config) => events.push(['hook', config.store]));
+      const resolved = await loadConfig(scopes('store: ndjson\nnonesuch: 1\n', null), {}, () => events.push('warn'));
+
+      expect(events).toEqual([['hook', 'ndjson'], 'warn']);
+      expect(resolved.config.store).toBe('ndjson');
+    } finally {
+      setConfigLoadHook(held);
+    }
+  });
+
+  it('hands the logger its settings through the hook the registry set, and leaves them with no hook set', async () => {
+    const held = activeConfigLoadHook();
+    try {
+      await loadConfig(scopes('logger:\n  level: error\n', null), {}, quiet);
+      const throughHook = activeLoggerSettings().level;
+      setActiveLoggerSettings(null);
+      setConfigLoadHook(null);
+      await loadConfig(scopes('logger:\n  level: error\n', null), {}, quiet);
+
+      expect([throughHook, activeLoggerSettings().level]).toEqual(['error', 'warn']);
+    } finally {
+      setConfigLoadHook(held);
+      setActiveLoggerSettings(null);
+    }
+  });
+
+  it('resolves the defaults silently when neither directory holds a config, creating nothing', async () => {
     const roots = scopes(null, null);
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config).toEqual({ ...CONFIG_DEFAULTS });
     expect(resolved.sources).toEqual(sourcesWith({}));
-    expect([resolved.path, resolved.userPath]).toEqual([null, null]);
+    expect(Object.values(resolved.provenance).every((origin) => origin === null)).toBe(true);
+    expect([resolved.path, resolved.userPath, resolved.shadowed]).toEqual([null, null, []]);
     expect(lines).toEqual([]);
     expect([readdirSync(roots.root), readdirSync(roots.home)]).toEqual([[], []]);
   });
 
-  it('hands the effort store the busy timeout it resolved, the user file answering where the project file is silent', () => {
+  it('hands the effort store the busy timeout it resolved, the user file answering where the project file is silent', async () => {
     try {
-      loadConfig(scopes('store: ndjson\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
+      await loadConfig(scopes('store: ndjson\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
       const fromUser = activeStoreSettings().busyTimeoutMs;
-      loadConfig(scopes('effort:\n  busyTimeoutMs: 60000\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
+      await loadConfig(scopes('effort:\n  busyTimeoutMs: 60000\n', 'effort:\n  busyTimeoutMs: 250\n'), {}, quiet);
       const fromProject = activeStoreSettings().busyTimeoutMs;
-      loadConfig(scopes(null, null), {}, quiet);
+      await loadConfig(scopes(null, null), {}, quiet);
 
       expect([fromUser, fromProject, activeStoreSettings().busyTimeoutMs]).toEqual([250, 60_000, 5000]);
     } finally {
@@ -228,13 +306,13 @@ describe('loadConfig', () => {
   });
 
   it('resolves effort.sync from the user file where the project file leaves it out, '
-    + 'and lets a project value outrank a user one', () => {
-    const omitting = loadConfig(
+    + 'and lets a project value outrank a user one', async () => {
+    const omitting = await loadConfig(
       scopes('effort:\n  busyTimeoutMs: 250\n', 'effort:\n  sync: file\n'),
       {},
       quiet,
     );
-    const naming = loadConfig(
+    const naming = await loadConfig(
       scopes('effort:\n  sync: local\n', 'effort:\n  sync: file\n'),
       {},
       quiet,
@@ -244,12 +322,12 @@ describe('loadConfig', () => {
     expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
   });
 
-  it('leaves the store settings as they were when it refuses a file', () => {
+  it('leaves the store settings as they were when it refuses a file', async () => {
     try {
       setActiveStoreSettings({ busyTimeoutMs: 250 });
       const roots = scopes('effort:\n  busyTimeoutMs: 0\n', null);
 
-      expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+      expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
         `${literalPath(roots.root)}: effort.busyTimeoutMs is 0, `
           + 'expected a lock wait in milliseconds, a whole number from 1 to 60000',
       ]);
@@ -259,9 +337,9 @@ describe('loadConfig', () => {
     }
   });
 
-  it('reads the project file and lets the command line outrank it', () => {
+  it('reads the project file and lets the command line outrank it, naming entry 0 of the file', async () => {
     const roots = scopes('store: ndjson\nplan:\n  inject: full\nloop:\n  settingSources: user\n', null);
-    const resolved = loadConfig(roots, { inject: 'task' }, quiet);
+    const resolved = await loadConfig(roots, { inject: 'task' }, quiet);
 
     expect(resolved.config).toEqual({
       ...CONFIG_DEFAULTS,
@@ -275,41 +353,44 @@ describe('loadConfig', () => {
       settingSources: 'file',
     }));
     expect(resolved.path).toBe(literalPath(roots.root));
+    expect([resolved.provenance.store, resolved.provenance.inject, resolved.provenance.planDir])
+      .toEqual([{ file: literalPath(roots.root), entry: 0 }, null, null]);
   });
 
-  it('reads the user file under the home it is handed, a path under this file temporary root', () => {
+  it('reads the user file under the home it is handed, a path under this file temporary root', async () => {
     const roots = scopes(null, 'store: ndjson\n');
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual({ ...CONFIG_DEFAULTS, store: 'ndjson' });
     expect(resolved.sources).toEqual(sourcesWith({ store: 'user' }));
     expect(resolved.userPath).toBe(literalPath(roots.home));
     expect(resolved.userPath?.startsWith(`${tempRoot}/`)).toBe(true);
+    expect(resolved.provenance.store).toEqual({ file: literalPath(roots.home), entry: 0 });
     expect(resolved.path).toBeNull();
 
     // The control: the same root under another home answers the default,
     // so it was the home handed in that answered above.
-    const elsewhere = loadConfig({ root: roots.root, home: freshDir('other-home') }, {}, quiet);
+    const elsewhere = await loadConfig({ root: roots.root, home: freshDir('other-home') }, {}, quiet);
     expect(elsewhere.config.store).toBe(CONFIG_DEFAULTS.store);
     expect(elsewhere.sources.store).toBe('default');
   });
 
-  it('reads the user file for a project root that does not exist', () => {
+  it('reads the user file for a project root that does not exist', async () => {
     const home = plant(freshDir('home'), 'store: ndjson\n');
     const root = freshPath('missing-root');
-    const resolved = loadConfig({ root, home }, {}, quiet);
+    const resolved = await loadConfig({ root, home }, {}, quiet);
 
     expect(existsSync(root)).toBe(false);
     expect(resolved.sources.store).toBe('user');
     expect(resolved.userPath).toBe(literalPath(home));
   });
 
-  it('lets the project file outrank the user file key by key, each over the default', () => {
+  it('lets the project file outrank the user file key by key, each over the default', async () => {
     const roots = scopes(
       'plan:\n  inject: task\n',
       'store: ndjson\nplan:\n  inject: full\n  dir: user-plans\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual({
       ...CONFIG_DEFAULTS,
@@ -326,10 +407,10 @@ describe('loadConfig', () => {
       .toEqual([literalPath(roots.root), literalPath(roots.home)]);
   });
 
-  it('lets the command line outrank both files', () => {
+  it('lets the command line outrank both files', async () => {
     const roots = scopes('plan:\n  dir: project-plans\n', 'plan:\n  dir: user-plans\n');
-    const flagged = loadConfig(roots, { planDir: 'cli-plans' }, quiet);
-    const unflagged = loadConfig(roots, {}, quiet);
+    const flagged = await loadConfig(roots, { planDir: 'cli-plans' }, quiet);
+    const unflagged = await loadConfig(roots, {}, quiet);
 
     expect(flagged.config.planDir).toBe('cli-plans');
     expect(flagged.sources.planDir).toBe('cli');
@@ -337,19 +418,27 @@ describe('loadConfig', () => {
     expect(unflagged.sources.planDir).toBe('file');
   });
 
-  it('warns about the user file unknown keys before the project file, naming each file', () => {
+  it('keeps a false as a value, where the merge would remove the key', async () => {
+    const roots = scopes('status:\n  notice: false\n', null);
+    const resolved = await loadConfig(roots, {}, quiet);
+
+    expect(CONFIG_DEFAULTS.statusNotice).toBe(true);
+    expect([resolved.config.statusNotice, resolved.sources.statusNotice]).toEqual([false, 'file']);
+  });
+
+  it('warns about the user file unknown keys before the project file, naming each file', async () => {
     const roots = scopes('plan:\n  depth: 3\n', 'nonesuch: a\nstore: ndjson\n');
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toStartWith(warningAbout('nonesuch', roots.home));
-    expect(lines[1]).toStartWith(warningAbout('plan.depth', roots.root));
+    expect(lines[0]).toStartWith(warningAbout('nonesuch', literalPath(roots.home)));
+    expect(lines[1]).toStartWith(warningAbout('plan.depth', literalPath(roots.root)));
     expect(resolved.userExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
     expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
   });
 
-  it('writes through the active output warn by default, and nothing through console.warn', () => {
+  it('writes through the active output warn by default, and nothing through console.warn', async () => {
     const roots = scopes('nonesuch: linear\n', null);
     const routed: string[] = [];
     const consoleWarned: unknown[][] = [];
@@ -363,7 +452,7 @@ describe('loadConfig', () => {
     }));
 
     try {
-      loadConfig(roots);
+      await loadConfig(roots);
     } finally {
       setActiveOutput(null);
       mock.restore();
@@ -374,19 +463,19 @@ describe('loadConfig', () => {
     expect(consoleWarned).toEqual([]);
   });
 
-  it('judges the files before it looks at the command line', () => {
+  it('judges the files before it looks at the command line', async () => {
     const roots = scopes('store: postgres\n', null);
-    const error = refusal(() => loadConfig(roots, { inject: 'bogus' }, quiet));
+    const error = await refusal(() => loadConfig(roots, { inject: 'bogus' }, quiet));
 
     expect(error.problems).toEqual([
       `${literalPath(roots.root)}: store is "postgres", expected one of: sqlite, ndjson`,
     ]);
   });
 
-  it('judges the user file before the project file', () => {
+  it('judges the user file before the project file', async () => {
     const project = 'plan:\n  inject: bogus\n';
     const roots = scopes(project, 'store: postgres\n');
-    const error = refusal(() => loadConfig(roots, {}, quiet));
+    const error = await refusal(() => loadConfig(roots, {}, quiet));
 
     expect(error.problems).toEqual([
       `${literalPath(roots.home)}: store is "postgres", expected one of: sqlite, ndjson`,
@@ -395,56 +484,91 @@ describe('loadConfig', () => {
     // The control: the same project file under a usable home is refused
     // on its own, so its problem was there to be named above.
     const alone = scopes(project, 'store: sqlite\n');
-    expect(refusal(() => loadConfig(alone, {}, quiet)).problems).toEqual([
+    expect((await refusal(() => loadConfig(alone, {}, quiet))).problems).toEqual([
       `${literalPath(alone.root)}: plan.inject is "bogus", expected one of: full, stage, task`,
     ]);
   });
 
-  it('refuses an unusable user value even where the project file outranks it', () => {
+  it('refuses an unusable user value even where the project file outranks it', async () => {
     const roots = scopes('store: ndjson\n', 'store: postgres\n');
 
-    expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
       `${literalPath(roots.home)}: store is "postgres", expected one of: sqlite, ndjson`,
     ]);
 
     // The control: a usable user value under the same project file is
     // outranked by it, and the run resolves.
     const usable = scopes('store: ndjson\n', 'store: sqlite\n');
-    expect(loadConfig(usable, {}, quiet).sources.store).toBe('file');
+    expect((await loadConfig(usable, {}, quiet)).sources.store).toBe('file');
+  });
+
+  it('refuses a line indented with a tab before the parser reads it', async () => {
+    const roots = scopes('plan:\n\tinject: full\n', null);
+
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
+      `${literalPath(roots.root)}: line 2 is indented with a tab; YAML indents with spaces only`,
+    ]);
+  });
+
+  it('refuses a stream of two documents as a list, not as two entries', async () => {
+    const roots = scopes('store: ndjson\n---\nstore: sqlite\n', null);
+
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
+      `${literalPath(roots.root)}: expected a mapping at the top level, found a list`,
+    ]);
+  });
+
+  it('refuses a directory at the project config path rather than reading it as absent', async () => {
+    const root = freshDir('directory-root');
+    mkdirSync(literalPath(root), { recursive: true });
+    const error = await refusal(() => loadConfig({ root, home: freshDir('home') }, {}, quiet));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toStartWith(`${literalPath(root)}: cannot be read (`);
+  });
+
+  it.skipIf(isRoot)('refuses a user config file it cannot read, naming why', async () => {
+    const roots = scopes(null, 'store: ndjson\n');
+    chmodSync(literalPath(roots.home), 0o000);
+    const error = await refusal(() => loadConfig(roots, {}, quiet));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toStartWith(`${literalPath(roots.home)}: cannot be read (`);
+    expect(error.cause).toMatchObject({ code: 'EACCES' });
   });
 
   it.each([
     ['a relative home', 'rel/home', '"rel/home"'],
     ['an empty home', '', '""'],
-  ])('refuses %s, printing nothing', (_label, home, quoted) => {
+  ])('refuses %s, printing nothing', async (_label, home, quoted) => {
     const root = plant(freshDir('project'), 'nonesuch: a\n');
     const { lines, warn } = sink();
 
-    expect(refusal(() => loadConfig({ root, home }, {}, warn)).problems).toEqual([
+    expect((await refusal(() => loadConfig({ root, home }, {}, warn))).problems).toEqual([
       `home directory is ${quoted}, expected an absolute path`,
     ]);
     expect(lines).toEqual([]);
 
     // The control: the same root under an absolute home warns about the
     // project file, so a run that got past the home would have printed.
-    loadConfig({ root, home: freshDir('home') }, {}, warn);
+    await loadConfig({ root, home: freshDir('home') }, {}, warn);
     expect(lines).toHaveLength(1);
   });
 
-  it('throws rather than reading any home when none is given', () => {
+  it('rejects rather than reading any home when none is given', async () => {
     const roots = scopes('store: ndjson\n', null);
     const noHome = { root: roots.root } as unknown as ConfigRoots;
 
-    expect(() => loadConfig(noHome, {}, quiet)).toThrow(TypeError);
+    await expect(loadConfig(noHome, {}, quiet)).rejects.toThrow(TypeError);
     // The control: the same root with a home resolves.
-    expect(loadConfig(roots, {}, quiet).config.store).toBe('ndjson');
+    expect((await loadConfig(roots, {}, quiet)).config.store).toBe('ndjson');
   });
 
-  it('reads a root that is the home once, as the project file', () => {
+  it('reads a root that is the home once, as the project file', async () => {
     const text = 'store: ndjson\nnonesuch: a\n';
     const dir = plant(freshDir('home-is-root'), text);
     const once = sink();
-    const resolved = loadConfig({ root: dir, home: dir }, {}, once.warn);
+    const resolved = await loadConfig({ root: dir, home: dir }, {}, once.warn);
 
     expect(resolved.sources.store).toBe('file');
     expect([resolved.path, resolved.userPath]).toEqual([literalPath(dir), null]);
@@ -452,21 +576,311 @@ describe('loadConfig', () => {
 
     // The control: the same text in two directories is read twice.
     const twice = sink();
-    const both = loadConfig(scopes(text, text), {}, twice.warn);
+    const both = await loadConfig(scopes(text, text), {}, twice.warn);
     expect(both.sources.store).toBe('file');
     expect(both.userPath).not.toBeNull();
     expect(twice.lines).toHaveLength(2);
   });
 
-  it('reads a root reached through a symlink to the home once', () => {
+  it('reads a root reached through a symlink to the home once', async () => {
     const home = plant(freshDir('linked-home'), 'nonesuch: a\n');
     const root = freshPath('link');
     symlinkSync(home, root);
     const { lines, warn } = sink();
-    const resolved = loadConfig({ root, home }, {}, warn);
+    const resolved = await loadConfig({ root, home }, {}, warn);
 
     expect(resolved.userPath).toBeNull();
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toStartWith(warningAbout('nonesuch', root));
+    expect(lines[0]).toStartWith(warningAbout('nonesuch', literalPath(root)));
+  });
+});
+
+describe('loadConfig over module files', () => {
+  it('reads a project rafa.config.ts, naming the file and the entry of each setting it answers', async () => {
+    const root = freshDir('ts-project');
+    const path = write(projectModulePath(root), moduleText([{ store: 'ndjson' }, { pr: { base: 'trunk' } }]));
+    const resolved = await loadConfig({ root, home: freshDir('home') }, {}, quiet);
+
+    expect([resolved.config.store, resolved.config.prBase]).toEqual(['ndjson', 'trunk']);
+    expect(resolved.sources).toEqual(sourcesWith({ store: 'file', prBase: 'file' }));
+    expect(resolved.path).toBe(path);
+    expect([resolved.provenance.store, resolved.provenance.prBase, resolved.provenance.inject])
+      .toEqual([{ file: path, entry: 0 }, { file: path, entry: 1 }, null]);
+  });
+
+  it('reads one entry exported on its own as a list of one', async () => {
+    const root = freshDir('ts-one-entry');
+    write(projectModulePath(root), 'export default { store: \'ndjson\' };\n');
+
+    expect((await loadConfig({ root, home: freshDir('home') }, {}, quiet)).config.store).toBe('ndjson');
+  });
+
+  it('reads a file holding import type and satisfies alone, with nothing installed beside it', async () => {
+    const root = freshDir('ts-types-only');
+    write(projectModulePath(root), 'import type { Config } from \'@open-tomato/rafa/config\';\n'
+      + 'export default [{ pr: { base: \'trunk\' } }] satisfies Config;\n');
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', root)).toThrow();
+    expect((await loadConfig({ root, home: freshDir('home') }, {}, quiet)).config.prBase).toBe('trunk');
+  });
+
+  it('reads rafa.config.mjs where no rafa.config.ts stands, and rafa.config.ts ahead of it', async () => {
+    const mjsOnly = freshDir('mjs-only');
+    write(projectModulePath(mjsOnly, 'rafa.config.mjs'), moduleText([{ store: 'ndjson' }]));
+    const both = freshDir('ts-and-mjs');
+    write(projectModulePath(both, 'rafa.config.mjs'), moduleText([{ store: 'ndjson' }]));
+    const ts = write(projectModulePath(both), moduleText([{ plan: { dir: 'ts-plans' } }]));
+
+    const fromMjs = await loadConfig({ root: mjsOnly, home: freshDir('home') }, {}, quiet);
+    const fromTs = await loadConfig({ root: both, home: freshDir('home') }, {}, quiet);
+
+    expect([fromMjs.config.store, fromMjs.path]).toEqual(['ndjson', projectModulePath(mjsOnly, 'rafa.config.mjs')]);
+    expect([fromTs.config.store, fromTs.config.planDir, fromTs.path]).toEqual([CONFIG_DEFAULTS.store, 'ts-plans', ts]);
+  });
+
+  it('reads the user scope module file under the home .rafa/, ranked under the project file key by key', async () => {
+    const roots = scopes('plan:\n  dir: project-plans\n', null);
+    const userPath = write(userModulePath(roots.home), moduleText([{ store: 'ndjson', plan: { dir: 'user-plans' } }]));
+    const resolved = await loadConfig(roots, {}, quiet);
+
+    expect([resolved.config.store, resolved.config.planDir]).toEqual(['ndjson', 'project-plans']);
+    expect([resolved.sources.store, resolved.sources.planDir]).toEqual(['user', 'file']);
+    expect(resolved.userPath).toBe(userPath);
+    expect(resolved.provenance.store).toEqual({ file: userPath, entry: 0 });
+  });
+
+  it('lets a later entry of one file win, and names it', async () => {
+    const root = freshDir('ts-later-wins');
+    const path = write(projectModulePath(root), moduleText([
+      { store: 'ndjson', plan: { dir: 'first' } },
+      { merge: { duplicates: 'allow' } },
+      { plan: { dir: 'second' } },
+    ]));
+    const resolved = await loadConfig({ root, home: freshDir('home') }, {}, quiet);
+
+    expect(resolved.config.planDir).toBe('second');
+    expect(resolved.provenance.planDir).toEqual({ file: path, entry: 2 });
+  });
+
+  it('sets back a false the merge removes, unless a later entry replaced the mapping above it', async () => {
+    const kept = freshDir('ts-false');
+    write(projectModulePath(kept), moduleText([{ status: { notice: false } }]));
+    const overwritten = freshDir('ts-false-then-true');
+    write(projectModulePath(overwritten), moduleText([
+      { merge: { duplicates: 'allow' } },
+      { status: { notice: false } },
+      { status: { notice: true } },
+    ]));
+    const replaced = freshDir('ts-false-then-replaced');
+    write(projectModulePath(replaced), moduleText([{ status: { notice: false } }, { status: { $replace: true } }]));
+    const home = freshDir('home');
+
+    const readings = await Promise.all([kept, overwritten, replaced].map(async (root) => {
+      const { config, sources } = await loadConfig({ root, home }, {}, quiet);
+      return [config.statusNotice, sources.statusNotice];
+    }));
+
+    expect(CONFIG_DEFAULTS.statusNotice).toBe(true);
+    expect(readings).toEqual([[false, 'file'], [true, 'file'], [true, 'default']]);
+  });
+
+  it('sets back a false at a routing row, shadowing the default row as a YAML file does', async () => {
+    const root = freshDir('ts-routing-false');
+    write(projectModulePath(root), moduleText([{ routing: { prose: false } }]));
+    const resolved = await loadConfig({ root, home: freshDir('home') }, {}, quiet);
+
+    expect(CONFIG_DEFAULTS.routing.get('prose')).toBe('doc-updater');
+    expect([resolved.config.routing.get('prose'), resolved.config.routing.get('tests')]).toEqual([false, 'tdd-guide']);
+  });
+
+  it('drops a logger.modules id a later entry sets to false, the removal its reader refuses as a value', async () => {
+    const dropped = freshDir('ts-module-false');
+    write(projectModulePath(dropped), moduleText([
+      { merge: { duplicates: 'allow' } },
+      { logger: { modules: { board: { level: 'debug' }, triage: { level: 'error' } } } },
+      { logger: { modules: { board: false } } },
+    ]));
+    const kept = freshDir('ts-module-kept');
+    write(projectModulePath(kept), moduleText([{ logger: { modules: { board: { level: 'debug' } } } }]));
+    const home = freshDir('home');
+
+    const fromDropped = await loadConfig({ root: dropped, home }, {}, quiet);
+    const fromKept = await loadConfig({ root: kept, home }, {}, quiet);
+
+    expect([...fromDropped.config.loggerModules]).toEqual([['triage', 'error']]);
+    expect([...fromKept.config.loggerModules]).toEqual([['board', 'debug']]);
+  });
+
+  it('refuses a value a reader refuses, naming the file as a YAML file is named', async () => {
+    const root = freshDir('ts-refused');
+    const path = write(projectModulePath(root), moduleText([{ store: 'postgres' }]));
+
+    expect((await refusal(() => loadConfig({ root, home: freshDir('home') }, {}, quiet))).problems).toEqual([
+      `${path}: store is "postgres", expected one of: sqlite, ndjson`,
+    ]);
+  });
+
+  it('warns about an unknown key of a module file, naming the file', async () => {
+    const root = freshDir('ts-unknown');
+    const path = write(projectModulePath(root), moduleText([{ nonesuch: 1 }]));
+    const { lines, warn } = sink();
+    await loadConfig({ root, home: freshDir('home') }, {}, warn);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toStartWith(warningAbout('nonesuch', path));
+  });
+
+  it('sees an edit to a module file in a later load of the same process', async () => {
+    const root = freshDir('ts-reload');
+    write(projectModulePath(root), moduleText([{ plan: { dir: 'before' } }]));
+    const home = freshDir('home');
+    const before = await loadConfig({ root, home }, {}, quiet);
+    write(projectModulePath(root), moduleText([{ plan: { dir: 'after' } }]));
+    const after = await loadConfig({ root, home }, {}, quiet);
+
+    expect([before.config.planDir, after.config.planDir]).toEqual(['before', 'after']);
+  });
+});
+
+describe('loadConfig with a scope holding both files', () => {
+  it('reads the module file alone, names the YAML file shadowed and warns about it once', async () => {
+    const roots = scopes('store: ndjson\n', null);
+    const ts = write(projectModulePath(roots.root), moduleText([{ plan: { dir: 'ts-plans' } }]));
+    const { lines, warn } = sink();
+    const resolved = await loadConfig(roots, {}, warn);
+
+    expect([resolved.config.store, resolved.sources.store]).toEqual([CONFIG_DEFAULTS.store, 'default']);
+    expect(resolved.config.planDir).toBe('ts-plans');
+    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
+    expect(lines).toEqual([
+      `rafa config: ${literalPath(roots.root)} is not read: ${ts} holds the project scope's config, `
+        + 'so move its keys into rafa.config.ts and remove it',
+    ]);
+    expect(resolved.warnings).toEqual(lines);
+
+    // The control: the same YAML file with no module file beside it is
+    // read, and shadows nothing.
+    const alone = await loadConfig(scopes('store: ndjson\n', null), {}, quiet);
+    expect([alone.config.store, alone.shadowed]).toEqual(['ndjson', []]);
+  });
+
+  it('names a user scope YAML file a user module file shadows', async () => {
+    const roots = scopes(null, 'store: ndjson\n');
+    const mjs = write(userModulePath(roots.home, 'rafa.config.mjs'), moduleText([{ plan: { dir: 'user-plans' } }]));
+    const resolved = await loadConfig(roots, {}, quiet);
+
+    expect(resolved.shadowed).toEqual([{ layer: 'user', path: literalPath(roots.home), by: mjs }]);
+    expect([resolved.config.store, resolved.config.planDir]).toEqual([CONFIG_DEFAULTS.store, 'user-plans']);
+  });
+});
+
+describe('loadConfig on a key two entries of one file set', () => {
+  it('warns by default, naming the file and the key, and resolves to the later entry', async () => {
+    const root = freshDir('ts-duplicate');
+    const path = write(projectModulePath(root), moduleText([{ pr: { base: 'first' } }, { pr: { base: 'second' } }]));
+    const { lines, warn } = sink();
+    const resolved = await loadConfig({ root, home: freshDir('home') }, {}, warn);
+
+    expect(resolved.config.prBase).toBe('second');
+    expect(duplicateLines(lines)).toEqual([
+      `rafa config: ${path}: pr.base is set more than once within one layer: layer "project" (entries 0, 1)`,
+    ]);
+  });
+
+  it('refuses at merge.duplicates error, the user file deciding where the project file names none', async () => {
+    const roots = scopes(null, 'merge:\n  duplicates: error\n');
+    const path = write(projectModulePath(roots.root), moduleText([{ pr: { base: 'first' } }, { pr: { base: 'second' } }]));
+
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
+      `${path}: pr.base is set more than once within one layer: layer "project" (entries 0, 1)`,
+    ]);
+  });
+
+  it('lets the project file level outrank the user file one', async () => {
+    const roots = scopes(null, 'merge:\n  duplicates: error\n');
+    write(projectModulePath(roots.root), moduleText([
+      { merge: { duplicates: 'warn' } },
+      { pr: { base: 'first' } },
+      { pr: { base: 'second' } },
+    ]));
+    const { lines, warn } = sink();
+    const resolved = await loadConfig(roots, {}, warn);
+
+    expect(resolved.config.prBase).toBe('second');
+    expect(duplicateLines(lines)).toHaveLength(1);
+  });
+
+  it('drops the warning at merge.duplicates allow', async () => {
+    const root = freshDir('ts-duplicate-allowed');
+    write(projectModulePath(root), moduleText([
+      { merge: { duplicates: 'allow' } },
+      { pr: { base: 'first' } },
+      { pr: { base: 'second' } },
+    ]));
+    const { lines, warn } = sink();
+    await loadConfig({ root, home: freshDir('home') }, {}, warn);
+
+    expect(duplicateLines(lines)).toEqual([]);
+  });
+});
+
+describe('loadConfig refusing a file', () => {
+  it('refuses flows in a user module file, naming the layer and the file', async () => {
+    const home = freshDir('home');
+    const path = write(userModulePath(home), moduleText([{ flows: { next: {} } }]));
+
+    expect((await refusal(() => loadConfig({ root: freshDir('project'), home }, {}, quiet))).problems).toEqual([
+      `${path}: flows is refused in the user layer; flows are a project's decision and belong in the project's config file`,
+    ]);
+
+    // The control: the same entry in the project file is an unknown key,
+    // warned about and not refused.
+    const root = freshDir('project');
+    const projectPath = write(projectModulePath(root), moduleText([{ flows: { next: {} } }]));
+    const { lines, warn } = sink();
+    await loadConfig({ root, home: freshDir('home') }, {}, warn);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toStartWith(warningAbout('flows', projectPath));
+  });
+
+  it('refuses steps in a user YAML file before any of its keys is read', async () => {
+    const roots = scopes(null, 'store: postgres\nsteps:\n  lint: {}\n');
+
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
+      `${literalPath(roots.home)}: steps is refused in the user layer; `
+        + 'steps are a project\'s decision and belong in the project\'s config file',
+    ]);
+  });
+
+  it('refuses a value import of rafa it cannot find, naming the file, the module and the install', async () => {
+    const root = freshDir('ts-value-import');
+    const path = write(projectModulePath(root), 'import { defineConfig } from \'@open-tomato/rafa/config\';\n'
+      + 'export default defineConfig([{ pr: { base: \'trunk\' } }]);\n');
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', root)).toThrow();
+    expect((await refusal(() => loadConfig({ root, home: freshDir('home') }, {}, quiet))).problems).toEqual([
+      `${path}: imports @open-tomato/rafa/config, which cannot be found from this file; `
+        + 'install @open-tomato/rafa in the project (bun add -d @open-tomato/rafa), '
+        + 'or import its types alone (import type { Config } from \'@open-tomato/rafa/config\'), which need nothing at run time',
+    ]);
+  });
+
+  it('names a missing relative module without an install', async () => {
+    const root = freshDir('ts-relative-import');
+    const path = write(projectModulePath(root), 'import { entries } from \'./nonesuch.js\';\nexport default entries;\n');
+
+    expect((await refusal(() => loadConfig({ root, home: freshDir('home') }, {}, quiet))).problems).toEqual([
+      `${path}: imports ./nonesuch.js, which cannot be found from this file`,
+    ]);
+  });
+
+  it('refuses a module file that throws as it loads, naming it', async () => {
+    const root = freshDir('ts-throws');
+    const path = write(projectModulePath(root), 'throw new Error(\'planted\');\n');
+    const error = await refusal(() => loadConfig({ root, home: freshDir('home') }, {}, quiet));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toStartWith(`${path}: cannot be loaded (`);
+    expect(error.problems[0]).toContain('planted');
   });
 });

@@ -520,15 +520,120 @@ rafa· no pr            no open pull request for feat/rafa-485
 
 ## Configuration
 
-Settings live in `.rafa/config.yaml` in the project, and in
-`~/.rafa/config.yaml` for every project on the machine; a setting in the
-project's file outranks the same one in yours. `rafa init` writes both
-with every setting commented out at its default, so uncomment a line,
-with its section line, to change it.
+rafa reads its settings from one file per scope. The project scope is
+the repository's root; the user scope is `~/.rafa/`, read under every
+project on the machine. In each scope the lookup takes the first of
+three names that is a file, and the others are not read:
+
+1. `rafa.config.ts`, a TypeScript module
+2. `rafa.config.mjs`, a JavaScript module
+3. `.rafa/config.yaml` in the project, `~/.rafa/config.yaml` for the user
+
+The layers stack: rafa's defaults, under the user scope's file, under the
+project's. A setting the project's file names outranks the same one in
+the user's, key by key; a setting neither file names takes its default.
+`rafa init` writes both YAML files with every setting commented out at
+its default, so uncomment a line, with its section line, to change it.
 
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
 the line that carries a tab; use spaces only.
+
+### Which form to use
+
+Pick the lightest form your situation needs:
+
+- **No config at all.** rafa runs on its defaults, as it always has.
+- **An older project on YAML.** Nothing changes; `.rafa/config.yaml` is
+  read as before.
+- **A solo Python repository with rafa installed globally.** Write
+  `rafa.config.mjs` holding a plain list, or `rafa.config.ts` with only
+  an `import type`. The type import is erased before the file runs, so
+  nothing is needed at run time. A module that imports
+  `@open-tomato/rafa` at run time finds no such package here and is
+  refused, naming the file.
+- **A JS or TS project that installs rafa as a dev dependency.** Write
+  `satisfies Config` or `defineConfig`, both from
+  `@open-tomato/rafa/config`, and your editor checks the entries.
+- **A project moving from YAML to TypeScript.** For a while both files
+  sit side by side. The TypeScript file is read, and a warning names the
+  YAML file as not read; `rafa doctor` lists it until its keys have
+  moved, and then it can be removed.
+
+The same setting in each form:
+
+```yaml
+# .rafa/config.yaml
+naming:
+  branch: feat/{stub}
+```
+
+```js
+// rafa.config.mjs
+export default [{ naming: { branch: 'feat/{stub}' } }];
+```
+
+```ts
+// rafa.config.ts
+import type { Config } from '@open-tomato/rafa/config';
+
+export default [{ naming: { branch: 'feat/{stub}' } }] satisfies Config;
+```
+
+```ts
+// rafa.config.ts
+import { defineConfig } from '@open-tomato/rafa/config';
+
+export default defineConfig([{ dangerous: { selfUpdateDuringLoop: true } }]);
+```
+
+The import from `@open-tomato/rafa/config` is the one that needs the
+package installed where the file runs. For this iteration it can be
+solved with something simple attacking the type project specifically,
+but the bigger issue remains.
+
+Some routes were set aside, each for one reason. Merging both files of
+one scope is not done: a scope reads one file, so one answer per key.
+A Bun plugin redirecting the import does not resolve, as measured.
+Setting `NODE_PATH` and starting rafa again is not done: it would start
+a second process to load one file. Requiring a local install, as ESLint
+and Vite do, is not done: it would refuse the global Python case above.
+
+### Shadowed YAML and `rafa config show`
+
+When a scope holds a module file and a YAML file, the YAML file is not
+read, and every load says so:
+
+```text
+rafa config: /repo/.rafa/config.yaml is not read: /repo/rafa.config.ts holds the project scope's config, so move its keys into rafa.config.ts and remove it
+```
+
+`rafa config show` prints every setting with its merged value, nested
+as a config file spells it. `rafa config show --sources` prints one line
+per setting instead: its value, the layer that answered (`project`,
+`user` or `default`) and, for a file, the file and the zero-based entry
+that last set it; a YAML file is entry 0. `--output=json` carries the
+same data for a script. The two views are refused together.
+
+### Changing a key with `config set`
+
+`rafa config set <key>=<value>` edits the project's `.rafa/config.yaml`
+in place and keeps its comments. In a project whose config is
+`rafa.config.ts` or `rafa.config.mjs`, it refuses with exit 1, naming
+that file and writing nothing, because a module is code the command does
+not rewrite. Edit the module by hand until #893 gives the command a file
+to write.
+
+### `dangerous.*` settings
+
+A `dangerous.*` key is a person's consent, so rafa says what is in force:
+once per run, before its work starts, every command that loads the
+config prints one line for each `dangerous.*` key set off its default,
+naming the file and entry that set it, such as:
+
+```text
+dangerous.selfUpdateDuringLoop: true (/repo/rafa.config.ts, entry 0)
+```
 
 ### `effort`
 
@@ -695,6 +800,52 @@ dangerous:
   selfUpdateDuringLoop: true   # update the binary even while a loop runs
 ```
 
+### `merge`
+
+One setting says what a load does when one key is set twice in a file.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `merge.duplicates` | `warn` | `warn` prints each duplicate, `error` refuses the load with every one, `allow` drops them |
+
+Two entries of one module file setting one key, or a YAML key given
+twice, are duplicates. The project's file decides the level, over the
+user's. `config set` refuses a key written twice in the same file, as
+the same mistake.
+
+```yaml
+merge:
+  duplicates: error
+```
+
+### `naming`
+
+One setting names the branch `rafa loop start` creates for a plan.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `naming.branch` | `feat/{stub}` | the branch name; `{stub}` appears exactly once and stands for the plan's stub |
+
+A template with no `{stub}`, or with it twice, is refused. The value is
+kept as written.
+
+```yaml
+naming:
+  branch: feat/{stub}
+```
+
+### Config code and `pr triage --resolve`
+
+A `rafa.config.ts` or `rafa.config.mjs` is a module rafa imports, so it
+runs with your shell, credentials and remotes. `pr triage --resolve`
+checks a pull request's branch out and starts a loop in it, and that loop
+loads whatever config the branch carries. So under `--resolve`, a head
+carrying a config module that `origin/<base>` does not hold as the same
+file (compared byte for byte) is refused with exit 1, before the worktree
+is added. Passing `--allow-local-config` runs it anyway and prints one
+warning line naming what it let through. A YAML config is data and is not
+checked this way.
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
@@ -803,7 +954,7 @@ bun src/rafa.ts loop start --plan=<file>
 
 Every command but `init`, the help and `describe` runs inside a rafa
 project: the nearest directory at or above the working directory holding
-`.rafa/config.yaml`. Outside one it prints the `rafa init` hint and exits
+`rafa.config.ts`, `rafa.config.mjs` or `.rafa/config.yaml`. Outside one it prints the `rafa init` hint and exits
 1; `bun src/rafa.ts init --yes` sets up the git toplevel as one.
 
 `bun run build` writes `dist/`, which the `rafa` bin and the package's
@@ -871,11 +1022,12 @@ takes `--yes`. The rest of `rafa update` (`self`, `project`, `board`,
 The build targets bun, and `engines` names `bun` alone: there is no
 `engines.node`, because no node version runs the binary. The package
 root, `./cli` and `./store` import `bun:sqlite`, which node's ESM loader
-refuses before any module code runs, so only `./plan`, `./ports` and
-`./learning` load under node at all. `module` points at
-`./dist/index.js`, the same build the root of `exports` names. The package ships no type declarations:
-`exports` names no `types`, and a TypeScript consumer gets TS7016 under
-`strict`.
+refuses before any module code runs, so only `./plan`, `./ports`,
+`./learning` and `./config` load under node at all. `module` points at
+`./dist/index.js`, the same build the root of `exports` names. Only
+`./config` ships type declarations, at `./dist/config/index.d.ts`, which
+its `exports` entry names as `types`. No other entry names `types`, and
+a TypeScript consumer importing one gets TS7016 under `strict`.
 
 ## Roadmap
 

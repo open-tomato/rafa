@@ -91,8 +91,10 @@ files that #905 moves there are the connective tissue of the codebase:
 graph analysis calls such files high-betweenness nodes, since many paths
 between the rest of the tree run through them. A twentieth,
 `runtime/identity.ts`, moved there in #1088 so the effort store imports
-nothing above core for it. They sit in eight subject folders. `config/` holds the config readers, schema, sections and loader;
-`command/` the command contract (`RafaCommand`, `RafaContext`,
+nothing above core for it. They sit in eight subject folders. `config/`
+holds the value readers, core's keys of the schema, the section
+contract, core's own section and the loader; `command/` the command
+contract (`RafaCommand`, `RafaContext`,
 `CommandExit`), the version and the confirm prompt; `output/` the active
 output; `adapters/` the adapter registry; `git/` the git runner and the
 commit helpers; `plan/` the block reader, the plan parser and the
@@ -142,7 +144,62 @@ subject folder is a deep import like any other file. Three things are not
 seen: an `import()` or `require()` whose argument is not a string literal,
 a `mock.module()` call, and a path built for a spawned process or a file
 read. The sweep prints the files it read at load, so an empty read cannot
-pass.
+pass. A module augmentation is no import: a `declare module` naming
+`src/core/config/config-schema.ts`, which each `src/config-schema-*.ts`
+file writes to add its fields to `RafaConfig`, is answered under
+`augment` and passes. It has to name the declaring file: spelled through
+the config barrel, two augmentations merged with each other and not with
+`RafaConfig`, whose `keyof` missed both. That file is one more path the
+core package will have to export (#808).
+
+**The config sections are handed in, never imported.** Core declares the
+section contract in `src/core/config/section.ts`: a `ConfigSection` carries its
+`package` name, its `settings`, its `defaults` and its cross-key `checks`. Core
+names no section. The twelve are listed in `src/config-registry.ts`, which sits
+outside `src/core/`: core's own (`core-section.ts`) and the eleven
+`src/config-schema-*.ts` files. Importing that module registers the twelve with
+core once, and `src/rafa.ts` and `src/index.ts` import it ahead of anything
+that loads a config. A file outside `src/core/` takes the merged `SETTINGS`,
+`CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
+`knownKeysAbove` from the registry, never from the core barrel, which exports
+none of them; core reads the same through the `active*` functions of
+`section.ts`. A registration that breaks a rule throws at import, naming what
+it refused: a setting name two sections define, a file key a second section
+defines under another setting name, which names both setting names too, or a
+`dangerous.*` key a second section defines under the same setting name, each
+naming both packages.
+
+**A section adds its keys to `RafaConfig` by `declare module`.**
+`RafaConfig` stays declared in `src/core/config/config-schema.ts` with core's
+keys. Each section file adds its own by a `declare module` naming that file,
+`'./core/config/config-schema.js'`, and not the config barrel, for the reason
+the augment note in the deep-import sweep paragraph above gives. So
+`ConfigSetting` names every key, and nothing in core names a section.
+
+**`ConfigShape` is composed from the sections, not merged into.** Each
+section file exports an interface of the keys a file writes for it
+(`HubShape` holds `hub`, `ReleaseShape` holds `pr` and `release`), and its
+part of a namespace it shares with core as an interface of its own:
+`LoopRetriesShape`, `LoopContinueShape` and `WrapUpShape` for `loop`,
+`BoardProjectLimitsShape` for `board.project`, `ReleaseDangerousShape`
+for `dangerous`. `src/config/shape.ts`, outside `src/core/`, holds core's
+keys and composes `ConfigShape`, `LoopShape`, `BoardProjectShape` and
+`DangerousShape` from those interfaces by `extends`, through `import type`.
+Each section's `declare module` on `shape.ts`, the form this replaced,
+merged only in a program that loaded the section files: the emitted
+`dist/config/shape.d.ts` imported none of them, so a consumer of the
+`./config` subpath saw core's keys alone. Written out, the emitted `shape.d.ts` imports every section's
+emitted declaration, and `src/config/shape.test.ts` reads
+`ConfigShape['hub']['url']` as `string` from declarations emitted in
+memory.
+
+**The sweep holds core off the section files.**
+`src/tests/core-config-sections.sweep.test.ts` reads every code file under
+`src/core/` and fails on any import of a `src/config-schema-*.ts` file, by any
+specifier `textImports` finds, so a dynamic `import()` or a `require()` counts
+as much as a static import. Like the barrel sweep, it does not see an
+argument that is not a string literal. A second `describe` holds `loadConfig`
+with no section registered to a refusal naming `src/config-registry.ts`.
 
 **A barrel is split, never widened, when it closes a runtime cycle.** A
 barrel that groups a file with one outside `src/core/` that imports the
@@ -150,8 +207,10 @@ barrel back by value closes a cycle. The cycle fails with a
 `ReferenceError` at load, in one import order only, so a green `tsc`
 proves nothing about it. The four barrels beyond the subject indexes are
 the splits made so far. `config/sections.ts` holds the leaf pair
-`config-sections.ts` and `config-readers.ts`, because `config-schema.ts`
-imports section files that import the pair back. `config/load.ts` stands
+`config-sections.ts` and `config-readers.ts`, split while
+`config-merged.ts` imported section files that import the pair back;
+that file is retired and nothing behind `config/index.ts` imports a
+section file now, so the split stands as it was made. `config/load.ts` stands
 alone, because `config-load.ts` reaches `src/effort/store/settings.ts`,
 which imports the config barrels back. `loop/readings.ts` stands alone,
 because `session-readings.ts` reaches `src/effort/store/task-finishes.ts`,
@@ -298,11 +357,15 @@ a thing to split.
 
 ### Adding a setting
 
-**A new key in `SETTINGS` reaches six files beyond the schema, sections
-and `init` scaffold.** `RafaConfig` literals have to be complete, so the
-layer literal in `src/core/config/config.ts` needs it.
-`src/core/config/config-schema.test.ts` pins the key set as closed
-lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`). Both config suites
+**A new key in `SETTINGS` reaches the files below beyond the schema,
+sections and `init` scaffold.** `src/core/config/config.ts` is not one:
+it builds a layer by a loop over the names registered with
+`src/core/config/section.ts`, so it names no setting.
+`src/config-registry.test.ts` pins the key set as closed lists (`KEYS`,
+`TOP`, `SECTIONS`, `knownKeysAbove`), and a core key
+is also spelled in `src/core/config/core-section.test.ts` and takes its
+place in one of the runs of core's names that `src/config-registry.ts`
+spells. Both config suites
 also check that every setting appears exactly once:
 `src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
 `FULL_VALUES`, its cases and `KNOWN`) and
@@ -332,6 +395,12 @@ nothing.
   back, so the escape is the convention rather than a thing to route
   around: 46 titles across `src/` carry one. This bullet read `so write
   test titles without one` until 2026-09-22, which those 46 falsify.
+- **An interface whose one `extends` is its whole content is refused**
+  (`@typescript-eslint/no-empty-object-type`) everywhere but
+  `src/config-schema-*.ts`, where `eslint.config.mjs` allows it: a
+  section's `interface RafaConfig extends HubSettings {}` inside its
+  `declare module` is that shape on purpose. This bullet replaces
+  nothing.
 - **Markdown is a lint target, and every fenced block needs a language**
   (`markdown/fenced-code-language`). A fence shown INSIDE a fenced example
   — a `context/` page quoting the comment a command writes, say — is read

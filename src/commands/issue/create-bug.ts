@@ -293,10 +293,10 @@ function draftOf(base: IssueDraft, record: BugRecord, rules: BugRules, body: str
  * type made, its title `''` for a line naming none; a refusal with exit
  * code 1 naming every problem of the record. See the module note.
  */
-export function readBugLine(context: RafaContext, seams: IssueSeams, base: IssueDraft, options: BugLineOptions): BugLine {
+export async function readBugLine(context: RafaContext, seams: IssueSeams, base: IssueDraft, options: BugLineOptions): Promise<BugLine> {
   const { usage, warn } = options;
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const rules = bugRulesOf(config);
   const cwd = (seams.cwd ?? ((): string => process.cwd()))();
   const git = seams.git ?? createGitRunner(cwd);

@@ -40,7 +40,11 @@
  * 3 as its controls, so a reader refusing every value fails here.
  *
  * The guard and wiring cases moved here from `tests/plan-stamp.test.ts`
- * with the two functions, unchanged.
+ * with the two functions, unchanged. The guard's `naming.branch` cases
+ * hand it `work/{stub}` and read `work/<stub>`, and no `feat/`, in the
+ * refusal on `main`, in the refusal of a detached HEAD, in the `git`
+ * line and in the convention warning; the refusals are each paired with
+ * the same call under no template, which names `feat/`.
  */
 
 import type { BranchSeams } from './branch.js';
@@ -424,6 +428,64 @@ describe('guardRunBranch', () => {
     expect(message).not.toContain('Pass --create-branch');
     // `--as-worktree` names its worktree after the stub and refuses a plan with none.
     expect(message).not.toContain('--as-worktree');
+  });
+
+  /** A `naming.branch` other than the default, which every name the guard writes is rendered from. */
+  const WORK_TEMPLATE = 'work/{stub}';
+
+  it('names the branch of naming.branch in the refusal on main, and never feat/', () => {
+    let caught: CommandExit | null = null;
+    try {
+      guardRunBranch(STUB, 'main', [], WORK_TEMPLATE);
+    } catch (error) {
+      if (!(error instanceof CommandExit)) throw error;
+      caught = error;
+    }
+
+    expect(caught?.exitCode).toBe(1);
+    expect(caught?.message).toBe(refusalNamingFlag('main', STUB).replace(`feat/${STUB}`, `work/${STUB}`));
+    expect(caught?.message).toContain(`--create-branch to create work/${STUB}`);
+    expect(caught?.message).not.toContain('feat/');
+    // The control: with no template handed in, the same refusal names feat/.
+    expect(refusalOf(STUB, 'main', [])?.message).toContain(`--create-branch to create feat/${STUB}`);
+  });
+
+  it('names the branch of naming.branch in the refusal of a detached HEAD, and never feat/', () => {
+    let caught: CommandExit | null = null;
+    try {
+      guardRunBranch(STUB, null, [], WORK_TEMPLATE);
+    } catch (error) {
+      if (!(error instanceof CommandExit)) throw error;
+      caught = error;
+    }
+
+    expect(caught?.exitCode).toBe(1);
+    expect(caught?.message).toBe(detachedRefusal(STUB).replace(`feat/${STUB}`, `work/${STUB}`));
+    expect(caught?.message).toContain(`--create-branch to create work/${STUB}`);
+    expect(caught?.message).not.toContain('feat/');
+    expect(refusalOf(STUB, null, [])?.message).toContain(`--create-branch to create feat/${STUB}`);
+  });
+
+  it('renders the `git` line of a plan with no stub through naming.branch', () => {
+    let message = '';
+    try {
+      guardRunBranch(null, 'main', [], WORK_TEMPLATE);
+    } catch (error) {
+      if (!(error instanceof CommandExit)) throw error;
+      message = error.message;
+    }
+
+    expect(message).toContain('git checkout -b work/this-plan');
+    expect(message).not.toContain('feat/');
+  });
+
+  it('spells the convention of the warning through naming.branch', () => {
+    guardRunBranch(STUB, 'probe', [], WORK_TEMPLATE);
+
+    expect(warnings).toEqual([
+      '\n⚠️  Branch `probe` carries no `<type>/` prefix.',
+      '   The run proceeds; the convention is `work/<plan-stub>`.',
+    ]);
   });
 
   it('allows a feature branch, writing nothing', () => {

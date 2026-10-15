@@ -134,7 +134,7 @@
 import type { BlockersReading } from '../board/relations/port.js';
 
 import { labelsLineBlockersOf } from '../board/relations/labels.js';
-import { SETTINGS } from '../core/config/index.js';
+import { SETTINGS } from '../config-registry.js';
 
 /** What a reference points at. */
 export type RefKind =

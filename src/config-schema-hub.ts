@@ -3,17 +3,22 @@
  * to reach a `rafa-hub` under `effort.sync: service`, each with its
  * field, its default, its spec and its reader, the one refusal that
  * reads two settings at once, and the {@link HubContext} an adapter is
- * handed. `config-schema.ts`'s `RafaConfig` extends {@link HubSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread {@link HUB_DEFAULTS}
- * and {@link HUB_SETTINGS} right after `effort.sync`, the setting they
- * serve, as `config-schema-release.ts`'s sections are spread.
+ * handed. {@link HUB_SECTION} hands them to core as one `ConfigSection`,
+ * package `hub`, with {@link hubUrlProblems} as its check, and the
+ * `declare module` below adds {@link HubSettings} to `RafaConfig`.
+ * {@link HubShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread {@link HUB_DEFAULTS} and {@link HUB_SETTINGS} right after
+ * `effort.sync`, the setting they serve, as `config-schema-release.ts`'s
+ * sections are spread.
  *
  * The section sits in a module of its own, readers included, for the
  * reason `config-schema-release.ts` and `config-readers.ts` give: measured
  * with `wc -l` when it was added, `config-schema.ts` stood at 554 lines
  * and `config-sections.ts` at 699, so the value rules here would have
  * pushed the second against the 800-line cap of `context/source.md`.
- * Every rule `config-schema.ts` states about a KEY holds here, as every
+ * Every rule `config.ts` and `section.ts` state about a KEY holds here, as every
  * rule `config-sections.ts` states about a VALUE does: nothing is
  * coerced, and a string spelled like a number is refused.
  *
@@ -53,8 +58,9 @@
  * the two may come from different files: a user scope naming the hub
  * for every project and a project choosing `service` is the layout the
  * spec's README section describes. So no single file can be refused for
- * it, and `resolveConfig` asks {@link hubUrlProblems} once every setting
- * is ranked, naming the file that chose `service`. Every other
+ * it, and {@link hubUrlProblems} is the section's check: `resolveConfig`
+ * asks it once every setting is ranked, and it names the file that chose
+ * `service`. Every other
  * strategy reads no `hub` key, so a `hub.url` beside `local` is kept and
  * never refused: switching strategy is then a one-line edit.
  *
@@ -67,10 +73,28 @@
  * adapter could reach; the refusal above keeps that from happening
  * under `service`.
  */
-import type { ConfigSource, SettingSpec } from './core/config/index.js';
+import type {
+  ConfigCheckInput,
+  ConfigSection,
+  SettingSpec,
+} from './core/config/index.js';
 import type { Reader, SyncStrategy } from './core/config/sections.js';
 
 import { describeValue, refused, text } from './core/config/sections.js';
+
+declare module './core/config/config-schema.js' {
+  /** The `hub` section's fields, added to core's. */
+  interface RafaConfig extends HubSettings {}
+}
+
+/** The `hub` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface HubShape {
+  readonly hub: {
+    readonly url: string;
+    readonly tokenSecret: string;
+    readonly timeout: HubTimeout;
+  };
+}
 
 /** The shortest `hub.timeout` accepted, in seconds. */
 export const HUB_TIMEOUT_MIN_SECONDS = 1;
@@ -160,38 +184,36 @@ export const HUB_SETTINGS: { readonly [K in keyof HubSettings]: SettingSpec<K> }
 /** The strategy that reads the `hub` section. */
 const HUB_STRATEGY: SyncStrategy = 'service';
 
-/** What {@link hubUrlProblems} reads: the two settings, and where `effort.sync` came from. */
-export interface HubUrlInput {
-  /** The resolved `effort.sync`. */
-  readonly effortSync: SyncStrategy;
-  /** The resolved `hub.url`. */
-  readonly hubUrl: string | null;
-  /** The layer that answered `effort.sync`. */
-  readonly effortSyncSource: ConfigSource;
-  /** The file each file layer was read from, null when there was none. */
-  readonly paths: { readonly file: string | null; readonly user: string | null };
-}
-
 /** The label a refusal opens with: the file that chose the strategy. */
-function labelOf(input: HubUrlInput): string {
-  const path = input.effortSyncSource === 'user'
-    ? input.paths.user
-    : input.paths.file;
-  return path ?? input.effortSyncSource;
+function labelOf(input: ConfigCheckInput): string {
+  const source = input.sources.effortSync;
+  const path = source === 'user'
+    ? input.userPath
+    : input.path;
+  return path ?? source;
 }
 
 /**
- * The refusal of a `service` sync with no `hub.url` in any layer, as a
- * list of one sentence, or an empty list; see the module note.
+ * The `hub` section's check: the refusal of a `service` sync with no
+ * `hub.url` in any layer, as a list of one sentence, or an empty list;
+ * see the module note.
  */
-export function hubUrlProblems(input: HubUrlInput): readonly string[] {
-  if (input.effortSync !== HUB_STRATEGY || input.hubUrl !== null) return [];
+export function hubUrlProblems(input: ConfigCheckInput): readonly string[] {
+  if (input.config.effortSync !== HUB_STRATEGY || input.config.hubUrl !== null) return [];
 
   return [
     `${labelOf(input)}: effort.sync is ${describeValue(HUB_STRATEGY)} and no config file names hub.url;`
       + ' expected hub.url, the address of the hub, such as https://hub.example.org',
   ];
 }
+
+/** The `hub` section: its three settings, their defaults, and {@link hubUrlProblems}. */
+export const HUB_SECTION: ConfigSection = Object.freeze({
+  package: 'hub',
+  settings: Object.freeze(HUB_SETTINGS),
+  defaults: HUB_DEFAULTS,
+  checks: Object.freeze([hubUrlProblems]),
+});
 
 /** The hub a `sync` adapter reaches, as `AdapterContext.hub` carries it. */
 export interface HubContext {

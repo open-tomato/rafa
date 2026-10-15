@@ -48,8 +48,8 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { parseWorktrees } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -991,6 +991,16 @@ describe('addRunWorktree against a real repository', () => {
     expect(run(path, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('feat/squatter');
     expect(run(project, ['worktree', 'list', '--porcelain'])).toBe(listed);
     expect(() => run(project, ['rev-parse', '--verify', '--quiet', 'refs/heads/feat/taken'])).toThrow();
+  });
+
+  it('adds the branch naming.branch names, at the stub\'s path, and no feat/<stub>', () => {
+    const outcome = addRunWorktree(request({ projectRoot: project, planStub: 'named', branchTemplate: 'work/{stub}-x' }));
+    const path = join(project, '.rafa', 'worktrees', 'named');
+
+    expect(outcome.branch).toBe('work/named-x');
+    expect(outcome.path).toBe(path);
+    expect(run(path, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('work/named-x');
+    expect(() => run(project, ['rev-parse', '--verify', '--quiet', 'refs/heads/feat/named'])).toThrow();
   });
 
 });

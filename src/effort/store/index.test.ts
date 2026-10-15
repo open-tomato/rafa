@@ -206,11 +206,11 @@ function writeConfig(root: string, text: string): void {
 }
 
 /** Resolves the config under a root, beside an empty home, and selects from it. */
-function selectFromDisk(
+async function selectFromDisk(
   root: string,
   cli: { store?: string } = {},
-): SelectedEffortStore {
-  const resolved = loadConfig({ root, home: join(tempBase, 'home') }, cli, () => undefined);
+): Promise<SelectedEffortStore> {
+  const resolved = await loadConfig({ root, home: join(tempBase, 'home') }, cli, () => undefined);
   return selectEffortStore(root, resolved.config);
 }
 
@@ -270,25 +270,25 @@ describe.each(LAYOUTS)('selectEffortStore for store: %s', (backend, layout) => {
 });
 
 describe('selectEffortStore over a resolved config', () => {
-  it('selects SQLite when the repo has no config file', () => {
+  it('selects SQLite when the repo has no config file', async () => {
     const root = freshRoot('no-config');
-    writeOneOfEach(selectFromDisk(root));
+    writeOneOfEach(await selectFromDisk(root));
 
     expect(storeFiles(root)).toEqual(SQLITE_FILES);
   });
 
-  it('selects the backend the config file names', () => {
+  it('selects the backend the config file names', async () => {
     const root = freshRoot('file-ndjson');
     writeConfig(root, 'store: ndjson\n');
-    writeOneOfEach(selectFromDisk(root));
+    writeOneOfEach(await selectFromDisk(root));
 
     expect(storeFiles(root)).toEqual(NDJSON_FILES);
   });
 
-  it('selects the backend the command line names over the file', () => {
+  it('selects the backend the command line names over the file', async () => {
     const root = freshRoot('cli-over-file');
     writeConfig(root, 'store: ndjson\n');
-    writeOneOfEach(selectFromDisk(root, { store: 'sqlite' }));
+    writeOneOfEach(await selectFromDisk(root, { store: 'sqlite' }));
 
     expect(storeFiles(root)).toEqual(SQLITE_FILES);
   });

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-nine registered so far wrap a
+ * of each is its command. Four of the hundred registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -85,7 +85,8 @@
  * which read an issue's claim branches and push one ownership commit on
  * them through `src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
- * through `src/config-set.ts`, nor `ci status`, which reads a branch's
+ * through `src/config-set.ts`, nor `config show`, which prints the
+ * config `loadConfig` resolves, nor `ci status`, which reads a branch's
  * newest run through the readers under `src/ci/`, nor `stretch start`,
  * which opens a stretch through the readings of `src/stretch/`, nor
  * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
@@ -122,12 +123,12 @@
  *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
- *   - `issue ready <n> [--yes] [--no-hint]`, an issue marked
+ *   - `issue ready <n> [--yes] [--dry-run] [--no-hint]`, an issue marked
  *     `spec:ready` once its author and its body check out, and
  *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
  *     whose `Blocked by:` line names only closed issues. Both read the
  *     GitHub board rather than the tracker chain. `issue unblock` always
- *     asks; `issue ready` asks unless `--yes` is typed.
+ *     asks; `issue ready` asks unless `--yes` or `--dry-run` is typed.
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.
@@ -322,6 +323,12 @@
  *     and new values printed; exit code 1, with nothing written, for an
  *     argument that is not `<key>=<value>` and for each refusal of
  *     `src/config-set.ts`. It starts no session.
+ *   - `config show [--resolved | --sources]`: every setting the config
+ *     resolves, with its merged value nested as a config file spells it,
+ *     or under `--sources` with the layer, the file and the entry index
+ *     that answered it (`default` with no file); exit code 1 for both
+ *     flags at once and for a config that cannot be used. It starts no
+ *     session.
  *   - `ci status --branch=<branch> [--workflow=<name>]`: the newest run
  *     on a branch, its state, its short commit and, when it is red, the
  *     bun cases it failed by file and case; exit code 0 green, 1 red, 2
@@ -418,6 +425,7 @@ import claimRelease from './claim/release.js';
 import claimTake from './claim/take.js';
 import cleanup from './cleanup.js';
 import configSet from './config/set.js';
+import configShow from './config/show.js';
 import describe from './describe.js';
 import docsPlan from './docs/plan.js';
 import doctor from './doctor.js';
@@ -520,7 +528,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
   { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
-  { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
+  { name: 'config', summary: 'show every setting and where it came from; set one key in the project\'s config, keeping every comment' },
   { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
   { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
   { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' },
@@ -613,6 +621,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   updateNext,
   updateLatest,
   configSet,
+  configShow,
   ciStatus,
   stretchStart,
   stretchItem,

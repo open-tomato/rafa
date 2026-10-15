@@ -208,8 +208,8 @@
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
- * names, resolved from the project's and the user scope's
- * `.rafa/config.yaml` as `rafa start` resolves them (`config-load.ts`),
+ * names, resolved from the project's and the user scope's config
+ * as `rafa start` resolves them (`config-load.ts`),
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
@@ -235,7 +235,7 @@ import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
-import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
+import { checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
@@ -584,9 +584,9 @@ export function runBranchLine(planPath: string): string | null {
  * named, as `rafa start` refuses one, before any session starts: a
  * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
-function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
+async function resolvePlanConfig(repoRoot: string, home: string): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: repoRoot, home }).config;
+    return (await loadConfig({ root: repoRoot, home })).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -601,7 +601,7 @@ export default async function plan(
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const home = homedir();
-  const config = resolvePlanConfig(repoRoot, home);
+  const config = await resolvePlanConfig(repoRoot, home);
   const {
     settingSources,
     routing,
@@ -613,9 +613,6 @@ export default async function plan(
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
-  // Before any board read, so an operator who forgot the setting is told
-  // before anything is spent (`commands/plan/refs-check.ts`).
-  announceCreateRefs(args, dangerousAcceptStaleRefs);
 
   // The spec, the cheap refusals over it, then the claim on its issue,
   // all before any session is paid for ("The claim").

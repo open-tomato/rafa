@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LOCKED_SETTINGS } from './config-locked.js';
-import { SETTINGS } from './core/config/index.js';
+import { SETTINGS } from './config-registry.js';
 
 describe('LOCKED_SETTINGS', () => {
   it('holds every entry to a SETTINGS key', () => {

@@ -1,8 +1,9 @@
 /**
- * `rafa issue ready <n> [--yes]`: the two checks a person would
+ * `rafa issue ready <n> [--yes | --dry-run]`: the two checks a person would
  * otherwise make by eye before a `gh issue edit`, printed, and the one
  * label swap that marks the spec ready, made on a typed yes or under
- * `--yes`.
+ * `--yes`. Under `--dry-run` the checks are made and printed and nothing
+ * is asked or written.
  *
  * Adding `spec:ready` is the decision the readiness gate's check 1
  * waits on (`src/board/readiness.ts`, `context/pull-requests.md`), and
@@ -42,12 +43,32 @@
  * step asks. A value given to it (`--yes=maybe`) is a line refusal with
  * exit code 1, read before anything is opened.
  *
+ * ## --dry-run
+ *
+ * `--dry-run` ({@link ReadyOptions.dryRun}) reads the status in one
+ * line, from a script, an agent or CI, and marks nothing: the run makes
+ * every check below in the same order, and every one that refuses
+ * refuses as without it, exit 2 with nothing written. Once all pass it
+ * reports `checked`, `#<n> is ready to mark; --dry-run wrote nothing.`,
+ * where the run without it would ask or write; an issue already
+ * carrying `spec:ready` still reports `already`. `ask` is never called
+ * and the board is never written to, whatever the terminal. It reads
+ * the TEMPLATE only: a `spec:blocked` label is not read, so a blocked
+ * issue with a complete body still reads as ready to mark (#1093).
+ *
+ * `--dry-run` with `--yes` is a line refusal with exit code 1, read
+ * before anything is opened: one asks for the write and the other for
+ * none. A value given to it (`--dry-run=maybe`) is refused the way one
+ * given to `--yes` is.
+ *
  * ## The ending, on a label that is on
  *
  * A run that MARKED the issue, under `--yes` or on a typed yes, and
  * one that found it marked already, ends by naming the one step that
  * follows — for a roadmap line that is ready and unblocked, the plan
- * (`src/next/ending.ts`, `--no-hint` to turn it off). The declined run
+ * (`src/next/ending.ts`, `--no-hint` to turn it off). A `--dry-run` run
+ * never ends with it, `checked` or `already`: the ending puts a question
+ * where there is a terminal, and `--dry-run` asks nothing. The declined run
  * and the one with no terminal end without it: no label moved, so the
  * state still reads as an issue carrying no `spec:ready`, and the hint
  * would put the very question that was just answered no, or name this
@@ -166,10 +187,13 @@ import { answeredYes } from '../../start/branch-decision.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
 /** The usage line a refusal names. */
-export const READY_USAGE = 'rafa issue ready <n> [--yes]';
+export const READY_USAGE = 'rafa issue ready <n> [--yes | --dry-run]';
 
 /** The flag that marks the issue with no question once every check passes. */
 const YES_FLAG = 'yes';
+
+/** The flag that makes every check and prints it, asking nothing and writing nothing. */
+const DRY_RUN_FLAG = 'dry-run';
 
 /** The exit code a label swap `gh` refused ends with. */
 export const READY_WRITE_EXIT = 1;
@@ -186,7 +210,9 @@ export type ReadyStatus =
   /** There was no terminal to ask on, so nothing was written. */
   | 'unasked'
   /** The issue already carries `spec:ready`, so there was nothing to add. */
-  | 'already';
+  | 'already'
+  /** Every check passed under `--dry-run`, so nothing was asked and nothing was written. */
+  | 'checked';
 
 /** What one run came to, and the lines it is reported with. */
 export interface ReadyReport {
@@ -224,6 +250,14 @@ export interface ReadyOptions {
    * check refuses as it does without it. False when left out.
    */
   readonly yes?: boolean;
+  /**
+   * Makes every check and reports `checked` once all pass, so `ask` is
+   * never called and `board` is never written to, whatever the
+   * terminal. Every check refuses as it does without it, and an issue
+   * already carrying `spec:ready` still reports `already`. Wins over
+   * `yes`, which the line refuses beside it. False when left out.
+   */
+  readonly dryRun?: boolean;
   /** Makes the label swap. Made over `gh` when left out. */
   readonly board?: IssueBoard;
   /** Reads the issue by number. Made over `gh` when left out. */
@@ -326,7 +360,8 @@ function readyReport(
 /**
  * The issue `options` names, read off the board, checked, asked about
  * and labelled on a yes, or labelled with no question under
- * {@link ReadyOptions.yes}. See the module note for the order of the
+ * {@link ReadyOptions.yes}, or only checked under
+ * {@link ReadyOptions.dryRun}. See the module note for the order of the
  * checks, what each costs and the one write.
  *
  * Throws the `CommandExit` of every refusal: exit 2 for an untrusted
@@ -349,6 +384,12 @@ export async function runIssueReady(options: ReadyOptions): Promise<ReadyReport>
     return readyReport(issue, 'already', reading, {
       ...lines,
       message: `#${String(issue)} is already marked ${SPEC_READY_LABEL}`,
+    });
+  }
+  if (options.dryRun === true) {
+    return readyReport(issue, 'checked', reading, {
+      ...lines,
+      message: `#${String(issue)} is ready to mark; --${DRY_RUN_FLAG} wrote nothing.`,
     });
   }
   if (options.yes !== true) {
@@ -402,15 +443,33 @@ export function readReadyIssue(context: RafaContext): number {
 }
 
 /**
+ * Whether the line typed the switch `name`, or a refusal with exit
+ * code 1 naming the usage for a value given to it. Pure over
+ * `context.flags`, so it can be read again after the run.
+ */
+function readReadySwitch(context: RafaContext, name: string): boolean {
+  const value = context.flags[name];
+  if (value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true' || value === 'false') return value === 'true';
+  throw lineRefusal(`--${name} takes no value, and read "${value}" as one`, READY_USAGE);
+}
+
+/**
  * Whether the line typed `--yes`, or a refusal with exit code 1 naming
  * the usage for a value given to it. Read before anything is opened.
  */
 export function readReadyYes(context: RafaContext): boolean {
-  const value = context.flags[YES_FLAG];
-  if (value === undefined) return false;
-  if (typeof value === 'boolean') return value;
-  if (value === 'true' || value === 'false') return value === 'true';
-  throw lineRefusal(`--${YES_FLAG} takes no value, and read "${value}" as one`, READY_USAGE);
+  return readReadySwitch(context, YES_FLAG);
+}
+
+/**
+ * Whether the line typed `--dry-run`, or a refusal with exit code 1
+ * naming the usage for a value given to it. Read before anything is
+ * opened.
+ */
+export function readReadyDryRun(context: RafaContext): boolean {
+  return readReadySwitch(context, DRY_RUN_FLAG);
 }
 
 /** How the board, the terminal and the question are reached; each left out is the system's own. */
@@ -458,15 +517,23 @@ export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () =
  * Runs the marking a line asks for: the line, the project's
  * `board.trustedAuthors`, the repository label off `origin`, and the
  * question through the prompter when there is a terminal and the line
- * did not type `--yes`. Its board refreshes the issue it labels on the
+ * typed neither `--yes` nor `--dry-run`. `--yes` with `--dry-run` is a
+ * refusal with exit code 1, read before anything is opened. Its board refreshes the issue it labels on the
  * project (`../../board/project/issue-board-refresh.ts`), each line the
  * refresh answers written at `warn`.
  */
 export async function markIssueReady(context: RafaContext, seams: ReadySeams): Promise<ReadyReport> {
   const issue = readReadyIssue(context);
   const yes = readReadyYes(context);
+  const dryRun = readReadyDryRun(context);
+  if (yes && dryRun) {
+    throw lineRefusal(
+      `--${YES_FLAG} and --${DRY_RUN_FLAG} cannot be used together: one asks for the write and the other for none`,
+      READY_USAGE,
+    );
+  }
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message: string) => {
+  const config = await issueSubjectConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
@@ -491,6 +558,7 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
       } }),
       relationships: config.boardRelationships,
       yes,
+      dryRun,
       ask: isTerminal()
         ? prompter.ask
         : null,
@@ -521,7 +589,9 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
       + ` removing ${SPEC_NEEDS_WORK_LABEL}. \`--yes\` makes the swap with no question once every check passes,`
       + ' with or without a terminal, and refuses everything the checks refuse without it; without a terminal and'
       + ' without `--yes` it prints both readings and adds no label. A run that marks the issue, or finds'
-      + ' it marked already, ends by naming the one step that follows, which `--no-hint` turns off. With'
+      + ' it marked already, ends by naming the one step that follows, which `--no-hint` turns off.'
+      + ' `--dry-run` makes every check and prints both readings, asking nothing and writing nothing whatever'
+      + ' the terminal, exits 2 on a check that refuses, and is refused beside `--yes`. With'
       + ' `--output=json` the report is the data of the terminal result event.',
     args: [
       {
@@ -538,6 +608,12 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
           + ' a check that refuses still refuses. Needed where standard input is no terminal.',
         type: 'boolean',
       },
+      {
+        name: DRY_RUN_FLAG,
+        description: 'Prints both readings and writes nothing, asking no question whatever the terminal;'
+          + ' a check that refuses still exits 2. Not with --yes.',
+        type: 'boolean',
+      },
       HINT_FLAG_SPEC,
     ],
     examples: [
@@ -549,14 +625,18 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
         cmd: 'rafa issue ready 57 --yes',
         note: `Checks #57 and marks it ${SPEC_READY_LABEL} with no question, from a script or an agent.`,
       },
+      {
+        cmd: 'rafa issue ready 57 --dry-run',
+        note: 'Checks #57 and reads its status in one line, from a script, an agent or CI, marking nothing.',
+      },
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
       const made = await markIssueReady(context, seams);
       if (context.outputMode === 'json') context.output.result(made);
       else writeReport(context, made);
-      // A run that added no label left the project where it was; see the module note.
-      if (made.status === 'marked' || made.status === 'already') {
+      // A run that added no label left the project where it was, and --dry-run asks nothing; see the module note.
+      if ((made.status === 'marked' || made.status === 'already') && !readReadyDryRun(context)) {
         await endWithNextStep(context, seams.ending);
       }
     },

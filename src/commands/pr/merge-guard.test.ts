@@ -35,6 +35,13 @@ import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createPrMergeCommand } from './merge.js';
 
+/**
+ * The words the step's own line, `#<n> merges anyway:
+ * dangerous.acceptVersionCollision is true.`, said before it was folded
+ * into the loader's pass line for the key.
+ */
+const MERGES_ANYWAY = 'merges anyway';
+
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-guard-')));
 
@@ -421,7 +428,7 @@ describe('a branch the guard reads collision', () => {
     expect(run.sent).not.toContain(MERGE_SENT);
   });
 
-  it('merges under dangerous.acceptVersionCollision, warning that the setting let it through', async () => {
+  it('merges under dangerous.acceptVersionCollision, its one line the pass line ending with what the removed line said', async () => {
     const repo = plantWorld({
       branch: STAMPED_BRANCH,
       baseAfter: BASE_RELEASED,
@@ -431,8 +438,11 @@ describe('a branch the guard reads collision', () => {
     const run = await ran(repo, ['--yes']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.warned[0]?.startsWith('Release guard: collision')).toBe(true);
-    expect(run.warned).toContain(`#${NUMBER} merges anyway: dangerous.acceptVersionCollision is true.`);
+    const folded = `dangerous.acceptVersionCollision: true (${join(repo.work, '.rafa', 'config.yaml')}, entry 0);`
+      + ` a release guard reading collision ${MERGES_ANYWAY}`;
+    expect(run.warned[0]).toBe(folded);
+    expect(run.warned.filter((line) => line.includes(MERGES_ANYWAY))).toEqual([folded]);
+    expect(run.warned[1]?.startsWith('Release guard: collision')).toBe(true);
     expect(run.sent).toContain(MERGE_SENT);
     expect(run.guard).toMatchObject({ answer: 'collision', reaction: 'accept' });
   });

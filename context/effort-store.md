@@ -3,7 +3,7 @@
 `src/effort/store/` holds what `rafa effort collect` and the task-report
 pipeline write: the `EffortStore` port (`store/types.ts`), an NDJSON and a
 SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks one
-from `store` in `.rafa/config.yaml`, `sqlite` by default.
+from `store` in the project's config, `sqlite` by default.
 
 **One kind of session row is not collected.** The search runner
 (`src/inventory/search/index.ts`) stores the `search` row of its own
@@ -258,10 +258,10 @@ one with the same pid but a different session id — is still refused
 (`migrateStore`, `migrate.ts`), which names no session id so it refuses
 any live loop, including its own if one somehow persists.
 
-**`effort.sync` in `.rafa/config.yaml` selects the sync strategy, one of
+**`effort.sync` in the project's config selects the sync strategy, one of
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
 which means no sync: a device keeps its own store. The user scope's
-`~/.rafa/config.yaml` already layers under the project's for every
+config under `~/.rafa/` already layers under the project's for every
 setting (`src/core/config/config.ts`), so the user default needs no reader of
 its own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
@@ -419,8 +419,9 @@ set aside any existing store on the new device. On 2026-09-28, an `scp`
 of the seed store overwrote the second device's own small store before
 rename; then take a consistent copy with `rafa effort copy` (or
 `sqlite3 .rafa/effort/effort.sqlite ".backup <path>"`, never a plain
-file copy during a write), move it and `.rafa/config.yaml` into the new
-device's `.rafa/`, and merge back later with `rafa effort merge`.
+file copy during a write), move it and the project's config file into the
+new device's project (`.rafa/config.yaml` under `.rafa/`, or
+`rafa.config.ts` at the root), and merge back later with `rafa effort merge`.
 
 **Why UUIDs alone are not trusted.** A v4 UUID almost never collides by
 chance; collisions come from copies (a restored backup, a cloned VM

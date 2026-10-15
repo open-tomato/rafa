@@ -94,7 +94,7 @@ export async function runImport(context: RafaContext, seams: ImportCommandSeams)
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${IMPORT_USAGE}`);
   const project = requireProject(context, COMMAND_NAME);
   mergeTargetPath(context, project.root, COMMAND_NAME);
-  const backend = resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message)).store;
+  const backend = (await resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message))).store;
   const otherPath = resolve((seams.cwd ?? ((): string => process.cwd()))(), file);
   const sync = (seams.createSync ?? createFileSync)(syncOptions(context, project.root, backend, seams));
 

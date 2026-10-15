@@ -136,8 +136,9 @@ and swallowed into a `debug` line, so nothing prints at the default verbosity.
 The config key `status.notice` (`true` by default) turns off the line and the
 snapshot file writes. With it false, the hook's `before` answers no line and
 `after` writes nothing, so the file the last command left stays as it was.
-The setting goes in `.rafa/config.yaml` or `~/.rafa/config.yaml`, and a
-project's file outranks the home's.
+The setting goes in the project's config (`.rafa/config.yaml`, or a
+`rafa.config.ts` or `rafa.config.mjs`) or in the user's under `~/.rafa/`,
+and a project's file outranks the home's.
 
 ### What a test's HOME must hold
 

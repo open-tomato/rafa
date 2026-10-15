@@ -237,6 +237,9 @@ const TYPE_EXPORTS = [
 /** The library that owns the learning records the entry re-exports. */
 const LEARNING_TYPES_FILE = join(SRC_DIR, 'learning', 'types.ts');
 
+/** The leaf that declares `LogLevel`, which the entry re-exports. */
+const LOG_LEVEL_FILE = join(SRC_DIR, 'ports', 'log-level.ts');
+
 /** The names the entry takes from the learning library, sorted. */
 const LEARNING_EXPORTS = [
   'BlessedBundle',
@@ -826,6 +829,18 @@ describe('the ports entry as the compiler reads it', () => {
     expect(target.name).toBe(name);
     expect((target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName))
       .toEqual([LEARNING_TYPES_FILE]);
+  });
+
+  it('exports LogLevel as the leaf declares it, not a copy', () => {
+    const checker = compiledProbes().program.getTypeChecker();
+    const exported = entryExports().find((symbol) => symbol.name === 'LogLevel');
+    if (exported === undefined) throw new Error('the entry exports no LogLevel');
+    const target = (exported.flags & ts.SymbolFlags.Alias) === 0
+      ? exported
+      : checker.getAliasedSymbol(exported);
+
+    expect((target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName))
+      .toEqual([LOG_LEVEL_FILE]);
   });
 
   it('declares nothing in the entry under a learning library name', () => {

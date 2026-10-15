@@ -414,18 +414,18 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** The `release` and `plan` settings this action reads, refusing a config `loadConfig` refuses. */
-function statusConfig(
+async function statusConfig(
   project: ProjectFound,
   warn: (message: string) => void,
-): {
+): Promise<{
   versionFile: string;
   changelog: string;
   planDir: string;
   waiting: WaitingSettings;
   tracker: StaleDocsSettings;
-} {
+}> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
     return {
       versionFile: config.releaseVersionFile,
       changelog: config.releaseChangelog,
@@ -475,7 +475,7 @@ export async function readStatus(
   expectNoArguments(context.args);
   const asked = readPlanFlag(context);
   const project = projectOf(context);
-  const config = statusConfig(project, (message: string) => {
+  const config = await statusConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const git = (seams.git ?? createGitRunner)(project.root);

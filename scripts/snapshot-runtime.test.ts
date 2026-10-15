@@ -106,34 +106,34 @@ describe('readOptions', () => {
 });
 
 describe('runSnapshot', () => {
-  it('refuses a version already installed, and replaces that directory whole under --force', () => {
+  it('refuses a version already installed, and replaces that directory whole under --force', async () => {
     const { repoRoot, home } = plantCheckout();
     const runtimeDir = join(home, '.rafa', 'runtime', '9.8.7');
     writeFile(join(runtimeDir, 'marker.txt'), 'planted\n');
     const errors: string[] = [];
     const out: string[] = [];
 
-    const refused = runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), undefined);
+    const refused = await runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), undefined);
 
     expect(refused).toBe(EXIT_REFUSED);
     expect(errors[0]).toBe(`${TAG} REFUSED — ${runtimeDir} already holds version 9.8.7, the version in package.json, and a loop may be running from it.`);
     expect(out.some((line) => line.includes('building'))).toBe(false);
 
-    const forced = runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), join(home, '.rafa', 'bin'), readOptions(['--force']));
+    const forced = await runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), join(home, '.rafa', 'bin'), readOptions(['--force']));
 
     expect(forced).toBe(EXIT_DONE);
     expect(existsSync(join(runtimeDir, 'marker.txt'))).toBe(false);
     expect(readlinkSync(join(home, '.rafa', 'bin', 'rafa'))).toBe(join(runtimeDir, 'cli.js'));
   });
 
-  it('writes the refusal to error after the prefix and answers 1, building nothing, while a loop is live', () => {
+  it('writes the refusal to error after the prefix and answers 1, building nothing, while a loop is live', async () => {
     const { repoRoot, home } = plantCheckout();
     writeFile(join(repoRoot, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] a task left\n');
     plantLoop(repoRoot, 'running');
     const out: string[] = [];
     const errors: string[] = [];
 
-    const code = runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), join(home, '.rafa', 'bin'));
+    const code = await runSnapshot(seamsOver(repoRoot, home, out), (line) => errors.push(line), join(home, '.rafa', 'bin'));
 
     expect(code).toBe(EXIT_REFUSED);
     expect(errors[0]).toStartWith(`${TAG} REFUSED — 1 plan tracker(s) in .rafa/plans`);
@@ -141,7 +141,7 @@ describe('runSnapshot', () => {
     expect(out.some((line) => line.includes('building'))).toBe(false);
   });
 
-  it('installs beside a tracker with a task left once its loop is done, warning on stderr after the prefix', () => {
+  it('installs beside a tracker with a task left once its loop is done, warning on stderr after the prefix', async () => {
     const { repoRoot, home } = plantCheckout();
     writeFile(join(repoRoot, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] a task left\n');
     plantLoop(repoRoot, 'done');
@@ -149,7 +149,7 @@ describe('runSnapshot', () => {
     const errors: string[] = [];
     const seams = { ...seamsOver(repoRoot, home, []), warn: (line: string): number => warned.push(`${TAG} warn: ${line}`) };
 
-    const code = runSnapshot(seams, (line) => errors.push(line), join(home, '.rafa', 'bin'));
+    const code = await runSnapshot(seams, (line) => errors.push(line), join(home, '.rafa', 'bin'));
 
     expect(code).toBe(EXIT_DONE);
     expect(errors).toEqual([]);
@@ -159,13 +159,13 @@ describe('runSnapshot', () => {
     expect(readlinkSync(join(home, '.rafa', 'bin', 'rafa'))).toBe(join(home, '.rafa', 'runtime', '9.8.7', 'cli.js'));
   });
 
-  it('installs ~/.rafa/bin/rafa and warns when ~/.rafa/bin is not ahead of ~/.bun/bin on PATH', () => {
+  it('installs ~/.rafa/bin/rafa and warns when ~/.rafa/bin is not ahead of ~/.bun/bin on PATH', async () => {
     const { repoRoot, home } = plantCheckout();
     const rafaBin = join(home, '.rafa', 'bin');
     const bunBin = join(home, '.bun', 'bin');
     const errors: string[] = [];
 
-    const code = runSnapshot(seamsOver(repoRoot, home, []), (line) => errors.push(line), [bunBin, rafaBin].join(delimiter));
+    const code = await runSnapshot(seamsOver(repoRoot, home, []), (line) => errors.push(line), [bunBin, rafaBin].join(delimiter));
 
     expect(code).toBe(EXIT_DONE);
     expect(readlinkSync(join(rafaBin, 'rafa'))).toBe(join(home, '.rafa', 'runtime', '9.8.7', 'cli.js'));
@@ -173,11 +173,11 @@ describe('runSnapshot', () => {
     expect(errors[0]).toStartWith(`${TAG} warn: ${rafaBin} is on PATH after ${bunBin}`);
   });
 
-  it('warns about nothing when ~/.rafa/bin leads the PATH, the control for the warning', () => {
+  it('warns about nothing when ~/.rafa/bin leads the PATH, the control for the warning', async () => {
     const { repoRoot, home } = plantCheckout();
     const errors: string[] = [];
 
-    const code = runSnapshot(seamsOver(repoRoot, home, []), (line) => errors.push(line), join(home, '.rafa', 'bin'));
+    const code = await runSnapshot(seamsOver(repoRoot, home, []), (line) => errors.push(line), join(home, '.rafa', 'bin'));
 
     expect(code).toBe(EXIT_DONE);
     expect(errors).toEqual([]);

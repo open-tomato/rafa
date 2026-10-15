@@ -5,7 +5,7 @@
  * settles racing for it.
  *
  * ```text
- * settleByPush(worktree, settings) → build, push, and at most one rebuild
+ * settleByPush(worktree, settings, configFile) → build, push, and at most one rebuild
  * ```
  *
  * ## The refused-push rule
@@ -66,7 +66,9 @@
  * `repository rule violations` (any case) is answered `rule`, exit 1,
  * with ONE line: the rule text GitHub gave (each `- ` item after the
  * GH013 line, or the GH013 line itself when it lists none) and
- * `set release.settle: pr in .rafa/config.yaml`. It is read before the
+ * `set release.settle: pr in <config file>`, the project scope's config
+ * file as the caller hands it (`.rafa/config.yaml`, or `rafa.config.ts`
+ * in a project that holds one). It is read before the
  * protected-branch wording, as the more specific of the two. The GH013
  * text was taken from the refusal #765 quotes (stretch 2, `main`); the
  * unit tests plant it with a `pre-receive` hook, whose porcelain reason
@@ -115,7 +117,6 @@ import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
 import type { GitResult, GitRunner } from '../core/git/index.js';
 
-import { CONFIG_FILE } from '../core/config/index.js';
 import { gitSaid } from '../core/git/index.js';
 
 import { buildSettle, releaseCommitSubject } from './settle.js';
@@ -274,11 +275,11 @@ function pushRelease(worktree: SettleWorktree, release: string): PushReading {
 }
 
 /** The one line a rule refusal ends on: the rule GitHub gave and the setting that delivers around it. */
-function ruleSentence(target: string, subject: string, rule: string): string {
+function ruleSentence(target: string, subject: string, rule: string, configFile: string): string {
   const stated = /[.!?]$/.test(rule)
     ? rule
     : `${rule}.`;
-  return `${target} refused ${subject} under a repository rule: ${stated} No retry can push it, so it is not delivered; set ${SETTLE_PR_SETTING} in ${CONFIG_FILE} to deliver it through a pull request.`;
+  return `${target} refused ${subject} under a repository rule: ${stated} No retry can push it, so it is not delivered; set ${SETTLE_PR_SETTING} in ${configFile} to deliver it through a pull request.`;
 }
 
 /** The base fetched again and resolved, or the sentence saying why not. */
@@ -349,6 +350,7 @@ function unsettled(build: Exclude<SettleBuild, SettleBuilt>, attempts: SettlePus
 /** Answers a push that was not a race refusal, which is final on either attempt. */
 function finalPush(
   worktree: SettleWorktree,
+  configFile: string,
   build: SettleBuilt,
   attempts: SettlePushAttempts,
   pushed: PushReading,
@@ -356,7 +358,7 @@ function finalPush(
   const subject = releaseCommitSubject(build.version);
   const target = `${worktree.remote} ${worktree.branch}`;
   if (pushed.kind === 'pushed') return { outcome: 'pushed', exitCode: 0, attempts, build };
-  if (pushed.kind === 'rule') return failed('rule', build, attempts, ruleSentence(target, subject, pushed.rule));
+  if (pushed.kind === 'rule') return failed('rule', build, attempts, ruleSentence(target, subject, pushed.rule, configFile));
   if (pushed.kind === 'protected') {
     return failed('protected', build, attempts, `${target} refused ${subject} as a protected branch, which no retry can push to; set ${SETTLE_PR_SETTING} to deliver it through a pull request: ${pushed.said}`);
   }
@@ -370,6 +372,7 @@ function finalPush(
 function rebuildAndPush(
   worktree: SettleWorktree,
   settings: SettleSettings,
+  configFile: string,
   build: SettleBuilt,
   base: string,
 ): SettlePushOutcome {
@@ -379,21 +382,23 @@ function rebuildAndPush(
   }
   const rebuilt = buildSettle(worktree, settings);
   if (rebuilt.outcome !== 'built') return unsettled(rebuilt, 1);
-  return finalPush(worktree, rebuilt, 2, pushRelease(worktree, rebuilt.release));
+  return finalPush(worktree, configFile, rebuilt, 2, pushRelease(worktree, rebuilt.release));
 }
 
 /**
  * Builds the release commit in `worktree` and pushes it to the base
  * branch, rebuilding and pushing once more when the base moved; see the
  * module note for the rule and each outcome's exit code. Never forces a
- * push, and touches no checkout but the worktree's.
+ * push, and touches no checkout but the worktree's. `configFile` is the
+ * project scope's config file as a rule refusal names it, e.g.
+ * `.rafa/config.yaml` or `rafa.config.ts`.
  */
-export function settleByPush(worktree: SettleWorktree, settings: SettleSettings): SettlePushOutcome {
+export function settleByPush(worktree: SettleWorktree, settings: SettleSettings, configFile: string): SettlePushOutcome {
   const build = buildSettle(worktree, settings);
   if (build.outcome !== 'built') return unsettled(build, 1);
 
   const pushed = pushRelease(worktree, build.release);
-  if (pushed.kind !== 'behind') return finalPush(worktree, build, 1, pushed);
+  if (pushed.kind !== 'behind') return finalPush(worktree, configFile, build, 1, pushed);
 
   const refetched = refetchBase(worktree);
   if ('problem' in refetched) return failed('unpushed', build, 1, refetched.problem);
@@ -401,5 +406,5 @@ export function settleByPush(worktree: SettleWorktree, settings: SettleSettings)
   if ('problem' in present) return failed('unpushed', build, 1, present.problem);
   if (present.present.length === 0) return superseded(worktree, build, refetched.base, 1);
 
-  return rebuildAndPush(worktree, settings, build, refetched.base);
+  return rebuildAndPush(worktree, settings, configFile, build, refetched.base);
 }

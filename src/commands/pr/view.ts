@@ -93,7 +93,7 @@ export function renderView(number: number, url: string | null): string {
 /** Picks the pull request and hands it to the provider's browser; see the module note. */
 export async function runView(context: RafaContext, seams: PrSeams): Promise<PrViewResult> {
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   await onProvider(`open pull request #${pick.number} in the browser`, () => pr.pulls.browse(pick.number));
   const url = trimmedOrNull(pick.summary?.url ?? '');

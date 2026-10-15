@@ -114,7 +114,7 @@ export async function promotableLessons(
 ): Promise<InstinctPromoteResult> {
   expectNoArgument(context.args, USAGE);
   const project = requireProject(context, NAME);
-  const config = resolveProjectConfig(project, NAME, (message) => {
+  const config = await resolveProjectConfig(project, NAME, (message) => {
     context.output.warn(message);
   });
   const kind = config.learningAdapter;

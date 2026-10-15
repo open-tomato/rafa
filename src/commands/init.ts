@@ -447,9 +447,9 @@ async function chooseRoot(
 }
 
 /** The config as it resolves for the root, refusing one `loadConfig` refuses. */
-function resolvedConfig(root: string, home: string, warn: (message: string) => void): ResolvedConfig {
+async function resolvedConfig(root: string, home: string, warn: (message: string) => void): Promise<ResolvedConfig> {
   try {
-    return loadConfig({ root, home }, {}, warn);
+    return await loadConfig({ root, home }, {}, warn);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw refusal(['rafa init: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)]);
@@ -510,12 +510,12 @@ interface ScopesWritten {
 }
 
 /** Checks, then writes, the scopes for `root`; see the module note for the order. */
-function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext, entry: string): ScopesWritten {
+async function initialise(root: ChosenRoot, start: string, home: string, context: RafaContext, entry: string): Promise<ScopesWritten> {
   const warn = (message: string): void => {
     context.output.warn(message);
   };
   checkConflicts(root.path, home);
-  const resolved = resolvedConfig(root.path, home, warn);
+  const resolved = await resolvedConfig(root.path, home, warn);
   const config = resolved.config;
   checkGitignore(root.path, config);
 
@@ -646,7 +646,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const start = seams.cwd();
   const home = seams.home();
   const root = await chooseRoot(context, seams, start, home, yes);
-  const scopes = initialise(root, start, home, context, seams.entry());
+  const scopes = await initialise(root, start, home, context, seams.entry());
   const release = await releaseStep(scopes, wantsRelease, yes, seams);
   const board = await boardStep(scopes, wantsBoard, seams);
   const epicGuard = await runEpicGuardStep({
