@@ -14,6 +14,7 @@ module's note is the long form.
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
 | `src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
+| `src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, re-exported by `src/cli/registry.ts` |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |

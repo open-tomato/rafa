@@ -1,12 +1,12 @@
 /**
  * The barrel over the command contract: every name `command.ts`,
- * `confirm.ts`, `running.ts`, `spends.ts`, `types.ts` and `version.ts`
- * export, and nothing else.
+ * `confirm.ts`, `registry-types.ts`, `running.ts`, `spends.ts`,
+ * `types.ts` and `version.ts` export, and nothing else.
  *
- * A file outside `src/core/` imports this file and never the six
+ * A file outside `src/core/` imports this file and never the seven
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `src/core/` imports the six directly and never this
+ * file inside `src/core/` imports the seven directly and never this
  * file.
  *
  * ## What sits behind it
@@ -15,6 +15,9 @@
  *     `CommandExit`, the routing words and the shape check;
  *   - `confirm.ts`: the `Prompter` every yes-or-no question goes
  *     through, and the line prompter that reads one from a stream;
+ *   - `registry-types.ts`: the contract of the dispatcher's registry,
+ *     `CommandRegistry` and the five shapes it names, whose builder
+ *     stays in `src/cli/registry.ts`;
  *   - `running.ts`: the command this process is running with its parsed
  *     flags, recorded by the dispatcher and read by the spend guard;
  *   - `spends.ts`: a command's `spends` declaration, `CommandSpend`, its
@@ -25,13 +28,13 @@
  *   - `version.ts`: the version the running build answers with, and the
  *     line that spells it.
  *
- * The six hold no name in common, so each name is exported once and
+ * The seven hold no name in common, so each name is exported once and
  * from the file that declares it.
  *
- * ## Why one barrel can hold all six
+ * ## Why one barrel can hold all seven
  *
  * A barrel that groups a file with a file outside `src/core/` that
- * imports the barrel back by value is a runtime cycle. None of the six
+ * imports the barrel back by value is a runtime cycle. None of the seven
  * imports a file outside `src/core/` by value. `command.ts` takes
  * `spendsProblem` from `spends.ts` beside it, and both take
  * `describeValue` from `src/core/config/config-sections.ts`.
@@ -39,11 +42,15 @@
  * `running.ts` naming `command.ts` and `types.ts` with `import type`.
  * `version.ts` imports the root `package.json`, and `types.ts` nothing
  * by value: it names `src/core/config/config-sections.ts` and the
- * `Output` port with `import type`.
+ * `Output` port with `import type`. `registry-types.ts` imports nothing
+ * by value either: it names `command.ts` with `import type`, and this
+ * file exports its names with `export type`, so loading the barrel
+ * never loads it.
  *
- * `command.ts` also names `src/cli/registry.ts` and
- * `src/project/scope.ts`, each with `import type`, which is erased
- * before anything loads. `src/cli/registry.ts` imports this barrel by
+ * `command.ts` also names `src/project/scope.ts` with `import type`,
+ * which is erased before anything loads; it named `src/cli/registry.ts`
+ * the same way until the registry's contract moved into
+ * `registry-types.ts`. `src/cli/registry.ts` imports this barrel by
  * value, for the shape check and the routing words, so that edge is the
  * one a value import in `command.ts` would turn into a cycle.
  *
@@ -65,13 +72,19 @@
  * or of `src/cli/`. The same `HELP_WORD` control held a sixth,
  * `src/cli/registry.ts`, `command.ts` and this file.
  *
+ * Measured again when the registry's contract moved into
+ * `registry-types.ts`, the same way: five cycles at the base and five
+ * after the move, none through a file of this folder or of `src/cli/`.
+ * The same `HELP_WORD` control held a sixth, `src/cli/registry.ts`,
+ * `command.ts` and this file.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the config barrels
  * spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the six files: every name any of
+ * `index.test.ts` holds the list to the seven files: every name any of
  * them exports is here once, as the same binding, and no other name is
  * here.
  */
@@ -85,6 +98,14 @@ export type {
   RafaFlagSpec,
 } from './command.js';
 export type { PromptOutput, Prompter } from './confirm.js';
+export type {
+  CommandAlias,
+  CommandRegistry,
+  CommandRegistryInput,
+  ModuleMount,
+  RosterOptions,
+  SubjectSpec,
+} from './registry-types.js';
 export type { RunningCommand } from './running.js';
 export type { CommandSpend, SpendsWhen } from './spends.js';
 export type {

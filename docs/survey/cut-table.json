@@ -3613,13 +3613,6 @@
           "from": "src/core/command/command.ts",
           "fromPackage": "@open-tomato/rafa",
           "kind": "type",
-          "to": "src/cli/registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
-        },
-        {
-          "from": "src/core/command/command.ts",
-          "fromPackage": "@open-tomato/rafa",
-          "kind": "type",
           "to": "src/project/scope.ts",
           "toPackage": "@open-tomato/rafa-cli"
         },
@@ -3980,8 +3973,8 @@
         "src/schema/tiers.ts"
       ],
       "rank": 1,
-      "remaining": 19,
-      "upwardEdges": 19
+      "remaining": 18,
+      "upwardEdges": 18
     },
     {
       "clearedByIssue118": 0,
@@ -6986,7 +6979,7 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 263,
+        "source": 264,
         "test": 466,
         "testSupport": 27
       },
@@ -7081,6 +7074,7 @@
         "src/cli/registry.ts",
         "src/cli/route.test.ts",
         "src/cli/route.ts",
+        "src/cli/running.ts",
         "src/cli/spends-roster.test.ts",
         "src/cli/spends.ts",
         "src/commands/agent/list.test.ts",
@@ -7749,7 +7743,7 @@
         "src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 33
+        "src/cli/": 34
       },
       "folders": [
         "src/cli/"
@@ -7767,12 +7761,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1983,
+    "files": 1984,
     "leftToPlace": 718,
-    "nonTestEdges": 4427,
+    "nonTestEdges": 4428,
     "unassignedFiles": 28,
     "unrankedEdges": 78,
-    "upwardEdges": 271
+    "upwardEdges": 270
   },
   "unassigned": [
     {

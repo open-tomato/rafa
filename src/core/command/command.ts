@@ -86,9 +86,9 @@
  * The field is declared here rather than on `FlagSpec`, so the copy of
  * `cli-core`'s contracts in `types.ts` keeps the source's shape.
  */
+import type { CommandRegistry } from './registry-types.js';
 import type { CommandSpend } from './spends.js';
 import type { CliCommand, CliContext, FlagSpec } from './types.js';
-import type { CommandRegistry } from '../../cli/registry.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DangerousPhrases } from '../config/dangerous.js';
 
