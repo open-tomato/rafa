@@ -22,6 +22,14 @@
  * calling the command directly, since the dispatcher refuses a command
  * needing a project outside one and would never hand it null.
  *
+ * ## The bundled items
+ *
+ * Each bundled case plants its own project under the temporary directory,
+ * with its own `src/bundled/` and its own `.claude/` links, so none reads
+ * this checkout's bundle or this machine's `~/.claude`. Each sits beside a
+ * control differing in one thing: a plan naming no bundled item, the same
+ * plan with no project, or the same edit with no parser issue beside it.
+ *
  * ## No session
  *
  * The spawned case runs `bun src/rafa.ts plan validate` in a scratch git
@@ -32,11 +40,12 @@
  * session: the log then exists, so the stand-in is what a session in that
  * planting reaches, and its absence after `validate` is a reading.
  */
+import type { CapturedRun } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -48,6 +57,7 @@ import { issueLine } from '@open-tomato/rafa/core/plan';
 import { createCommandRegistry } from '../../cli/registry.js';
 import { parsePlan } from '../../plan/index.js';
 import { validatePlan } from '../../plan/validate.js';
+import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
 import {
   dispatchCaptured,
   dispatchInProject,
@@ -529,6 +539,239 @@ describe('the agents rafa plan validate checks', () => {
       '✅ plan.md: no issues; 0 stages, tasks 0/1 done, 0 blocked, 1 open',
     ]);
     expect([inProject.exitCode, inProject.stdout.includes('"tdd-guide"')]).toEqual([1, true]);
+  });
+});
+
+/** The plan file the bundled cases write at the root of their project, and the file its pins go to. */
+const BUNDLED_PLAN = 'PLAN-demo.md';
+const BUNDLED_PREREQUISITES = 'PREREQUISITES-demo.md';
+
+/** A plan of one stage whose checklist is `lines`; its first task sits on line 5. */
+function bundledPlanOf(...lines: string[]): string {
+  return ['# Plan: bundled', '', '# Stage: one', '', ...lines, ''].join('\n');
+}
+
+/** What the note of one edit says, typed as `PLAN-demo.md`, before the tail saying what became of the pin. */
+function editNote(line: number, kind: string, name: string, path: string, pin: string): string {
+  return `ℹ️  ${BUNDLED_PLAN}:${line}: a task edits the bundled ${kind} \`${name}\` (\`${path}\`);`
+    + ` each clone that merges it needs the pin \`${pin}\``;
+}
+
+/** The tail of a note whose pin went to the prerequisites file beside the plan. */
+const WRITTEN_TAIL = `, written to ${BUNDLED_PREREQUISITES} as a [human] prerequisite.`;
+
+/**
+ * A fresh project holding `plan` as `PLAN-demo.md` and, of its own, two
+ * bundled agents and two bundled skills under `src/bundled/`, with
+ * `.claude/` links to `doc-updater.md` and to the `dev-planner` folder, so
+ * no case reads this checkout's bundle or this machine's `~/.claude`.
+ */
+function plantBundledProject(plan: string): { root: string; home: string } {
+  const scope = mkdtempSync(join(tempBase, 'bundled-'));
+  const project = plantProject(scope);
+  const agents = join(project.root, 'src', 'bundled', 'agents');
+  const skills = join(project.root, 'src', 'bundled', 'skills');
+  mkdirSync(agents, { recursive: true });
+  for (const name of ['doc-updater', 'loop-implementer']) {
+    writeFileSync(join(agents, `${name}.md`), `---\nname: ${name}\ndescription: The ${name} agent.\n---\n\nBody.\n`);
+  }
+  for (const name of ['dev-planner', 'git-workflow']) {
+    mkdirSync(join(skills, name), { recursive: true });
+    writeFileSync(join(skills, name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n---\n\nBody.\n`);
+  }
+  mkdirSync(join(project.root, '.claude', 'agents'), { recursive: true });
+  mkdirSync(join(project.root, '.claude', 'skills'), { recursive: true });
+  symlinkSync('../../src/bundled/agents/doc-updater.md', join(project.root, '.claude', 'agents', 'doc-updater.md'));
+  symlinkSync('../../src/bundled/skills/dev-planner', join(project.root, '.claude', 'skills', 'dev-planner'));
+  writeFileSync(join(project.root, BUNDLED_PLAN), plan, 'utf8');
+  return project;
+}
+
+/** Dispatches `plan validate PLAN-demo.md` in `project`, with `words` added to the line. */
+async function validateBundled(
+  project: { root: string; home: string },
+  words: readonly string[] = [],
+): Promise<CapturedRun> {
+  return dispatchInProject(
+    ['plan', 'validate', BUNDLED_PLAN, ...words],
+    SUBJECTS,
+    [createPlanValidateCommand(() => project.root)],
+    project,
+  );
+}
+
+/** The prerequisites file the project holds beside its plan, or null when none was written. */
+function prerequisitesOf(project: { root: string }): string | null {
+  const path = join(project.root, BUNDLED_PREREQUISITES);
+  return existsSync(path)
+    ? readFileSync(path, 'utf8')
+    : null;
+}
+
+/** The plan of the cases below: one task editing a bundled agent. */
+const AGENT_EDIT_PLAN = bundledPlanOf('- [ ] Rewrite `src/bundled/agents/doc-updater.md` to read the changes fragment');
+
+describe('the bundled agents and skills rafa plan validate notes', () => {
+  it('prints a note with the tiers.agents pin for an agent a task edits, exits 0 and writes the pin as a [human] prerequisite', async () => {
+    const project = plantBundledProject(AGENT_EDIT_PLAN);
+    // The control names no bundled item, in a project holding the same bundle.
+    const control = plantBundledProject(bundledPlanOf('- [ ] Rewrite `src/commands/plan/validate.ts` to read the bundle'));
+
+    const run = await validateBundled(project);
+    const controlRun = await validateBundled(control);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.stdout.split('\n')).toEqual([
+      editNote(5, 'agent', 'doc-updater', 'src/bundled/agents/doc-updater.md', 'tiers.agents: { doc-updater: project }')
+        + WRITTEN_TAIL,
+      '✅ PLAN-demo.md: no issues; 1 stage, tasks 0/1 done, 0 blocked, 1 open',
+      '',
+    ]);
+    const items = parsePrerequisites(prerequisitesOf(project) ?? '');
+    expect(items.map(({ tag, probe }) => ({ tag, probe }))).toEqual([{ tag: 'human', probe: null }]);
+    expect(items[0]?.description).toContain('`tiers.agents: { doc-updater: project }`');
+    expect(items[0]?.description).toContain(BUNDLED_PLAN);
+
+    expect([controlRun.exitCode, controlRun.stdout.includes('bundled')]).toEqual([0, false]);
+  });
+
+  it('writes no second copy of the item on a second run, and says the file already holds it', async () => {
+    const project = plantBundledProject(AGENT_EDIT_PLAN);
+
+    await validateBundled(project);
+    const before = prerequisitesOf(project);
+    const second = await validateBundled(project);
+
+    expect(before).not.toBeNull();
+    expect(prerequisitesOf(project)).toBe(before);
+    expect(second.exitCode).toBe(0);
+    expect(second.stdout.split('\n')[0]).toEndWith(`, already held by ${BUNDLED_PREREQUISITES}.`);
+  });
+
+  it('carries one bundledEdits entry in the result of json mode, the note an info log event before it', async () => {
+    const project = plantBundledProject(AGENT_EDIT_PLAN);
+
+    const run = await validateBundled(project, ['--output=json']);
+    const events = eventsOf(run.stdout);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(events.map(labelOf)).toEqual([
+      'start',
+      `info:${editNote(5, 'agent', 'doc-updater', 'src/bundled/agents/doc-updater.md', 'tiers.agents: { doc-updater: project }')
+        + WRITTEN_TAIL}`,
+      'result',
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      type: 'result',
+      ok: true,
+      data: {
+        bundledEdits: [{
+          kind: 'agent',
+          name: 'doc-updater',
+          path: 'src/bundled/agents/doc-updater.md',
+          lines: [5],
+          pinLine: 'tiers.agents: { doc-updater: project }',
+        }],
+      },
+    });
+    expect((events.at(-1) as { data: { bundledEdits: unknown[] } }).data.bundledEdits).toHaveLength(1);
+  });
+
+  it('prints the tiers.skills pin for a skill a task names through a planted .claude link', async () => {
+    const project = plantBundledProject(bundledPlanOf('- [ ] Teach `.claude/skills/dev-planner` the bundled-item note'));
+
+    const run = await validateBundled(project);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')[0]).toBe(
+      editNote(5, 'skill', 'dev-planner', '.claude/skills/dev-planner', 'tiers.skills: { dev-planner: project }')
+        + WRITTEN_TAIL,
+    );
+    expect(prerequisitesOf(project)).toContain('`tiers.skills: { dev-planner: project }`');
+  });
+
+  it('prints one note per planted agent for a plan naming src/bundled/agents/ whole, and none for a skill', async () => {
+    const project = plantBundledProject(bundledPlanOf('- [ ] Sweep `src/bundled/agents/` for the old pin wording'));
+
+    const run = await validateBundled(project);
+    const notes = run.stdout.split('\n').filter((line) => line.includes('a task edits the bundled'));
+
+    expect(run.exitCode).toBe(0);
+    expect(notes).toEqual([
+      editNote(5, 'agent', 'doc-updater', 'src/bundled/agents/', 'tiers.agents: { doc-updater: project }') + WRITTEN_TAIL,
+      editNote(5, 'agent', 'loop-implementer', 'src/bundled/agents/', 'tiers.agents: { loop-implementer: project }')
+        + WRITTEN_TAIL,
+    ]);
+    expect(parsePrerequisites(prerequisitesOf(project) ?? '')).toHaveLength(2);
+  });
+
+  it('prints no note and writes no file for a plan naming no bundled item, and says nothing of one', async () => {
+    const project = plantBundledProject(bundledPlanOf(
+      '- [ ] Add `src/commands/plan/bundled-check.ts` and run `bun test src/commands/plan/`',
+      '- [ ] Read `~/.claude/agents/doc-updater.md` and `src/bundled/agents/missing.md` for the shape',
+    ));
+
+    const run = await validateBundled(project);
+
+    expect(run).toEqual({
+      exitCode: 0,
+      stdout: '✅ PLAN-demo.md: no issues; 1 stage, tasks 0/2 done, 0 blocked, 2 open\n',
+      stderr: '',
+    });
+    expect(prerequisitesOf(project)).toBeNull();
+  });
+
+  it('reads nothing when it is handed no project, where the same plan in the project is noted and written', async () => {
+    const project = plantBundledProject(AGENT_EDIT_PLAN);
+    const info: string[] = [];
+
+    await createPlanValidateCommand(() => project.root).run({
+      args: [BUNDLED_PLAN],
+      argv: [BUNDLED_PLAN],
+      flags: {},
+      outputMode: 'text',
+      verbosity: 1,
+      output: sinkOutput({ info: (message) => { info.push(message); } }),
+      signal: new AbortController().signal,
+      env: {},
+      registry: createCommandRegistry({ subjects: SUBJECTS, commands: [] }),
+      project: null,
+    });
+
+    expect(info).toEqual([
+      'ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked'
+        + ' and no edit of a bundled agent or skill was read.',
+      '✅ PLAN-demo.md: no issues; 1 stage, tasks 0/1 done, 0 blocked, 1 open',
+    ]);
+    expect(prerequisitesOf(project)).toBeNull();
+
+    const inProject = await validateBundled(project);
+
+    expect(inProject.stdout).toContain('a task edits the bundled agent `doc-updater`');
+    expect(prerequisitesOf(project)).not.toBeNull();
+  });
+
+  it('exits 1 and writes nothing for a plan with a parser issue beside an edit, where the plan without the issue writes it', async () => {
+    const edit = '- [ ] Rewrite `src/bundled/agents/doc-updater.md` to read the changes fragment';
+    const broken = BROKEN_PLAN.replace('- [ ] a task', edit);
+    const refusedProject = plantBundledProject(broken);
+    // The control holds the same edit with no issue beside it.
+    const control = plantBundledProject(AGENT_EDIT_PLAN);
+
+    const refused = await validateBundled(refusedProject);
+    const passed = await validateBundled(control);
+
+    expect(parsePlan(broken).issues.length).toBeGreaterThan(0);
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toContain('error: PLAN-demo.md:3: unusable-field:');
+    expect(refused.stdout).toContain('a task edits the bundled agent `doc-updater`');
+    expect(refused.stdout).toContain(', not written while the plan is refused.');
+    expect(refused.stderr).toMatch(/^❌ PLAN-demo\.md: \d+ issues?; the plan does not read as written\n$/u);
+    expect(prerequisitesOf(refusedProject)).toBeNull();
+
+    expect(passed.exitCode).toBe(0);
+    expect(prerequisitesOf(control)).not.toBeNull();
   });
 });
 
