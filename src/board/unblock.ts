@@ -44,7 +44,8 @@
  * board ask for the same number of issues.
  *
  * `--state all` because a blocker is cleared by being CLOSED, so a
- * closed issue is still an issue the board has.
+ * closed issue is still an issue the board has. The listing and the
+ * reading of its rows are `./blocker-states.ts`'s, imported here.
  *
  * ## Nothing is removed on a half-read board
  *
@@ -110,15 +111,17 @@
  * none of them reaches GitHub or spawns `gh`.
  */
 import type { BlockedReading } from './blocked.js';
+import type { BoardState, BoardStates } from './blocker-states.js';
 import type { IssueBoard } from './issue-board.js';
 import type { SpecIssueReader } from './issue.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { plural } from '../core/plan/index.js';
 
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from './blocked-issues.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';
+import { readBoardStates, rowNumber, rowsOf } from './blocker-states.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 
@@ -200,45 +203,6 @@ export function unblockQuestion(issue: number, blockers: readonly number[]): str
     + ` Remove ${SPEC_BLOCKED_LABEL}? [y/N] `;
 }
 
-/** What a failed command wrote, for a message. Never empty. */
-function detailOf(result: GhResult, command: string): string {
-  const written = result.stderr.trim() || result.stdout.trim();
-  return written === ''
-    ? `${command} failed and wrote nothing`
-    : `${command} failed: ${written}`;
-}
-
-/** The rows `args` wrote. Throws, naming `command`, when it failed or answered something else. */
-async function rowsOf(gh: GhRunner, args: readonly string[], command: string): Promise<readonly unknown[]> {
-  const result = await gh(args);
-  if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.stdout) as unknown;
-  } catch (error) {
-    throw new Error(`${PREFIX}: ${command} wrote output that is not JSON: ${messageOf(error)}`, { cause: error });
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${PREFIX}: ${command} answered ${describeValue(parsed)}, expected a list of issues`);
-  }
-  return parsed as readonly unknown[];
-}
-
-/** One row's `number`, checked. */
-function rowNumber(row: unknown, command: string, where: string): number {
-  if (!isMapping(row)) {
-    throw new Error(`${PREFIX}: ${command} answered ${where} as ${describeValue(row)}, expected a mapping`);
-  }
-  const number = row['number'];
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
-    throw new Error(
-      `${PREFIX}: ${command} answered ${where}.number as ${describeValue(number)}, expected a positive whole number`,
-    );
-  }
-  return number;
-}
-
 /** One row's `body`, checked. An issue written with no body answers the empty string. */
 function rowBody(row: unknown, command: string, where: string): string {
   const body = isMapping(row)
@@ -261,57 +225,6 @@ const BLOCKED_ARGS: readonly string[] = Object.freeze([
 
 /** The blocked-issue listing, as a message names it. */
 const BLOCKED_COMMAND = `gh ${BLOCKED_ARGS.join(' ')}`;
-
-/** The arguments and the command line of the board's state listing. */
-const STATE_ARGS: readonly string[] = Object.freeze([
-  'issue', 'list',
-  '--state', 'all',
-  '--limit', String(KNOWN_LIST_LIMIT),
-  '--json', 'number,state',
-]);
-
-/** The state listing, as a message names it. */
-const STATE_COMMAND = `gh ${STATE_ARGS.join(' ')}`;
-
-/** What the board holds an issue as; a state this reads as neither is no reading at all. */
-type BoardState = 'open' | 'closed';
-
-/** What the board answered about its issues. */
-interface BoardStates {
-  /** Every issue number the listing named, whatever it said of its state. */
-  readonly numbers: ReadonlySet<number>;
-  /** The issues whose state the listing answered as one the board holds. */
-  readonly states: ReadonlyMap<number, BoardState>;
-  /** True when the listing answered its own limit, so the board may hold more. */
-  readonly full: boolean;
-}
-
-/** One row's `state`, folded, or null when it is neither state the board holds. */
-function rowState(row: unknown): BoardState | null {
-  const state = isMapping(row)
-    ? row['state']
-    : null;
-  if (typeof state !== 'string') return null;
-  const folded = state.trim().toUpperCase();
-  if (folded === 'OPEN') return 'open';
-  return folded === 'CLOSED'
-    ? 'closed'
-    : null;
-}
-
-/** Every issue the board holds with its state; throws, naming the command, when the listing failed. */
-async function readBoardStates(gh: GhRunner): Promise<BoardStates> {
-  const rows = await rowsOf(gh, STATE_ARGS, STATE_COMMAND);
-  const numbers = new Set<number>();
-  const states = new Map<number, BoardState>();
-  for (const [index, row] of rows.entries()) {
-    const number = rowNumber(row, STATE_COMMAND, `issue ${String(index)}`);
-    numbers.add(number);
-    const state = rowState(row);
-    if (state !== null) states.set(number, state);
-  }
-  return { numbers, states, full: rows.length >= KNOWN_LIST_LIMIT };
-}
 
 /** One issue this run considered: its body to read, or the outcome that already settled it. */
 interface Considered {
