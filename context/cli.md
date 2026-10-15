@@ -16,7 +16,7 @@ module's note is the long form.
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger and the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
@@ -2689,6 +2689,18 @@ New; it replaces no earlier text. What a row or an action added to
   so a command that sets it and returns ends as a success.
 - **`hidden` keeps an action out of every roster and every refusal's
   list of actions**, and it still dispatches.
+- **`dangerous` names what the command does under a `dangerous.*`
+  key**: a mapping of key to phrase, `{ 'dangerous.acceptStaleRefs':
+  '<phrase>' }`. The dispatcher runs the command inside
+  `runWithDangerousPhrases` (`src/core/config/dangerous.ts`) beside the
+  running command's record, in the same kind of async scope, so a pass
+  line the loader writes during the run for a declared key reads
+  `dangerous.<key>: <value> (<file>, entry <n>); <phrase>`, and one for
+  an undeclared key keeps its bare form. `setDangerousPhrases` and
+  `restoreDangerousPhrases` set and put back the module-level phrases
+  for a test. `commandProblem` refuses a `dangerous` that is no mapping,
+  a key not opening with `dangerous.` and a phrase that is no non-empty
+  string.
 
 ### Routing
 

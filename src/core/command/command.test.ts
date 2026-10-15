@@ -122,7 +122,19 @@ describe('the shape check', () => {
       hidden: false,
       exec: true,
       spends: { when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' },
+      dangerous: { 'dangerous.acceptStaleRefs': 'refuses no reference' },
     })).toBeNull();
+  });
+
+  it.each([
+    ['a list', ['dangerous.acceptStaleRefs'], 'a list'],
+    ['a key outside dangerous.', { 'pr.base': 'x' }, 'a mapping'],
+    ['an empty phrase', { 'dangerous.acceptStaleRefs': '' }, 'a mapping'],
+    ['a phrase that is no string', { 'dangerous.acceptStaleRefs': true }, 'a mapping'],
+  ])('refuses dangerous as %s', (_title, dangerous, shown) => {
+    expect(commandProblem({ ...VALID, dangerous })).toBe(
+      `command "loop start": dangerous is ${shown}, expected absent or a mapping of dangerous.* keys to phrases`,
+    );
   });
 
   it.each([

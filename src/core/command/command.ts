@@ -65,6 +65,17 @@
  * expected a flag as typed, starting with --`. A module entry declaring a
  * malformed `spends` is therefore skipped like any other bad shape.
  *
+ * ## Dangerous phrases
+ *
+ * `dangerous` maps a `dangerous.*` key to the phrase naming what the
+ * command does under it: `{ 'dangerous.acceptVersionCollision': 'a
+ * release guard reading collision merges anyway' }`. The dispatcher
+ * runs the command inside `runWithDangerousPhrases`
+ * (`src/core/config/dangerous.ts`) with it, so a pass line the loader
+ * writes for a declared key during the run ends with `; <phrase>`. The
+ * shape check refuses a key not opening with `dangerous.` and a phrase
+ * that is not a non-empty string.
+ *
  * ## Deprecated flags
  *
  * A flag a command declares is a {@link RafaFlagSpec}: a `FlagSpec` that
@@ -79,6 +90,7 @@ import type { CliCommand, CliContext, FlagSpec } from '../../cli/core/types.js';
 import type { CommandRegistry } from '../../cli/registry.js';
 import type { CommandSpend } from '../../cli/spends.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { DangerousPhrases } from '../config/dangerous.js';
 
 import { spendsProblem } from '../../cli/spends.js';
 import { describeValue } from '../config/config-sections.js';
@@ -180,6 +192,13 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
    * `src/cli/spends.ts`.
    */
   readonly spends?: CommandSpend;
+  /**
+   * What the command does under each `dangerous.*` key it declares, as a
+   * phrase the loader's pass line for that key ends with after `; `.
+   * The dispatcher sets it for the command's run; see "Dangerous
+   * phrases" in the module note.
+   */
+  readonly dangerous?: DangerousPhrases;
   /** Runs the command. Throws {@link CommandExit} to refuse. */
   readonly run: (context: RafaContext) => Promise<void>;
 }
@@ -224,6 +243,14 @@ function hasStrings(value: unknown, keys: readonly string[]): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return keys.every((key) => typeof record[key] === 'string');
+}
+
+/** True when a value is a mapping of `dangerous.*` keys, each to a non-empty phrase. */
+function isDangerousPhrases(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return Object.entries(value).every(([key, phrase]) => key.startsWith('dangerous.')
+    && typeof phrase === 'string'
+    && phrase !== '');
 }
 
 /**
@@ -280,6 +307,11 @@ function fieldProblem(fields: CommandFields): string | null {
       'absent or a boolean',
     ],
     ['exec', fields.exec === undefined || fields.exec === true, 'absent or true'],
+    [
+      'dangerous',
+      fields.dangerous === undefined || isDangerousPhrases(fields.dangerous),
+      'absent or a mapping of dangerous.* keys to phrases',
+    ],
     ['run', typeof fields.run === 'function', 'a function'],
   ];
   const failed = checks.find(([, passes]) => !passes);

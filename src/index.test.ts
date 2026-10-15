@@ -20,9 +20,10 @@
  * The first config module is read through its barrel,
  * `src/core/config/index.ts`, the one path a file outside `src/core/`
  * may import it by. The barrel is wider than the root: it also holds
- * core's section, the item readers and the section registry with the
- * key indexes it answers, which the tree reads and the package does not
- * publish. Those twenty names are spelled under
+ * core's section, the item readers, the section registry with the
+ * key indexes it answers, and the dangerous listing with the running
+ * command's phrases, which the tree reads and the package does not
+ * publish. Those thirty names are spelled under
  * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
  * name added to the barrel still reds it until the name is added to the
  * root or to that list. The ten runtime names `config.ts` re-exports
@@ -398,6 +399,9 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'activeSections',
   'activeSettingByKey',
   'activeSettings',
+  'dangerousKeys',
+  'dangerousPassLines',
+  'dangerousPhrases',
   'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
@@ -406,7 +410,11 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'registerConfigSections',
   'requiredPrerequisite',
   'restoreConfigSections',
+  'restoreDangerousPhrases',
+  'runWithDangerousPhrases',
   'setConfigLoadHook',
+  'setDangerousPhrases',
+  'writeDangerousPassLines',
 ];
 
 /** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
