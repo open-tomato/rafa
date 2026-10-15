@@ -1,6 +1,6 @@
 /**
- * The barrel over git: every name `git.ts` and `commit.ts` export but
- * one, and nothing else.
+ * The barrel over git: every name `git.ts`, `commit.ts` and
+ * `gh-runner.ts` export but one, and nothing else.
  *
  * A file outside `src/core/` imports this file and never the two behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
@@ -14,7 +14,10 @@
  *     what git said instead of throwing, with the reader of that answer;
  *   - `commit.ts`: staging and committing one task's work on the loop's
  *     behalf, the subject derived from the task text, and the argv of
- *     each step.
+ *     each step;
+ *   - `gh-runner.ts`: the type of the runner every `gh` command goes
+ *     through and what one command answers, types alone, imported by
+ *     nothing.
  *
  * ## The one name the two files share
  *
@@ -76,6 +79,7 @@
  * exports is here once, as the same binding, `GitRunner` as the type
  * `git.ts` declares, and no other name is here.
  */
+export type { GhResult, GhRunner } from './gh-runner.js';
 export type { GitResult, GitRunner } from './git.js';
 export type {
   CommitAttempt,

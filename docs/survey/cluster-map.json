@@ -305,6 +305,7 @@
     "src/core/config/config-sections.ts": "c1",
     "src/core/config/config.ts": "c7",
     "src/core/git/commit.ts": "c3",
+    "src/core/git/gh-runner.ts": "c1",
     "src/core/git/git.ts": "c1",
     "src/core/loop/claude.ts": "c3",
     "src/core/loop/sessions.ts": "c2",

@@ -1,7 +1,8 @@
 /**
- * Tests for the `index.ts` barrel: it exports every name `git.ts` and
- * `commit.ts` export, each once, as the same binding, and no other name,
- * with the one name the two files share exported as `git.ts` declares it.
+ * Tests for the `index.ts` barrel: it exports every name `git.ts`,
+ * `commit.ts` and `gh-runner.ts` export, each once, as the same
+ * binding, and no other name, with the one name `git.ts` and
+ * `commit.ts` share exported as `git.ts` declares it.
  *
  * The barrel spells its names, so a name added to one of the two files
  * and not to the barrel is a name no file outside `src/core/` can import.
@@ -50,6 +51,7 @@ const ROOT = resolve(import.meta.dir, '../../..');
 const BARREL = 'src/core/git/index.ts';
 const GIT = 'src/core/git/git.ts';
 const COMMIT = 'src/core/git/commit.ts';
+const GH = 'src/core/git/gh-runner.ts';
 
 /** The names both files export. The barrel exports each as `git.ts` declares it. */
 const SHARED = ['GitRunner'];
@@ -145,29 +147,36 @@ describe('the git barrel', () => {
   });
 
   it('exports the type names of the two files with the runtime ones, each once, and no other', () => {
-    const exports = readExports([BARREL, GIT, COMMIT]);
-    const expected = [...new Set([...namesOf(exports[GIT]), ...namesOf(exports[COMMIT])])].sort();
+    const exports = readExports([BARREL, GIT, COMMIT, GH]);
+    const expected = [
+      ...new Set([...namesOf(exports[GIT]), ...namesOf(exports[COMMIT]), ...namesOf(exports[GH])]),
+    ].sort();
 
     expect(namesOf(exports[GIT])).toContain('GitResult');
     expect(namesOf(exports[COMMIT])).toContain('CommitAttempt');
+    expect(namesOf(exports[GH])).toEqual(['GhResult', 'GhRunner']);
     expect(Object.keys(git)).not.toContain('GitResult');
     expect(Object.keys(commit)).not.toContain('CommitAttempt');
     expect(namesOf(exports[BARREL])).toEqual(expected);
   });
 
   it('exports each shared name as git.ts declares it, and every other name from its own file', () => {
-    const exports = readExports([BARREL, GIT, COMMIT]);
+    const exports = readExports([BARREL, GIT, COMMIT, GH]);
     const gitNames = namesOf(exports[GIT]);
+    const ghNames = namesOf(exports[GH]);
     const expected = Object.fromEntries(
       namesOf(exports[BARREL]).map((name) => [
         name,
         gitNames.includes(name)
           ? GIT
-          : COMMIT,
+          : ghNames.includes(name)
+            ? GH
+            : COMMIT,
       ]),
     );
 
     expect(expected['CommitAttempt']).toBe(COMMIT);
+    expect(expected['GhRunner']).toBe(GH);
     for (const name of SHARED) {
       expect([name, expected[name]]).toEqual([name, GIT]);
     }

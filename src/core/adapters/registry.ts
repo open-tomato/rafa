@@ -108,7 +108,6 @@
  * labels a `github` tracker remembers making are the ones it made itself.
  */
 import type { PlanPromptBuilder } from '../../adapters/planner/claude.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { SelectedEffortStore } from '../../effort/store/index.js';
 import type {
   Learning,
@@ -121,6 +120,7 @@ import type {
   Tracker,
 } from '../../ports/index.js';
 import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
+import type { GhRunner } from '../git/gh-runner.js';
 import type { CapturingSpawner } from '../loop/claude.js';
 import type { OutputStream } from '../output/stream.js';
 
