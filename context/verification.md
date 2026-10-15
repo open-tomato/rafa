@@ -561,9 +561,9 @@ whose suite steps are off (no baseline) still gets it. To check one by hand,
 point a tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
 by absolute path (a bare `tsconfig.json` is looked up as a package, the repo's
 options are never applied, and hundreds of TS2802 errors follow), never
-`tsconfig.base.json`, which leaves `module` unset and fails `src/plan.ts` and
-`src/start.ts` on `import.meta` (TS1343), `files` holding the test's absolute
-path, `include` empty, `compilerOptions.typeRoots` naming
+the shared base `packages/typescript-config/base.json`, which leaves `module`
+unset and fails `src/plan.ts` and `src/start.ts` on `import.meta` (TS1343),
+`files` holding the test's absolute path, `include` empty, `compilerOptions.typeRoots` naming
 `<repo>/node_modules/@types` absolutely (left out, every file reports `Cannot
 find module 'bun:test'`) — and run `./node_modules/.bin/tsc -p` on it. Test
 files already carry errors no gate ever reported, so compare against the base

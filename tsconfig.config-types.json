@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Declarations of the ./config subpath, written into dist by the build after core's (packages/rafa/tsconfig.types.json)",
-  "extends": "./tsconfig.base.json",
+  "extends": "@open-tomato/rafa-typescript-config/base",
   "compilerOptions": {
     "noEmit": false,
     "emitDeclarationOnly": true,

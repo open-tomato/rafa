@@ -9,7 +9,11 @@
  * `paths`, which the scratch repository carries a stub target for).
  *
  * The scratch repository lives under the checkout's gitignored `.tmp/`
- * so that Node resolution finds the installed `node_modules` above it.
+ * so that Node resolution finds the installed `node_modules` above it:
+ * the plugins the lint config imports, and
+ * `@open-tomato/rafa-typescript-config`, the base the copied
+ * `tsconfig.packages.json` extends, which the scratch repository does not
+ * copy.
  */
 import type { GitResult, GitRunner } from '../pr/index.js';
 
@@ -26,7 +30,7 @@ import { runLintStep } from './lint-step.js';
 
 const ROOT = join(import.meta.dir, '..', '..');
 const STOP = 130;
-const CONFIG_FILES = ['eslint.config.mjs', 'eslint.base.mjs', 'sharedRules.mjs', 'tsconfig.json', 'tsconfig.base.json', 'tsconfig.packages.json'];
+const CONFIG_FILES = ['eslint.config.mjs', 'eslint.base.mjs', 'sharedRules.mjs', 'tsconfig.json', 'tsconfig.packages.json'];
 const PACKAGE_FILE = 'packages/scratch-pkg/src/planted.ts';
 const LINT_TIMEOUT_MS = 120_000;
 

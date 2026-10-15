@@ -39,9 +39,12 @@ spells out, and the shapes the lint config forces.
 
 ### Explicit types on exports
 
-**`tsconfig.base.json` sets `isolatedDeclarations` and `erasableSyntaxOnly`**,
-so the root config and the three workspace packages are held to them by `bun
-run check-types`, with no flag on the command line. `declaration` sits beside
+**`base.json` of `packages/typescript-config` sets `isolatedDeclarations`
+and `erasableSyntaxOnly`**, and every tsconfig extends it, by the name
+`@open-tomato/rafa-typescript-config/base`, so the root config and the three
+code packages are held to them by `bun run check-types`, with no flag on the
+command line. The package's `base.test.ts` holds both flags and
+`declaration`. `declaration` sits beside
 them because `tsc` refuses `isolatedDeclarations` without it; under the base's
 `noEmit` it writes no file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
@@ -342,12 +345,14 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with three members: `packages/rafa/`
+  `package.json`) with four members: `packages/rafa/`
   (`@open-tomato/rafa-core`, core, under its interim name),
-  `packages/rafa-hub/` (`@open-tomato/rafa-hub`) and
-  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`). All three
-  are `private`: publishing them is an operator's decision, and the root
-  `files` ships none of them.
+  `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
+  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and
+  `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`), the
+  tsconfig base, which the root declares with `workspace:*` so the `extends`
+  name resolves from the root. All four are `private`: publishing them is an
+  operator's decision, and the root `files` ships none of them.
 - **The import name resolves through `paths`, not `node_modules`.**
   `tsconfig.packages.json` maps four entries, longest prefix first:
   `@open-tomato/rafa/store` and `@open-tomato/rafa/ports` to the two barrels,

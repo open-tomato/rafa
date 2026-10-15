@@ -1,0 +1,17 @@
+{
+  "name": "@open-tomato/rafa-typescript-config",
+  "version": "0.0.0",
+  "description": "The strict tsconfig base every rafa tsconfig extends: isolatedDeclarations, erasableSyntaxOnly and the rest, in one place.",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./base": "./base.json"
+  },
+  "files": [
+    "base.json"
+  ],
+  "scripts": {
+    "test": "bun test"
+  }
+}
