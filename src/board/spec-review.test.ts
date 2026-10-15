@@ -81,13 +81,29 @@
  *    gap beside a non-blocking one, and the case keeping an assumption
  *    written beside a blocking gap.
  *
- * The drift guard is not one of those seventeen: no mutation of the
+ * The drift guard is not one of those mutations: no mutation of the
  * module can redden it, since what it reads is the prompt. Its controls
  * are the cases beside it, one rewriting the prompt's ask back to the
  * opening one this parser was written for before 2026-09-20, the other
  * back to the `{heading, what}` gap it read before 2026-09-22, each
  * asserting the guard it belongs to answers false while the other still
  * answers true.
+ *
+ * Five more were driven on 2026-10-15, for the second read (#1128), the
+ * same way: 39 pass either side, and each fails the second-read cases
+ * named:
+ *
+ *  - the second parse reading the body unquoted, so no second read
+ *    exists: 4 fail, every case of that describe whose block throws as
+ *    written, the broken-verdict case through its control.
+ *  - an already-quoted value quoted again: 1 fail, the case leaving a
+ *    quoted value beside one it quotes. The already-quoted block is
+ *    read by the FIRST parse and never reaches the quoting.
+ *  - `\` and `"` left unescaped: 1 fail, the same case.
+ *  - the second read's issue dropped, so a helped review is silent: 3
+ *    fail.
+ *  - a ` #` cutting the quoted value short: 2 fail, the two cases whose
+ *    `what` holds one.
  *
  * Both guards match SUBSTRINGS of the prompt, so rewrapping a prompt
  * sentence across a line break reddens them: that is how the widened
@@ -153,6 +169,13 @@ function asksForBlockingAndAssumption(prompt: string): boolean {
     && prompt.includes(ASK_ASSUMPTION)
     && prompt.includes(ASK_WHEN_BLOCKING);
 }
+
+/** The assumption #1089's plan wrote, which broke its whole review block (#1128). */
+const ISSUE_1089_ASSUMPTION = 'The definition of done is note 5\'s: '
+  + 'scripts/survey/cut-table.ts reports ...';
+
+/** A `what` holding the same `: ` and a ` #` that would open a comment. */
+const DOD_WHAT = `${ISSUE_1089_ASSUMPTION} for stream M, #1089`;
 
 /** Every gap of `output` as `<heading>: <what>`, in the order it answers them. */
 function gapsIn(output: string): readonly string[] {
@@ -482,6 +505,86 @@ describe('a malformed block', () => {
     expect(reading.ready).toBe(false);
     expect(reading.block?.closed).toBe(false);
     expect(reading.text).toContain('is never closed');
+  });
+});
+
+describe('the second read, after quoting the free-text keys', () => {
+  /** A ready block with one non-blocking gap, written as `what` and `assumption` lines. */
+  const readyGap = (what: string, assumption: string): string => 'verdict: ready\ngaps:\n'
+    + `  - heading: Definition of done\n    what: ${what}\n`
+    + `    blocking: false\n    assumption: ${assumption}`;
+
+  /** The note the second read files against `gaps` for a block at line 3. */
+  const QUOTED_NOTE = 'the rafa:spec-review block at line 3 is not valid YAML as written';
+
+  it('reads a what holding `: ` and ` #` back as written, under verdict: ready with its gaps', () => {
+    const body = readyGap(DOD_WHAT, 'the table cut on 15 Oct is the one measured');
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(() => Bun.YAML.parse(body)).toThrow();
+    expect(reading.answer).toBe('ready');
+    expect(reading.ready).toBe(true);
+    expect(reading.gaps).toEqual([
+      {
+        heading: 'Definition of done',
+        what: DOD_WHAT,
+        blocking: false,
+        assumption: 'the table cut on 15 Oct is the one measured',
+      },
+    ]);
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps']);
+    expect(reading.issues[0]?.text).toStartWith(QUOTED_NOTE);
+    expect(reading.issues[0]?.text).toEndWith(
+      'it was read after quoting the values of its heading, what and assumption keys',
+    );
+    expect(reading.text).toBe('the rafa:spec-review block at line 3 judged the spec ready');
+  });
+
+  it('reads an assumption holding `: ` back as written, the same way', () => {
+    const body = readyGap('the definition of done names no command', ISSUE_1089_ASSUMPTION);
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(() => Bun.YAML.parse(body)).toThrow();
+    expect(reading.answer).toBe('ready');
+    expect(reading.gaps[0]?.assumption).toBe(ISSUE_1089_ASSUMPTION);
+    expect(reading.gaps[0]?.blocking).toBe(false);
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps']);
+  });
+
+  it('reads a block whose values are already quoted once, with nothing reported', () => {
+    const body = readyGap(JSON.stringify(DOD_WHAT), JSON.stringify(ISSUE_1089_ASSUMPTION));
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.answer).toBe('ready');
+    expect(reading.issues).toEqual([]);
+    expect(reading.gaps[0]?.what).toBe(DOD_WHAT);
+    expect(reading.gaps[0]?.assumption).toBe(ISSUE_1089_ASSUMPTION);
+  });
+
+  it('leaves a quoted value as written beside one it quotes, escaping `\\` and `"`', () => {
+    const quoted = 'a "quoted": value with a \\ in it';
+    const written = 'the "path" C:\\survey: reports #3';
+    const body = readyGap(written, JSON.stringify(quoted));
+    const reading = parseSpecReview(outputWith(body));
+
+    expect(reading.answer).toBe('ready');
+    expect(reading.gaps[0]?.what).toBe(written);
+    expect(reading.gaps[0]?.assumption).toBe(quoted);
+    expect(reading.issues.map((issue) => issue.field)).toEqual(['gaps']);
+  });
+
+  it('still answers malformed for a block whose verdict line is broken', () => {
+    const body = readyGap(DOD_WHAT, ISSUE_1089_ASSUMPTION);
+    const broken = body.replace('verdict: ready', 'verdict: [ready');
+    const reading = parseSpecReview(outputWith(broken));
+
+    expect(parseSpecReview(outputWith(body)).answer).toBe('ready');
+    expect(reading.answer).toBe('malformed');
+    expect(reading.ready).toBe(false);
+    expect(reading.gaps).toEqual([MISSING_REVIEW_GAP]);
+    expect(reading.issues).toEqual([]);
+    expect(reading.text).toStartWith('the rafa:spec-review block at line 3 is not valid YAML (');
+    expect(reading.text).not.toContain('after quoting');
   });
 });
 
