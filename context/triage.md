@@ -97,7 +97,8 @@ defaults a missing flag. Searching a public tracker for a vulnerability's
 terms is disclosure, so a private bug never reaches the public one: no find,
 no create, no comment, no reference stored. A recurrence is found by the
 private tracker's own find, which reads files locally, and is commented on
-there. The GitHub advisory channel stays one a human opens.
+there. Its body holds the same record a public bug's does (see the body
+below). The GitHub advisory channel stays one a human opens.
 
 **Machine.** A bug whose `what` and `artifact` name a system toolchain, an
 SDK path, or a package-manager build failure: a fault of the MACHINE the
@@ -133,6 +134,46 @@ tracker; it says nothing of whether its store row was written. A `docs` kind
 entry of `out_of_scope_bugs` is the other route to that table: it is stored
 as a `sighting` row whose `where` is the first path its `what`, then its
 `artifact`, names, or null, and its `bug_routes` row says `docs`.
+
+### The body the loop files
+
+A bug the loop files carries the bug record (`context/bug-record.md`), built
+by `bugFilingOf` (`src/triage/bug-filing.ts`) from the session's report, the
+dispatch it ran under and the checkout. Its body opens with the sentence
+saying where it came from, then `What`, `Artifact`, `Refs` when the artifact
+names a path or a symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`.
+The sections above `Feedback` are the ones `./bug-key.ts` and
+`./similarity.ts` read, and the record adds nothing to them. After `Feedback`
+come the record's sections, one per field holding a value, in `BUG_FIELDS`
+order: `Reproduce`, `Rerun`, `Cause`, `Proposed cause`, `Suspected cause`,
+`Module`, `Action`, `Project`, `Environment` and `Versions`. Last are
+`Reported module` and `Reported action`, the session's word for a `Module` or
+`Action` the record holds as `unknown`.
+
+`Reproduce` is the session's word, else `seen while running task <line> of
+plan <stub>`, or ``seen while running `<command>` `` for a dispatch with no
+plan stub. The record never holds `unknown` there.
+
+`Cause` follows the cause rule (`src/bugs/cause-rule.ts`), which never refuses
+a session's words. A code of the list is kept as written. A shaped code the
+list lacks is `<family>:new-context`, with the code kept as `Proposed cause`,
+or `unknown:new-context` when its family is unlisted. Any other text is
+`unknown:new-context`, with the text kept as `Suspected cause`. No cause at
+all is `unknown:new-context` with nothing beside it.
+
+`Rerun` is ``bun test <file> -t "<case>"`` for a test failure naming its file
+and case (`rerunOf`). The case's describe names and its own are joined by a
+space, as `bun test -t` matches them, and the pattern is matched literally.
+No other bug has a `Rerun`.
+
+Every free text of the record is redacted when it is answered: local paths
+over both roots in one pass, the checkout the task ran in and the project
+root, the longer first, then named secrets. Two passes would leave the
+folders between the home and a worktree in its path.
+
+A recurrence's comment carries no record field but `Versions`, the versions
+the bug was seen again on, written after `Feedback`. It has none of the
+other record sections.
 
 ### The repair task and its cap
 
@@ -274,6 +315,8 @@ paths taken out and the artifact stripped of numbers, commit hashes and
 folder prefixes (`./bug-key.ts`). The test file, case and evidence line of a
 bug naming a test case; else the tracker file it was reported against WITH
 its artifact. A bug with no artifact has no key and is filed every time.
+The `Recurrence key` section of a filed body holds this key, and the record
+adds no field the key reads (see the body above).
 
 On the public channel, a bug is looked up in two steps:
 
@@ -357,6 +400,26 @@ Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 - `triage.similarity.candidates`: the count of nearest bugs listed in the
   `Possible duplicates` section when the step files a bug with no match at
   the threshold. Default is `3`.
+
+### Configuration: the record's rules
+
+Triage builds the record under the `issues` and `errors` keys the run
+resolves from `.rafa/config.yaml`. `bugRulesOf`
+(`src/config-schema-issues.ts`) turns them into the rules, read once per run
+in `src/start/triage.ts` and handed to every filing. It reads:
+
+- `issues.titles.bug` and `issues.titles.summaryMax`: the template and the cap
+  the summary is cut under, so a title reads back as its fields.
+- `issues.vocabulary.modules` and `issues.vocabulary.actions`: a name outside
+  a set vocabulary is filed as `unknown`, with the word kept as
+  `Reported module` or `Reported action`. An empty list accepts any name of
+  the shape.
+- `errors.codes`: the project's codes, beside rafa's own, which the cause rule
+  reads.
+
+The place is `ci` or `local`, from the `CI` variable (`suggestedEnvironment`),
+so `issues.environments` does not reach a loop-filed bug. With no rules
+handed, rafa's defaults apply (`DEFAULT_BUG_RULES`).
 
 ### Three cases, lightest first
 
