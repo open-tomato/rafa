@@ -3056,13 +3056,14 @@ the same process (#863).
   default reads, runs
   `RAFA_UPDATE_HELP_SNAPSHOTS=1 bun test src/cli/help.test.ts`, reads the
   diff, and keeps this page true.
-- **The frozen set is seven files** — `rafa.txt`, `rafa-loop.txt`,
+- **The frozen set is nine files** — `rafa.txt`, `rafa-loop.txt`,
   `rafa-loop-start.txt`, `rafa-loop-wait.txt`, `rafa-next.txt`,
-  `rafa-issue-ready.txt` and `rafa-issue-edit.txt`, the list `SNAPSHOTS` in
+  `rafa-issue-ready.txt`, `rafa-issue-edit.txt`, `rafa-release-tag.txt`
+  and `rafa-issue-unblock.txt`, the list `SNAPSHOTS` in
   `src/cli/help.test.ts` spells — and none of them renders another
   command's flag list. A flag added to `init`, to `plan create` or to a
   `pr` action shows only in that command's own `--help`, which is not
-  snapshotted, so the updater legitimately writes all seven back
+  snapshotted, so the updater legitimately writes all nine back
   BYTE-IDENTICAL. That is the expected reading and not a writer that
   never fired; the control that tells them apart is dirtying one snapshot
   with an extra line and re-running the updater, which returns the file
@@ -3070,7 +3071,7 @@ the same process (#863).
   snapshot byte-identical after the updater, and a dirtied `rafa.txt`
   returned to its sha (measured on 2026-10-13).
 - **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
-  one of the seven that lists subjects; the other six render a single
+  one of the nine that lists subjects; the other eight render a single
   command or subtree and are untouched. Read which files actually differ
   off `git status`, never off the assumption that they all move
   together — registering a subject or a top-level command reddens
