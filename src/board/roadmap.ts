@@ -143,11 +143,17 @@ import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import {
+  branchFromTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
+  describeValue,
+  isMapping,
+  messageOf,
+} from '@open-tomato/rafa/core/config/sections';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
-import { boardId, BRANCH_PREFIX } from './naming.js';
+import { boardId } from './naming.js';
 import {
   claimBranchOfRef,
   createRemoteClaimReader,
@@ -419,7 +425,7 @@ export function closedIssuesIn(body: string): readonly number[] {
  * claims issue 2 and not issue 20.
  */
 export function branchClaims(ref: string, issue: number): boolean {
-  const claim = `${BRANCH_PREFIX}/${boardId(issue)}`;
+  const claim = branchFromTemplate(DEFAULT_BRANCH_TEMPLATE, boardId(issue));
   return new RegExp(`(?:^|/)${claim}(?:-|$)`, 'u').test(ref);
 }
 
