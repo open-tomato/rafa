@@ -22,6 +22,7 @@ module's note is the long form.
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `packages/rafa/src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
+| `src/cli/feature-load-probe.ts` | the probe `src/cli/feature-load-cli.test.ts` spawns fresh: with no argument it registers core's sections and adapters, builds `createRosterRegistry()`, renders every help level and `describeRegistry`, and prints the modules `require.cache` holds under the repository root as `{ loaded, featureActions }`; `--run=<subject> <action>` runs that command's `run` over no project and no argument and prints the thrown message beside them as `refusal`; `--project=<dir> --home=<dir>` loads that project's modules and prints the adapter kinds before and after activation, building no roster |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help` and `rafa release tag --help` |
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `packages/rafa/src/core/command/confirm.ts` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
@@ -34,10 +35,10 @@ module's note is the long form.
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the audit of the changelog's released history (`src/release/audit.ts`) and the count of open stale-docs lines on the tracker the chain lands on (`status-stale-docs.ts`; `none` at zero, `?` when unread, never the exit code), writing nothing; `release settle`, below; and `release tag [--push]`, which puts `v<version>` on the commit of the release branch that set the version and prints the push and publish lines rather than running them; with `--push` it pushes the tag to the remote the release branch tracks (`origin` when it tracks none) through `src/release/tag-push.ts` and drops the push line, and a push that fails exits 1 with git's words and keeps the local tag |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery, the tag and the project refresh as the terminal result's data. With `board.project.number` set, a push that left the base without the folded fragments is followed by the project refresh of `settle-project.ts`: the issues closed by the pull requests that added them, read off `associatedPullRequests` through `gh api graphql`, each line a warning that keeps the exit code. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
 | `src/commands/release/declarations.ts` | the three `release` commands as `CommandDeclaration`s, each command less its `run`, which `createReleaseStatusCommand`, `createReleaseSettleCommand` and `createReleaseTagCommand` spread under their own; `RELEASE_SUBJECT`, the subject's routing word and roster line; and the flags a declaration spells that a module reads too: `RELEASE_STATUS_PLAN_FLAG` (`status.ts`), `RELEASE_SETTLE_DRY_RUN_FLAG` (`settle.ts`) and `RELEASE_TAG_PUSH_FLAG` (`tag.ts`). It imports types from `@open-tomato/rafa/core/command` alone and no module under `src/`, which `declarations.test.ts` reads off its source |
-| `src/commands/release/index.ts` | `RELEASE_FEATURE`, the `CommandFeature` named `release`: `RELEASE_SUBJECT` and its three commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`), and `src/commands/index.test.ts` holds the `release` subject and the very commands it declares to be the registry's |
+| `src/commands/release/index.ts` | `RELEASE_FEATURE`, the `CommandFeature` named `release`: `RELEASE_SUBJECT` and its three commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`) unless `features.release` is `false`, and `src/commands/index.test.ts` holds the `release` subject and the very commands it declares to be the registry's |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing; `board sync [--dry-run] [--output=json]`, every item of the repository's GitHub project refreshed (over `src/board/project/refresh.ts`) and every open issue missing from it added (no refresh with `board.project.number` unset), reading nothing and starting no session so it declares no `spends`. `--dry-run` prints each change without writing; `--output=json` prints the changes as the result's data. Each run warns about failures (the `project` scope missing, a rate-limit refusal, an unknown field) and names the fix; a missing `project` scope, a number naming no project and a rate-limit refusal exit 2 (`BOARD_SYNC_REFUSAL_EXIT`, `src/commands/board/sync.ts`), and an unknown field keeps the exit code at 0. No auto-add rule is set, and with `board.project.number` unset the command refuses with exit 1 naming `rafa init --board --project` |
 | `src/commands/board/declarations.ts` | the two `board` commands as `CommandDeclaration`s, each command less its `run`, which `createBoardListCommand` and `createBoardSyncCommand` spread under their own; `BOARD_SUBJECT`, the subject's routing word and roster line; and `BOARD_SYNC_DRY_RUN_FLAG`, the flag `board sync` declares and `sync.ts` reads. It imports types from `@open-tomato/rafa/core/command` alone and no module under `src/` |
-| `src/commands/board/index.ts` | `BOARD_FEATURE`, the `CommandFeature` named `board`: `ISSUE_SUBJECT`, `BOARD_SUBJECT` and `EPIC_SUBJECT` and their eighteen commands in roster order, each made by `lazyCommand` over its declaration (from the `issue`, `board` and `epic` declaration files) and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`), and `src/commands/index.test.ts` holds its three subjects and the very commands it declares to be the registry's |
+| `src/commands/board/index.ts` | `BOARD_FEATURE`, the `CommandFeature` named `board`: `ISSUE_SUBJECT`, `BOARD_SUBJECT` and `EPIC_SUBJECT` and their eighteen commands in roster order, each made by `lazyCommand` over its declaration (from the `issue`, `board` and `epic` declaration files) and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`) unless `features.board` is `false`, and `src/commands/index.test.ts` holds its three subjects and the very commands it declares to be the registry's |
 | `src/board/relations/port.ts` | the `BoardRelations` interface and its adapters: `mode` (one of `labels` or `native`), the three reading functions (`epicOf`, `membersOf`, `blockersOf` with their truncation reading, `freedBy`), the three writing functions' types (to be called through the `GhRunner` seam), and the per-mode listing fields that `BOARD_LIST_FIELDS` carries to the cache |
 | `src/board/relations/labels.ts` | the `labels` adapter, delivering `labels` mode: membership from `epic:<slug>` labels, order from the epic's checklist, waiting from `spec:blocked` labels and `Blocked by:` lines with the four faults, and `readUnblockableIssues` read by the unblock step of `pr merge` |
 | `src/board/relations/native.ts` | the `native` adapter, delivering `native` mode: membership from the `parent` field, order from the `subIssues` array if `gh` answers it (the checklist otherwise), waiting from `blockedBy` nodes each with their state, and `readFreedIssues` read by `pr merge` to print what a merge freed |
@@ -47,7 +48,7 @@ module's note is the long form.
 | `src/commands/epic/declarations.ts` | the seven `epic` commands as `CommandDeclaration`s, each command less its `run`, which each module's `createEpic<Action>Command` spreads under its own; `EPIC_SUBJECT`, the subject's routing word and roster line; the `epic` lasting alias of `epic show` and the `spends` of `epic close`, which ride on their declarations; and the constants a declaration spells that a module reads too: `TO_FLAG` (read by `horizon-change.ts` and `move.ts`), `DEFER_TARGETS` and `PROMOTE_TARGETS` (the targets of `horizon-change.ts`'s two actions), `DEFAULT_HORIZON` (`new.ts`) and `ACCEPT_UNCHECKED_FLAG` (`close.ts`). It imports types from the core entries alone and no module under `src/`, which `declarations.test.ts` reads off its source, so the values its help spells from elsewhere are copies that test holds equal to their sources: `EPIC_REASON_FLAG`, a copy of `REASON_FLAG` (`src/board/epic-trail.ts`), and `EPIC_HORIZON_WORDS`, a copy of `HORIZONS` (`src/board/roadmap-epic-rows.ts`). `BOARD_FEATURE` (`src/commands/board/index.ts`) reads it, and `ROSTER_SUBJECTS` (`src/commands/index.ts`) takes `EPIC_SUBJECT` from it |
 | `src/commands/claim/` | `claim release <n>`, which releases a claim the store owns, leaving the issue claimable by other devices; `claim hand <n> --to=<store id>`, which hands over a claim to another device for acceptance; `claim accept <n>`, which accepts a handed-over claim from another device; and `claim take <n> [--stale]`, which takes a claim held too long, failing if the claimed issue was written in this run or if `--stale` is not named and the claim is not stale by `claims.staleAfter` |
 | `src/commands/claim/declarations.ts` | the four `claim` commands as `CommandDeclaration`s, each command less its `run`, which `createClaimReleaseCommand`, `createClaimHandCommand`, `createClaimAcceptCommand` and `createClaimTakeCommand` spread under their own; `CLAIM_SUBJECT`, the subject's routing word and roster line; and the flags a declaration spells that a module reads too: `CLAIM_HAND_TO_FLAG` and `CLAIM_HAND_WITHDRAW_FLAG` (`hand.ts`) and `CLAIM_TAKE_STALE_FLAG` (`take.ts`). It imports types from `@open-tomato/rafa/core/command` alone and no module under `src/`, which `declarations.test.ts` reads off its source |
-| `src/commands/claim/index.ts` | `RUN_FEATURE`, the `CommandFeature` named `run`: `CLAIM_SUBJECT` and its four commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`), and `src/commands/index.test.ts` holds the `claim` subject and the very commands it declares to be the registry's |
+| `src/commands/claim/index.ts` | `RUN_FEATURE`, the `CommandFeature` named `run`: `CLAIM_SUBJECT` and its four commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module; `index.test.ts` reads each `lazyCommand` call off the source and holds its loader to its declaration's module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`) unless `features.run` is `false`, and `src/commands/index.test.ts` holds the `claim` subject and the very commands it declares to be the registry's |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the roster: `CORE_SUBJECTS` and `CORE_COMMANDS`, core's own subjects and commands; `ROSTER_SUBJECTS`, every subject in roster order, each feature subject the one its declaration file exports; `BUNDLED_FEATURES`, `BOARD_FEATURE`, `PR_FEATURE`, `RUN_FEATURE` and `RELEASE_FEATURE`; `createRosterRegistry({ off })`, one registry of `CORE_COMMANDS` followed by the commands of every feature `off` does not name, the subjects no kept command declares dropped and a name that is no bundled feature's refused; and `CORE_REGISTRY`, `createRosterRegistry()` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -72,7 +73,7 @@ module's note is the long form.
 | `src/commands/loop/wait.ts` | `rafa loop wait [--session-id=<id>] [--until=<reasons>] [--timeout=<minutes>]`: follows one run until a reason `--until` asks for happens, in code and starting no session, so it declares no `spends`. The session is picked as `loop status` picks it; the two refusals finding none exit 2, every other refusal of the pick 1. `--until` is read by `src/loop/wait-reasons.ts`, whose `WAIT_REASONS` table the help, the json result and the exit code all read: `pr` 0, `no-pr` 10, `halt` 11, `error` 12, `blocked` (event `task-blocked`) 13, `exit` (the record's pid not alive, or the record reading `stopped` or `done`) 14, `quiet:<minutes>` 15; left out it is `pr,no-pr,halt,error,exit`. An entry it refuses, a `--timeout` that is no whole number from 1 and a stray word exit 1. Every `WAIT_POLL_MS` (5 s) a poll reads the events file from the last offset (`src/loop/events-file.ts`, from byte 0 so a run that already ended answers), then the record and its pid, reading the events once more before answering `exit`, then the awake clock (`src/loop/awake-clock.ts`) for `quiet`, counted from the last event read, and `--timeout`, counted from the wait's start, exit 16; both count awake minutes, and on macOS, where the clock counts through sleep, a long sleep can raise a false `quiet`, which the help says. A run with no events file is noted once as a warning and the wait goes on. It prints one `rafa·` line: the event's summary, or a line naming `exit`, `quiet` or `timeout`, the last two adding the minutes suspended. In json mode the result (reason, exit code, line, event, session id, state, pid and liveness, awake and suspended minutes) is a named `wait` event, and the terminal result's `data` for `pr` alone, since the dispatcher drops a payload on a non-zero exit; for any other reason the terminal error's message is the line. The branch reader, pid probe, record read, clock, sleep and poll length are seams |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class, or for `conflict-version` converted in code with no session; and `pr wait`, its checks polled until they settle, the deadline passes or it turns out to have none, exiting 0 green, 1 red and on no checks at all, and 3 at the deadline |
 | `src/commands/pr/declarations.ts` | the ten `pr` commands as `CommandDeclaration`s, each command less its `run`, which each module's `createPr<Action>Command` spreads under its own; `PR_SUBJECT`, the subject's routing word and roster line; and the constants a declaration spells that a module reads too: `PR_SHOW_JSON_FIELDS`, `WAIT_TIMEOUT_FLAG`, `DEFAULT_WAIT_TIMEOUT_MIN`, `ALLOW_LOCAL_CONFIG_FLAG`, `DEFAULT_MAX_ATTEMPTS` and `MERGE_DANGEROUS_PHRASES`. It imports types from the core entries alone and no module under `src/`, which `declarations.test.ts` reads off its source, so `PR_HINT_FLAG_SPEC` is a copy of `HINT_FLAG_SPEC` (`src/next/ending.ts`) and `DEFAULT_WAIT_TIMEOUT_MIN` of `DEFAULT_CI_TIMEOUT_MIN`, each held equal by that test |
-| `src/commands/pr/index.ts` | `PR_FEATURE`, the `pr` `CommandFeature` named `pr`: `PR_SUBJECT` and the ten commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`), and `src/commands/index.test.ts` holds its `pr` subject and the very commands it declares to be the registry's |
+| `src/commands/pr/index.ts` | `PR_FEATURE`, the `pr` `CommandFeature` named `pr`: `PR_SUBJECT` and the ten commands in roster order, each made by `lazyCommand` over its declaration and a dynamic import of its module, so importing it loads no command module. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`) unless `features.pr` is `false`, and `src/commands/index.test.ts` holds its `pr` subject and the very commands it declares to be the registry's |
 | `src/commands/pr/wait.ts` | `rafa pr wait [<n>] [--timeout=<minutes>]`: polls one pull request's checks until they settle or the deadline passes, reading and writing nothing else. Exit code 0 for green (every check passed); 1 for red (a check failed) or none (no check registered yet); 3 for a deadline that passed with checks still running or pending. The `--timeout` flag takes a minute count from 1, defaulting to `DEFAULT_WAIT_TIMEOUT_MIN` (`declarations.ts`), which its test holds equal to `DEFAULT_CI_TIMEOUT_MIN`; the number is read from the line, so `rafa pr wait --timeout 41` is a 41-minute wait on the branch's own PR, not a wait on #41. The verdict state values are `green`, `red`, `none`, `pending`, and `timeout`. A green run ends with the one step that follows; the other four each carry their report as the message of their `CommandExit`. The poll is the `waitForChecks` the loop's own CI gate uses, so one wait and the loop agree about what green means and how often a pull request is asked. This command alone hands it the head's committed time (`PullRequestDetail.headCommittedAt`, read through `get`): zero checks on a head younger than `FIRST_CHECK_GRACE_MS` (120 s, `src/pr/checks.ts`) are polled again, so a wait typed just after a push holds until the first check registers. A null time, or a head past the grace, gets none, and the gate and `pr triage --resolve` pass no time at all. A `none` ending reads the detail once more and prints the does-not-merge-cleanly line only when it reads `conflicting`; otherwise it names `rafa pr wait <n>` to ask again and `rafa pr show <n>`. The report is the data of a json-mode terminal result when green, or its error message when not. See `--no-hint` under the ending hint. |
 | `src/commands/pr/open.ts` | `rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`: the four flags read and a head equal to the base refused, the body file read whole and refused when it cannot be read or holds nothing but whitespace, then `findOpen(head)` asked before `PullRequests.create`, so a head already holding an open pull request has that pull request printed with `opened: false` and none opened, warned about when its base is another. The line and the body file are read before the config, so a refusal of either makes no provider. Exit code 0 for one opened or already open; 2 where `pr.provider` is not `gh`; 1 for every other refusal. Starts no session and declares no `spends` |
 | `src/commands/pr/retarget.ts` | `rafa pr retarget <n> --base=<branch>`: the number and `--base` read first, then `get(n)` for the base the pull request is on now, then `PullRequests.editBase` only when that base differs (compared exactly), printing the line `retargetedLine` (`src/start/pr-retarget.ts`) builds. A pull request already on the base sends no edit and exits 0. A refused line makes no provider. Exit code 0 for one retargeted or already on the base; 2 where `pr.provider` is not `gh`; 1 for every other refusal, a refused edit and an absent pull request among them. Starts no session and declares no `spends` |
@@ -359,9 +360,44 @@ New; it replaces no earlier text. What a row or an action added to
   `dist/cli.js` bundles only what static imports reach. An action sits at
   `src/commands/<subject>/<action>.ts` and a top-level command at
   `src/commands/<name>.ts`, each module's default export its command. The
-  four bundled features' commands are not on that list: each feature's
-  `index.ts` holds a lazy command per action, which imports its module
-  when it runs, and `createRosterRegistry` registers them after core's.
+  four bundled features are not on that list. Each has one folder,
+  `src/commands/<feature>/`, holding a `declarations.ts` of its
+  `CommandDeclaration`s and subject constants, which imports no module
+  under `src/`, and an `index.ts` that makes a `lazyCommand` per
+  declaration. `board` (`src/commands/board/`) holds the `issue`, `board`
+  and `epic` subjects, `pr` (`src/commands/pr/`) the `pr` subject,
+  `release` (`src/commands/release/`) the `release` subject, and `run`
+  (`src/commands/claim/`) the `claim` subject. Its folder is `claim`, but
+  its switch is `features.run`.
+- **`lazyCommand` refuses by name.** A declaration's `load` imports the
+  command's module only when the command runs, and a second run imports
+  it again, the module loader's cache answering. A load that rejects, or a
+  default export that is no command of the declared subject and action,
+  throws `CommandExit(1)` reading `feature "<feature>": command
+  "<spelling>" failed to load: <reason>`, naming the feature whose
+  `index.ts` made it (`packages/rafa/src/core/command/lazy.ts`).
+- **`features.<name>` turns a feature off.** `features.board`, `features.pr`,
+  `features.run` and `features.release` each read `true` (the default) or
+  `false` (`src/config-schema-features.ts`). A project whose config sets
+  `features:` and `  pr: false` loads none of the `pr` commands:
+  `disabledFeatures` (`src/modules/load.ts`) names each `false` feature, and
+  `src/rafa.ts` hands the names to `createRosterRegistry({ off })`.
+- **`createRosterRegistry({ off })` builds the routing registry.** It
+  registers `CORE_COMMANDS`, then the commands of each feature in
+  `BUNDLED_FEATURES` that `off` does not name, under the subjects of
+  `ROSTER_SUBJECTS` that a kept command declares, so a subject whose
+  feature is off is in no roster. A name `off` gives that no bundled
+  feature holds throws before any registry is built, reading `rafa: cannot
+  build the roster: no bundled feature is named "<name>"; the features are
+  board, pr, run, release`. `CORE_REGISTRY` is `createRosterRegistry()`
+  with every feature on, the registry the help snapshots and the roster
+  tests read.
+- **A feature turned off is absent, not refused.** With `features.pr`
+  false, `rafa pr list` is refused as `unknown_subject`, and the root help
+  and `rafa describe` list no `pr` line or entry (measured on 2026-10-16).
+  With `features.board` and `features.run` false, the `issue`, `board`,
+  `epic` and `claim` subjects leave both; core's `roadmap`, `switch` and
+  `next` stay, since core owns them.
 - **No feature command module loads until its command runs, and no
   module's adapters until the config names it.** `src/cli/feature-load-cli.test.ts`
   spawns `src/cli/feature-load-probe.ts` fresh and reads the modules off
@@ -397,6 +433,14 @@ New; it replaces no earlier text. What a row or an action added to
   same file spells by feature and spelling: an
   import added to `src/commands/plan/spec-route.ts` reddens nothing,
   while one added to `src/commands/plan/create.ts` does.
+- **Registering a command under a feature moves four places.** Its
+  `CommandDeclaration` goes in the feature's `declarations.ts`; a
+  `lazyCommand` line goes in the feature's `index.ts`, in roster order;
+  its spelling goes in `FEATURE_COMMANDS` in `src/index.test.ts`, which
+  holds each feature's exported command list to its spelled order; and a
+  new subject joins `ROSTER_SUBJECTS` in `src/commands/index.ts` beside
+  the constant its declaration file exports. The snapshots move as the
+  next bullet says.
 - **Neither roster walks the filesystem.** Both are spelled lists checked
   against `CORE_REGISTRY`, so a module added under `src/commands/` and not
   yet registered reddens neither, and a plan can split "add the module"
@@ -2759,10 +2803,18 @@ New; it replaces no earlier text. What a row or an action added to
   route nothing.
 - **The refusal codes** are `unknown_subject`, `missing_action`,
   `unknown_action`, `unknown_module` and `unexpected_version`.
+- **A feature turned off routes nothing under its subjects.** With
+  `features.pr` false, `rafa pr list`, `rafa pr --help` and
+  `rafa pr show --help` are each the `unknown_subject` refusal, the
+  word `pr` being no subject, alias or top-level command of that
+  registry. The other features' lines route as before.
 
 ### The registry
 
-It is built from code, so a collision throws when it is built — and
+The roster's registry is the one `createRosterRegistry({ off })` builds
+(see "The core roster"), core's commands and every kept feature's
+together, and the rules below hold for that registry whole. It is built
+from code, so a collision throws when it is built — and
 because it builds silently when nothing collides, a clean build is no
 evidence the check ran. To prove one absent, force one: register a
 deliberately colliding subject and read the named refusal it throws
@@ -2801,9 +2853,10 @@ config's `modules:` and `allowList:`, with the bundled features whose
 `createRosterRegistry({ off })`. Outside a project nothing is loaded
 or warned, and a config `loadConfig` refuses or a walk the scope refuses
 loads nothing and warns nothing: the command reading the config, or the
-dispatcher placing a command in a project, says why once. So
-`rafa describe` and help under a refused config list no module action and
-say nothing of why.
+dispatcher placing a command in a project, says why once. Such a load
+turns no feature off, whatever `features.<name>` the refused file holds,
+so every bundled feature stays on. So `rafa describe` and help under a
+refused config list no module action and say nothing of why.
 
 - **A source's name** is its `package.json` `name` for `path`, the package
   for `npm`, and `owner/repo` for `github`; `allowList:` matches it. A
@@ -3087,6 +3140,12 @@ the same process (#863).
   The mark wraps as one word. An action declaring no `spends` has no block.
 - **A hidden action** is in no roster, quick start, example list or
   `See also`, and its own help still renders.
+- **A feature turned off drops out of help.** `rafa --help` has no line
+  for its subject, and its quick start takes the first visible action of
+  each subject that is left. Its subject's help and its actions' help are
+  refused as `unknown_subject`, as in "Routing". The snapshots render
+  `CORE_REGISTRY` with every feature on, so no `features.<name>` switch
+  moves one of the nine files.
 - **Prose wraps at 80 columns.** An example's command is never wrapped.
 - **The snapshots** under `src/cli/testdata/help/` are written by
   `src/cli/help.test.ts` only when `RAFA_UPDATE_HELP_SNAPSHOTS=1` is set.
@@ -3163,6 +3222,10 @@ the same process (#863).
   loaded after `module list` and `module exec`.
 - **A hidden command is in no entry**, nor is an action typed through a
   hidden `exec` action.
+- **A feature turned off is in no entry.** The document reads the same
+  registry the line routed through, so with `features.pr` false no `pr`
+  subject or action is listed (measured on 2026-10-16 with
+  `createRosterRegistry({ off: ['pr'] })`).
 - **The completeness case** in `src/cli/describe.test.ts` is red when a
   command the core registry holds, hidden ones included, or an entry of
   its document lacks a summary, a description, an example or its
