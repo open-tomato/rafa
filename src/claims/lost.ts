@@ -8,11 +8,15 @@
  *
  * ## What is read
  *
- * The caller has already pushed `feat/<stub>` and been refused, so this
- * module never pushes: not again, not with a lease, never with force.
- * It runs one fetch of the `feat/rafa-*` branches and reads the
- * remote's branch as that fetch left it (`./git.ts`); the remote is the
- * authority on who holds the claim.
+ * The caller has already pushed the claim branch, the `naming.branch`
+ * template with the stub in it (`feat/rafa-<n>-<slug>` by default), and
+ * been refused, so this module never pushes: not again, not with a
+ * lease, never with force. It runs one fetch of the template's claim
+ * branches and reads the remote's branch as that fetch left it
+ * (`./git.ts`); the remote is the authority on who holds the claim.
+ * The template is {@link RefusedPushInput.branchTemplate}, the default
+ * `feat/{stub}` when left out; a branch under any other template is no
+ * claim branch.
  *
  * | Reading of the remote | Answer |
  * |---|---|
@@ -40,7 +44,10 @@
  * ## Keeping the commits
  *
  * On `lost`, the local `refs/heads/lost/<stub>` is pointed at the local
- * tip of `feat/<stub>`, the commits the refused push carried. It is
+ * tip of the claim branch, the commits the refused push carried. The
+ * `lost/` prefix is rafa's own namespace and stays fixed whatever the
+ * template: `work/rafa-7-x` under `work/{stub}` keeps `lost/rafa-7-x`,
+ * the stub `stubOfBranch` reads. It is
  * written with `git update-ref`, whose old value makes each write a
  * compare-and-set, so no existing ref is ever moved off commits it held:
  *
@@ -53,8 +60,8 @@
  *
  * A `failed` keep still answers `lost`: the claim is lost whether or not
  * the branch could be made, and the commits are still on the local
- * `feat/<stub>`, which the report says. Nothing here touches the working
- * tree, the index, `HEAD` or `feat/<stub>` itself.
+ * claim branch, which the report says. Nothing here touches the working
+ * tree, the index, `HEAD` or the claim branch itself.
  *
  * ## What was measured
  *
@@ -72,8 +79,10 @@ import type { ClaimBranchReading } from './git.js';
 import type { PendingHandover } from './record.js';
 import type { GitRunner } from '../pr/index.js';
 
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, localRef, REMOTE } from '../start/branch-decision.js';
+import { localRef, REMOTE } from '../start/branch-decision.js';
 
 import { holdsClaim } from './device.js';
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from './git.js';
@@ -90,13 +99,13 @@ export type LostBranch =
     readonly state: 'created' | 'existing' | 'advanced';
     /** The branch, `lost/<stub>`. */
     readonly name: string;
-    /** The commit it now points at: the local tip of `feat/<stub>`. */
+    /** The commit it now points at: the local tip of the claim branch. */
     readonly sha: string;
   }
   | {
     readonly state: 'failed';
     readonly name: string;
-    /** The local tip of `feat/<stub>`, or null when it could not be read. */
+    /** The local tip of the claim branch, or null when it could not be read. */
     readonly sha: string | null;
     readonly reason: string;
   };
@@ -134,8 +143,14 @@ export type RefusedPushReading =
 
 /** What {@link readRefusedPush} reads. */
 export interface RefusedPushInput {
-  /** The branch whose push was refused, `feat/<stub>`. */
+  /** The branch whose push was refused: the template with the stub, `feat/rafa-<n>-<slug>` by default. */
   readonly branch: string;
+  /**
+   * The `naming.branch` template the claim branch is read under, for the
+   * fetch, the issue and the remote reading; `DEFAULT_BRANCH_TEMPLATE`
+   * when left out.
+   */
+  readonly branchTemplate?: string;
   /** This device's store id, or null when its store names none. */
   readonly storeId: string | null;
   /** The ids that store carried before; none for a store that names no id. */
@@ -146,15 +161,19 @@ export interface RefusedPushInput {
 const MUST_NOT_EXIST = '';
 
 /**
- * The branch that keeps the commits of a lost claim on `branch`:
- * `feat/<stub>` becomes `lost/<stub>`. Throws on a branch that is not a
- * claim branch, since one reaching here is the caller's mistake.
+ * The branch that keeps the commits of a lost claim on `branch`, a
+ * claim branch under `template`: its stub, as `stubOfBranch` reads it,
+ * under `lost/`, so `feat/rafa-7-x` and, under `work/{stub}`,
+ * `work/rafa-7-x` both become `lost/rafa-7-x`. Throws on a branch that
+ * is not a claim branch under `template`, since one reaching here is
+ * the caller's mistake.
  */
-export function lostBranchFor(branch: string): string {
-  if (claimBranchIssue(branch) === null) {
-    throw new Error(`claim lost: ${JSON.stringify(branch)} is not a ${BRANCH_PREFIX}rafa-<n> branch`);
+export function lostBranchFor(branch: string, template: string = DEFAULT_BRANCH_TEMPLATE): string {
+  const stub = stubOfBranch(template, branch);
+  if (stub === null || claimBranchIssue(branch, template) === null) {
+    throw new Error(`claim lost: ${JSON.stringify(branch)} is not a ${branchFromTemplate(template, 'rafa-<n>')} branch`);
   }
-  return `${LOST_PREFIX}${branch.slice(BRANCH_PREFIX.length)}`;
+  return `${LOST_PREFIX}${stub}`;
 }
 
 /**
@@ -165,18 +184,19 @@ export function lostBranchFor(branch: string): string {
  */
 export function readRefusedPush(git: GitRunner, input: RefusedPushInput): RefusedPushReading {
   const { branch, storeId } = input;
+  const template = input.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
   const device = storeId === null
     ? null
     : { storeId, replacedIds: input.replacedIds };
-  const issue = claimBranchIssue(branch);
+  const issue = claimBranchIssue(branch, template);
   if (issue === null) {
     return { outcome: 'not-lost', branch, cause: 'not-a-claim-branch', reason: `${branch} is not a claim branch, so it carries no claim to lose` };
   }
-  const fetched = fetchClaimBranches(git);
+  const fetched = fetchClaimBranches(git, template);
   if (!fetched.ok) {
     return { outcome: 'unknown', issue, branch, reason: fetched.reason };
   }
-  const remote = readClaimBranch(git, branch);
+  const remote = readClaimBranch(git, branch, template);
   const notLost = notLostReading(issue, remote, device);
   if (notLost !== null) return notLost;
   if (remote.state !== 'found' || remote.ownership.state !== 'held') {
@@ -192,7 +212,7 @@ export function readRefusedPush(git: GitRunner, input: RefusedPushInput): Refuse
     storeId,
     replacedIds: input.replacedIds,
     remoteTip: remote.tip,
-    kept: keepCommits(git, branch),
+    kept: keepCommits(git, branch, template),
   };
 }
 
@@ -236,9 +256,9 @@ function resolveRef(git: GitRunner, ref: string): { readonly sha: string | null 
     : { error: said };
 }
 
-/** Points `lost/<stub>` at the local tip of `branch` without moving it off any commit; see the module note. */
-function keepCommits(git: GitRunner, branch: string): LostBranch {
-  const name = lostBranchFor(branch);
+/** Points `lost/<stub>` at the local tip of `branch`, a claim branch under `template`, without moving it off any commit; see the module note. */
+function keepCommits(git: GitRunner, branch: string, template: string): LostBranch {
+  const name = lostBranchFor(branch, template);
   const tip = resolveRef(git, localRef(branch));
   if ('error' in tip || tip.sha === null) {
     const said = 'error' in tip
