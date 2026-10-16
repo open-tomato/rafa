@@ -336,6 +336,15 @@ fragment IDs since the forecast in the PR body was written.
 **`rafa doctor`** prints one row for the release status: the base version, the
 latest tag, the top heading in the changelog, and the waiting fragments on the
 base branch. It warns when fragments wait and names `rafa release settle`.
+Right under it, a `Release ladder: level <n>, <name>` row names the level
+`release.settle`, `release.tag` and `release.publish` read as, and a key that
+does not fit the level's row. It is an `info` line when the level has all it
+needs and a `warn` line listing each missing precondition (a needed workflow
+under `.github/workflows/` absent or not a file, with `rafa release workflows
+--write` to write it; the publish workflow without `id-token: write`; the
+version file's manifest private or without a `name`; the bot fragment workflow
+while `.github/dependabot.yml` exists) otherwise. It never changes the exit
+code.
 
 ### Config keys
 
