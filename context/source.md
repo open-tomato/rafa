@@ -97,9 +97,8 @@ and the test files carry hundreds (the spike's probe 8, #804).
 reads.** Its source is `packages/rafa/src/`, and the files of its `core/`
 folder are the connective tissue of the codebase: graph analysis calls such
 files high-betweenness nodes, since many paths between the rest of the tree
-run through them. `CORE_MOVES` of `scripts/survey/core-moves.ts` lists the
-twenty-nine files that changed path, nineteen by #905 and ten more by #1088
-and #1089, `runtime/identity.ts` among them. They sit in eight subject
+run through them. Twenty-nine files changed path into it, nineteen by #905
+and ten more by #1088 and #1089, `runtime/identity.ts` among them. They sit in eight subject
 folders. `config/` holds the value readers, core's keys of the schema, the
 section contract, core's own section and the loader; `command/` the command
 contract (`RafaCommand`, `RafaContext`, `CommandExit`), the version and the
@@ -107,10 +106,9 @@ confirm prompt; `output/` the active output; `adapters/` the adapter registry;
 `git/` the git runner and the commit helpers; `plan/` the block reader, the
 plan parser and the plan-file readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
-is running. A file keeps its base name when it moves. A moved file keeps a
-re-export at its old path while a non-test file outside core still imports it
-there; `CORE_REEXPORTS` of `scripts/survey/core-moves.ts` lists those paths,
-and it is empty since the move into the package.
+is running. A file keeps its base name when it moves. A moved file keeps no
+re-export at its old path since the move into the package, which pointed every
+importer at core's subpaths.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it moved to
