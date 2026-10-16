@@ -94,8 +94,7 @@
  * source file a test's walk reaches (through support files or not) and,
  * when a test spawns, every source file of the bin's reach, that the map
  * holds no unit for. An unplaced file counts toward no index. Under the
- * survey's rules and `coreRules` every file has a folder and `unplaced`
- * is empty.
+ * survey's rules every file has a folder and `unplaced` is empty.
  *
  * The files the guard reads are the ones `git add -A` would commit:
  * tracked, or untracked and covered by no ignore rule, and present on
@@ -103,23 +102,8 @@
  * the loop commits it, a listing of tracked files alone would leave it
  * out, and the graph keeps an edge only to a file it was handed
  * (`addEdge`, `import-graph.ts`).
- *
- * The folder-unit comparison
- *
- * `against`, `compareToBaseline` and `coreRules` hold a tree to the
- * folder-unit baseline the record replaced, the moves of #905 and #1090
- * followed through `core-moves.ts`, and no mode runs them: a later task
- * of the plan removes them with their tests. Under `coreRules` every file
- * under `CORE_SOURCE` (`packages/rafa/src/`) counts as `packages/rafa`,
- * every file under the handed core folder as that one folder, and a core
- * barrel is read as a support file is. `compareToBaseline` brings a test
- * file under `CORE_SOURCE` or `CORE_PARKED_TESTS` back to `src/`, follows
- * a moved test file to the entry under the path it moved from, and sorts
- * each test file into `risen`, `equal`, `fallen`, `added` or `unread`, a
- * baseline entry no test file answers being `gone`.
  */
 
-import type { CoreMove } from './core-moves';
 import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
 import type { ImportGraph } from './import-graph';
@@ -131,17 +115,8 @@ import { isAbsolute, join, posix } from 'node:path';
 
 import ts from 'typescript';
 
-import {
-  CORE_FOLDER,
-  CORE_MOVES,
-  CORE_PACKAGE,
-  CORE_PARKED_TESTS,
-  CORE_SOURCE,
-  barrelPaths,
-  movedPaths,
-} from './core-moves';
 import { readCutMap } from './cut-map';
-import { classifyFile, coverageLine, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
+import { classifyFile, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
   OUTPUT_DIR,
   buildImportGraph,
@@ -151,6 +126,7 @@ import {
 } from './import-graph';
 import { readMembers } from './package-entries';
 import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
+import { renderTestIndexMarkdown } from './test-index-markdown';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
 import { readTestKindGlobs } from './test-kinds';
 
@@ -182,7 +158,7 @@ export interface TestIndexEntry {
   readonly spawns: boolean;
   /** The files whose text spawns, the test or its support files, sorted. */
   readonly spawnsVia: readonly string[];
-  /** The support files the walk reaches, sorted; under `coreRules`, the core barrels too. */
+  /** The support files the walk reaches, sorted. */
   readonly support: readonly string[];
   /** The folders reached only through support files, sorted; not counted. */
   readonly supportFolders: readonly string[];
@@ -231,64 +207,6 @@ export interface IndexRules {
   readonly spawnedUnplaced?: readonly string[];
 }
 
-/** One test's record in the baseline. */
-export interface BaselineEntry {
-  /** The folders its index was counted from, sorted. */
-  readonly folders: readonly string[];
-  /** Its index when the baseline was taken. */
-  readonly index: number;
-  /** Whether it spawned a process then. */
-  readonly spawns: boolean;
-  /** The files whose text spawned then, sorted. */
-  readonly spawnsVia: readonly string[];
-}
-
-/** The baseline as `parseBaseline` reads it back. */
-export interface TestIndexBaseline {
-  /** The commit whose tree the baseline was read from. */
-  readonly commit: string;
-  /** Each indexed test's record, keyed by the path it had at that commit. */
-  readonly tests: ReadonlyMap<string, BaselineEntry>;
-  /** The test files that had no index then, sorted. */
-  readonly unindexed: readonly string[];
-}
-
-/** One test file's index now beside the one the baseline holds for it. */
-export interface IndexChange {
-  /** The test file's path now. */
-  readonly test: string;
-  /** The path the baseline holds it under: its own, its path brought back to `src/`, or the one it moved from. */
-  readonly baselineTest: string;
-  /** Its index in the baseline. */
-  readonly before: number;
-  /** Its index now. */
-  readonly after: number;
-  /** The folders counted now and not in the baseline, sorted. */
-  readonly gained: readonly string[];
-  /** The folders counted in the baseline and not now, sorted. */
-  readonly lost: readonly string[];
-  /** The files it spawns through now, when it did not spawn in the baseline; empty otherwise. */
-  readonly spawnsSince: readonly string[];
-}
-
-/** Every test file of the tree against the baseline, each list sorted by path. */
-export interface BaselineComparison {
-  /** The commit the baseline names. */
-  readonly commit: string;
-  /** The test files whose index is above the baseline's. */
-  readonly risen: readonly IndexChange[];
-  /** The test files whose index is the baseline's. */
-  readonly equal: readonly IndexChange[];
-  /** The test files whose index is below the baseline's. */
-  readonly fallen: readonly IndexChange[];
-  /** The test files the baseline holds no index for: new, held to nothing. */
-  readonly added: readonly string[];
-  /** The baseline's entries no test file answers, at their path or any path a test file is brought back from. */
-  readonly gone: readonly string[];
-  /** The test files the baseline holds an index for and that have none now. */
-  readonly unread: readonly string[];
-}
-
 /** The record mode, with the map it reads. */
 export interface BaselineMode {
   /** Always `true`: the mode writes the record. */
@@ -323,23 +241,8 @@ export const MAP_FLAG = '--map=';
 /** The bin's entry, the file a spawned `rafa` process starts from. */
 export const BIN_ENTRY = 'src/rafa.ts';
 
-/** The one folder every file under `packages/rafa/src/core/` counts as under `coreRules`, while that folder lies outside the package. */
-export const CORE_UNIT: string = CORE_FOLDER.replace(/\/$/, '');
-
-/** The one folder every file under `CORE_SOURCE` counts as under `coreRules`: the core package. */
-export const CORE_PACKAGE_UNIT: string = CORE_PACKAGE.replace(/\/$/, '');
-
-/** The prefixes a test file is brought back to `src/` from before it is compared, each with its closing `/`. */
-export const CORE_TEST_PREFIXES: readonly string[] = [CORE_SOURCE, CORE_PARKED_TESTS];
-
 /** The record's path, relative to the repository root; the folder-unit baseline lay at the same path. */
 export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
-
-/** How many test files the summary lists by index. */
-export const TOP_INDEXES = 20;
-
-/** How many source files the summary lists by tests from other folders. */
-export const TOP_REACHED = 20;
 
 const PACKAGE_FILE = /^(packages\/[^/]+)\/src\//;
 const SPAWNING_MEMBERS: ReadonlySet<string> = new Set(['$', 'spawn', 'spawnSync']);
@@ -358,31 +261,6 @@ export function indexFolder(path: string): string {
 
 /** The survey's rules: a file counts as its folder or its package, and none is set aside. */
 export const SURVEY_RULES: IndexRules = { folderOf: indexFolder, setsAside: () => false };
-
-/**
- * The rules the comparison reads the tree by: every file under
- * `CORE_SOURCE` is the package's one folder, `packages/rafa/src/core/` is one folder,
- * and a core barrel is set aside. The package is read first, so a
- * `packages/rafa/src/core/` folder moved under `CORE_SOURCE` counts as the package.
- *
- * @param barrels - The core barrels; those of `core-moves.ts` unless a test plants its own.
- * @param coreFolder - The `packages/rafa/src/core/` folder, with its closing `/`; `CORE_FOLDER` unless a test plants its own.
- * @returns The rules.
- */
-export function coreRules(barrels: readonly string[] = barrelPaths(), coreFolder: string = CORE_FOLDER): IndexRules {
-  const aside = new Set(barrels);
-  const coreUnit = coreFolder.replace(/\/$/, '');
-  const folderOf = (path: string): string => {
-    if (path.startsWith(CORE_SOURCE)) {
-      return CORE_PACKAGE_UNIT;
-    }
-    if (path.startsWith(coreFolder)) {
-      return coreUnit;
-    }
-    return indexFolder(path);
-  };
-  return { folderOf, setsAside: (path) => aside.has(path) };
-}
 
 /**
  * Each file's import targets, edges of either kind, in the graph's order.
@@ -433,21 +311,6 @@ export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
     spawnedReach: [...units].sort(),
     spawnedUnplaced: unplaced.sort(),
   };
-}
-
-/**
- * A test file's path brought back to `src/`: under `CORE_SOURCE` or under
- * `CORE_PARKED_TESTS`, that prefix replaced by `src/`; any other path as
- * it is.
- *
- * @param path - A repository-relative path.
- * @returns The path the test file had before core became its package.
- */
-export function pathBeforePackage(path: string): string {
-  const prefix = CORE_TEST_PREFIXES.find((candidate) => path.startsWith(candidate));
-  return prefix === undefined
-    ? path
-    : `src/${path.slice(prefix.length)}`;
 }
 
 /**
@@ -684,7 +547,7 @@ function unplacedFiles(
  * Pure: the caller builds the graph and reads the texts (see `main`).
  *
  * @param input - The import graph and the source texts.
- * @param rules - How a file is read; the survey's rules unless the comparison or `packageRules` passes its own.
+ * @param rules - How a file is read; the survey's rules unless `packageRules` passes its own.
  * @returns The index, every list sorted.
  */
 export function computeTestIndex(input: TestIndexInput, rules: IndexRules = SURVEY_RULES): TestIndex {
@@ -745,359 +608,6 @@ export function renderTestIndexJson(index: TestIndex): string {
     tests: Object.fromEntries(index.tests.map(({ test, ...entry }) => [test, entry])),
     unindexed: index.unindexed,
   });
-}
-
-/**
- * Orders two strings by UTF-16 code unit, the order `sort` gives.
- *
- * @param left - One string.
- * @param right - The other.
- * @returns A negative, zero or positive number.
- */
-function byText(left: string, right: string): number {
-  if (left === right) {
-    return 0;
-  }
-  return left < right
-    ? -1
-    : 1;
-}
-
-/**
- * A list of paths as one markdown cell, each in code, or `-` when empty.
- *
- * @param paths - The paths.
- * @returns The cell.
- */
-function codeCell(paths: readonly string[]): string {
-  return paths.length === 0
-    ? '-'
-    : paths.map((path) => `\`${path}\``).join(', ');
-}
-
-/**
- * The table of the highest indexes, highest first, then by path.
- *
- * @param tests - Every indexed test.
- * @returns The table's lines.
- */
-function topIndexRows(tests: readonly TestIndexEntry[]): string[] {
-  const top = [...tests]
-    .sort((left, right) => right.index - left.index || byText(left.test, right.test))
-    .slice(0, TOP_INDEXES);
-  return [
-    '| Rank | Test | Index | Folders | Spawns via | Support-only folders |',
-    '| --- | --- | --- | --- | --- | --- |',
-    ...top.map((entry, rank) => `| ${rank + 1} | \`${entry.test}\` | ${entry.index} | ${entry.folders.length} | `
-      + `${codeCell(entry.spawnsVia)} | ${codeCell(entry.supportFolders)} |`),
-  ];
-}
-
-/**
- * The table of the source files most reached from other folders, most
- * first, then by path; a file no test from another folder reaches is left
- * out.
- *
- * @param sources - Every source file.
- * @returns The table's lines.
- */
-function topReachedRows(sources: readonly SourceReach[]): string[] {
-  const top = sources
-    .filter((source) => source.testsFromOtherFolders > 0)
-    .sort((left, right) => right.testsFromOtherFolders - left.testsFromOtherFolders || byText(left.source, right.source))
-    .slice(0, TOP_REACHED);
-  return [
-    '| Rank | Source file | Tests from other folders | All tests | Support-only tests |',
-    '| --- | --- | --- | --- | --- |',
-    ...top.map((source, rank) => `| ${rank + 1} | \`${source.source}\` | ${source.testsFromOtherFolders} | `
-      + `${source.tests.length} | ${source.supportOnlyTests.length} |`),
-  ];
-}
-
-/**
- * The index as `docs/survey/test-index.md` holds it: the coverage line,
- * the counts, the highest indexes, and the source files reached by the
- * most test files from other folders.
- *
- * @param index - The computed index.
- * @param tracked - The tracked files in scope, for the coverage line.
- * @returns The markdown text, ending in a newline.
- */
-export function renderTestIndexMarkdown(index: TestIndex, tracked: readonly string[]): string {
-  const spawning = index.tests.filter((entry) => entry.spawns).length;
-  const unreached = index.sources.filter((source) => source.tests.length === 0).length;
-  const lines = [
-    '# Test index',
-    '',
-    coverageLine(index.read, tracked),
-    '',
-    `${index.tests.length} test files indexed, ${spawning} of them spawning a process; `
-    + `${index.sources.length} source files, ${unreached} of them reached by no test outside support files. `
-    + 'A test\'s index is the number of folders (a package counts as one) its transitive imports reach '
-    + 'through source files, doubled when it spawns a process; folders reached only through `src/tests/` '
-    + 'support files and fakes are listed apart and not counted.',
-    '',
-    `## The ${TOP_INDEXES} highest indexes`,
-    '',
-    ...topIndexRows(index.tests),
-    '',
-    `## The ${TOP_REACHED} source files reached by the most test files from other folders`,
-    '',
-    ...topReachedRows(index.sources),
-  ];
-  if (index.unindexed.length > 0) {
-    lines.push('', '## Unindexed tests', '', 'No `bun build` entry reached these; their imports were not read.', '');
-    lines.push(...index.unindexed.map((path) => `- \`${path}\``));
-  }
-  return `${lines.join('\n')}\n`;
-}
-
-/**
- * The index as `docs/survey/test-index.baseline.json` holds it: the commit
- * read, each test keyed by its path with its index and what the index was
- * counted from, and the unindexed tests. The per-source lists and the
- * support files are left out: the baseline is compared by test file, and
- * neither counts toward an index.
- *
- * @param index - The computed index.
- * @param commit - The commit whose tree the index was read from.
- * @returns The JSON text.
- */
-export function renderTestIndexBaselineJson(index: TestIndex, commit: string): string {
-  return stableJson({
-    commit,
-    tests: Object.fromEntries(index.tests.map((entry) => [
-      entry.test,
-      { folders: entry.folders, index: entry.index, spawns: entry.spawns, spawnsVia: entry.spawnsVia },
-    ])),
-    unindexed: index.unindexed,
-  });
-}
-
-/**
- * Whether a parsed JSON value is an object with keys, not an array or `null`.
- *
- * @param value - Any parsed value.
- * @returns `true` when its keys can be read.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Whether a parsed JSON value is a list of strings.
- *
- * @param value - Any parsed value.
- * @returns `true` when every element is a string.
- */
-function isStringList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-/**
- * One test's record, read from the baseline's `tests`.
- *
- * @param test - The key it lies under.
- * @param value - The parsed value.
- * @returns The record.
- * @throws When a field is missing or of another type.
- */
-function baselineEntry(test: string, value: unknown): BaselineEntry {
-  if (!isRecord(value)
-    || !isStringList(value['folders'])
-    || typeof value['index'] !== 'number'
-    || !Number.isInteger(value['index'])
-    || value['index'] < 0
-    || typeof value['spawns'] !== 'boolean'
-    || !isStringList(value['spawnsVia'])) {
-    throw new Error(`not a test-index baseline: tests["${test}"] must hold folders, a whole index, spawns and spawnsVia`);
-  }
-  return { folders: value['folders'], index: value['index'], spawns: value['spawns'], spawnsVia: value['spawnsVia'] };
-}
-
-/**
- * Reads back what `renderTestIndexBaselineJson` wrote.
- *
- * @param text - The baseline file's text.
- * @returns The baseline.
- * @throws When the text is not JSON, or not the baseline's shape.
- */
-export function parseBaseline(text: string): TestIndexBaseline {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (err) {
-    const reason = err instanceof Error
-      ? err.message
-      : String(err);
-    throw new Error(`not a test-index baseline: ${reason}`);
-  }
-  if (!isRecord(parsed) || typeof parsed['commit'] !== 'string' || !isRecord(parsed['tests']) || !isStringList(parsed['unindexed'])) {
-    throw new Error('not a test-index baseline: it must hold a commit, tests keyed by path, and unindexed');
-  }
-  const tests = new Map(Object.entries(parsed['tests']).map(([test, value]) => [test, baselineEntry(test, value)]));
-  return { commit: parsed['commit'], tests, unindexed: parsed['unindexed'] };
-}
-
-/**
- * One test's index now beside its baseline record.
- *
- * @param entry - The test's entry now.
- * @param baselineTest - The path the baseline holds it under.
- * @param before - Its record in the baseline.
- * @returns The change, with the folders gained and lost.
- */
-function indexChange(entry: TestIndexEntry, baselineTest: string, before: BaselineEntry): IndexChange {
-  const was = new Set(before.folders);
-  const now = new Set(entry.folders);
-  return {
-    after: entry.index,
-    baselineTest,
-    before: before.index,
-    gained: entry.folders.filter((folder) => !was.has(folder)),
-    lost: before.folders.filter((folder) => !now.has(folder)),
-    spawnsSince: before.spawns
-      ? []
-      : entry.spawnsVia,
-    test: entry.test,
-  };
-}
-
-/**
- * Compares an index with a baseline, test file by test file (see "The
- * comparison" in the module note). Pure: the caller computes the index
- * and reads the baseline.
- *
- * @param index - The index of the tree now, computed under `coreRules`.
- * @param baseline - The baseline it is held to.
- * @param moves - The moves a test file is followed through; those of `core-moves.ts` unless a test plants its own.
- * @returns Each test file under what it is, and the baseline's entries left unanswered.
- */
-export function compareToBaseline(index: TestIndex, baseline: TestIndexBaseline, moves: readonly CoreMove[] = CORE_MOVES): BaselineComparison {
-  const movedFrom = new Map(movedPaths(moves).map((moved) => [pathBeforePackage(moved.to), moved.from]));
-  const heldUnder = (test: string): string | undefined => {
-    const back = pathBeforePackage(test);
-    return [movedFrom.get(back), back, test].find((path) => path !== undefined && baseline.tests.has(path));
-  };
-  const answered = new Set<string>();
-  const risen: IndexChange[] = [];
-  const equal: IndexChange[] = [];
-  const fallen: IndexChange[] = [];
-  const added: string[] = [];
-  const unread: string[] = [];
-  for (const entry of index.tests) {
-    const baselineTest = heldUnder(entry.test);
-    const before = baselineTest === undefined
-      ? undefined
-      : baseline.tests.get(baselineTest);
-    if (baselineTest === undefined || before === undefined) {
-      added.push(entry.test);
-      continue;
-    }
-    answered.add(baselineTest);
-    const change = indexChange(entry, baselineTest, before);
-    const bucket = change.after === change.before
-      ? equal
-      : change.after > change.before
-        ? risen
-        : fallen;
-    bucket.push(change);
-  }
-  for (const test of index.unindexed) {
-    const baselineTest = heldUnder(test);
-    if (baselineTest === undefined) {
-      added.push(test);
-      continue;
-    }
-    answered.add(baselineTest);
-    unread.push(test);
-  }
-  const byTest = (left: IndexChange, right: IndexChange): number => byText(left.test, right.test);
-  return {
-    added: added.sort(),
-    commit: baseline.commit,
-    equal: equal.sort(byTest),
-    fallen: fallen.sort(byTest),
-    gone: [...baseline.tests.keys()].filter((path) => !answered.has(path)).sort(),
-    risen: risen.sort(byTest),
-    unread: unread.sort(),
-  };
-}
-
-/**
- * Whether a comparison holds the tree to its baseline: no test file's
- * index rose, and none the baseline indexed went unread.
- *
- * @param comparison - The comparison.
- * @returns `false` when the comparing mode exits 1.
- */
-export function holdsBaseline(comparison: BaselineComparison): boolean {
-  return comparison.risen.length === 0 && comparison.unread.length === 0;
-}
-
-/**
- * The line a compared test file is printed as: its path, the path the
- * baseline holds it under when it moved, both indexes, and what changed.
- *
- * @param change - The test file's change.
- * @returns The line, indented.
- */
-function changeLine(change: IndexChange): string {
-  const name = change.baselineTest === change.test
-    ? change.test
-    : `${change.test} (in the baseline as ${change.baselineTest})`;
-  const details = [
-    ...change.gained.length > 0
-      ? [`gained ${change.gained.join(', ')}`]
-      : [],
-    ...change.lost.length > 0
-      ? [`lost ${change.lost.join(', ')}`]
-      : [],
-    ...change.spawnsSince.length > 0
-      ? [`now spawns via ${change.spawnsSince.join(', ')}`]
-      : [],
-  ];
-  const tail = details.length > 0
-    ? ` (${details.join('; ')})`
-    : '';
-  return `  ${name}: ${change.before} -> ${change.after}${tail}`;
-}
-
-/**
- * A heading with its lines below it, or nothing when there are no lines.
- *
- * @param heading - What the lines are.
- * @param lines - One line per test file, unindented.
- * @returns The block's lines, opened by an empty one.
- */
-function namedBlock(heading: string, lines: readonly string[]): string[] {
-  return lines.length === 0
-    ? []
-    : ['', `${heading} (${lines.length}):`, ...lines];
-}
-
-/**
- * The comparison as the comparing mode prints it: the baseline read, the
- * counts, then each risen test file with its two indexes and what it
- * gained, and the unread, added and gone ones by name. Equal and fallen
- * test files are counted and not named.
- *
- * @param comparison - The comparison.
- * @param baselinePath - The baseline's path as it was passed.
- * @returns The text, without a closing newline.
- */
-export function renderComparison(comparison: BaselineComparison, baselinePath: string): string {
-  const { added, equal, fallen, gone, risen, unread } = comparison;
-  const held = risen.length + equal.length + fallen.length;
-  return [
-    `test-index: ${held} test file(s) held to ${baselinePath}, read at commit ${comparison.commit}: `
-    + `${risen.length} risen, ${equal.length} equal, ${fallen.length} fallen`,
-    `test-index: ${added.length} new, ${gone.length} gone, ${unread.length} not read`,
-    ...namedBlock('Risen, the index is above the baseline', risen.map(changeLine)),
-    ...namedBlock('Not read, the baseline holds an index and bun build reached no imports now', unread.map((test) => `  ${test}`)),
-    ...namedBlock('New, the baseline holds no index and nothing is held', added.map((test) => `  ${test}`)),
-    ...namedBlock('Gone, no test file answers the baseline entry', gone.map((test) => `  ${test}`)),
-  ].join('\n');
 }
 
 /**
@@ -1272,25 +782,6 @@ function fromRoot(root: string, path: string): string {
   return isAbsolute(path)
     ? path
     : join(root, path);
-}
-
-/**
- * Reads the repository at `root` under `coreRules` and compares it with a
- * folder-unit baseline. Writes nothing, and no mode runs it.
- *
- * @param root - The repository root.
- * @param baselinePath - The baseline's path, absolute or relative to `root`.
- * @returns The comparison; `holdsBaseline` says whether it passes.
- * @throws When the baseline cannot be read or is not one, or the tree cannot be read.
- */
-export async function against(root: string, baselinePath: string): Promise<BaselineComparison> {
-  const file = fromRoot(root, baselinePath);
-  if (!existsSync(file)) {
-    throw new Error(`cannot read the baseline: no file at ${file}`);
-  }
-  const baseline = parseBaseline(readFileSync(file, 'utf8'));
-  const index = await readIndex(root, listCommittableFiles(root).all, coreRules());
-  return compareToBaseline(index, baseline);
 }
 
 /** The tree read in projected packages: the index, the rules it was computed under, and what a test's record is read by. */
