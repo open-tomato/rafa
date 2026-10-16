@@ -67,12 +67,14 @@ repository.
   the guard of `scripts/survey/test-index-guard.ts`, which writes nothing and exits 1 when the record's unit is not
   `packages` or its map's sha256 is not the handed map's, when a test that does not meet its kind's rule is not on
   `unsorted` (a unit or contract test reaching a unit beyond its own, a use-case test entering another unit through no
-  public entry), when a test the record holds has no imports read now, or when the map lists a file nowhere. It holds
-  1145 test files (1009 unit, 136 use-case, none contract; 418 spawning a process): 180 meet their kind's rule, 965 are
-  on `unsorted`, none are unindexed. Read at d70b783 against itself it prints 0 risen, 965 unsorted and 180 held, then 0
-  gone, 0 not read, 0 unindexed and 0 unplaced, and exits 0. It is not one of the four maps, so
-  `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent, keys `unit`, `map`, `commit`, `binReach` (the
-  bin's reach, eleven units), `tests` keyed by path, `unsorted`, `unindexed`.
+  public entry), when a test the record holds has no imports read now, or when the map lists a file nowhere. The three
+  flags are read by `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, either
+  mode without `--map=<file>`, and `--map=<file>` alone. The record holds 1145 test files (1009 unit, 136 use-case, none
+  contract; 418 spawning a process): 180 meet their kind's rule, 965 are on `unsorted`, none are unindexed. Read at
+  d70b783 against itself it prints 0 risen, 965 unsorted and 180 held, then 0 gone, 0 not read, 0 unindexed and 0
+  unplaced, and exits 0. The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it.
+  JSON: 2-space indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path,
+  `unsorted`, `unindexed`.
 
   The index counts the units a test reaches, doubled when it spawns, so the cut moves it three ways. Lightest first:
   1. A test whose index falls because three folders became one package: say it reached three folders of `src/`, which
