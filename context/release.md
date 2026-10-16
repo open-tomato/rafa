@@ -219,9 +219,12 @@ written: a unit whose version a tag already names is skipped, the run refuses
 `tagged` only when every unit is skipped, and any other refusal of any unit
 exits 1 with nothing written. It prints one `✅ Tagged <tag> at …` line per tag
 in unit order, then what to run next: per tag, its push and its publish line, a
-package's as `(cd <dir> && <publishCommand>)`. Without `--push` it reaches no
-network and each push is a line to copy, naming the remote `--push` would reach
-(#857).
+package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
+publish line is replaced by one sentence saying the pushed tag publishes through
+`.github/workflows/release-publish.yml`, and json mode carries `publish: "ci"`
+on that unit (`src/commands/release/tag-follow-ups.ts`). Without `--push` it
+reaches no network and each push is a line to copy, naming the remote `--push`
+would reach (#857).
 
 With `--push` (#736) it pushes each tag itself once every tag is written, in
 unit order (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote

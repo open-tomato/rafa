@@ -22,12 +22,15 @@ Description:
   puts it on the remote and the publish line for the registry its manifest
   configures, with the command `release.publishCommand` names (`npm publish` by
   default), run in the package's folder for a package and spelled to publish
-  from the tag when HEAD is past it, which it does not run. With `--push` it
-  pushes each tag itself to the remote the release branch tracks (`origin` when
-  it tracks none) and drops its push line; a push that fails exits 1 with what
-  git said and keeps the local tags. With `--output=json` the readings, the
-  decisions, the follow-ups and the pushes of every unit are the data of the
-  terminal result event.
+  from the tag when HEAD is past it, which it does not run. Under
+  `release.publish: ci` a unit's publish line is replaced by one sentence saying
+  the pushed tag publishes through `.github/workflows/release-publish.yml`, and
+  json carries `publish: "ci"` on that unit. With `--push` it pushes each tag
+  itself to the remote the release branch tracks (`origin` when it tracks none)
+  and drops its push line; a push that fails exits 1 with what git said and
+  keeps the local tags. With `--output=json` the readings, the decisions, the
+  follow-ups and the pushes of every unit are the data of the terminal result
+  event.
 
 Flags:
   --push   boolean

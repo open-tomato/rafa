@@ -13,7 +13,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { RELEASE_REMOTE } from '../../release/version.js';
 
-import { DEFAULT_REGISTRY, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
+import { ciPublishSentence, DEFAULT_REGISTRY, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
 
 const VERSION = '0.5.0';
 const TAG = `v${VERSION}`;
@@ -118,5 +118,36 @@ describe('a unit published from its own folder', () => {
   it('names no publish line for a private package, folder or not', () => {
     expect(followUpsFor(pkgTag, '0.2.0', target({ isPrivate: true }), DEFAULT_PUBLISH, { ahead: 0, branch: 'main', dir: 'packages/plugin' }, null))
       .toEqual([]);
+  });
+});
+
+describe('a publish that CI runs, under release.publish: ci', () => {
+  const onHead = { ahead: 0, branch: 'main' };
+  const sentence = `Once pushed, ${TAG} publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`
+    + ' through .github/workflows/release-publish.yml (release.publish: ci).';
+
+  it('names the push alone under ci, where the same call under manual adds the publish line', () => {
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, RELEASE_REMOTE, 'ci')
+      .map((each) => each.command)).toEqual([`git push ${RELEASE_REMOTE} ${TAG}`]);
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, RELEASE_REMOTE, 'manual')
+      .map((each) => each.command)).toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
+  });
+
+  it('names nothing under ci once the run pushed the tag, behind HEAD and in a folder too', () => {
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, null, 'ci')).toEqual([]);
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 2, branch: 'main', dir: 'packages/plugin' }, null, 'ci'))
+      .toEqual([]);
+  });
+
+  it('says the pushed tag publishes through the publish workflow, naming the package, version and registry', () => {
+    expect(ciPublishSentence(TAG, VERSION, target())).toBe(sentence);
+    expect(ciPublishSentence(TAG, VERSION, target({ registry: 'https://npm.example.com' })))
+      .toContain('to https://npm.example.com through .github/workflows/release-publish.yml');
+  });
+
+  it('gives no sentence where there is nothing to publish: a private package or a file naming none', () => {
+    expect(ciPublishSentence(TAG, VERSION, target({ isPrivate: true }))).toBeNull();
+    expect(ciPublishSentence(TAG, VERSION, target({ name: null }))).toBeNull();
+    expect(ciPublishSentence(TAG, VERSION, target({ isPrivate: false }))).not.toBeNull();
   });
 });
