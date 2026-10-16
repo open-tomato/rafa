@@ -18,7 +18,16 @@ import type { ReleasePrepared } from './prepare.js';
 import type { ReleaseVerified } from './verify.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import { describe, expect, it } from 'bun:test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
+import { afterAll, describe, expect, it } from 'bun:test';
+
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   bodyWithRelease,
@@ -28,7 +37,9 @@ import {
   releaseBodyBlock,
   releaseBodyLines,
 } from './branch-forecast.js';
+import { readFragmentTree } from './fragment-tree.js';
 import { parseFragment, serializeFragment } from './fragment.js';
+import { readGuard } from './guard.js';
 
 const COMMIT = 'c'.repeat(40);
 const SETTINGS = {
@@ -277,6 +288,88 @@ describe('readBranchForecast', () => {
     });
 
     expect(read.ok && read.forecast.kind === 'ships' && read.forecast.section).toContain('<!-- rafa:fragments rafa-21-2 -->');
+  });
+});
+
+/** A temporary directory of this file's own, for the one real repository. */
+const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-branch-forecast-')));
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
+
+describe('the body and the guard over one real repository', () => {
+  it('forecast 0.3.0 from the plugin\'s own 0.2.0, not the root\'s 0.24.0, in the same sentence', () => {
+    const home = join(tempBase, 'home');
+    const repo = join(tempBase, 'repo');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(repo, { recursive: true });
+    const git = (args: readonly string[]): string => execFileSync('git', [...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        HOME: home,
+        GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+        GIT_CONFIG_NOSYSTEM: '1',
+        ...gitIdentityEnv(),
+        GIT_AUTHOR_DATE: '2026-09-01T12:00:00Z',
+        GIT_COMMITTER_DATE: '2026-09-01T12:00:00Z',
+        LC_ALL: 'C',
+      },
+    }).trim();
+    const commit = (files: Readonly<Record<string, string>>, message: string): string => {
+      for (const [path, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(repo, path)), { recursive: true });
+        writeFileSync(join(repo, path), text, 'utf8');
+      }
+      git(['add', '-A']);
+      git(['commit', '-q', '--no-verify', '-m', message]);
+      return git(['rev-parse', 'HEAD']);
+    };
+    git(['init', '-q', '--initial-branch=main', '.']);
+    const baseCommit = commit({
+      'package.json': '{"name":"demo","version":"0.24.0","workspaces":["packages/*"]}\n',
+      'packages/plugin/package.json': '{"name":"@scope/plugin","version":"0.2.0"}\n',
+      '.changes/.gitkeep': '',
+    }, 'base');
+    git(['switch', '-q', '-c', 'feat/1192']);
+    const fragment: Fragment = { plan: 'rafa-1192', title: 'plugin feature', level: 'minor', package: '@scope/plugin', notes: ['- plugin: new'] };
+    commit({ '.changes/rafa-1192.md': serializeFragment(fragment) }, 'feat: plugin fragment');
+    const runner = createGitRunner(repo);
+    const settings = {
+      releaseVersionFile: 'package.json',
+      releaseChangelog: 'CHANGELOG.md',
+      releaseFragments: '.changes',
+      releaseStrategy: 'semver-by-level',
+      releaseHeading: '## {version} — {date}, {title}',
+      releaseMoveLock: false,
+    } as const;
+    const now = new Date('2026-09-29T12:00:00Z');
+
+    const guard = readGuard({ git: runner, settings, base: 'main', branch: { ref: 'feat/1192', name: 'feat/1192', pullRequest: null }, now });
+    const tree = readFragmentTree(runner, baseCommit, '.changes');
+    if (!tree.ok) throw new Error(`tree not read: ${tree.problem}`);
+    const body = readBranchForecast({
+      git: runner,
+      settings,
+      prepared: { ...preparedOver(tree.fragments), base: { ref: 'main', commit: baseCommit, waiting: tree.fragments } },
+      verified: verified(fragment, '.changes/rafa-1192.md'),
+      now,
+    });
+
+    if (!guard.ok) throw new Error(`guard not read: ${guard.problem}`);
+    const guardForecast = guard.forecast;
+    if (guardForecast === null || !guardForecast.ok || guardForecast.forecast.kind !== 'ships') {
+      throw new Error(`expected a shipping guard forecast, got ${JSON.stringify(guardForecast)}`);
+    }
+    if (!body.ok || body.forecast.kind !== 'ships') throw new Error(`expected a shipping body forecast, got ${JSON.stringify(body)}`);
+    expect(guardForecast.baseVersion).toBe('0.2.0');
+    expect(body.baseVersion).toBe('0.2.0');
+    expect(guardForecast.forecast.version).toBe('0.3.0');
+    expect(body.forecast.version).toBe('0.3.0');
+    expect(body.forecast.sentence).toBe(guardForecast.forecast.sentence);
+    expect(body.forecast.sentence).toContain('0.3.0');
   });
 });
 
