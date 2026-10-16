@@ -2794,11 +2794,16 @@ say nothing of why.
   command-entry warnings (`DispatchOptions.warnings`); a disabled module
   warns nothing. A second source giving a name is refused, and an
   `allowList:` name no source gives is warned about.
-- **The adapter registry reaches no reader.** `resolveTracker`,
-  `selectEffortStore` and `rafa plan` still resolve through
-  `CORE_ADAPTER_REGISTRY`, so a module's adapter is registered and listed
-  by `module list` and selected by nothing.
-- **`module list`** loads the modules again from the config and lists
+- **A module's adapter is made active for the invocation.** `src/rafa.ts`
+  hands the registry `loadInvocationModules` answers to
+  `activateModuleAdapters` (`src/modules/activate.ts`), which makes it the
+  active registry through core's `restoreAdapters` and keeps the one it
+  replaced as `baseAdapterRegistry()`. `resolveTracker`,
+  `selectEffortStore` and `rafa plan` resolve through
+  `CORE_ADAPTER_REGISTRY`, so they find a loaded module's kind.
+- **`module list`** loads the modules again from the config, from
+  `baseAdapterRegistry()`, which `loadModules` starts from when handed no
+  registry, so no module meets its own kind already held, and lists
   each source's name, version, types, whether it is enabled, its state,
   adapters, command entry and problems, with `mounted` read off the
   context's registry. Exit code 1 for an argument and a refused config.

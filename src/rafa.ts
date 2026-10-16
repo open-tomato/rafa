@@ -22,7 +22,11 @@
  * and the command hook handed to it. It first loads the modules of the project the working directory is
  * in (`src/modules/load.ts`), so a module's actions route, render help
  * and are described, and hands the dispatcher their command entries and
- * the loader's warnings. `src/commands/index.ts`
+ * the loader's warnings. Before it dispatches, it makes the adapters
+ * those modules registered the active registry with
+ * `activateModuleAdapters` (`src/modules/activate.ts`), so a module's
+ * kind resolves through `CORE_ADAPTER_REGISTRY` for the invocation.
+ * `src/commands/index.ts`
  * holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
  * of each subject and action from it, and `src/cli/dispatch.ts` routes
  * the line, runs the command, writes its events and answers the exit
@@ -52,6 +56,7 @@ import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
 import { registerCoreConfigSections } from './config-registry.js';
+import { activateModuleAdapters } from './modules/activate.js';
 import { loadInvocationModules } from './modules/load.js';
 import { createStatusHook } from './status/hook.js';
 
@@ -59,6 +64,7 @@ registerCoreConfigSections();
 registerCoreAdapters();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
+activateModuleAdapters(modules);
 const { exitCode } = await dispatch(process.argv.slice(2), {
   registry: CORE_REGISTRY,
   renderHelp,

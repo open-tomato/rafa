@@ -72,11 +72,17 @@
  * ## Where the answer goes
  *
  * `src/rafa.ts` calls {@link loadInvocationModules} before it dispatches,
- * handing the dispatcher the command entries and the warnings. The
- * adapter registry it answers reaches no reader yet: `resolveTracker`,
- * `selectEffortStore` and `rafa plan` resolve through
- * `CORE_ADAPTER_REGISTRY`, so a module's `tracker.default: linear` is
- * registered and listed by `rafa module list`, and selected by nothing.
+ * handing the dispatcher the command entries and the warnings, and hands
+ * the adapter registry it answers to `activateModuleAdapters`
+ * (`activate.ts`), which makes it the active registry. So
+ * `resolveTracker`, `selectEffortStore` and `rafa plan`, resolving
+ * through `CORE_ADAPTER_REGISTRY`, find a loaded module's kind for the
+ * rest of the invocation.
+ *
+ * Handed no registry, {@link loadModules} registers on
+ * `baseAdapterRegistry()`, the registry activation replaced, holding
+ * core's adapters and no module's: a second load from the config, as
+ * `rafa module list` makes, then finds no module's kind already held.
  *
  * ## Prototype keys
  *
@@ -101,6 +107,7 @@ import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/conf
 import { importModuleEntry } from '../cli/modules.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
+import { baseAdapterRegistry } from './activate.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 
 /** What a configured module came to. */
@@ -158,7 +165,7 @@ export interface ModuleLoadSeams {
   readonly readText?: (path: string) => string;
   /** The rafa and port versions a manifest is held to. The running ones when left out. */
   readonly manifest?: ManifestSeams;
-  /** The registry adapters are registered on. `CORE_ADAPTER_REGISTRY` when left out. */
+  /** The registry adapters are registered on. `baseAdapterRegistry()` (`activate.ts`) when left out. */
   readonly adapters?: AdapterRegistry;
 }
 
@@ -334,7 +341,7 @@ function repeatedName(name: string | null, at: string, seen: ReadonlyMap<string,
 export async function loadModules(settings: ModuleSettings, seams: ModuleLoadSeams = {}): Promise<LoadedModules> {
   const importModule = seams.importModule ?? importModuleEntry;
   const allowed = new Set(settings.allowList);
-  let adapters = seams.adapters ?? CORE_ADAPTER_REGISTRY;
+  let adapters = seams.adapters ?? baseAdapterRegistry();
   const seen = new Map<string, string>();
   const modules: ConfiguredModule[] = [];
   const commands: ModuleCommandEntry[] = [];

@@ -481,6 +481,7 @@ const CLI_IMPORTS: ImportList = [
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
   ['./config-registry.js', ['registerCoreConfigSections']],
+  ['./modules/activate.js', ['activateModuleAdapters']],
   ['./modules/load.js', ['loadInvocationModules']],
   ['./status/hook.js', ['createStatusHook']],
 ];
