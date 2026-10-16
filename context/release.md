@@ -182,20 +182,31 @@ settle deterministic across machines and retries.
 
 ### Tag and its push
 
-`rafa release tag [--push]` writes `v<version>` on the commit of the release
-branch that set the version, then prints what to run next: the push of the tag
-and the publish line. Without `--push` it reaches no network and the push is a
-line to copy, naming the remote `--push` would reach (#857).
+`rafa release tag [--push]` writes one tag per unit on the commit of the release
+branch that set that unit's version: `v<version>` for the root, read off
+`release.versionFile` and `release.changelog`, and `<name>@<version>` for each
+publishable workspace package, read off `<dir>/package.json` and
+`<dir>/CHANGELOG.md` (`src/commands/release/tag-units.ts`). The branch is
+checked once for the run, and every unit is decided before the first tag is
+written: a unit whose version a tag already names is skipped, the run refuses
+`tagged` only when every unit is skipped, and any other refusal of any unit
+exits 1 with nothing written. It prints one `✅ Tagged <tag> at …` line per tag
+in unit order, then what to run next: per tag, its push and its publish line, a
+package's as `(cd <dir> && <publishCommand>)`. Without `--push` it reaches no
+network and each push is a line to copy, naming the remote `--push` would reach
+(#857).
 
-With `--push` (#736) it pushes `refs/tags/v<version>` itself once the tag is
-written (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote the
-release branch tracks (`branch.<pr.base>.remote`), or `origin` when the branch
-tracks none or tracks a local branch. A push that went prints
-`✅ Pushed v<version> to <remote>.` and drops the push line from the follow-ups;
-json mode carries it as the result's `pushed`, a key a run without the flag
-leaves out. A push that fails, a hook or rule refusing it included, exits 1 with
-git's words and the push to run again, and keeps the local tag, since it names
-the right commit whether or not the remote has it.
+With `--push` (#736) it pushes each tag itself once every tag is written, in
+unit order (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote
+the release branch tracks (`branch.<pr.base>.remote`), or `origin` when the
+branch tracks none or tracks a local branch. A push that went prints
+`✅ Pushed <tag> to <remote>.` under its `Tagged` line and drops that push line
+from the follow-ups; json mode carries it as the unit's `pushed` and the root's
+as the result's `pushed`, keys a run without the flag leaves out. A push that
+fails, a hook or rule refusing it included, exits 1 with git's words and the
+push to run again, naming the tags pushed before it and those written and not
+pushed after it, and keeps every local tag, since each names the right commit
+whether or not the remote has it.
 
 ### Guards: the preflight check
 
@@ -242,7 +253,7 @@ last fetched) and prints:
 - The latest root release tag (`v<version>`, or a bare `<version>`) by
   semantic version precedence. A package's `<name>@<version>` tag is read
   (`releaseTagsOf`, with `package` set) but neither counted nor taken as latest
-  here, and `rafa release tag` refuses `tagged` on a root tag only
+  here, and `rafa release tag` counts only a unit's own tags for its skip
 - Untagged versions marked in `release.changelog` (a changelog section with no
   matching `v<version>` tag; a package's tag of that version does not count)
 - The fragments waiting on the base branch, one line each in fold order with
@@ -305,7 +316,8 @@ publish, default `npm publish`. Free text, printed as written and never run, so
 a project that publishes with another tool or a flag (`pnpm publish --tag
 next`) spells it here. When HEAD is past the tagged commit the line becomes
 `git switch --detach <tag> && <publishCommand> && git switch <branch>`, so the
-tagged tree is the one published. The manifest's `packageManager` field is not
+tagged tree is the one published. A workspace package's line runs it in the
+package's folder: `(cd <dir> && <publishCommand>)`. The manifest's `packageManager` field is not
 read for it: that field names the tool a project installs with, and tagging
 0.24.1 printed `bun publish` from it while rafa is published with `npm publish`.
 

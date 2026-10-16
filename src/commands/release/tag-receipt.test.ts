@@ -54,6 +54,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
   return {
     releaseBranch: DEFAULT_RELEASE_BRANCH,
     branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null },
+    package: null,
     version: { path: 'package.json', text: null, version: VERSION, problem: null },
     changelog: { path: 'CHANGELOG.md', version: VERSION, problem: null },
     tags: { tags: [tag('v0.7.0')], latest: tag('v0.7.0'), problem: null },
