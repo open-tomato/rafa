@@ -2763,7 +2763,9 @@ answers, described under "Loading modules".
 `process.cwd()` and the home. It resolves the project as the dispatcher
 does, reads its config with the unknown-key warnings dropped, since a
 command reading the config warns once, and hands `loadModules` the
-config's `modules:` and `allowList:`. Outside a project nothing is loaded
+config's `modules:` and `allowList:`, with the bundled features whose
+`features.<name>` resolved `false`, which it answers back as
+`disabledFeatures`. Outside a project nothing is loaded
 or warned, and a config `loadConfig` refuses or a walk the scope refuses
 loads nothing and warns nothing: the command reading the config, or the
 dispatcher placing a command in a project, says why once. So
