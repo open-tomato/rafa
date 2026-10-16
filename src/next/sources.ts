@@ -347,7 +347,7 @@ export interface NextBoardOptions {
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
+type NextConfig = Pick<RafaConfig, 'namingBranch' | 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -580,6 +580,7 @@ export async function openNextSources(
     runs: (): readonly SessionRecord[] => readRecords(project.root, loop),
     git,
     pulls,
+    branchTemplate: config.namingBranch,
     ...roadmap
       ? { roadmap: Object.freeze({ ownerApproval: nextOwnerGate({ gh, root: project.root, pulls, configured: config.roadmapIssue }) }) }
       : {},

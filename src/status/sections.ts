@@ -222,7 +222,10 @@ export type Section<T> = (T & { readonly read: true }) | SectionUnread;
 export interface BranchReading {
   /** The branch, as `git rev-parse --abbrev-ref HEAD` names it. */
   readonly branch: string;
-  /** The plan `feat/<stub>` names, with its task counts, or null when the branch names none. */
+  /**
+   * The plan the branch names under the `naming.branch` template, with
+   * its task counts, or null when the branch names none.
+   */
   readonly plan: PlanListing | null;
   /** What was read around: the plans directory, when it could not be listed. */
   readonly notes: readonly string[];
@@ -482,7 +485,7 @@ function readBranchSection(sources: NextSources): BranchReading | SectionUnread 
     return unread(notes.join('; ') || 'the branch at the project root could not be read');
   }
   const plans = readPlans(sources, note);
-  return { branch, plan: readBranchPlan(branch, plans), notes };
+  return { branch, plan: readBranchPlan(branch, plans, sources.branchTemplate), notes };
 }
 
 /** Every checklist holding a blocked task, named with the newest session of its plan. */
@@ -703,6 +706,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
     git,
     pulls,
     board,
+    branchTemplate: config.namingBranch,
   };
 
   const branch = localSection(() => readBranchSection(sources));
