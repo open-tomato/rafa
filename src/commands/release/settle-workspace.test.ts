@@ -20,23 +20,30 @@
  */
 import type { ReleaseSettleSeams } from './settle.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { WorkspaceWorld } from '../../tests/workspace-world.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import '../../adapter-registry.js';
 
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
-import { projectConfigText } from '../../project/scaffold.js';
-import { serializeFragment } from '../../release/fragment.js';
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
+import { dispatchInProject } from '../../tests/cli-capture.js';
+import {
+  BOTH_SUBJECT,
+  CORE_MANIFEST,
+  createWorkspaceWorld,
+  landBoth,
+  packageFragmentText,
+  PLUGIN_CHANGELOG,
+  PLUGIN_MANIFEST,
+  rootFragmentText,
+  SETUP_DATE,
+} from '../../tests/workspace-world.js';
 
 import { createReleaseSettleCommand } from './settle.js';
 
@@ -53,113 +60,18 @@ let worldCount = 0;
 /** The one subject the cases register. */
 const SUBJECTS = [{ name: 'release', summary: 'releases' }];
 
-/** The root manifest on `main`: a version and the workspace globs. */
-const ROOT_MANIFEST = '{\n\t"name": "demo",\n\t"version": "0.4.0",\n\t"workspaces": ["packages/*"]\n}\n';
-
-/** The publishable member's manifest on `main`. */
-const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
-
-/** The private member's manifest on `main`. */
-const CORE_MANIFEST = '{\n  "name": "@scope/core",\n  "version": "0.0.0",\n  "private": true\n}\n';
-
-/** The root changelog on `main`. */
-const ROOT_CHANGELOG = '# Changelog\n\n## 0.4.0 — 2026-08-01, older\n\n- Loop: old line\n';
-
-/** The plugin's changelog on `main`. */
-const PLUGIN_CHANGELOG = '# Changelog\n\n## 0.1.0 — 2026-08-01, first\n\n- Plugin: old line\n';
-
-/** The committer date every setup commit gets. */
-const SETUP_DATE = '2026-09-01T12:00:00Z';
-
 /** A remote `resolvePrProvider` reads as GitHub. */
 const GITHUB_REMOTE = 'https://github.com/open-tomato/demo.git';
 
-/** The subject a release moving the root to 0.5.0 and the plugin to 0.2.0 carries. */
-const BOTH_SUBJECT = 'chore: release 0.5.0, @scope/plugin@0.2.0';
-
-/** The environment every setup git runs under, isolated from the operator's config. */
-function isolatedEnv(home: string): Record<string, string> {
-  return {
-    PATH: process.env['PATH'] ?? '',
-    HOME: home,
-    GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
-    GIT_CONFIG_NOSYSTEM: '1',
-    ...gitIdentityEnv(),
-    GIT_AUTHOR_DATE: SETUP_DATE,
-    GIT_COMMITTER_DATE: SETUP_DATE,
-    LC_ALL: 'C',
-  };
-}
-
-/** A three-field fragment's text: it names no package, so it belongs to the root. */
-function rootFragmentText(plan: string): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level: 'minor', package: null, notes: ['- Loop: a line'] });
-}
-
-/** A fragment's text naming `name` as its package. */
-function packageFragmentText(plan: string, name: string): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level: 'minor', package: name, notes: ['- Plugin: a hook'] });
-}
-
-/** A bare origin, a clone that lands commits on `main`, and the caller's clone as a project. */
-interface World {
-  readonly origin: string;
-  readonly project: PlantedProject;
-  readonly scratchRoot: string;
-  /** Runs git in `cwd` under the isolated environment, answering stdout trimmed. */
-  readonly git: (cwd: string, args: readonly string[]) => string;
-  /** Writes each path in the other clone, commits and pushes `main`. */
-  readonly land: (files: Readonly<Record<string, string>>, message: string) => void;
-}
-
-/** Builds a {@link World} whose base holds the workspace and whose caller holds `.rafa/config.yaml` with `extra` appended. */
-function world(extra = ''): World {
+/** Builds a {@link WorkspaceWorld} of this file's own, its caller holding `.rafa/config.yaml` with `extra` appended. */
+function world(extra = ''): WorkspaceWorld {
   worldCount += 1;
-  const dir = join(tempBase, `world-${String(worldCount)}`);
-  const home = join(dir, 'home');
-  const origin = join(dir, 'origin.git');
-  const caller = join(dir, 'caller');
-  const other = join(dir, 'other');
-  const scratchRoot = join(dir, 'scratch');
-  for (const path of [home, scratchRoot]) mkdirSync(path, { recursive: true });
-  const git = (cwd: string, args: readonly string[]): string => execFileSync('git', [...args], { cwd, encoding: 'utf8', env: isolatedEnv(home), stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  const commit = (files: Readonly<Record<string, string>>, message: string): void => {
-    for (const [path, text] of Object.entries(files)) {
-      mkdirSync(dirname(join(other, path)), { recursive: true });
-      writeFileSync(join(other, path), text);
-    }
-    git(other, ['add', '-A']);
-    git(other, ['commit', '-q', '-m', message]);
-    git(other, ['push', '-q', 'origin', 'main']);
-  };
-  const land = (files: Readonly<Record<string, string>>, message: string): void => {
-    git(other, ['pull', '-q', '--ff-only', 'origin', 'main']);
-    commit(files, message);
-  };
-
-  git(dir, ['init', '-q', '--bare', '--initial-branch=main', origin]);
-  git(dir, ['clone', '-q', origin, other]);
-  commit({
-    'package.json': ROOT_MANIFEST,
-    'CHANGELOG.md': ROOT_CHANGELOG,
-    'packages/plugin/package.json': PLUGIN_MANIFEST,
-    'packages/plugin/CHANGELOG.md': PLUGIN_CHANGELOG,
-    'packages/core/package.json': CORE_MANIFEST,
-  }, 'first');
-
-  git(dir, ['clone', '-q', origin, caller]);
-  const settings: readonly (readonly [string, string])[] = [['user.name', 'rafa settle'], ['user.email', 'settle@example.invalid'], ['commit.gpgsign', 'false'], ['tag.gpgsign', 'false'], ['core.hooksPath', join(dir, 'no-hooks')]];
-  for (const [key, value] of settings) {
-    git(caller, ['config', key, value]);
-  }
-  git(caller, ['switch', '-q', '-c', 'feat']);
-  plantProjectConfig(caller, `${projectConfigText()}${extra}`);
-  return { origin, project: { root: caller, home }, scratchRoot, git, land };
+  return createWorkspaceWorld(join(tempBase, `world-${String(worldCount)}`), extra);
 }
 
 /** Dispatches `rafa release settle` in the world's caller. */
 async function settle(
-  w: World,
+  w: WorkspaceWorld,
   seams: ReleaseSettleSeams = {},
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
   const command: RafaCommand = createReleaseSettleCommand({ scratchRoot: w.scratchRoot, ...seams });
@@ -167,33 +79,27 @@ async function settle(
 }
 
 /** Origin's subject at `ref`. */
-function originSubject(w: World, ref = 'main'): string {
+function originSubject(w: WorkspaceWorld, ref = 'main'): string {
   return w.git(w.origin, ['log', '-1', '--format=%s', ref]);
 }
 
 /** A file's text at origin's `ref`. */
-function originFile(w: World, path: string, ref = 'main'): string {
+function originFile(w: WorkspaceWorld, path: string, ref = 'main'): string {
   return w.git(w.origin, ['show', `${ref}:${path}`]);
 }
 
 /** The paths `ref`'s commit changed against its parent, sorted. */
-function changedPaths(w: World, ref: string): string[] {
+function changedPaths(w: WorkspaceWorld, ref: string): string[] {
   return w.git(w.origin, ['diff', '--name-only', `${ref}~1`, ref]).split('\n')
     .sort();
 }
 
 /** The files origin's `main` holds under `.changes/`. */
-function originFragments(w: World): string[] {
+function originFragments(w: WorkspaceWorld): string[] {
   const listed = w.git(w.origin, ['ls-tree', '--name-only', 'main', '.changes/']);
   return listed === ''
     ? []
     : listed.split('\n');
-}
-
-/** Lands one fragment for the root and one for the plugin, as two merges would. */
-function landBoth(w: World): void {
-  w.land({ '.changes/rafa-9.md': rootFragmentText('rafa-9') }, 'merge rafa-9');
-  w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', '@scope/plugin') }, 'merge rafa-7');
 }
 
 describe('rafa release settle over a workspace, fragments that cannot be folded', () => {
