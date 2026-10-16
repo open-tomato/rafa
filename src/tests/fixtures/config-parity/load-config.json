@@ -256,6 +256,10 @@
       "value": false,
       "source": "default"
     },
+    "releasePublish": {
+      "value": "manual",
+      "source": "default"
+    },
     "releasePublishCommand": {
       "value": "npm publish",
       "source": "default"

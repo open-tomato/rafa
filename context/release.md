@@ -336,7 +336,7 @@ base branch. It warns when fragments wait and names `rafa release settle`.
 
 ### Config keys
 
-Eight keys control the release flow, all under the `release` section except two:
+Nine keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -369,6 +369,12 @@ package's folder: `(cd <dir> && <publishCommand>)`. The manifest's `packageManag
 read for it: that field names the tool a project installs with, and tagging
 0.24.1 printed `bun publish` from it while rafa is published with `npm publish`.
 
+**`release.publish`** — Who publishes a tagged version: `manual` (default, a
+person runs the publish command `rafa release tag` prints) or `ci` (the pushed
+tag publishes through the project's CI workflow). Any other value is refused.
+It is the third key the release ladder is read off, beside `release.settle`
+and `release.tag`.
+
 **`release.moveLock`** — Boolean (default `false`, read through `flag`, so
 `"true"`, `yes` and `1` are refused). `true` has settle also write `rafa.lock`
 at the root to the version it settles, in the release commit, so the repository
@@ -389,6 +395,7 @@ another.
 All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
 `release.settle` defaults to `push`, an absent `release.tag` defaults to
-`manual`, an absent `release.publishCommand` defaults to `npm publish`, and an
-absent `release.moveLock` defaults to `false`. They're set by `rafa init` and
+`manual`, an absent `release.publishCommand` defaults to `npm publish`, an
+absent `release.publish` defaults to `manual`, and an absent `release.moveLock`
+defaults to `false`. They're set by `rafa init` and
 read by `loadConfig`.

@@ -33,6 +33,7 @@
  * neither exports.
  */
 export type {
+  ReleasePublishMode,
   ReleaseSettleMode,
   ReleaseStrategy,
   ReleaseTagMode,
@@ -72,10 +73,12 @@ export {
   fragmentsDirectory,
   isBranchTemplate,
   mapOf,
+  RELEASE_PUBLISH_MODES,
   RELEASE_SETTLE_MODES,
   RELEASE_STRATEGIES,
   RELEASE_TAG_MODES,
   releaseFile,
+  releasePublishMode,
   releaseSettleMode,
   releaseStrategy,
   releaseTagMode,

@@ -171,6 +171,43 @@ describe('release.tag', () => {
   });
 });
 
+describe('release.publish', () => {
+  it('spells the key file-only, and defaults to manual in its section object', () => {
+    expect(SETTINGS.releasePublish.key).toBe('release.publish');
+    expect(SETTINGS.releasePublish.cli).toBe(false);
+    expect(RELEASE_DEFAULTS.releasePublish).toBe('manual');
+    expect(resolveConfig().config.releasePublish).toBe('manual');
+    expect(resolveConfig().sources.releasePublish).toBe('default');
+  });
+
+  it.each(['manual', 'ci'])('accepts %s', (raw) => {
+    expectAccepted('releasePublish', raw);
+  });
+
+  it.each(['auto', 'settle', 'CI', 'Manual', ''])('refuses %p', (raw) => {
+    expectRefused('releasePublish', raw, `F: release.publish is "${raw}", expected one of: manual, ci`);
+  });
+
+  it.each([
+    [true, 'true'],
+    [['ci'], 'a list'],
+  ])('refuses %p, which is no string', (raw, shown) => {
+    expectRefused('releasePublish', raw, `F: release.publish is ${shown}, expected one of: manual, ci`);
+  });
+
+  it('resolves a file naming ci to ci, from the file', () => {
+    const resolved = resolveConfig({ file: parseConfigText('release:\n  publish: ci\n', PATH) });
+
+    expect(resolved.config.releasePublish).toBe('ci');
+    expect(resolved.sources.releasePublish).toBe('file');
+  });
+
+  it('reports a file naming another value the way every unusable value is', () => {
+    expect(refusal(() => parseConfigText('release:\n  publish: github\n', PATH)).problems)
+      .toEqual([`${PATH}: release.publish is "github", expected one of: manual, ci`]);
+  });
+});
+
 describe('release.publishCommand', () => {
   it('spells the key file-only, and defaults to npm publish in its section object', () => {
     expect(SETTINGS.releasePublishCommand.key).toBe('release.publishCommand');
@@ -402,6 +439,7 @@ describe('the section', () => {
       ['releaseSettle', 'release.settle'],
       ['releaseTag', 'release.tag'],
       ['releasePublishCommand', 'release.publishCommand'],
+      ['releasePublish', 'release.publish'],
       ['releaseMoveLock', 'release.moveLock'],
       ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
     ]);
@@ -420,6 +458,7 @@ describe('the section', () => {
       releaseSettle: 'push',
       releaseTag: 'manual',
       releasePublishCommand: 'npm publish',
+      releasePublish: 'manual',
       releaseMoveLock: false,
       dangerousAcceptVersionCollision: false,
     });

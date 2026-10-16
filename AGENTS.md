@@ -63,7 +63,7 @@ back into every turn and the split would save nothing.
 - `context/terminology.md` — formal and colloquial names: the ledger,
   lore and hindsight, and how prose introduces them.
 - `context/release.md` — fragments and the fold, settle and its deliveries,
-  the receipt rule with adoption boundary, the guards, readers, and eight keys.
+  the receipt rule with adoption boundary, the guards, readers, and nine keys.
 - `context/board-project.md` — the template, the five fields, the Stage
   outline and its rules, the refresh and its callers, and the warnings.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
