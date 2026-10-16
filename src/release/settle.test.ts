@@ -196,6 +196,19 @@ function callerState(w: World): { branch: string; status: string; refs: string }
   };
 }
 
+/** The files {@link buildIn} reads back from the worktree after the build. */
+const BUILT_FILES = [
+  'package.json',
+  'CHANGELOG.md',
+  LOCK_FILE,
+  '.changes/rafa-1.md',
+  '.changes/rafa-9.md',
+  '.changes/rafa-7.md',
+  'packages/plugin/package.json',
+  'packages/plugin/CHANGELOG.md',
+  'packages/core/package.json',
+] as const;
+
 /** What a build answered, with the worktree's state read before it was removed. */
 interface Built {
   readonly build: SettleBuild;
@@ -231,7 +244,7 @@ async function buildIn(
       before,
       head: worktree.git(['rev-parse', 'HEAD']).stdout.trim(),
       status: worktree.git(['status', '--porcelain']).stdout.trim(),
-      files: Object.fromEntries(['package.json', 'CHANGELOG.md', LOCK_FILE, '.changes/rafa-1.md', '.changes/rafa-9.md'].map((path) => [path, read(path)])),
+      files: Object.fromEntries(BUILT_FILES.map((path) => [path, read(path)])),
     };
   });
   if (!outcome.ok) throw new Error(outcome.problem);
@@ -556,8 +569,8 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.release).toBe(built.head);
     expect(built.before).toBe(second);
     expect(built.build.commit).toBe(second);
-    expect(built.build.deleted).toEqual(['.changes/rafa-9.md', '.changes/rafa-1.md']);
-    expect(built.build.insertPoint).toBe('before-next-heading');
+    expect(built.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-9.md', '.changes/rafa-1.md'] }]);
+    expect(built.build.insertPoints).toEqual([{ package: null, changelog: 'CHANGELOG.md', point: 'before-next-heading' }]);
     expect(built.status).toBe('');
 
     expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`chore: release 0.5.0\n${second}`);
@@ -606,7 +619,7 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
     expect(soleUnit(built.build).version).toBe('0.4.1');
-    expect(built.build.deleted).toEqual(['.changes/rafa-3.md', '.changes/rafa-1.md']);
+    expect(built.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-3.md', '.changes/rafa-1.md'] }]);
     expect(soleUnit(built.build).section).toContain('<!-- rafa:fragments rafa-3 rafa-1 -->');
   });
 
@@ -658,8 +671,8 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
     expect(soleUnit(built.build).changelogMissing).toBe(true);
-    expect(built.build.createdChangelog).toBe('CHANGELOG.md');
-    expect(built.build.insertPoint).toBe('file-end');
+    expect(built.build.createdChangelog).toEqual(['CHANGELOG.md']);
+    expect(built.build.insertPoints).toEqual([{ package: null, changelog: 'CHANGELOG.md', point: 'file-end' }]);
     expect(built.files['CHANGELOG.md']).toBe(`${CHANGELOG_TITLE}\n\n${soleUnit(built.build).section}\n`);
     expect(built.status).toBe('');
     expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toContain('A\tCHANGELOG.md');
@@ -674,7 +687,7 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
     expect(soleUnit(built.build).changelogMissing).toBe(false);
-    expect(built.build.createdChangelog).toBeNull();
+    expect(built.build.createdChangelog).toEqual([]);
     expect(built.files['CHANGELOG.md']).toStartWith('# Changelog\n\nEvery release.\n\n## 0.5.0');
   });
 
@@ -773,6 +786,104 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.outcome).toBe('unbuilt');
     if (built.build.outcome !== 'unbuilt') return;
     expect(built.build.problem).toBe('the folded fragments could not be deleted: planted failure of git rm');
+    expect(built.head).toBe(built.before);
+  });
+});
+
+describe('buildSettle over a workspace, one commit for every unit', () => {
+  it('moves both versions and writes both changelogs in one commit, deleting every unit\'s fragments', async () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9', '2026-09-10T12:00:00Z');
+    const head = w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'minor', '@scope/plugin', ['- Plugin: a hook']) }, 'merge rafa-7', '2026-09-11T12:00:00Z');
+
+    const built = await buildIn(w);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.before).toBe(head);
+    expect(built.build.release).toBe(built.head);
+    expect(built.status).toBe('');
+    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`chore: release 0.5.0, @scope/plugin@0.2.0\n${head}`);
+    expect(w.git(w.caller, ['diff', '--name-status', head, built.head]).split('\n')).toEqual([
+      'D\t.changes/rafa-7.md',
+      'D\t.changes/rafa-9.md',
+      'M\tCHANGELOG.md',
+      'M\tpackage.json',
+      'A\tpackages/plugin/CHANGELOG.md',
+      'M\tpackages/plugin/package.json',
+    ]);
+    expect(built.files['package.json']).toBe(WORKSPACE_MANIFEST.replace('"version": "0.4.0"', '"version": "0.5.0"'));
+    expect(built.files['packages/plugin/package.json']).toBe(PLUGIN_MANIFEST.replace('"version": "0.1.0"', '"version": "0.2.0"'));
+    const [root, plugin] = built.build.units;
+    expect(built.files['CHANGELOG.md']).toStartWith(`# Changelog\n\nEvery release.\n\n${String(root?.section)}\n\n## 0.4.0`);
+    expect(built.files['packages/plugin/CHANGELOG.md']).toBe(`${CHANGELOG_TITLE}\n\n${String(plugin?.section)}\n`);
+    expect(plugin?.section).toContain('<!-- rafa:fragments rafa-7 -->');
+    expect(built.build.deleted).toEqual([
+      { package: null, paths: ['.changes/rafa-9.md'] },
+      { package: '@scope/plugin', paths: ['.changes/rafa-7.md'] },
+    ]);
+    expect(built.build.insertPoints).toEqual([
+      { package: null, changelog: 'CHANGELOG.md', point: 'before-next-heading' },
+      { package: '@scope/plugin', changelog: 'packages/plugin/CHANGELOG.md', point: 'file-end' },
+    ]);
+    expect(built.build.createdChangelog).toEqual(['packages/plugin/CHANGELOG.md']);
+    expect(built.files['packages/core/package.json']).toBe(CORE_MANIFEST);
+  });
+
+  it('leaves a package no fragment names byte-identical while the root moves', async () => {
+    const w = world(WORKSPACE_SEED);
+    const { second } = landTwo(w);
+
+    const built = await buildIn(w);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.files['packages/plugin/package.json']).toBe(PLUGIN_MANIFEST);
+    expect(built.files['packages/plugin/CHANGELOG.md']).toBe('<absent>');
+    expect(built.build.createdChangelog).toEqual([]);
+    expect(w.git(w.caller, ['diff', '--name-only', second, built.head]).split('\n')).toEqual([
+      '.changes/rafa-1.md',
+      '.changes/rafa-9.md',
+      'CHANGELOG.md',
+      'package.json',
+    ]);
+    expect(w.git(w.caller, ['log', '-1', '--format=%s', built.head])).toBe('chore: release 0.5.0');
+    // The control: the same build moved the root's manifest, so a plugin left alone is the grouping's doing.
+    expect(built.files['package.json']).toBe(WORKSPACE_MANIFEST.replace('"version": "0.4.0"', '"version": "0.5.0"'));
+  });
+
+  it('leaves the root byte-identical when only a package moves, naming the package alone in the subject', async () => {
+    const w = world(WORKSPACE_SEED);
+    const head = w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'patch', '@scope/plugin', ['- Plugin: a fix']) }, 'merge rafa-7');
+
+    const built = await buildIn(w);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.files['package.json']).toBe(WORKSPACE_MANIFEST);
+    expect(built.files['CHANGELOG.md']).toBe(CHANGELOG);
+    expect(built.files['packages/plugin/package.json']).toBe(PLUGIN_MANIFEST.replace('"version": "0.1.0"', '"version": "0.1.1"'));
+    expect(w.git(w.caller, ['log', '-1', '--format=%s', built.head])).toBe('chore: release @scope/plugin@0.1.1');
+    expect(w.git(w.caller, ['diff', '--name-only', head, built.head]).split('\n')).toEqual([
+      '.changes/rafa-7.md',
+      'packages/plugin/CHANGELOG.md',
+      'packages/plugin/package.json',
+    ]);
+  });
+
+  it('refuses a package manifest whose version in the worktree is not the base commit\'s, committing nothing', async () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
+    w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'minor', '@scope/plugin', ['- Plugin: a hook']) }, 'merge rafa-7');
+
+    const built = await buildIn(w, SETTINGS, (worktree) => {
+      writeFileSync(join(worktree.path, 'packages/plugin/package.json'), PLUGIN_MANIFEST.replace('0.1.0', '0.1.5'));
+      return worktree;
+    });
+
+    expect(built.build.outcome).toBe('unbuilt');
+    if (built.build.outcome !== 'unbuilt') return;
+    expect(built.build.problem).toBe('packages/plugin/package.json declared 0.1.5 in the worktree, where the base commit declares 0.1.0');
     expect(built.head).toBe(built.before);
   });
 });

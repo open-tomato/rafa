@@ -209,9 +209,9 @@ function built(): SettleBuilt {
     fragments: [FRAGMENT],
     units: [rootUnit()],
     release: 'c'.repeat(40),
-    deleted: ['.changes/rafa-9.md'],
-    insertPoint: 'before-next-heading',
-    createdChangelog: null,
+    deleted: [{ package: null, paths: ['.changes/rafa-9.md'] }],
+    insertPoints: [{ package: null, changelog: 'CHANGELOG.md', point: 'before-next-heading' }],
+    createdChangelog: [],
     lock: null,
   };
 }
@@ -244,7 +244,7 @@ describe('settledResult, the outcomes rendered from literals', () => {
   });
 
   it('names a changelog the release commit created, above the push line', () => {
-    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoints: [{ package: null, changelog: 'CHANGELOG.md', point: 'file-end' }], createdChangelog: ['CHANGELOG.md'] };
     const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build } };
 
     const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
@@ -259,7 +259,7 @@ describe('settledResult, the outcomes rendered from literals', () => {
   });
 
   it('names no created changelog when the push was refused, since nothing landed', () => {
-    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoints: [{ package: null, changelog: 'CHANGELOG.md', point: 'file-end' }], createdChangelog: ['CHANGELOG.md'] };
     const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'protected', exitCode: 1, attempts: 1, build, sentence: 'main is protected' } };
 
     const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');

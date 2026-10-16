@@ -277,7 +277,7 @@ describe('tagSettle under release.tag: settle and a push delivery', () => {
 
     expect(run.delivered.outcome.attempts).toBe(2);
     const build = pushedBuild(run.delivered);
-    expect(build.deleted).toContain('.changes/rafa-4.md');
+    expect(build.deleted.flatMap((unit) => unit.paths)).toContain('.changes/rafa-4.md');
     expect(run.tagged.outcome).toBe('tagged');
     expect(tagCommit(w, w.origin, TAG)).toBe(originMain(w));
     expect(originMain(w)).toBe(build.release);

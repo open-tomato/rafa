@@ -332,7 +332,7 @@ describe('settleByPush, the refused-push rule', () => {
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.commit).toBe(arrived);
     expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['1.0.0']);
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
     expect(w.git(w.origin, ['log', '-1', '--format=%s%n%P', 'main'])).toBe(`chore: release 1.0.0\n${arrived}`);
     expect(originFragments(w)).toEqual([]);
@@ -352,7 +352,7 @@ describe('settleByPush, the refused-push rule', () => {
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.baseVersion).toBe('0.5.0');
     expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['0.5.1']);
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-1.md']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-1.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
   });
 

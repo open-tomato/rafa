@@ -327,8 +327,8 @@ export function settledResult(
   const ending = deliveryEnding(delivered, branch);
   if (ending.refuses) return resultOf(base, lines, ending.line);
   const landed = delivered.outcome.outcome === 'pushed' || delivered.outcome.outcome === 'delivered';
-  if (landed && reading.outcome === 'built' && reading.createdChangelog !== null) {
-    lines.push(createdChangelogLine(reading.createdChangelog));
+  if (landed && reading.outcome === 'built') {
+    for (const changelog of reading.createdChangelog) lines.push(createdChangelogLine(changelog));
   }
   if (landed && reading.outcome === 'built' && reading.lock !== null) {
     lines.push(`Lock: ${reading.lock.path} moved to ${reading.lock.to}.`);

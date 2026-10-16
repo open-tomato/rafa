@@ -69,8 +69,8 @@ function built(fragments: readonly SettleFragment[]): SettleBuilt {
     version: '0.5.0',
     section: '## 0.5.0',
     release: hash('f'),
-    deleted: fragments.map((each) => each.path),
-    insertPoint: 'before-next-heading',
+    deleted: [{ package: null, paths: fragments.map((each) => each.path) }],
+    insertPoints: [{ package: null, changelog: 'CHANGELOG.md', point: 'before-next-heading' }],
   };
 }
 

@@ -68,10 +68,14 @@ calendar-based versioning) while keeping the default simple.
 first-parent commit, folding them to a version and section, then delivering by
 one of two methods:
 
-**Push delivery** (default): Settle writes the version and section on the base
-branch, deletes the fragments it folded, commits `chore: release <version>` and
-pushes. If the push is refused, settle fetches again. If the fragments it folded
-are gone (another machine settled them), it stops with exit 0. If new fragments
+**Push delivery** (default): Settle writes each unit's version and section on
+the base branch (the root's, and each workspace package a fragment names),
+deletes the fragments it folded, commits them all at once as
+`chore: release <version>`, `chore: release <version>, <name>@<version>` or
+`chore: release <name>@<version>` (`releaseCommitSubject`,
+`src/release/release-move.ts`) and pushes. If the push is refused, settle
+fetches again. If the fragments it folded are gone (another machine settled
+them), it stops with exit 0. If new fragments
 arrived, it recomputes and retries once, then stops with exit 1 if that retry
 is refused.
 

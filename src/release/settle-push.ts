@@ -319,7 +319,7 @@ function superseded(
   base: string,
   attempts: SettlePushAttempts,
 ): SettleSuperseded {
-  const first = build.deleted[0];
+  const first = build.deleted.flatMap((unit) => unit.paths)[0];
   const winner = first === undefined
     ? null
     : deletedBy(worktree.git, base, first);
@@ -403,7 +403,7 @@ export function settleByPush(worktree: SettleWorktree, settings: SettleSettings,
 
   const refetched = refetchBase(worktree);
   if ('problem' in refetched) return failed('unpushed', build, 1, refetched.problem);
-  const present = stillPresent(worktree.git, refetched.base, build.deleted);
+  const present = stillPresent(worktree.git, refetched.base, build.deleted.flatMap((unit) => unit.paths));
   if ('problem' in present) return failed('unpushed', build, 1, present.problem);
   if (present.present.length === 0) return superseded(worktree, build, refetched.base, 1);
 
