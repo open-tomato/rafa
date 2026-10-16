@@ -2810,6 +2810,13 @@ say nothing of why.
 - **`module exec`** declares `exec` and `needsProject: false`. Typed with
   no module word it refuses with exit code 1, naming each mount and its
   actions, or that none is mounted.
+- **The entries register core.** `src/rafa.ts` and `src/index.ts` call
+  `registerCoreConfigSections` (`src/config-registry.ts`), then
+  `registerCoreAdapters` (`src/adapter-registry.ts`), in place of the
+  effect imports a bundler drops under `"sideEffects": false`. The test
+  suite gets the same two calls from `src/tests/preload.ts`, which
+  `bunfig.toml` names under `[test] preload`; a child process a test
+  spawns runs no preload and calls the entries itself.
 
 ### One invocation
 
