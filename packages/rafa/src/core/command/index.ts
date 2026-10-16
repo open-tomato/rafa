@@ -14,7 +14,8 @@
  *   - `command.ts`: `RafaCommand`, the `RafaContext` it runs with,
  *     `CommandExit`, the routing words and the shape check;
  *   - `confirm.ts`: the `Prompter` every yes-or-no question goes
- *     through, and the line prompter that reads one from a stream;
+ *     through, the line prompter that reads one from a stream, and the
+ *     lazy prompter that opens one only to ask;
  *   - `lazy.ts`: `CommandDeclaration`, a command less its `run`, and
  *     `lazyCommand`, the command over a declaration whose `run` imports
  *     the command's module and delegates to its default export;
@@ -105,7 +106,7 @@ export type {
   RafaContext,
   RafaFlagSpec,
 } from './command.js';
-export type { PromptOutput, Prompter } from './confirm.js';
+export type { LazyPrompter, PromptOutput, Prompter } from './confirm.js';
 export type { CommandDeclaration } from './lazy.js';
 export type {
   CommandAlias,
@@ -133,7 +134,7 @@ export {
   isRoutingWord,
   isTopLevel,
 } from './command.js';
-export { createLinePrompter } from './confirm.js';
+export { createLinePrompter, lazyPrompter } from './confirm.js';
 export { lazyCommand } from './lazy.js';
 export {
   restoreRunningCommand,

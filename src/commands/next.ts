@@ -265,7 +265,7 @@ import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { pullBeforeRead } from '../effort/sync/contact.js';
@@ -295,7 +295,6 @@ import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
 import { REMOTE } from '../start/branch-decision.js';
 
-import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument } from './plan/plan-files.js';
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */

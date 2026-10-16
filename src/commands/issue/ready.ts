@@ -21,7 +21,7 @@
  * {@link Prompter} `rafa init`, `pr merge` and `issue unblock` read an
  * answer with, so a json-mode stdout stays NDJSON. An answer that is
  * not `y` or `yes` declines, the empty answer and an input that ended
- * included ({@link answeredYes}): the question is spelled `[y/N]`.
+ * included ({@link lazyPrompter}): the question is spelled `[y/N]`.
  *
  * Without a terminal and without `--yes` nothing is asked and nothing
  * is written. The two readings are printed anyway and the run reports
@@ -164,7 +164,7 @@ import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
@@ -183,7 +183,6 @@ import {
 } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
-import { answeredYes } from '../../start/branch-decision.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
@@ -489,30 +488,6 @@ export interface ReadySeams {
 
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_READY_SEAMS: ReadySeams = Object.freeze({});
-
-/**
- * The prompter the one question goes through, opened to ask it and
- * closed by `close`. Nothing is opened by a run that never asks.
- *
- * Exported for `../plan/ready-offer.ts`, which puts this command's
- * question inside a `plan create` run, for `../next.ts`, which puts
- * one question per step of its chain, and for `../cleanup.ts`, which
- * asks after its checklist: each must open and close the terminal the
- * same way rather than spelling the pair again.
- */
-export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () => void } {
-  let prompter: Prompter | null = null;
-  return {
-    ask: async (question: string): Promise<boolean> => {
-      prompter ??= open();
-      return answeredYes(await prompter.ask(question));
-    },
-    close: (): void => {
-      prompter?.close();
-      prompter = null;
-    },
-  };
-}
 
 /**
  * Runs the marking a line asks for: the line, the project's

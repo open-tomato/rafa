@@ -75,7 +75,7 @@
  *      that did not, and exit code 1 when any did not.
  *
  * The yes-or-no questions, yes being `y` or `yes`, go through a line
- * {@link Prompter} that `lazyPrompter` (`./issue/ready.ts`) opens only
+ * {@link Prompter} that `lazyPrompter` (`@open-tomato/rafa/core/command`) opens only
  * once the checklist has answered, since two readers over one standard
  * input would each take part of what is typed. A stale row is
  * confirmed by the final question alone, and so is an Only on origin
@@ -119,7 +119,7 @@ import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import {
   cleanupSteps,
@@ -143,7 +143,6 @@ import {
   runRowLine,
   worktreeRowLine,
 } from './cleanup-render.js';
-import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from './plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

@@ -41,7 +41,7 @@
  * read the body for the leak refusal first, and a leaking unlabelled
  * body would change which sentence the run ends with.
  *
- * The prompter is opened only to ask, through `issue ready`'s own
+ * The prompter is opened only to ask, through the command contract's
  * {@link lazyPrompter}, and closed as soon as the question is answered.
  *
  * ## Nothing here spawns
@@ -55,10 +55,10 @@ import type { ReadyOffer, ReadyOfferRequest } from '../../board/plan-spec.js';
 import type { ReadyReport } from '../issue/ready.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import { createLinePrompter } from '@open-tomato/rafa/core/command';
+import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { lazyPrompter, runIssueReady } from '../issue/ready.js';
+import { runIssueReady } from '../issue/ready.js';
 
 /** What the offer is: one run of `rafa issue ready` over an issue already read. */
 export type ReadyRun = typeof runIssueReady;

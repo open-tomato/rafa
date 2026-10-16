@@ -638,7 +638,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./move-project.js', ['refreshMovedIssue']],
   ]],
   ['./commands/issue/ready.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
     ['../../adapters/tracker/github.js', ['createGhRunner', 'moduleOfLabels', 'typeOfLabels']],
@@ -651,7 +651,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/readiness.js', ['hasSpecReadyLabel', 'READINESS_REFUSAL_EXIT', 'requireCompleteSpec', 'SPEC_READY_LABEL']],
     ['../../board/trust.js', ['ghBoardTrust', 'requireTrustedBoardAuthor']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../start/branch-decision.js', ['answeredYes']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/unblock.js', [
@@ -1321,7 +1320,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/plan-files.js', ['resolveProjectConfig']],
   ]],
   ['./commands/next.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
@@ -1336,7 +1335,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../next/state.js', ['readHomeAfterLoop', 'readNextState']],
     ['../next/sync.js', ['fastForwardBase']],
     ['../start/branch-decision.js', ['REMOTE']],
-    ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/roadmap.js', [
@@ -1413,13 +1411,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],
     ['../cli/prompt/terminal.js', ['processTerminal']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
     ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
-    ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
