@@ -480,7 +480,7 @@ const CLI_IMPORTS: ImportList = [
   ['./adapter-registry.js', ['registerCoreAdapters']],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
-  ['./commands/index.js', ['CORE_REGISTRY']],
+  ['./commands/index.js', ['createRosterRegistry']],
   ['./config-registry.js', ['registerCoreConfigSections']],
   ['./modules/activate.js', ['activateModuleAdapters']],
   ['./modules/load.js', ['loadInvocationModules']],

@@ -26,8 +26,11 @@
  * those modules registered the active registry with
  * `activateModuleAdapters` (`src/modules/activate.ts`), so a module's
  * kind resolves through `CORE_ADAPTER_REGISTRY` for the invocation.
- * `src/commands/index.ts`
- * holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
+ * It then builds the registry it dispatches through with
+ * `createRosterRegistry` (`src/commands/index.ts`), core's commands
+ * plus every bundled feature the project's config does not turn off
+ * (`LoadedModules.disabledFeatures`), so a feature turned off neither
+ * routes nor renders help. `src/commands/index.ts` holds the roster, `src/cli/help.ts` renders `rafa --help` and the help
  * of each subject and action from it, and `src/cli/dispatch.ts` routes
  * the line, runs the command, writes its events and answers the exit
  * code, which this module sets on the process. It hands the dispatcher
@@ -43,7 +46,11 @@
  * which hands the thirteen sections of the config schema to core, then
  * `registerCoreAdapters`, both before it loads the project's modules,
  * so every setting is registered before anything run here reads a
- * config and core's adapters before anything resolves one. A call
+ * config and core's adapters before anything resolves one. From
+ * `src/commands/index.ts` it imports `createRosterRegistry` rather than
+ * the default `CORE_REGISTRY`, since the roster it dispatches through
+ * depends on the features the loaded config turns off, which is known
+ * only after `loadInvocationModules` has run. A call
  * survives a bundler that drops an import kept for its effect alone.
  *
  * Importing the module dispatches `process.argv`, so no library module
@@ -54,7 +61,7 @@ import { homedir } from 'node:os';
 import { registerCoreAdapters } from './adapter-registry.js';
 import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
-import { CORE_REGISTRY } from './commands/index.js';
+import { createRosterRegistry } from './commands/index.js';
 import { registerCoreConfigSections } from './config-registry.js';
 import { activateModuleAdapters } from './modules/activate.js';
 import { loadInvocationModules } from './modules/load.js';
@@ -65,8 +72,9 @@ registerCoreAdapters();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
 activateModuleAdapters(modules);
+const registry = createRosterRegistry({ off: modules.disabledFeatures });
 const { exitCode } = await dispatch(process.argv.slice(2), {
-  registry: CORE_REGISTRY,
+  registry,
   renderHelp,
   modules: modules.commands,
   warnings: modules.warnings,

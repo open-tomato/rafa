@@ -161,7 +161,7 @@ module's note is the long form.
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/adapters/tracker/github-open-issues.ts` | the `openIssues` reading of the `github` Tracker adapter: one `gh issue list --state open` narrowed by the `type:` label and asking for `OPEN_LIST_FIELDS`, so each row carries its title, body and `createdAt` in the one call. A row whose `createdAt` is missing or unparseable answers null, and the listing goes on; a row whose title or body is not a string fails it. Up to `OPEN_ISSUES_LIMIT` rows, newest first as `gh` lists them. `github.ts` hands it its own runner and row readers. The pit stop's open-bug count reads it as `openIssues('bug')`; its filed-since line reads `filedIssues` (`github-filed-issues.ts`) instead, so a bug closed after filing stays listed there |
 | `src/adapters/tracker/github-filed-issues.ts` | the `filedIssues` reading of the `github` Tracker adapter: one `gh issue list --state all` narrowed by the `type:` label and by a `--search` of `created:>=<since>`, `since` written to the second in UTC, asking for `OPEN_LIST_FIELDS` up to `OPEN_ISSUES_LIMIT` rows, newest first, so an issue closed since its filing is listed beside the open ones. A row whose `createdAt` is missing or unparseable fails the listing, naming the row, as one whose title or body is not a string does; a `since` that is no valid `Date` and a type the port does not name are refused before anything is sent. `github.ts` hands it the readers it hands `openIssues` |
-| `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
+| `src/rafa.ts` | the entry: `process.argv` dispatched through `createRosterRegistry({ off: modules.disabledFeatures })`, built after `loadInvocationModules`, with `renderHelp`, and the exit code set |
 
 ### Project scope and configuration discovery
 
@@ -2782,7 +2782,8 @@ does, reads its config with the unknown-key warnings dropped, since a
 command reading the config warns once, and hands `loadModules` the
 config's `modules:` and `allowList:`, with the bundled features whose
 `features.<name>` resolved `false`, which it answers back as
-`disabledFeatures`. Outside a project nothing is loaded
+`disabledFeatures`, which `src/rafa.ts` hands to
+`createRosterRegistry({ off })`. Outside a project nothing is loaded
 or warned, and a config `loadConfig` refuses or a walk the scope refuses
 loads nothing and warns nothing: the command reading the config, or the
 dispatcher placing a command in a project, says why once. So
