@@ -49,4 +49,4 @@ Outputs:
   text, json
 
 See also:
-  rafa release status, rafa release settle
+  rafa release status, rafa release settle, rafa release list

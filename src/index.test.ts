@@ -983,6 +983,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/status-readings.js', ['readTags', 'readUntagged', 'rootTags']],
     ['../../release/version.js', ['readManifestVersion']],
     ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
+    ['./status-packages.js', ['packagesCell', 'packagesLines', 'readPackages']],
     ['./status-stale-docs.js', ['readStaleDocs', 'readStaleDocsSafely', 'staleDocsCell', 'staleDocsProblem']],
   ]],
   ['./commands/release/settle.js', [
@@ -1014,6 +1015,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./status.js', ['DEFAULT_RELEASE_SEAMS']],
     ['./tag-follow-ups.js', ['followUpsFor', 'readPublishTarget']],
     ['./tag-units.js', ['readNewestRelease', 'readTagPackages', 'readUnitInputs', 'readVersion', 'unitDecisionOf']],
+  ]],
+  ['./commands/release/list.js', [
+    ['../../pr/index.js', ['createGitRunner']],
+    ['../../release/status-readings.js', ['readTags']],
+    ['../../release/version.js', ['readManifestName']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
+    ['./status-fragments.js', ['readWaiting', 'waitingSettingsOf']],
+    ['./status-packages.js', ['packagesLines', 'readPackages']],
+    ['./status.js', ['DEFAULT_RELEASE_SEAMS', 'readVersionFile', 'UNREADABLE']],
   ]],
   ['./commands/board/list.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -1669,6 +1679,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/status.js',
       './commands/release/settle.js',
       './commands/release/tag.js',
+      './commands/release/list.js',
       './commands/board/list.js',
       './commands/board/sync.js',
       './commands/epic/show.js',

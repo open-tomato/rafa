@@ -282,6 +282,16 @@ readers other folders import (`compareVersions`, `changelogVersions`,
 `readTags`, `readUntagged`, `rootTags`) are its library half,
 `src/release/status-readings.ts`.
 
+**`rafa release list`** prints one row per unit that releases on its own,
+the root first (`@open-tomato/rafa  0.45.0  2 waiting  v0.45.0`), then each
+publishable workspace package in the columns of the `packages` row: name,
+version, waiting fragments and newest tag, or `untagged`. The root's name is
+the version file's manifest `name`, for display only; its version comes from
+`release.versionFile`, its waiting count from the base's fragments with no
+`package` line, its tag from the latest root tag. A column it could not read
+is `?`, with the reason under the rows, and it still exits 0. Never writes.
+Implemented in `src/commands/release/list.ts`, over `status`'s readers.
+
 **`rafa pr list`** shows each open pull request's forecast (the version and
 section that settle would produce if the branch merged now), marked as forecast,
 and marks it `(base moved)` when the base branch has changed version or waiting

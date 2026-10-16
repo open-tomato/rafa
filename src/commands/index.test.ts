@@ -8,7 +8,7 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
+ * `release status`, `release settle`, `release tag`, `release list`, `board list`, `board sync`,
  * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -181,6 +181,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release status': ['text', 'json'],
   'release settle': ['text', 'json'],
   'release tag': ['text', 'json'],
+  'release list': ['text', 'json'],
   'board list': ['text', 'json'],
   'board sync': ['text', 'json'],
   'claim release': ['text', 'json'],
@@ -260,6 +261,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release status': [[], ['plan']],
   'release settle': [[], ['dry-run']],
   'release tag': [[], ['push']],
+  'release list': [[], []],
   'board list': [[], []],
   'board sync': [[], ['dry-run']],
   'status': [[], []],
@@ -522,9 +524,9 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
 };
 
-/** The value a spelled English number names, a hyphenated tens word and ones word added together. */
+/** The value a spelled English number names, its words joined by a hyphen or `and` added together. */
 function numberWord(word: string): number {
-  return word.split('-').reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
+  return word.split(/-| and /).reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
 }
 
 /** The module note of `src/commands/index.ts`, read fresh so it stays honest as the roster grows. */
@@ -536,7 +538,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the four release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -600,6 +602,7 @@ describe('the core roster', () => {
       'release status',
       'release settle',
       'release tag',
+      'release list',
       'board list',
       'board sync',
       'epic show',
@@ -670,7 +673,7 @@ describe('the core roster', () => {
 
 describe('the module note\'s count word', () => {
   it('names the roster at exactly CORE_COMMANDS.length', () => {
-    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:-[a-z]+)?) registered so far/);
+    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:(?:-| and )[a-z]+)?) registered so far/);
 
     expect(match).not.toBeNull();
     expect(numberWord(match?.[1] ?? '')).toBe(CORE_COMMANDS.length);
@@ -678,6 +681,11 @@ describe('the module note\'s count word', () => {
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
     expect(numberWord('forty-two')).not.toBe(CORE_COMMANDS.length);
+  });
+
+  it('reads a count spelled with and as its words added together', () => {
+    expect(numberWord('hundred and one')).toBe(101);
+    expect(numberWord('hundred and')).toBeNaN();
   });
 });
 
