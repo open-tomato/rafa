@@ -52,4 +52,5 @@ Outputs:
   text, json
 
 See also:
-  rafa release status, rafa release settle, rafa release list
+  rafa release status, rafa release settle, rafa release publish, rafa release
+  list

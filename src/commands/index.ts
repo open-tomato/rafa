@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred and one registered so far
+ * of each is its command. Four of the hundred and two registered so far
  * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
  * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -239,7 +239,11 @@
  *     which puts `v<version>` on the release branch's HEAD and prints
  *     the push and publish lines rather than running them, refusing on
  *     another branch, on a tag already there, and where the two release
- *     files disagree; and `release list`, one row per unit that
+ *     files disagree; `release publish [--tag=<tag>] [--dry-run]`,
+ *     which runs `release.publishCommand` in the directory of each
+ *     release unit whose tag points at HEAD, skipping a version the
+ *     registry holds and stopping at the first publish that fails; and
+ *     `release list`, one row per unit that
  *     releases on its own, the root first and then each publishable
  *     workspace package, with its version, the fragments waiting for it
  *     and its newest tag, writing nothing.
@@ -492,6 +496,7 @@ import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
 import prWait from './pr/wait.js';
 import releaseList from './release/list.js';
+import releasePublish from './release/publish.js';
 import releaseSettle from './release/settle.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
@@ -528,7 +533,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
-  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
+  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it; publish the tagged units' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home; sync the GitHub project' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
@@ -604,6 +609,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseSettle,
   releaseTag,
+  releasePublish,
   releaseList,
   boardList,
   boardSync,

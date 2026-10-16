@@ -115,10 +115,12 @@
  *     one write of the tag, and `settle` has settle put it on the
  *     commit it pushes.
  *
- * One more `release` setting is text rafa prints and never runs:
+ * One more `release` setting is text `rafa release tag` prints and
+ * `rafa release publish` runs:
  *
  *   - `release.publishCommand` defaults to `npm publish`, the command
- *     `rafa release tag` names for the publish after the tag. It is free
+ *     `rafa release tag` names for the publish after the tag and
+ *     `rafa release publish` runs in each tagged unit's folder. It is free
  *     text, so a project that publishes with another tool, or with a
  *     flag such as `--tag next`, says so here. It was read off the
  *     manifest's `packageManager` field until 2026-09-30, which named
@@ -282,7 +284,7 @@ export interface ReleaseSettings {
   releaseSettle: ReleaseSettleMode;
   /** Who tags a settled version. `release.tag`. */
   releaseTag: ReleaseTagMode;
-  /** The command `rafa release tag` prints for the publish, which it never runs. `release.publishCommand`. */
+  /** The command `rafa release tag` prints for the publish and `rafa release publish` runs. `release.publishCommand`. */
   releasePublishCommand: string;
   /** Who publishes a tagged version: a person, or CI on the pushed tag. `release.publish`. */
   releasePublish: ReleasePublishMode;

@@ -372,9 +372,11 @@ fails). Read by `rafa release settle` and `rafa release tag`. Under
 request merges.
 
 **`release.publishCommand`** — The command `rafa release tag` prints for the
-publish, default `npm publish`. Free text, printed as written and never run, so
-a project that publishes with another tool or a flag (`pnpm publish --tag
-next`) spells it here. When HEAD is past the tagged commit the line becomes
+publish, default `npm publish`. Free text: `rafa release tag` prints it as
+written and never runs it, and `rafa release publish` runs it through the shell
+in each unit's folder for the release tags on HEAD, skipping a version the
+registry holds (`src/commands/release/publish.ts`). So a project that publishes
+with another tool or a flag (`pnpm publish --tag next`) spells it here. When HEAD is past the tagged commit the line becomes
 `git switch --detach <tag> && <publishCommand> && git switch <branch>`, so the
 tagged tree is the one published. A workspace package's line runs it in the
 package's folder: `(cd <dir> && <publishCommand>)`. The manifest's `packageManager` field is not

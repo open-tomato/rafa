@@ -255,8 +255,8 @@ pr:
 The keys are: `release.fragments` (path, default `.changes/`), `release.strategy`
 (fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
 default `push`), `release.tag` (`manual` or `settle`, default `manual`),
-`release.publishCommand` (the publish line `rafa release tag` prints and never
-runs, default `npm publish`), `release.publish` (`manual` or `ci`, who
+`release.publishCommand` (the publish line `rafa release tag` prints and
+`rafa release publish` runs in each tagged unit's folder, default `npm publish`), `release.publish` (`manual` or `ci`, who
 publishes a tagged version, default `manual`), and `release.moveLock` (`true`
 has settle write `rafa.lock` in its release commit, default `false`). `pr.versionCollision`
 controls what happens when a merge would collide (default `report`). Read `context/release.md` for the full design,

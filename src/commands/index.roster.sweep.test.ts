@@ -3,7 +3,8 @@
  * name default-exports the very object the roster holds, and `rafa
  * describe` lists the command names it listed at `origin/stretch/102`,
  * with `docs plan` registered since after `bug codes`, `config show`
- * since after `config set` and `release list` since after `release tag`.
+ * since after `config set`, `release list` since after `release tag` and
+ * `release publish` since between those two.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -22,7 +23,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
 const DEFAULT_IMPORT = /^import (\w+) from '(\.\/[^']+)\.js';$/gm;
 
-/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show` and `release list` added: `<subject> <action>`, then top-level names. */
+/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list` and `release publish` added: `<subject> <action>`, then top-level names. */
 const BASE_NAMES: readonly string[] = [
   'plan create',
   'plan list',
@@ -86,6 +87,7 @@ const BASE_NAMES: readonly string[] = [
   'release status',
   'release settle',
   'release tag',
+  'release publish',
   'release list',
   'board list',
   'board sync',
@@ -155,7 +157,7 @@ describe('the commands roster', () => {
     expect(CORE_COMMANDS.length).toBe(modules.length);
   });
 
-  it('lists through `rafa describe` the same command names as at origin/stretch/102, docs plan, config show and release list added', () => {
+  it('lists through `rafa describe` the same command names as at origin/stretch/102, docs plan, config show, release list and release publish added', () => {
     // Arrange
     const spawned = Bun.spawnSync(['bun', 'src/rafa.ts', 'describe'], { cwd: REPO_ROOT, stderr: 'pipe' });
 
