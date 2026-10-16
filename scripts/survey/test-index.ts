@@ -27,12 +27,13 @@
  *     (a refusal, a risen test or an unread one) or a file is unplaced.
  *
  * Either flag is refused without `--map=<file>`, and `--map=<file>` is
- * refused alone. The map is the cut table, `docs/survey/cut-table.json`
- * as `scripts/survey/cut-table.ts` writes it, read by `cut-map.ts`: a
- * file's unit is the `name` of the `packages[]` row whose `files` list it,
- * or the `folder` of the `unassigned[]` entry whose `files` list it
- * (`src/ci/`). No other key of the table is read, and a file it lists
- * nowhere is unplaced.
+ * refused alone; the modes, the flags and `parseMode`, which reads them,
+ * lie in `test-index-args.ts`. The map is the cut table,
+ * `docs/survey/cut-table.json` as `scripts/survey/cut-table.ts` writes it,
+ * read by `cut-map.ts`: a file's unit is the `name` of the `packages[]`
+ * row whose `files` list it, or the `folder` of the `unassigned[]` entry
+ * whose `files` list it (`src/ci/`). No other key of the table is read,
+ * and a file it lists nowhere is unplaced.
  *
  * The rule per kind, which the record and the guard apply: a test's kind
  * is read from its name through `tests.contract` and `tests.integration`
@@ -65,8 +66,9 @@
  *   - A test spawns a process when its own text, or the text of a support
  *     file it reaches, calls `Bun.spawn`, `Bun.spawnSync` or `Bun.$`,
  *     imports `$` from `bun`, or imports `node:child_process` by value.
- *     The calls are read from a TypeScript parse, so a comment or a string
- *     naming them is not one. A source file the test reaches may spawn too
+ *     The calls are read from a TypeScript parse (`spawnApis`, in
+ *     `test-index-spawn.ts`), so a comment or a string naming them is not
+ *     one. A source file the test reaches may spawn too
  *     (git, `gh`); that is the code under test, not the test, and does not
  *     double the index.
  *
@@ -107,13 +109,12 @@
 import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
 import type { ImportGraph } from './import-graph';
+import type { AgainstMode, WritingMode } from './test-index-args';
 import type { RecordComparison } from './test-index-guard';
 import type { RecordInput, TestRecord } from './test-index-record';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
-
-import ts from 'typescript';
 
 import { readCutMap } from './cut-map';
 import { classifyFile, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
@@ -125,9 +126,11 @@ import {
   stableJson,
 } from './import-graph';
 import { readMembers } from './package-entries';
+import { parseMode } from './test-index-args';
 import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
+import { spawnApis } from './test-index-spawn';
 import { readTestKindGlobs } from './test-kinds';
 
 /** What the index is computed from, all of it passed in as data. */
@@ -207,37 +210,6 @@ export interface IndexRules {
   readonly spawnedUnplaced?: readonly string[];
 }
 
-/** The record mode, with the map it reads. */
-export interface BaselineMode {
-  /** Always `true`: the mode writes the record. */
-  readonly baseline: true;
-  /** The map's path, absolute or relative to the repository root. */
-  readonly map: string;
-}
-
-/** The guard, with the record and the map it reads. */
-export interface AgainstMode {
-  /** The record's path, absolute or relative to the repository root. */
-  readonly against: string;
-  /** The map's path, absolute or relative to the repository root. */
-  readonly map: string;
-}
-
-/** A mode that writes files: the survey's two, or the record. */
-export type WritingMode = 'survey' | BaselineMode;
-
-/** What a command line asks for: the survey's files, the record, or the guard. */
-export type TestIndexMode = WritingMode | AgainstMode;
-
-/** The flag that picks the record mode. */
-export const BASELINE_FLAG = '--baseline';
-
-/** The flag that picks the guard, up to the record's path. */
-export const AGAINST_FLAG = '--against=';
-
-/** The flag that names the map either mode reads, up to the map's path. */
-export const MAP_FLAG = '--map=';
-
 /** The bin's entry, the file a spawned `rafa` process starts from. */
 export const BIN_ENTRY = 'src/rafa.ts';
 
@@ -245,8 +217,6 @@ export const BIN_ENTRY = 'src/rafa.ts';
 export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
 
 const PACKAGE_FILE = /^(packages\/[^/]+)\/src\//;
-const SPAWNING_MEMBERS: ReadonlySet<string> = new Set(['$', 'spawn', 'spawnSync']);
-const CHILD_PROCESS: ReadonlySet<string> = new Set(['child_process', 'node:child_process']);
 
 /**
  * The folder a file counts as: `packages/<name>` for a file of a package,
@@ -311,81 +281,6 @@ export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
     spawnedReach: [...units].sort(),
     spawnedUnplaced: unplaced.sort(),
   };
-}
-
-/**
- * Whether an import declaration brings in a binding that runs: not
- * `import type`, and not a named list whose every element is `type`.
- *
- * @param node - An import declaration.
- * @returns `true` when the import survives to run time.
- */
-function importsValue(node: ts.ImportDeclaration): boolean {
-  const clause = node.importClause;
-  if (clause === undefined) {
-    return true;
-  }
-  if (clause.isTypeOnly) {
-    return false;
-  }
-  const bindings = clause.namedBindings;
-  if (clause.name !== undefined || bindings === undefined || !ts.isNamedImports(bindings)) {
-    return true;
-  }
-  return bindings.elements.length === 0 || bindings.elements.some((element) => !element.isTypeOnly);
-}
-
-/**
- * The spawning call or import a node is, if it is one.
- *
- * @param node - Any node of a parsed source file.
- * @returns How it spawns (`Bun.spawn`, `node:child_process`, …), or `undefined`.
- */
-function spawnApiOf(node: ts.Node): string | undefined {
-  if (ts.isPropertyAccessExpression(node)
-    && ts.isIdentifier(node.expression)
-    && node.expression.text === 'Bun'
-    && SPAWNING_MEMBERS.has(node.name.text)) {
-    return `Bun.${node.name.text}`;
-  }
-  if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || !importsValue(node)) {
-    return undefined;
-  }
-  const module = node.moduleSpecifier.text;
-  if (CHILD_PROCESS.has(module)) {
-    return module;
-  }
-  const bindings = node.importClause?.namedBindings;
-  const importsDollar = bindings !== undefined
-    && ts.isNamedImports(bindings)
-    && bindings.elements.some((element) => !element.isTypeOnly && (element.propertyName ?? element.name).text === '$');
-  return module === 'bun' && importsDollar
-    ? '$ from bun'
-    : undefined;
-}
-
-/**
- * The ways a source text spawns a process, read from a TypeScript parse.
- *
- * @param path - The file's path, which picks the parser's script kind.
- * @param text - The file's source text.
- * @returns Each spawning call or import found, sorted, without duplicates.
- */
-export function spawnApis(path: string, text: string): string[] {
-  const kind = /\.(?:js|mjs)$/.test(path)
-    ? ts.ScriptKind.JS
-    : ts.ScriptKind.TS;
-  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false, kind);
-  const found = new Set<string>();
-  const visit = (node: ts.Node): void => {
-    const api = spawnApiOf(node);
-    if (api !== undefined) {
-      found.add(api);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return [...found].sort();
 }
 
 /**
@@ -608,91 +503,6 @@ export function renderTestIndexJson(index: TestIndex): string {
     tests: Object.fromEntries(index.tests.map(({ test, ...entry }) => [test, entry])),
     unindexed: index.unindexed,
   });
-}
-
-/**
- * The value after `flag` in `arg`, when `arg` opens with it and holds one.
- *
- * @param arg - One argument.
- * @param flag - A flag that takes its value after `=`.
- * @returns The value, or `undefined` when `arg` is not the flag or holds no value.
- */
-function flagValue(arg: string, flag: string): string | undefined {
-  return arg.startsWith(flag) && arg.length > flag.length
-    ? arg.slice(flag.length)
-    : undefined;
-}
-
-/** The arguments a command line holds, each read once. */
-interface ParsedArgs {
-  readonly baseline: boolean;
-  readonly against: string | undefined;
-  readonly map: string | undefined;
-}
-
-/**
- * Reads each argument as one of the three flags, refusing any other and
- * any flag passed twice.
- *
- * @param args - The arguments after the script's path.
- * @param usage - The refusal's text for an argument that is none of them.
- * @returns The flags read.
- * @throws When an argument is none of the flags, or one is passed twice.
- */
-function readArgs(args: readonly string[], usage: string): ParsedArgs {
-  let baseline = false;
-  let against: string | undefined;
-  let map: string | undefined;
-  for (const arg of args) {
-    const againstValue = flagValue(arg, AGAINST_FLAG);
-    const mapValue = flagValue(arg, MAP_FLAG);
-    if (arg === BASELINE_FLAG && !baseline) {
-      baseline = true;
-    } else if (againstValue !== undefined && against === undefined) {
-      against = againstValue;
-    } else if (mapValue !== undefined && map === undefined) {
-      map = mapValue;
-    } else {
-      throw new Error(usage);
-    }
-  }
-  return { against, baseline, map };
-}
-
-/**
- * The mode a command line asks for, its arguments in any order.
- *
- * @param args - The arguments after the script's path.
- * @returns `survey` when there is no argument, the map's path under `map`
- *   with `baseline` when the arguments are `--baseline` and
- *   `--map=<file>`, and the record's path under `against` beside the
- *   map's when they are `--against=<record>` and `--map=<file>`.
- * @throws When any other argument is passed, one twice, `--baseline` with
- *   `--against=`, a flag ending in `=` with no path, either mode without
- *   `--map=<file>`, or `--map=<file>` alone.
- */
-export function parseMode(args: readonly string[]): TestIndexMode {
-  if (args.length === 0) {
-    return 'survey';
-  }
-  const usage = `unknown arguments: ${args.join(' ')}. Usage: bun scripts/survey/test-index.ts `
-    + `[${BASELINE_FLAG} ${MAP_FLAG}<file> | ${AGAINST_FLAG}<record> ${MAP_FLAG}<file>]`;
-  const { against, baseline, map } = readArgs(args, usage);
-  if (baseline && against !== undefined) {
-    throw new Error(usage);
-  }
-  if (!baseline && against === undefined) {
-    throw new Error(`${MAP_FLAG}<file> names the map of ${BASELINE_FLAG} or ${AGAINST_FLAG}<record>, and neither was passed`);
-  }
-  const flag = baseline
-    ? BASELINE_FLAG
-    : `${AGAINST_FLAG}<record>`;
-  if (map === undefined) {
-    throw new Error(`${flag} reads the map: pass ${MAP_FLAG}<file> beside it`);
-  }
-  return against === undefined
-    ? { baseline: true, map }
-    : { against, map };
 }
 
 /**

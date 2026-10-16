@@ -15,10 +15,8 @@ import {
   indexFolder,
   main,
   packageRules,
-  parseMode,
   readCommit,
   renderTestIndexJson,
-  spawnApis,
 } from './test-index';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 
@@ -118,13 +116,6 @@ describe('a spawning test', () => {
     expect(entryOf(index, MENTIONS)).toMatchObject({ index: 2, spawns: false });
     expect(entryOf(index, TYPE_ONLY)).toMatchObject({ index: 2, spawns: false });
   });
-
-  it('reads each way of spawning from a parse', () => {
-    expect(spawnApis('a.ts', 'Bun.spawn([]);\nBun.spawnSync([]);\nawait Bun.$`ls`;\n')).toEqual(['Bun.$', 'Bun.spawn', 'Bun.spawnSync']);
-    expect(spawnApis('a.ts', 'import { $ } from \'bun\';\nimport { spawn } from \'child_process\';\n')).toEqual(['$ from bun', 'child_process']);
-    expect(spawnApis('a.mjs', 'import * as cp from \'node:child_process\';\n')).toEqual(['node:child_process']);
-    expect(spawnApis('a.ts', 'import { file } from \'bun\';\nimport { type $ } from \'bun\';\n')).toEqual([]);
-  });
 });
 
 describe('a test reaching a folder only through support files', () => {
@@ -189,38 +180,6 @@ describe('the outputs', () => {
   it('counts a package as one folder', () => {
     expect(indexFolder('packages/rafa-hub/src/store/rows.ts')).toBe('packages/rafa-hub');
     expect(indexFolder('src/effort/store/rows.ts')).toBe('src/effort/store');
-  });
-});
-
-describe('the command line', () => {
-  it('is picked by --baseline beside --map=<file>, and any other argument is refused', () => {
-    expect(parseMode([])).toBe('survey');
-    expect(parseMode(['--baseline', '--map=docs/survey/cut-table.json'])).toEqual({ baseline: true, map: 'docs/survey/cut-table.json' });
-    expect(parseMode(['--map=m.json', '--baseline'])).toEqual({ baseline: true, map: 'm.json' });
-    expect(() => parseMode(['--base'])).toThrow('unknown arguments: --base.');
-    expect(() => parseMode(['--baseline', '--baseline', '--map=m.json'])).toThrow('unknown arguments');
-  });
-
-  it('refuses --baseline without --map=<file>, and --map=<file> alone', () => {
-    expect(() => parseMode(['--baseline'])).toThrow('--baseline reads the map: pass --map=<file> beside it');
-    expect(() => parseMode(['--map=m.json'])).toThrow('--map=<file> names the map of --baseline or --against=<record>, and neither was passed');
-    expect(() => parseMode(['--baseline', '--map='])).toThrow('unknown arguments: --baseline --map=.');
-    expect(() => parseMode(['--baseline', '--map=a.json', '--map=b.json'])).toThrow('unknown arguments');
-  });
-
-  it('is picked by --against=<record> beside --map=<file>, each with a path', () => {
-    expect(parseMode(['--against=docs/survey/test-index.baseline.json', '--map=docs/survey/cut-table.json'])).toEqual({
-      against: 'docs/survey/test-index.baseline.json',
-      map: 'docs/survey/cut-table.json',
-    });
-    expect(() => parseMode(['--against=', '--map=m.json'])).toThrow('unknown arguments: --against= --map=m.json.');
-    expect(() => parseMode(['--against'])).toThrow('unknown arguments: --against.');
-    expect(() => parseMode(['--baseline', '--against=a.json', '--map=m.json'])).toThrow('unknown arguments');
-    expect(() => parseMode(['--against=a.json', '--against=b.json', '--map=m.json'])).toThrow('unknown arguments');
-  });
-
-  it('refuses --against=<record> without --map=<file>', () => {
-    expect(() => parseMode(['--against=a.json'])).toThrow('--against=<record> reads the map: pass --map=<file> beside it');
   });
 });
 
