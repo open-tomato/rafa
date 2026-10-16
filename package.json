@@ -34,6 +34,7 @@
   "workspaces": [
     "packages/*"
   ],
+  "sideEffects": false,
   "module": "./dist/index.js",
   "bin": {
     "rafa": "dist/cli.js"
