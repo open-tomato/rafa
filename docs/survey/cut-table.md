@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 1993 files, 1965 of them in 12 packages (741 left to place) and 28 in 3 unassigned folders. Of the 4422 edges between two files neither of which is a test, value and type alike, 229 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2024 files, 1996 of them in 12 packages (757 left to place) and 28 in 3 unassigned folders. Of the 4511 edges between two files neither of which is a test, value and type alike, 251 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -14,14 +14,14 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 3 | `@open-tomato/rafa-core` | 202 | 115 | 85 | 2 | 0 | 0 | 0 |
 | 4 | `rafa-inventory` | 102 | 51 | 51 | 0 | 25 | 0 | 25 |
-| 5 | `rafa-board` | 303 | 136 | 160 | 7 | 71 | 0 | 71 |
-| 6 | `rafa-pr` | 176 | 75 | 99 | 2 | 45 | 0 | 45 |
-| 7 | `rafa-run` | 221 | 92 | 129 | 0 | 75 | 0 | 75 |
-| 8 | `rafa-release` | 73 | 35 | 38 | 0 | 9 | 0 | 9 |
+| 5 | `rafa-board` | 311 | 140 | 164 | 7 | 77 | 0 | 77 |
+| 6 | `rafa-pr` | 180 | 76 | 102 | 2 | 59 | 0 | 59 |
+| 7 | `rafa-run` | 221 | 92 | 129 | 0 | 76 | 0 | 76 |
+| 8 | `rafa-release` | 76 | 36 | 40 | 0 | 10 | 0 | 10 |
 | 9 | `rafa-effort` | 70 | 36 | 34 | 0 | 4 | 0 | 4 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 777 | 255 | 495 | 27 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 793 | 260 | 506 | 27 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -33,10 +33,10 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
 | `@open-tomato/rafa-core` | `packages/rafa/` (202) | - |
 | `rafa-inventory` | `src/inventory/` (28), `src/tiers/` (13), `src/schema/` (11), `src/backfill/` (10), `src/demote/` (10), `src/learning/` (10), `src/check/` (8), `src/task/` (8), `src/agents/` (4), `src/bundled/` (0) | - |
-| `rafa-board` | `src/board/` (129), `src/board/project/` (41), `src/commands/issue/` (41), `src/commands/epic/` (29), `src/adapters/tracker/` (17), `src/refs/` (13), `src/commands/board/` (4) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/naming.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts` |
-| `rafa-pr` | `src/commands/pr/` (73), `src/pr/` (65), `src/triage/` (36) | `src/pr/index.ts` |
+| `rafa-board` | `src/board/` (131), `src/board/project/` (43), `src/commands/issue/` (41), `src/commands/epic/` (31), `src/adapters/tracker/` (19), `src/refs/` (13), `src/commands/board/` (4) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/naming.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts` |
+| `rafa-pr` | `src/commands/pr/` (73), `src/pr/` (65), `src/triage/` (40) | `src/pr/index.ts` |
 | `rafa-run` | `src/start/` (171), `src/claims/` (18), `src/suite/` (13), `src/commands/claim/` (9), `src/preflight/` (8) | `src/start/branch-decision.ts` |
-| `rafa-release` | `src/release/` (56), `src/commands/release/` (17) | - |
+| `rafa-release` | `src/release/` (58), `src/commands/release/` (18) | - |
 | `rafa-effort` | `src/effort/` (68) | `src/schema/frontmatter.ts` |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
@@ -49,19 +49,19 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-inventory` | `rafa-run` | 1 |
 | `rafa-inventory` | `rafa-effort` | 16 |
 | `rafa-inventory` | `@open-tomato/rafa` | 8 |
-| `rafa-board` | `rafa-pr` | 6 |
+| `rafa-board` | `rafa-pr` | 8 |
 | `rafa-board` | `rafa-run` | 11 |
 | `rafa-board` | `rafa-release` | 2 |
 | `rafa-board` | `rafa-effort` | 2 |
-| `rafa-board` | `@open-tomato/rafa` | 50 |
+| `rafa-board` | `@open-tomato/rafa` | 54 |
 | `rafa-pr` | `rafa-run` | 7 |
 | `rafa-pr` | `rafa-release` | 26 |
-| `rafa-pr` | `@open-tomato/rafa` | 12 |
+| `rafa-pr` | `@open-tomato/rafa` | 26 |
 | `rafa-run` | `rafa-release` | 16 |
 | `rafa-run` | `rafa-effort` | 3 |
-| `rafa-run` | `@open-tomato/rafa` | 56 |
+| `rafa-run` | `@open-tomato/rafa` | 57 |
 | `rafa-release` | `rafa-effort` | 1 |
-| `rafa-release` | `@open-tomato/rafa` | 8 |
+| `rafa-release` | `@open-tomato/rafa` | 9 |
 | `rafa-effort` | `@open-tomato/rafa` | 4 |
 
 ## The 20 files most upward edges end on
@@ -78,16 +78,16 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `src/plan/index.ts` | 5 | `@open-tomato/rafa` | left to place |
 | `src/release/enabled.ts` | 5 | `rafa-release` | by rule |
 | `src/release/settle.ts` | 5 | `rafa-release` | by rule |
+| `src/triage/triage.ts` | 5 | `rafa-pr` | by rule |
+| `src/bugs/record.ts` | 4 | `@open-tomato/rafa` | left to place |
+| `src/bugs/title.ts` | 4 | `@open-tomato/rafa` | left to place |
 | `src/claims/stale.ts` | 4 | `rafa-run` | by rule |
+| `src/config-schema-issues.ts` | 4 | `@open-tomato/rafa` | left to place |
+| `src/epic/verify-plan.ts` | 4 | `@open-tomato/rafa` | left to place |
 | `src/next/ending.ts` | 4 | `@open-tomato/rafa` | left to place |
 | `src/release/guard-merge.ts` | 4 | `rafa-release` | by rule |
 | `src/release/guard.ts` | 4 | `rafa-release` | by rule |
 | `src/release/version.ts` | 4 | `rafa-release` | by rule |
-| `src/commands/doctor-refs.ts` | 3 | `@open-tomato/rafa` | left to place |
-| `src/commands/plan/refs-check.ts` | 3 | `@open-tomato/rafa` | left to place |
-| `src/epic/verify-plan.ts` | 3 | `@open-tomato/rafa` | left to place |
-| `src/modules/load.ts` | 3 | `@open-tomato/rafa` | left to place |
-| `src/release/fragment-tree.ts` | 3 | `rafa-release` | by rule |
 
 ## Edges #118 clears
 
@@ -97,21 +97,21 @@ None.
 
 ## Files left to place
 
-No rule holds these 741 files. By folder, with the upward edges that end on its files:
+No rule holds these 757 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
+| `src/` | 37 | 19 | 26 |
 | `src/utils/` | 12 | 6 | 25 |
-| `src/` | 37 | 19 | 22 |
-| `src/project/` | 27 | 13 | 19 |
-| `src/commands/plan/` | 31 | 16 | 16 |
+| `src/project/` | 27 | 13 | 21 |
+| `src/bugs/` | 20 | 10 | 18 |
+| `src/commands/plan/` | 33 | 17 | 16 |
 | `src/plan/` | 14 | 8 | 8 |
-| `src/bugs/` | 11 | 6 | 6 |
+| `src/epic/` | 4 | 2 | 6 |
 | `src/next/` | 50 | 19 | 6 |
 | `src/cleanup/` | 22 | 10 | 5 |
 | `src/commands/` | 96 | 41 | 5 |
 | `src/docs/` | 6 | 3 | 4 |
-| `src/epic/` | 4 | 2 | 4 |
 | `src/modules/` | 4 | 2 | 4 |
 | `src/runtime/` | 4 | 2 | 2 |
 | `src/adapters/logger/` | 12 | 6 | 1 |
@@ -142,7 +142,7 @@ No rule holds these 741 files. By folder, with the upward edges that end on its 
 | `src/notices/` | 3 | 2 | 0 |
 | `src/ports/` | 1 | 1 | 0 |
 | `src/status/` | 19 | 9 | 0 |
-| `src/tests/` | 214 | 21 | 0 |
+| `src/tests/` | 219 | 21 | 0 |
 | `src/tests/core-coupled/core/command/` | 1 | 0 | 0 |
 | `src/tests/core-coupled/core/config/` | 5 | 0 | 0 |
 | `src/tests/core-coupled/core/loop/` | 2 | 0 | 0 |

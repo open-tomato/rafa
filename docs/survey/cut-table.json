@@ -124,6 +124,16 @@
     },
     {
       "kind": "test",
+      "path": "src/bugs/cause-rule.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/bugs/cause-rule.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
       "path": "src/bugs/closest.test.ts",
       "upwardEdgesIn": 0
     },
@@ -133,9 +143,44 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test",
+      "path": "src/bugs/fenced.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/bugs/fenced.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
+      "path": "src/bugs/filed-values.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/bugs/filed-values.ts",
+      "upwardEdgesIn": 1
+    },
+    {
+      "kind": "test",
+      "path": "src/bugs/fill.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/bugs/fill.ts",
+      "upwardEdgesIn": 1
+    },
+    {
       "kind": "source",
       "path": "src/bugs/places.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
+    },
+    {
+      "kind": "test",
+      "path": "src/bugs/record-composition.test.ts",
+      "upwardEdgesIn": 0
     },
     {
       "kind": "test",
@@ -145,7 +190,7 @@
     {
       "kind": "source",
       "path": "src/bugs/record.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 4
     },
     {
       "kind": "test",
@@ -155,7 +200,7 @@
     {
       "kind": "source",
       "path": "src/bugs/stack-path.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -165,7 +210,7 @@
     {
       "kind": "source",
       "path": "src/bugs/title.ts",
-      "upwardEdgesIn": 2
+      "upwardEdgesIn": 4
     },
     {
       "kind": "test",
@@ -175,7 +220,7 @@
     {
       "kind": "source",
       "path": "src/bugs/versions.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -1049,6 +1094,16 @@
     },
     {
       "kind": "test",
+      "path": "src/commands/plan/bundled-check.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "source",
+      "path": "src/commands/plan/bundled-check.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/commands/plan/claim-route.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1400,7 +1455,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-errors.ts",
-      "upwardEdgesIn": 0
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -1420,7 +1475,7 @@
     {
       "kind": "source",
       "path": "src/config-schema-issues.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 4
     },
     {
       "kind": "test",
@@ -1575,7 +1630,7 @@
     {
       "kind": "source",
       "path": "src/epic/verify-plan.ts",
-      "upwardEdgesIn": 3
+      "upwardEdgesIn": 4
     },
     {
       "kind": "test",
@@ -1585,7 +1640,7 @@
     {
       "kind": "source",
       "path": "src/epic/verify-run.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -2160,7 +2215,7 @@
     {
       "kind": "source",
       "path": "src/project/lock.ts",
-      "upwardEdgesIn": 0
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -2170,7 +2225,7 @@
     {
       "kind": "source",
       "path": "src/project/package-of.ts",
-      "upwardEdgesIn": 1
+      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -2714,6 +2769,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-package-changed-spawned.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/core-package.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3158,6 +3218,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test",
+      "path": "src/tests/package-lint-spawned.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test-support",
       "path": "src/tests/package-tree.ts",
       "upwardEdgesIn": 0
@@ -3290,6 +3355,11 @@
     {
       "kind": "test-support",
       "path": "src/tests/real-node-modules.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/references-gate-spawned.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3594,6 +3664,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/turbo-config.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/user-facing-spelling.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3605,6 +3680,11 @@
     {
       "kind": "test",
       "path": "src/tests/workflow-permission-section.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/workspace-graph.sweep.test.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -4353,6 +4433,13 @@
           "toPackage": "@open-tomato/rafa"
         },
         {
+          "from": "src/board/project/add-filed.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/triage/triage.ts",
+          "toPackage": "rafa-pr"
+        },
+        {
           "from": "src/board/project/facts.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
@@ -4493,6 +4580,55 @@
           "toPackage": "rafa-pr"
         },
         {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/config-schema-issues.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/epic/verify-plan.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/epic/verify-run.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/start/stale-docs.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/start/triage.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/triage/local-paths.ts",
+          "toPackage": "rafa-pr"
+        },
+        {
+          "from": "src/commands/epic/close-triage.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/triage/triage.ts",
+          "toPackage": "rafa-pr"
+        },
+        {
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
@@ -4530,28 +4666,7 @@
         {
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/start/stale-docs.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/epic/close.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/start/triage.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/epic/close.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/triage/local-paths.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
-          "from": "src/commands/epic/close.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
+          "kind": "type",
           "to": "src/triage/triage.ts",
           "toPackage": "rafa-pr"
         },
@@ -4609,6 +4724,13 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/commands/issue/create-bug.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/bugs/fill.ts",
           "toPackage": "@open-tomato/rafa"
         },
         {
@@ -4809,8 +4931,8 @@
         }
       ],
       "fileCounts": {
-        "source": 136,
-        "test": 160,
+        "source": 140,
+        "test": 164,
         "testSupport": 7
       },
       "files": [
@@ -4820,6 +4942,8 @@
         "src/adapters/tracker/github-edit.ts",
         "src/adapters/tracker/github-fake.test.ts",
         "src/adapters/tracker/github-fake.ts",
+        "src/adapters/tracker/github-filed-issues.test.ts",
+        "src/adapters/tracker/github-filed-issues.ts",
         "src/adapters/tracker/github-open-issues.test.ts",
         "src/adapters/tracker/github-open-issues.ts",
         "src/adapters/tracker/github-timeout.test.ts",
@@ -4841,6 +4965,8 @@
         "src/board/blocker-epic-native.test.ts",
         "src/board/blocker-epic.test.ts",
         "src/board/blocker-epic.ts",
+        "src/board/blocker-states.test.ts",
+        "src/board/blocker-states.ts",
         "src/board/board-body.test.ts",
         "src/board/board-body.ts",
         "src/board/board-cache-invalidate.test.ts",
@@ -4924,6 +5050,8 @@
         "src/board/plan-spec.ts",
         "src/board/previous-copy.test.ts",
         "src/board/previous-copy.ts",
+        "src/board/project/add-filed.test.ts",
+        "src/board/project/add-filed.ts",
         "src/board/project/add-issue.test.ts",
         "src/board/project/add-issue.ts",
         "src/board/project/facts-fake.ts",
@@ -5042,6 +5170,8 @@
         "src/commands/epic/close-docs.test.ts",
         "src/commands/epic/close-docs.ts",
         "src/commands/epic/close-native.test.ts",
+        "src/commands/epic/close-triage.test.ts",
+        "src/commands/epic/close-triage.ts",
         "src/commands/epic/close.test.ts",
         "src/commands/epic/close.ts",
         "src/commands/epic/defer.test.ts",
@@ -5119,11 +5249,11 @@
         "src/refs/verify.ts"
       ],
       "filesByFolder": {
-        "src/adapters/tracker/": 17,
-        "src/board/": 129,
-        "src/board/project/": 41,
+        "src/adapters/tracker/": 19,
+        "src/board/": 131,
+        "src/board/project/": 43,
         "src/commands/board/": 4,
-        "src/commands/epic/": 29,
+        "src/commands/epic/": 31,
         "src/commands/issue/": 41,
         "src/refs/": 13
       },
@@ -5155,8 +5285,8 @@
         "src/board/trust.ts"
       ],
       "rank": 5,
-      "remaining": 71,
-      "upwardEdges": 71
+      "remaining": 77,
+      "upwardEdges": 77
     },
     {
       "clearedByIssue118": 0,
@@ -5435,11 +5565,95 @@
           "toPackage": "rafa-run"
         },
         {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/cause-rule.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/filed-values.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/places.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/record.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/stack-path.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/title.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/versions.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/config-schema-errors.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/config-schema-issues.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/bug-filing.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/project/package-of.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/suite/run.ts",
           "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/triage/issue-text.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/fenced.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/issue-text.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/record.ts",
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/triage/kind-route.ts",
@@ -5473,13 +5687,27 @@
           "from": "src/triage/triage.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
+          "to": "src/bugs/record.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/triage.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/bugs/title.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/triage/triage.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
           "to": "src/utils/tracker.ts",
           "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
-        "source": 75,
-        "test": 99,
+        "source": 76,
+        "test": 102,
         "testSupport": 2
       },
       "files": [
@@ -5625,6 +5853,8 @@
         "src/pr/worktree.ts",
         "src/triage/base-run.test.ts",
         "src/triage/base-run.ts",
+        "src/triage/bug-filing.test.ts",
+        "src/triage/bug-filing.ts",
         "src/triage/bug-key.test.ts",
         "src/triage/bug-key.ts",
         "src/triage/closed-issue-triage.test.ts",
@@ -5632,6 +5862,7 @@
         "src/triage/doc-only.ts",
         "src/triage/inherited.test.ts",
         "src/triage/inherited.ts",
+        "src/triage/issue-text.test.ts",
         "src/triage/issue-text.ts",
         "src/triage/kind-route.test.ts",
         "src/triage/kind-route.ts",
@@ -5648,6 +5879,7 @@
         "src/triage/refs-section.ts",
         "src/triage/scoring-fixture.test.ts",
         "src/triage/scoring-fixture.ts",
+        "src/triage/similarity-record.test.ts",
         "src/triage/similarity-scoring.test.ts",
         "src/triage/similarity-triage.test.ts",
         "src/triage/similarity.test.ts",
@@ -5663,7 +5895,7 @@
       "filesByFolder": {
         "src/commands/pr/": 73,
         "src/pr/": 65,
-        "src/triage/": 36
+        "src/triage/": 40
       },
       "folders": [
         "src/commands/pr/",
@@ -5675,8 +5907,8 @@
         "src/pr/index.ts"
       ],
       "rank": 6,
-      "remaining": 45,
-      "upwardEdges": 45
+      "remaining": 59,
+      "upwardEdges": 59
     },
     {
       "clearedByIssue118": 0,
@@ -6165,6 +6397,13 @@
           "toPackage": "@open-tomato/rafa"
         },
         {
+          "from": "src/start/triage.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/config-schema-issues.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
           "from": "src/start/wrap-up-retry.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
@@ -6454,8 +6693,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 7,
-      "remaining": 75,
-      "upwardEdges": 75
+      "remaining": 76,
+      "upwardEdges": 76
     },
     {
       "clearedByIssue118": 0,
@@ -6522,16 +6761,24 @@
           "kind": "value",
           "to": "src/config-registry.ts",
           "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/release/settle-lock.ts",
+          "fromPackage": "rafa-release",
+          "kind": "value",
+          "to": "src/project/lock.ts",
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
-        "source": 35,
-        "test": 38,
+        "source": 36,
+        "test": 40,
         "testSupport": 0
       },
       "files": [
         "src/commands/release/release-commit.test.ts",
         "src/commands/release/release-commit.ts",
+        "src/commands/release/settle-lock.test.ts",
         "src/commands/release/settle-project.test.ts",
         "src/commands/release/settle-project.ts",
         "src/commands/release/settle.test.ts",
@@ -6580,6 +6827,8 @@
         "src/release/scaffold.ts",
         "src/release/setting.test.ts",
         "src/release/setting.ts",
+        "src/release/settle-lock.test.ts",
+        "src/release/settle-lock.ts",
         "src/release/settle-pr.test.ts",
         "src/release/settle-pr.ts",
         "src/release/settle-push.test.ts",
@@ -6605,8 +6854,8 @@
         "src/release/version.ts"
       ],
       "filesByFolder": {
-        "src/commands/release/": 17,
-        "src/release/": 56
+        "src/commands/release/": 18,
+        "src/release/": 58
       },
       "folders": [
         "src/commands/release/",
@@ -6615,8 +6864,8 @@
       "name": "rafa-release",
       "named": [],
       "rank": 8,
-      "remaining": 9,
-      "upwardEdges": 9
+      "remaining": 10,
+      "upwardEdges": 10
     },
     {
       "clearedByIssue118": 0,
@@ -6830,8 +7079,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 255,
-        "test": 495,
+        "source": 260,
+        "test": 506,
         "testSupport": 27
       },
       "files": [
@@ -6859,9 +7108,18 @@
         "src/adapters/output/json.ts",
         "src/adapters/planner/claude.test.ts",
         "src/adapters/planner/claude.ts",
+        "src/bugs/cause-rule.test.ts",
+        "src/bugs/cause-rule.ts",
         "src/bugs/closest.test.ts",
         "src/bugs/closest.ts",
+        "src/bugs/fenced.test.ts",
+        "src/bugs/fenced.ts",
+        "src/bugs/filed-values.test.ts",
+        "src/bugs/filed-values.ts",
+        "src/bugs/fill.test.ts",
+        "src/bugs/fill.ts",
         "src/bugs/places.ts",
+        "src/bugs/record-composition.test.ts",
         "src/bugs/record.test.ts",
         "src/bugs/record.ts",
         "src/bugs/stack-path.test.ts",
@@ -7077,6 +7335,8 @@
         "src/commands/next.ts",
         "src/commands/plan/blocked-offer.test.ts",
         "src/commands/plan/blocked-offer.ts",
+        "src/commands/plan/bundled-check.test.ts",
+        "src/commands/plan/bundled-check.ts",
         "src/commands/plan/claim-route.test.ts",
         "src/commands/plan/claim-route.ts",
         "src/commands/plan/create.ts",
@@ -7413,6 +7673,7 @@
         "src/tests/core-coupled/ports/index.test.ts",
         "src/tests/core-coupled/report/parse.test.ts",
         "src/tests/core-coupled/schema/project-id.test.ts",
+        "src/tests/core-package-changed-spawned.test.ts",
         "src/tests/core-package.sweep.test.ts",
         "src/tests/cut-table-shape.test.ts",
         "src/tests/declaration-dispatch.test.ts",
@@ -7502,6 +7763,7 @@
         "src/tests/output-sinks.test.ts",
         "src/tests/output-sinks.ts",
         "src/tests/package-build.test.ts",
+        "src/tests/package-lint-spawned.test.ts",
         "src/tests/package-tree.ts",
         "src/tests/parity-differential.test.ts",
         "src/tests/parity-fixture.test.ts",
@@ -7529,6 +7791,7 @@
         "src/tests/readiness-gate-integration.test.ts",
         "src/tests/readme-spenders.test.ts",
         "src/tests/real-node-modules.ts",
+        "src/tests/references-gate-spawned.test.ts",
         "src/tests/refs-gate-integration.test.ts",
         "src/tests/refs-reading-integration.test.ts",
         "src/tests/refs-readings-integration.test.ts",
@@ -7589,9 +7852,11 @@
         "src/tests/task-report.test.ts",
         "src/tests/tracker-declarations.test.ts",
         "src/tests/triage-local.test.ts",
+        "src/tests/turbo-config.sweep.test.ts",
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/verify-workflow.test.ts",
         "src/tests/workflow-permission-section.sweep.test.ts",
+        "src/tests/workspace-graph.sweep.test.ts",
         "src/tests/worktree-restart-integration.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tests/worktree-start-integration.test.ts",
@@ -7632,12 +7897,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 1993,
-    "leftToPlace": 741,
-    "nonTestEdges": 4422,
+    "files": 2024,
+    "leftToPlace": 757,
+    "nonTestEdges": 4511,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 229
+    "upwardEdges": 251
   },
   "unassigned": [
     {
