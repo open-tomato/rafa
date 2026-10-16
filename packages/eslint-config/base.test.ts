@@ -2,16 +2,24 @@
  * Tests for `base.mjs`, the shared flat config every rafa ESLint config
  * builds on through `@open-tomato/rafa-eslint-config`.
  *
- * The lint cases run `ESLint` with `base.mjs` as its config file over
- * files planted in a scratch directory, so each reading is what the
- * package's config says of a file, with no root leaf in between. A
+ * The lint cases run one `ESLint` instance, with `base.mjs` as its config
+ * file, over files planted in a scratch directory, so each reading is what
+ * the package's config says of a file, with no root leaf in between. A
  * rule-breaking file reads red with the rule named, once for a rule of
  * `sharedRules.mjs` and once for `ar/no-unsafe-unicode` from
  * `rules/unsafe-unicode.mjs`; a clean file beside them reads green, the
  * control that the red cases come from those rules and not from a
  * config that refuses everything.
  *
- * The manifest case holds the `dependencies` to every package `base.mjs`
+ * The instance is warmed once, in the describe's `beforeAll`: a cold ESLint
+ * start (loading the plugins and the config) is slow under parallel tasks,
+ * so it is paid there, under its own 30 000 ms timeout, and no case carries
+ * it. The scratch folder is made in the same hook and outlives every lint,
+ * removed only by the `afterAll`, so no lint reads a folder already gone.
+ * The warm-up lints a clean file and asserts it green, so a config broken
+ * on first load still fails the describe.
+ *
+ * The manifest cases hold the `dependencies` to every package `base.mjs`
  * imports by name: bun links each workspace member in isolation, so the
  * config resolves its plugins from this package's own `node_modules`, and
  * a plugin left out of the manifest fails to load wherever the package
@@ -21,7 +29,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ESLint } from 'eslint';
 
 /** The package's directory. */
@@ -45,7 +53,14 @@ interface Finding {
   readonly severity: number;
 }
 
+/** The `beforeAll` timeout: the cold ESLint start and the warm-up lint. */
+const WARM_UP_TIMEOUT_MS = 30_000;
+
+/** The timeout of each lint case over the warm instance. */
+const LINT_CASE_TIMEOUT_MS = 15_000;
+
 let scratch: string;
+let eslint: ESLint;
 
 /** The package a bare specifier names: `eslint` of `eslint/config`, `@eslint/js` of itself. */
 function packageName(specifier: string): string {
@@ -60,7 +75,6 @@ function packageName(specifier: string): string {
 async function lintPlanted(name: string, source: string): Promise<{ errorCount: number; findings: Finding[] }> {
   const path = join(scratch, name);
   writeFileSync(path, source, 'utf8');
-  const eslint = new ESLint({ cwd: scratch, overrideConfigFile: CONFIG_FILE });
   const [result] = await eslint.lintFiles([path]);
   if (result === undefined) throw new Error(`ESLint answered no result for ${name}`);
   return {
@@ -69,35 +83,42 @@ async function lintPlanted(name: string, source: string): Promise<{ errorCount: 
   };
 }
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'rafa-eslint-config-'));
-});
-
-afterEach(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
-
 describe('base.mjs', () => {
+  beforeAll(async () => {
+    scratch = mkdtempSync(join(tmpdir(), 'rafa-eslint-config-'));
+    eslint = new ESLint({ cwd: scratch, overrideConfigFile: CONFIG_FILE });
+    const started = performance.now();
+    const warmUp = await lintPlanted('warm-up.ts', CLEAN);
+    const elapsed = Math.round(performance.now() - started);
+    expect(warmUp.findings).toEqual([]);
+    expect(warmUp.errorCount).toBe(0);
+    console.info(`base.mjs warm-up: ${elapsed} ms`);
+  }, WARM_UP_TIMEOUT_MS);
+
+  afterAll(() => {
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
   it('reads a clean file green', async () => {
     const outcome = await lintPlanted('clean.ts', CLEAN);
 
     expect(outcome.findings).toEqual([]);
     expect(outcome.errorCount).toBe(0);
-  });
+  }, LINT_CASE_TIMEOUT_MS);
 
   it('reads a double-quoted string red under @stylistic/quotes', async () => {
     const outcome = await lintPlanted('quoted.ts', DOUBLE_QUOTED);
 
     expect(outcome.errorCount).toBeGreaterThan(0);
     expect(outcome.findings).toContainEqual({ ruleId: '@stylistic/quotes', severity: 2 });
-  });
+  }, LINT_CASE_TIMEOUT_MS);
 
   it('reads a literal zero-width space red under ar/no-unsafe-unicode', async () => {
     const outcome = await lintPlanted('invisible.ts', ZERO_WIDTH);
 
     expect(outcome.errorCount).toBeGreaterThan(0);
     expect(outcome.findings).toContainEqual({ ruleId: 'ar/no-unsafe-unicode', severity: 2 });
-  });
+  }, LINT_CASE_TIMEOUT_MS);
 });
 
 describe('package.json', () => {
