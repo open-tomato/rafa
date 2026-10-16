@@ -477,8 +477,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   itself by name through its own `exports`. After a manifest edit, `bun
   install` refreshes `bun.lock` and the links.
 - **The build reads core from its source and names it through two shims.** The
-  root `build` script bun-builds `src/effort/store/index.ts` and
-  `src/ports/index.ts`, two of its entries, which are one-line `export *`
+  root `build` script runs `scripts/build/bundle.ts`, which bun-builds
+  `src/rafa.ts` and six library entries with every publishable member as
+  `--external` (core is private, so it stays bundled) and fails when a
+  bundle holds a publishable member's file. Two of those entries,
+  `src/effort/store/index.ts` and `src/ports/index.ts`, are one-line `export *`
   shims of `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the
   `dist/` files the root `exports` name exist until #808 bundles core into
   the root. Its declarations come in two passes:
