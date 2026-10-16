@@ -35,7 +35,8 @@
  *      command and record none. Its context's `registry` is the one the
  *      line was routed through, with every module that loaded mounted on
  *      it, and its `project` the project resolved for it.
- *   6. The terminal result event is written, and the exit code answered.
+ *   6. The terminal result event is written, and the exit code answered
+ *      (`ending.ts`).
  *
  * A command that runs inside a project in text mode runs between the two
  * calls of the command hook, when the caller hands one in (see "The
@@ -100,7 +101,9 @@
  * as one line, and a result a command gave is written as the `text`
  * adapter writes one. Help and the version are text only: in json mode
  * each writes its two events and no text. Either way the terminal event is
- * answered with the exit code, in {@link DispatchOutcome}.
+ * answered with the exit code, in {@link DispatchOutcome}. `ending.ts`
+ * builds that event from how the route settled and writes it, in each
+ * mode.
  *
  * ## What a command writes through
  *
@@ -154,7 +157,8 @@
  * A refusal from routing, `invalid_spec` or `no_project` ends with exit
  * code 1 and `rafa: <message>` on stderr in text mode. A terminal event
  * that cannot be written, such as a payload `JSON.stringify` refuses, is
- * replaced by the `result_unwritable` failure with exit code 1.
+ * replaced by the `result_unwritable` failure with exit code 1. The
+ * ending each of these gives, and the fallback, are `ending.ts`'s.
  *
  * ## The project
  *
@@ -225,6 +229,7 @@
  *
  *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
+import type { Ending } from './ending.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
@@ -247,6 +252,7 @@ import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/s
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';
+import { failure, finish, messageOf, success } from './ending.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
 
@@ -353,16 +359,6 @@ interface Settings {
   readonly commandHook: CommandHook | null;
 }
 
-/** How a route settled, before its terminal event is built. */
-interface Ending {
-  readonly exitCode: number;
-  /** The payload a command gave, or null. */
-  readonly payload: { readonly value: unknown } | null;
-  readonly error: { readonly code: DispatchErrorCode; readonly message: string } | null;
-  /** The line text mode writes to stderr, or null. */
-  readonly stderrLine: string | null;
-}
-
 /** An output that holds a command's result, and the payload it holds. */
 interface GuardedOutput {
   readonly output: Output;
@@ -445,23 +441,6 @@ export function readDeprecatedFlags(route: CommandRoute): DeprecatedFlagReading 
 /** The line a deprecated flag typed writes to stderr; see the module note. */
 export function deprecatedFlagLine(route: CommandRoute, flag: DeprecatedFlagTyped): string {
   return `rafa: "rafa ${route.label} ${flag.typed}" is deprecated; use "rafa ${route.label} ${flag.use}"`;
-}
-
-/** What was thrown, as a message. */
-function messageOf(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : String(error);
-}
-
-/** A failure with exit code 1 and the `rafa: <message>` stderr line. */
-function failure(code: DispatchErrorCode, message: string): Ending {
-  return { exitCode: 1, payload: null, error: { code, message }, stderrLine: `rafa: ${message}` };
-}
-
-/** A success, carrying the payload a command gave. */
-function success(payload: { readonly value: unknown } | null): Ending {
-  return { exitCode: 0, payload, error: null, stderrLine: null };
 }
 
 /**
@@ -698,48 +677,6 @@ async function settle(
       return problem === null
         ? settleCommand(route, base, registry, settings)
         : failure('invalid_spec', problem);
-  }
-}
-
-/** The terminal event an ending is told as. */
-function resultEvent(ending: Ending, now: () => Date): CliEventResult {
-  const ts = now().toISOString();
-  if (ending.error !== null) return { type: 'result', ok: false, error: { ...ending.error }, ts };
-  return ending.payload === null
-    ? { type: 'result', ok: true, ts }
-    : { type: 'result', ok: true, data: ending.payload.value, ts };
-}
-
-/**
- * Writes an ending's terminal event, or in text mode what a person reads
- * of it. In events mode a failed ending is one `rafa· error` line on
- * stdout, its exit code when it carries no message, so a watcher reading
- * only those lines sees how the run ended.
- */
-function writeEnding(ending: Ending, event: CliEventResult, base: CliContext, settings: Settings): void {
-  if (base.outputMode === 'json') {
-    base.output.emit(event);
-    return;
-  }
-  if (base.outputMode === 'events') {
-    if (ending.exitCode !== 0) base.output.error(ending.stderrLine ?? `exit code ${ending.exitCode}`);
-    return;
-  }
-  if (ending.stderrLine !== null) settings.stderr.write(`${ending.stderrLine}\n`);
-  if (ending.payload !== null) base.output.result(ending.payload.value);
-}
-
-/** Writes the terminal event, falling back to `result_unwritable`, and answers the outcome. */
-function finish(ending: Ending, base: CliContext, settings: Settings): DispatchOutcome {
-  const event = resultEvent(ending, settings.now);
-  try {
-    writeEnding(ending, event, base, settings);
-    return { exitCode: ending.exitCode, result: event };
-  } catch (error) {
-    const fallback = failure('result_unwritable', `the result could not be written: ${messageOf(error)}`);
-    const fallbackEvent = resultEvent(fallback, settings.now);
-    writeEnding(fallback, fallbackEvent, base, settings);
-    return { exitCode: fallback.exitCode, result: fallbackEvent };
   }
 }
 
