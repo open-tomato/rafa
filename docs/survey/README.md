@@ -58,23 +58,24 @@ repository.
 
 - **`test-index.baseline.json`**: The baseline the move of #905 is held to for the fourth criterion of epic #801, in the
   unit `packages`. A file's unit is the `name` of the `packages` row of the map `docs/survey/cut-table.json` that lists
-  it, or the `unassigned` folder that lists it (`src/ci/`). The record names that map by path and sha256
-  (`bbb8a36c7a7d…`, in full under `map`) and the commit it reads, `d70b783`, in full under `commit`. Written by `bun
-  scripts/survey/test-index.ts --baseline --map=docs/survey/cut-table.json` through
-  `scripts/survey/test-index-record.ts`, which reads `src/` and `packages/*/src/` at that commit and refuses when a
-  tracked file in scope differs from `HEAD`; it writes nothing and exits 1 naming each file the map lists nowhere. Read
-  by `bun scripts/survey/test-index.ts --against=docs/survey/test-index.baseline.json --map=docs/survey/cut-table.json`,
-  the guard of `scripts/survey/test-index-guard.ts`, which writes nothing and exits 1 when the record's unit is not
-  `packages` or its map's sha256 is not the handed map's, when a test that does not meet its kind's rule is not on
-  `unsorted` (a unit or contract test reaching a unit beyond its own, a use-case test entering another unit through no
-  public entry), when a test the record holds has no imports read now, or when the map lists a file nowhere. The three
-  flags are read by `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, either
-  mode without `--map=<file>`, and `--map=<file>` alone. The record holds 1145 test files (1009 unit, 136 use-case, none
-  contract; 418 spawning a process): 180 meet their kind's rule, 965 are on `unsorted`, none are unindexed. Read at
-  d70b783 against itself it prints 0 risen, 965 unsorted and 180 held, then 0 gone, 0 not read, 0 unindexed and 0
-  unplaced, and exits 0. The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it.
-  JSON: 2-space indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path,
-  `unsorted`, `unindexed`.
+  it, or the `unassigned` folder that lists it (`src/ci/`), else the unit of its folder as `cut-table.{json,md}` below
+  says. The record names that map by path and sha256 (`bbb8a36c7a7d…`, in full under `map`) and the commit it reads,
+  `d70b783`, in full under `commit`. Written by `bun scripts/survey/test-index.ts --baseline
+  --map=docs/survey/cut-table.json` through `scripts/survey/test-index-record.ts`, which reads `src/` and
+  `packages/*/src/` at that commit and refuses when a tracked file in scope differs from `HEAD`; it writes nothing and
+  exits 1 naming each file the map holds no unit for. Read by `bun scripts/survey/test-index.ts
+  --against=docs/survey/test-index.baseline.json --map=docs/survey/cut-table.json`, the guard of
+  `scripts/survey/test-index-guard.ts`, which writes nothing and exits 1 when the record's unit is not `packages` or its
+  map's sha256 is not the handed map's, when a test that does not meet its kind's rule is not on `unsorted` (a unit or
+  contract test reaching a unit beyond its own, a use-case test entering another unit through no public entry), when a
+  test the record holds has no imports read now, or when the map holds no unit for a file. The three flags are read by
+  `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, either mode without
+  `--map=<file>`, and `--map=<file>` alone. The record holds 1145 test files (1009 unit, 136 use-case, none contract;
+  418 spawning a process): 180 meet their kind's rule, 965 are on `unsorted`, none are unindexed. Read at d70b783
+  against itself it prints 0 risen, 965 unsorted and 180 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and
+  exits 0. The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space
+  indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`,
+  `unindexed`.
 
   The index counts the units a test reaches, doubled when it spawns, so the cut moves it three ways. Lightest first:
   1. A test whose index falls because three folders became one package: say it reached three folders of `src/`, which
@@ -93,22 +94,25 @@ repository.
   first, with the files each holds by rule and its count of upward edges: imports of kind `value` or `type`, between two
   files neither of which is a test, from a package lower in the order into a higher one. Its unit is the map: a
   `packages` row is a unit, an `unassigned` row is a folder unit, and a file's unit is the name of the row that lists
-  it, spelled as the table spells it. The two shared-config packages, `rafa-eslint-config` and `rafa-typescript-config`,
-  sit lowest, since nothing in the graph imports them; core is `@open-tomato/rafa-core` above them and the root
-  `@open-tomato/rafa` at the top, #808's names. Written by `bun scripts/survey/cut-table.ts`, which reads
-  `docs/survey/import-graph.json` and never a build of its own, so the table and the graph cannot disagree; the files as
-  tracked were written at commit d70b783, with the graph at the same commit: 2025 files, 1997 of them in 12 packages
-  (758 left to place and counted in `@open-tomato/rafa`) and 28 in the three unassigned folders `src/ci/`,
-  `src/commands/stretch/` and `src/stretch/`. Of 4511 edges between non-test files 251 point upward, none cleared by
-  #118, and 77 touch an unassigned folder and have no rank. Read by `bun scripts/survey/test-index.ts --baseline
-  --map=docs/survey/cut-table.json` and by its guard with `--against=`; any run that reads the map prints the unplaced
-  files and exits 1 when there is one. The counts rank options and do not certify a cut: `tsc --build` with project
-  references is that gate (#807). It is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it,
-  and it goes stale when `import-graph.json` is written again without it. JSON: 2-space indent, sorted keys, `graph`,
-  `order`, `packages` (each with `files`, `edges`, `upwardEdges`, `clearedByIssue118`, `remaining`), `leftToPlace`,
-  `clearedByIssue118`, `unassigned`, `totals`. Markdown: the sums, the packages with their counts, what each holds by
-  rule, the upward edges by pair of packages, the 20 files most upward edges end on, the edges #118 clears, the files
-  left to place by folder, the unassigned folders.
+  it, spelled as the table spells it. A file the table lists nowhere, such as a test added after it was written, is
+  placed by its folder: the unit of the listed files of its own directory when they share one, else the unit of the one
+  row naming its longest folder (`packages[].folders` or an `unassigned` folder), read by `scripts/survey/cut-map.ts`;
+  it stays unplaced otherwise, and the table is not touched, so its sha256 is kept. The two shared-config packages,
+  `rafa-eslint-config` and `rafa-typescript-config`, sit lowest, since nothing in the graph imports them; core is
+  `@open-tomato/rafa-core` above them and the root `@open-tomato/rafa` at the top, #808's names. Written by `bun
+  scripts/survey/cut-table.ts`, which reads `docs/survey/import-graph.json` and never a build of its own, so the table
+  and the graph cannot disagree; the files as tracked were written at commit d70b783, with the graph at the same commit:
+  2025 files, 1997 of them in 12 packages (758 left to place and counted in `@open-tomato/rafa`) and 28 in the three
+  unassigned folders `src/ci/`, `src/commands/stretch/` and `src/stretch/`. Of 4511 edges between non-test files 251
+  point upward, none cleared by #118, and 77 touch an unassigned folder and have no rank. Read by `bun
+  scripts/survey/test-index.ts --baseline --map=docs/survey/cut-table.json` and by its guard with `--against=`; any run
+  that reads the map prints the unplaced files and exits 1 when there is one. The counts rank options and do not certify
+  a cut: `tsc --build` with project references is that gate (#807). It is not one of the four maps, so
+  `scripts/survey/maps.test.ts` does not check it, and it goes stale when `import-graph.json` is written again without
+  it. JSON: 2-space indent, sorted keys, `graph`, `order`, `packages` (each with `files`, `edges`, `upwardEdges`,
+  `clearedByIssue118`, `remaining`), `leftToPlace`, `clearedByIssue118`, `unassigned`, `totals`. Markdown: the sums, the
+  packages with their counts, what each holds by rule, the upward edges by pair of packages, the 20 files most upward
+  edges end on, the edges #118 clears, the files left to place by folder, the unassigned folders.
 
 ### Cluster contract traces
 
