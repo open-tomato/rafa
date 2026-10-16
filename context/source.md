@@ -570,10 +570,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps six `types`-only entries for core's
+  them. The root `exports` also keeps eight `types`-only entries for core's
   files (`./core/config`, `./core/config/config-schema`,
-  `./core/config/sections`, `./ports/log-level`, `./report/parse` and
-  `./store/check-rows`), which #808 retires.
+  `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
+  `./ports/log-level`, `./report/parse` and `./store/check-rows`), which
+  #808 retires.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a

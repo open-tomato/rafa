@@ -58,6 +58,12 @@
     "./core/config/sections": {
       "types": "./dist/core/config/sections.d.ts"
     },
+    "./errors/codes": {
+      "types": "./dist/errors/codes.d.ts"
+    },
+    "./errors/rafa-codes": {
+      "types": "./dist/errors/rafa-codes.d.ts"
+    },
     "./ports/log-level": {
       "types": "./dist/ports/log-level.d.ts"
     },
