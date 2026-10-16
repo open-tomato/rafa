@@ -34,7 +34,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { serializeFragment } from './fragment.js';
 import { RAFA_PACKAGE_NAME } from './settle-lock.js';
 import { withSettleWorktree } from './settle-worktree.js';
-import { buildSettle, CHANGELOG_TITLE, readSettle, releaseCommitSubject } from './settle.js';
+import { buildSettle, CHANGELOG_TITLE, readSettle } from './settle.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-settle-')));
@@ -365,7 +365,7 @@ describe('buildSettle, the release commit', () => {
     expect(built.build.insertPoint).toBe('before-next-heading');
     expect(built.status).toBe('');
 
-    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`${releaseCommitSubject('0.5.0')}\n${second}`);
+    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`chore: release 0.5.0\n${second}`);
     expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toEqual([
       'D\t.changes/rafa-1.md',
       'D\t.changes/rafa-9.md',
@@ -647,7 +647,7 @@ describe('readSettle and buildSettle under release.moveLock', () => {
     expect(built.build.lock).toEqual({ path: LOCK_FILE, from: '0.4.0', to: '0.5.0' });
     expect(built.files[LOCK_FILE]).toBe(projectLockText('0.5.0'));
     expect(built.status).toBe('');
-    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`${releaseCommitSubject('0.5.0')}\n${second}`);
+    expect(w.git(w.caller, ['log', '-1', '--format=%s%n%P', built.head])).toBe(`chore: release 0.5.0\n${second}`);
     expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toEqual([
       'D\t.changes/rafa-1.md',
       'D\t.changes/rafa-9.md',

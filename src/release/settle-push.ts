@@ -119,7 +119,8 @@ import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
-import { buildSettle, releaseCommitSubject } from './settle.js';
+import { releaseCommitSubject } from './release-move.js';
+import { buildSettle, settleMoves } from './settle.js';
 
 /** How a settle ends for the shell: 0 settled or nothing to do, 1 not. */
 export type SettleExitCode = 0 | 1;
@@ -355,7 +356,7 @@ function finalPush(
   attempts: SettlePushAttempts,
   pushed: PushReading,
 ): SettlePushOutcome {
-  const subject = releaseCommitSubject(build.version);
+  const subject = releaseCommitSubject(settleMoves(build));
   const target = `${worktree.remote} ${worktree.branch}`;
   if (pushed.kind === 'pushed') return { outcome: 'pushed', exitCode: 0, attempts, build };
   if (pushed.kind === 'rule') return failed('rule', build, attempts, ruleSentence(target, subject, pushed.rule, configFile));

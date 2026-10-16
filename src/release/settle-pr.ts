@@ -80,6 +80,7 @@
  * true: `rafa/release` holds the release and only the pull request step
  * is left to a settle run again.
  */
+import type { ReleaseMove } from './release-move.js';
 import type { SettleExitCode } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
@@ -89,8 +90,9 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { gitSaid } from '../pr/index.js';
 
+import { releaseCommitSubject } from './release-move.js';
 import { pushSaid } from './settle-push.js';
-import { buildSettle, releaseCommitSubject } from './settle.js';
+import { buildSettle, settleMoves } from './settle.js';
 
 /** The branch the `pr` delivery pushes the release commit to. */
 export const RELEASE_PR_BRANCH = 'rafa/release';
@@ -167,9 +169,9 @@ function failed(
   return { outcome, exitCode: 1, build, pushed, sentence };
 }
 
-/** The pull request's title: the release commit's subject. */
-export function releasePullTitle(version: string): string {
-  return releaseCommitSubject(version);
+/** The pull request's title: the subject of the release commit making `moves`. */
+export function releasePullTitle(moves: readonly ReleaseMove[]): string {
+  return releaseCommitSubject(moves);
 }
 
 /** The pull request's body; see the module note. Holds no hash and no clock. */
@@ -226,7 +228,7 @@ function pushReleaseBranch(worktree: SettleWorktree, build: SettleBuilt, current
   const lease = `--force-with-lease=${RELEASE_PR_REF}:${current ?? ''}`;
   const pushed = worktree.git(['push', '--porcelain', lease, worktree.remote, `${build.release}:${RELEASE_PR_REF}`]);
   if (pushed.ok) return null;
-  const subject = releaseCommitSubject(build.version);
+  const subject = releaseCommitSubject(settleMoves(build));
   const said = pushSaid(pushed);
   if (pushed.stdout.split('\n').some((line) => STALE_LEASE.test(line.trimEnd()))) {
     const read = current === null
@@ -328,13 +330,13 @@ export async function settleByPr(
   const draft: PullRequestDraft = {
     head: RELEASE_PR_BRANCH,
     base: worktree.branch,
-    title: releasePullTitle(build.version),
+    title: releasePullTitle(settleMoves(build)),
     body: releasePullBody(build, worktree.branch),
   };
   try {
     const delivered = await deliverPull(pulls, open, draft);
     return { outcome: 'delivered', exitCode: 0, build, head, pushed: !branch.same, ...delivered };
   } catch (error) {
-    return failed('unopened', build, true, `${RELEASE_PR_BRANCH} holds ${releaseCommitSubject(build.version)}, but the release pull request into ${worktree.branch} could not be opened or updated; settle again to finish it: ${messageOf(error)}`);
+    return failed('unopened', build, true, `${RELEASE_PR_BRANCH} holds ${releaseCommitSubject(settleMoves(build))}, but the release pull request into ${worktree.branch} could not be opened or updated; settle again to finish it: ${messageOf(error)}`);
   }
 }

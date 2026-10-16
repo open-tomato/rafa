@@ -98,11 +98,12 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
+import { releaseCommitSubject } from '../../release/release-move.js';
 import { settleByPr } from '../../release/settle-pr.js';
 import { settleByPush } from '../../release/settle-push.js';
 import { tagSettle } from '../../release/settle-tag.js';
 import { withSettleWorktree } from '../../release/settle-worktree.js';
-import { CHANGELOG_TITLE, readSettle, releaseCommitSubject } from '../../release/settle.js';
+import { CHANGELOG_TITLE, readSettle, settleMoves } from '../../release/settle.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '../plan/plan-files.js';
 
@@ -265,7 +266,7 @@ export function dryRunResult(reading: SettleReading, ref: string, branch: string
   if (reading.outcome === 'folded') {
     if (reading.changelogMissing) lines.push(createdChangelogLine(changelog));
     if (reading.lock !== null) lines.push(plannedLockLine(reading.lock));
-    lines.push(`Dry run: settle would commit "${releaseCommitSubject(reading.version)}" on ${branch}; nothing was written.`);
+    lines.push(`Dry run: settle would commit "${releaseCommitSubject(settleMoves(reading))}" on ${branch}; nothing was written.`);
     return resultOf(base, lines, null);
   }
   const ending = unwrittenEnding(reading);
@@ -282,7 +283,7 @@ function deliveryEnding(delivered: SettleDelivered, branch: string): { readonly 
     if (build.outcome === 'unbuilt') return { line: `❌ The release commit could not be built: ${build.problem}`, refuses: true };
     return unwrittenEnding(build);
   }
-  const subject = releaseCommitSubject(outcome.build.version);
+  const subject = releaseCommitSubject(settleMoves(outcome.build));
   switch (outcome.outcome) {
     case 'pushed': {
       const retried = outcome.attempts === 2

@@ -75,7 +75,8 @@
  *   4. stages both files, and `rafa.lock` when step 3 wrote it, and
  *      `git rm`s every folded fragment, `none` ones included, since the
  *      receipt names them all;
- *   5. commits `chore: release <version>` ({@link releaseCommitSubject}),
+ *   5. commits `chore: release <version>` (`releaseCommitSubject` of
+ *      {@link settleMoves}, `./release-move.ts`),
  *      with the repository's hooks running as they would for any commit.
  *
  * Delivery — the push, a retry, the release pull request — is the
@@ -91,6 +92,7 @@
  */
 import type { BranchForecastSettings } from './branch-forecast.js';
 import type { ChangelogInsertPoint } from './changelog.js';
+import type { ReleaseMove } from './release-move.js';
 import type { SettleLockPlan } from './settle-lock.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { FoldFragment } from './strategy.js';
@@ -106,6 +108,7 @@ import { errorCode } from '@open-tomato/rafa/core/loop';
 
 import { insertChangelogEntry } from './changelog.js';
 import { readFragmentTree } from './fragment-tree.js';
+import { releaseCommitSubject } from './release-move.js';
 import { readSettleLock, writeSettleLock } from './settle-lock.js';
 import { foldWithStrategy, releaseStrategyFor } from './strategy.js';
 import { gitPathOf, readManifestVersion, writeManifestVersion } from './version.js';
@@ -224,9 +227,12 @@ export type SettleBuild = Exclude<SettleReading, SettleFolded> | SettleUnbuilt |
 /** The heading a changelog the build creates opens with, above the settled section. */
 export const CHANGELOG_TITLE = '# Changelog';
 
-/** The subject of the commit a settle builds. */
-export function releaseCommitSubject(version: string): string {
-  return `chore: release ${version}`;
+/**
+ * The moves a folded settle makes, in the order the commit subject names
+ * them: today the root's alone, from the base version to the folded one.
+ */
+export function settleMoves(reading: Pick<SettleFolded, 'baseVersion' | 'version'>): readonly ReleaseMove[] {
+  return [{ package: null, dir: '.', from: reading.baseVersion, to: reading.version }];
 }
 
 /**
@@ -381,7 +387,7 @@ function commitRelease(
   const removed = git(['rm', '-q', '--', ...paths]);
   if (!removed.ok) return { problem: `the folded fragments could not be deleted: ${gitSaid(removed)}` };
 
-  const subject = releaseCommitSubject(reading.version);
+  const subject = releaseCommitSubject(settleMoves(reading));
   const made = git(['commit', '--cleanup=whitespace', '-m', subject]);
   if (!made.ok) return { problem: `${subject} could not be committed: ${gitSaid(made)}` };
 
