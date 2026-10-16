@@ -120,10 +120,10 @@
  *
  * ## The asset-tree clause
  *
- * The two templates above are named files; the pinned resolve plans
- * and the board templates are DIRECTORIES, so the build script ends with
- * a loop over a table of `<source under src>:<name under dist>` pairs.
- * Three readings shape it:
+ * The two templates above are named files; the pinned resolve plans,
+ * the board templates and the release workflow templates are
+ * DIRECTORIES, so the build script ends with a loop over a table of
+ * `<source under src>:<name under dist>` pairs. Three readings shape it:
  *
  *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
  *     holds `load.ts` and `load.test.ts` beside the four plans, and
@@ -131,12 +131,16 @@
  *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
- *     `src/board/templates/epic-guard.yml`, and a case resolves it
- *     through `readEpicGuard` pointed at `dist/`. Unlike `*.md`, a tree
- *     holding no YAML is not a failure: the `[ -e ]` guard skips the
- *     unmatched pattern, since `src/pr/plans/` carries none.
- *   - A tree lands DIRECTLY under `dist/`, as `dist/plans` and
- *     `dist/templates`, not at its source path. A bundle reading
+ *     `src/board/templates/epic-guard.yml` and the release ladder's
+ *     `src/release/templates/*.yml`, and a case resolves each through
+ *     `readEpicGuard` and `readReleaseTemplate` pointed at `dist/`.
+ *     Each pattern is copied file by file behind an `[ -e ]` guard, so
+ *     a tree holding no YAML (`src/pr/plans/`) or no markdown
+ *     (`src/release/templates/`) is not a failure.
+ *   - A tree lands DIRECTLY under `dist/`, as `dist/plans`,
+ *     `dist/templates` and `dist/release-templates`, not at its source
+ *     path; the release tree takes its own name because `templates` is
+ *     the board's. A bundle reading
  *     `import.meta.url` answers its own directory, which is `dist/` for
  *     `cli.js`, so `src/pr/plans/load.ts`'s first candidate is
  *     `<moduleDir>/plans/<name>.md`; `PINNED_PLANS_DIRNAME` is that
@@ -144,7 +148,8 @@
  *     `readPinnedPlan` pointed at `dist/` rather than only comparing
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
- *     with no markdown in it fails the build, whatever YAML it holds. `src/board/templates/`
+ *     with neither markdown nor YAML in it fails the build: the loop
+ *     counts what it copied and exits 1 on none. `src/board/templates/`
  *     now carries `spec.md`, the spec issue template, and carried no
  *     tracked file when the clause was written: `cp
  *     src/board/templates/*.md` against an absent directory would have
@@ -154,7 +159,13 @@
  *     with the directory absent, the `[ -d ]` guard skipped it and the
  *     run exited 0; with it present and holding no markdown, the `cp`
  *     matched nothing and the run exited 1. So the skip cannot hide a
- *     tree that is there and ships nothing.
+ *     tree that is there and ships nothing. When the release tree
+ *     joined the table on 2026-10-16, the clause as it stood (`cp
+ *     "$src"/*.md`) exited 1 on a probe tree holding only a `.yml`, so
+ *     the copy became one guarded loop over both patterns with a count;
+ *     in the same probe that loop copied a markdown-only and a
+ *     YAML-only tree, skipped an absent one, and exited 1 on a tree
+ *     holding only a `.ts` file and on an empty one.
  *
  * That last reading is why the board tree's case reads a PLANTED file:
  * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
@@ -469,6 +480,7 @@ import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
+import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '../release/templates.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
@@ -692,6 +704,7 @@ const TEMPLATES: [string, string][] = [
 const ASSET_TREES: [string, string][] = [
   ['src/pr/plans', 'plans'],
   ['src/board/templates', 'templates'],
+  ['src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
 
 /**
@@ -1191,7 +1204,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(149);
+    expect(before).toHaveLength(150);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1799,5 +1812,11 @@ describe('the asset trees in the build', () => {
     const source = readFileSync(join(PACKAGE_DIR, 'src/board/templates', EPIC_GUARD_FILE), 'utf8');
 
     expect(readEpicGuard(DIST)).toBe(source);
+  });
+
+  it('lands the release publish workflow where readReleaseTemplate looks for it from a bundle in dist', () => {
+    const source = readFileSync(join(PACKAGE_DIR, 'src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
+
+    expect(readReleaseTemplate(RELEASE_PUBLISH_FILE, DIST)).toBe(source);
   });
 });
