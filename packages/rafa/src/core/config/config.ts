@@ -84,8 +84,9 @@
  * `section.ts` (`activeSettings()`) and take each default from
  * `activeDefaults()`, so a layer and a resolution hold every registered
  * setting, in registration order. `src/config-registry.ts`, outside
- * `packages/rafa/src/core/`, registers the twelve sections when it is imported; a
- * process that has not imported it reads no setting at all, where the
+ * `packages/rafa/src/core/`, registers the twelve sections when its
+ * `registerCoreConfigSections` is called; a process that has not called
+ * it reads no setting at all, where the
  * literal this loop replaced held every setting whatever was registered.
  *
  * {@link parseConfigText} turns YAML text into one file layer and

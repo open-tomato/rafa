@@ -7,8 +7,9 @@
  * names moved to from the core config barrel (`SETTINGS`,
  * `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
  * `knownKeysAbove`), with the list of sections it registers and the
- * load hook it sets, `handConfigToLogger`. It is no
- * published entry; `src/index.ts` takes `CONFIG_DEFAULTS` from it.
+ * load hook it sets, `handConfigToLogger`, and the root that registers
+ * them, `registerCoreConfigSections`. It is no published entry;
+ * `src/index.ts` takes `CONFIG_DEFAULTS` and that root from it.
  *
  * Names are read with the TypeScript checker, so type-only exports count.
  * A deliberate change to a published name edits the list below in the
@@ -213,6 +214,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'readRafaBlocks',
     'registerAdapters',
     'registerCoreAdapters',
+    'registerCoreConfigSections',
     'renderInjection',
     'resolveConfig',
     'resolveScope',
@@ -234,6 +236,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'SETTING_NAMES',
     'handConfigToLogger',
     'knownKeysAbove',
+    'registerCoreConfigSections',
   ],
   'src/plan/index.ts': [
     'CheckOutcome',

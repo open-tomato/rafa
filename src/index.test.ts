@@ -37,9 +37,11 @@
  * names and no other, so nothing is left out of its containment case.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
- * config registry (`src/config-registry.ts`) for its effect, then the
  * adapter registry's composition root (`src/adapter-registry.ts`) for
- * the `registerCoreAdapters` it calls, then the dispatcher, the help renderer, the core registry, the module loader
+ * the `registerCoreAdapters` it calls, the dispatcher, the help
+ * renderer, the core registry, the config registry
+ * (`src/config-registry.ts`) for the `registerCoreConfigSections` it
+ * calls, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
@@ -186,7 +188,7 @@ import {
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
-import { CONFIG_DEFAULTS } from './config-registry.js';
+import { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import {
@@ -304,6 +306,7 @@ const RUNTIME_EXPORTS = [
   'readRafaBlocks',
   'registerAdapters',
   'registerCoreAdapters',
+  'registerCoreConfigSections',
   'renderInjection',
   'resolveConfig',
   'resolveScope',
@@ -386,6 +389,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
+  ['registerCoreConfigSections', entry.registerCoreConfigSections, registerCoreConfigSections],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
   ['resolveScope', entry.resolveScope, resolveScope],
@@ -472,11 +476,11 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 
 /** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
-  ['./config-registry.js', []],
   ['./adapter-registry.js', ['registerCoreAdapters']],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],
+  ['./config-registry.js', ['registerCoreConfigSections']],
   ['./modules/load.js', ['loadInvocationModules']],
   ['./status/hook.js', ['createStatusHook']],
 ];

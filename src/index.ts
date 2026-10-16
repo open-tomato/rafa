@@ -69,17 +69,17 @@
  *
  * ## The registries load first
  *
- * The first import is `config-registry.ts`, for its effect: it hands
- * the twelve sections of the config schema to core, so every setting
- * is registered before any module behind this entry loads or reads a
- * config. {@link CONFIG_DEFAULTS} is the registry's own. The second is
- * `adapter-registry.ts`, which registers nothing as it is imported: the
- * entry calls its {@link registerCoreAdapters} once its imports have
- * loaded, which hands core's adapters to the adapter registry, so
- * {@link CORE_ADAPTER_REGISTRY} answers every core kind before a caller
- * of this entry resolves one. A call is what survives a bundler that
- * drops an import kept for its effect alone. The entry exports it and
- * {@link CORE_ADAPTERS} too; a second call registers nothing.
+ * Neither `config-registry.ts` nor `adapter-registry.ts` registers
+ * anything as it is imported. Once its imports have loaded, the entry
+ * calls {@link registerCoreConfigSections}, which hands the twelve
+ * sections of the config schema to core, so every setting is
+ * registered before a caller of this entry loads or reads a config,
+ * then {@link registerCoreAdapters}, which hands core's adapters to the
+ * adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers every core
+ * kind before a caller resolves one. A call is what survives a bundler
+ * that drops an import kept for its effect alone. The entry exports
+ * both roots, {@link CONFIG_DEFAULTS} (the registry's own) and
+ * {@link CORE_ADAPTERS} too; a second call of either registers nothing.
  *
  * ## Why the commands carry a `Command` suffix
  *
@@ -131,9 +131,8 @@
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
-import './config-registry.js';
-
 import { registerCoreAdapters } from './adapter-registry.js';
+import { registerCoreConfigSections } from './config-registry.js';
 
 export type {
   Adapter,
@@ -283,7 +282,7 @@ export {
 } from '@open-tomato/rafa/core/adapters';
 export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
-export { CONFIG_DEFAULTS } from './config-registry.js';
+export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 export {
   CONFIG_FILE,
   ConfigError,
@@ -364,4 +363,5 @@ export {
 } from './project/scope.js';
 export { default as startCommand } from './start.js';
 
+registerCoreConfigSections();
 registerCoreAdapters();

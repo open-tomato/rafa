@@ -1,6 +1,6 @@
 /**
  * The registry: the twelve sections of the config schema, handed to
- * core when this module is imported, and the merged schema read off
+ * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
@@ -8,14 +8,23 @@
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
  * the twelve are listed, {@link CONFIG_SECTIONS}: core's own
  * (`CORE_SECTION`) and the eleven files `src/config-schema-*.ts`.
- * Importing it calls `registerConfigSections` once, with that list cut
- * into the runs {@link SETTINGS} holds (see the order below), so
- * `activeSettings()` and `activeDefaults()` answer every setting.
- * `src/rafa.ts` and `src/index.ts` import it ahead of every other
- * import, before anything that loads a config; core never imports it.
- * A refused registration throws at import, naming what it refused.
  *
- * Importing it also sets core's load hook (`setConfigLoadHook` in
+ * Importing it registers nothing. {@link registerCoreConfigSections}
+ * calls `registerConfigSections` once, with that list cut into the runs
+ * {@link SETTINGS} holds (see the order below), so `activeSettings()`
+ * and `activeDefaults()` answer every setting; a registration core
+ * refuses throws from the call, naming what it refused. The root is
+ * called, never imported for its effect: under `"sideEffects": false`
+ * in a manifest, `bun build` drops an import kept for its effect alone.
+ * `src/rafa.ts` and `src/index.ts` call it as they load, after their
+ * imports, ahead of `registerCoreAdapters` and before anything that
+ * loads a config; core never imports this module. Until something calls
+ * it, `loadConfig` refuses, naming this module. `bun test` calls it once
+ * for the test process, from `src/tests/preload.ts`; a child process a
+ * test spawns runs no preload, and calls the root itself. A second call
+ * finds every setting registered already and registers nothing.
+ *
+ * The call also sets core's load hook (`setConfigLoadHook` in
  * `packages/rafa/src/core/config/section.ts`) to {@link handConfigToLogger}, so every
  * config `loadConfig` resolves hands the logger its `logger` settings
  * without core importing the logger's section file.
@@ -74,7 +83,12 @@ import type {
   SettingSpec,
 } from '@open-tomato/rafa/core/config';
 
-import { CORE_SECTION, registerConfigSections, setConfigLoadHook } from '@open-tomato/rafa/core/config';
+import {
+  activeSettings,
+  CORE_SECTION,
+  registerConfigSections,
+  setConfigLoadHook,
+} from '@open-tomato/rafa/core/config';
 
 import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import {
@@ -133,14 +147,12 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
 /**
  * The hook `loadConfig` calls with every config it resolves: it hands
  * the logger its `logger` settings, read through the logger section's
- * `loggerSettingsOf`. Set when this module is imported, beside the
- * registration.
+ * `loggerSettingsOf`. Set by {@link registerCoreConfigSections}, beside
+ * the registration.
  */
 export function handConfigToLogger(config: Readonly<RafaConfig>): void {
   setActiveLoggerSettings(loggerSettingsOf(config));
 }
-
-setConfigLoadHook(handConfigToLogger);
 
 /** Core's settings up to `effort.sync`, before the `hub` section. */
 const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;
@@ -311,7 +323,29 @@ function inSettingOrder(
   }));
 }
 
-registerConfigSections(inSettingOrder(CONFIG_SECTIONS, SETTING_NAMES));
+/** Whether core's registry holds every setting of {@link SETTINGS}, each as the same spec. */
+function holdsCoreSections(): boolean {
+  const active = activeSettings();
+  return SETTING_NAMES.every((name) => active[name] === SETTINGS[name]);
+}
+
+/**
+ * Registers {@link CONFIG_SECTIONS} with core, cut into the runs
+ * {@link SETTINGS} holds them in, and sets core's load hook to
+ * {@link handConfigToLogger}.
+ *
+ * When core's registry holds every setting already, each as the same
+ * spec, it registers nothing and leaves the load hook as it is, so the
+ * preload and an entry may both call it in one process. Throws what
+ * `registerConfigSections` throws on a section core refuses, such as a
+ * setting another package registered first, leaving the registry and
+ * the load hook as they were.
+ */
+export function registerCoreConfigSections(): void {
+  if (holdsCoreSections()) return;
+  registerConfigSections(inSettingOrder(CONFIG_SECTIONS, SETTING_NAMES));
+  setConfigLoadHook(handConfigToLogger);
+}
 
 /** Setting names by the dotted key the file spells them with. */
 export const SETTING_BY_KEY: ReadonlyMap<string, ConfigSetting> = new Map(

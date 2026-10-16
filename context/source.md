@@ -245,14 +245,17 @@ contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
 `checks`. Core names no section. The twelve are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and the eleven `src/config-schema-*.ts` files. Importing
-that module registers the twelve with core once, and `src/rafa.ts` and
-`src/index.ts` import it ahead of anything that loads a config. A file outside
+own (`core-section.ts`) and the eleven `src/config-schema-*.ts` files. That
+module registers nothing as it is imported: its `registerCoreConfigSections()`
+registers the twelve with core and sets core's load hook, and `src/rafa.ts`,
+`src/index.ts` and `src/tests/preload.ts` call it ahead of
+`registerCoreAdapters()`, before anything loads a config. A second call
+registers nothing. A file outside
 `packages/rafa/src/core/` takes the merged `SETTINGS`, `CONFIG_DEFAULTS`,
 `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and `knownKeysAbove` from the
 registry, never from the core barrel, which exports none of them; core reads the
 same through the `active*` functions of `section.ts`. A registration that breaks
-a rule throws at import, naming what it refused: a setting name two sections
+a rule throws from the call, naming what it refused: a setting name two sections
 define, a file key a second section defines under another setting name, which
 names both setting names too, or a `dangerous.*` key a second section defines
 under the same setting name, each naming both packages.

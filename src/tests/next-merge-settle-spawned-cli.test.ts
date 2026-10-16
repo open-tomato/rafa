@@ -103,6 +103,8 @@ function buildProbe(): string {
   return [
     'import { writeFileSync } from "node:fs";',
     `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+    `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
+    'registerCoreConfigSections();',
     'registerCoreAdapters();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,

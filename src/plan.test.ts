@@ -311,6 +311,8 @@ const PROBE = [
   'import { mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
   `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+  `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
+  'registerCoreConfigSections();',
   'registerCoreAdapters();',
   `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,

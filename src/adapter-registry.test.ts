@@ -571,7 +571,7 @@ describe('the core adapter registry', () => {
 
       expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered') })).toThrow(
         'adapter registry: learning.bless.minConfidence has no registered default:'
-          + ' import src/config-registry.ts before making the local learning adapter without one',
+          + ' call registerCoreConfigSections from src/config-registry.ts before making the local learning adapter without one',
       );
       // Control: a floor the context names needs no registered default.
       expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered'), learningBlessMinConfidence: 0.5 }))
@@ -592,7 +592,7 @@ describe('the core adapter registry', () => {
     });
     // bun's homedir() keeps the HOME the process started with, so each reading is a child of its own.
     const script = [
-      `await import(${JSON.stringify(CONFIG_REGISTRY_ENTRY)});`,
+      `(await import(${JSON.stringify(CONFIG_REGISTRY_ENTRY)})).registerCoreConfigSections();`,
       `(await import(${JSON.stringify(ROOT_ENTRY)})).registerCoreAdapters();`,
       `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(BARREL_ENTRY)});`,
       `const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: ${JSON.stringify(root)} });`,

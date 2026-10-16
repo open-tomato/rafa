@@ -84,7 +84,7 @@ function registeredBlessMinConfidence(): number {
   const value = activeDefaults().learningBlessMinConfidence;
   if (value === undefined) {
     throw new Error(`${REFUSAL}: learning.bless.minConfidence has no registered default:`
-      + ' import src/config-registry.ts before making the local learning adapter without one');
+      + ' call registerCoreConfigSections from src/config-registry.ts before making the local learning adapter without one');
   }
   return value;
 }

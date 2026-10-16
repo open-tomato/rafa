@@ -1,8 +1,10 @@
 /**
  * Tests for the registry: the twelve sections it lists, the
- * registration its import makes, and the merged schema it exports.
+ * registration its root, `registerCoreConfigSections`, makes, and the
+ * merged schema it exports.
  *
- * The cases in one process read the registry this file's import made:
+ * The cases in one process read the registry the root made when
+ * `src/tests/preload.ts` called it:
  * every setting the registered sections define is in {@link SETTINGS}
  * as the same spec, every default is in {@link CONFIG_DEFAULTS} as the
  * same value, and a second registration of the list is refused naming
@@ -14,13 +16,19 @@
  * key under two setting names; `section.test.ts` holds the refusal that
  * case could meet.
  *
- * The probe cases import one module first in a fresh `bun` process and
- * print how many settings and defaults core's registry answers. The
- * registry answers all of them; the control, the core config barrel
- * alone, answers none, so the probe can tell a registration from its
- * absence.
+ * A second call of the root registers nothing and leaves the load hook
+ * as it found it; over an empty registry, a call registers every
+ * setting and sets the hook, the control that the first case could
+ * have read a registration.
  *
- * The load hook the import sets is held to be {@link handConfigToLogger},
+ * The probe cases import one module first in a fresh `bun` process,
+ * which runs no preload, and print how many settings and defaults
+ * core's registry answers. The registry with its root called answers
+ * all of them; the registry imported alone answers none, as does the
+ * core config barrel alone, so the probe can tell a registration from
+ * its absence.
+ *
+ * The load hook the root sets is held to be {@link handConfigToLogger},
  * and that function to hand the logger the settings of the config it is
  * given, each away from its default so a hook that handed the defaults
  * fails.
@@ -55,6 +63,7 @@ import {
   mergeConfigSections,
   registerConfigSections,
   restoreConfigSections,
+  setConfigLoadHook,
 } from '@open-tomato/rafa/core/config';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
@@ -63,6 +72,7 @@ import {
   CONFIG_SECTIONS,
   handConfigToLogger,
   knownKeysAbove,
+  registerCoreConfigSections,
   SECTIONS,
   SETTING_BY_KEY,
   SETTING_NAMES,
@@ -231,11 +241,17 @@ const COMMAND_LINE: readonly ConfigSetting[] = [
   'taskSkills',
 ];
 
-/** The settings and defaults core's registry answers once `module` is imported first, in a fresh process. */
-function probeRegistered(module: string): { settings: number; defaults: number } {
+/**
+ * The settings and defaults core's registry answers once `module` is
+ * imported first, in a fresh process, and its `registerCoreConfigSections`
+ * called when `call` is set.
+ */
+function probeRegistered(module: string, call = false): { settings: number; defaults: number } {
   const barrel = join(import.meta.dir, '..', 'packages', 'rafa', 'src', 'core', 'config', 'index.ts');
   const script = [
-    `await import(${JSON.stringify(module)});`,
+    call
+      ? `(await import(${JSON.stringify(module)})).registerCoreConfigSections();`
+      : `await import(${JSON.stringify(module)});`,
     `const core = await import(${JSON.stringify(barrel)});`,
     'console.log(JSON.stringify({',
     '  settings: Object.keys(core.activeSettings()).length,',
@@ -269,7 +285,7 @@ describe('CONFIG_SECTIONS', () => {
   });
 });
 
-describe('the registration at import', () => {
+describe('the registration the preload made', () => {
   it('registers every setting of SETTINGS, each as the same spec', () => {
     const active = activeSettings();
     const registered = Object.keys(active).sort();
@@ -348,8 +364,40 @@ describe('the registration at import', () => {
   });
 });
 
+describe('registerCoreConfigSections', () => {
+  it('registers nothing and keeps the load hook when every setting is held already', () => {
+    const before = activeSettings();
+    const hook = setConfigLoadHook(null);
+    try {
+      registerCoreConfigSections();
+
+      expect(activeSettings()).toBe(before);
+      expect(activeConfigLoadHook()).toBeNull();
+    } finally {
+      setConfigLoadHook(hook);
+    }
+  });
+
+  it('registers every setting in schema order and sets the load hook, over an empty registry', () => {
+    const held = registerConfigSections([]);
+    const hook = setConfigLoadHook(null);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      expect(Object.keys(activeSettings())).toEqual([]);
+
+      registerCoreConfigSections();
+
+      expect(Object.keys(activeSettings())).toEqual(KEYS.map(([setting]) => setting));
+      expect(activeConfigLoadHook()).toBe(handConfigToLogger);
+    } finally {
+      restoreConfigSections(held);
+      setConfigLoadHook(hook);
+    }
+  });
+});
+
 describe('the load hook', () => {
-  it('is set at import to handConfigToLogger', () => {
+  it('is set by the registration to handConfigToLogger', () => {
     expect(activeConfigLoadHook()).toBe(handConfigToLogger);
   });
 
@@ -380,10 +428,17 @@ describe('the load hook', () => {
 });
 
 describe('the registration in a fresh process', () => {
-  it('answers every setting and default once the registry is imported first', () => {
-    expect(probeRegistered(join(import.meta.dir, 'config-registry.ts'))).toEqual({
+  it('answers every setting and default once the registry\'s root is called', () => {
+    expect(probeRegistered(join(import.meta.dir, 'config-registry.ts'), true)).toEqual({
       settings: KEYS.length,
       defaults: KEYS.length,
+    });
+  });
+
+  it('answers none when the registry is imported and its root not called', () => {
+    expect(probeRegistered(join(import.meta.dir, 'config-registry.ts'))).toEqual({
+      settings: 0,
+      defaults: 0,
     });
   });
 

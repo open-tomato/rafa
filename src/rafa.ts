@@ -33,29 +33,29 @@
  * `process.exitCode` rather than calling `process.exit`, so nothing a
  * command wrote is truncated mid-flush.
  *
- * Its first import is `src/config-registry.ts`, for its effect: the
- * twelve sections of the config schema are handed to core before any
- * module loaded here reads a config. It also imports
- * `src/adapter-registry.ts`, which registers nothing as it is imported:
- * the module calls its `registerCoreAdapters` before it loads the
- * project's modules, so core's adapters are registered before anything
- * run here resolves one, and the call survives a bundler that drops an
- * import kept for its effect alone.
+ * It imports `src/config-registry.ts` and `src/adapter-registry.ts`,
+ * neither of which registers anything as it is imported: once its
+ * imports have loaded, the module calls `registerCoreConfigSections`,
+ * which hands the twelve sections of the config schema to core, then
+ * `registerCoreAdapters`, both before it loads the project's modules,
+ * so every setting is registered before anything run here reads a
+ * config and core's adapters before anything resolves one. A call
+ * survives a bundler that drops an import kept for its effect alone.
  *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
-import './config-registry.js';
-
 import { homedir } from 'node:os';
 
 import { registerCoreAdapters } from './adapter-registry.js';
 import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
+import { registerCoreConfigSections } from './config-registry.js';
 import { loadInvocationModules } from './modules/load.js';
 import { createStatusHook } from './status/hook.js';
 
+registerCoreConfigSections();
 registerCoreAdapters();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
