@@ -2880,9 +2880,10 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   `src/start/loop-events.ts`'s, and `context/operators.md` lists their
   line shapes.
 - **The context's output** passes lines and `step`, `log` and named
-  `event` events through; text drops a named event, json writes it. It holds `result(payload)` for the terminal event, and refuses
-  a second result and any `start` or `result` handed to `emit`. A refusal
-  there ends the command as `command_error`.
+  `event` events through; text drops a named event, json writes it. It
+  holds `result(payload)` for the terminal event, and refuses a second
+  result and any `start` or `result` handed to `emit`. A refusal there
+  ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
   (`packages/rafa/src/core/output/active.ts`), in the invocation's output mode,
   which `activeOutputMode()` answers. Both are held in an async scope of the
