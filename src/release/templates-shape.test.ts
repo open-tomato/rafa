@@ -37,12 +37,15 @@ interface Shape {
  * token; the tag workflow runs on a closed pull request and pushes a
  * tag, granting the token to its publish job alone; the settle
  * workflow runs on a push and pushes a release commit and its tags, and
- * does the same.
+ * does the same; the bot fragment workflow runs on a bot's pull request
+ * in the base's context, pushes one commit to its branch and reads the
+ * pull request's metadata.
  */
 const SHAPES: Readonly<Record<string, Shape>> = {
   'release-publish.yml': { triggers: ['push', 'workflow_call'], permissions: { contents: 'read', 'id-token': 'write' } },
   'release-tag.yml': { triggers: ['pull_request'], permissions: { contents: 'write' } },
   'release-settle.yml': { triggers: ['push'], permissions: { contents: 'write' } },
+  'release-bot-fragment.yml': { triggers: ['pull_request_target'], permissions: { 'contents': 'write', 'pull-requests': 'read' } },
 };
 
 /** The workflow at `file`, parsed. */

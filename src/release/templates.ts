@@ -30,6 +30,13 @@
  * tagged it, calls the publish workflow through `workflow_call` with
  * that commit as `ref`, for the same reason.
  *
+ * `release-bot-fragment.yml` ({@link RELEASE_BOT_FRAGMENT_FILE}) is
+ * needed at levels 3 and 4 while `.github/dependabot.yml` exists: a
+ * Dependabot pull request, run on `pull_request_target`, gets the
+ * fragment `rafa release fragment --plan=dependabot-<number>` writes from
+ * the base branch's checkout, committed and pushed to the pull request's
+ * branch, from which nothing runs.
+ *
  * {@link writeReleaseWorkflow} writes through `../board/setup.ts`'s
  * {@link writeShippedFile}, the writer the epic guard uses: an existing
  * file is left byte for byte as it is, whatever it holds, and a
@@ -57,6 +64,9 @@ export const RELEASE_TAG_FILE = 'release-tag.yml';
 
 /** The level 4 settle workflow's name, in the templates directory and under `.github/workflows/`. */
 export const RELEASE_SETTLE_FILE = 'release-settle.yml';
+
+/** The bot fragment workflow's name, in the templates directory and under `.github/workflows/`. */
+export const RELEASE_BOT_FRAGMENT_FILE = 'release-bot-fragment.yml';
 
 /** Where a project's workflows live, under its root. */
 const WORKFLOWS_DIR: string = join('.github', 'workflows');
