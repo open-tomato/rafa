@@ -181,6 +181,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
   ...RELEASE_FRAGMENT_LINES,
   `#   publishCommand: ${CONFIG_DEFAULTS.releasePublishCommand}      # the publish line release tag prints and never runs`,
+  `#   publish: ${CONFIG_DEFAULTS.releasePublish}              # manual | ci, who publishes a tagged version; ci publishes from the pushed tag`,
   '# errors:',
   '#   codes: []                    # cause codes this project adds to rafa\'s list, each code/description/hint/level/since',
   '# logger:',

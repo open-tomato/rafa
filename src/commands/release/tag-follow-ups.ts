@@ -14,8 +14,21 @@
  * subshell leaves the operator's shell where it was, and the line after
  * it, `git switch <branch>` for a tag behind HEAD, still runs from the
  * root.
+ *
+ * ## A publish that CI runs
+ *
+ * Under `release.publish: ci` a pushed tag starts
+ * `.github/workflows/release-publish.yml`, which publishes the unit
+ * itself, so a command for the operator to type would publish the same
+ * version twice. {@link followUpsFor} then names the push line alone,
+ * and {@link ciPublishSentence} gives the one sentence that stands where
+ * the publish line stood, for exactly the units that would have had
+ * one. The workflow path is the ladder's {@link PUBLISH_WORKFLOW}, so
+ * the sentence and the doctor row name the same file.
  */
+import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections';
 
+import { PUBLISH_WORKFLOW } from '../../release/ladder.js';
 import { RELEASE_REMOTE } from '../../release/version.js';
 
 /** The registry a publish reaches when the manifest names none. */
@@ -114,12 +127,24 @@ function publishFrom(publish: string, dir: string | null | undefined): string {
 }
 
 /**
+ * The sentence that stands in for the publish line of `tag` under
+ * `release.publish: ci`, or null when `target` has nothing to publish,
+ * as {@link followUpsFor} would name no publish line for it either.
+ */
+export function ciPublishSentence(tag: string, version: string, target: PublishTarget): string | null {
+  if (target.name === null || target.isPrivate) return null;
+  return `Once pushed, ${tag} publishes ${target.name}@${version} to ${target.registry}`
+    + ` through ${PUBLISH_WORKFLOW.path} (release.publish: ci).`;
+}
+
+/**
  * What the operator does next once `tag` is written: push it to
  * `pushTo`, unless `pushTo` is `null` because the run pushed it
  * already, and publish `version` with
  * `publish`, `release.publishCommand`, when there is something to
  * publish — in the unit's folder when `place` names one, and from the
- * tag when HEAD is past it. Pure and total.
+ * tag when HEAD is past it. Under `mode` `ci` the publish line is left
+ * out, CI publishing the pushed tag; see the module note. Pure and total.
  */
 export function followUpsFor(
   tag: string,
@@ -128,11 +153,12 @@ export function followUpsFor(
   publish: string,
   place: TagPlace = ON_HEAD,
   pushTo: string | null = RELEASE_REMOTE,
+  mode: ReleasePublishMode = 'manual',
 ): readonly ReleaseFollowUp[] {
   const push: readonly ReleaseFollowUp[] = pushTo === null
     ? []
     : [{ command: `git push ${pushTo} ${tag}`, why: `the tag is local until ${pushTo} has it` }];
-  if (target.name === null || target.isPrivate) return push;
+  if (mode === 'ci' || target.name === null || target.isPrivate) return push;
   const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
   const command = publishFrom(publish, place.dir);
   if (place.ahead === 0) return [...push, { command, why: publishes }];

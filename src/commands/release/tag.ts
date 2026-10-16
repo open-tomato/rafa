@@ -128,6 +128,12 @@
  * its line is `(cd <dir> && <publishCommand>)` (`./tag-follow-ups.ts`),
  * one publish line per unit, under the push line of that unit's tag.
  *
+ * Under `release.publish: ci` the pushed tag starts
+ * `.github/workflows/release-publish.yml`, which publishes the unit, so
+ * the publish line gives way to one sentence saying so
+ * (`ciPublishSentence` in `./tag-follow-ups.ts`), and json carries
+ * `publish: "ci"` on each unit that sentence was written for.
+ *
  * The command is a setting rather than a reading of the manifest. Until
  * 2026-09-30 it was `<manager> publish`, the manager read off the
  * manifest's `packageManager` field, and tagging 0.24.1 of this
@@ -199,6 +205,7 @@ import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
@@ -213,7 +220,7 @@ import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
-import { followUpsFor, readPublishTarget } from './tag-follow-ups.js';
+import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
 import {
   readNewestRelease,
   readTagPackages,
@@ -321,6 +328,11 @@ export interface ReleaseTagUnit {
   readonly followUps: readonly ReleaseFollowUp[];
   /** The push `--push` made of its tag; left out of a run without the flag and of a skipped unit. */
   readonly pushed?: TagPushed;
+  /**
+   * `ci` when `release.publish: ci` hands its publish to the publish
+   * workflow; left out where the unit has a publish line or nothing to publish.
+   */
+  readonly publish?: 'ci';
 }
 
 /**
@@ -438,7 +450,7 @@ function projectOf(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The four settings one run reads out of the config. */
+/** The five settings one run reads out of the config. */
 export interface TagSettings {
   /** `release.versionFile`, relative to the repository root. */
   readonly versionFile: string;
@@ -448,9 +460,11 @@ export interface TagSettings {
   readonly releaseBranch: string;
   /** `release.publishCommand`, the publish line's command; see the module note. */
   readonly publishCommand: string;
+  /** `release.publish`: `ci` replaces the publish line; see the module note. */
+  readonly publishMode: ReleasePublishMode;
 }
 
-/** The four settings this action reads, refusing a config `loadConfig` refuses. */
+/** The five settings this action reads, refusing a config `loadConfig` refuses. */
 async function tagConfig(project: ProjectFound, warn: (message: string) => void): Promise<TagSettings> {
   try {
     const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
@@ -459,6 +473,7 @@ async function tagConfig(project: ProjectFound, warn: (message: string) => void)
       changelog: config.releaseChangelog,
       releaseBranch: config.prBase ?? DEFAULT_RELEASE_BRANCH,
       publishCommand: config.releasePublishCommand,
+      publishMode: config.releasePublish,
     };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
@@ -594,8 +609,7 @@ function pushTags(git: GitRunner, ready: readonly ReadyUnit[], branch: string): 
 /** `unit` as the result carries it, with its follow-ups and the push it got. */
 function unitResult(
   unit: DecidedUnit,
-  publishCommand: string,
-  branch: string,
+  config: TagSettings,
   pushed: ReadonlyMap<string, TagPushed> | null,
   pushTo: string | null,
 ): ReleaseTagUnit {
@@ -603,12 +617,27 @@ function unitResult(
   if (unit.decision.kind !== 'ready') return { ...base, followUps: [] };
   const { tag, version, ahead } = unit.decision;
   const target = readPublishTarget(unit.inputs.version.text);
-  const place = { ahead, branch, dir: unit.dir };
-  const followUps = followUpsFor(tag, version, target, publishCommand, place, pushTo);
+  const place = { ahead, branch: config.releaseBranch, dir: unit.dir };
+  const mode = config.publishMode;
+  const followUps = followUpsFor(tag, version, target, config.publishCommand, place, pushTo, mode);
+  const ci = mode === 'ci' && ciPublishSentence(tag, version, target) !== null
+    ? { publish: 'ci' as const }
+    : {};
   const push = pushed?.get(tag);
   return push === undefined
-    ? { ...base, followUps }
-    : { ...base, followUps, pushed: push };
+    ? { ...base, followUps, ...ci }
+    : { ...base, followUps, pushed: push, ...ci };
+}
+
+/** The `Next:` lines of one unit: its follow-ups, then the CI publish sentence when it has one. */
+function nextLines(unit: ReleaseTagUnit): readonly string[] {
+  const lines = unit.followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`);
+  if (unit.publish !== 'ci' || unit.decision.kind !== 'ready') return lines;
+  const { tag, version } = unit.decision;
+  const sentence = ciPublishSentence(tag, version, readPublishTarget(unit.inputs.version.text));
+  return sentence === null
+    ? lines
+    : [...lines, `${INDENT}${sentence}`];
 }
 
 /** The warning a run prints when HEAD is past the tagged commit, or null when HEAD is the tagged commit. */
@@ -642,13 +671,14 @@ function unitLines(unit: ReleaseTagUnit, branch: string): readonly string[] {
  * `Tagged` line per tag in unit order, each with its `Pushed` line when
  * the tag was pushed, a `Skipped` line per skipped unit, and the
  * `Next:` heading only over follow-ups there are, every unit's in unit
- * order.
+ * order, a unit under `release.publish: ci` giving its CI publish
+ * sentence where its publish line would stand.
  */
 export function renderTagged(units: readonly ReleaseTagUnit[], branch: string): readonly string[] {
-  const followUps = units.flatMap((unit) => unit.followUps);
-  const next = followUps.length === 0
+  const lines = units.flatMap(nextLines);
+  const next = lines.length === 0
     ? []
-    : ['Next:', ...followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`)];
+    : ['Next:', ...lines];
   return [...units.flatMap((unit) => unitLines(unit, branch)), ...next];
 }
 
@@ -678,7 +708,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
   const pushTo = pushed === null
     ? trackedRemote(git, config.releaseBranch)
     : null;
-  const units = decided.map((unit) => unitResult(unit, config.publishCommand, config.releaseBranch, pushed, pushTo));
+  const units = decided.map((unit) => unitResult(unit, config, pushed, pushTo));
   const root = units[0];
   const written = root?.decision.kind === 'ready'
     ? root.decision
@@ -710,7 +740,10 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
       + ' read. After the tags it prints what to run next: per tag, the push that puts it on the remote'
       + ' and the publish line for the registry its manifest configures, with the command'
       + ' `release.publishCommand` names (`npm publish` by default), run in the package\'s folder for a'
-      + ' package and spelled to publish from the tag when HEAD is past it, which it does not run. With'
+      + ' package and spelled to publish from the tag when HEAD is past it, which it does not run. Under'
+      + ' `release.publish: ci` a unit\'s publish line is replaced by one sentence saying the pushed tag'
+      + ' publishes through `.github/workflows/release-publish.yml`, and json carries `publish: "ci"` on'
+      + ' that unit. With'
       + ' `--push` it pushes each tag itself to the remote the release branch tracks (`origin` when it'
       + ' tracks none) and drops its push line; a push that fails exits 1 with what git said and keeps'
       + ' the local tags. With `--output=json` the readings, the decisions, the follow-ups and the pushes'

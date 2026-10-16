@@ -147,6 +147,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['releasePublish', 'release.publish'],
   ['releaseMoveLock', 'release.moveLock'],
   ['errorsCodes', 'errors.codes'],
   ['loggerKind', 'logger.kind'],
@@ -516,6 +517,7 @@ describe('knownKeysAbove', () => {
         'settle',
         'tag',
         'publishCommand',
+        'publish',
         'moveLock',
       ],
     ]);

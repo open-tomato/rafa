@@ -783,6 +783,84 @@ describe('the dispatched action', () => {
   });
 });
 
+describe('a run under release.publish: ci', () => {
+  const sentence = `Once pushed, ${TAG} publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`
+    + ' through .github/workflows/release-publish.yml (release.publish: ci).';
+
+  /** A release project whose config sets `release.publish` to `mode`. */
+  function publishProject(mode: string, manifest = MANIFEST): PlantedProject {
+    const project = plantProject(scratch(), `release:\n  publish: ${mode}\n`);
+    writeFileSync(join(project.root, 'package.json'), manifest, 'utf8');
+    writeFileSync(join(project.root, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    return project;
+  }
+
+  it('prints the sentence where the publish line stood, and no publish command', async () => {
+    const run = await ran(recorded(gitTable()).seams, publishProject('ci'));
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
+    expect(run.stdout).toContain(`  ${sentence}`);
+    expect(run.stdout).not.toContain(`${DEFAULT_PUBLISH} — publishes`);
+  });
+
+  it('prints the publish command and no sentence under release.publish: manual', async () => {
+    const run = await ran(recorded(gitTable()).seams, publishProject('manual'));
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION}`);
+    expect(run.stdout).not.toContain('release-publish.yml');
+  });
+
+  it('carries publish: "ci" on the unit in json, with only the push among its follow-ups', async () => {
+    const run = await ran(recorded(gitTable()).seams, publishProject('ci'), ['--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(data.units[0]?.publish).toBe('ci');
+    expect(data.units[0]?.followUps.map((each) => each.command)).toEqual([`git push ${RELEASE_REMOTE} ${TAG}`]);
+  });
+
+  it('leaves publish out of the unit in json under manual', async () => {
+    const run = await ran(recorded(gitTable()).seams, publishProject('manual'), ['--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(data.units[0]).toBeDefined();
+    expect(data.units[0]).not.toHaveProperty('publish');
+  });
+
+  it('gives a private root neither a sentence nor publish: "ci"', async () => {
+    const manifest = JSON.stringify({ name: '@open-tomato/rafa', version: VERSION, private: true });
+    const table = { ...gitTable(), [`show ${SET_COMMIT}:./package.json`]: said(manifest) };
+
+    const run = await ran(recorded(table).seams, publishProject('ci', manifest), ['--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(data.units[0]?.decision.kind).toBe('ready');
+    expect(data.units[0]).not.toHaveProperty('publish');
+  });
+
+  it('renders the sentence after the unit\'s push line, and alone once the tag was pushed', () => {
+    const pushed: TagPushed = { outcome: 'pushed', exitCode: 0, tag: TAG, remote: 'origin', sentence: '' };
+    const onHead = { ahead: 0, branch: 'main' };
+    const followUps = followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, RELEASE_REMOTE, 'ci');
+
+    expect(renderTagged([unit({ followUps, publish: 'ci' })], 'main')).toEqual([
+      `✅ Tagged ${TAG} at the HEAD of main.`,
+      'Next:',
+      `  git push ${RELEASE_REMOTE} ${TAG} — the tag is local until ${RELEASE_REMOTE} has it`,
+      `  ${sentence}`,
+    ]);
+    expect(renderTagged([unit({ followUps: [], pushed, publish: 'ci' })], 'main')).toEqual([
+      `✅ Tagged ${TAG} at the HEAD of main.`,
+      `✅ Pushed ${TAG} to origin.`,
+      'Next:',
+      `  ${sentence}`,
+    ]);
+  });
+});
+
 describe('a run over a workspace', () => {
   /** The package the workspace cases publish, and its folder. */
   const PLUGIN = '@scope/plugin';

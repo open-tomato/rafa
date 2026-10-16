@@ -141,6 +141,9 @@ ports/log-level.d.ts
 ports/spec-review.d.ts
 pr/checks.d.ts
 pr/types.d.ts
+release-templates/release-publish.yml
+release-templates/release-settle.yml
+release-templates/release-tag.yml
 report/parse.d.ts
 schema/project-id.d.ts
 schema/tiers.d.ts

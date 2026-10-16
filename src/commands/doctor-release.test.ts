@@ -71,6 +71,10 @@ const CONFIG = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
+  releaseSettle: 'push',
+  releaseTag: 'manual',
+  releasePublish: 'manual',
 } as const;
 
 /** The manifest on `main`, at a version neither the tag nor the heading names. */
@@ -307,7 +311,7 @@ describe('readTopHeading', () => {
 });
 
 describe('writeDoctorRelease', () => {
-  it('writes the row at info in text mode while nothing waits, and nothing in json mode', () => {
+  it('writes the row at info in text mode while nothing waits, and only the ladder row in json mode', () => {
     const reading = readDoctorRelease({ root: world().caller, config: CONFIG });
     const text = recordingOutput();
     const json = recordingOutput();
@@ -315,8 +319,9 @@ describe('writeDoctorRelease', () => {
     writeDoctorRelease({ output: text.output, outputMode: 'text' }, reading);
     writeDoctorRelease({ output: json.output, outputMode: 'json' }, reading);
 
-    expect(text.seen.map(([level]) => level)).toEqual(['info']);
-    expect(json.seen).toEqual([]);
+    expect(text.seen.map(([level]) => level)).toEqual(['info', 'info']);
+    expect(text.seen[1]?.[1]).toBe('Release ladder: level 0, Manual.');
+    expect(json.seen).toEqual([['info', 'Release ladder: level 0, Manual.']]);
   });
 
   it('warns in both modes while fragments wait', () => {
@@ -330,8 +335,8 @@ describe('writeDoctorRelease', () => {
     writeDoctorRelease({ output: text.output, outputMode: 'text' }, reading);
     writeDoctorRelease({ output: json.output, outputMode: 'json' }, reading);
 
-    expect(text.seen.map(([level]) => level)).toEqual(['warn']);
-    expect(json.seen.map(([level]) => level)).toEqual(['warn']);
+    expect(text.seen.map(([level]) => level)).toEqual(['warn', 'info']);
+    expect(json.seen.map(([level]) => level)).toEqual(['warn', 'info']);
     expect(json.seen[0]?.[1]).toContain('run rafa release settle');
   });
 

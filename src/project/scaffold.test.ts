@@ -457,6 +457,32 @@ describe('the config files', () => {
     expect([resolved.config.taskSkills, resolved.config.taskLessons]).toEqual(['none', 'off']);
   });
 
+  it('carries release.publish at manual right after publishCommand, which resolves from the file once uncommented', () => {
+    const at = CONFIG_SETTINGS_LINES.findIndex((line) => line.startsWith('#   publish:'));
+    const pair = CONFIG_SETTINGS_LINES.slice(at - 1, at + 1);
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', '# release:', ...pair].join('\n')), 'c.yaml') });
+
+    expect(at).toBeGreaterThan(CONFIG_SETTINGS_LINES.indexOf('# release:'));
+    expect(at).toBeLessThan(CONFIG_SETTINGS_LINES.indexOf('# errors:'));
+    expect(pair.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '#   publishCommand: npm publish',
+      '#   publish: manual',
+    ]);
+    expect(pair[1]).toContain('# manual | ci,');
+    expect(resolved.config.releasePublish).toBe('manual');
+    expect(resolved.sources.releasePublish).toBe('file');
+  });
+
+  it('answers release.publish from the file once its line is changed, and from the default once dropped, so the reading above can fail', () => {
+    const changed = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}publish:) manual/, '$1 ci'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   publish:'));
+    const resolve = (lines: readonly string[]) => resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(resolve(changed).config.releasePublish).toBe('ci');
+    expect(dropped).toHaveLength(CONFIG_SETTINGS_LINES.length - 1);
+    expect(resolve(dropped).sources.releasePublish).toBe('default');
+  });
+
   it('opens each file with its own header and ends it with a line break', () => {
     expect(projectConfigText().split('\n')[0]).toBe('# rafa project config, written by rafa init and left as it is on a rerun.');
     expect(userConfigText().split('\n')[0]).toBe('# rafa user config, read under every project on this machine, written by');

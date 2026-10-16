@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred and one registered so far
+ * of each is its command. Four of the hundred and four registered so far
  * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
  * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -62,6 +62,15 @@
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
+ * `release publish`, which runs `release.publishCommand` in each tagged
+ * unit's directory through `./release/tag-units.ts`,
+ * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * `release workflows`, which reads the ladder's files through
+ * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `src/release/templates.ts`, nor
+ * `release fragment`, which writes one change fragment through
+ * `src/release/fragment.ts` and reads the waiting ones through
+ * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
@@ -239,7 +248,21 @@
  *     which puts `v<version>` on the release branch's HEAD and prints
  *     the push and publish lines rather than running them, refusing on
  *     another branch, on a tag already there, and where the two release
- *     files disagree; and `release list`, one row per unit that
+ *     files disagree; `release publish [--tag=<tag>] [--dry-run]`,
+ *     which runs `release.publishCommand` in the directory of each
+ *     release unit whose tag points at HEAD, skipping a version the
+ *     registry holds and stopping at the first publish that fails;
+ *     `release workflows [--write]`, one row per workflow file of the
+ *     release ladder with the levels it serves, whether the configured
+ *     level needs it and whether it is present, missing or differs from
+ *     the shipped template, `--write` writing each needed missing one
+ *     and exiting 0 in every case; `release fragment --plan=<id>
+ *     --level=<level> --title=<text> [--note=<area>: <summary>]...
+ *     [--package=<name>]`, which writes one change fragment under
+ *     `release.fragments` for a branch with no wrap-up, named free of
+ *     the fragments waiting on `origin/<pr.base>` after a fetch, and
+ *     prints the path written; and
+ *     `release list`, one row per unit that
  *     releases on its own, the root first and then each publishable
  *     workspace package, with its version, the fragments waiting for it
  *     and its newest tag, writing nothing.
@@ -491,10 +514,13 @@ import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
 import prWait from './pr/wait.js';
+import releaseFragment from './release/fragment.js';
 import releaseList from './release/list.js';
+import releasePublish from './release/publish.js';
 import releaseSettle from './release/settle.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
+import releaseWorkflows from './release/workflows.js';
 import roadmap from './roadmap.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';
@@ -528,7 +554,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
-  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
+  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it; publish the tagged units; list and write the ladder\'s workflows; write a fragment for a branch with no wrap-up' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home; sync the GitHub project' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
@@ -604,6 +630,9 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseSettle,
   releaseTag,
+  releasePublish,
+  releaseWorkflows,
+  releaseFragment,
   releaseList,
   boardList,
   boardSync,

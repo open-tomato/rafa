@@ -23,6 +23,12 @@ spells out, and the shapes the lint config forces.
   refusal is the real smell, as `release status`'s hand-rolled
   `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
+  `src/commands/release/workflows.ts` takes `readLadderFiles` from
+  `src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
+  takes too, and `LADDER_WORKFLOWS` from `src/release/ladder.ts` and
+  `readReleaseTemplate` and `writeReleaseWorkflow` from
+  `src/release/templates.ts`, so the command and the doctor row read one
+  set of files.
 - **Every `import type` line forms one `import/order` group**
   (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its order: neither plain
   name order, "every sibling before every parent", nor path depth first,
