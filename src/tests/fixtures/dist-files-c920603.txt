@@ -141,6 +141,7 @@ ports/log-level.d.ts
 ports/spec-review.d.ts
 pr/checks.d.ts
 pr/types.d.ts
+release-templates/release-bot-fragment.yml
 release-templates/release-publish.yml
 release-templates/release-settle.yml
 release-templates/release-tag.yml
