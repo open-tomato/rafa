@@ -123,8 +123,10 @@ pull-request code, but release code imports the git runner too, so it moved to
 `packages/rafa/src/core/git/`. `packages/rafa/src/report/parse.ts` reads like
 the run's report code, but the effort store reads it, so it is core. Core is
 also `packages/rafa/src/ports/`, the effort store under
-`packages/rafa/src/effort/store/` and `packages/rafa/src/report/record.ts`: core
-by assignment, kept where they are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
+`packages/rafa/src/effort/store/`, `packages/rafa/src/report/record.ts` and
+the cause codes of `packages/rafa/src/errors/codes.ts` and
+`packages/rafa/src/errors/rafa-codes.ts`: core by assignment, kept where they
+are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
 `scripts/survey/core-moves.ts` list core's folders and named files, and
 `isCoreFile` reads them: the one place a sweep, a survey script or a spawned
 loader takes core's location from.

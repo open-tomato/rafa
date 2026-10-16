@@ -6,8 +6,8 @@
  * beside an accepting control, and every key and message is SPELLED,
  * never read off the module.
  */
-import type { ErrorCodeEntry } from './errors/codes.js';
 import type { ConfigSetting } from '@open-tomato/rafa/core/config';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 
 import { describe, expect, it } from 'bun:test';
 

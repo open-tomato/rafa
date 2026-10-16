@@ -1,6 +1,7 @@
 ## Cause codes
 
-`src/errors/` holds the cause codes a bug or a rafa error can carry (#949).
+`packages/rafa/src/errors/` holds the cause codes a bug or a rafa error can
+carry (#949), and `src/errors/match.ts` ranks them.
 A code marks which gate tripped: where the pain shows and where the
 symptoms come from. Two bugs sharing a code may still fail in different
 things, so a shared code raises a match score and never decides a match.
@@ -8,9 +9,9 @@ things, so a shared code raises a match score and never decides a match.
 ### The shape
 
 A code is `<family>:<leaf>`, both kebab-case, checked by `CODE_PATTERN`
-(`src/errors/codes.ts`). The family names the gate or tool (`git`, `tsc`,
-`fs`), and the leaf names the condition (`git:no-identity`). An entry
-(`ErrorCodeEntry`) holds:
+(`packages/rafa/src/errors/codes.ts`). The family names the gate or tool
+(`git`, `tsc`, `fs`), and the leaf names the condition (`git:no-identity`). An
+entry (`ErrorCodeEntry`) holds:
 
 - `code`
 - `description`: one line saying what the context is
@@ -31,7 +32,7 @@ therefore refuses three spellings in a declared code: the leaf
 
 ### rafa's list
 
-`RAFA_CODES` (`src/errors/rafa-codes.ts`) is declared through
+`RAFA_CODES` (`packages/rafa/src/errors/rafa-codes.ts`) is declared through
 `defineErrorCodes`, which throws a `TypeError` on a bad shape or on a code
 declared twice: the list is source, so a fault in it is a build error. Each
 family the list uses has one line in `FAMILY_DESCRIPTIONS`.
@@ -57,9 +58,10 @@ Four per-module unions existed before the list: `ROUTE_REFUSALS` and
 entry in the new form, with the old spelling in `legacy`
 (`cli:command-exit` carries `command_exit`).
 
-Nothing derives the unions from the list. `src/errors/rafa-codes.test.ts`
-holds the two together in both directions: a union value with no entry
-turns it red, and so does a `legacy` naming no union value. Adding a value
+Nothing derives the unions from the list.
+`src/tests/core-coupled/errors/rafa-codes.test.ts` holds the two together in
+both directions: a union value with no entry turns it red, and so does a
+`legacy` naming no union value. Adding a value
 to one of the four unions therefore means adding its entry in the same
 commit.
 

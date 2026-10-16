@@ -5,7 +5,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { RAFA_CODES } from '../errors/rafa-codes.js';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
+
 import { ISSUE_OPENING } from '../triage/issue-text.js';
 import { issueTextOf } from '../triage/similarity.js';
 

@@ -615,7 +615,7 @@ export interface LogEntry {
   module?: string;
   /** The action or step running. */
   action?: string;
-  /** A cause code, `<family>:<leaf>` (`src/errors/codes.ts`). */
+  /** A cause code, `<family>:<leaf>` (`packages/rafa/src/errors/codes.ts`). */
   code?: string;
   /** The recommended next action. */
   hint?: string;

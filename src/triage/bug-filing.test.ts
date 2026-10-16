@@ -9,9 +9,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
 import { bugTitle } from '../bugs/record.js';
-import { RAFA_CODES } from '../errors/rafa-codes.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES, reproduceOf, rerunOf } from './bug-filing.js';
 import { localPathRedactor } from './local-paths.js';

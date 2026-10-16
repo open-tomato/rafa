@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { defineErrorCodes } from './codes.js';
+import { defineErrorCodes } from '@open-tomato/rafa/errors/codes';
+
 import { nearDuplicates, suggestCodes } from './match.js';
 
 const LIST = defineErrorCodes([
