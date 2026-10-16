@@ -50,8 +50,7 @@ import type { Output } from '@open-tomato/rafa/ports';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
-/** The flag that lets a head's own config through; declared on `pr triage`. */
-export const ALLOW_LOCAL_CONFIG_FLAG = 'allow-local-config';
+import { ALLOW_LOCAL_CONFIG_FLAG } from './declarations.js';
 
 /** The exit code a config refusal ends with. */
 export const CONFIG_TRUST_REFUSE_EXIT = 1;

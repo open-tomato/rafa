@@ -88,6 +88,8 @@ import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
+import { PR_FEATURE } from './pr/index.js';
+
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
 
 /** The `src/` directory, which the phase 0 modules sit in. */
@@ -656,6 +658,16 @@ describe('the core roster', () => {
         ['start', 'loop start', false],
         ['epic', 'epic show', true],
       ]);
+  });
+
+  it('lists the pr subject and the pr commands PR_FEATURE declares, each its lazy command less the run', () => {
+    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
+      Object.entries(command).filter(([field]) => field !== 'run'),
+    );
+
+    expect(CORE_SUBJECTS.filter((subject) => subject.name === 'pr')).toEqual([...PR_FEATURE.subjects]);
+    expect(CORE_COMMANDS.filter((command) => command.subject === 'pr').map(lessRun))
+      .toEqual(PR_FEATURE.commands.map(lessRun));
   });
 
   it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and its outputs', (spelling, command) => {
