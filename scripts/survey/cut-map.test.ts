@@ -9,7 +9,8 @@ import { parseCutMap, readCutMap } from './cut-map';
 
 /**
  * A planted table: `rafa-three` holds three folders, `src/split/` is cut
- * across `rafa-three` and `rafa-other`, and `src/ci/` is unassigned. The
+ * across `rafa-three` and `rafa-other` (both name it), `rafa-empty` lists
+ * no file under the folder it names, and `src/ci/` is unassigned. The
  * keys the map does not read ride along, as the live table carries them.
  */
 const TABLE = {
@@ -91,18 +92,12 @@ describe('parseCutMap', () => {
     expect(map.unitOf('src/ci/runs.ts')).toBe('src/ci/');
   });
 
-  it('answers undefined for a file listed nowhere, even inside a listed folder', () => {
-    expect(map.unitOf('src/split/new.ts')).toBeUndefined();
-    expect(map.unitOf('src/ci/')).toBeUndefined();
-    expect(map.unitOf('src/zzz/file.ts')).toBeUndefined();
-  });
-
   it('lists every unit sorted, a package with no files included', () => {
     expect(map.units).toEqual(['rafa-empty', 'rafa-other', 'rafa-three', 'src/ci/']);
   });
 
   it('answers the unplaced files of a set sorted and once each', () => {
-    const files = ['src/z.ts', 'src/a/one.ts', 'src/split/new.ts', 'src/z.ts', 'src/ci/runs.ts'];
+    const files = ['src/z.ts', 'src/a/one.ts', 'src/split/new.ts', 'src/z.ts', 'src/ci/runs.ts', 'src/a/new.test.ts'];
     expect(map.unplaced(files)).toEqual(['src/split/new.ts', 'src/z.ts']);
     expect(map.unplaced(new Set(['src/a/one.ts']))).toEqual([]);
   });
@@ -112,6 +107,62 @@ describe('parseCutMap', () => {
       (table.unassigned as { files: string[] }[])[0]!.files.push('src/a/one.ts');
     }), 'x');
     expect(twice.unitOf('src/a/one.ts')).toBe('rafa-three');
+  });
+});
+
+describe('parseCutMap fallback for a file listed nowhere', () => {
+  const map = parseCutMap(TEXT, 'docs/survey/cut-table.json');
+
+  /** The planted table with `src/split/` named by `rafa-three` alone. */
+  const splitOnce = parseCutMap(tableWith((table) => {
+    delete (table.packages as Record<string, unknown>[])[1]!.folders;
+  }), 'x');
+
+  it('answers the listing before the folder', () => {
+    expect(map.unitOf('src/a/one.ts')).toBe('rafa-three');
+    expect(map.unitOf('src/ci/runs.ts')).toBe('src/ci/');
+  });
+
+  it('places a file beside listed siblings of one unit in that unit', () => {
+    expect(map.unitOf('src/a/new.test.ts')).toBe('rafa-three');
+  });
+
+  it('places a file beside siblings of two units by the one row naming its folder', () => {
+    expect(splitOnce.unitOf('src/split/new.ts')).toBe('rafa-three');
+    expect(splitOnce.unitOf('src/split/moved.ts')).toBe('rafa-other');
+  });
+
+  it('leaves unplaced a file whose longest folder two rows name', () => {
+    expect(map.unitOf('src/split/new.ts')).toBeUndefined();
+  });
+
+  it('leaves unplaced a file no listing, sibling or folder matches', () => {
+    expect(map.unitOf('src/zzz/file.ts')).toBeUndefined();
+    expect(map.unitOf('src/ci/')).toBeUndefined();
+    expect(map.unitOf('packages/other/x.ts')).toBeUndefined();
+    expect(map.unitOf('src/cia/x.ts')).toBeUndefined();
+  });
+
+  it('places a file under an unassigned folder or an empty row by the folder', () => {
+    expect(map.unitOf('src/ci/runs2.ts')).toBe('src/ci/');
+    expect(map.unitOf('src/ci/deep/new.ts')).toBe('src/ci/');
+    expect(map.unitOf('packages/empty/x.ts')).toBe('rafa-empty');
+  });
+
+  it('places a file by the longest folder that holds it', () => {
+    const nested = parseCutMap(tableWith((table) => {
+      (table.packages as Record<string, unknown>[])[1]!.folders = ['src/a/sub/'];
+    }), 'x');
+    expect(nested.unitOf('src/a/sub/x.ts')).toBe('rafa-other');
+    expect(nested.unitOf('src/a/other/x.ts')).toBe('rafa-three');
+  });
+
+  it('places nothing by a shorter folder when two rows name the longest', () => {
+    const twice = parseCutMap(tableWith((table) => {
+      (table.packages as Record<string, unknown>[])[1]!.folders = ['src/split/'];
+      (table.packages as Record<string, unknown>[])[2]!.folders = ['src/split/'];
+    }), 'x');
+    expect(twice.unitOf('src/split/deep/x.ts')).toBeUndefined();
   });
 });
 
@@ -146,6 +197,15 @@ describe('parseCutMap refusals', () => {
     expect(() => parseCutMap(tableWith((table) => {
       (table.packages as Record<string, unknown>[])[0]!.files = [1];
     }), 'x')).toThrow('`packages[0]` holds no `files` array of strings');
+  });
+
+  it('refuses a package row whose folders is not an array of strings, naming the row', () => {
+    expect(() => parseCutMap(tableWith((table) => {
+      (table.packages as Record<string, unknown>[])[0]!.folders = 'src/a/';
+    }), 'x')).toThrow('`packages[0]` holds no `folders` array of strings');
+    expect(() => parseCutMap(tableWith((table) => {
+      (table.packages as Record<string, unknown>[])[0]!.folders = [1];
+    }), 'x')).toThrow('`packages[0]` holds no `folders` array of strings');
   });
 
   it('refuses a table with no unassigned array', () => {

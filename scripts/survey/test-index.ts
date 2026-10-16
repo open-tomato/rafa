@@ -32,8 +32,10 @@
  * `docs/survey/cut-table.json` as `scripts/survey/cut-table.ts` writes it,
  * read by `cut-map.ts`: a file's unit is the `name` of the `packages[]`
  * row whose `files` list it, or the `folder` of the `unassigned[]` entry
- * whose `files` list it (`src/ci/`). No other key of the table is read,
- * and a file it lists nowhere is unplaced.
+ * whose `files` list it (`src/ci/`). A file listed nowhere takes its
+ * folder's unit through `cut-map.ts` (the one unit of its directory's
+ * listed files, else the one row naming its longest folder), and is
+ * unplaced only when that places it nowhere.
  *
  * The rule per kind, which the record and the guard apply: a test's kind
  * is read from its name through `tests.contract` and `tests.integration`
@@ -91,7 +93,8 @@
  * entry `src/rafa.ts` along the graph (edges of either kind), and a
  * spawning test then counts the union of its own units and that reach
  * instead of doubling, since the process it spawns loads the bin, not the
- * test's imports twice. A file the map lists nowhere has no unit and is
+ * test's imports twice. A file listed nowhere takes its folder's unit
+ * through `cut-map.ts`, and a file that places nowhere has no unit and is
  * unplaced: the index names under `unplaced` every test file, every
  * source file a test's walk reaches (through support files or not) and,
  * when a test spawns, every source file of the bin's reach, that the map

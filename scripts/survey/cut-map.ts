@@ -1,20 +1,36 @@
 /**
  * The cut map: `docs/survey/cut-table.json` read as the unit each file
- * belongs to. A file's unit is the `name` of the `packages` row whose
- * `files` list it, or the `folder` of the `unassigned` entry whose
- * `files` list it (`src/ci/`), spelled as the table spells it. A file the
- * table lists nowhere has no unit and is unplaced.
+ * belongs to, spelled as the table spells it: a `packages` row's `name`,
+ * or an `unassigned` entry's `folder` (`src/ci/`). A file's unit is read
+ * in three steps, the first that answers winning:
  *
- * Only `packages[].name`, `packages[].files`, `unassigned[].folder` and
- * `unassigned[].files` are read; every other key of the table is left
- * alone. A row's `folders` play no part: a package that holds three
- * folders and a folder split across two packages are both read from the
- * files each row lists. When a file is listed twice, the first listing
- * wins, the `packages` rows read before the `unassigned` entries.
+ * 1. The listing: the row whose `files` list the file. When a file is
+ *    listed twice, the first listing wins, the `packages` rows read
+ *    before the `unassigned` entries.
+ * 2. The directory's listed files: a file listed nowhere takes the unit
+ *    of the listed files of its own directory (`posix.dirname(file)`,
+ *    never an ancestor or a subfolder) when every one of them has the
+ *    same unit.
+ * 3. The row folders: otherwise the unit of the row whose folder is the
+ *    longest prefix of the file's directory, read with its trailing `/`
+ *    (so `src/ci/` holds `src/ci/runs2.ts` and not `src/cia/x.ts`), when
+ *    exactly one row names that folder. A row's folders are its
+ *    `packages[].folders`, or an `unassigned` entry's `folder`.
+ *
+ * A file is unplaced, its unit `undefined`, when no row lists it, its
+ * directory holds no listed file or listed files of more than one unit,
+ * and no single row names its longest folder: a longest folder two rows
+ * name places nothing, and no shorter folder is tried. The two fallback
+ * steps are computed once when the table is read, so `unitOf` is a
+ * lookup.
+ *
+ * Only `packages[].name`, `packages[].files`, `packages[].folders`
+ * (absent read as empty), `unassigned[].folder` and `unassigned[].files`
+ * are read; every other key of the table is left alone.
  */
 
 import { readFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, posix } from 'node:path';
 
 /** The cut table read as the unit of each file it lists. */
 export interface CutMap {
@@ -24,16 +40,21 @@ export interface CutMap {
   readonly sha256: string;
   /** Every package row name and unassigned folder, sorted. */
   readonly units: readonly string[];
-  /** The unit that lists `file`, or `undefined` when none does. */
+  /**
+   * The unit of `file`: the row that lists it, else the one unit of its
+   * directory's listed files, else the one row naming its longest folder;
+   * `undefined` when none of the three places it.
+   */
   unitOf(file: string): string | undefined;
   /** The files of `files` the map holds no unit for, sorted and unique. */
   unplaced(files: Iterable<string>): string[];
 }
 
-/** One placement read from the table: a unit and the files it lists. */
+/** One placement read from the table: a unit, the files it lists and the folders it names. */
 interface Placement {
   readonly unit: string;
   readonly files: readonly string[];
+  readonly folders: readonly string[];
 }
 
 /** Whether `value` is a plain object, not an array and not `null`. */
@@ -48,9 +69,12 @@ function isStringArray(value: unknown): value is string[] {
 
 /**
  * Reads the rows of the table's `list` key, each holding the string key
- * `unitKey` and a `files` array of strings.
+ * `unitKey` and a `files` array of strings. A `packages` row's folders are
+ * its optional `folders` array, absent read as empty; an `unassigned`
+ * entry's one folder is its `folder`, which is also its unit.
  *
- * @throws when `list` is not an array, or a row lacks either key.
+ * @throws when `list` is not an array, a row lacks either key, or a
+ *   `packages` row holds a `folders` that is not an array of strings.
  */
 function placementsOf(table: Record<string, unknown>, list: string, unitKey: string, path: string): Placement[] {
   const rows = table[list];
@@ -64,8 +88,79 @@ function placementsOf(table: Record<string, unknown>, list: string, unitKey: str
     if (!isStringArray(row.files)) {
       throw new Error(`${path}: \`${list}[${index}]\` holds no \`files\` array of strings`);
     }
-    return { files: row.files, unit: row[unitKey] };
+    return { files: row.files, folders: foldersOf(row, list, unitKey, `${path}: \`${list}[${index}]\``), unit: row[unitKey] };
   });
+}
+
+/**
+ * The folders a row names: the `unassigned` entry's `folder`, or a
+ * `packages` row's optional `folders`.
+ *
+ * @throws when a present `folders` is not an array of strings, naming the
+ *   row through `where`.
+ */
+function foldersOf(row: Record<string, unknown>, list: string, unitKey: string, where: string): string[] {
+  if (list === 'unassigned') {
+    return [row[unitKey] as string];
+  }
+  if (row.folders === undefined) {
+    return [];
+  }
+  if (!isStringArray(row.folders)) {
+    throw new Error(`${where} holds no \`folders\` array of strings`);
+  }
+  return row.folders;
+}
+
+/**
+ * The one unit of each directory's listed files, or `undefined` for a
+ * directory whose listed files fall in more than one unit.
+ */
+function directoryUnits(units: ReadonlyMap<string, string>): Map<string, string | undefined> {
+  const byDirectory = new Map<string, string | undefined>();
+  for (const [file, unit] of units) {
+    const directory = posix.dirname(file);
+    const seen = byDirectory.get(directory);
+    byDirectory.set(directory, byDirectory.has(directory) && seen !== unit
+      ? undefined
+      : unit);
+  }
+  return byDirectory;
+}
+
+/**
+ * Each folder a row names, with the unit of its row, or `undefined` when
+ * more than one row names it.
+ */
+function folderUnits(placements: readonly Placement[]): Map<string, string | undefined> {
+  const rows = new Map<string, Set<number>>();
+  placements.forEach((placement, index) => {
+    for (const folder of placement.folders) {
+      rows.set(folder, (rows.get(folder) ?? new Set<number>()).add(index));
+    }
+  });
+  return new Map([...rows].map(([folder, indexes]) => [
+    folder,
+    indexes.size === 1
+      ? placements[[...indexes][0]!]!.unit
+      : undefined,
+  ]));
+}
+
+/**
+ * The unit of the longest folder that is a prefix of `directory` read
+ * with its trailing `/`; `undefined` when no folder is, or when the
+ * longest one is named by two rows.
+ */
+function longestFolderUnit(folders: ReadonlyMap<string, string | undefined>, directory: string): string | undefined {
+  let prefix = `${directory}/`;
+  while (prefix.length > 0) {
+    if (folders.has(prefix)) {
+      return folders.get(prefix);
+    }
+    prefix = prefix.slice(0, prefix.lastIndexOf('/', prefix.length - 2) + 1);
+  }
+  return undefined;
 }
 
 /** The sha256 of `text`'s UTF-8 bytes, as lowercase hex. */
@@ -81,10 +176,11 @@ function sha256Hex(text: string): string {
  * @param text - the table's text, as read from the file.
  * @param path - the path the text came from, kept on the map and named in
  *   every refusal.
- * @returns the map of each listed file to its unit.
+ * @returns the map of each file to its unit, by listing or by folder.
  * @throws when the text is not JSON, is not an object, holds no
  *   `packages` array with a string `name` and a `files` array on each
- *   row, or no `unassigned` array with a string `folder` and a `files`
+ *   row (and, when present, a `folders` array of strings), or no
+ *   `unassigned` array with a string `folder` and a `files`
  *   array on each entry; the message names what is missing.
  */
 export function parseCutMap(text: string, path: string): CutMap {
@@ -109,7 +205,16 @@ export function parseCutMap(text: string, path: string): CutMap {
       }
     }
   }
-  const unitOf = (file: string): string | undefined => units.get(file);
+  const directories = directoryUnits(units);
+  const folders = folderUnits(placements);
+  const unitOf = (file: string): string | undefined => {
+    const listed = units.get(file);
+    if (listed !== undefined) {
+      return listed;
+    }
+    const directory = posix.dirname(file);
+    return directories.get(directory) ?? longestFolderUnit(folders, directory);
+  };
   return {
     path,
     sha256: sha256Hex(text),
@@ -125,7 +230,7 @@ export function parseCutMap(text: string, path: string): CutMap {
  * @param root - the repository root a relative `file` is read against.
  * @param file - the table's path, absolute or relative to `root`; kept on
  *   the map as handed in.
- * @returns the map of each listed file to its unit.
+ * @returns the map of each file to its unit, by listing or by folder.
  * @throws when the file cannot be read, or {@link parseCutMap} refuses it.
  */
 export function readCutMap(root: string, file: string): CutMap {

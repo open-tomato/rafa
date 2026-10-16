@@ -375,7 +375,9 @@ const SCRATCH_FILES: Readonly<Record<string, string>> = {
  * The cut table the scratch repositories plant: the bin, its test and
  * `fresh.test.ts`, listed before it is written, in `@scratch/cli`, and
  * `y.ts` alone in `@scratch/far`. `untracked.test.ts`, `stray.test.ts`
- * and `stray/z.ts` are listed nowhere.
+ * and `stray/z.ts` are listed nowhere; the two under `src/stray/` stay
+ * unplaced, since no listed file sits beside them and no row names a
+ * folder.
  */
 const SCRATCH_TABLE = `${JSON.stringify({
   packages: [
@@ -483,12 +485,12 @@ describe('the record mode over a scratch repository', () => {
   it('refuses naming each file the map lists nowhere, a test and the source file it reaches, and leaves the record as it was', async () => {
     const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
     git(root, ['reset', '--quiet', '--hard', 'HEAD']);
-    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+    plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     git(root, ['add', '-A']);
     git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'stray']);
     const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json lists nowhere:\n'
-      + '  src/a/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
+      + '  src/stray/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
     await expect(main(root, RECORD_MODE)).rejects.toThrow(refusal);
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
@@ -561,7 +563,7 @@ describe('the guard over a scratch repository', () => {
   });
 
   it('exits 1 naming each file the map lists nowhere, with no test risen', () => {
-    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+    plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     const run = runGuard(root, BASELINE_PATH);
     expect(run.stdout.split('\n')).toEqual([
@@ -570,12 +572,11 @@ describe('the guard over a scratch repository', () => {
       'test-index: 0 gone, 0 not read, 0 unindexed still, 1 unplaced',
       '',
       `test-index: 2 file(s) the map ${SCRATCH_MAP} lists nowhere:`,
-      '  src/a/stray.test.ts',
+      '  src/stray/stray.test.ts',
       '  src/stray/z.ts',
       '',
     ]);
     expect(run).toMatchObject({ exitCode: 1, stderr: '' });
-    rmSync(join(root, 'src/a/stray.test.ts'));
     rmSync(join(root, 'src/stray'), { force: true, recursive: true });
   });
 
