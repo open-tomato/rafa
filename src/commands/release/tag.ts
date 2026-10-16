@@ -101,7 +101,7 @@
  * prints the publish line for the configured registry and does not run
  * it" (the spec, step 4). The configured registry is the version
  * file's own `publishConfig.registry`, and the default when it names
- * none is npm's, {@link DEFAULT_REGISTRY}. The command is
+ * none is npm's, `DEFAULT_REGISTRY` in `./tag-follow-ups.ts`. The command is
  * `release.publishCommand`, `npm publish` by default, printed as the
  * config spells it. Nothing here adds a flag: `publishConfig` carries
  * the access and the registry, and npm reads that block itself, so a
@@ -169,6 +169,7 @@
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
+import type { ReleaseFollowUp, TagPlace } from './tag-follow-ups.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
@@ -188,11 +189,12 @@ import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { changelogVersions, readTags, rootTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
 import { versionTag } from '../../release/version-tag.js';
-import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
+import { readManifestVersion } from '../../release/version.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
+import { followUpsFor, readPublishTarget } from './tag-follow-ups.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
@@ -202,9 +204,6 @@ export const PUSH_FLAG = 'push';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
-
-/** The registry a publish reaches when the manifest names none. */
-export const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
 
 /** What every line under a heading is indented by, as `pr merge` indents its follow-ups. */
 const INDENT = '  ';
@@ -240,24 +239,6 @@ export interface ChangelogReading {
   readonly version: string | null;
   /** Why the file could not be read, or null when it was. */
   readonly problem: string | null;
-}
-
-/** Where a publish would go, read off the version file; see the module note. */
-export interface PublishTarget {
-  /** `publishConfig.registry`, or {@link DEFAULT_REGISTRY}. */
-  readonly registry: string;
-  /** The package name, or null when the file names none. */
-  readonly name: string | null;
-  /** True when the manifest declares `"private": true`. */
-  readonly isPrivate: boolean;
-}
-
-/** One command the run names for the operator to type next. */
-export interface ReleaseFollowUp {
-  /** The whole command, as the operator types it. */
-  readonly command: string;
-  /** Why it applies, in a phrase, lower case and with no full stop. */
-  readonly why: string;
 }
 
 /** Why a run refused; see the module note for the five, and the receipt. */
@@ -385,95 +366,6 @@ export function readNewestRelease(root: string, configured: string): ChangelogRe
     return { path: configured, version: null, problem: `the changelog could not be read at ${resolved}` };
   }
   return { path: configured, version: changelogVersions(text)[0] ?? null, problem: null };
-}
-
-/** A string with something in it, trimmed, or null. */
-function trimmedOrNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed === ''
-    ? null
-    : trimmed;
-}
-
-/** `value` as a JSON object's fields, or null when it is anything else. */
-function fieldsOf(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-/** What a version file that is no manifest at all reads as: nothing to publish. */
-const NO_PACKAGE: PublishTarget = Object.freeze({
-  registry: DEFAULT_REGISTRY,
-  name: null,
-  isPrivate: false,
-});
-
-/**
- * Where a publish of `text` would go. A text that is no JSON object
- * reads as {@link NO_PACKAGE}, which names no package and so gets no
- * publish line; see the module note.
- */
-export function readPublishTarget(text: string | null): PublishTarget {
-  if (text === null) return NO_PACKAGE;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return NO_PACKAGE;
-  }
-  const fields = fieldsOf(parsed);
-  if (fields === null) return NO_PACKAGE;
-
-  const publishConfig = fieldsOf(fields['publishConfig']);
-  return {
-    registry: trimmedOrNull(publishConfig?.['registry']) ?? DEFAULT_REGISTRY,
-    name: trimmedOrNull(fields['name']),
-    isPrivate: fields['private'] === true,
-  };
-}
-
-/** Where the tag went relative to the checkout: how far HEAD is past it, on which branch. */
-export interface TagPlace {
-  /** First-parent commits HEAD is past the tagged commit. */
-  readonly ahead: number;
-  /** The branch checked out, which the publish line switches back to. */
-  readonly branch: string;
-}
-
-/** The place of a tag written on HEAD itself. */
-const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRANCH });
-
-/**
- * What the operator does next once `tag` is written: push it to
- * `pushTo`, unless `pushTo` is `null` because the run pushed it
- * already, and publish `version` with
- * `publish`, `release.publishCommand`, when there is something to
- * publish — from the tag when HEAD is past it; see the module note.
- * Pure and total.
- */
-export function followUpsFor(
-  tag: string,
-  version: string,
-  target: PublishTarget,
-  publish: string,
-  place: TagPlace = ON_HEAD,
-  pushTo: string | null = RELEASE_REMOTE,
-): readonly ReleaseFollowUp[] {
-  const push: readonly ReleaseFollowUp[] = pushTo === null
-    ? []
-    : [{ command: `git push ${pushTo} ${tag}`, why: `the tag is local until ${pushTo} has it` }];
-  if (target.name === null || target.isPrivate) return push;
-  const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
-  if (place.ahead === 0) return [...push, { command: publish, why: publishes }];
-  return [
-    ...push,
-    {
-      command: `git switch --detach ${tag} && ${publish} && git switch ${place.branch}`,
-      why: `${publishes} from the tagged commit, not HEAD; skip it if ${target.registry} has that version already`,
-    },
-  ];
 }
 
 /** A refusal, spelled once so every branch below reads the same. */

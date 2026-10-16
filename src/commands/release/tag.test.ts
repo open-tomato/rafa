@@ -36,9 +36,9 @@
  *     0.24.0 shape `./release-commit.ts` measures.
  */
 import type { ReleaseSeams } from './status.js';
+import type { PublishTarget } from './tag-follow-ups.js';
 import type {
   ChangelogReading,
-  PublishTarget,
   ReleaseTagResult,
   TagDecision,
   TagInputs,
@@ -65,15 +65,13 @@ import { parseSemanticVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
+import { DEFAULT_REGISTRY, followUpsFor } from './tag-follow-ups.js';
 import {
   createReleaseTagCommand,
   DEFAULT_RELEASE_BRANCH,
-  DEFAULT_REGISTRY,
   decideTag,
-  followUpsFor,
   readBranch,
   readNewestRelease,
-  readPublishTarget,
   readVersion,
   RELEASE_TAG_USAGE,
   pastReleaseWarning,
@@ -352,75 +350,6 @@ describe('the changelog reading', () => {
 
     expect(reading.version).toBeNull();
     expect(reading.problem).toContain(join(root, 'CHANGELOG.md'));
-  });
-});
-
-describe('where a publish would go', () => {
-  it('reads the name and the registry publishConfig names, and nothing off packageManager', () => {
-    const manifest = JSON.stringify({
-      name: '@open-tomato/rafa',
-      version: VERSION,
-      packageManager: 'bun@1.3.14',
-      publishConfig: { registry: 'https://npm.example.com' },
-    });
-
-    expect(readPublishTarget(manifest)).toEqual({
-      registry: 'https://npm.example.com',
-      name: '@open-tomato/rafa',
-      isPrivate: false,
-    });
-  });
-
-  it('falls back to the npm registry when the manifest names none', () => {
-    expect(readPublishTarget('{"name": "a", "version": "1.0.0"}'))
-      .toEqual({ registry: DEFAULT_REGISTRY, name: 'a', isPrivate: false });
-  });
-
-  it('reads a private manifest as private', () => {
-    expect(readPublishTarget('{"name": "a", "private": true}').isPrivate).toBe(true);
-  });
-
-  it('names no package for a text that is no JSON object, and for no text at all', () => {
-    expect(readPublishTarget('not json').name).toBeNull();
-    expect(readPublishTarget('[]').name).toBeNull();
-    expect(readPublishTarget(null).name).toBeNull();
-  });
-});
-
-describe('what the operator is told to do next', () => {
-  it('names the push and the publish, the publish saying what goes where', () => {
-    const followUps = followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH);
-
-    expect(followUps.map((followUp) => followUp.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
-    expect(followUps[1]?.why).toBe(`publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
-  });
-
-  it('names the publish command it is handed, flags and all', () => {
-    expect(followUpsFor(TAG, VERSION, target(), 'pnpm publish --tag next')[1]?.command)
-      .toBe('pnpm publish --tag next');
-  });
-
-  it('names the push alone for a private package, where the same one public gets a publish line', () => {
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH).map((each) => each.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`]);
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: false }), DEFAULT_PUBLISH)).toHaveLength(2);
-  });
-
-  it('names the push alone when the version file names no package to publish', () => {
-    expect(followUpsFor(TAG, VERSION, target({ name: null }), DEFAULT_PUBLISH)).toHaveLength(1);
-  });
-
-  it('names the remote it is handed in the push line', () => {
-    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, 'upstream')[0])
-      .toEqual({ command: `git push upstream ${TAG}`, why: 'the tag is local until upstream has it' });
-  });
-
-  it('drops the push line once the run pushed the tag, keeping the publish line', () => {
-    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null)
-      .map((each) => each.command)).toEqual([DEFAULT_PUBLISH]);
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null))
-      .toEqual([]);
   });
 });
 
