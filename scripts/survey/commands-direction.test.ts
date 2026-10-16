@@ -132,19 +132,20 @@ describe('readCommandsEdges', () => {
     expect(reading.edges.map(edgeLine)).toEqual(['src/tests/cli-capture -> src/commands/next']);
   });
 
-  it('leaves src/rafa.ts and src/plan.ts unread, exempt by name, and names them', () => {
+  it('leaves src/rafa.ts, src/plan.ts and the feature-load probe unread, exempt by name, and names them', () => {
     const reading = readCommandsEdges({
-      files: ['src/rafa.ts', 'src/plan.ts', 'src/index.ts'],
+      files: ['src/rafa.ts', 'src/plan.ts', 'src/cli/feature-load-probe.ts', 'src/index.ts'],
       resolve: resolveByPath,
       sources: new Map([
         ['src/rafa.ts', 'import { coreRoster } from \'./commands/index.js\';\n'],
         ['src/plan.ts', 'import { expectNoArgument } from \'./commands/plan/plan-files.js\';\n'],
+        ['src/cli/feature-load-probe.ts', 'import { createRosterRegistry } from \'../commands/index.js\';\n'],
         ['src/index.ts', 'export { coreRoster } from \'./commands/index.js\';\n'],
       ]),
     });
 
-    expect(EXEMPT_IMPORTERS).toEqual(['src/plan.ts', 'src/rafa.ts']);
-    expect(reading.exempt).toEqual(['src/plan.ts', 'src/rafa.ts']);
+    expect(EXEMPT_IMPORTERS).toEqual(['src/cli/feature-load-probe.ts', 'src/plan.ts', 'src/rafa.ts']);
+    expect(reading.exempt).toEqual(['src/cli/feature-load-probe.ts', 'src/plan.ts', 'src/rafa.ts']);
     expect(reading.read).toEqual(['src/index.ts']);
     expect(reading.edges.map(edgeLine)).toEqual(['src/index -> src/commands/index']);
   });

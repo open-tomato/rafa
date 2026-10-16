@@ -37,13 +37,16 @@
  * names and no other, so nothing is left out of its containment case.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
- * config registry (`src/config-registry.ts`) for its effect, then the
  * adapter registry's composition root (`src/adapter-registry.ts`) for
- * its effect, then the dispatcher, the help renderer, the core registry, the module loader
+ * the `registerCoreAdapters` it calls, the dispatcher, the help
+ * renderer, the core registry, the config registry
+ * (`src/config-registry.ts`) for the `registerCoreConfigSections` it
+ * calls, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
- * hold exactly the commands of the core command modules spelled here, so
- * a command registered and not spelled goes red. Each of those modules
+ * hold exactly the commands of the core command modules spelled here,
+ * followed by the lazy commands of the bundled features spelled in
+ * `FEATURE_COMMANDS`, so a command registered and not spelled goes red. Each of those modules
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. The command
@@ -184,8 +187,9 @@ import {
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
 
+import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
-import { CONFIG_DEFAULTS } from './config-registry.js';
+import { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import {
@@ -242,6 +246,7 @@ const RUNTIME_EXPORTS = [
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
   'CONFIG_VERSIONS',
+  'CORE_ADAPTERS',
   'CORE_ADAPTER_REGISTRY',
   'ConfigError',
   'DISK_FILE_SYSTEM',
@@ -301,6 +306,8 @@ const RUNTIME_EXPORTS = [
   'readConfigFile',
   'readRafaBlocks',
   'registerAdapters',
+  'registerCoreAdapters',
+  'registerCoreConfigSections',
   'renderInjection',
   'resolveConfig',
   'resolveScope',
@@ -322,6 +329,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
   ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
+  ['CORE_ADAPTERS', entry.CORE_ADAPTERS, CORE_ADAPTERS],
   ['CORE_ADAPTER_REGISTRY', entry.CORE_ADAPTER_REGISTRY, CORE_ADAPTER_REGISTRY],
   ['ConfigError', entry.ConfigError, ConfigError],
   ['DISK_FILE_SYSTEM', entry.DISK_FILE_SYSTEM, DISK_FILE_SYSTEM],
@@ -381,6 +389,8 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['readConfigFile', entry.readConfigFile, readConfigFile],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
+  ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
+  ['registerCoreConfigSections', entry.registerCoreConfigSections, registerCoreConfigSections],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
   ['resolveScope', entry.resolveScope, resolveScope],
@@ -467,18 +477,21 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 
 /** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
-  ['./config-registry.js', []],
-  ['./adapter-registry.js', []],
+  ['./adapter-registry.js', ['registerCoreAdapters']],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
-  ['./commands/index.js', ['CORE_REGISTRY']],
+  ['./commands/index.js', ['createRosterRegistry']],
+  ['./config-registry.js', ['registerCoreConfigSections']],
+  ['./modules/activate.js', ['activateModuleAdapters']],
   ['./modules/load.js', ['loadInvocationModules']],
   ['./status/hook.js', ['createStatusHook']],
 ];
 
 /**
  * Each core command module, from `src/`, in the roster's order, and what
- * it imports, spelled here as {@link CLI_IMPORTS} is.
+ * it imports, spelled here as {@link CLI_IMPORTS} is. A bundled
+ * feature's command modules are not here: the registry holds a lazy
+ * command for each, spelled in {@link FEATURE_COMMANDS}.
  */
 const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/plan/create.js', [
@@ -586,186 +599,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../loop/wait-reasons.js', ['DEFAULT_WAIT_UNTIL', 'matchEvent', 'matchQuiet', 'matchRecord', 'parseWaitUntil', 'WAIT_NO_SESSION_EXIT', 'WAIT_REASONS', 'WAIT_TIMEOUT_EXIT', 'waitExitCode', 'WaitUntilError']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['lineRefusal', 'NoSessionRefusal', 'pickSession', 'sessionIdFlag']],
-  ]],
-  ['./commands/issue/list.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['@open-tomato/rafa/core/plan', ['plansDirAt']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
-    ['../../board/board-cache.js', ['createCachedBoardListing']],
-    ['../../board/boards.js', ['createGhBoardLister']],
-    ['../../board/configured-relations.js', ['readConfiguredRelations']],
-    ['../../board/issue.js', ['createGhSpecIssueReader']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing', 'keepListing']],
-    ['../../board/roadmap-epic-rows.js', ['hasEpicLines', 'readRoadmapEpicRows']],
-    ['../../board/roadmap-rows.js', ['createPlanDirNames']],
-    ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'ROADMAP_REFUSAL_EXIT']],
-    ['../../bugs/title.js', ['parseTitle']],
-    ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
-    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
-    ['../plan/refs-check.js', ['registryRoster']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueProject', 'issueSubjectConfig', 'keepsBoard', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readTextFlag', 'resolveIssueTracker']],
-    ['./roadmap-check.js', ['EPIC_CHECK_EXIT', 'epicCheckFailure']],
-    ['./roadmap-epic-table.js', ['renderEpicTable']],
-    ['./roadmap-table.js', ['renderRoadmapTable']],
-  ]],
-  ['./commands/issue/show.js', [
-    ['../plan/plan-files.js', ['expectOneArgument']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
-  ]],
-  ['./commands/issue/create.js', [
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
-    ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
-    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
-    ['../../triage/triage.js', ['TRIAGE_MODULE']],
-    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
-    ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
-    ['./create-bug.js', ['BUG_FLAGS', 'readBugLine']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readRequiredFlag', 'readTextFlag', 'resolveIssueTracker', 'urlLines']],
-  ]],
-  ['./commands/issue/comment.js', [
-    ['../plan/plan-files.js', ['expectOneArgument']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
-  ]],
-  ['./commands/issue/move.js', [
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueProject', 'issueRef', 'issueSubjectConfig', 'onTracker', 'readChoice', 'resolveIssueTracker']],
-    ['./move-project.js', ['refreshMovedIssue']],
-  ]],
-  ['./commands/issue/ready.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['../../adapters/tracker/github.js', ['createGhRunner', 'moduleOfLabels', 'typeOfLabels']],
-    ['../../board/epic-problems.js', ['epicProblemMessage', 'readEpicProblems']],
-    ['../../board/gate.js', ['SPEC_NEEDS_WORK_LABEL']],
-    ['../../board/issue-board.js', ['createGhIssueBoard']],
-    ['../../board/issue.js', ['createGhSpecIssueReader']],
-    ['../../board/plan-spec.js', ['boardRepoLabel', 'issueSource']],
-    ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard']],
-    ['../../board/readiness.js', ['hasSpecReadyLabel', 'READINESS_REFUSAL_EXIT', 'requireCompleteSpec', 'SPEC_READY_LABEL']],
-    ['../../board/trust.js', ['ghBoardTrust', 'requireTrustedBoardAuthor']],
-    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../start/branch-decision.js', ['answeredYes']],
-    ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-  ]],
-  ['./commands/issue/unblock.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/blocked.js', ['SPEC_BLOCKED_LABEL']],
-    ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard', 'refreshFailedWarning', 'refreshIssueItems']],
-    ['../../board/unblock.js', ['isUnblockFailure', 'runUnblock']],
-    ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-    ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'refreshNativeUnblock', 'unblockRelationshipsMode']],
-  ]],
-  ['./commands/issue/check.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../board/naming.js', ['boardId', 'notesFileName', 'SPEC_EXTENSION']],
-    ['../../board/refs-gate.js', ['memoiseVerifier']],
-    ['../../refs/reading.js', ['readCopyRefs', 'readRefsText', 'restampCopyRefs']],
-    ['../../refs/stamp.js', ['fingerprintText', 'RefsBlockError']],
-    ['../../refs/verify.js', ['RefVerifyError']],
-    ['../plan/plan-files.js', ['readSwitch']],
-    ['../plan/refs-check.js', ['createPlanRefsVerifier', 'registryRoster']],
-    ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-  ]],
-  ['./commands/issue/edit.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
-    ['./edit-priority.js', ['PRIORITY_FLAG']],
-    ['./edit-run.js', ['editIssue', 'renderEditReport']],
-  ]],
-  ['./commands/pr/current.js', [
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
-  ]],
-  ['./commands/pr/show.js', [
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../board/roadmap.js', ['closedIssuesIn']],
-    ['../../pr/index.js', ['formatRows']],
-    ['./current.js', ['SEPARATOR']],
-    ['./last-triage.js', ['readLastTriage']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
-  ]],
-  ['./commands/pr/view.js', [
-    ['./current.js', ['SEPARATOR']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
-  ]],
-  ['./commands/pr/open.js', [
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../issue/issue-tracker.js', ['readRequiredFlag']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE']],
-  ]],
-  ['./commands/pr/retarget.js', [
-    ['../../start/pr-retarget.js', ['retargetedLine']],
-    ['../issue/issue-tracker.js', ['readRequiredFlag']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readPullArgument']],
-  ]],
-  ['./commands/pr/close.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['../issue/issue-tracker.js', ['readRequiredFlag']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
-  ]],
-  ['./commands/pr/list.js', [
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../pr/index.js', ['createGitRunner']],
-    ['../../release/enabled.js', ['resolveReleaseEnabled']],
-    ['./current.js', ['SEPARATOR']],
-    ['./list-forecast.js', ['createBaseReader', 'forecastCell', 'forecastLine', 'listForecast']],
-    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'onProvider', 'openPrContext', 'PR_USAGE']],
-  ]],
-  ['./commands/pr/wait.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../pr/index.js', ['failingRows', 'formatRows', 'waitForChecks']],
-    ['../../start/pr-lifecycle.js', ['CI_POLL_INTERVAL_MS', 'DEFAULT_CI_TIMEOUT_MIN']],
-    ['./current.js', ['SEPARATOR']],
-    ['./pr-context.js', ['lineRefusal', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
-  ]],
-  ['./commands/pr/merge.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['@open-tomato/rafa/store/plan-ci', ['recordPlanCi']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/epic-tick.js', ['epicTickSentence']],
-    ['../../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../../board/roadmap-tick.js', ['tickSentence']],
-    ['../../board/roadmap.js', ['closedIssuesIn']],
-    ['../../board/unblock-after-merge.js', ['unblockAfterMerge']],
-    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../pr/index.js', ['createGitRunner', 'isMergeMethod', 'MERGE_METHODS']],
-    ['./merge-cleanup.js', ['cleanUpAfterMerge', 'INDENT', 'reportFollowUps']],
-    ['./merge-freed.js', ['freedAfterMerge']],
-    ['./merge-guard.js', ['guardBeforeMerge', 'MERGE_DANGEROUS_PHRASES']],
-    ['./merge-project.js', ['refreshProjectAfterMerge']],
-    ['./merge-refuse.js', ['refuseFromGit']],
-    ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
-    ['./merge-unchecked.js', ['commentIfUnchecked', 'confirmUncheckedMerge', 'readUncheckedMerge', 'uncheckedReport']],
-    ['./pr-context.js', ['lineRefusal', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
-  ]],
-  ['./commands/pr/triage.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/store/plan-ci', ['recordPlanCi']],
-    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../pr/index.js', ['createGitRunner']],
-    ['../../pr/triage/classify.js', ['classifyTriage']],
-    ['../../pr/triage/comment.js', ['triageCommentBody', 'writeTriageComment']],
-    ['../../pr/triage/follow-up.js', ['buildFollowUpPrompt']],
-    ['../../pr/triage/rerun.js', ['readTriageRerun']],
-    ['../../pr/triage/select.js', ['selectTriagePullRequests']],
-    ['./pr-context.js', ['lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
-    ['./triage-config-trust.js', ['ALLOW_LOCAL_CONFIG_FLAG']],
-    ['./triage-guard.js', ['readTriageGuard', 'triageVerdict']],
-    ['./triage-read.js', ['readConflictFiles', 'readFailedLogs', 'readWorkflowCount']],
-    ['./triage-report.js', ['evidenceOf', 'renderTriages', 'workflowCountOf']],
-    ['./triage-resolve.js', ['resolvePullRequest']],
-    ['./triage-trust.js', ['ghPermissionsIn', 'readTrustedTriageComment', 'repoLabel']],
   ]],
   ['./commands/effort/collect.js', [
     ['../../effort/collect.js', ['default']],
@@ -969,226 +802,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../learning/index.js', ['promotable']],
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
   ]],
-  ['./commands/release/status.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config', ['ConfigError']],
-    ['@open-tomato/rafa/core/config/load', ['loadConfig']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/store/changes', ['readPlanChanges']],
-    ['../../effort/attribution.js', ['planStubsFromFileNames', 'resolvePlanStub']],
-    ['../../pr/index.js', ['createGitRunner']],
-    ['../../release/audit.js', ['auditCell', 'auditLines', 'readAudit']],
-    ['../../release/changelog.js', ['groupChangeNotes', 'renderNoteLines']],
-    ['../../release/level.js', ['highestChangeLevel']],
-    ['../../release/status-readings.js', ['readTags', 'readUntagged']],
-    ['../../release/version.js', ['readManifestVersion']],
-    ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
-    ['./status-stale-docs.js', ['readStaleDocs', 'readStaleDocsSafely', 'staleDocsCell', 'staleDocsProblem']],
-  ]],
-  ['./commands/release/settle.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
-    ['../../release/settle-pr.js', ['settleByPr']],
-    ['../../release/settle-push.js', ['settleByPush']],
-    ['../../release/settle-tag.js', ['tagSettle']],
-    ['../../release/settle-worktree.js', ['withSettleWorktree']],
-    ['../../release/settle.js', ['CHANGELOG_TITLE', 'readSettle', 'releaseCommitSubject']],
-    ['../../release/version.js', ['RELEASE_BASE_BRANCH', 'RELEASE_REMOTE']],
-    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
-    ['./settle-project.js', ['refreshProjectAfterSettle']],
-  ]],
-  ['./commands/release/tag.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config', ['ConfigError']],
-    ['@open-tomato/rafa/core/config/load', ['loadConfig']],
-    ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
-    ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
-    ['../../release/status-readings.js', ['changelogVersions', 'readTags']],
-    ['../../release/tag-push.js', ['pushTag', 'trackedRemote']],
-    ['../../release/version-tag.js', ['versionTag']],
-    ['../../release/version.js', ['readManifestVersion', 'RELEASE_REMOTE']],
-    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
-    ['./release-commit.js', ['readReleaseCommit']],
-    ['./status.js', ['DEFAULT_RELEASE_SEAMS']],
-  ]],
-  ['./commands/board/list.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/board-body.js', ['readBoardBody']],
-    ['../../board/epic-board.js', ['openBoards']],
-    ['../../board/owner-resolve.js', ['createOwnerResolver']],
-    ['../../board/place.js', ['resolvePlace']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/setup.js', ['ROADMAP_LABEL']],
-    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-    ['../switch.js', ['defaultBoardOnce']],
-  ]],
-  ['./commands/board/sync.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/project/progress.js', ['commandProgressFeed']],
-    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
-    ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
-    ['../../board/project/sync.js', ['syncProject']],
-    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-  ]],
-  ['./commands/epic/show.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['@open-tomato/rafa/core/plan', ['plansDirAt']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
-    ['../../board/epic-cancel-notice.js', ['cancelledEpicNoticeLines']],
-    ['../../board/epic-problems.js', ['epicProblemMessage']],
-    ['../../board/epic-walk.js', ['epicLines']],
-    ['../../board/issue.js', ['createGhSpecIssueReader']],
-    ['../../board/now-epic.js', ['firstNowEpic']],
-    ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams', 'readListedEpics', 'readModeEpicProblems']],
-    ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
-    ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
-    ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
-    ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueProject', 'issueSubjectConfig', 'lineRefusal']],
-    ['../issue/list.js', ['roadmapBoard']],
-    ['../issue/roadmap-epic-table.js', ['unknownLine']],
-    ['../issue/roadmap-table.js', ['renderRoadmapTable']],
-    ['../plan/plan-files.js', ['readSwitch']],
-    ['../plan/refs-check.js', ['registryRoster']],
-  ]],
-  ['./commands/epic/new.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/epic-checklist.js', ['appendLine', 'editChecklist']],
-    ['../../board/epic-context.js', ['EPIC_TYPE_LABEL']],
-    ['../../board/epic-problems.js', ['HORIZON_LABEL_PREFIX']],
-    ['../../board/epic-template.js', ['renderEpicBody']],
-    ['../../board/epics.js', ['EPIC_LABEL_PREFIX']],
-    ['../../board/issue-board.js', ['createGhIssueBoard']],
-    ['../../board/place.js', ['resolvePlace']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/roadmap-epic-rows.js', ['HORIZONS']],
-    ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
-    ['../../board/setup.js', ['LABEL_LIST_LIMIT', 'listBoardLabels']],
-    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
-    ['../switch.js', ['defaultBoardOnce']],
-    ['./epic-project.js', ['newEpicTarget', 'refreshProjectAfterEpic']],
-    ['./move-native.js', ['NATIVE_MODE']],
-  ]],
-  ['./commands/epic/defer.js', [
-    ['../../board/epic-trail.js', ['REASON_FLAG']],
-    ['./horizon-change.js', ['DEFER_ACTION', 'runEpicHorizon', 'TO_FLAG']],
-  ]],
-  ['./commands/epic/promote.js', [
-    ['../../board/epic-trail.js', ['REASON_FLAG']],
-    ['./horizon-change.js', ['PROMOTE_ACTION', 'runEpicHorizon', 'TO_FLAG']],
-  ]],
-  ['./commands/epic/move.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/epic-horizon.js', ['branchNameOf']],
-    ['../../board/epic-trail.js', ['blankReasonMessage', 'REASON_FLAG', 'readReason', 'renderMoveComment', 'unaskedReasonMessage']],
-    ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf']],
-    ['../../board/issue-board.js', ['createGhIssueBoard']],
-    ['../../board/repository.js', ['readBoardRepository']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/roadmap.js', ['branchClaims', 'closedIssuesIn', 'createGhOpenPullRequests', 'parseRoadmapBody', 'scanClaimBranches']],
-    ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
-    ['./epic-project.js', ['moveTarget', 'refreshProjectAfterEpic']],
-    ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
-    ['./move-native.js', ['configuredMoveRelations', 'NATIVE_MODE', 'NATIVE_RETRY_HINT', 'nativeAlreadyMessage', 'nativeEpicLeft', 'nativeParentLine']],
-  ]],
-  ['./commands/epic/close.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['@open-tomato/rafa/core/loop', ['claudeArgs', 'spawnClaudeCaptured']],
-    ['@open-tomato/rafa/store', ['selectEffortStore']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/epic-body.js', ['readEpicBody']],
-    ['../../board/epic-template.js', ['PLACEHOLDER_REASON']],
-    ['../../board/epic-trail.js', ['renderCloseComment']],
-    ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf', 'groupByEpicLabel']],
-    ['../../board/issue-board.js', ['createGhIssueBoard']],
-    ['../../board/relations/labels.js', ['LABELS_READS']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../effort/epic-cost.js', ['readEpicCost', 'renderEpicCost']],
-    ['../../epic/verify-plan.js', ['buildVerifyPrompt', 'criteriaToAsk', 'parseVerifyPlan', 'readVerifyPrompt', 'splitCriteria']],
-    ['../../epic/verify-run.js', ['runVerification']],
-    ['../../start/dispatch.js', ['SESSION_ID_FLAG']],
-    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
-    ['../plan/plan-files.js', ['readSwitch']],
-    ['./close-docs.js', ['isDocsOnlyCriterion']],
-    ['./close-triage.js', ['fileFailures']],
-    ['./epic-project.js', ['closeTarget', 'refreshProjectAfterEpic']],
-  ]],
-  ['./commands/epic/cancel.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/blocked.js', ['SPEC_BLOCKED_LABEL']],
-    ['../../board/epic-checklist.js', ['editChecklist']],
-    ['../../board/epic-dependents.js', ['readEpicDependents']],
-    ['../../board/epic-trail.js', ['cancelMoveReason', 'REASON_FLAG', 'renderCancelComment', 'renderDependentComment', 'renderUnblockNote']],
-    ['../../board/epics.js', ['isNotPlanned', 'localDay']],
-    ['../../board/issue-board.js', ['createGhIssueBoard']],
-    ['../../board/relations/labels.js', ['createLabelsRelations', 'LABELS_READS']],
-    ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
-    ['../../board/roadmap.js', ['createGhOpenPullRequests']],
-    ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
-    ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
-    ['./epic-project.js', ['cancelTarget', 'refreshProjectAfterEpic']],
-    ['./move.js', ['applyEpicMove', 'readEpicMove']],
-  ]],
-  ['./commands/claim/release.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../claims/device.js', ['holdsClaim']],
-    ['../../claims/git.js', ['claimBranchIssue', 'fetchClaimBranches', 'makeOwnershipCommit', 'pushOwnershipCommit', 'readClaimBranch']],
-    ['../../claims/labels.js', ['unlabelReleased']],
-    ['../../pr/index.js', ['gitSaid']],
-    ['../../start/branch-decision.js', ['BRANCH_PREFIX', 'REMOTE']],
-    ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
-    ['../plan/plan-files.js', ['expectOneArgument', 'requireProject', 'resolveProjectConfig']],
-  ]],
-  ['./commands/claim/hand.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../claims/device.js', ['holdsClaim']],
-    ['../../start/branch-decision.js', ['REMOTE']],
-    ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
-    ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
-    ['./release.js', ['findOwnedBranch', 'pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
-  ]],
-  ['./commands/claim/accept.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../claims/device.js', ['holdsClaim']],
-    ['../../claims/record.js', ['parseClaimMessage']],
-    ['../../start/branch-decision.js', ['REMOTE']],
-    ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
-    ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
-    ['./release.js', ['pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
-  ]],
-  ['./commands/claim/take.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['CLAIMS_STALE_DISABLED', 'messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/issue.js', ['createGhSpecIssueReader']],
-    ['../../board/roadmap-claims.js', ['idleText']],
-    ['../../claims/device.js', ['holdsClaim']],
-    ['../../claims/stale.js', ['readClaimState']],
-    ['../../start/branch-decision.js', ['REMOTE']],
-    ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
-    ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
-    ['./release.js', ['pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
-  ]],
   ['./commands/update/current.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'RAFA_VERSION']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],
@@ -1290,7 +903,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/items.js', ['malformedItemLines', 'readItems']],
     ['../../stretch/launch.js', ['lineText']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['../pr/open.js', ['baseWarning', 'openPull', 'renderOpen']],
     ['../pr/pr-context.js', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext']],
     ['./item.js', ['stretchOfBase']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
@@ -1321,7 +933,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/plan-files.js', ['resolveProjectConfig']],
   ]],
   ['./commands/next.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
@@ -1336,12 +948,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../next/state.js', ['readHomeAfterLoop', 'readNextState']],
     ['../next/sync.js', ['fastForwardBase']],
     ['../start/branch-decision.js', ['REMOTE']],
-    ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/roadmap.js', [
+    ['./issue/declarations.js', ['ISSUE_LIST_FLAGS']],
     ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
-    ['./issue/list.js', ['ISSUE_LIST_FLAGS', 'runIssueList']],
   ]],
   ['./commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -1413,13 +1024,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],
     ['../cli/prompt/terminal.js', ['processTerminal']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
     ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
-    ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
@@ -1437,6 +1047,24 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../package.json', ['version']],
     ['../cli/describe.js', ['describeRegistry']],
   ]],
+];
+
+/**
+ * Each bundled feature, in the order its commands follow core's in the
+ * registry: the file that exports it, from `src/`, the name it is
+ * exported under, and the spelling of each of its commands, in order.
+ */
+const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, commands: readonly string[]])[] = [
+  ['./commands/board/index.js', 'BOARD_FEATURE', [
+    'issue list', 'issue show', 'issue create', 'issue comment', 'issue move', 'issue ready', 'issue unblock', 'issue check', 'issue edit',
+    'board list', 'board sync',
+    'epic show', 'epic new', 'epic defer', 'epic promote', 'epic move', 'epic close', 'epic cancel',
+  ]],
+  ['./commands/pr/index.js', 'PR_FEATURE', [
+    'pr current', 'pr show', 'pr view', 'pr open', 'pr retarget', 'pr close', 'pr list', 'pr wait', 'pr merge', 'pr triage',
+  ]],
+  ['./commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
+  ['./commands/release/index.js', 'RELEASE_FEATURE', ['release status', 'release settle', 'release tag']],
 ];
 
 /**
@@ -1577,7 +1205,7 @@ describe('what the CLI reaches, through the entry', () => {
     expect(readImports(join(SRC_DIR, path))).toEqual(spelled(imports));
   });
 
-  it('dispatches through a registry holding exactly the commands of the modules spelled here', async () => {
+  it('dispatches through a registry holding exactly the commands of the modules spelled here, then those of the features spelled here', async () => {
     const { CORE_REGISTRY: registry } = await import(join(SRC_DIR, 'commands', 'index.js')) as {
       CORE_REGISTRY: { commands: (options: { includeHidden: boolean }) => readonly unknown[] };
     };
@@ -1586,10 +1214,19 @@ describe('what the CLI reaches, through the entry', () => {
       const module = await import(join(SRC_DIR, path)) as { default: unknown };
       spelledCommands.push(module.default);
     }
+    const featureSpellings: string[][] = [];
+    for (const [path, name] of FEATURE_COMMANDS) {
+      const module = await import(join(SRC_DIR, path)) as Record<string, { commands: readonly { subject?: string; action: string }[] } | undefined>;
+      const commands = module[name]?.commands ?? [];
+      featureSpellings.push(commands.map((command) => `${command.subject ?? ''} ${command.action}`));
+      spelledCommands.push(...commands);
+    }
 
     expect(spelledCommands.filter((command) => command === undefined)).toEqual([]);
+    expect(featureSpellings).toEqual(FEATURE_COMMANDS.map(([, , spellings]) => [...spellings]));
     expect(registry.commands({ includeHidden: true }).map((command) => spelledCommands.indexOf(command)))
-      .toEqual(COMMAND_MODULES.map((_module, index) => index));
+      .toEqual(spelledCommands.map((_command, index) => index));
+    expect(spelledCommands).toHaveLength(COMMAND_MODULES.length + FEATURE_COMMANDS.flatMap(([, , spellings]) => spellings).length);
   });
 
   it('reaches the phase 0 command each wrapping core command module runs, its one default import, as a root export', async () => {
@@ -1620,25 +1257,6 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/loop/status.js',
       './commands/loop/list.js',
       './commands/loop/wait.js',
-      './commands/issue/list.js',
-      './commands/issue/show.js',
-      './commands/issue/create.js',
-      './commands/issue/comment.js',
-      './commands/issue/move.js',
-      './commands/issue/ready.js',
-      './commands/issue/unblock.js',
-      './commands/issue/check.js',
-      './commands/issue/edit.js',
-      './commands/pr/current.js',
-      './commands/pr/show.js',
-      './commands/pr/view.js',
-      './commands/pr/open.js',
-      './commands/pr/retarget.js',
-      './commands/pr/close.js',
-      './commands/pr/list.js',
-      './commands/pr/wait.js',
-      './commands/pr/merge.js',
-      './commands/pr/triage.js',
       './commands/effort/dashboard.js',
       './commands/effort/fix-schema.js',
       './commands/effort/copy.js',
@@ -1664,22 +1282,6 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/instinct/show.js',
       './commands/instinct/flag.js',
       './commands/instinct/promote.js',
-      './commands/release/status.js',
-      './commands/release/settle.js',
-      './commands/release/tag.js',
-      './commands/board/list.js',
-      './commands/board/sync.js',
-      './commands/epic/show.js',
-      './commands/epic/new.js',
-      './commands/epic/defer.js',
-      './commands/epic/promote.js',
-      './commands/epic/move.js',
-      './commands/epic/close.js',
-      './commands/epic/cancel.js',
-      './commands/claim/release.js',
-      './commands/claim/hand.js',
-      './commands/claim/accept.js',
-      './commands/claim/take.js',
       './commands/update/current.js',
       './commands/update/self.js',
       './commands/update/project.js',

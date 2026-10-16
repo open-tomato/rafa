@@ -540,6 +540,9 @@ const PUBLISH_CONFIG = {
 /** The engine the build targets, and the only one the manifest names. */
 const ENGINES = { bun: '>=1.3.14' };
 
+/** The manifest's `sideEffects`: false lets the bundler drop an unused import, so the entries call their roots. */
+const SIDE_EFFECTS = false;
+
 /** The manifest's `module`: the root of the exports map, which the build writes. */
 const MODULE = './dist/index.js';
 
@@ -1090,6 +1093,10 @@ describe('the package manifest', () => {
     expect(readManifest()['engines']).toEqual(ENGINES);
   });
 
+  it('declares no side effects, so the entries must call the composition roots', () => {
+    expect(readManifest()['sideEffects']).toBe(SIDE_EFFECTS);
+  });
+
   it('points module at the built root export, not at a source placeholder', () => {
     expect(readManifest()['module']).toBe(MODULE);
     expect(MODULE).toBe(EXPORTS['.']);
@@ -1234,6 +1241,22 @@ describe('the built CLI', () => {
     expect(existsSync(join(copy, '..', 'package.json'))).toBe(false);
     expect((JSON.parse(fromBuild.stdout) as { version?: unknown }).version).toBe(readManifest()['version']);
     expect(fromBuild).toEqual(fromSource);
+  }, 30_000);
+
+  it('answers describe --output=json with pr merge among the pr actions, so both roots survived the bundle', () => {
+    const env = {
+      TMPDIR: tmpdir(),
+      ...Object.fromEntries(Object.entries(withBunOnPath()).filter(([name]) => !name.startsWith('RAFA_'))),
+      ...scratchHomeEnv(tempRoot),
+    };
+    const fromBuild = run([process.execPath, join(DIST, 'cli.js'), 'describe', '--output=json'], tempRoot, env);
+
+    expectExit(fromBuild, 0, { cwd: tempRoot });
+    const document = JSON.parse(fromBuild.stdout) as {
+      subjects: { name: string; actions: { name: string }[] }[];
+    };
+    const pr = document.subjects.find((subject) => subject.name === 'pr');
+    expect(pr?.actions.map((action) => action.name)).toContain('merge');
   }, 30_000);
 
   it('prints its help when imported and sets the exit code it answers, which the import probe can see', () => {
@@ -1423,14 +1446,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the eleven section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the twelve section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'errors', 'hub', 'issues', 'logger', 'loop-continue',
+      'board-project', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
       'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(11);
+    expect(sections).toHaveLength(12);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);

@@ -219,16 +219,17 @@ import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { unblockAfterMerge } from '../../board/unblock-after-merge.js';
-import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
+import { endWithNextStep } from '../../next/ending.js';
 import {
   createGitRunner,
   isMergeMethod,
   MERGE_METHODS,
 } from '../../pr/index.js';
 
+import { PR_MERGE_DECLARATION } from './declarations.js';
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
 import { freedAfterMerge } from './merge-freed.js';
-import { guardBeforeMerge, MERGE_DANGEROUS_PHRASES } from './merge-guard.js';
+import { guardBeforeMerge } from './merge-guard.js';
 import { refreshProjectAfterMerge } from './merge-project.js';
 import { refuseFromGit } from './merge-refuse.js';
 import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
@@ -654,88 +655,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
 /** The command, reaching the provider, git and the terminal through `seams`; see the module note. */
 export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr merge',
-    subject: 'pr',
-    action: 'merge',
-    summary: 'merge a pull request and clean up both branches',
-    description: 'Merges one pull request through the GitHub CLI and then, in code, switches to the base branch,'
-      + ' pulls it fast-forward only, deletes the head branch locally and on the remote where it is still there,'
-      + ' and prunes, reporting each step; a head branch this checkout has no local branch for is reported as a'
-      + ' skipped local delete, and the rest still run. Refuses before it asks anything on a tracked change in the working tree or an'
-      + ' untracked path the pull request\'s head or the base\'s remote-tracking branch holds, on a pull'
-      + ' request that is not green or does not merge, and on a head branch checked out in another worktree, except a'
-      + ' clean, ended loop worktree under `loop.worktreeDir`, which it removes after copying its two plan files out. It'
-      + ' shows the pull request, its branches and the method and asks `Merge? [y/N]`; `--yes` skips the question,'
-      + ' and without a terminal and without `--yes` it refuses. A pull request that reports no checks at all is'
-      + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'
-      + ' with it the command reads how many workflows the repository defines, prints a warning for that case, asks'
-      + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow, or'
-      + ' where no workflow file on the base has a `pull_request` trigger naming it),'
-      + ' and after the merge posts one comment on the pull request saying so. Where the release runs, the release'
-      + ' guard reads the branch before the question: a `collision` is refused unless'
-      + ' `dangerous.acceptVersionCollision` is true, and `pr.versionCollision` sets whether a `missing` or'
-      + ' `stale` branch merges silently, with a warning, after its own question, or not at all. A step that fails never undoes the merge: it'
-      + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
-      + ' every issue the pull request closes, first on the checklist of the open epic that issue\'s `epic:` label'
-      + ' names, printing one line per epic, then on every open board whose checklist lists it, or on the roadmap'
-      + ' issue while no issue carries `type:roadmap`, warning rather than failing when one of those writes'
-      + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
-      + ' request closes, asking whether to remove `spec:blocked` from each one whose blockers have all closed;'
-      + ' `--yes` does not answer that question, and every failure of that reading is a warning. With'
-      + ' board.relationships set to native it ticks no epic checklist and, in place of that reading, prints the'
-      + ' open issues the merge freed, whose blockers GitHub clears by itself, asking nothing and writing nothing. With'
-      + ' `--output=json` the pull request, the method, the steps that ran, the follow-ups, the roadmap tick and'
-      + ' the unblock reading, or the freed issues in native mode, are the data of the terminal result event;'
-      + ' the tick of each closed issue\'s epic checklist is one line per epic and no key of that data, and under'
-      + ' native there is none. Refuses with exit code 2 where'
-      + ' `pr.provider` is not `gh`.',
-    args: [
-      {
-        name: 'n',
-        description: 'The pull request number. The open pull request of the current branch when it is left out.',
-        type: 'number',
-      },
-    ],
-    flags: [
-      {
-        name: 'yes',
-        description: 'Merge without asking. Needed where standard input is no terminal.',
-        type: 'boolean',
-      },
-      {
-        name: 'skip-checks',
-        description: 'Merge a pull request that reports no checks at all, after a warning and its own question.'
-          + ' Refused where the pull request reports any check; `--yes` beside it is refused where the repository'
-          + ' defines a workflow that may run on pull requests into the base, or its workflow count could not be read.',
-        type: 'boolean',
-      },
-      {
-        name: 'method',
-        description: 'How to merge: squash, merge or rebase. `pr.mergeMethod` when it is left out.',
-        type: 'string',
-      },
-      HINT_FLAG_SPEC,
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr merge',
-        note: 'Asks, then merges the open pull request of the branch checked out at the project root.',
-      },
-      {
-        cmd: 'rafa pr merge 41 --yes',
-        note: 'Merges pull request 41 without asking, then runs the clean-up.',
-      },
-      {
-        cmd: 'rafa pr merge 41 --skip-checks',
-        note: 'Warns that nothing on GitHub tested pull request 41, asks, merges it and comments that it had no checks.',
-      },
-      {
-        cmd: 'rafa pr merge 41 --method=rebase --output=json',
-        note: 'Merges by rebase and writes a result event holding each clean-up step and the follow-ups.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    dangerous: MERGE_DANGEROUS_PHRASES,
+    ...PR_MERGE_DECLARATION,
     run: async (context) => {
       const merged = await runMerge(context, seams);
       if (context.outputMode === 'json') context.output.result(merged);

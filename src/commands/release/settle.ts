@@ -106,6 +106,7 @@ import { CHANGELOG_TITLE, readSettle, releaseCommitSubject } from '../../release
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { RELEASE_SETTLE_DECLARATION, RELEASE_SETTLE_DRY_RUN_FLAG } from './declarations.js';
 import { refreshProjectAfterSettle } from './settle-project.js';
 
 /** The usage line this action's refusals name. */
@@ -113,9 +114,6 @@ export const RELEASE_SETTLE_USAGE = 'rafa release settle [--dry-run]';
 
 /** The command's name, as a config refusal opens. */
 const COMMAND_NAME = 'rafa release settle';
-
-/** The flag that reads without writing. */
-const DRY_RUN_FLAG = 'dry-run';
 
 /** What every line under a heading is indented by. */
 const INDENT = '  ';
@@ -341,7 +339,7 @@ export async function runSettle(
   seams: ReleaseSettleSeams = DEFAULT_RELEASE_SETTLE_SEAMS,
 ): Promise<ReleaseSettleResult> {
   expectNoArgument(context.args, RELEASE_SETTLE_USAGE);
-  const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${RELEASE_SETTLE_USAGE}`);
+  const dryRun = readSwitch(RELEASE_SETTLE_DRY_RUN_FLAG, context.flags[RELEASE_SETTLE_DRY_RUN_FLAG], `Usage: ${RELEASE_SETTLE_USAGE}`);
   const project = projectOf(context);
   const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
@@ -383,49 +381,7 @@ export async function runSettle(
 /** The command, reaching git and the provider through `seams`; see the module note. */
 export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_RELEASE_SETTLE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'release settle',
-    subject: 'release',
-    action: 'settle',
-    summary: 'fold the fragments waiting on the base branch into one version and changelog section',
-    description: 'Fetches `origin/<pr.base>` (or `origin/main`) and works in a scratch worktree of it, so the'
-      + ' checkout it runs from is never touched. It lists the fragments under `release.fragments` in the order'
-      + ' the base received them, folds them through `release.strategy` into the next version and one'
-      + ' changelog section, writes both (creating `release.changelog` under `# Changelog` when the base lacks it), deletes the folded fragments and commits `chore: release <version>`.'
-      + ' With `release.moveLock: true` the same commit writes `rafa.lock` at the root to the new version,'
-      + ' creating it when the base holds none, and the settle is refused, writing nothing, when the lock'
-      + ' does not read or the version file names a package other than rafa.'
-      + ' With `release.settle: push` (the default) the commit is pushed to the base, never forced; a refused'
-      + ' push fetches again and ends as settled when another run released the same fragments, or rebuilds'
-      + ' and pushes once more. With `release.settle: pr` it goes to `rafa/release` and one pending release'
-      + ' pull request is opened or updated. `release.tag: settle` tags a pushed release. It prints the'
-      + ' strategy, the base version, the fragments in order and the new version, and exits 0 when the'
-      + ' release is delivered or nothing waits, 1 otherwise. With `--dry-run` it prints the same reading'
-      + ' and writes nothing. With `--output=json` a run exiting 0 gives the reading and what was delivered'
-      + ' as the data of the terminal result event. Starts no session.',
-    args: [],
-    flags: [
-      {
-        name: DRY_RUN_FLAG,
-        description: 'Print the fragments, their order, the strategy and the version, and write nothing:'
-          + ' no commit, no push, no tag.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release settle',
-        note: 'Folds the waiting fragments into a release commit and delivers it by `release.settle`.',
-      },
-      {
-        cmd: 'rafa release settle --dry-run',
-        note: 'Prints what a settle would fold and the version it would write, writing nothing.',
-      },
-      {
-        cmd: 'rafa release settle --output=json',
-        note: 'Settles and gives the reading and the delivery as a result event.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_SETTLE_DECLARATION,
     run: async (context) => {
       const result = await runSettle(context, seams);
       const warnProject = (): void => {

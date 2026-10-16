@@ -75,8 +75,9 @@ import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
+import { DEFAULT_MAX_ATTEMPTS } from './declarations.js';
 import { PR_USAGE } from './pr-context.js';
-import { createPrTriageCommand, DEFAULT_MAX_ATTEMPTS, readMaxAttempts } from './triage.js';
+import { createPrTriageCommand, readMaxAttempts } from './triage.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-triage-')));

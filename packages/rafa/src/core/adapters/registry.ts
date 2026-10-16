@@ -11,8 +11,10 @@
  * registers"). Enabling a module is phase 7's work; until then an
  * add-on reaches the registry through {@link AdapterRegistry.register},
  * which `src/modules/load.ts` calls for each module `allowList:` names
- * from a `path` source. No reader resolves through that registry yet:
- * every caller below resolves through {@link CORE_ADAPTER_REGISTRY}.
+ * from a `path` source. `src/modules/activate.ts` hands the registry it
+ * answers to {@link restoreAdapters} for an invocation of the CLI, so
+ * every caller below, resolving through {@link CORE_ADAPTER_REGISTRY},
+ * finds a loaded module's kind.
  *
  * ## Keys
  *
@@ -73,10 +75,12 @@
  *
  * Nothing of its own: this module imports no adapter. The composition
  * root `src/adapter-registry.ts`, outside `packages/rafa/src/core/`, lists core's
- * adapters and hands them to {@link registerAdapters} as it is imported,
- * and `src/rafa.ts` and `src/index.ts` import it right after
- * `src/config-registry.ts`. Until something registers, every member of
- * {@link CORE_ADAPTER_REGISTRY} refuses, naming that module.
+ * adapters, and its `registerCoreAdapters` hands them to
+ * {@link registerAdapters} when it is called; importing it registers
+ * nothing. `src/rafa.ts` and `src/index.ts` call it, and `bun test`
+ * calls it once per test process from `src/tests/preload.ts`. Until
+ * something registers, every member of {@link CORE_ADAPTER_REGISTRY}
+ * refuses, naming that module.
  *
  * The root registers the two store backends, `store/sqlite` and
  * `store/ndjson`, which `selectEffortStore` resolves through
@@ -511,14 +515,14 @@ function registered(): AdapterRegistry {
 
 /**
  * Core's registry: whatever the active registry holds when it is called,
- * which `src/adapter-registry.ts` fills with core's adapters as it is
- * imported. Core imports no adapter; it reads the ones it is handed.
+ * which `registerCoreAdapters` of `src/adapter-registry.ts` fills with
+ * core's adapters. Core imports no adapter; it reads the ones it is handed.
  *
  * A frozen facade, not a registry value: each member reads the active
  * registry at call time, so a caller holding it reads what was
  * registered after it took hold of it. While the active registry holds
  * no adapter, every member, `find` among them, throws an `Error` naming
- * `src/adapter-registry.ts`, so a caller that never imported it learns
+ * `src/adapter-registry.ts`, so a caller that never called its root learns
  * so at its first read rather than finding nothing. `register` answers
  * a new registry, a value, and leaves the active registry as it is.
  */

@@ -26,8 +26,8 @@
  *   - `accept` — a `collision` under `dangerous.acceptVersionCollision`:
  *     the lines as warnings, and the merge goes on. The setting that let
  *     it through is named by the loader's pass line, which ends with the
- *     phrase `pr merge` declares for the key
- *     ({@link MERGE_DANGEROUS_PHRASES}, `packages/rafa/src/core/config/dangerous.ts`),
+ *     phrase `pr merge` declares for the key (`MERGE_DANGEROUS_PHRASES`
+ *     in `./declarations.ts`, `packages/rafa/src/core/config/dangerous.ts`),
  *     so this step prints no line of its own for it.
  *
  * Every refusal names the answer and the setting first and the guard's
@@ -52,7 +52,6 @@ import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { GuardReaction } from '../../release/guard-merge.js';
 import type { GuardAnswer, GuardReading } from '../../release/guard.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
@@ -60,14 +59,6 @@ import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
 import { guardLines, localPlanNotes } from '../../release/guard.js';
 import { releaseDeliveryLine, releaseDeliveryOf } from '../../release/release-delivery.js';
-
-/**
- * What `pr merge` does under each `dangerous.*` key it reads, its
- * `RafaCommand.dangerous`; see the module note.
- */
-export const MERGE_DANGEROUS_PHRASES: DangerousPhrases = Object.freeze({
-  'dangerous.acceptVersionCollision': 'a release guard reading collision merges anyway',
-});
 
 /** The answers that mean yes to a question spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];

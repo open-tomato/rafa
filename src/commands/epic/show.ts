@@ -162,6 +162,8 @@ import { renderRoadmapTable } from '../issue/roadmap-table.js';
 import { readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
+import { EPIC_SHOW_DECLARATION } from './declarations.js';
+
 /** The usage line a refusal names. */
 const USAGE = 'rafa epics [<n>] [--labels] [--texts] [--refresh]';
 
@@ -417,66 +419,7 @@ export async function runEpics(context: RafaContext, seams: EpicShowSeams): Prom
 /** The command, reading the board with `seams`; see the module note. */
 export function createEpicShowCommand(seams: EpicShowSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic show',
-    subject: 'epic',
-    action: 'show',
-    summary: 'list one epic\'s issues as the Roadmap table: the epic numbered, or the first now epic not done',
-    description: 'Prints one epic\'s issues as `rafa roadmap` prints its spec lines, with the spec, blocked by,'
-      + ' has and refs columns: the unticked lines of the epic\'s checklist in its order, then its open members'
-      + ' missing from the checklist by number. The epic is the type:epic issue numbered, or, with no number,'
-      + ' the current place\'s epic, the one `rafa switch` moved to; a place naming a board alone, or no'
-      + ' position file, takes the first epic that board (with no position file `roadmap.issue`, else the'
-      + ' lowest-numbered open type:roadmap board, else the open issue titled Roadmap) names that is open,'
-      + ' horizon:now and not done, the one `rafa next` walks into. The table is headed by the epic\'s title,'
-      + ' computed state and done/total, and a stored state disagreeing with the computed one is printed'
-      + ' under it. No issue of another epic is named. Each label problem about the epic and each reading that'
-      + ' failed is warned about; an unreachable board prints the epic unknown with the reason. With'
-      + ' `--output=json` the epic, its rows, its problems and the warnings are the data of the terminal result'
-      + ' event. `rafa epics` and `rafa epic` are the same command, typed by the subject alone.',
-    args: [
-      {
-        name: 'n',
-        description: 'The epic\'s issue number on the GitHub board. Left out, the current place\'s epic, else the first now epic on its board that is not done.',
-        type: 'string',
-        required: false,
-      },
-    ],
-    flags: [
-      {
-        name: 'labels',
-        description: 'Print each issue\'s labels on a row of their own under it; they are no column.',
-        type: 'boolean',
-      },
-      {
-        name: 'texts',
-        description: 'Spell the spec and blocked by columns in words instead of symbols, with no legend.',
-        type: 'boolean',
-        aliases: ['t'],
-      },
-      {
-        name: 'refresh',
-        description: 'Read the whole board again instead of only what changed since the listing kept under .rafa/cache/.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic show',
-        note: 'Prints the issues of the epic `rafa next` is walking: the first now epic on the Roadmap not done.'
-          + ' `rafa epics` prints the same.',
-      },
-      {
-        cmd: 'rafa epic show 252',
-        note: 'Prints the issues of epic #252, whatever its horizon, in its checklist\'s order, as `rafa epics 252` does.',
-      },
-      {
-        cmd: 'rafa epic show 252 --output=json',
-        note: 'Writes a result event whose data holds epic #252 as computed, its rows and its label problems.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    aliases: ['epic'],
-    lastingAliases: ['epic'],
+    ...EPIC_SHOW_DECLARATION,
     run: (context) => runEpics(context, seams),
   };
   return Object.freeze(command);

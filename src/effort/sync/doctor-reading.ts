@@ -47,6 +47,7 @@ import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
 
+import { baseAdapterRegistry } from '../../modules/activate.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { SyncModuleMissing, selectSync } from './select.js';
@@ -98,12 +99,16 @@ function withoutRowName(message: string): string {
     : message;
 }
 
-/** The registry the strategy is selected through: core's when it holds the kind, the modules' otherwise. */
+/**
+ * The registry the strategy is selected through: core's when the base
+ * registry, which holds no module's kind, holds the kind, the modules'
+ * otherwise.
+ */
 async function registryFor(input: DoctorEffortSyncInput, kind: unknown, seams: DoctorEffortSyncSeams): Promise<{
   readonly registry: AdapterRegistry;
   readonly source: EffortSyncSource;
 }> {
-  if (typeof kind === 'string' && CORE_ADAPTER_REGISTRY.find('sync', kind) !== undefined) {
+  if (typeof kind === 'string' && baseAdapterRegistry().find('sync', kind) !== undefined) {
     return { registry: CORE_ADAPTER_REGISTRY, source: 'core' };
   }
   const settings = moduleSettings(input.resolved, { root: input.root, home: input.home });

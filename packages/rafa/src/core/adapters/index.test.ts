@@ -29,10 +29,11 @@
  * note records as gone, each imported first in a child `bun`, since this
  * file has already imported two of them by the time a case runs. Each
  * child imports the composition root `src/adapter-registry.ts` after
- * it, resolves `sync/local` through the barrel and pushes with it, so a
- * module that loaded with a binding still unset fails the case. The
- * control child imports the barrel and `select.ts` without the root,
- * and must be refused naming it.
+ * it and calls its `registerCoreAdapters`, since importing the root
+ * registers nothing, then resolves `sync/local` through the barrel and
+ * pushes with it, so a module that loaded with a binding still unset
+ * fails the case. The control child imports the barrel and `select.ts`
+ * without the root, and must be refused naming it.
  *
  * Three mutations were driven against this file on 2026-10-12, one run
  * each, with every file restored and verified with `sha256sum -c`, while
@@ -111,7 +112,7 @@ function loadingFirst(first: string, withRoot = true): { exitCode: number; stdou
   const script = [
     `await import(${JSON.stringify(resolve(ROOT, first))});`,
     ...(withRoot
-      ? [`await import(${JSON.stringify(resolve(ROOT, ROOT_MODULE))});`]
+      ? [`(await import(${JSON.stringify(resolve(ROOT, ROOT_MODULE))})).registerCoreAdapters();`]
       : []),
     `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(resolve(ROOT, BARREL))});`,
     `const { selectSync } = await import(${JSON.stringify(resolve(ROOT, SELECT))});`,

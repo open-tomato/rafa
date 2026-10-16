@@ -93,6 +93,7 @@ import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { CLAIM_ACCEPT_DECLARATION } from './declarations.js';
 import { pushOnClaimTip, readClaimDevice, readIssueArgument, readIssueBranches } from './release.js';
 
 /** The usage line a refusal names. */
@@ -240,36 +241,7 @@ const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => createStartPreflightC
 /** The command, reaching git and the store through `makeSeams`; see the module note. */
 export function createClaimAcceptCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'claim accept',
-    subject: 'claim',
-    action: 'accept',
-    summary: 'take up a handover of an issue\'s claim offered to this device',
-    description: 'Pushes one accept commit naming this device\'s store to the issue\'s claim branch on'
-      + ' origin, leased on the tip it read, so this device owns the claim from then on and no other'
-      + ' device\'s push is overwritten. Refused when no handover pending on the branch names this'
-      + ' device\'s store, when the handover was withdrawn or replaced, when the branch moved meanwhile,'
-      + ' and when origin cannot be reached. No label and no local branch moves. With `--output=json`'
-      + ' the issue, the branch, the stores and the commits are the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number whose handover this device accepts.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa claim accept 324',
-        note: 'Accepts the handover of #324 offered to this device\'s store; this device owns the claim from then on.',
-      },
-      {
-        cmd: 'rafa claim accept 324 --output=json',
-        note: 'Writes a start event, then a result event whose data holds the branch and the accept commit.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...CLAIM_ACCEPT_DECLARATION,
     run: async (context) => {
       const result = await acceptClaim(context, makeSeams);
       if (context.outputMode === 'json') {

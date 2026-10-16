@@ -589,7 +589,7 @@ export async function loadConfig(
   warn: (message: string) => void = printWarning,
 ): Promise<ResolvedConfig> {
   if (Object.keys(activeSettings()).length === 0) {
-    throw new Error('no config section is registered: import src/config-registry.ts before loadConfig');
+    throw new Error('no config section is registered: call registerCoreConfigSections from src/config-registry.ts before loadConfig');
   }
   const places = scopesOf(roots);
   const readings = new Map<ConfigScopeName, ScopeReading>();

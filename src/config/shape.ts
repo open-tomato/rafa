@@ -21,7 +21,7 @@
  *
  * This module declares core's own top-level keys, the keys of
  * `packages/rafa/src/core/config/core-section.ts`, and composes {@link ConfigShape}
- * from them and the interface each of the eleven section files
+ * from them and the interface each of the twelve section files
  * (`src/config-schema-*.ts`) exports for the keys it writes: `HubShape`
  * for `hub`, `ReleaseShape` for `pr` and `release`, and so on, each
  * extended by {@link ConfigShape}. A namespace two packages share is a
@@ -47,6 +47,7 @@
  */
 import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
 import type { ErrorsShape } from '../config-schema-errors.js';
+import type { FeaturesShape } from '../config-schema-features.js';
 import type { HubShape } from '../config-schema-hub.js';
 import type { IssuesShape } from '../config-schema-issues.js';
 import type { LoggerShape } from '../config-schema-logger.js';
@@ -151,6 +152,7 @@ export interface DangerousShape extends ReleaseDangerousShape {
 /** The nested file shape: core's keys, and each section's; see the module note. */
 export interface ConfigShape extends
   ErrorsShape,
+  FeaturesShape,
   HubShape,
   IssuesShape,
   LoggerShape,

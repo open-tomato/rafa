@@ -191,14 +191,12 @@ import { versionTag } from '../../release/version-tag.js';
 import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
+import { RELEASE_TAG_DECLARATION, RELEASE_TAG_PUSH_FLAG } from './declarations.js';
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
-
-/** The flag that pushes the tag once it is written; see the module note. */
-export const PUSH_FLAG = 'push';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
@@ -652,7 +650,7 @@ export function renderTagged(
 /** One whole run: the readings, the decision, the write it may make, and the lines. */
 export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): Promise<ReleaseTagResult> {
   expectNoArgument(context.args, RELEASE_TAG_USAGE);
-  const push = readSwitch(PUSH_FLAG, context.flags[PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
+  const push = readSwitch(RELEASE_TAG_PUSH_FLAG, context.flags[RELEASE_TAG_PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
   const project = projectOf(context);
   const config = await tagConfig(project, (message: string) => {
     context.output.warn(message);
@@ -684,50 +682,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
 /** The command, reaching git through `seams`; see the module note. */
 export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'release tag',
-    subject: 'release',
-    action: 'tag',
-    summary: 'tag the commit that set the version both release files agree on',
-    description: 'Writes `v<version>` on the release branch — `pr.base`, or `main` — when the'
-      + ' version `release.versionFile` declares is the one the newest section of `release.changelog` names.'
-      + ' The tag goes on the commit that set that version: HEAD, or, where later commits landed on the branch,'
-      + ' the earlier commit, with a warning naming how many commits HEAD is past it.'
-      + ' It refuses, and writes nothing, when another branch is checked out, when a tag already names that'
-      + ' version, when the two files disagree, when the changelog section of that version carries no'
-      + ' `<!-- rafa:fragments -->` receipt and is above the newest version released before settle,'
-      + ' when no commit holds the version yet, and when the version'
-      + ' file, the tag list or the history could not be read. After the tag it prints what to run next: the'
-      + ' push that puts the tag on the remote, and the publish line for the registry the version file'
-      + ' configures, with the command `release.publishCommand` names (`npm publish` by default),'
-      + ' spelled to publish from the tag when HEAD is past it, which it does not run. With `--push` it'
-      + ' pushes the tag itself to the remote the release branch tracks (`origin` when it tracks none) and'
-      + ' drops the push line; a push that fails exits 1 with what git said and keeps the local tag. With'
-      + ' `--output=json` the readings, the decision, the follow-ups and the push are the data of the terminal'
-      + ' result event.',
-    args: [],
-    flags: [
-      {
-        name: PUSH_FLAG,
-        description: 'Push the tag to the remote the release branch tracks once it is written; a push that'
-          + ' fails exits 1 and keeps the local tag.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release tag',
-        note: 'Tags the merged release and prints the push and publish lines to run next.',
-      },
-      {
-        cmd: 'rafa release tag --push',
-        note: 'Tags the merged release, pushes the tag, and prints the publish line to run next.',
-      },
-      {
-        cmd: 'rafa release tag --output=json',
-        note: 'Writes the same tag and gives the readings, the decision and the follow-ups as a result event.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_TAG_DECLARATION,
     run: async (context) => {
       const result = await runTag(context, seams);
       const past = pastReleaseWarning(result.written, result.inputs.releaseBranch);

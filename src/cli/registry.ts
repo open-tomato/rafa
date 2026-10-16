@@ -9,8 +9,9 @@
  *
  * The contract, {@link CommandRegistry} and the five shapes it names,
  * is declared in `packages/rafa/src/core/command/registry-types.ts`, so core's
- * `RafaContext` can name it; this file re-exports the six under the
- * same names and keeps the builder and its refusals.
+ * `RafaContext` can name it, beside a seventh shape, `CommandFeature`,
+ * what one feature contributes to a registry; this file re-exports the
+ * seven under the same names and keeps the builder and its refusals.
  *
  * ## What a registry holds
  *
@@ -66,6 +67,7 @@
  */
 import type {
   CommandAlias,
+  CommandFeature,
   CommandRegistry,
   CommandRegistryInput,
   ModuleMount,
@@ -85,6 +87,7 @@ export const HELP_WORD = 'help';
 
 export type {
   CommandAlias,
+  CommandFeature,
   CommandRegistry,
   CommandRegistryInput,
   ModuleMount,
