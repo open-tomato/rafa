@@ -222,6 +222,45 @@ function folded(lock: SettleFolded['lock']): SettleFolded {
   return { outcome: 'folded', strategy, commit, baseVersion, fragments, units, lock };
 }
 
+/** The plugin's fragment the two-unit literal folds. */
+const PLUGIN_FRAGMENT: SettleFragment = {
+  id: 'rafa-7',
+  path: '.changes/rafa-7.md',
+  commit: 'e'.repeat(40),
+  addedOn: '2026-09-02',
+  fragment: { plan: 'rafa-7', title: 'title of rafa-7', level: 'minor', package: '@scope/plugin', notes: ['- Plugin: a hook'] },
+};
+
+/** The plugin's unit the two-unit literal folds, with `changelogMissing` as given. */
+function pluginUnit(changelogMissing = false): SettleUnitFold {
+  return {
+    package: '@scope/plugin',
+    dir: 'packages/plugin',
+    versionFile: 'packages/plugin/package.json',
+    changelog: 'packages/plugin/CHANGELOG.md',
+    baseVersion: '0.1.0',
+    version: '0.2.0',
+    section: '## 0.2.0',
+    changelogMissing,
+    fragments: [PLUGIN_FRAGMENT],
+  };
+}
+
+/** A built settle moving the root and `@scope/plugin` in one commit, the plugin's changelog created. */
+function builtBoth(): SettleBuilt {
+  return {
+    ...built(),
+    fragments: [FRAGMENT, PLUGIN_FRAGMENT],
+    units: [rootUnit(), pluginUnit(true)],
+    deleted: [{ package: null, paths: [FRAGMENT.path] }, { package: '@scope/plugin', paths: [PLUGIN_FRAGMENT.path] }],
+    insertPoints: [
+      { package: null, changelog: 'CHANGELOG.md', point: 'before-next-heading' },
+      { package: '@scope/plugin', changelog: 'packages/plugin/CHANGELOG.md', point: 'file-end' },
+    ],
+    createdChangelog: ['packages/plugin/CHANGELOG.md'],
+  };
+}
+
 /** A tag step that was not meant to write. */
 const NO_TAG: SettleTagOutcome = { outcome: 'skipped', exitCode: 0, reason: 'manual', sentence: null };
 
@@ -289,7 +328,7 @@ describe('settledResult, the outcomes rendered from literals', () => {
 
   it('exits 1 when the tag failed after a push that landed, keeping the push line', () => {
     const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build: built() } };
-    const tag: SettleTagOutcome = { outcome: 'failed', exitCode: 1, tag: 'v0.5.0', commit: 'c'.repeat(40), written: true, sentence: 'v0.5.0 could not be pushed' };
+    const tag: SettleTagOutcome = { outcome: 'failed', exitCode: 1, tag: 'v0.5.0', commit: 'c'.repeat(40), written: true, tags: [], sentence: 'v0.5.0 could not be pushed' };
 
     const result = settledResult(delivered, tag, 'origin/main', 'main');
 
@@ -322,6 +361,62 @@ describe('settledResult, the outcomes rendered from literals', () => {
     expect(result.exitCode).toBe(1);
     expect(result.problem).toBe('❌ Nothing was written: semver-by-level threw: boom');
     expect(result.lines).not.toContain('Version: 0.4.0 → 0.5.0');
+  });
+});
+
+describe('settledResult and dryRunResult, a release moving the root and a package', () => {
+  it('prints one Version: line per unit, the root\'s first, and the fragment\'s package after its title', () => {
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build: builtBoth() } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines).toEqual([
+      'Strategy: semver-by-level',
+      'Base: origin/main at aaaaaaaaaaaa, version 0.4.0',
+      'Fragments, in the order the base received them:',
+      '  1. .changes/rafa-9.md — minor, "title of rafa-9", added 2026-09-01 in bbbbbbbbbbbb',
+      '  2. .changes/rafa-7.md — minor, "title of rafa-7" for @scope/plugin, added 2026-09-02 in eeeeeeeeeeee',
+      'Version: 0.4.0 → 0.5.0',
+      'Version: @scope/plugin 0.1.0 → 0.2.0',
+      'Changelog: packages/plugin/CHANGELOG.md is missing, so the release commit creates it under "# Changelog".',
+      '✅ Pushed "chore: release 0.5.0, @scope/plugin@0.2.0" (cccccccccccc) to main.',
+    ]);
+  });
+
+  it('prints a package\'s Version: line alone when the root folded nothing', () => {
+    const build: SettleBuilt = { ...builtBoth(), fragments: [PLUGIN_FRAGMENT], units: [pluginUnit()], createdChangelog: [] };
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.lines.filter((line) => line.startsWith('Version:'))).toEqual(['Version: @scope/plugin 0.1.0 → 0.2.0']);
+    expect(result.lines.at(-1)).toBe('✅ Pushed "chore: release @scope/plugin@0.2.0" (cccccccccccc) to main.');
+  });
+
+  it('names both moves in the dry run\'s commit line', () => {
+    const { strategy, commit, baseVersion, fragments, units } = builtBoth();
+    const reading: SettleFolded = { outcome: 'folded', strategy, commit, baseVersion, fragments, units, lock: null };
+
+    const result = dryRunResult(reading, 'origin/main', 'main');
+
+    expect(result.lines.slice(-4)).toEqual([
+      'Version: 0.4.0 → 0.5.0',
+      'Version: @scope/plugin 0.1.0 → 0.2.0',
+      'Changelog: packages/plugin/CHANGELOG.md is missing, so the release commit creates it under "# Changelog".',
+      'Dry run: settle would commit "chore: release 0.5.0, @scope/plugin@0.2.0" on main; nothing was written.',
+    ]);
+  });
+
+  it('prints the tag step\'s sentence naming every tag after the push line', () => {
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build: builtBoth() } };
+    const sentence = `v0.5.0, @scope/plugin@0.2.0 name ${'c'.repeat(12)} and are pushed to origin`;
+    const tag: SettleTagOutcome = { outcome: 'tagged', exitCode: 0, tags: ['v0.5.0', '@scope/plugin@0.2.0'], commit: 'c'.repeat(40), sentence };
+
+    const result = settledResult(delivered, tag, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines.slice(-2)).toEqual(['✅ Pushed "chore: release 0.5.0, @scope/plugin@0.2.0" (cccccccccccc) to main.', `✅ ${sentence}`]);
   });
 });
 

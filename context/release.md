@@ -90,7 +90,9 @@ scope's own config file (`rafa.config.ts` in a project that holds one). No refus
 drops that line from what it quotes (#765).
 
 **PR delivery** (`release.settle: pr`): Settle pushes the commit to the `rafa/release`
-branch and opens or updates one pending release pull request. Closing that PR
+branch and opens or updates one pending release pull request, titled with the
+commit's subject. Its body lists each unit's move and ends with one changelog
+section per unit, each under a line naming the unit. Closing that PR
 undoes the release before it lands. This is the delivery method for a protected
 base branch that requires review.
 
@@ -285,9 +287,12 @@ branch) or `pr` (open or update one pending release pull request on
 `rafa/release`). Read by `rafa release settle` and `rafa next`.
 
 **`release.tag`** — Who tags the version: `manual` (default, tag by hand with
-`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags the commit it pushed). Read by
-`rafa release settle` and `rafa release tag`. Under `release.settle: pr`, the
-tag waits for `rafa release tag` after that pull request merges.
+`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags
+the commit it pushed, one tag per unit it moves: `v<version>` for the root,
+`<name>@<version>` for a package, in unit order, stopping at the first that
+fails). Read by `rafa release settle` and `rafa release tag`. Under
+`release.settle: pr`, the tag waits for `rafa release tag` after that pull
+request merges.
 
 **`release.publishCommand`** — The command `rafa release tag` prints for the
 publish, default `npm publish`. Free text, printed as written and never run, so

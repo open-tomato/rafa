@@ -1,10 +1,12 @@
 /**
  * `rafa release settle [--dry-run]`: the fragments waiting on the base
- * branch folded into one version and one changelog section, committed
- * as `chore: release <version>` and delivered by `release.settle`. The
- * command reads its line and the config, hands the work to
- * `src/release/`, and prints what came back; it assembles no `git` or
- * `gh` argv of its own.
+ * branch folded into one version and one changelog section per unit —
+ * the root, and each workspace package a fragment names — committed at
+ * once under `releaseCommitSubject` (`src/release/release-move.ts`:
+ * `chore: release 0.46.0, @scope/plugin@0.2.0`) and delivered by
+ * `release.settle`. The command reads its line and the config, hands
+ * the work to `src/release/`, and prints what came back; it assembles
+ * no `git` or `gh` argv of its own.
  *
  * ```text
  * rafa release settle            → fold, commit, deliver, maybe tag
@@ -34,11 +36,14 @@
  * Every run names the strategy that answered, the base commit and the
  * version it declares, and the fragments in fold order — the order the
  * base received them, first-parent add commit first — each with its
- * level, its title and the commit and date that added it. A fold that
- * answered adds one `Version:` line per unit it moves, the root's
- * first, a package's naming the package before its versions; a
- * delivery adds one line for what it did, and a tag one more. A settle
- * whose base lacks `release.changelog`, or a package's
+ * level, its title, the package it names after the title when it names
+ * one (`"a hook" for @scope/plugin`), and the commit and date that
+ * added it. A fold that answered adds one `Version:` line per unit it
+ * moves, the root's first, a package's naming the package before its
+ * versions; a delivery adds one line for what it did, and a tag one
+ * more, naming every tag the step wrote (one per unit,
+ * `src/release/settle-tag.ts`). A settle whose base lacks
+ * `release.changelog`, or a package's
  * `<dir>/CHANGELOG.md`, creates it holding `# Changelog` and the section
  * (`buildSettle`, #842), and says so in a `Changelog:` line above the
  * delivery's — the dry run in the same words, before its own last line;
@@ -90,7 +95,7 @@ import type { ProjectFound } from '../../project/scope.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
-import type { SettleBuild, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
+import type { SettleBuild, SettleFragment, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
@@ -208,14 +213,22 @@ export function readingLines(reading: SettleReading | SettleBuild, ref: string):
   } else {
     lines.push('Fragments, in the order the base received them:');
     reading.fragments.forEach((each, index) => {
-      const { level, title } = each.fragment;
-      lines.push(`${INDENT}${String(index + 1)}. ${each.path} — ${level}, "${title}", added ${each.addedOn} in ${short(each.commit)}`);
+      lines.push(`${INDENT}${String(index + 1)}. ${fragmentLine(each)}`);
     });
   }
   if (reading.outcome === 'folded' || reading.outcome === 'built' || reading.outcome === 'unbuilt') {
     for (const unit of reading.units) lines.push(versionLine(unit));
   }
   return lines;
+}
+
+/** One fragment as the list names it: path, level, title, the package after the title when set, and where it was added. */
+function fragmentLine(each: SettleFragment): string {
+  const { level, title } = each.fragment;
+  const named = each.fragment.package === null
+    ? ''
+    : ` for ${each.fragment.package}`;
+  return `${each.path} — ${level}, "${title}"${named}, added ${each.addedOn} in ${short(each.commit)}`;
 }
 
 /** One unit's `Version:` line: the root's bare, a package's naming the package first. */
