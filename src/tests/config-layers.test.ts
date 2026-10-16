@@ -289,6 +289,7 @@ const PROJECT_TEXT = [
   'tests:',
   '  fullSuiteTriggers: ["project/*.toml"]',
   '  integration: ["project/**/*.e2e.ts"]',
+  '  contract: ["project/**/*.pact.ts"]',
   '  alwaysRun: ["project/**/*.sweep.ts"]',
   '  retakeRedAlone: false',
   '',
@@ -404,6 +405,7 @@ const PROJECT_VALUES: RafaConfig = {
   namingBranch: 'project/{stub}',
   testsFullSuiteTriggers: ['project/*.toml'],
   testsIntegration: ['project/**/*.e2e.ts'],
+  testsContract: ['project/**/*.pact.ts'],
   testsAlwaysRun: ['project/**/*.sweep.ts'],
   testsRetakeRedAlone: false,
 };
@@ -545,6 +547,7 @@ const USER_TEXT = [
   'tests:',
   '  fullSuiteTriggers: []',
   '  integration: ["user/**/*.e2e.ts"]',
+  '  contract: ["user/**/*.pact.ts"]',
   '  alwaysRun: []',
   '  retakeRedAlone: true',
   '',
@@ -646,6 +649,7 @@ const USER_VALUES: RafaConfig = {
   namingBranch: 'user/{stub}',
   testsFullSuiteTriggers: [],
   testsIntegration: ['user/**/*.e2e.ts'],
+  testsContract: ['user/**/*.pact.ts'],
   testsAlwaysRun: [],
   testsRetakeRedAlone: true,
 };
@@ -1187,6 +1191,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.integration', 'tests:\n  integration: { e2e: true }',
     'tests.integration is a mapping, expected a list of glob patterns',
     'tests:\n  integration: []', 'testsIntegration', [],
+  ],
+  [
+    'tests.contract', 'tests:\n  contract: "*.contract.test.ts"',
+    'tests.contract is "*.contract.test.ts", expected a list of glob patterns',
+    'tests:\n  contract: ["pkg/**/*.contract.test.ts"]', 'testsContract', ['pkg/**/*.contract.test.ts'],
   ],
   [
     'tests.alwaysRun', 'tests:\n  alwaysRun: ["/src/*.sweep.test.ts"]',

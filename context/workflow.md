@@ -265,6 +265,11 @@ automatically, and which tests always run:**
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
   — the test files a stage step with `Owns:` folders runs beside the
   folders it changed; a task step does not read this key
+- `tests.contract` (glob list; defaults to `**/*.contract.test.ts`) — the
+  contract tests: a contract test checks the promise a package makes to
+  others, with a fixture, and runs in that package's own `test` task in
+  ring 1 of CI, where a use-case test matching `tests.integration` runs in
+  ring 0's full run; no step reads this key yet
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and

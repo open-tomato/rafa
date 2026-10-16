@@ -177,6 +177,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['namingBranch', 'naming.branch'],
   ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
   ['testsIntegration', 'tests.integration'],
+  ['testsContract', 'tests.contract'],
   ['testsAlwaysRun', 'tests.alwaysRun'],
   ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
 ];

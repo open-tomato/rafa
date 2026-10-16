@@ -205,6 +205,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'namingBranch',
   'testsFullSuiteTriggers',
   'testsIntegration',
+  'testsContract',
   'testsAlwaysRun',
   'testsRetakeRedAlone',
 ];
@@ -312,6 +313,7 @@ const DEFAULTS: RafaConfig = {
     '**/*-spawned*.test.ts',
     '**/*-cli.test.ts',
   ],
+  testsContract: ['**/*.contract.test.ts'],
   testsAlwaysRun: ['src/**/*.sweep.test.ts'],
   testsRetakeRedAlone: true,
 };
@@ -462,6 +464,7 @@ const FULL = [
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
+  '  contract: [packages/*/src/*.contract.test.ts]',
   '  alwaysRun: [src/sweeps/*.test.ts]',
   '  retakeRedAlone: false',
   '',
@@ -576,6 +579,7 @@ const FULL_VALUES: RafaConfig = {
   namingBranch: 'work/{stub}',
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
+  testsContract: ['packages/*/src/*.contract.test.ts'],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
   testsRetakeRedAlone: false,
 };
@@ -646,7 +650,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(15);
+    expect(lists).toHaveLength(16);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1261,6 +1265,11 @@ describe('parseConfigText', () => {
         'tests.integration', 'tests:\n  integration: ["/abs/*.test.ts"]',
         'tests.integration[0] is "/abs/*.test.ts", expected a glob pattern relative to the repository root',
         'tests:\n  integration: ["e2e/**"]', 'testsIntegration', ['e2e/**'],
+      ],
+      [
+        'tests.contract', 'tests:\n  contract: [7]',
+        'tests.contract[0] is 7, expected a glob pattern relative to the repository root',
+        'tests:\n  contract: ["**/*.contract.test.ts"]', 'testsContract', ['**/*.contract.test.ts'],
       ],
       [
         'tests.alwaysRun', 'tests:\n  alwaysRun: { sweeps: true }',

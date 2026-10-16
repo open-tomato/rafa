@@ -317,6 +317,12 @@
       ],
       "source": "default"
     },
+    "testsContract": {
+      "value": [
+        "**/*.contract.test.ts"
+      ],
+      "source": "default"
+    },
     "testsFullSuiteTriggers": {
       "value": [
         "bunfig.toml",

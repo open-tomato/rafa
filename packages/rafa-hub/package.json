@@ -4,15 +4,24 @@
   "description": "The rafa hub server: syncs effort stores between a team's devices.",
   "private": true,
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "type": "module",
   "bin": {
     "rafa-hub": "./src/bin.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "test": "bun test",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --build"
   },
   "dependencies": {
     "@open-tomato/rafa-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
   }
 }

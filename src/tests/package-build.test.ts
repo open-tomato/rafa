@@ -8,8 +8,9 @@
  * first three and phase 1's publishing stage the rest, so a target
  * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest and lockfile, its tsconfig files, the README, `src/` and
- * core's workspace package `packages/rafa/`) into a scratch directory and runs
+ * (its manifest and lockfile, its tsconfig files, the README, `src/`,
+ * core's workspace package `packages/rafa/` and the tsconfig base's
+ * `packages/typescript-config/`) into a scratch directory and runs
  * `bun run build` there,
  * the script as the manifest holds it, so nothing is written into the
  * repository's own `dist/`.
@@ -372,6 +373,14 @@
  * two `@types` links it exited 2 on 151 errors, the first
  * `Cannot find module 'node:async_hooks'`, both measured on 2026-10-14.
  *
+ * Both declaration passes, and the root's `tsconfig.packages.json`, extend
+ * `@open-tomato/rafa-typescript-config/base`, a workspace package `tsc`
+ * resolves through `node_modules`. The scratch package copies
+ * `packages/typescript-config` and links it under its name as `bun install`
+ * does, a relative link to the copy. Without the link the first `tsc` pass
+ * exits 1 on TS6053, the base file not found, and 36 of this file's 77
+ * cases failed, measured on 2026-10-15 with typescript 5.9.3.
+ *
  * Three mutations of `package.json` were driven on 2026-10-14, one run
  * of this file each, with the manifest restored byte-identical (sha256).
  * Dropping the `./config` exports entry reddened the exports map case
@@ -588,7 +597,6 @@ const PACKAGE_FILES = [
   // `bun pm pack` resolves the `workspace:*` devDependency on core's package through the lockfile.
   'bun.lock',
   'tsconfig.json',
-  'tsconfig.base.json',
   'tsconfig.packages.json',
   'tsconfig.config-types.json',
   'README.md',
@@ -596,6 +604,9 @@ const PACKAGE_FILES = [
 
 /** Core's workspace package, which the build reads core's source and first declarations pass from. */
 const CORE_PACKAGE_DIR = 'packages/rafa';
+
+/** The workspace package holding the tsconfig base every tsconfig extends: its directory and its name. */
+const TYPESCRIPT_CONFIG = ['packages/typescript-config', '@open-tomato/rafa-typescript-config'] as const;
 
 /** The installed packages the declaration step reads, linked into the scratch package; see the module note. */
 const TYPESCRIPT_PACKAGES = ['typescript', '@types/bun', '@types/node'];
@@ -746,6 +757,7 @@ beforeAll(() => {
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
   cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), { recursive: true });
+  linkTypeScriptConfig(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
@@ -780,6 +792,15 @@ function linkInstalled(dir: string, name: string): void {
 /** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
 function linkDefineConfig(dir: string): void {
   linkInstalled(dir, DEFINE_CONFIG);
+}
+
+/** Copies {@link TYPESCRIPT_CONFIG} into `dir` and links it under its name, as `bun install` does. */
+function linkTypeScriptConfig(dir: string): void {
+  const [packageDir, name] = TYPESCRIPT_CONFIG;
+  cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), { recursive: true });
+  const link = join(dir, 'node_modules', name);
+  mkdirSync(dirname(link), { recursive: true });
+  symlinkSync(relative(dirname(link), join(dir, packageDir)), link, 'dir');
 }
 
 /** Links {@link TYPESCRIPT_PACKAGES} into `dir`'s `node_modules`, and `tsc` into its `.bin`. */
