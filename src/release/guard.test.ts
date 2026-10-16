@@ -517,6 +517,59 @@ describe('readGuard over a bare origin and a clone', () => {
     expect(reading.problems).toEqual([]);
   });
 
+  describe('a package slot the base cannot fold', () => {
+    /** A branch off a `main` holding `files`, carrying one fragment of `pkg`. */
+    function packageBranch(files: Readonly<Record<string, string>> | null, pkg: string): World {
+      const w = world();
+      if (files !== null) {
+        w.commit(files, 'workspace');
+        w.git(['push', '-q', 'origin', 'main']);
+      }
+      w.git(['switch', '-q', '-c', 'feat/unfoldable']);
+      w.commit({
+        'src/b.ts': 'b\n',
+        '.changes/rafa-1.md': packageFragmentText('rafa-1', 'minor', pkg, '- Plugin: a feature'),
+      }, 'package fragment');
+      return w;
+    }
+
+    /** Expects no forecast and one problem naming `pkg`, which `guardLines` prints. */
+    function expectUnfolded(w: World, pkg: string, detail: string): void {
+      const reading = read(guard(w, 'feat/unfoldable'));
+      expect(reading.forecast).toBeNull();
+      expect(reading.problems).toHaveLength(1);
+      const problem = reading.problems[0] ?? '';
+      expect(problem).toContain(pkg);
+      expect(problem).toContain(detail);
+      expect(problem).toEndWith('so no forecast was folded');
+      expect(guardLines(reading, 'package.json')).toContain(`  note: ${problem}`);
+    }
+
+    it('answers no forecast for a package the base\'s workspace does not hold', () => {
+      const w = packageBranch(WORKSPACE_FILES, '@scope/missing');
+      expectUnfolded(w, '@scope/missing', 'holds no package');
+    });
+
+    it('answers no forecast for a private member, naming its manifest', () => {
+      const w = packageBranch(WORKSPACE_FILES, '@scope/core');
+      expectUnfolded(w, '@scope/core', 'packages/core/package.json');
+    });
+
+    it('answers no forecast for a member declaring no version, naming its manifest', () => {
+      const w = packageBranch({
+        ...WORKSPACE_FILES,
+        'packages/plugin/package.json': `${JSON.stringify({ name: '@scope/plugin' }, null, 2)}\n`,
+      }, '@scope/plugin');
+      expectUnfolded(w, '@scope/plugin', 'packages/plugin/package.json');
+    });
+
+    it('answers no forecast when the workspace is planted on the branch alone, the base still lacking it', () => {
+      const w = packageBranch(null, '@scope/plugin');
+      w.commit(WORKSPACE_FILES, 'workspace on the branch only');
+      expectUnfolded(w, '@scope/plugin', 'origin/main');
+    });
+  });
+
   it('folds a waiting fragment the branch edits once, in the branch\'s place', () => {
     const w = world();
     w.commit({ '.changes/rafa-5.md': fragmentText('rafa-5', 'patch', '- Loop: a fix') }, 'waiting fragment');
