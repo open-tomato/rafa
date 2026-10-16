@@ -1,16 +1,22 @@
 /**
- * The bundle guard over literal metafiles, shaped as `bun build
- * --metafile` writes them on bun 1.3.14: each input keyed by its path
- * relative to the build's working directory, each import by the absolute
- * path it reached, or by the bare specifier with `external: true` when
- * bun left it out. A publishable plugin and a private core are the two
- * members; each finding case has a control beside it that reads clean,
- * so no clean reading here is of a guard that could never fail.
+ * The bundle guard, in two halves. The first runs it over literal
+ * metafiles, shaped as `bun build --metafile` writes them on bun 1.3.14:
+ * each input keyed by its path relative to the build's working
+ * directory, each import by the absolute path it reached, or by the bare
+ * specifier with `external: true` when bun left it out. The last
+ * describe runs the script as a process over a planted workspace. A
+ * publishable plugin and a private core are the two members; each
+ * finding case has a control beside it that reads clean, so no clean
+ * reading here is of a guard that could never fail.
  */
 import type { BundleMetafile } from './bundle';
 import type { WorkspacePackage } from '../../src/release/workspace-packages.js';
 
-import { describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import {
   bundledPackageFiles,
@@ -18,6 +24,7 @@ import {
   externalsLine,
   findingLine,
   LIBRARY_ENTRIES,
+  NO_EXTERNALS_FLAG,
   parseBundleArgs,
   rootRelative,
 } from './bundle';
@@ -189,4 +196,109 @@ describe('parseBundleArgs', () => {
     expect(parseBundleArgs(['--root'], '/cwd')).toEqual({ ok: false, problem: '--root needs a value' });
     expect(parseBundleArgs(['--out', '--no-externals'], '/cwd')).toEqual({ ok: false, problem: '--out needs a value' });
   });
+});
+
+/** The script under test, run as `bun scripts/build/bundle.ts` would be. */
+const SCRIPT = resolve(import.meta.dir, 'bundle.ts');
+
+/** The checkout the script is run from, so its own imports resolve as they do in a build. */
+const CHECKOUT = resolve(import.meta.dir, '../..');
+
+/** A line only the publishable plugin's source holds. */
+const PLUGIN_MARKER = 'plugin-marker-6f1c2e';
+
+/** A line only the private core's source holds. */
+const CORE_MARKER = 'core-marker-93ab47';
+
+/** The files of the planted workspace, keyed by path relative to its root. */
+const PLANTED: Readonly<Record<string, string>> = {
+  'package.json': JSON.stringify({ name: 'scratch-root', version: '0.0.0', workspaces: ['packages/*'] }),
+  'tsconfig.json': JSON.stringify({
+    compilerOptions: {
+      module: 'ESNext',
+      moduleResolution: 'bundler',
+      paths: {
+        '@scope/plugin': ['./packages/plugin/src/index.ts'],
+        '@scope/core': ['./packages/core/src/index.ts'],
+      },
+    },
+  }),
+  'packages/plugin/package.json': JSON.stringify({ name: '@scope/plugin', version: '1.0.0' }),
+  'packages/plugin/src/index.ts': `export const pluginName = '${PLUGIN_MARKER}';\n`,
+  'packages/core/package.json': JSON.stringify({ name: '@scope/core', version: '1.0.0', private: true }),
+  'packages/core/src/index.ts': `export const coreName = '${CORE_MARKER}';\n`,
+  'src/rafa.ts': 'import { run } from \'./cli\';\n\nconsole.log(run());\n',
+  'src/cli.ts': [
+    'import { coreName } from \'@scope/core\';',
+    'import { pluginName } from \'@scope/plugin\';',
+    '',
+    'export function run(): string {',
+    '  return `${coreName} ${pluginName}`;',
+    '}',
+    '',
+  ].join('\n'),
+  ...Object.fromEntries(LIBRARY_ENTRIES.map((entry) => [entry, 'export const entry = true;\n'])),
+};
+
+/** What one run of the script said and left. */
+interface ScriptRun {
+  readonly exitCode: number;
+  readonly lines: readonly string[];
+  /** The text of `<out>/cli.js`. */
+  readonly bundle: string;
+}
+
+describe('bundle.ts as a process over a planted workspace', () => {
+  let root = '';
+
+  /** Runs the script on the planted root, writing the bundles to `out` under it. */
+  function runScript(out: string, extra: readonly string[]): ScriptRun {
+    const run = Bun.spawnSync(
+      [process.execPath, SCRIPT, '--root', root, '--out', out, ...extra],
+      { cwd: CHECKOUT, stderr: 'pipe', stdout: 'pipe' },
+    );
+    return {
+      exitCode: run.exitCode,
+      lines: run.stdout.toString().split('\n')
+        .filter((line) => line !== ''),
+      bundle: readFileSync(join(root, out, 'cli.js'), 'utf8'),
+    };
+  }
+
+  beforeAll(() => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'rafa-bundle-test-')));
+    for (const [path, text] of Object.entries(PLANTED)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test('keeps the publishable package out of the bundle, as its bare specifier, and bundles the private one', () => {
+    const run = runScript('dist', []);
+
+    expect(run.lines).toEqual([
+      'dist/cli.js built with externals: @scope/plugin',
+      'dist/ built with externals: @scope/plugin',
+    ]);
+    expect(run.exitCode).toBe(0);
+    expect(run.bundle).not.toContain(PLUGIN_MARKER);
+    expect(run.bundle).not.toContain('packages/plugin');
+    expect(run.bundle).toMatch(/from\s*["']@scope\/plugin["']/);
+    expect(run.bundle).toContain(CORE_MARKER);
+    expect(run.bundle).not.toMatch(/from\s*["']@scope\/core["']/);
+  }, 30_000);
+
+  test(`${NO_EXTERNALS_FLAG} exits 1 naming the plugin's file, its package and the importing file`, () => {
+    const run = runScript('dist-unguarded', [NO_EXTERNALS_FLAG]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.lines).toEqual([
+      'dist-unguarded/cli.js bundles packages/plugin/src/index.ts of @scope/plugin, imported by src/cli.ts',
+    ]);
+    expect(run.bundle).toContain(PLUGIN_MARKER);
+  }, 30_000);
 });
