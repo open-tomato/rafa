@@ -639,7 +639,7 @@ async function readPackages(root: string, files: readonly string[], mapPath: str
 export function unplacedLines(unplaced: readonly string[], mapPath: string): string[] {
   return unplaced.length === 0
     ? []
-    : [`test-index: ${unplaced.length} file(s) the map ${mapPath} lists nowhere:`, ...unplaced.map((path) => `  ${path}`)];
+    : [`test-index: ${unplaced.length} file(s) the map ${mapPath} places in no unit, by listing or by folder:`, ...unplaced.map((path) => `  ${path}`)];
 }
 
 /**

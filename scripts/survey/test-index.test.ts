@@ -482,14 +482,14 @@ describe('the record mode over a scratch repository', () => {
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
 
-  it('refuses naming each file the map lists nowhere, a test and the source file it reaches, and leaves the record as it was', async () => {
+  it('refuses naming each file the map places in no unit, a test and the source file it reaches, and leaves the record as it was', async () => {
     const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
     git(root, ['reset', '--quiet', '--hard', 'HEAD']);
     plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     git(root, ['add', '-A']);
     git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'stray']);
-    const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json lists nowhere:\n'
+    const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json places in no unit, by listing or by folder:\n'
       + '  src/stray/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
     await expect(main(root, RECORD_MODE)).rejects.toThrow(refusal);
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
@@ -562,7 +562,7 @@ describe('the guard over a scratch repository', () => {
     rmSync(join(root, 'src/a/fresh.test.ts'));
   });
 
-  it('exits 1 naming each file the map lists nowhere, with no test risen', () => {
+  it('exits 1 naming each file the map places in no unit, with no test risen', () => {
     plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     const run = runGuard(root, BASELINE_PATH);
@@ -571,7 +571,7 @@ describe('the guard over a scratch repository', () => {
       + '0 risen, 0 sorted, 0 unsorted (0 widened), 1 held, 0 new',
       'test-index: 0 gone, 0 not read, 0 unindexed still, 1 unplaced',
       '',
-      `test-index: 2 file(s) the map ${SCRATCH_MAP} lists nowhere:`,
+      `test-index: 2 file(s) the map ${SCRATCH_MAP} places in no unit, by listing or by folder:`,
       '  src/stray/stray.test.ts',
       '  src/stray/z.ts',
       '',
