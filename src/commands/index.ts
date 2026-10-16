@@ -62,6 +62,15 @@
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
+ * `release publish`, which runs `release.publishCommand` in each tagged
+ * unit's directory through `./release/tag-units.ts`,
+ * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * `release workflows`, which reads the ladder's files through
+ * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `src/release/templates.ts`, nor
+ * `release fragment`, which writes one change fragment through
+ * `src/release/fragment.ts` and reads the waiting ones through
+ * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
