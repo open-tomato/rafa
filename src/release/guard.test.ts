@@ -85,6 +85,11 @@ function fragmentText(plan: string, level: Fragment['level'], ...notes: readonly
   return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
+/** A fragment's text releasing the workspace package `pkg`. */
+function packageFragmentText(plan: string, level: Fragment['level'], pkg: string, ...notes: readonly string[]): string {
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: pkg, notes });
+}
+
 /** The base both sides of the 0.25.0 incident forked from. */
 const FORK_CHANGELOG = changelog(stamped('0.24.0', 'older', '- Loop: old line'));
 
@@ -408,6 +413,42 @@ describe('readGuard over a bare origin and a clone', () => {
     expect(broken.verdict).toEqual({ answer: 'missing', outside: ['src/d.ts'] });
     expect(broken.problems).toHaveLength(1);
     expect(broken.problems[0]).toContain('feat/broken\'s .changes/rafa-9.md does not count as a fragment');
+  });
+
+  it('holds a waiting package fragment out of the root forecast, and folds a waiting root fragment', () => {
+    const w = world();
+    w.git(['switch', '-q', '-c', 'feat/root']);
+    w.commit({ 'src/b.ts': 'b\n', '.changes/rafa-7.md': fragmentText('rafa-7', 'patch', '- Next: one hop') }, 'root fragment branch');
+    w.git(['switch', '-q', 'main']);
+    w.commit({
+      '.changes/rafa-4.md': packageFragmentText('rafa-4', 'major', '@scope/plugin', '- Plugin: a break'),
+      '.changes/rafa-5.md': fragmentText('rafa-5', 'minor', '- Loop: a feature'),
+    }, 'waiting fragments', '2026-09-20T12:00:00Z');
+    w.git(['push', '-q', 'origin', 'main']);
+
+    const reading = read(guard(w, 'feat/root'));
+    const forecast = reading.forecast;
+    if (forecast === null || !forecast.ok || forecast.forecast.kind !== 'ships') throw new Error('no shipping forecast');
+    expect(forecast.waiting).toEqual(['rafa-5']);
+    expect(forecast.forecast.version).toBe('0.25.0');
+    expect(forecast.forecast.section).toContain('<!-- rafa:fragments rafa-5 rafa-7 -->');
+    expect(reading.problems).toEqual([]);
+  });
+
+  it('folds the waiting fragments of the branch fragment\'s own package, the control beside the root case', () => {
+    const w = world();
+    w.git(['switch', '-q', '-c', 'feat/plugin']);
+    w.commit({ 'src/b.ts': 'b\n', '.changes/rafa-7.md': packageFragmentText('rafa-7', 'patch', '@scope/plugin', '- Plugin: a fix') }, 'plugin fragment branch');
+    w.git(['switch', '-q', 'main']);
+    w.commit({
+      '.changes/rafa-4.md': packageFragmentText('rafa-4', 'major', '@scope/plugin', '- Plugin: a break'),
+      '.changes/rafa-5.md': fragmentText('rafa-5', 'minor', '- Loop: a feature'),
+    }, 'waiting fragments', '2026-09-20T12:00:00Z');
+    w.git(['push', '-q', 'origin', 'main']);
+
+    const forecast = read(guard(w, 'feat/plugin')).forecast;
+    if (forecast === null || !forecast.ok) throw new Error('no forecast');
+    expect(forecast.waiting).toEqual(['rafa-4']);
   });
 
   it('folds a waiting fragment the branch edits once, in the branch\'s place', () => {

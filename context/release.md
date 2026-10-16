@@ -195,8 +195,10 @@ the right commit whether or not the remote has it.
 
 A preflight item in `rafa pr merge` (read also by `rafa pr triage`) runs the fold
 as a dry run over the base branch's current version and the fragments waiting
-there (the state at the time the branch was last pulled). It answers one of four
-classes:
+there (the state at the time the branch was last pulled) that name the branch
+fragment's package, or none for the root, as the pull request body's forecast
+does: a package fragment waiting there does not move the root's forecast. It
+answers one of four classes:
 
 - **`clean`**: A fragment is present and the branch changes neither the version
   file nor the changelog.

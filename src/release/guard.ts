@@ -83,6 +83,13 @@
  * edits is the branch's, folded once in the branch's place, as the
  * merge would leave one file at that path.
  *
+ * Only the waiting fragments whose `package` equals the package of the
+ * branch fragment in the forecast's last place (null with null, the
+ * root; null too when the branch carries none) are folded, as
+ * `./branch-forecast.ts` does: a package's fragment waiting on the base
+ * does not move the root's forecast, and one left out this way is not a
+ * problem line.
+ *
  * ## Both sides, and the fix
  *
  * A `stale` or `collision` answer names the branch with its pull
@@ -499,15 +506,6 @@ function dryFold(
   }
   const listed = readFragmentTree(git, base.commit, input.settings.releaseFragments);
   if (!listed.ok) return { forecast: { ok: false, ref: base.ref, problem: listed.problem, problems: [] }, problems: [] };
-  const problems: string[] = [];
-  const waiting: FoldFragment[] = [];
-  const own = new Set(branch.map((each) => each.id));
-  for (const each of listed.fragments) {
-    if (own.has(each.id)) continue;
-    if (each.reading.ok) waiting.push({ id: each.id, fragment: each.reading.fragment, addedOn: each.addedOn });
-    else problems.push(`${base.ref}'s ${each.path} was left out of the forecast: ${each.reading.sentence}`);
-  }
-
   const shipping = branch
     .map((each, index) => (each.fragment.level === 'none'
       ? -1
@@ -516,6 +514,19 @@ function dryFold(
   const last = shipping.at(-1) ?? branch.length - 1;
   const slot = branch[last] ?? null;
   const before = branch.filter((_, index) => index !== last);
+  const pkg = slot?.fragment.package ?? null;
+
+  const problems: string[] = [];
+  const waiting: FoldFragment[] = [];
+  const own = new Set(branch.map((each) => each.id));
+  for (const each of listed.fragments) {
+    if (own.has(each.id)) continue;
+    if (!each.reading.ok) {
+      problems.push(`${base.ref}'s ${each.path} was left out of the forecast: ${each.reading.sentence}`);
+    } else if (each.reading.fragment.package === pkg) {
+      waiting.push({ id: each.id, fragment: each.reading.fragment, addedOn: each.addedOn });
+    }
+  }
   const strategy = releaseStrategyFor(input.settings.releaseStrategy, { heading: input.settings.releaseHeading });
   const forecast = forecastRelease({ strategy, baseVersion: base.version, waiting: [...waiting, ...before], branch: slot });
   return {
