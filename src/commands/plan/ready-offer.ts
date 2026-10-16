@@ -44,6 +44,15 @@
  * The prompter is opened only to ask, through the command contract's
  * {@link lazyPrompter}, and closed as soon as the question is answered.
  *
+ * ## `issue ready` is loaded only to run
+ *
+ * `runIssueReady` is reached through a dynamic import of
+ * `../issue/ready.js`, made when the offer runs, which is once the
+ * route found an unlabelled issue on a terminal. `issue ready` is a
+ * command module of a feature, and a static import here would load it
+ * whenever `plan create`'s own module loads. The import of its types is
+ * erased at run time.
+ *
  * ## Nothing here spawns
  *
  * The terminal, the prompter and the run itself are all seams
@@ -52,13 +61,12 @@
  * waits on an answer.
  */
 import type { ReadyOffer, ReadyOfferRequest } from '../../board/plan-spec.js';
-import type { ReadyReport } from '../issue/ready.js';
+import type { ReadyReport, runIssueReady } from '../issue/ready.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { runIssueReady } from '../issue/ready.js';
 
 /** What the offer is: one run of `rafa issue ready` over an issue already read. */
 export type ReadyRun = typeof runIssueReady;
@@ -72,6 +80,16 @@ export interface ReadyOfferSeams {
   /** Makes the run; `runIssueReady` when left out. */
   readonly run?: ReadyRun;
 }
+
+/**
+ * `runIssueReady`, its module loaded only when an offer runs: `issue
+ * ready` is a feature command module, which `plan create` does not load
+ * with its own; see the module note.
+ */
+const runIssueReadyLazily: ReadyRun = async (options) => {
+  const { runIssueReady: run } = await import('../issue/ready.js');
+  return run(options);
+};
 
 /** The seams a `plan create` run offers with: the system's own, every one. */
 export const DEFAULT_OFFER_SEAMS: ReadyOfferSeams = Object.freeze({});
@@ -107,7 +125,7 @@ export function createPlanReadyOffer(seams: ReadyOfferSeams = DEFAULT_OFFER_SEAM
   if (!isTerminal()) return null;
 
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
-  const run = seams.run ?? runIssueReady;
+  const run = seams.run ?? runIssueReadyLazily;
 
   return async (request: ReadyOfferRequest): Promise<boolean> => {
     const { issue } = request;

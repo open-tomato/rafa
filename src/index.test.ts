@@ -616,6 +616,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['../plan/refs-check.js', ['registryRoster']],
+    ['./declarations.js', ['ISSUE_LIST_DECLARATION']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueProject', 'issueSubjectConfig', 'keepsBoard', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readTextFlag', 'resolveIssueTracker']],
     ['./roadmap-check.js', ['EPIC_CHECK_EXIT', 'epicCheckFailure']],
     ['./roadmap-epic-table.js', ['renderEpicTable']],
@@ -623,6 +624,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/issue/show.js', [
     ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./declarations.js', ['ISSUE_SHOW_DECLARATION']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
   ]],
   ['./commands/issue/create.js', [
@@ -635,15 +637,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
     ['./create-bug.js', ['BUG_FLAGS', 'readBugLine']],
+    ['./declarations.js', ['DEFAULT_ISSUE_TYPE', 'ISSUE_CREATE_DECLARATION']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'onTracker', 'readChoiceFlag', 'readNonBlankFlag', 'readRequiredFlag', 'readTextFlag', 'resolveIssueTracker', 'urlLines']],
   ]],
   ['./commands/issue/comment.js', [
     ['../plan/plan-files.js', ['expectOneArgument']],
+    ['./declarations.js', ['ISSUE_COMMENT_DECLARATION']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
   ]],
   ['./commands/issue/move.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
+    ['./declarations.js', ['ISSUE_MOVE_DECLARATION']],
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueProject', 'issueRef', 'issueSubjectConfig', 'onTracker', 'readChoice', 'resolveIssueTracker']],
     ['./move-project.js', ['refreshMovedIssue']],
   ]],
@@ -660,7 +665,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard']],
     ['../../board/readiness.js', ['hasSpecReadyLabel', 'READINESS_REFUSAL_EXIT', 'requireCompleteSpec', 'SPEC_READY_LABEL']],
     ['../../board/trust.js', ['ghBoardTrust', 'requireTrustedBoardAuthor']],
-    ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
+    ['../../next/ending.js', ['endWithNextStep']],
+    ['./declarations.js', ['ISSUE_READY_DECLARATION', 'READY_DRY_RUN_FLAG', 'READY_YES_FLAG']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/unblock.js', [
@@ -669,6 +675,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/blocked.js', ['SPEC_BLOCKED_LABEL']],
     ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard', 'refreshFailedWarning', 'refreshIssueItems']],
     ['../../board/unblock.js', ['isUnblockFailure', 'runUnblock']],
+    ['./declarations.js', ['ISSUE_UNBLOCK_DECLARATION', 'UNBLOCK_ALL_FLAG', 'UNBLOCK_YES_FLAG']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'refreshNativeUnblock', 'unblockRelationshipsMode']],
   ]],
@@ -682,12 +689,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../refs/verify.js', ['RefVerifyError']],
     ['../plan/plan-files.js', ['readSwitch']],
     ['../plan/refs-check.js', ['createPlanRefsVerifier', 'registryRoster']],
+    ['./declarations.js', ['ISSUE_CHECK_DECLARATION', 'STAMP_FLAG']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
-    ['./edit-priority.js', ['PRIORITY_FLAG']],
+    ['./declarations.js', ['ISSUE_EDIT_DECLARATION']],
     ['./edit-run.js', ['editIssue', 'renderEditReport']],
   ]],
   ['./commands/pr/current.js', [
@@ -1357,8 +1364,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/roadmap.js', [
+    ['./issue/declarations.js', ['ISSUE_LIST_FLAGS']],
     ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
-    ['./issue/list.js', ['ISSUE_LIST_FLAGS', 'runIssueList']],
+    ['./issue/list.js', ['runIssueList']],
   ]],
   ['./commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],

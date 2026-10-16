@@ -30,8 +30,9 @@
 import type { IssueSeams } from './issue/issue-tracker.js';
 import type { RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
+import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
 import { DEFAULT_ISSUE_SEAMS } from './issue/issue-tracker.js';
-import { ISSUE_LIST_FLAGS, runIssueList } from './issue/list.js';
+import { runIssueList } from './issue/list.js';
 
 /** The `issue list` flags `rafa roadmap` leaves undeclared: the one it sets, and the one refused beside it. */
 const NOT_DECLARED: readonly string[] = ['roadmap', 'state'];

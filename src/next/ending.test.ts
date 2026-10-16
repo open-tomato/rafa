@@ -49,10 +49,11 @@
  * and their inner run writes a plan or runs a whole loop, so neither is
  * driven here. What IS held: the wrapper's own behaviour, over a stub
  * inner command, in the block above; and, in the last block, that all
- * six declare {@link HINT_FLAG_SPEC}, the three `pr` commands as an
- * equal copy (`src/commands/pr/declarations.ts`, which imports no
- * module under `src/`) and the other three by IDENTITY, with no other
- * core command declaring the flag as the control. That the two modules reach
+ * six declare {@link HINT_FLAG_SPEC}, the three `pr` commands and
+ * `issue ready` as an equal copy (`src/commands/pr/declarations.ts` and
+ * `src/commands/issue/declarations.ts`, which import no module under
+ * `src/`) and the other two by IDENTITY, with no other core command
+ * declaring the flag as the control. That the two modules reach
  * `endingWith` and that spec at all is held a third way, by the import
  * case of `src/index.test.ts`, which spells the imports each command
  * module takes.
@@ -462,11 +463,11 @@ describe('the six commands that end with it', () => {
   /** The six, as the modules that declare them export them. */
   const SIX: readonly RafaCommand[] = [prMerge, prWait, prTriage, planCreate, issueReady, loopStart];
 
-  it('declares this flag spec on all six, the three pr commands as their declarations\' copy, so their help reads the same', () => {
+  it('declares this flag spec on all six, the pr commands and issue ready as their declarations\' copy, so their help reads the same', () => {
     const declared = SIX.map((command) => command.flags.some((flag) => Bun.deepEquals(flag, HINT_FLAG_SPEC, true)));
 
     expect(declared).toEqual(SIX.map(() => true));
-    expect(SIX.map((command) => command.flags.includes(HINT_FLAG_SPEC))).toEqual([false, false, false, true, true, true]);
+    expect(SIX.map((command) => command.flags.includes(HINT_FLAG_SPEC))).toEqual([false, false, false, true, false, true]);
     expect(SIX.map((command) => `${command.subject} ${command.action}`)).toEqual([
       'pr merge',
       'pr wait',
