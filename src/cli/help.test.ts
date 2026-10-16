@@ -76,7 +76,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { commandSpelling } from '@open-tomato/rafa/core/command';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
+import { CORE_REGISTRY, ROSTER_SUBJECTS } from '../commands/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -265,8 +265,8 @@ describe('the frozen help snapshots', () => {
 
   it('differs from the root snapshot once one command leaves the roster, so the comparison can fail', () => {
     const lessDescribe = createCommandRegistry({
-      subjects: CORE_SUBJECTS,
-      commands: CORE_COMMANDS.filter((held) => commandSpelling(held) !== 'describe'),
+      subjects: ROSTER_SUBJECTS,
+      commands: CORE_REGISTRY.commands({ includeHidden: true }).filter((held) => commandSpelling(held) !== 'describe'),
     });
     const snapshot = readSnapshot('rafa.txt');
 

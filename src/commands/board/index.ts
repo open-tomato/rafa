@@ -12,9 +12,10 @@
  * the command (`packages/rafa/src/core/command/lazy.ts`).
  *
  * The subjects and the commands are in roster order, the order
- * `CORE_SUBJECTS` and `CORE_COMMANDS` (`src/commands/index.ts`) list
- * them in. `index.test.ts` holds each command's spelling to its
- * declaration's, and each loaded module's command to its declaration.
+ * `ROSTER_SUBJECTS` lists the subjects in and `createRosterRegistry`
+ * (`src/commands/index.ts`) registers the commands in. `index.test.ts`
+ * holds each command's spelling to its declaration's, and each loaded
+ * module's command to its declaration.
  */
 import type { CommandFeature } from '@open-tomato/rafa/core/command';
 

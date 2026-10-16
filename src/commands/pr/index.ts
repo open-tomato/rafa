@@ -10,10 +10,10 @@
  * declared command, refuses with exit 1 naming the feature, `pr`, and
  * the command (`packages/rafa/src/core/command/lazy.ts`).
  *
- * The commands are in roster order, the order `CORE_COMMANDS`
- * (`src/commands/index.ts`) lists them in. `index.test.ts` holds each
- * one's spelling to its declaration's, and each loaded module's command
- * to its declaration.
+ * The commands are in roster order, the order `createRosterRegistry`
+ * (`src/commands/index.ts`) registers them in. `index.test.ts` holds
+ * each one's spelling to its declaration's, and each loaded module's
+ * command to its declaration.
  */
 import type { CommandFeature } from '@open-tomato/rafa/core/command';
 

@@ -1,6 +1,8 @@
 /**
- * Tests for the core roster (`src/commands/index.ts`) and the
+ * Tests for the roster (`src/commands/index.ts`) and the
  * declarations of the commands it registers: what the registry holds,
+ * what `createRosterRegistry` leaves out for a feature turned off and
+ * the name it refuses,
  * how each spelling of the command tree routes, with the deprecation
  * line each alias prints, and that each command wrapping a phase 0
  * command declares the flags its phase 0 module reads.
@@ -70,7 +72,7 @@
  * roster order case and the refusal listing the actions of `effort`.
  */
 import type { DispatchOutcome } from '../cli/dispatch.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import '../adapter-registry.js';
@@ -93,7 +95,7 @@ import { RUN_FEATURE } from './claim/index.js';
 import { PR_FEATURE } from './pr/index.js';
 import { RELEASE_FEATURE } from './release/index.js';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
+import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRosterRegistry, ROSTER_SUBJECTS } from './index.js';
 
 /** The `src/` directory, which the phase 0 modules sit in. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -436,8 +438,11 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['describe', 'describe', [], ''],
 ];
 
-/** Each core command by its spelling. */
-const COMMANDS = CORE_COMMANDS.map((command): [string, RafaCommand] => [commandSpelling(command), command]);
+/** Every command the roster registers, hidden ones included: core's, then each bundled feature's. */
+const ROSTER_COMMANDS = CORE_REGISTRY.commands({ includeHidden: true });
+
+/** Each command of the roster by its spelling. */
+const COMMANDS = ROSTER_COMMANDS.map((command): [string, RafaCommand] => [commandSpelling(command), command]);
 
 /** What one line ran, and what it wrote. */
 interface Dispatched {
@@ -464,7 +469,7 @@ function memoryStream(): { stream: OutputStream; text: () => string } {
 /** Dispatches the words of `line` over the roster, each command recording what it was handed in place of running. */
 async function dispatchRecorded(line: string): Promise<Dispatched> {
   const ran: (readonly [string, readonly string[]])[] = [];
-  const commands = CORE_COMMANDS.map((command): RafaCommand => ({
+  const commands = ROSTER_COMMANDS.map((command): RafaCommand => ({
     ...command,
     run: async (context) => {
       ran.push([commandSpelling(command), [...context.argv]]);
@@ -473,7 +478,7 @@ async function dispatchRecorded(line: string): Promise<Dispatched> {
   const stdout = memoryStream();
   const stderr = memoryStream();
   const outcome = await dispatch(line.split(' ').filter((word) => word.length > 0), {
-    registry: createCommandRegistry({ subjects: CORE_SUBJECTS, commands }),
+    registry: createCommandRegistry({ subjects: ROSTER_SUBJECTS, commands }),
     env: {},
     stdout: stdout.stream,
     stderr: stderr.stream,
@@ -538,10 +543,11 @@ const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8')
 describe('the core roster', () => {
   it('registers the nineteen subjects with an action, in roster order', () => {
     expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug', 'docs']);
-    expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
+    expect(CORE_REGISTRY.subjects()).toEqual([...ROSTER_SUBJECTS]);
+    expect(ROSTER_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers core\'s commands in roster order, top-level ones last, then the commands of the board, pr, run and release features in theirs, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -556,25 +562,6 @@ describe('the core roster', () => {
       'loop status',
       'loop list',
       'loop wait',
-      'issue list',
-      'issue show',
-      'issue create',
-      'issue comment',
-      'issue move',
-      'issue ready',
-      'issue unblock',
-      'issue check',
-      'issue edit',
-      'pr current',
-      'pr show',
-      'pr view',
-      'pr open',
-      'pr retarget',
-      'pr close',
-      'pr list',
-      'pr wait',
-      'pr merge',
-      'pr triage',
       'effort collect',
       'effort report',
       'effort dashboard',
@@ -602,22 +589,6 @@ describe('the core roster', () => {
       'instinct show',
       'instinct flag',
       'instinct promote',
-      'release status',
-      'release settle',
-      'release tag',
-      'board list',
-      'board sync',
-      'epic show',
-      'epic new',
-      'epic defer',
-      'epic promote',
-      'epic move',
-      'epic close',
-      'epic cancel',
-      'claim release',
-      'claim hand',
-      'claim accept',
-      'claim take',
       'update current',
       'update self',
       'update project',
@@ -643,13 +614,48 @@ describe('the core roster', () => {
       'cleanup',
       'self-update',
       'describe',
+      'issue list',
+      'issue show',
+      'issue create',
+      'issue comment',
+      'issue move',
+      'issue ready',
+      'issue unblock',
+      'issue check',
+      'issue edit',
+      'board list',
+      'board sync',
+      'epic show',
+      'epic new',
+      'epic defer',
+      'epic promote',
+      'epic move',
+      'epic close',
+      'epic cancel',
+      'pr current',
+      'pr show',
+      'pr view',
+      'pr open',
+      'pr retarget',
+      'pr close',
+      'pr list',
+      'pr wait',
+      'pr merge',
+      'pr triage',
+      'claim release',
+      'claim hand',
+      'claim accept',
+      'claim take',
+      'release status',
+      'release settle',
+      'release tag',
     ]);
-    expect(CORE_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
-    expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length - 2);
+    expect(ROSTER_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
+    expect(CORE_REGISTRY.commands()).toHaveLength(ROSTER_COMMANDS.length - 2);
   });
 
   it('runs every command inside a project but module exec, the two checkers, the seven update stubs, init and describe, which declare needsProject false', () => {
-    const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
+    const outside = ROSTER_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);
   });
@@ -663,47 +669,15 @@ describe('the core roster', () => {
       ]);
   });
 
-  it('lists the pr subject and the pr commands PR_FEATURE declares, each its lazy command less the run', () => {
-    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
-      Object.entries(command).filter(([field]) => field !== 'run'),
-    );
+  it.each(BUNDLED_FEATURES.map((feature): [string, CommandFeature] => [feature.name, feature]))('registers the subjects and the very commands the %s feature declares, which CORE_SUBJECTS and CORE_COMMANDS hold none of', (_name, feature) => {
+    const subjects = feature.subjects.map((subject) => subject.name);
+    const registered = subjects.flatMap((subject) => CORE_REGISTRY.actionsOf(subject, { includeHidden: true }));
 
-    expect(CORE_SUBJECTS.filter((subject) => subject.name === 'pr')).toEqual([...PR_FEATURE.subjects]);
-    expect(CORE_COMMANDS.filter((command) => command.subject === 'pr').map(lessRun))
-      .toEqual(PR_FEATURE.commands.map(lessRun));
-  });
-
-  it('lists the issue, board and epic subjects and commands BOARD_FEATURE declares, each its lazy command less the run', () => {
-    const subjects = BOARD_FEATURE.subjects.map((subject) => subject.name);
-    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
-      Object.entries(command).filter(([field]) => field !== 'run'),
-    );
-
-    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([...BOARD_FEATURE.subjects]);
-    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? '')).map(lessRun))
-      .toEqual(BOARD_FEATURE.commands.map(lessRun));
-  });
-
-  it('lists the claim subject and commands RUN_FEATURE declares, each its lazy command less the run', () => {
-    const subjects = RUN_FEATURE.subjects.map((subject) => subject.name);
-    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
-      Object.entries(command).filter(([field]) => field !== 'run'),
-    );
-
-    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([...RUN_FEATURE.subjects]);
-    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? '')).map(lessRun))
-      .toEqual(RUN_FEATURE.commands.map(lessRun));
-  });
-
-  it('lists the release subject and commands RELEASE_FEATURE declares, each its lazy command less the run', () => {
-    const subjects = RELEASE_FEATURE.subjects.map((subject) => subject.name);
-    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
-      Object.entries(command).filter(([field]) => field !== 'run'),
-    );
-
-    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([...RELEASE_FEATURE.subjects]);
-    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? '')).map(lessRun))
-      .toEqual(RELEASE_FEATURE.commands.map(lessRun));
+    expect(ROSTER_SUBJECTS.filter((subject) => subjects.includes(subject.name)).map((subject) => feature.subjects.indexOf(subject)))
+      .toEqual(feature.subjects.map((_subject, index) => index));
+    expect(registered.map((command) => feature.commands.indexOf(command))).toEqual(feature.commands.map((_command, index) => index));
+    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([]);
+    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? ''))).toEqual([]);
   });
 
   it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and its outputs', (spelling, command) => {
@@ -717,15 +691,67 @@ describe('the core roster', () => {
 });
 
 describe('the module note\'s count word', () => {
-  it('names the roster at exactly CORE_COMMANDS.length', () => {
+  it('names the roster at exactly the count of the commands CORE_REGISTRY holds', () => {
     const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:-[a-z]+)?) registered so far/);
 
     expect(match).not.toBeNull();
-    expect(numberWord(match?.[1] ?? '')).toBe(CORE_COMMANDS.length);
+    expect(numberWord(match?.[1] ?? '')).toBe(ROSTER_COMMANDS.length);
   });
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
-    expect(numberWord('forty-two')).not.toBe(CORE_COMMANDS.length);
+    expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-five')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-five')).not.toBe(ROSTER_COMMANDS.length);
+  });
+});
+
+/** Where each of `commands` sits in the roster with every feature on: -1 for one it does not hold. */
+function rosterPlaces(commands: readonly RafaCommand[]): number[] {
+  return commands.map((command) => ROSTER_COMMANDS.indexOf(command));
+}
+
+describe('createRosterRegistry', () => {
+  it('bundles the board, pr, run and release features, in that order', () => {
+    expect(BUNDLED_FEATURES.map((feature) => feature.name)).toEqual(['board', 'pr', 'run', 'release']);
+    expect([BOARD_FEATURE, PR_FEATURE, RUN_FEATURE, RELEASE_FEATURE].map((feature) => BUNDLED_FEATURES.indexOf(feature)))
+      .toEqual([0, 1, 2, 3]);
+  });
+
+  it('holds the 100 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+    const registry = createRosterRegistry();
+
+    expect(registry.commands({ includeHidden: true })).toHaveLength(100);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
+    expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(100);
+  });
+
+  it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
+    const registry = createRosterRegistry({ off: ['pr'] });
+    const kept = ROSTER_COMMANDS.filter((command) => command.subject !== 'pr');
+
+    expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
+    expect(PR_FEATURE.commands).toHaveLength(10);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(90);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
+    expect(registry.subjects().map((subject) => subject.name))
+      .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));
+    expect([registry.subjectOf('pr'), registry.find('pr', 'list')]).toEqual([undefined, undefined]);
+    expect(registry.actionsOf('pr', { includeHidden: true })).toEqual([]);
+  });
+
+  it('holds CORE_SUBJECTS and CORE_COMMANDS alone with all four features off', () => {
+    const registry = createRosterRegistry({ off: ['board', 'pr', 'run', 'release'] });
+
+    expect(registry.subjects()).toEqual([...CORE_SUBJECTS]);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(CORE_COMMANDS));
+    expect(registry.commands({ includeHidden: true })).toHaveLength(CORE_COMMANDS.length);
+  });
+
+  it('refuses a name in off that is no bundled feature\'s, naming the four, and builds no registry', () => {
+    expect(() => createRosterRegistry({ off: ['pr', 'prs'] }))
+      .toThrow('rafa: cannot build the roster: no bundled feature is named "prs"; the features are board, pr, run, release');
+    expect(() => createRosterRegistry({ off: ['claim'] })).toThrow('no bundled feature is named "claim"');
   });
 });
 

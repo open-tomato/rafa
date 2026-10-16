@@ -60,7 +60,7 @@
  */
 import type { NextEndingSeams } from './ending.js';
 import type { NextState } from './state.js';
-import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { CommandRegistry, RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
@@ -478,10 +478,11 @@ describe('the six commands that end with it', () => {
     ]);
   });
 
-  it('is declared by no other core command, which is the control', async () => {
-    const { CORE_COMMANDS } = await import('../commands/index.js') as { CORE_COMMANDS: readonly RafaCommand[] };
-    const others = CORE_COMMANDS
-      .filter((command) => !SIX.includes(command))
+  it('is declared by no other command of the roster, which is the control', async () => {
+    const { CORE_REGISTRY } = await import('../commands/index.js') as { CORE_REGISTRY: CommandRegistry };
+    const six = SIX.map((command) => `${command.subject} ${command.action}`);
+    const others = CORE_REGISTRY.commands({ includeHidden: true })
+      .filter((command) => !six.includes(`${command.subject} ${command.action}`))
       .filter((command) => command.flags.some((flag) => flag.name === HINT_FLAG));
 
     expect(others.map((command) => command.name)).toEqual([]);
