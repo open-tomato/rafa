@@ -2900,8 +2900,10 @@ refused config list no module action and say nothing of why.
   actions, or that none is mounted.
 - **The entries register core.** `src/rafa.ts` and `src/index.ts` call
   `registerCoreConfigSections` (`src/config-registry.ts`), then
-  `registerCoreAdapters` (`src/adapter-registry.ts`), in place of the
-  effect imports a bundler drops under `"sideEffects": false`. The test
+  `registerCoreAdapters` (`src/adapter-registry.ts`), so the entries hold
+  under a manifest declaring `"sideEffects": false`, which the root
+  manifest does not declare today because bun 1.3.14's split build breaks
+  under it (#1213). The test
   suite gets the same two calls from `src/tests/preload.ts`, which
   `bunfig.toml` names under `[test] preload`; a child process a test
   spawns runs no preload and calls the entries itself.

@@ -15,6 +15,13 @@
  * the script as the manifest holds it, so nothing is written into the
  * repository's own `dist/`.
  *
+ * The manifest declares no `sideEffects` field, and every build this file
+ * reads was taken without one: under `"sideEffects": false` bun 1.3.14's
+ * `--splitting` build wrote library entries that failed to parse, so the
+ * field went and #1213 keeps the goal of declaring it again. The entries
+ * call their composition roots, `registerCoreConfigSections` and
+ * `registerCoreAdapters`, either way, so they hold under the field too.
+ *
  * ## What each clause of the build script is for
  *
  * Each clause answers a reading taken on bun 1.3.14:
@@ -548,9 +555,6 @@ const PUBLISH_CONFIG = {
 
 /** The engine the build targets, and the only one the manifest names. */
 const ENGINES = { bun: '>=1.3.14' };
-
-/** The manifest's `sideEffects`: false lets the bundler drop an unused import, so the entries call their roots. */
-const SIDE_EFFECTS = false;
 
 /** The manifest's `module`: the root of the exports map, which the build writes. */
 const MODULE = './dist/index.js';
@@ -1111,8 +1115,8 @@ describe('the package manifest', () => {
     expect(readManifest()['engines']).toEqual(ENGINES);
   });
 
-  it('declares no side effects, so the entries must call the composition roots', () => {
-    expect(readManifest()['sideEffects']).toBe(SIDE_EFFECTS);
+  it('declares no sideEffects field, which bun 1.3.14\'s split build cannot take (#1213); the entries call the composition roots regardless', () => {
+    expect('sideEffects' in readManifest()).toBe(false);
   });
 
   it('points module at the built root export, not at a source placeholder', () => {
