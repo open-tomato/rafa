@@ -121,9 +121,9 @@
  * type names the entry now exports compiled, and one naming
  * `RootCandidates` (`src/project/roots.ts`), which the entry leaves out,
  * failed with TS2305. That tsconfig sets `module` to `ESNext`, as the
- * repository's does: on `tsconfig.base.json` alone both probes also
- * failed with TS1343, on the `import.meta` reads of `src/plan.ts` and
- * `src/start.ts`.
+ * repository's does: on `packages/typescript-config/base.json` alone both
+ * probes also failed with TS1343, on the `import.meta` reads of
+ * `src/plan.ts` and `src/start.ts`.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

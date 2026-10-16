@@ -938,6 +938,9 @@ The full guide, with the spec template explained, a prompt for drafting
 a spec, epics, boards and every gate in order, is
 [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md).
 
+The version policy, the bump levels, which package publishes and the
+`REFACTOR_NEEDED.md` rule are in [docs/versioning.md](docs/versioning.md).
+
 ## From a checkout
 
 To install dependencies:

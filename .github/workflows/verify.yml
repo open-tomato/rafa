@@ -39,3 +39,35 @@ jobs:
       - name: Types
         if: ${{ !cancelled() }}
         run: bun run check-types
+
+  affected:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/integration' }}
+      TURBO_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Affected
+        if: ${{ !cancelled() }}
+        run: bun run verify:affected
+
+      - name: References
+        if: ${{ !cancelled() }}
+        run: bunx tsc --build tsconfig.references.json
+
+      - name: Graph
+        if: ${{ !cancelled() }}
+        run: bun scripts/workspace/graph-check.ts

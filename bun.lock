@@ -9,6 +9,8 @@
         "@eslint/markdown": "^8.0.3",
         "@open-tomato/define-config": "0.5.0",
         "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/rafa-typescript-config": "workspace:*",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/bun": "^1.4.0",
         "@types/node": "^26.4.1",
@@ -19,13 +21,42 @@
         "eslint-plugin-jsonc": "^3.4.2",
         "globals": "^17.12.0",
         "jsonc-eslint-parser": "^3.1.0",
+        "turbo": "^2.11.8",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.69.0",
+      },
+    },
+    "packages/eslint-config": {
+      "name": "@open-tomato/rafa-eslint-config",
+      "version": "0.0.0",
+      "dependencies": {
+        "@eslint/js": "^9.39.4",
+        "@eslint/markdown": "^8.0.3",
+        "@stylistic/eslint-plugin": "^5.10.0",
+        "@typescript-eslint/parser": "^8.69.0",
+        "eslint": "^9.39.4",
+        "eslint-import-resolver-typescript": "^4.4.4",
+        "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-jsonc": "^3.4.2",
+        "globals": "^17.12.0",
+        "jsonc-eslint-parser": "^3.1.0",
+        "typescript-eslint": "^8.69.0",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
       },
     },
     "packages/rafa": {
       "name": "@open-tomato/rafa-core",
       "version": "0.45.0",
+      "dependencies": {
+        "@open-tomato/define-config": "0.5.0",
+      },
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
     "packages/rafa-hub": {
       "name": "@open-tomato/rafa-hub",
@@ -36,12 +67,31 @@
       "dependencies": {
         "@open-tomato/rafa-core": "workspace:*",
       },
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
     },
     "packages/rafa-sync-service": {
       "name": "@open-tomato/rafa-sync-service",
       "version": "0.0.0",
       "dependencies": {
         "@open-tomato/rafa-core": "workspace:*",
+      },
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/typescript-config": {
+      "name": "@open-tomato/rafa-typescript-config",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
       },
     },
   },
@@ -88,9 +138,13 @@
 
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
 
+    "@open-tomato/rafa-eslint-config": ["@open-tomato/rafa-eslint-config@workspace:packages/eslint-config"],
+
     "@open-tomato/rafa-hub": ["@open-tomato/rafa-hub@workspace:packages/rafa-hub"],
 
     "@open-tomato/rafa-sync-service": ["@open-tomato/rafa-sync-service@workspace:packages/rafa-sync-service"],
+
+    "@open-tomato/rafa-typescript-config": ["@open-tomato/rafa-typescript-config@workspace:packages/typescript-config"],
 
     "@ota-meshi/ast-token-store": ["@ota-meshi/ast-token-store@0.3.0", "", {}, "sha512-XRO0zi2NIUKq2lUk3T1ecFSld1fMWRKE6naRFGkgkdeosx7IslyUKNv5Dcb5PJTja9tHJoFu0v/7yEpAkrkrTg=="],
 
@@ -99,6 +153,18 @@
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
 
     "@stylistic/eslint-plugin": ["@stylistic/eslint-plugin@5.10.0", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.9.1", "@typescript-eslint/types": "^8.56.0", "eslint-visitor-keys": "^4.2.1", "espree": "^10.4.0", "estraverse": "^5.3.0", "picomatch": "^4.0.3" }, "peerDependencies": { "eslint": "^9.0.0 || ^10.0.0" } }, "sha512-nPK52ZHvot8Ju/0A4ucSX1dcPV2/1clx0kLcH5wDmrE4naKso7TUC/voUyU1O9OTKTrR6MYip6LP0ogEMQ9jPQ=="],
+
+    "@turbo/darwin-64": ["@turbo/darwin-64@2.11.8", "", { "os": "darwin", "cpu": "x64" }, "sha512-u+6s4C2hskRYx6MkW2uT7BCW6sESCL/+5bjHDDWUfQfQliCSJ7lAHAL6RQaw0an9WU6nJvwYgT786mEWul2kDw=="],
+
+    "@turbo/darwin-arm64": ["@turbo/darwin-arm64@2.11.8", "", { "os": "darwin", "cpu": "arm64" }, "sha512-y3qpPbclA4MuzAf/pSp6ivifp2mBCiLMHyf/bVq2eAJLjTnzev9JG5eqFhM0UvDGi0b3QKRNZi2HiavPnLbEbw=="],
+
+    "@turbo/linux-64": ["@turbo/linux-64@2.11.8", "", { "os": [ "linux", "android", ], "cpu": "x64" }, "sha512-5Pm0icIkXPjk/HxhZD2AFMCyfH8RlITgtOksoSAdeLtXHAagzAqaAkdqG+6Ebd3eGPT1k3nJZWQD4wCLlIte5g=="],
+
+    "@turbo/linux-arm64": ["@turbo/linux-arm64@2.11.8", "", { "os": [ "linux", "android", ], "cpu": "arm64" }, "sha512-gh/Pcg7WVLS22SpoFqNxs/4y6feU/+Qa9nkCLTOHMTLjE3ADeqMjLFulq1LVCsWD2vjQccCnaZSUOLJ/lHzBRQ=="],
+
+    "@turbo/windows-64": ["@turbo/windows-64@2.11.8", "", { "os": "win32", "cpu": "x64" }, "sha512-NnHtcWPE6PymlYsCKEuYditlY/nMeCEB3xyD4yc3cpqpxW7/4Xqdlqd5TpqvEpjS8CDazPHelGCQS/ghUIoZ6g=="],
+
+    "@turbo/windows-arm64": ["@turbo/windows-arm64@2.11.8", "", { "os": "win32", "cpu": "arm64" }, "sha512-o8UyM/VlYCvW5Enfo2O37Pe11p3wmnEYtJrohXA2SyOlehmo5KyXpptPRKrXOMNfdmoYEulo6Nhj0tIv2UB0hA=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg=="],
 
@@ -671,6 +737,8 @@
     "tsconfig-paths": ["tsconfig-paths@3.15.0", "", { "dependencies": { "@types/json5": "^0.0.29", "json5": "^1.0.2", "minimist": "^1.2.6", "strip-bom": "^3.0.0" } }, "sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg=="],
 
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
+
+    "turbo": ["turbo@2.11.8", "", { "optionalDependencies": { "@turbo/darwin-64": "2.11.8", "@turbo/darwin-arm64": "2.11.8", "@turbo/linux-64": "2.11.8", "@turbo/linux-arm64": "2.11.8", "@turbo/windows-64": "2.11.8", "@turbo/windows-arm64": "2.11.8" }, "bin": { "turbo": "bin/turbo" } }, "sha512-OwiFs6xNO5c2XtPgYCgCXuSlkur4b5T/OeAbOKzgsHh5mmJ9Sh7m041fz2JchrvyQv8hmae+1n07HfBmvDLZRA=="],
 
     "type-check": ["type-check@0.4.0", "", { "dependencies": { "prelude-ls": "^1.2.1" } }, "sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew=="],
 

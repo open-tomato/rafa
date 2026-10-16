@@ -1,0 +1,40 @@
+{
+  "name": "@open-tomato/rafa-eslint-config",
+  "version": "0.0.0",
+  "description": "The shared flat ESLint config every rafa config builds on: the plugins, the shared rules and the ar/no-unsafe-unicode rule, in one place.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./base.mjs",
+    "./base": "./base.mjs"
+  },
+  "files": [
+    "base.mjs",
+    "sharedRules.mjs",
+    "rules"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.4",
+    "@eslint/markdown": "^8.0.3",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@typescript-eslint/parser": "^8.69.0",
+    "eslint": "^9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsonc": "^3.4.2",
+    "globals": "^17.12.0",
+    "jsonc-eslint-parser": "^3.1.0",
+    "typescript-eslint": "^8.69.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

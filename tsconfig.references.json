@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // The solution file: `tsc --build tsconfig.references.json` builds every
+  // composite workspace member in dependency order and refuses a cycle.
+  "files": [],
+  "references": [
+    { "path": "./packages/rafa" },
+    { "path": "./packages/rafa-hub" },
+    { "path": "./packages/rafa-sync-service" }
+  ]
+}

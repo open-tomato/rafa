@@ -21,7 +21,8 @@ ARG BUN_VERSION=1.3.14
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /repo
-COPY package.json tsconfig.base.json tsconfig.packages.json ./
+COPY package.json tsconfig.packages.json ./
+COPY packages/typescript-config ./packages/typescript-config
 COPY src ./src
 COPY packages/rafa-hub ./packages/rafa-hub
 RUN bun build packages/rafa-hub/src/bin.ts --target=bun --outfile=/out/rafa-hub.js
