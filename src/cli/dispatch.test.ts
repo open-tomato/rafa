@@ -1248,6 +1248,9 @@ describe('the dangerous phrases', () => {
   });
 });
 
+/** The hint rafa's list gives `input:invalid-value`, which a relative working directory is refused with. */
+const INVALID_VALUE_HINT = 'pass one of the values the message lists';
+
 describe('the project a command runs in', () => {
   it('hands the project resolved from a subdirectory of its root, the root a real path', async () => {
     const { outcome } = await run(['loop', 'start'], { cwd: join(PROJECT, 'sub') });
@@ -1298,8 +1301,27 @@ describe('the project a command runs in', () => {
     expect(start.outcome.exitCode).toBe(1);
     expect(start.outcome.result).toMatchObject({
       ok: false,
-      error: { code: 'no_project', message: expect.stringContaining('not/absolute'), cause: 'cli:no-project' },
+      error: { code: 'no_project', message: expect.stringContaining('not/absolute'), cause: 'input:invalid-value' },
     });
+  });
+
+  it('ends a relative working directory as no_project with the cause and hint of the ScopeError the walk threw', async () => {
+    const { outcome, stderr } = await run(['loop', 'start'], { cwd: 'not/absolute' });
+    const json = await run(['--output=json', 'loop', 'start'], { cwd: 'not/absolute' });
+
+    expect(seen).toBeNull();
+    expect(outcome.exitCode).toBe(1);
+    expect(json.outcome.result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'no_project',
+        message: 'rafa scope: start directory is "not/absolute", expected an absolute path',
+        cause: 'input:invalid-value',
+        hint: INVALID_VALUE_HINT,
+        module: 'project',
+      },
+    });
+    expect(stderr).toContain(`[input:invalid-value]\n  hint: ${INVALID_VALUE_HINT}\n`);
   });
 
   it('answers a help request, a routing refusal and an unreadable spec without reading the working directory', async () => {

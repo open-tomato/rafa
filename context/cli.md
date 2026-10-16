@@ -2841,8 +2841,11 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text
   mode, the hint as the result's message in json mode. The command never
   runs, so it prints no deprecation line. A relative working directory or
-  home, and a git that cannot name the main checkout, end the same way
-  with the walk's message. A help request, a
+  home, a start that does not resolve, and a git that cannot name the
+  main checkout end as `no_project` too, with the walk's message and the
+  cause of the `ScopeError` it threw: `input:invalid-value`,
+  `fs:not-found` and `git:new-context`, the line's bracket and the
+  code's hint with them where it has one. A help request, a
   routing refusal, `invalid_spec` and a command declaring
   `needsProject: false` read neither the working directory nor the home.
 
