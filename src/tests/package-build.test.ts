@@ -320,6 +320,15 @@
  * `--version` copy sits beside the package, not under it, so no
  * `node_modules` is at or above it still.
  *
+ * The four packages, and the `tsc` the two type-check cases run, are
+ * linked as bun resolves them from the checkout (`Bun.resolveSync` of the
+ * package's `package.json` from `REPO_ROOT`), not as
+ * `REPO_ROOT/node_modules/<name>`. A linked worktree with no
+ * `node_modules` of its own (a loop's, under `.rafa/worktrees/`) finds the
+ * main checkout's that way. Measured on 2026-10-16 on bun 1.3.14, the
+ * fixed path made `beforeAll` fail with ENOENT in such a worktree, the
+ * failure of #1124's three reports.
+ *
  * ## The config subpath's declarations
  *
  * `./config` is the exports entry carrying both conditions: `types` at
@@ -785,11 +794,20 @@ function defineConfigLoads(text: string): string[] {
   return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
 }
 
+/** The directory the repository installed the package `name` in, found as bun resolves it from {@link REPO_ROOT}. */
+function installedDir(name: string): string {
+  return realpathSync(dirname(Bun.resolveSync(`${name}/package.json`, REPO_ROOT)));
+}
+
+/** The `tsc` binary of the `typescript` the repository installed. */
+function installedTsc(): string {
+  return join(installedDir('typescript'), 'bin', 'tsc');
+}
+
 /** Links the package `name` as the repository installed it into `dir`'s `node_modules`. */
 function linkInstalled(dir: string, name: string): void {
   mkdirSync(dirname(join(dir, 'node_modules', name)), { recursive: true });
-  const installed = realpathSync(join(REPO_ROOT, 'node_modules', name));
-  symlinkSync(installed, join(dir, 'node_modules', name), 'dir');
+  symlinkSync(installedDir(name), join(dir, 'node_modules', name), 'dir');
 }
 
 /** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
@@ -1536,7 +1554,7 @@ describe('the config subpath, installed from the packed tarball', () => {
     }), 'utf8');
     const env = withBunOnPath();
 
-    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, env);
+    const check = run([process.execPath, installedTsc(), '--noEmit', '--pretty', 'false'], project, env);
     const load = run([
       process.execPath,
       '-e',
@@ -1561,7 +1579,7 @@ describe('the config subpath, installed from the packed tarball', () => {
       files: ['bad.config.ts'],
     }), 'utf8');
 
-    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
+    const check = run([process.execPath, installedTsc(), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
 
     expect(check.exitCode).not.toBe(0);
     expect(check.stdout).toContain('bad.config.ts');
