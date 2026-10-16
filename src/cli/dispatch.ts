@@ -154,11 +154,24 @@
  *     with the thrown message, `rafa: <message>` on stderr in text mode,
  *     and the stack as a `debug` line.
  *
+ * Either throw is read by the error handler, `failureOf`
+ * (`src/errors/handler.ts`), with the command's subject and action as
+ * its boundary, so the error carries a `cause` and the `module` and
+ * `action`: a `RafaError` thrown, or one in a `CommandExit`'s `cause`
+ * chain, gives its own code, hint, module and action, and the line ends
+ * with the code in brackets, its hint on a line below in text mode.
+ *
  * A refusal from routing, `invalid_spec` or `no_project` ends with exit
- * code 1 and `rafa: <message>` on stderr in text mode. A terminal event
- * that cannot be written, such as a payload `JSON.stringify` refuses, is
- * replaced by the `result_unwritable` failure with exit code 1. The
- * ending each of these gives, and the fallback, are `ending.ts`'s.
+ * code 1 and `rafa: <message>` on stderr in text mode, its `cause` the
+ * `cli:` code of its dispatcher code. A `no_project` built from a coded
+ * error the walk threw carries that error's code and hint instead, with
+ * the command's action where the error names none. An error thrown past
+ * the command, caught by the catch-all as `command_error`, is read with
+ * no boundary. A terminal event that cannot be written, such as a
+ * payload `JSON.stringify` refuses, is replaced by the
+ * `result_unwritable` failure with exit code 1. The ending each of these
+ * gives, the bracket and the hint line, and the fallback, are
+ * `ending.ts`'s.
  *
  * ## The project
  *
@@ -234,6 +247,7 @@ import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { LoggerResolver } from '../adapters/logger/active.js';
+import type { FailureBoundary } from '../errors/handler.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
@@ -249,10 +263,11 @@ import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
+import { failureOf } from '../errors/handler.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';
-import { failure, finish, messageOf, success } from './ending.js';
+import { endingError, failure, finish, messageOf, success } from './ending.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
 
@@ -540,6 +555,11 @@ function assemble(route: Route, settings: Settings): { base: CliContext; problem
   }
 }
 
+/** The command that ran, as the error handler reads it: its subject as the module, and its action. */
+function boundaryOf(command: RafaCommand): FailureBoundary {
+  return { module: command.subject, action: command.action };
+}
+
 /** Runs a routed command with its context; see the module note. */
 async function runCommand(
   route: CommandRoute,
@@ -572,34 +592,38 @@ async function runCommand(
     ));
     return success(guarded.payload());
   } catch (error) {
+    const found = failureOf(error, boundaryOf(route.command));
     if (!(error instanceof CommandExit)) {
       if (error instanceof Error && error.stack !== undefined) base.output.debug(error.stack);
-      return failure('command_error', messageOf(error));
+      return failure('command_error', messageOf(error), found);
     }
     if (error.exitCode === 0) {
       if (error.message !== '') base.output.info(error.message);
       return success(guarded.payload());
     }
+    const message = error.message === ''
+      ? `exit code ${error.exitCode}`
+      : error.message;
     return {
       exitCode: error.exitCode,
       payload: null,
-      error: {
-        code: 'command_exit',
-        message: error.message === ''
-          ? `exit code ${error.exitCode}`
-          : error.message,
-      },
+      error: endingError('command_exit', message, found),
       stderrLine: error.message === ''
         ? null
         : error.message,
+      coded: found.coded,
     };
   }
 }
 
-/** Where a command runs: in a project, outside any for one needing none, or refused with a message. */
+/**
+ * Where a command runs: in a project, outside any for one needing none,
+ * or refused with a message and the error the walk threw, null for its
+ * plain answer that no project holds the working directory.
+ */
 type Placement =
   | { readonly kind: 'placed'; readonly project: ProjectFound | null }
-  | { readonly kind: 'refused'; readonly message: string };
+  | { readonly kind: 'refused'; readonly message: string; readonly error: ScopeError | null };
 
 /** Resolves the project a command runs in; see the module note. */
 function placeCommand(command: RafaCommand, settings: Settings): Placement {
@@ -608,10 +632,10 @@ function placeCommand(command: RafaCommand, settings: Settings): Placement {
     const scope = resolveScope(settings.cwd(), { home: settings.home() });
     return scope.found
       ? { kind: 'placed', project: scope }
-      : { kind: 'refused', message: scope.hint };
+      : { kind: 'refused', message: scope.hint, error: null };
   } catch (error) {
     if (!(error instanceof ScopeError)) throw error;
-    return { kind: 'refused', message: error.message };
+    return { kind: 'refused', message: error.message, error };
   }
 }
 
@@ -632,6 +656,21 @@ async function callHook<T>(half: 'before' | 'after', call: () => Promise<T>, bas
   }
 }
 
+/**
+ * The `no_project` failure a refused placement ends as. The error the
+ * walk threw is read by the error handler with the command's boundary,
+ * and lends the failure its cause, hint, module and action only when it
+ * is coded, since the command never ran; see the module note.
+ */
+function refusedPlacement(placement: Extract<Placement, { kind: 'refused' }>, command: RafaCommand): Ending {
+  const found = placement.error === null
+    ? null
+    : failureOf(placement.error, boundaryOf(command));
+  return failure('no_project', placement.message, found?.coded === true
+    ? found
+    : null);
+}
+
 /** Runs a command whose spec was read in the project it needs, or ends as `no_project`; see the module note. */
 async function settleCommand(
   route: CommandRoute,
@@ -640,7 +679,7 @@ async function settleCommand(
   settings: Settings,
 ): Promise<Ending> {
   const placement = placeCommand(route.command, settings);
-  if (placement.kind === 'refused') return failure('no_project', placement.message);
+  if (placement.kind === 'refused') return refusedPlacement(placement, route.command);
   const { project } = placement;
   const hook = base.outputMode === 'text'
     ? settings.commandHook
@@ -710,7 +749,7 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
   try {
     ending = await settle(route, base, problem, loaded.registry, settings);
   } catch (error) {
-    ending = failure('command_error', messageOf(error));
+    ending = failure('command_error', messageOf(error), failureOf(error, null));
   }
   return finish(ending, base, settings);
 }

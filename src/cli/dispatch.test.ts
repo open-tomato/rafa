@@ -387,20 +387,35 @@ describe('the events of one invocation', () => {
       'loop refuse',
       ['loop', 'refuse'],
       3,
-      { type: 'result', ok: false, error: { code: 'command_exit', message: 'plan is not ready' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_exit', message: 'plan is not ready', cause: 'cli:command-exit', module: 'loop', action: 'refuse' },
+        ts: NOW.toISOString(),
+      },
     ],
     [
       'loop quiet',
       ['loop', 'quiet'],
       2,
-      { type: 'result', ok: false, error: { code: 'command_exit', message: 'exit code 2' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_exit', message: 'exit code 2', cause: 'cli:command-exit', module: 'loop', action: 'quiet' },
+        ts: NOW.toISOString(),
+      },
     ],
     ['loop early', ['loop', 'early'], 0, { type: 'result', ok: true, data: 'stopped', ts: NOW.toISOString() }],
     [
       'loop crash',
       ['loop', 'crash'],
       1,
-      { type: 'result', ok: false, error: { code: 'command_error', message: 'boom' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_error', message: 'boom', cause: 'unknown:new-context', module: 'loop', action: 'crash' },
+        ts: NOW.toISOString(),
+      },
     ],
     [
       'loop emit-start',
@@ -412,6 +427,9 @@ describe('the events of one invocation', () => {
         error: {
           code: 'command_error',
           message: 'dispatcher: a command emits no start event; the dispatcher writes the one each invocation has',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'emit-start',
         },
         ts: NOW.toISOString(),
       },
@@ -426,6 +444,9 @@ describe('the events of one invocation', () => {
         error: {
           code: 'command_error',
           message: 'dispatcher: a command emits no result event; the dispatcher writes the one each invocation has',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'emit-result',
         },
         ts: NOW.toISOString(),
       },
@@ -437,7 +458,13 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'command_error', message: 'dispatcher: refused a second result; a command gives exactly one' },
+        error: {
+          code: 'command_error',
+          message: 'dispatcher: refused a second result; a command gives exactly one',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'twice',
+        },
         ts: NOW.toISOString(),
       },
     ],
@@ -448,7 +475,7 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'unknown_subject', message: 'unknown subject or command "bogus"' },
+        error: { code: 'unknown_subject', message: 'unknown subject or command "bogus"', cause: 'cli:unknown-subject' },
         ts: NOW.toISOString(),
       },
     ],
@@ -459,7 +486,11 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'missing_action', message: startsWith('"loop" needs an action; one of: start, status,') },
+        error: {
+          code: 'missing_action',
+          message: startsWith('"loop" needs an action; one of: start, status,'),
+          cause: 'cli:missing-action',
+        },
         ts: NOW.toISOString(),
       },
     ],
@@ -478,7 +509,7 @@ describe('the events of one invocation', () => {
     expect(outcome.exitCode).toBe(1);
     expect(outcome.result).toMatchObject({
       ok: false,
-      error: { code: 'result_unwritable', message: startsWith('the result could not be written: ') },
+      error: { code: 'result_unwritable', message: startsWith('the result could not be written: '), cause: 'cli:result-unwritable' },
     });
     expect(eventsOf(stdout)).toHaveLength(2);
   });
@@ -491,6 +522,7 @@ describe('the events of one invocation', () => {
       code: 'invalid_spec',
       message: 'command "loop spec" declares arguments or flags that cannot be read:'
         + ' parseArgs: the spelling "p" names both flag "plan" and flag "path"',
+      cause: 'cli:invalid-spec',
     });
     expect(seen).toBeNull();
   });
@@ -1138,7 +1170,7 @@ describe('the project a command runs in', () => {
 
     expect(seen).toBeNull();
     expect(outcome.exitCode).toBe(1);
-    expect(outcome.result).toMatchObject({ ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) } });
+    expect(outcome.result).toMatchObject({ ok: false, error: { code: 'no_project', message: initHint(OUTSIDE), cause: 'cli:no-project' } });
     expect(stdout).toBe('');
     expect(stderr).toBe(`rafa: ${initHint(OUTSIDE)}\n`);
   });
@@ -1150,7 +1182,12 @@ describe('the project a command runs in', () => {
     expect(stderr).toBe('');
     expect(eventsOf(stdout)).toEqual([
       { type: 'start', command: 'loop status', ts: NOW.toISOString() },
-      { type: 'result', ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'no_project', message: initHint(OUTSIDE), cause: 'cli:no-project' },
+        ts: NOW.toISOString(),
+      },
     ]);
   });
 
@@ -1169,7 +1206,7 @@ describe('the project a command runs in', () => {
     expect(start.outcome.exitCode).toBe(1);
     expect(start.outcome.result).toMatchObject({
       ok: false,
-      error: { code: 'no_project', message: expect.stringContaining('not/absolute') },
+      error: { code: 'no_project', message: expect.stringContaining('not/absolute'), cause: 'cli:no-project' },
     });
   });
 
@@ -1182,8 +1219,8 @@ describe('the project a command runs in', () => {
 
     expect(help.outcome.exitCode).toBe(0);
     expect([refusal.outcome.result, spec.outcome.result]).toMatchObject([
-      { ok: false, error: { code: 'unknown_subject' } },
-      { ok: false, error: { code: 'invalid_spec' } },
+      { ok: false, error: { code: 'unknown_subject', cause: 'cli:unknown-subject' } },
+      { ok: false, error: { code: 'invalid_spec', cause: 'cli:invalid-spec' } },
     ]);
   });
 });

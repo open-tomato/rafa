@@ -2849,8 +2849,13 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 - **json mode writes one `start` event first and one terminal `result`
   last**, every line NDJSON. Text mode writes neither event. A failure's
   message goes to stderr, a `CommandExit` message as the command gave
-  it and anything else as `rafa: <message>`. A result a command gave is
-  written as the `text` adapter writes one.
+  it and anything else as `rafa: <message>`. A coded failure, one whose
+  error or `cause` chain holds a `RafaError` (`failureOf`,
+  `src/errors/handler.ts`), ends that line with its code in brackets,
+  `rafa: x [git:no-identity]`, and writes its hint below it as
+  `  hint: <hint>`; events mode writes the bracket and no hint line, and
+  `--no-hint` never hides it (`src/cli/ending.ts`). A result a command
+  gave is written as the `text` adapter writes one.
 - **events mode is given only to a command declaring `events` among its
   outputs**, which today is `loop start` alone; any other command reads
   `--output=events` or `RAFA_OUTPUT=events` as text
@@ -2943,6 +2948,13 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 - **The result error codes** are the five routing refusals, `invalid_spec` (a
   spec `parseArgs` refuses), `no_project` (a command run outside a
   project), `command_exit`, `command_error` and `result_unwritable`.
+  Beside `code` and `message` the result's `error` carries `cause` on
+  every failure: a coded failure's own code, else the `cli:` code whose
+  `legacy` is the dispatcher code, and `unknown:new-context` for
+  `command_error`. A coded failure with a hint carries `hint`, and a
+  coded failure or one of a command that ran carries `module` and
+  `action`, the command's subject and action where no coded error names
+  them (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 - **So is the version.** A version route writes `rafa <version>`

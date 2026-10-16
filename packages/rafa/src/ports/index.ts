@@ -534,12 +534,29 @@ export interface CliEventLog {
   ts: string;
 }
 
-/** The command's outcome: its data when it succeeded, its error when not. */
+/**
+ * The command's outcome: its data when it succeeded, its error when not.
+ *
+ * `error.code` is the dispatcher's own code (`command_exit`,
+ * `no_project`, …) and `error.message` the failure's words. The four
+ * optional members say what the failure was beside them (#952): `cause`
+ * is a `<family>:<leaf>` cause code on every failure the dispatcher
+ * writes; `hint` is a coded error's next step, when it has one; `module`
+ * and `action` name where a coded error was thrown, or the command that
+ * ran for an uncoded failure of one.
+ */
 export interface CliEventResult {
   type: 'result';
   ok: boolean;
   data?: unknown;
-  error?: { code: string; message: string };
+  error?: {
+    code: string;
+    message: string;
+    cause?: string;
+    hint?: string;
+    module?: string;
+    action?: string;
+  };
   ts: string;
 }
 
