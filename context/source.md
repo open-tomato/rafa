@@ -37,6 +37,35 @@ spells out, and the shapes the lint config forces.
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
 
+### Declarations, feature indexes and the roots
+
+- **A `declarations.ts` imports types and `@open-tomato/rafa/core/*`
+  values alone.** A value import of a module under `src/` loads it with
+  the roster and undoes the laziness the declaration exists for. A
+  feature's test reads the file's imports off the source (its
+  `declarations.test.ts`, or `index.test.ts` for `board`, which has none)
+  and holds that; a constant a declaration and its command both read lives
+  in the declaration file, and a copy of a value from outside `src/commands/`
+  is held equal to its source by the same test.
+- **A feature's `index.ts` reaches a command module only through
+  `lazyCommand`'s dynamic import.** Each command is one
+  `lazyCommand(DECLARATION, () => import('./x.js'), FEATURE)` line, so
+  importing the index loads the declarations and the core command barrel
+  and no command module. `index.test.ts` reads each call off the source
+  and holds its loader to its declaration's module.
+- **No module under `src/` registers an adapter or a config section on
+  import.** `src/config-registry.ts` and `src/adapter-registry.ts` register
+  nothing as they load, and neither do the declarations, the feature
+  indexes or the command modules. The registration calls sit at the top
+  level of two roots only: `src/index.ts`, the `@open-tomato/rafa` entry,
+  and `src/rafa.ts`, the CLI's. Each calls `registerCoreConfigSections`,
+  then `registerCoreAdapters`, once its imports have loaded.
+  `src/tests/preload.ts` makes the same two calls, and `bunfig.toml`'s
+  `[test] preload` runs it before the first test file. Other callers, such
+  as `src/cli/feature-load-probe.ts`, call them inside a function they run,
+  never on import. A child process a test spawns runs no preload, so its
+  script calls a root itself before it reads either registry.
+
 ### Explicit types on exports
 
 **`base.json` of `packages/typescript-config` sets `isolatedDeclarations`
