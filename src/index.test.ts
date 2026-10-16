@@ -1013,7 +1013,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['./release-commit.js', ['readReleaseCommit']],
     ['./status.js', ['DEFAULT_RELEASE_SEAMS']],
-    ['./tag-follow-ups.js', ['followUpsFor', 'readPublishTarget']],
+    ['./tag-follow-ups.js', ['ciPublishSentence', 'followUpsFor', 'readPublishTarget']],
     ['./tag-units.js', ['readNewestRelease', 'readTagPackages', 'readUnitInputs', 'readVersion', 'unitDecisionOf']],
   ]],
   ['./commands/release/list.js', [
