@@ -59,6 +59,10 @@ keeps its version through a release. The pull request body's forecast
 (`src/release/branch-forecast.ts`) applies the same split: it folds only the
 waiting fragments whose `package` equals the branch fragment's (null with null),
 so a package fragment waiting on the base does not move the root's forecast.
+A package slot folds from the member's own manifest version at the base commit,
+as the guard does, read through `packageBaseVersionAt`; a package the base cannot
+fold answers one problem line in the guard's words, ending `so no forecast was
+folded`.
 
 Fragment order is first-parent commit order: the commit that ADDED each fragment
 to the base branch, read from git. First add wins if a fragment name appears

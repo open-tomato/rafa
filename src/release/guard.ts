@@ -156,11 +156,11 @@ import { forecastLine } from './branch-forecast.js';
 import { forecastRelease } from './forecast.js';
 import { directoryPrefix, readFragmentTree } from './fragment-tree.js';
 import { highestChangeLevel, RELEASE_LEVEL_RANK } from './level.js';
+import { packageBaseVersionAt } from './package-base-version.js';
 import { readReceipt } from './receipt.js';
 import { changelogVersions, compareVersions } from './status-readings.js';
 import { releaseStrategyFor } from './strategy.js';
 import { gitPathOf, parseSemanticVersion, readManifestVersion } from './version.js';
-import { packageNamed, readWorkspacePackagesAt } from './workspace-packages.js';
 
 /** The four answers of the guard; see the module note. */
 export type GuardAnswer = 'clean' | 'missing' | 'stale' | 'collision';
@@ -524,7 +524,7 @@ function slotOf(branch: readonly FoldFragment[]): { readonly slot: FoldFragment 
 /**
  * The version the slot's unit declares at the base: `release.versionFile`'s
  * for the root (`rootVersion`, already read), the member manifest's for a
- * package, read through {@link readWorkspacePackagesAt}; or the problem
+ * package, read through {@link packageBaseVersionAt}; or the problem
  * line saying why no forecast was folded.
  */
 function slotBaseVersion(
@@ -539,14 +539,7 @@ function slotBaseVersion(
       ? { problem: `${base.ref} declares no version in ${input.settings.releaseVersionFile}, ${unfolded}` }
       : { version: base.rootVersion };
   }
-  const workspace = readWorkspacePackagesAt(git, base.commit);
-  if (!workspace.ok) return { problem: `${base.ref}'s workspace could not be read for ${pkg}, ${unfolded}: ${workspace.problem}` };
-  const member = packageNamed(workspace.packages, pkg);
-  if (member === null) return { problem: `${base.ref}'s workspace holds no package ${pkg}, ${unfolded}` };
-  if (member.isPrivate) return { problem: `${base.ref} declares ${pkg} private in ${member.manifestPath}, ${unfolded}` };
-  return member.version === null
-    ? { problem: `${base.ref} declares no version for ${pkg} in ${member.manifestPath}, ${unfolded}` }
-    : { version: member.version };
+  return packageBaseVersionAt({ git, base, package: pkg });
 }
 
 /** The fold run dry over the base and the branch's fragments; see the module note. */
