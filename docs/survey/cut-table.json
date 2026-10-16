@@ -3334,6 +3334,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/public-entries.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/rafa-block-strip.test.ts",
       "upwardEdgesIn": 0
     },
@@ -7080,7 +7085,7 @@
       "edges": [],
       "fileCounts": {
         "source": 260,
-        "test": 506,
+        "test": 507,
         "testSupport": 27
       },
       "files": [
@@ -7786,6 +7791,7 @@
         "src/tests/project-skills-check.test.ts",
         "src/tests/project-stand-in-spawn.ts",
         "src/tests/prompt-restore.test.ts",
+        "src/tests/public-entries.sweep.test.ts",
         "src/tests/rafa-block-strip.test.ts",
         "src/tests/rafa-prompt-phase.test.ts",
         "src/tests/readiness-gate-integration.test.ts",
@@ -7897,8 +7903,8 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2024,
-    "leftToPlace": 757,
+    "files": 2025,
+    "leftToPlace": 758,
     "nonTestEdges": 4511,
     "unassignedFiles": 28,
     "unrankedEdges": 77,

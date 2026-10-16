@@ -1880,6 +1880,7 @@
     "src/tests/project-skills-check.test.ts": 0,
     "src/tests/project-stand-in-spawn.ts": 2,
     "src/tests/prompt-restore.test.ts": 0,
+    "src/tests/public-entries.sweep.test.ts": 0,
     "src/tests/rafa-block-strip.test.ts": 0,
     "src/tests/rafa-prompt-phase.test.ts": 0,
     "src/tests/readiness-gate-integration.test.ts": 0,
@@ -4414,7 +4415,7 @@
         "src/commands": 1,
         "src/fixtures": 3,
         "src/start": 1,
-        "src/tests": 16,
+        "src/tests": 17,
         "src/tests/core-coupled/effort/store": 1
       },
       "hub": "src/tests/sweep-timeout.ts",
@@ -4432,6 +4433,7 @@
         "src/tests/default-plan-dirs.sweep.test.ts",
         "src/tests/git-identity.sweep.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
+        "src/tests/public-entries.sweep.test.ts",
         "src/tests/relations-import-boundary.sweep.test.ts",
         "src/tests/repo-hygiene.sweep.test.ts",
         "src/tests/routing-table-agents.sweep.test.ts",
@@ -4443,7 +4445,7 @@
         "src/tests/workspace-graph.sweep.test.ts"
       ],
       "name": "c16-sweep-timeout",
-      "size": 22
+      "size": 23
     },
     {
       "folders": {
@@ -54365,6 +54367,11 @@
       "to": "src/cli/prompt/terminal.ts"
     },
     {
+      "from": "src/tests/public-entries.sweep.test.ts",
+      "kind": "value",
+      "to": "src/tests/sweep-timeout.ts"
+    },
+    {
       "from": "src/tests/rafa-block-strip.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/git/index.ts"
@@ -66690,6 +66697,11 @@
       "cluster": "c11-index",
       "kind": "test",
       "path": "src/tests/prompt-restore.test.ts"
+    },
+    {
+      "cluster": "c16-sweep-timeout",
+      "kind": "test",
+      "path": "src/tests/public-entries.sweep.test.ts"
     },
     {
       "cluster": "c04-index",

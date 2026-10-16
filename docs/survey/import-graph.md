@@ -1,8 +1,8 @@
 # Import graph
 
-Coverage: 2024 of 2024 tracked files read (src/ and packages/*/src/).
+Coverage: 2025 of 2025 tracked files read (src/ and packages/*/src/).
 
-2024 files, 10533 edges (8260 value, 2273 type), 32 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
+2025 files, 10534 edges (8261 value, 2273 type), 32 clusters. Value edges are what `bun build --metafile` records; type edges are the imports `ts.preProcessFile` reads that it does not.
 
 ## Clusters by size
 
@@ -23,7 +23,7 @@ Coverage: 2024 of 2024 tracked files read (src/ and packages/*/src/).
 | `c13-record` | 43 | `src/bugs` (20), `src/triage` (10), `src/errors` (6), `src` (2), `src/project` (2), `src/commands/issue` (1), `src/schema` (1), `src/tests` (1) |
 | `c14-start` | 33 | `src/stretch` (13), `src/ci` (7), `src/commands/stretch` (7), `src` (2), `src/commands` (2), `src/commands/ci` (2) |
 | `c15-verify` | 28 | `src/refs` (11), `src/tests` (4), `src/board` (3), `src/commands` (3), `src/commands/issue` (2), `src/commands/plan` (2), `src/triage` (2), `src/cli` (1) |
-| `c16-sweep-timeout` | 22 | `src/tests` (16), `src/fixtures` (3), `src/commands` (1), `src/start` (1), `src/tests/core-coupled/effort/store` (1) |
+| `c16-sweep-timeout` | 23 | `src/tests` (17), `src/fixtures` (3), `src/commands` (1), `src/start` (1), `src/tests/core-coupled/effort/store` (1) |
 | `c17-main` | 2 | `src/tools/ts-symbols/fixtures/proj/src` (2) |
 | `c18-types.test` | 1 | `packages/rafa/src/core/command` (1) |
 | `c19-config-schema-readings` | 1 | `src` (1) |
