@@ -71,6 +71,7 @@ const CONFIG = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublish: 'manual',
