@@ -549,3 +549,49 @@ describe('main over one planted root, before and after the fix', () => {
     expect(fixed.lines).not.toContain(refusal);
   });
 });
+
+describe('main over a plugin whose shipped file and root config import a private member', () => {
+  /** The base's private config member, the stand-in for the live `@open-tomato/rafa-eslint-config`. */
+  const CONFIG = '@open-tomato/rafa-config';
+
+  /** A file importing the private config member. */
+  const importsConfig = `import base from '${CONFIG}';\nexport default [...base];\n`;
+
+  /** The plugin's fields: the peer, and the config declared as the live members declare it. */
+  const linted = { ...PEER_FIELDS, devDependencies: { '@open-tomato/rafa': 'workspace:*', [CONFIG]: 'workspace:*' } };
+
+  /** The lines of a run that name `file`. */
+  const naming = (lines: readonly string[], file: string): readonly string[] => lines.filter((line) => line.includes(file));
+
+  test('exits 1 with one refusal line naming src/index.ts and none naming eslint.config.mjs', () => {
+    const root = plantWith({ ...plugin(linted, importsConfig), [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig });
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(1);
+    expect(naming(lines, 'src/index.ts')).toHaveLength(1);
+    expect(naming(lines, 'eslint.config.mjs')).toEqual([]);
+  });
+
+  test('exits 0 over the same root once the src/index.ts import is removed', () => {
+    const root = plantWith({ ...plugin(linted, importsConfig), [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig });
+    writeFileSync(join(root, PLUGIN_DIR, 'src/index.ts'), 'export const id: string = \'plugin\';\n');
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(0);
+    expect(naming(lines, 'eslint.config.mjs')).toEqual([]);
+  });
+
+  test('a files list naming eslint.config.mjs explicitly earns the refusal, since a listed file ships', () => {
+    const root = plantWith({
+      ...plugin({ ...linted, files: ['src', 'eslint.config.mjs'] }),
+      [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig,
+    });
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(1);
+    expect(naming(lines, 'eslint.config.mjs')).toHaveLength(1);
+  });
+});
