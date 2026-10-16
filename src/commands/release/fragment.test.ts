@@ -33,8 +33,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { parseFragment, serializeFragment } from '../../release/fragment.js';
+import { readGuard } from '../../release/guard.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
@@ -313,6 +315,58 @@ describe('rafa release fragment', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('the tree of origin/main could not be read');
     expect(changesOf(w.project)).toEqual([]);
+  });
+});
+
+describe('the preflight guard over a branch holding the written fragment', () => {
+  /** A branch changing a source file, guarded against the fetched `origin/main`. */
+  function guardedAnswer(w: World): string | undefined {
+    const git = createGitRunner(w.project.root);
+    const reading = readGuard({
+      git,
+      settings: {
+        releaseVersionFile: 'package.json',
+        releaseChangelog: 'CHANGELOG.md',
+        releaseFragments: '.changes',
+        releaseStrategy: 'semver-by-level',
+        releaseHeading: '## {version} — {date}, {title}',
+        releaseMoveLock: false,
+      },
+      base: 'origin/main',
+      branch: { ref: 'HEAD', name: 'dependabot/bun/zod', pullRequest: 7 },
+      now: new Date('2026-10-16T12:00:00Z'),
+    });
+    return reading.ok
+      ? reading.verdict.answer
+      : `unread: ${reading.problem}`;
+  }
+
+  /** Lands a source change on a branch of the caller's clone. */
+  function branchWithSourceChange(w: World): void {
+    w.inCaller(['checkout', '-q', '-b', 'dependabot/bun/zod']);
+    plant(w.project.root, { 'src/index.ts': 'export const a = 1;\n' });
+    w.inCaller(['add', 'src/index.ts']);
+    w.inCaller(['commit', '-q', '-m', 'bump zod']);
+  }
+
+  it('reads clean once the fragment the command wrote is committed', async () => {
+    const w = world();
+    branchWithSourceChange(w);
+
+    const run = await ran(w.project, ['--plan=dependabot-7', '--level=none', '--title=Bump zod']);
+    w.inCaller(['add', '.changes/dependabot-7-2.md']);
+    w.inCaller(['commit', '-q', '-m', 'chore: release fragment dependabot-7']);
+
+    expect(run.exitCode).toBe(0);
+    expect(guardedAnswer(w)).toBe('clean');
+  });
+
+  it('reads missing for the same branch without the fragment', () => {
+    const w = world();
+    w.inCaller(['fetch', '-q', 'origin']);
+    branchWithSourceChange(w);
+
+    expect(guardedAnswer(w)).toBe('missing');
   });
 });
 
