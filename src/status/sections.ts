@@ -321,6 +321,7 @@ export type StatusConfig = Pick<
   | 'cleanupStaleDays'
   | 'cleanupWorktreeIdleDays'
   | 'loopWorktreeDir'
+  | 'namingBranch'
 >;
 
 /** What {@link readStatusSections} reads. */
@@ -706,7 +707,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
 
   const branch = localSection(() => readBranchSection(sources));
   const loops = readLoopsSection(root, sources);
-  const claimBranches = localSection(() => readClaimBranches(git));
+  const claimBranches = localSection(() => readClaimBranches(git, config.namingBranch));
 
   const provider = resolvePrProvider({ configured: config.prProvider, dir: root, readRemote: seams.readRemote });
   const isGh = provider.provider === 'gh';
