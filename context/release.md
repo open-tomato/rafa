@@ -6,6 +6,86 @@ A branch no longer stamps a version: instead, its wrap-up commits a small file
 under `release.fragments` (default `.changes/`), and the pull request shows a
 forecast of what version the branch would get if merged now.
 
+### The ladder
+
+Three keys decide how much of a release runs on its own: `release.settle`,
+`release.tag` and `release.publish`. A project sits on one rung, from nothing
+on its own (0) to a release on every merge (4):
+
+| Level | `release.settle` | `release.tag` | `release.publish` | Runs on its own |
+|---|---|---|---|---|
+| 0 Manual | any | `manual` | `manual` | nothing |
+| 1 Settle tags | `push` | `settle` | `manual` | version, changelog and tag in one settle |
+| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and publishes with provenance |
+| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags and publishes |
+| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags |
+
+A level is read off the keys that choose it: levels 3 and 4 by all three,
+level 1 by `release.settle: push` with `release.tag: settle`, and level 2 by
+`release.publish: ci` alone. Level 0 is the floor every combination stands on.
+The highest level whose choosing keys all hold is the reading, and each key is
+then compared with that level's row. A key that differs is the misfit, and
+doctor names it on the ladder row. `release.settle: pr` with `release.tag:
+manual` and `release.publish: ci` reads as level 2 with `release.settle` named,
+since level 2 spells `push`. `release.settle: pr` with `release.tag: settle` and
+`release.publish: manual` reads as level 0 with `release.tag` named, since a
+`pr` delivery never tags.
+
+`rafa doctor` prints the reading as its `Release ladder:` row, right under the
+`Release:` row, and lists what the level still needs. The row is `info` when
+nothing is missing and `warn` otherwise. It never refuses the setting or
+changes the exit code, so a level turned on before CI can carry it is listed on
+every run until its preconditions hold. From level 2 up, the missing items are
+the publish workflow, `.github/workflows/release-publish.yml`, when it is
+absent, not a file, or lacks `id-token: write` (npm trusted publishing needs
+that grant), and the version file's manifest when it is `private` or has no
+`name`, since the level publishes it. Level 3 adds `release-tag.yml` and level 4
+adds `release-settle.yml`, each missing when absent or not a file. Levels 3 and
+4 also need `release-bot-fragment.yml` while `.github/dependabot.yml` exists.
+Doctor
+cannot read the trusted publisher on npmjs.com, so that stays a step the project
+takes by hand.
+
+The release order across packages (a topological layer, rules by id) is parked
+by the spec's 2026-10-16 update until two publishable packages depend on each
+other.
+
+### Workflows and the GITHUB_TOKEN rule
+
+`rafa release workflows` prints one row per ladder workflow: its path under
+`.github/workflows/`, the levels it serves, whether the level the keys read as
+needs it, and its state. `present` is a regular file holding the template's
+bytes, `differs` a regular file with other bytes (a project's own edit, not
+wrong by itself) and `missing` nothing at the path, or something that is not a
+file. `--write` writes each needed workflow that is missing from its template
+under `src/release/templates/`. A file already at the path is left byte for
+byte, and a directory there is refused with its reason. The command exits 0 in
+every case, since the doctor row is what warns.
+
+The four templates:
+
+- `release-publish.yml` (level 2 and up): on a pushed tag, or through
+  `workflow_call` with a `ref`, checks the ref out, runs the tests, the lint and
+  the type check, upgrades npm (trusted publishing needs npm 11.5.1 or newer)
+  and runs `rafa release publish`. It grants `id-token: write` and sets no token
+  and no provenance flag, since npm attaches provenance on a trusted publish.
+- `release-tag.yml` (level 3): when a pull request from `rafa/release` merges,
+  checks the base branch out at the merge commit, runs
+  `rafa release tag --push`, then calls the publish workflow with the merge
+  commit as `ref`.
+- `release-settle.yml` (level 4): on each push to the default branch, runs
+  `rafa release settle`, and when that pushed a release commit and tagged it,
+  calls the publish workflow with that commit as `ref`.
+- `release-bot-fragment.yml` (levels 3 and 4, while `.github/dependabot.yml`
+  exists): see "Fragments" below.
+
+The two tagging workflows publish in their own run because of GitHub's
+recursion guard: a tag or commit pushed with the workflow's `GITHUB_TOKEN`
+starts no other workflow run, so the `push: tags` trigger of the publish
+workflow never fires for a tag they push. Each calls the publish workflow
+through `workflow_call` instead. The trigger stays, for a tag a person pushes by
+hand.
+
 ### Fragments: the branch carries intent
 
 A fragment is one file per plan, named `<plan id>.md` (or `-2`, `-3` if a
@@ -39,6 +119,31 @@ and the commit is `chore: release fragment <plan id>`. The wrap-up never edits
 the version file or the changelog. `src/release/fragment.ts` holds the format,
 parser, and the name allocation logic (`src/release/fragment-tree.ts` reads
 the base branch's fragments after a `git fetch` to pick the right name).
+
+`rafa release fragment --plan=<id> --level=<level> --title=<text>
+[--note=<area>: <summary>]... [--package=<name>]` writes one fragment for a
+branch with no wrap-up to write it, such as a bot's pull request, and prints
+its path as the last line. `--plan` must match the plan id pattern, `--level`
+is one of `patch`, `minor`, `major` and `none`, and `--package` must name a
+public member of the checkout's workspace. A shipping level given no `--note`
+takes the title as its one note, with a warning. The name is `<plan>.md`, or
+`-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
+already at the path, in the working tree or in `HEAD`, is refused, so a second
+run never duplicates the first.
+
+The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
+a Dependabot pull request. It runs on `pull_request_target` for
+`dependabot[bot]` pulls from the repository itself, so its token is writable
+and no code from the pull request runs: rafa runs from the base branch's
+checkout, and the branch is checked out only to receive one file. A branch
+that already adds a fragment named for the pull request
+(`dependabot-<number>.md`, or `-2`, `-3` and on) is left as it is. Otherwise
+the fragment is written at `patch` when `dependabot/fetch-metadata` reads the
+update as `direct:production`, and at `none` otherwise, committed as
+`chore: release fragment dependabot-<number>` and pushed to the pull request's
+branch. That push uses `GITHUB_TOKEN`, so it starts no other run. Dependabot
+stops rebasing a branch someone else has pushed to, so a rebase it asks for
+drops that commit, and the `synchronize` run that follows writes it again.
 
 ### The fold: one strategy, pure function
 
@@ -220,9 +325,12 @@ written: a unit whose version a tag already names is skipped, the run refuses
 exits 1 with nothing written. It prints one `✅ Tagged <tag> at …` line per tag
 in unit order, then what to run next: per tag, its push and its publish line, a
 package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
-publish line is replaced by one sentence saying the pushed tag publishes through
-`.github/workflows/release-publish.yml`, and json mode carries `publish: "ci"`
-on that unit (`src/commands/release/tag-follow-ups.ts`). Without `--push` it
+publish line is replaced by one sentence in the form `Once pushed, <tag>
+publishes <name>@<version> to <registry> through
+.github/workflows/release-publish.yml (release.publish: ci).`, for the units
+that would have had a publish line (a unit with no name, or a private one,
+gets neither), and json mode carries `publish: "ci"` on that unit
+(`src/commands/release/tag-follow-ups.ts`). Without `--push` it
 reaches no network and each push is a line to copy, naming the remote `--push`
 would reach (#857).
 
@@ -237,6 +345,30 @@ fails, a hook or rule refusing it included, exits 1 with git's words and the
 push to run again, naming the tags pushed before it and those written and not
 pushed after it, and keeps every local tag, since each names the right commit
 whether or not the remote has it.
+
+**`rafa release publish [--tag=<tag>] [--dry-run]`** runs the publish line's
+command for the release tags on HEAD (`git tag --points-at HEAD`), in the order
+git lists them with the root's first. The root publishes from the project root
+and a package from its own folder, through `release.publishCommand`. `--tag`
+names one of those tags and is refused when HEAD does not carry it, and a HEAD
+with no release tag is refused with exit 1, so a publish never ships a tree its
+tag does not name. Every unit is read before anything runs, and a version other
+than the tag's is refused. The publish workflow calls it, and a person may run
+it by hand.
+
+The retry rule: before each unit publishes, `npm view <name>@<version> version`
+asks the registry the manifest names (`publishConfig.registry`, or
+`https://registry.npmjs.org`). A version the registry holds is skipped with a
+`Skipped` line, and a version it lacks is published. An `E404` reads as lacking,
+since npm answers it both for a missing version and for a package it does not
+know, and a query that exits 0 without the version reads as lacking too. Any
+other failure to read the registry stops the run with exit 1, since a publish
+on a guess could ship a version twice or not at all. So a rerun after a publish
+that stopped halfway publishes only the units the registry lacks. A manifest
+that names no package or is `private` is skipped without a query. The first
+publish command that fails stops the run, and the units after it are not tried.
+`--dry-run` prints each unit's command, directory and registry, and runs
+nothing, not even the query.
 
 ### Guards: the preflight check
 
@@ -361,13 +493,15 @@ effect the next settle.
 
 **`release.settle`** — Delivery method: `push` (default, push to the base
 branch) or `pr` (open or update one pending release pull request on
-`rafa/release`). Read by `rafa release settle` and `rafa next`.
+`rafa/release`). Read by `rafa release settle` and `rafa next`, and by the
+ladder reading in `rafa doctor` and `rafa release workflows`.
 
 **`release.tag`** — Who tags the version: `manual` (default, tag by hand with
 `rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags
 the commit it pushed, one tag per unit it moves: `v<version>` for the root,
 `<name>@<version>` for a package, in unit order, stopping at the first that
-fails). Read by `rafa release settle` and `rafa release tag`. Under
+fails). Read by `rafa release settle` and `rafa release tag`, and by the
+ladder reading in `rafa doctor` and `rafa release workflows`. Under
 `release.settle: pr`, settle never tags: the tag waits for `rafa release tag`
 after that pull request merges, run by hand under `tag: manual`, and by the
 `release-tag.yml` workflow under `tag: settle`, which the release pull
@@ -389,7 +523,10 @@ read for it: that field names the tool a project installs with, and tagging
 person runs the publish command `rafa release tag` prints) or `ci` (the pushed
 tag publishes through the project's CI workflow). Any other value is refused.
 It is the third key the release ladder is read off, beside `release.settle`
-and `release.tag`.
+and `release.tag`. Its readers are `rafa release tag`, which prints the CI
+sentence in place of a publish line under `ci`, and the ladder reading in
+`rafa doctor` and `rafa release workflows`. `rafa release publish` does not
+read it: it runs `release.publishCommand`.
 
 **`release.moveLock`** — Boolean (default `false`, read through `flag`, so
 `"true"`, `yes` and `1` are refused). `true` has settle also write `rafa.lock`
