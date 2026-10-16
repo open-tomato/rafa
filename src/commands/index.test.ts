@@ -8,7 +8,7 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release list`, `board list`, `board sync`,
+ * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
  * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -183,6 +183,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release tag': ['text', 'json'],
   'release publish': ['text', 'json'],
   'release workflows': ['text', 'json'],
+  'release fragment': ['text', 'json'],
   'release list': ['text', 'json'],
   'board list': ['text', 'json'],
   'board sync': ['text', 'json'],
@@ -265,6 +266,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release tag': [[], ['push']],
   'release publish': [[], ['tag', 'dry-run']],
   'release workflows': [[], ['write']],
+  'release fragment': [[], ['plan', 'level', 'title', 'note', 'package']],
   'release list': [[], []],
   'board list': [[], []],
   'board sync': [[], ['dry-run']],
@@ -542,7 +544,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the six release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the seven release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, config show, ci status, stretch start, stretch item, stretch end, bug codes, docs plan, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -608,6 +610,7 @@ describe('the core roster', () => {
       'release tag',
       'release publish',
       'release workflows',
+      'release fragment',
       'release list',
       'board list',
       'board sync',
