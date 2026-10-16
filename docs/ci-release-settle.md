@@ -8,10 +8,11 @@ release process and merges always come through one gateway.
 
 Each time a pull request merges, a CI job:
 
-1. Checks out the base branch at the merge commit
+1. Checks out the base branch with full history
 2. Installs rafa and its dependencies
-3. Runs `rafa release settle` to fold waiting fragments into a version
-4. Optionally tags the released commit (if configured)
+3. Runs `rafa release settle` to fold waiting fragments into a version, push
+   the release commit and, under `release.tag: settle`, tag it
+4. Publishes the tagged release in the same run, through `release-publish.yml`
 
 Because `settle` is a pure function of committed data (the base branch's
 current version and the ordered fragments), every machine runs it the same way
@@ -35,63 +36,105 @@ coordination, no conflict with parallel PRs.
 - Each PR owns its own version (this workflow removes that; use fragments for
   release intent instead)
 
-## GitHub Actions workflow example
+## GitHub Actions workflow
 
-Create `.github/workflows/release-settle.yml`:
+rafa ships this workflow as a template, `release-settle.yml`, the one level 4
+of the release ladder needs. Install it with:
+
+```bash
+rafa release workflows --write
+```
+
+The command writes each workflow the level your `release` keys read as needs
+and that is missing, `.github/workflows/release-settle.yml` among them at level
+4 (`release.settle: push`, `release.tag: settle`, `release.publish: ci`), and
+leaves a file already there as it is. `rafa release workflows` alone lists each
+file as `present`, `differs` (your own edit) or `missing`.
+
+The template, as written:
 
 ```yaml
-name: Settle release after merge
+name: Release settle
 
 on:
   push:
-    branches:
-      - main
+    branches: ['**']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-settle
+  cancel-in-progress: false
 
 jobs:
   settle:
-    name: Settle fragments to version
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    timeout-minutes: 15
+    outputs:
+      release: ${{ steps.settle.outputs.release }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for fragment ordering
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install rafa
-        run: bun install -g @open-tomato/rafa
-
-      - name: Settle release fragments
-        run: rafa release settle
-
-      - name: Configure git user
+      - name: Set git identity
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Push release commit
-        run: git push origin main
-        if: success()
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
-      - name: Tag release (optional)
-        run: rafa release tag --from-settle
-        if: success()
+      - name: Settle
+        id: settle
+        shell: bash
+        run: |
+          # Runs `rafa release settle --output=json` (from the checkout in
+          # rafa's own repository, from a global install of
+          # @open-tomato/rafa elsewhere) and writes `release=<commit>` to
+          # the step's output when settle pushed a release commit and
+          # tagged it, `release=` otherwise.
+          ...
+
+  publish:
+    needs: settle
+    if: needs.settle.outputs.release != ''
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      ref: ${{ needs.settle.outputs.release }}
+    secrets: inherit
 ```
 
-The workflow:
+The Settle step's script is shortened here; `rafa release workflows --write`
+writes it whole. The workflow:
 
-- Runs only on pushes to `main` (customize for your base branch name)
-- Checks out full history so fragment ordering by first-parent commit works
-- Installs rafa from npm
+- Runs on a push to the repository's default branch. When `pr.base` names
+  another branch, write that branch's name in place of
+  `github.event.repository.default_branch` in the settle job's `if`;
+  `rafa release workflows` then reads the file as `differs`, which is not an
+  error.
+- Runs one settle at a time (`concurrency`), so two quick merges settle in
+  turn rather than racing.
+- Checks out full history so fragment ordering by first-parent commit works.
+- Sets a git identity before settle, which writes the release commit.
 - Runs settle (which is idempotent: if fragments already settled, it finds
-  nothing to do)
-- Configures git credentials so the settle commit can push
-- Tags the version if `release.tag: settle` is set in `.rafa/config.yaml`
+  nothing to do). Settle pushes the release commit to the base branch itself,
+  and under `release.tag: settle` tags it; no separate push or tag step runs.
+- Publishes in the same run. A commit or tag pushed with the workflow's
+  `GITHUB_TOKEN` starts no other workflow run, so the publish job calls
+  `release-publish.yml` through `workflow_call` with the release commit as
+  `ref` instead of waiting for that workflow's `push: tags` trigger. It runs
+  only when settle pushed a release commit and tagged it. `release-publish.yml`
+  is the level 2 template; `rafa release workflows --write` installs it too.
 
 ## Configuration for CI settle
 
@@ -106,15 +149,22 @@ In `.rafa/config.yaml`, choose how settle should behave:
 Settle pushes the release commit to the base branch. You tag releases by hand
 with `rafa release tag`.
 
-### Automated tagging
+### Automated tagging and publishing
 
 ```yaml
 release:
+  settle: push
   tag: settle
+  publish: ci
 ```
 
-Settle tags the commit it pushed with `v<version>`. Useful when releases are
-fully automated and you want a Git tag for each one.
+This is level 4 of the release ladder, the one the template above serves.
+Settle tags the commit it pushed, one tag per release unit it moved:
+`v<version>` for the root and `<name>@<version>` for a workspace package. The
+workflow's publish job then runs `release-publish.yml` on that commit, which
+publishes every unit whose tag points at it. Install both workflows with
+`rafa release workflows --write`. Without `publish: ci`, settle still tags, and
+you publish by hand.
 
 ### Protected base branch with review
 

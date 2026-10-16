@@ -35,11 +35,14 @@ interface Shape {
  * Each shipped template's triggers and permissions. The publish
  * workflow runs on a pushed tag or a `workflow_call` and mints an id
  * token; the tag workflow runs on a closed pull request and pushes a
- * tag, granting the token to its publish job alone.
+ * tag, granting the token to its publish job alone; the settle
+ * workflow runs on a push and pushes a release commit and its tags, and
+ * does the same.
  */
 const SHAPES: Readonly<Record<string, Shape>> = {
   'release-publish.yml': { triggers: ['push', 'workflow_call'], permissions: { contents: 'read', 'id-token': 'write' } },
   'release-tag.yml': { triggers: ['pull_request'], permissions: { contents: 'write' } },
+  'release-settle.yml': { triggers: ['push'], permissions: { contents: 'write' } },
 };
 
 /** The workflow at `file`, parsed. */
