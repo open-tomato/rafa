@@ -65,8 +65,8 @@ const SELECT = 'src/effort/sync/select.ts';
 const ROOT_MODULE = 'src/adapter-registry.ts';
 
 /** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
-const UNREGISTERED = 'adapter registry: no adapter is registered: import src/adapter-registry.ts,'
-  + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY';
+const UNREGISTERED = 'adapter registry: no adapter is registered: call registerCoreAdapters()'
+  + ' from src/adapter-registry.ts before reading CORE_ADAPTER_REGISTRY';
 
 /**
  * Every export name of each file, types included, sorted.

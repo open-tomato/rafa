@@ -506,8 +506,8 @@ export function activeAdapterRegistry(): AdapterRegistry {
 function registered(): AdapterRegistry {
   if (holdsNone(active)) {
     throw new Error(
-      `${REFUSAL}: no adapter is registered: import ${COMPOSITION_ROOT},`
-        + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY',
+      `${REFUSAL}: no adapter is registered: call registerCoreAdapters() from ${COMPOSITION_ROOT}`
+        + ' before reading CORE_ADAPTER_REGISTRY',
     );
   }
   return active;

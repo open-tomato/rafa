@@ -180,8 +180,8 @@ const BASE: AdapterRegistry = createAdapterRegistry([
 ]);
 
 /** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
-const UNREGISTERED = 'adapter registry: no adapter is registered: import src/adapter-registry.ts,'
-  + ' which registers core\'s adapters, before reading CORE_ADAPTER_REGISTRY';
+const UNREGISTERED = 'adapter registry: no adapter is registered: call registerCoreAdapters()'
+  + ' from src/adapter-registry.ts before reading CORE_ADAPTER_REGISTRY';
 
 /** What `restoreAdapters` throws when handed `CORE_ADAPTER_REGISTRY` itself. */
 const RESTORE_REFUSAL = 'adapter registry: CORE_ADAPTER_REGISTRY reads the active registry and cannot be made the active one;'
