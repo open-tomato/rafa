@@ -35,7 +35,22 @@
  * ## The tags read, and the order they are put in
  *
  * `git tag --list` answers every tag, and only the ones that parse as
- * `[v]<semver>` are release tags here. The latest is the highest by
+ * `[v]<semver>` or `<name>@<semver>` are release tags here. The first
+ * is a ROOT tag, `package: null`; the second is a workspace package's
+ * (`packageTag` in `./version-tag.ts` spells it), `<name>` a scoped or
+ * bare npm name: `@scope/plugin@0.2.0`, `plugin@0.2.0`. A tag naming
+ * no version in either shape is left out.
+ *
+ * {@link TagReading}'s `tags` holds every release tag, root and
+ * package alike, and its `latest` is the highest ROOT tag, so a
+ * reader of the root's release — `release status`'s `latest tag` row,
+ * `doctor`, `rafa release tag`'s refusal of a version already tagged,
+ * the untagged list — reads what it read before package tags were
+ * kept. {@link rootTags} and {@link latestTagOf} pick one unit's tags
+ * out of a reading; {@link readUntagged} compares root tags only,
+ * since the changelog it reads is the root's.
+ *
+ * The latest is the highest by
  * SEMVER PRECEDENCE and not the newest by date: a tag pushed today on
  * an old maintenance branch is not the latest release, and git's own
  * `--sort=v:refname` is a version-sort of its own that would make the
@@ -78,17 +93,28 @@ const ATX_HEADING = /^ {0,3}#{1,6}(?: |$)/;
 /** The open or close of a fenced code block. */
 const CODE_FENCE = /^ {0,3}(?:```|~~~)/;
 
-/** A tag naming a release: an optional `v`, then a version. */
-const RELEASE_TAG = /^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/;
+/** A semantic version as a tag spells it, captured whole. */
+const TAG_VERSION = '(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)';
+
+/** A root tag naming a release: an optional `v`, then a version. */
+const RELEASE_TAG = new RegExp(`^v?${TAG_VERSION}$`);
+
+/** A scoped or bare npm package name, as npm accepts one for a new package. */
+const PACKAGE_NAME = '((?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*)';
+
+/** A workspace package's tag naming a release: its name, `@`, then a version. */
+const PACKAGE_TAG = new RegExp(`^${PACKAGE_NAME}@${TAG_VERSION}$`);
 
 /** A prerelease identifier made only of digits, which compares numerically. */
 const NUMERIC_IDENTIFIER = /^(?:0|[1-9]\d*)$/;
 
 /** One tag of the repository that names a release. */
 export interface ReleaseTag {
-  /** The tag as git spells it: `v0.5.0`, or `0.5.0` without the prefix. */
+  /** The tag as git spells it: `v0.5.0`, `0.5.0` without the prefix, or `@scope/plugin@0.2.0`. */
   readonly tag: string;
-  /** The version it names, its `v` off. */
+  /** The workspace package the tag names a release of, or null for the root. */
+  readonly package: string | null;
+  /** The version it names, its `v` or package name off. */
   readonly version: string;
   /** That version parsed, which is what the order is taken from. */
   readonly parsed: SemanticVersion;
@@ -96,9 +122,9 @@ export interface ReleaseTag {
 
 /** What the repository's tags answered. */
 export interface TagReading {
-  /** Every tag of the repository that names a release, highest first. */
+  /** Every tag of the repository that names a release, root and package alike, highest first. */
   readonly tags: readonly ReleaseTag[];
-  /** The highest of them by semver precedence, or null when there is none. */
+  /** The highest ROOT tag by semver precedence, or null when there is none; see the module note. */
   readonly latest: ReleaseTag | null;
   /** What git said when the list could not be read, or null when it was. */
   readonly problem: string | null;
@@ -178,23 +204,41 @@ export function compareReleaseTags(left: ReleaseTag, right: ReleaseTag): number 
   return compareVersions(right.parsed, left.parsed);
 }
 
+/** `tag` read as a release tag, root or package, or null when it names no release. */
+function releaseTagOf(tag: string): ReleaseTag | null {
+  const root = RELEASE_TAG.exec(tag);
+  const found = PACKAGE_TAG.exec(tag);
+  const name = root === null
+    ? found?.[1] ?? null
+    : null;
+  const version = root?.[1] ?? found?.[2];
+  if (version === undefined) return null;
+  const parsed = parseSemanticVersion(version);
+  return parsed === null
+    ? null
+    : { tag, package: name, version, parsed };
+}
+
 /**
  * The tags of `text`, one per line as `git tag --list` writes them,
- * that name a release, highest by precedence first. A line naming no
- * version at all is left out.
+ * that name a release, root and package alike, highest by precedence
+ * first. A line naming no version in either shape is left out.
  */
 export function releaseTagsOf(text: string): readonly ReleaseTag[] {
-  const tags: ReleaseTag[] = [];
-  for (const line of text.split('\n')) {
-    const tag = line.trim();
-    const found = RELEASE_TAG.exec(tag);
-    const version = found?.[1];
-    if (version === undefined) continue;
-    const parsed = parseSemanticVersion(version);
-    if (parsed === null) continue;
-    tags.push({ tag, version, parsed });
-  }
-  return [...tags].sort(compareReleaseTags);
+  return text.split('\n')
+    .map((line) => releaseTagOf(line.trim()))
+    .filter((tag): tag is ReleaseTag => tag !== null)
+    .sort(compareReleaseTags);
+}
+
+/** The root's tags of `reading`, highest first: those naming no package. */
+export function rootTags(reading: TagReading): readonly ReleaseTag[] {
+  return reading.tags.filter((tag) => tag.package === null);
+}
+
+/** The highest tag of `reading` naming a release of `name`, null for the root's; null when it holds none. */
+export function latestTagOf(reading: TagReading, name: string | null): ReleaseTag | null {
+  return reading.tags.find((tag) => tag.package === name) ?? null;
 }
 
 /**
@@ -251,13 +295,15 @@ export function readTags(git: GitRunner): TagReading {
     return { tags: [], latest: null, problem: `the tags could not be listed: ${gitSaid(result)}` };
   }
   const tags = releaseTagsOf(result.stdout);
-  return { tags, latest: tags[0] ?? null, problem: null };
+  return { tags, latest: tags.find((tag) => tag.package === null) ?? null, problem: null };
 }
 
 /**
  * The versions the changelog at `configured` calls released, and which
- * of them carry no tag. An absent file sets `missing` beside its
- * problem; a file that exists and cannot be read sets the problem only.
+ * of them carry no ROOT tag: a package tag of `tags` names a release
+ * of that package, not of the changelog's. An absent file sets
+ * `missing` beside its problem; a file that exists and cannot be read
+ * sets the problem only.
  */
 export function readUntagged(
   root: string,
@@ -276,5 +322,6 @@ export function readUntagged(
     };
   }
   const released = changelogVersions(text);
-  return { path: configured, released, versions: untaggedVersions(released, tags), missing: false, problem: null };
+  const roots = tags.filter((tag) => tag.package === null);
+  return { path: configured, released, versions: untaggedVersions(released, roots), missing: false, problem: null };
 }

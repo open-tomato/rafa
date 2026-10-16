@@ -46,7 +46,7 @@ function tag(raw: string): ReleaseTag {
   const bare = raw.slice(1);
   const parsed = parseSemanticVersion(bare);
   if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
-  return { tag: raw, version: bare, parsed };
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** Readings that all agree and carry a receipt, narrowed by `over`. */

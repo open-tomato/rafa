@@ -160,7 +160,7 @@ function tag(raw: string): ReleaseTag {
     : raw;
   const parsed = version(bare);
   if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
-  return { tag: raw, version: bare, parsed };
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** A git result git writes for a command that worked. */
@@ -490,6 +490,13 @@ describe('the decision one run makes', () => {
 
     expect(refusal.reason).toBe('tagged');
     expect(refusal.message).toBe(`${VERSION} already names ${VERSION}, so there is nothing to tag`);
+  });
+
+  it('does not refuse for a package\'s tag naming the same version, which is no root tag', () => {
+    const plugin = { ...tag(VERSION), tag: `@scope/plugin@${VERSION}`, package: '@scope/plugin' };
+
+    expect(decideTag(inputs({ tags: { tags: [plugin, tag('v0.4.0')], latest: tag('v0.4.0'), problem: null } })))
+      .toEqual(READY);
   });
 
   it('refuses when the newest changelog section names another version, naming both files', () => {

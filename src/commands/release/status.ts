@@ -95,7 +95,7 @@ import { createGitRunner } from '../../pr/index.js';
 import { auditCell, auditLines, readAudit } from '../../release/audit.js';
 import { groupChangeNotes, renderNoteLines } from '../../release/changelog.js';
 import { highestChangeLevel } from '../../release/level.js';
-import { readTags, readUntagged } from '../../release/status-readings.js';
+import { readTags, readUntagged, rootTags } from '../../release/status-readings.js';
 import { readManifestVersion } from '../../release/version.js';
 
 import { readWaiting, waitingCell, waitingLines, waitingSettingsOf } from './status-fragments.js';
@@ -313,10 +313,10 @@ function versionFileCell(reading: VersionFileReading): string {
   return `${reading.path}: ${reading.version ?? UNREADABLE}`;
 }
 
-/** The latest tag's cell: the tag, and how many release tags there are. */
+/** The latest tag's cell: the root's latest tag, and how many root release tags there are. */
 function tagCell(reading: TagReading): string {
   if (reading.problem !== null) return UNREADABLE;
-  const held = `of ${reading.tags.length} release tags`;
+  const held = `of ${rootTags(reading).length} release tags`;
   return reading.latest === null
     ? `${NOTHING}, ${held}`
     : `${reading.latest.tag}, ${held}`;
@@ -495,7 +495,7 @@ export async function readStatus(
       readNotes,
     ),
     waiting: readWaiting(git, config.waiting),
-    audit: readAudit(project.root, config.changelog, tags.tags.map((tag) => tag.version)),
+    audit: readAudit(project.root, config.changelog, rootTags(tags).map((tag) => tag.version)),
     staleDocs: await readStaleDocsSafely(seams.readStaleDocs ?? readStaleDocs, project, config.tracker),
   };
   return { reading, text: renderStatus(reading) };

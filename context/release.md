@@ -173,7 +173,7 @@ needing retrofitted fragments and makes every pre-settle section acceptable.
 
 `src/release/receipt.ts` computes the boundary by reading the changelog;
 `src/release/audit.ts` in `rafa release status` audits the changelog and names
-any heading with no tag above the adoption boundary.
+any heading with no root tag above the adoption boundary.
 
 The `{title}` in `release.heading` renders the batch's plan titles in fold order
 joined by `; `, and `{date}` is the UTC date of the newest folded fragment's add
@@ -239,9 +239,12 @@ ordinary branch stamping a version still reads `stale`.
 last fetched) and prints:
 
 - The version `release.versionFile` declares now
-- The latest release tag by semantic version precedence
+- The latest root release tag (`v<version>`, or a bare `<version>`) by
+  semantic version precedence. A package's `<name>@<version>` tag is read
+  (`releaseTagsOf`, with `package` set) but neither counted nor taken as latest
+  here, and `rafa release tag` refuses `tagged` on a root tag only
 - Untagged versions marked in `release.changelog` (a changelog section with no
-  matching `v<version>` tag)
+  matching `v<version>` tag; a package's tag of that version does not count)
 - The fragments waiting on the base branch, one line each in fold order with
   level, add date and title, then `for <name>` when the fragment names a
   package, and the release that settle would produce from them: the root's,
@@ -260,7 +263,7 @@ last fetched) and prints:
 
 Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
 readers other folders import (`compareVersions`, `changelogVersions`,
-`readTags`, `readUntagged`) are its library half,
+`readTags`, `readUntagged`, `rootTags`) are its library half,
 `src/release/status-readings.ts`.
 
 **`rafa pr list`** shows each open pull request's forecast (the version and

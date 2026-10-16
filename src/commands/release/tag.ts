@@ -185,7 +185,7 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
-import { changelogVersions, readTags } from '../../release/status-readings.js';
+import { changelogVersions, readTags, rootTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
 import { versionTag } from '../../release/version-tag.js';
 import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
@@ -266,7 +266,7 @@ export type TagRefusalReason =
   | 'branch'
   /** The version file could not be read, or declares no version. */
   | 'version'
-  /** A tag already names that version. */
+  /** A root tag already names that version; a package's tag of the same version does not count. */
   | 'tagged'
   /** The changelog's newest section names another version, or none. */
   | 'changelog'
@@ -312,7 +312,7 @@ export interface TagInputs {
   readonly version: VersionReading;
   /** What the changelog's newest section names. */
   readonly changelog: ChangelogReading;
-  /** The repository's release tags, as `release status` reads them. */
+  /** The repository's release tags, as `release status` reads them; {@link decideTag} reads the root's. */
   readonly tags: TagReading;
   /** The commit that set the version, or null when there was no version to look for. */
   readonly release: ReleaseCommitReading | null;
@@ -522,7 +522,7 @@ export function decideTag(inputs: TagInputs): TagDecision {
   }
 
   if (inputs.tags.problem !== null) return refuse('git', inputs.tags.problem);
-  const held = inputs.tags.tags.find((candidate) => candidate.version === version);
+  const held = rootTags(inputs.tags).find((candidate) => candidate.version === version);
   if (held !== undefined) {
     return refuse('tagged', `${held.tag} already names ${version}, so there is nothing to tag`);
   }

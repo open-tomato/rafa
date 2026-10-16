@@ -34,6 +34,7 @@
 import type { StaleDocsReading } from './status-stale-docs.js';
 import type { ReleaseSeams, ReleaseStatusReading, ReleaseStatusResult } from './status.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { ReleaseTag } from '../../release/status-readings.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
@@ -107,11 +108,13 @@ function version(raw: string): ReturnType<typeof parseSemanticVersion> {
 }
 
 /** A release tag, for an ordering case. */
-function tag(raw: string): { tag: string; version: string; parsed: ReturnType<typeof version> } {
+function tag(raw: string): ReleaseTag {
   const bare = raw.startsWith('v')
     ? raw.slice(1)
     : raw;
-  return { tag: raw, version: bare, parsed: version(bare) };
+  const parsed = version(bare);
+  if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** A git result git writes for a command that worked. */
@@ -630,6 +633,15 @@ describe('the block', () => {
     expect(text).not.toContain('\n\n');
   });
 
+  it('counts the root\'s tags only in the latest tag cell, a package\'s tag left to its own row', () => {
+    const tags = releaseTagsOf('v0.4.0\n@scope/plugin@0.9.0\n');
+    const text = renderStatus(reading({ tags: { tags, latest: tags[1] ?? null, problem: null } }));
+
+    // The control: the package tag IS in the reading, and is the highest.
+    expect(tags.map((each) => each.tag)).toEqual(['@scope/plugin@0.9.0', 'v0.4.0']);
+    expect(cellOf(text, 'latest tag')).toBe('v0.4.0, of 1 release tags');
+  });
+
   it('says a repository with no release tag has none', () => {
     const text = renderStatus(reading({ tags: { tags: [], latest: null, problem: null } }));
 
@@ -748,6 +760,32 @@ describe('the dispatched action', () => {
     expect(data.reading.plan.stub).toBe(STUB);
     expect(data.reading.plan.notes).toHaveLength(1);
     expect(data.text).toContain('version file');
+  });
+
+  it('reads the untagged list and the audit against the root\'s tags, never a package\'s', async () => {
+    const project = freshProject();
+    writeFileSync(join(project.root, 'package.json'), '{"version": "0.5.0"}', 'utf8');
+    const changelog = '# Changelog\n\n## 0.5.0 — x\n\n<!-- rafa:fragments a1 -->\n\n## 0.4.0 — y\n';
+    writeFileSync(join(project.root, 'CHANGELOG.md'), changelog, 'utf8');
+
+    const packageOnly = dataOf((await ran(
+      recorded(gitTable('v0.4.0\n@scope/plugin@0.5.0\n')).seams,
+      project,
+      ['--output=json'],
+    )).events) as ReleaseStatusResult;
+    // The control: the same changelog with the root's own tag reads clean.
+    const rootTagged = dataOf((await ran(
+      recorded(gitTable('v0.4.0\nv0.5.0\n@scope/plugin@0.5.0\n')).seams,
+      project,
+      ['--output=json'],
+    )).events) as ReleaseStatusResult;
+
+    expect(packageOnly.reading.tags.tags).toHaveLength(2);
+    expect(packageOnly.reading.tags.latest?.tag).toBe('v0.4.0');
+    expect(packageOnly.reading.untagged.versions).toEqual(['0.5.0']);
+    expect(packageOnly.reading.audit.findings).toEqual([{ kind: 'untagged', version: '0.5.0' }]);
+    expect(rootTagged.reading.untagged.versions).toEqual([]);
+    expect(rootTagged.reading.audit.findings).toEqual([]);
   });
 
   it('reads the pending notes for the stub --plan names', async () => {
