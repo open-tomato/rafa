@@ -135,7 +135,7 @@ function plant(options: CaseOptions = {}): Case {
       const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, number: Number(args[2]), state: 'OPEN' };
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
-    tracker: () => ({ openIssues: async () => Promise.resolve([]) }),
+    tracker: () => ({ openIssues: async () => Promise.resolve([]), filedIssues: async () => Promise.resolve([]) }),
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();

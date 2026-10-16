@@ -50,6 +50,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { LEFTOVER_MARKER } from '../triage/leftover-repair.js';
 import { createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
@@ -92,6 +93,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const BASE = 'base0000000000000000';

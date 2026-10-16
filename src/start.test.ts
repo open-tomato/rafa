@@ -352,9 +352,11 @@ describe('the two directories start.ts points each call at', () => {
       expect(firstArgument(name)).not.toContain('checkout');
     }
     // The triage's store and issues stay at the project root; the checkout
-    // goes only to its kind check, which runs git and named tests there
+    // goes to `triageReport`, which takes its paths out and reads `Refs`
+    // there, and to its kind check, which runs git and named tests there
     // (`start/triage-kinds.ts`).
     expect(firstArgument('createStartTriage')).not.toContain('repoRoot: checkout');
+    expect(firstArgument('createStartTriage')).toContain('repoRoot, checkout,');
     expect(firstArgument('createStartTriage')).toContain('kinds: { checkout,');
     // The session record is written at the project root, and handed the
     // checkout only to record it as the run's `worktree` (`start/session.ts`).

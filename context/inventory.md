@@ -49,6 +49,12 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
    no longer open. The refused start still writes a run record under
    `.rafa/runs/` with state `stopped` and task `null`; that is not a crash.
 
+   A plan whose task edits an agent or a skill rafa bundles gets a note,
+   never a refusal, from `plan validate` and `plan create`. A clone whose
+   project copy differs from the installed rafa's would meet this collision
+   at `loop start`, so the command writes the pin as a `[human]` prerequisite,
+   once (`src/commands/plan/bundled-check.ts`).
+
 ### Collisions and the byte-identical rule
 
 Two or more loaded tiers holding the same kind and name with different contents

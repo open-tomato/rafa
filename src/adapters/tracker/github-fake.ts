@@ -86,6 +86,17 @@
  * A `--repo` naming another repository than the fake's own is refused
  * the same way.
  *
+ * `issue list --search` is a lower-cased substring of the title and the
+ * body, the source's, with one qualifier of GitHub's search syntax
+ * modelled, a rule of rafa's own: a `created:>=<time>` term, the time
+ * ISO 8601 to the second in UTC, is taken out of the text and keeps the
+ * issues opened at or after that time, in any state `--state` lets
+ * through, and the terms left, joined by one space, are the text. A
+ * `created:` term in any other form, `created:>` or `created:<=` among
+ * them, a `created:>=` naming a date alone, and a second `created:>=`
+ * are refused. Every other qualifier, `in:title` among them, is not
+ * modelled and is read as text, the source's.
+ *
  * Stdin is read by `gh issue edit --body-file -` alone, the one command
  * modelled to read it: a stdin handed to any other command is refused,
  * and so is that edit handed none, which `gh` would read as an empty
@@ -289,6 +300,51 @@ function labelValues(parsed: ParsedCommand, flag = '--label'): string[] {
   return (parsed.flags.get(flag) ?? []).flatMap((value) => value.split(','));
 }
 
+/** A time as the `created:>=` qualifier is modelled to read it: ISO 8601 to the second, in UTC. */
+const QUALIFIER_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+/** What an `issue list --search` asks for: a lower-cased text, and the time a `created:>=` term names. */
+interface SearchQuery {
+  /**
+   * The text, lower-cased: the whole value when it holds no `created:>=`
+   * term, else the terms left once it is taken out, joined by one space;
+   * undefined for none.
+   */
+  readonly text: string | undefined;
+  /** The `created:>=` time in milliseconds, or undefined when the search names none. */
+  readonly createdFrom: number | undefined;
+}
+
+/**
+ * Reads an `issue list --search` value, or answers what the fake refuses
+ * in it: a `created:>=<time>` term is taken out of the text, and a
+ * `created:` term in any other form is refused.
+ */
+function searchQuery(search: string | undefined): SearchQuery | GhResult {
+  if (search === undefined) return { text: undefined, createdFrom: undefined };
+  const terms = search.split(/\s+/).filter((term) => term !== '');
+  const times = terms.filter((term) => term.startsWith('created:>='));
+  const unmodelled = terms.find((term) => term.startsWith('created:') && !term.startsWith('created:>='));
+  if (unmodelled !== undefined) return failed(`fake gh: issue list --search does not model the qualifier ${unmodelled}\n`);
+  if (times.length > 1) return failed('fake gh: issue list --search models one created:>= term\n');
+  const time = times[0]?.slice('created:>='.length);
+  if (time !== undefined && (!QUALIFIER_TIME.test(time) || Number.isNaN(Date.parse(time)))) {
+    return failed(`fake gh: issue list --search models created:>= with a time to the second in UTC, and was handed ${time}\n`);
+  }
+  const text = time === undefined
+    ? search.toLowerCase()
+    : terms.filter((term) => !term.startsWith('created:>=')).join(' ')
+      .toLowerCase();
+  return {
+    text: text === ''
+      ? undefined
+      : text,
+    createdFrom: time === undefined
+      ? undefined
+      : Date.parse(time),
+  };
+}
+
 /** Makes a fake `gh` over an empty repository; see the module note. */
 export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
   const authOk = options.authOk ?? true;
@@ -415,15 +471,19 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       const state = flagValue(parsed, '--state') ?? 'open';
       if (!['open', 'closed', 'all'].includes(state)) return failed(`fake gh: does not model --state ${state}\n`);
       const wanted = labelValues(parsed);
-      const search = flagValue(parsed, '--search')?.toLowerCase();
+      const search = searchQuery(flagValue(parsed, '--search'));
+      if ('ok' in search) return search;
+      const { text, createdFrom } = search;
 
-      // Newest first, as recorded. The search is a lower-cased substring
-      // of the title and body, the source's; GitHub's search syntax is
-      // not modelled.
+      // Newest first, as recorded. The search text is a lower-cased
+      // substring of the title and body, the source's; a `created:>=`
+      // term keeps the issues opened at or after its time, and an issue
+      // whose time does not read is never one of them.
       const rows = [...issues.values()]
         .filter((issue) => state === 'all' || issue.state.toLowerCase() === state)
         .filter((issue) => wanted.every((label) => issue.labels.includes(label)))
-        .filter((issue) => search === undefined || `${issue.title}\n${issue.body}`.toLowerCase().includes(search))
+        .filter((issue) => text === undefined || `${issue.title}\n${issue.body}`.toLowerCase().includes(text))
+        .filter((issue) => createdFrom === undefined || Date.parse(issue.createdAt) >= createdFrom)
         .sort((a, b) => b.number - a.number)
         .slice(0, limit)
         .map((issue) => render(issue, fields));

@@ -248,8 +248,9 @@ The keys are: `release.fragments` (path, default `.changes/`), `release.strategy
 (fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
 default `push`), `release.tag` (`manual` or `settle`, default `manual`),
 `release.publishCommand` (the publish line `rafa release tag` prints and never
-runs, default `npm publish`). `pr.versionCollision` controls what happens when a merge would collide
-(default `report`). Read `context/release.md` for the full design,
+runs, default `npm publish`), and `release.moveLock` (`true` has settle write
+`rafa.lock` in its release commit, default `false`). `pr.versionCollision`
+controls what happens when a merge would collide (default `report`). Read `context/release.md` for the full design,
 `docs/ci-release-settle.md` for automating settle in CI, and
 `rafa release settle --help` for the settle command.
 
@@ -408,7 +409,12 @@ writes it; you can change it.
   `project` pin while a loaded user tier does; pin the tier the refusal
   names, or delete or rename the copy it names. `loop start` refuses a
   plan that names an agent or a skill it cannot resolve before any
-  session is paid for.
+  session is paid for. `rafa plan validate` names a plan whose task edits
+  an agent or a skill rafa bundles, with the pin that item needs, and
+  writes the pin as a `[human]` prerequisite of the plan, so a clone that
+  merges the plan sets the pin itself; that note is never a refusal. The
+  pin is not set at merge, since a pin is per clone and gitignored, and
+  one set unasked would hide the drift `doctor` shows.
 - User-tier items are invisible unless `loop.settingSources` includes
   `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
   <name>` copies one in or updates it, and `rafa skill check .claude/skills

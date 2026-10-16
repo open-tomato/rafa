@@ -42,6 +42,7 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
@@ -176,6 +177,8 @@ function triageFor(f: Fixture): StartTriage {
       prerequisitesOptional: [],
       triageSimilarityThreshold: 0.3,
       triageSimilarityCandidates: 3,
+      ...ISSUES_DEFAULTS,
+      errorsCodes: [],
     },
     env: {},
     resolve: () => Promise.resolve({

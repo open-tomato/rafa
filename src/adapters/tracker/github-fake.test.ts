@@ -27,6 +27,19 @@
  * reddened its own refusal row here and no adapter case: a label added
  * that the repository lacks, which reddened the case adding it once made
  * as well, one added that the issue holds, and one removed that it lacks.
+ *
+ * Eight mutations of the `created:>=` qualifier were driven on
+ * 2026-10-15 over this file and `github.test.ts`, at 196 pass before and
+ * after, the module restored byte-identical (sha256) after each, and each
+ * reddened a case here and none in the adapter's file: the qualifier
+ * ignored, two cases; a time strictly after, the boundary case; the other
+ * `created:` forms accepted, two refusal rows; the term left in the text,
+ * eight cases; a date alone accepted, two refusal rows; an undated issue
+ * kept, the undated case; every qualifier refused, and a search with no
+ * `created:>=` term rejoined by one space, the other-qualifier case. The
+ * first form of this change refused every qualifier and reddened four
+ * cases of `closed-issue-triage.test.ts` and `issue/create.test.ts`,
+ * whose searches hold `line:` and `in:title`.
  */
 import type { FakeGh } from './github-fake.js';
 
@@ -186,6 +199,74 @@ describe('the recorded gh fake', () => {
     expect(await listed(fake, '--state', 'all', '--label', 'bug')).toBe('[{"number":2},{"number":1}]\n');
     expect(await listed(fake, '--state', 'all', '--search', 'REPLAY')).toBe('[{"number":3},{"number":1}]\n');
     expect(await listed(fake, '--state', 'all', '--limit', '1')).toBe('[{"number":3}]\n');
+  });
+
+  it('keeps the issues opened at or after a created:>= time in any state, the rest of the search still the text', async () => {
+    const times = ['2026-10-14T01:29:38Z', '2026-10-14T01:29:39Z', '2026-10-14T03:00:00Z'];
+    const fake = createFakeGh({ now: () => times.shift() ?? '' });
+    await fake.run(issueCreate('Replay before the cut-off', 'bug'));
+    await fake.run(issueCreate('Replay at the cut-off', 'bug'));
+    await fake.run(issueCreate('Cookie after the cut-off', 'bug'));
+    await fake.run(closeIssue('3', 'completed'));
+    const since = 'created:>=2026-10-14T01:29:39Z';
+
+    expect(fake.issue('1')).toMatchObject({ state: 'OPEN', createdAt: '2026-10-14T01:29:38Z' });
+    expect(fake.issue('3')).toMatchObject({ state: 'CLOSED', createdAt: '2026-10-14T03:00:00Z' });
+    expect(await listed(fake, '--state', 'all', '--search', since)).toBe('[{"number":3},{"number":2}]\n');
+    expect(await listed(fake, '--state', 'all', '--label', 'bug', '--search', since)).toBe('[{"number":3},{"number":2}]\n');
+    expect(await listed(fake, '--search', since)).toBe('[{"number":2}]\n');
+    expect(await listed(fake, '--state', 'all', '--search', `REPLAY ${since}`)).toBe('[{"number":2}]\n');
+    expect(await listed(fake, '--state', 'all', '--search', `${since}  the  cut-off`)).toBe('[{"number":3},{"number":2}]\n');
+    expect(await listed(fake, '--state', 'all', '--search', 'created:>=2026-10-14T03:00:01Z')).toBe('[]\n');
+    expect(await listed(fake, '--state', 'all')).toBe('[{"number":3},{"number":2},{"number":1}]\n');
+  });
+
+  it('never lists an issue whose time does not read against a created:>= time, beside one whose time does', async () => {
+    const fake = createFakeGh({ now: () => '2026-10-14T03:00:00Z' });
+    await fake.run(issueCreate('Dated', 'bug'));
+    await fake.run(issueCreate('Undated', 'bug'));
+    fake.update('2', (issue) => ({ ...issue, createdAt: 'not a time' }));
+
+    expect(await listed(fake, '--search', 'created:>=2026-10-14T01:29:39Z')).toBe('[{"number":1}]\n');
+    expect(await listed(fake)).toBe('[{"number":2},{"number":1}]\n');
+  });
+
+  it('reads every other qualifier as text, the source\'s, and a search with no created:>= term whole', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('Roadmap', 'bug'));
+    await fake.run(issueCreate('Key  line: 12', 'bug'));
+
+    expect(await listed(fake, '--search', 'Roadmap in:title')).toBe('[]\n');
+    expect(await listed(fake, '--search', 'roadmap')).toBe('[{"number":1}]\n');
+    expect(await listed(fake, '--search', 'key  LINE: 12')).toBe('[{"number":2}]\n');
+    expect(await listed(fake, '--search', 'key line: 12')).toBe('[]\n');
+  });
+
+  it.each([
+    ['created:<=2026-10-14T01:29:39Z replay', 'fake gh: issue list --search does not model the qualifier created:<=2026-10-14T01:29:39Z\n'],
+    ['created:>2026-10-14T01:29:39Z', 'fake gh: issue list --search does not model the qualifier created:>2026-10-14T01:29:39Z\n'],
+    [
+      'created:>=2026-10-14',
+      'fake gh: issue list --search models created:>= with a time to the second in UTC, and was handed 2026-10-14\n',
+    ],
+    [
+      'created:>=2026-10-14T01:29:39.000Z',
+      'fake gh: issue list --search models created:>= with a time to the second in UTC, and was handed 2026-10-14T01:29:39.000Z\n',
+    ],
+    [
+      'created:>=2026-13-45T01:29:39Z',
+      'fake gh: issue list --search models created:>= with a time to the second in UTC, and was handed 2026-13-45T01:29:39Z\n',
+    ],
+    [
+      'created:>=2026-10-14T01:29:39Z created:>=2026-10-15T00:00:00Z',
+      'fake gh: issue list --search models one created:>= term\n',
+    ],
+  ])('refuses the search %p, beside the created:>= search it answers', async (search, stderr) => {
+    const fake = createFakeGh({ now: () => '2026-10-14T03:00:00Z' });
+    await fake.run(issueCreate('Replay', 'bug'));
+
+    expect(await fake.run(['issue', 'list', '--json', 'number', '--search', search])).toEqual(failure(stderr));
+    expect(await listed(fake, '--search', 'replay created:>=2026-10-14T01:29:39Z')).toBe('[{"number":1}]\n');
   });
 
   it('answers the recorded failures for no login, no remote, an unknown issue and an unexpandable path', async () => {

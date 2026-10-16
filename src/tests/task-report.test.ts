@@ -384,6 +384,50 @@ describe('a report\'s change notes, stored under a plan stub', () => {
     expect(await storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done', learning: null })).toBe(true);
     expect(readPlanChanges(root, 'a-plan-stub')).toHaveLength(2);
   });
+
+  it('keeps what, artifact and security in an out_of_scope_bugs row whose entry carries the four keys', async () => {
+    const root = join(tempRoot, 'bug-four-keys');
+    mkdirSync(root, { recursive: true });
+    const output = [
+      'Done: a bug was seen.',
+      '',
+      `${FENCE}rafa:report`,
+      'status: done',
+      'findings: []',
+      'blockers: []',
+      'out_of_scope_bugs:',
+      '  - what: "a stand-in bug"',
+      '    artifact: "stand-in bug artifact"',
+      '    security: true',
+      '    kind: bug',
+      '    module: "src/stand-in"',
+      '    action: "run the stand-in"',
+      '    reproduce: "run the stand-in: it fails"',
+      '    cause: "the stand-in: it was never built"',
+      FENCE,
+      '',
+    ].join('\n');
+    const dispatch = {
+      sessionId: 'dddd-1111',
+      taskText: 'Record a bug with the four keys',
+      output,
+      declaration: null,
+      flags: [],
+      resolver: null,
+      skillsOffered: [],
+      lessonsOffered: [],
+    };
+
+    expect(await storeTaskReport({ repoRoot: root, planStub: 'a-plan-stub', dispatch, outcome: 'done', learning: null })).toBe(true);
+
+    const db = new Database(sqliteStorePath(root), { readonly: true });
+    try {
+      expect(db.query<Record<string, unknown>, []>('SELECT what, artifact, security FROM out_of_scope_bugs ORDER BY seq').all())
+        .toEqual([{ what: 'a stand-in bug', artifact: 'stand-in bug artifact', security: 1 }]);
+    } finally {
+      db.close();
+    }
+  });
 });
 
 /** The command every run executes. */
@@ -425,6 +469,11 @@ const REPORT = [
   'out_of_scope_bugs:',
   '  - what: "a stand-in bug"',
   '    security: false',
+  '    kind: bug',
+  '    module: "src/stand-in"',
+  '    action: "run the stand-in"',
+  '    reproduce: "run the stand-in: it fails"',
+  '    cause: "the stand-in: it was never built"',
   FENCE,
   '',
 ].join('\n');

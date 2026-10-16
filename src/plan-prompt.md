@@ -45,7 +45,9 @@ on the `open-tomato/rafa` board.
   list of gaps for not-ready. Every gap carries `heading`, `what` and
   `blocking: true` or `blocking: false`, and a gap that is NOT blocking also
   carries the `assumption:` you would plan under — one sentence naming the
-  guess, not a restatement of the gap. A gap is blocking when guessing wrong
+  guess, not a restatement of the gap. Write every one of the three values,
+  `heading`, `what` and `assumption`, in double quotes, so that a `: ` or a
+  ` #` inside one stays part of its text. A gap is blocking when guessing wrong
   changes what ships or what is safe; write no plan while one gap is blocking,
   and plan under your stated assumptions when every gap is non-blocking.
   The block is the LAST thing you write: end the final message with it, after

@@ -29,6 +29,7 @@ import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
 
@@ -56,6 +57,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const OUTPUT = [

@@ -115,6 +115,19 @@
  * `env` names another. `triageReport` redacts every filed text of them, and
  * this module redacts every failure it warns about.
  *
+ * ## The checkout, its git and the bug record
+ *
+ * Every `triageReport` is handed the run's checkout
+ * ({@link StartTriageOptions.checkout}, the repo root when left out), a
+ * git runner in it, the environment the secrets are read from, and the
+ * rules a bug record is checked against, `bugRulesOf`
+ * (`config-schema-issues.ts`) over the run's resolved config, read once
+ * when the triage is made. Paths are taken out over the checkout and the
+ * repo root in one pass, here as in `triageReport`, so a run in a
+ * worktree outside the project names neither in a filed body nor in a
+ * line printed here. The store and both issue directories stay at the
+ * repo root.
+ *
  * ## A failure never stops the run
  *
  * The triage never rejects. A blocker text not written, a bug skipped or
@@ -148,15 +161,45 @@
  * Every line goes through the active output (`core/output/active.ts`):
  * what was written, filed or commented on through `info`, and everything
  * that was not through `warn`.
+ *
+ * ## A filed bug, onto the project
+ *
+ * Once a report's lines are printed and its routes stored, each bug it
+ * filed on the public `github` tracker is added to the repository's
+ * project and filled, through `addFiledBugs`
+ * (`board/project/add-filed.ts`), in the order filed. Every line that add
+ * answers is printed last, as a warning under the `Triage: ` prefix,
+ * redacted of the named secrets, so it follows the bug's `filed` note
+ * whatever the task's own output does. Nothing is sent with
+ * `board.project.number` unset, nor for a bug commented on, inherited,
+ * failed, skipped, routed elsewhere, filed on another kind of tracker or
+ * filed privately.
+ *
+ * The runner every project call goes through is
+ * {@link StartTriageProjectSeams.gh}, or a `gh` runner in the repo root
+ * when left out, opened retrying (`board/project/project-runner.ts`) with
+ * each retry reported to the active output. It is opened at most once per
+ * run, and only once a report filed a bug the add sends calls for.
+ *
+ * The add never rejects: a project the token may not read, a number
+ * naming no project, or a refresh that failed is each a warning line, and
+ * the task's tracker line and stored reference stand as the triage left
+ * them. A throw from it all the same is the `nothing more was triaged`
+ * warning above, never a rejection to `start()`.
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { RefreshAddedItems } from '../board/project/add-issue.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
+import type { IssuesConfigSettings } from '../config-schema-issues.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { InheritedTriage } from '../triage/inherited.js';
 import type { KindRouteOptions } from '../triage/kind-route.js';
-import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triage.js';
+import type { BugTriage, SecretEnvironment, TriageOptions, TriageResult } from '../triage/triage.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
@@ -164,11 +207,16 @@ import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/stor
 import { homedir } from 'node:os';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { addFiledBugs } from '../board/project/add-filed.js';
+import { openProjectRunner } from '../board/project/project-runner.js';
+import { bugRulesOf } from '../config-schema-issues.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';
 import { inheritedFailureOf } from '../triage/inherited.js';
@@ -214,6 +262,19 @@ function foundByText(bug: BugTriage): string {
     : `${found} (score ${scoreText(bug.score)})`;
 }
 
+/**
+ * How the add of a filed bug reaches the project, the shape of an epic
+ * action's seams; see the module note.
+ */
+export interface StartTriageProjectSeams {
+  /** Runs every project call; a `gh` runner in the repo root when left out. */
+  readonly gh?: GhRunner;
+  /** The refresh of each added issue; `refreshProjectItems` when left out. */
+  readonly projectRefresh?: RefreshAddedItems;
+  /** The wait before a retried call and between two writes; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
 /** What the run's triage is made with. */
 export interface StartTriageOptions {
   /** The repo root: where the store and both issue directories live, and the chain's context. */
@@ -221,7 +282,10 @@ export interface StartTriageOptions {
   /**
    * The run's resolved config: `tracker.default` and `tracker.fallback` for
    * the chain, the prerequisite tiers whose `env` items name secrets, and
-   * the `triage.similarity` settings.
+   * the `triage.similarity` settings, the `issues` keys and
+   * `errors.codes` the bug record's rules are read from, and the
+   * `board.project` keys and the rest of what the project refresh reads,
+   * for the add of each filed bug.
    */
   readonly config: Pick<
     RafaConfig,
@@ -231,9 +295,26 @@ export interface StartTriageOptions {
     | 'prerequisitesOptional'
     | 'triageSimilarityThreshold'
     | 'triageSimilarityCandidates'
+    | keyof IssuesConfigSettings
+    | 'errorsCodes'
+    | keyof RefreshConfig
   >;
-  /** The environment the secrets' values are read from. `process.env` when left out. */
+  /**
+   * The environment the secrets' values are read from, handed to every
+   * `triageReport` as its own. `process.env` when left out.
+   */
   readonly env?: SecretEnvironment;
+  /**
+   * The checkout the run's tasks run in: the repo root, or a worktree of
+   * it. Its paths are taken out of every filed and printed text with the
+   * repo root's, and `triageReport` reads `Refs` in it. The repo root
+   * when left out.
+   */
+  readonly checkout?: string;
+  /** A git runner in {@link checkout}, handed to every `triageReport`. `createGitRunner(checkout)` when left out. */
+  readonly git?: GitRunner;
+  /** Triages one report. `triageReport` when left out; a seam for tests. */
+  readonly triageReport?: (options: TriageOptions) => Promise<TriageResult>;
   /** Resolves the chain. `resolveTracker` over the core registry when left out. */
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Where security bugs go. `triageReport`'s own, under the repo root, when left out. */
@@ -247,6 +328,8 @@ export interface StartTriageOptions {
    * existed.
    */
   readonly kinds?: StartKindOptions;
+  /** How each filed bug's add reaches the project; see the module note. */
+  readonly project?: StartTriageProjectSeams;
 }
 
 /** One task whose report `start()` has just stored. */
@@ -558,14 +641,39 @@ function inheritedByIndex(
  * the run-start baseline not yet read. See the module note.
  */
 export function createStartTriage(options: StartTriageOptions): StartTriage {
-  const secrets = namedSecrets(options.config, options.env ?? process.env);
+  const env = options.env ?? process.env;
+  const secrets = namedSecrets(options.config, env);
   const redact = (text: string): string => redactSecrets(text, secrets);
-  const local = localPathRedactor(options.repoRoot, homedir());
+  const checkout = options.checkout ?? options.repoRoot;
+  const local = localPathRedactor([checkout, options.repoRoot], homedir());
+  const git = options.git ?? createGitRunner(checkout);
+  const bugRules = bugRulesOf(options.config);
+  const triage = options.triageReport ?? triageReport;
   const kindReader: KindReader | null = options.kinds === undefined
     ? null
     : createKindReader(options.kinds);
   let publicTracker: Promise<Tracker> | null = null;
   let inherited: InheritedTriage | null = null;
+  let projectGh: GhRunner | null = null;
+  const project = options.project ?? {};
+
+  const openProjectGh = (): GhRunner => {
+    projectGh ??= openProjectRunner(project.gh ?? createGhRunner({ cwd: options.repoRoot }), options.config, project.sleep === undefined
+      ? {}
+      : { sleep: project.sleep });
+    return projectGh;
+  };
+
+  const addToProject = (result: TriageResult): Promise<readonly string[]> => addFiledBugs({
+    config: options.config,
+    openGh: openProjectGh,
+    ...(project.projectRefresh === undefined
+      ? {}
+      : { refresh: project.projectRefresh }),
+    ...(project.sleep === undefined
+      ? {}
+      : { sleep: project.sleep }),
+  }, result);
 
   const inheritedFor = (trackerPath: string): InheritedTriage => {
     inherited ??= { failures: runStartFailures(trackerPath), commented: new Set() };
@@ -596,7 +704,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       ? undefined
       : kindReader();
     const dispatch = dispatchOf(input);
-    const result = await triageReport({
+    const result = await triage({
       repoRoot: options.repoRoot,
       trackerPath: input.trackerPath,
       lineNum: input.lineNum,
@@ -610,6 +718,10 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       inherited: run,
       similarity: options.config,
       kinds,
+      checkout,
+      git,
+      env,
+      bugRules,
     });
 
     const routes = bugRouteEntriesOf(result, report, saidKindsOf(reading.block.body));
@@ -620,6 +732,8 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
     for (const warning of warnings) activeOutput().warn(`${INDENT}${warning}`);
     for (const warning of unstored) activeOutput().warn(`${INDENT}${LINE_PREFIX}${redact(warning)}`);
     for (const failure of named.values()) emitLoopEvent({ kind: 'inherited', file: failure.file, name: failure.name });
+    const added = await addToProject(result);
+    for (const warning of added) activeOutput().warn(`${INDENT}${LINE_PREFIX}${redact(warning)}`);
     return result;
   };
 

@@ -41,6 +41,11 @@
  * (`buildSettle`, #842), and says so in a `Changelog:` line above the
  * delivery's — the dry run in the same words, before its own last line;
  * a delivery that refused prints no such line, since nothing landed.
+ * Under `release.moveLock` a `Lock:` line follows it the same way: the
+ * dry run says `rafa.lock` would move from the base's version to the
+ * new one, or that the release commit creates it when the base holds
+ * none, and a landed delivery says it moved; with the key off, or
+ * after a refused delivery, no `Lock:` line is printed.
  * After a push that was retried, the
  * reading printed is the REBUILT one, the batch the base now holds.
  *
@@ -79,6 +84,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RefreshItems } from '../../board/project/add-issue.js';
 import type { GitRunner, PullRequests } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleReading, SettleSettings } from '../../release/settle.js';
@@ -172,6 +178,7 @@ function settleSettings(config: RafaConfig): SettleSettings {
     releaseFragments: config.releaseFragments,
     releaseStrategy: config.releaseStrategy,
     releaseHeading: config.releaseHeading,
+    releaseMoveLock: config.releaseMoveLock,
   };
 }
 
@@ -238,16 +245,26 @@ function createdChangelogLine(changelog: string): string {
   return `Changelog: ${changelog} is missing, so the release commit creates it under "${CHANGELOG_TITLE}".`;
 }
 
+/** The dry run's line naming how the release commit would move `rafa.lock`. */
+function plannedLockLine(lock: SettleLockPlan): string {
+  return lock.from === null
+    ? `Lock: ${lock.path} is missing, so the release commit creates it at ${lock.to}.`
+    : `Lock: ${lock.path} would move from ${lock.from} to ${lock.to}.`;
+}
+
 /**
  * The dry run's answer: the reading, and what a settle would commit.
  * `changelog` is `release.changelog`, named in a line of its own when
- * the base lacks it and the settle would create it.
+ * the base lacks it and the settle would create it; a reading whose
+ * `lock` is set, under `release.moveLock`, adds how `rafa.lock` would
+ * move.
  */
 export function dryRunResult(reading: SettleReading, ref: string, branch: string, changelog: string): ReleaseSettleResult {
   const base = { dryRun: true, delivery: null, reading, delivered: null, tag: null };
   const lines = [...readingLines(reading, ref)];
   if (reading.outcome === 'folded') {
     if (reading.changelogMissing) lines.push(createdChangelogLine(changelog));
+    if (reading.lock !== null) lines.push(plannedLockLine(reading.lock));
     lines.push(`Dry run: settle would commit "${releaseCommitSubject(reading.version)}" on ${branch}; nothing was written.`);
     return resultOf(base, lines, null);
   }
@@ -301,6 +318,9 @@ export function settledResult(
   const landed = delivered.outcome.outcome === 'pushed' || delivered.outcome.outcome === 'delivered';
   if (landed && reading.outcome === 'built' && reading.createdChangelog !== null) {
     lines.push(createdChangelogLine(reading.createdChangelog));
+  }
+  if (landed && reading.outcome === 'built' && reading.lock !== null) {
+    lines.push(`Lock: ${reading.lock.path} moved to ${reading.lock.to}.`);
   }
   lines.push(ending.line);
   if (tag.outcome === 'failed') return resultOf(base, lines, `❌ ${tag.sentence}`);
@@ -371,6 +391,9 @@ export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_R
       + ' checkout it runs from is never touched. It lists the fragments under `release.fragments` in the order'
       + ' the base received them, folds them through `release.strategy` into the next version and one'
       + ' changelog section, writes both (creating `release.changelog` under `# Changelog` when the base lacks it), deletes the folded fragments and commits `chore: release <version>`.'
+      + ' With `release.moveLock: true` the same commit writes `rafa.lock` at the root to the new version,'
+      + ' creating it when the base holds none, and the settle is refused, writing nothing, when the lock'
+      + ' does not read or the version file names a package other than rafa.'
       + ' With `release.settle: push` (the default) the commit is pushed to the base, never forced; a refused'
       + ' push fetches again and ends as settled when another run released the same fragments, or rebuilds'
       + ' and pushes once more. With `release.settle: pr` it goes to `rafa/release` and one pending release'

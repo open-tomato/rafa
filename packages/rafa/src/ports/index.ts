@@ -45,9 +45,10 @@
  *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
  *     is opened, {@link IssueType} gains `epic` and `spec`, and the note on
  *     `IssueRef.externalId` names the `local` adapter's issue number
- *     where the source named a file path. Three members are rafa's own
+ *     where the source named a file path. Four members are rafa's own
  *     and absent from the source, all optional: the `openIssues`
- *     reading, with the {@link OpenIssue} it answers, and the `editable`
+ *     reading, with the {@link OpenIssue} it answers, the `filedIssues`
+ *     reading, with the {@link FiledIssue} it answers, and the `editable`
  *     and `edit` pair `rafa issue edit` writes through, with the
  *     {@link EditableIssue} and {@link IssueEdit} they take and answer. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
@@ -326,6 +327,27 @@ export interface OpenIssue {
 }
 
 /**
+ * One issue as `filedIssues` answers it: where it lives, the title and
+ * body it holds, and when it was filed. rafa's own type, absent from the
+ * source.
+ *
+ * Unlike {@link OpenIssue}, its creation time is never null: a listing
+ * by filing time cannot place an undated issue against its cut-off, so
+ * an adapter never answers one.
+ */
+export interface FiledIssue {
+  readonly ref: IssueRef;
+  readonly title: string;
+  /** The body as the tracker holds it, unnormalised. */
+  readonly body: string;
+  /**
+   * When the issue was created, as an ISO 8601 date and time with its
+   * offset.
+   */
+  readonly createdAt: string;
+}
+
+/**
  * One issue as `editable` answers it: what `rafa issue edit` weighs
  * before it writes, read in one call. rafa's own type, absent from the
  * source.
@@ -434,6 +456,18 @@ export interface Tracker {
    * issues, and a caller that needs them goes without.
    */
   openIssues?: (type: IssueType) => Promise<OpenIssue[]>;
+  /**
+   * The issues of `type` filed after `since`, in any state: one closed
+   * since it was filed is listed beside the open ones, so a caller asking
+   * what was filed after a time does not lose an issue closed before it
+   * asks. Each carries its title, its body and the time it was created,
+   * in the order the adapter lists them. An issue whose creation time the
+   * tracker does not hold, or holds unreadable, is never answered: a
+   * listing by filing time cannot place it against `since`. rafa's own
+   * member, absent from the source, and optional: a tracker without it
+   * reads no filed issues, and a caller that needs them goes without.
+   */
+  filedIssues?: (type: IssueType, since: Date) => Promise<FiledIssue[]>;
   /**
    * The issue's title, body, open state, labels and author, in one
    * read, with its priority on a tracker whose `edit` writes one.

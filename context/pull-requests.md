@@ -655,6 +655,11 @@ the session check 3 is part of, so a refusal from it spends no session:
    writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
    the standing it answers is `assumed` and the command does not refuse.
 
+   Whatever the verdict, each issue the reader filed against the block is
+   one warning line of its own (`reviewIssueWarning`), so a block read only
+   after its `heading`, `what` and `assumption` values were quoted names
+   its line on the terminal, `verdict: ready` included.
+
    A MISSING or malformed block is not that verdict and is not treated as
    one. It is weighed against the plan the session wrote: one that
    `plan validate` reads without an issue STANDS, with one warning, no
@@ -1085,6 +1090,11 @@ runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
 spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
 `afterMerge`). `--yes` does not answer that question; every failure is a warning.
+Each blocker's state is read the way `rafa issue unblock` reads it
+(`src/board/blocker-states.ts`): one `gh issue list --state all --limit 500`,
+then one `gh issue view <n> --json number,state` for each blocker that a full
+listing did not hold. A blocker whose state is not read counts as not cleared,
+so its issue keeps the label and the run names it `#<n> (state not read)`.
 
 In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
 the open issues the merge freed, read through the port's `freedBy`, and sends no

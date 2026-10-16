@@ -2,17 +2,21 @@
  * `rafa plan validate <file>`: a plan file read by `parsePlan`, every
  * issue the parser reports written out, and exit code 1 when there is
  * one. This is the command half: the command, its roster check, its
- * effort-store rules and what it writes. The reading of the one file,
+ * effort-store rules, its bundled-item notes and what it writes. The
+ * reading of the one file,
  * `validatePlan` with its `PlanValidation`, is the library half,
  * `../../plan/validate.ts`, which any folder may import.
  *
  * ## What is read
  *
  * The one file the line names, resolved against the working directory as
- * a shell completes it, wherever it sits: the command reads no config and
- * no repository, though the dispatcher runs it only inside a project, as
- * it runs every command but `module exec`, `init` and `describe`. It reads that file and
- * nothing else, and starts no
+ * a shell completes it, wherever it sits, though the dispatcher runs it
+ * only inside a project, as it runs every command but `module exec`,
+ * `init` and `describe`. Beside that file it reads only what the checks
+ * below name: the config and the tiers for the roster, the
+ * `PREREQUISITES-<stub>.md` beside the plan for the store rules, and the
+ * project's bundle for the bundled-item edits, the one thing it writes
+ * being their pins. It starts no
  * Claude Code session: `validate.test.ts` runs it with a stand-in `claude`
  * first on the PATH and finds the stand-in never called, where
  * `rafa plan create` under the same planting calls it.
@@ -78,16 +82,35 @@
  * roster, they are the command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
  * planner's plan with and which reads one file only.
  *
+ * ## The bundled-item edits
+ *
+ * After both, the command reads which agents and skills rafa bundles
+ * the plan's still-to-run tasks edit, with `findBundledEdits` of
+ * `./bundled-check.ts`, against the project's `src/bundled/` and the
+ * `.claude/` links into it: a clone that merges such a plan holds a
+ * project copy differing from the installed rafa's, and its next
+ * `loop start` refuses the collision until the tier is pinned. Each edit
+ * is a note, never a refusal: one line at `info` per edit,
+ * `<file>:<lines>: <the line `bundledEditLine` words>` naming the item,
+ * the path as typed and the `pinLine` pin, then what became of the pin.
+ * When nothing else refuses the plan, `writeTierPins` writes each pin as
+ * a `[human]` item of the `PREREQUISITES-<stub>.md` beside it, which a
+ * second run leaves as it is; a plan something refuses gets its notes and
+ * no write, and so does a plan not named `PLAN-<stub>.md`, which has no
+ * such file. A file that cannot be written is warned about and changes
+ * no exit code. Handed no project, the command reads no edit, and the
+ * line saying no agent was checked says so too.
+ *
  * ## What it writes
  *
  * With nothing to report, json mode gives the terminal result `data`:
  * `file` (absolute), the number of `stages`, the task counts under
  * `tasks`, an empty `issues`, an empty `missingAgents`, an empty
- * `skillCollisions`, an empty `unresolvedSkills` and an empty
- * `storeProblems`, with the `warnings` `validatePlan` answered, which
- * end nothing. Text mode
- * writes one line naming the file as typed, its stages and its counts,
- * and does not write the warnings.
+ * `skillCollisions`, an empty `unresolvedSkills`, an empty
+ * `storeProblems` and the `bundledEdits` read, one `BundledEdit` each,
+ * with the `warnings` `validatePlan` answered, which end nothing. Text
+ * mode writes one line naming the file as typed, its stages and its
+ * counts, after the bundled-edit notes, and does not write the warnings.
  *
  * With issues, each is written at `error`, in line order, as
  * `<file>:<line>: <reason>: <text>`, with the file as typed and the line
@@ -102,7 +125,8 @@
  * skill, the task lines that asked for it, why and what settles it.
  * Each broken store rule follows those, at `error`, as
  * `<file>:<line>: <rule>: <text>` (`storeRuleLine`), the text ending
- * with what to write instead. The command then
+ * with what to write instead. The bundled-edit notes follow those, at
+ * `info`, each saying its pin was not written. The command then
  * throws `CommandExit` with exit code 1 and a message counting what it
  * found, which text mode writes to stderr and json mode carries in the
  * terminal result.
@@ -110,6 +134,7 @@
  * A line naming no file or more than one, and a path that is no file,
  * are refused with exit code 1 before anything is parsed.
  */
+import type { BundledEdit } from './bundled-check.js';
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
@@ -118,11 +143,12 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
 
 import {
@@ -136,7 +162,9 @@ import {
 } from '../../agents/roster.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';
+import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 
+import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
 import { expectOneArgument } from './plan-files.js';
 import { checkStoreRules } from './store-check.js';
 
@@ -160,6 +188,8 @@ export interface RosterFindings {
 export interface PlanValidationResult extends PlanValidation, RosterFindings {
   /** Every effort-store rule the plan breaks, in line order; see the module note. */
   readonly storeProblems: readonly StoreRuleProblem[];
+  /** Every bundled agent and skill the still-to-run tasks edit; empty when no project was found. See the module note. */
+  readonly bundledEdits: readonly BundledEdit[];
 }
 
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
@@ -185,7 +215,8 @@ async function resolvedConfig(project: ProjectFound, warn: (message: string) => 
 async function checkRoster(context: RafaContext, markdown: string): Promise<RosterFindings> {
   const project = context.project;
   if (project === null) {
-    context.output.info('ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked.');
+    context.output.info('ℹ️  No project was found from the working directory, so no `agent=` or `skills=` was checked'
+      + ' and no edit of a bundled agent or skill was read.');
     return { missingAgents: [], skillCollisions: [], unresolvedSkills: [] };
   }
 
@@ -199,6 +230,62 @@ async function checkRoster(context: RafaContext, markdown: string): Promise<Rost
     skillCollisions: collidingPlanSkills(markdown, roster),
     unresolvedSkills: unresolvedPlanSkills(markdown, roster),
   };
+}
+
+/** The bundled agents and skills the plan's still-to-run tasks edit, read in the project; none without one. */
+function readBundledEdits(context: RafaContext, markdown: string): readonly BundledEdit[] {
+  return context.project === null
+    ? []
+    : findBundledEdits(markdown, { repoRoot: context.project.root });
+}
+
+/** What became of the pins of one plan's bundled edits; see the module note. */
+interface PinOutcome {
+  /** The prerequisites file as the typed plan path spells it, or null when the plan's name carries no stub. */
+  readonly file: string | null;
+  /** True when something refuses the plan, so nothing was written. */
+  readonly refused: boolean;
+  /** The edits an item was written for in this run. */
+  readonly written: readonly BundledEdit[];
+  /** True when the file could not be written. */
+  readonly failed: boolean;
+}
+
+/**
+ * Writes the pins of `edits` into the prerequisites file beside the plan
+ * at `file` unless the plan is `refused`, warning when it cannot; see
+ * the module note.
+ */
+function writeBundledPins(
+  context: RafaContext,
+  plan: { readonly file: string; readonly typed: string },
+  edits: readonly BundledEdit[],
+  refused: boolean,
+): PinOutcome {
+  const path = prerequisitesPathForPlan(plan.file);
+  const outcome: PinOutcome = { file: prerequisitesPathForPlan(plan.typed), refused, written: [], failed: false };
+  if (refused || path === null || edits.length === 0) return outcome;
+  try {
+    return { ...outcome, written: writeTierPins(path, basename(plan.file), edits) };
+  } catch (error) {
+    context.output.warn(`${outcome.file ?? path}: the tier pins could not be written: ${messageOf(error)}`);
+    return { ...outcome, failed: true };
+  }
+}
+
+/** What became of `edit`'s pin, as the tail of its note. */
+function pinTail(edit: BundledEdit, outcome: PinOutcome): string {
+  if (outcome.refused) return 'not written while the plan is refused';
+  if (outcome.file === null) return 'not written, since a plan not named PLAN-<stub>.md has no PREREQUISITES file';
+  if (outcome.failed) return `not written to ${outcome.file}`;
+  return outcome.written.includes(edit)
+    ? `written to ${outcome.file} as a [human] prerequisite`
+    : `already held by ${outcome.file}`;
+}
+
+/** Writes one note per bundled edit, each saying what became of its pin. */
+function noteBundledEdits(context: RafaContext, typed: string, edits: readonly BundledEdit[], outcome: PinOutcome): void {
+  for (const edit of edits) context.output.info(`ℹ️  ${bundledEditLine(typed, edit)}, ${pinTail(edit, outcome)}.`);
 }
 
 /** How many of each kind of refusal one plan met. */
@@ -257,11 +344,15 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       + ' names migration `<id>`, a command running src/rafa.ts, dist/cli.js or bun run rafa without a leading'
       + ' RAFA_EFFORT_DIR=, or no [auto] `rafa effort schema --check` probe in its PREREQUISITES), then exits 1'
       + ' — the same check'
-      + ' `rafa loop start` halts on before it dispatches anything. The path is read relative to the'
-      + ' working directory; the agents are read from the project found from it and the config that'
-      + ' resolves there, and are left unchecked when there is no project. With `--output=json` each issue'
-      + ' and each missing agent is an error log event, and a plan with neither is the data of the terminal'
-      + ' result event.',
+      + ' `rafa loop start` halts on before it dispatches anything. A task that edits an agent or a skill'
+      + ' rafa bundles, under src/bundled/ or through a .claude/ link into it, gets a note naming the item'
+      + ' and the `tiers.agents` or `tiers.skills` pin a clone that merges the plan needs, never a refusal;'
+      + ' when nothing refuses the plan the pin is written as a [human] item of the PREREQUISITES-<stub>.md'
+      + ' beside it, once. The path is read relative to the'
+      + ' working directory; the agents and the bundle are read from the project found from it and the'
+      + ' config that resolves there, and are left unread when there is no project. With `--output=json`'
+      + ' each issue and each missing agent is an error log event, each note an info log event, and a plan'
+      + ' with neither is the data of the terminal result event, its `bundledEdits` listing the edits.',
     args: [
       {
         name: 'file',
@@ -274,11 +365,13 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
     examples: [
       {
         cmd: 'rafa plan validate .rafa/plans/PLAN-my-feature.md',
-        note: 'Prints one line when the plan reads as written, or one error line per issue and exits 1.',
+        note: 'Prints one line when the plan reads as written, after a note per bundled agent or skill a task'
+          + ' edits with its pin written to PREREQUISITES-my-feature.md, or one error line per issue and exits 1.',
       },
       {
         cmd: 'rafa plan validate .rafa/plans/PLAN-my-feature.md --output=json',
-        note: 'Writes a start event, an error log event per issue, then a result event.',
+        note: 'Writes a start event, an error log event per issue, then a result event whose bundledEdits'
+          + ' names each bundled item a task edits.',
       },
     ],
     outputs: ['text', 'json'],
@@ -291,7 +384,8 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
       const findings = await checkRoster(context, markdown);
       const { missingAgents, skillCollisions, unresolvedSkills } = findings;
       const storeProblems = checkStoreRules(file, markdown);
-      const result: PlanValidationResult = { ...validation, ...findings, storeProblems };
+      const bundledEdits = readBundledEdits(context, markdown);
+      const result: PlanValidationResult = { ...validation, ...findings, storeProblems, bundledEdits };
       const counts = {
         issues: issues.length,
         agents: missingAgents.length,
@@ -299,14 +393,18 @@ export function createPlanValidateCommand(workingDirectory: WorkingDirectory = (
         unresolved: unresolvedSkills.length,
         store: storeProblems.length,
       };
-      if (Object.values(counts).some((count) => count > 0)) {
+      const refused = Object.values(counts).some((count) => count > 0);
+      const pins = writeBundledPins(context, { file, typed }, bundledEdits, refused);
+      if (refused) {
         for (const issue of issues) context.output.error(issueLine(typed, issue));
         for (const agent of missingAgents) context.output.error(`${typed}: ${missingAgentLine(agent)}`);
         for (const skill of skillCollisions) context.output.error(`${typed}: ${skillCollisionLine(skill)}`);
         for (const skill of unresolvedSkills) context.output.error(`${typed}: ${unresolvedSkillLine(skill)}`);
         for (const problem of storeProblems) context.output.error(storeRuleLine(typed, problem));
+        noteBundledEdits(context, typed, bundledEdits, pins);
         throw new CommandExit(1, refusalFor(typed, counts));
       }
+      noteBundledEdits(context, typed, bundledEdits, pins);
       if (context.outputMode === 'json') {
         context.output.result(result);
         return;

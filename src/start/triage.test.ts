@@ -53,15 +53,40 @@
  * Three mutations of `src/start.ts`, restored sha256-identical, each changed
  * its reading: the call dropped, the triage run before the store (the
  * finding's trigger and what lost), and the task line off by one.
+ *
+ * {@link CONFIG} leaves `board.project.number` unset, so no case above the
+ * project's own sends a project call. Those cases set it, and route every
+ * `gh` call through one runner that answers the repository read itself
+ * and hands the rest to the project fake (`board/project/project-fake.ts`)
+ * and the facts fake (`board/project/facts-fake.ts`), as
+ * `board/project/add-filed.test.ts` builds it, so the real refresh fills
+ * the added item and no case reaches `gh`. Their public tracker is a
+ * `local` one spied as kind `github`, whose `create` answers a GitHub ref
+ * to an issue the fake repository holds. A refused add is read beside the
+ * same report with the number unset, whose tracker file and stored
+ * reference it matches.
+ *
+ * One report listing a filed bug, a recurring one commented on, a security
+ * bug and one with no `what` is read through a planted refresh that records
+ * each issue list it is asked for, beside the same report without the filed
+ * bug, which adds nothing; two filed bugs numbered out of order show the
+ * adds follow the report's order. A report with the number unset records no
+ * `gh` call and prints no line beside the same report with it set, and a
+ * `json` output holds each warning of the add as a `warn` log event after
+ * the filed notes.
  */
 import type {
   StartTriage,
   StartTriageOptions,
   TaskTriageInput,
 } from './triage.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { TriageResult } from '../triage/triage.js';
-import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { RefreshAddedItems } from '../board/project/add-issue.js';
+import type { ProjectRefresh } from '../board/project/refresh.js';
+import type { TriageOptions, TriageResult } from '../triage/triage.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import '../adapter-registry.js';
@@ -87,13 +112,20 @@ import {
   it,
 } from 'bun:test';
 
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 
+import { createJsonOutput } from '../adapters/output/json.js';
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { createFakeFactsGh } from '../board/project/facts-fake.js';
+import { createGhProjectPort } from '../board/project/gh.js';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
+import { scopeWarning } from '../board/project/refresh-warnings.js';
+import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { bugKeyOf, createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
+import { bugKeyOf, createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
@@ -144,6 +176,16 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
+  boardProjectNumber: null,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
+  boardRelationships: 'labels',
+  roadmapIssue: null,
+  releaseFragments: '.changes',
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
@@ -965,5 +1007,497 @@ describe('the run\'s similarity settings', () => {
 
     expect(second?.bugs.map((bug) => [bug.action, bug.foundBy])).toEqual([['filed', null]]);
     expect(issueNames(f.publicDir)).toEqual(['1.md', '2.md']);
+  });
+});
+
+describe('what each triageReport is handed', () => {
+  /** A git runner that spawns nothing: it records each call and answers `abc1234` to every one. */
+  function fakeGit(): { readonly git: GitRunner; readonly calls: (readonly string[])[] } {
+    const calls: (readonly string[])[] = [];
+    return {
+      calls,
+      git: (args) => {
+        calls.push(args);
+        return { ok: true, stdout: 'abc1234\n', stderr: '' };
+      },
+    };
+  }
+
+  /** A `triageReport` that records the options it is handed, then triages through the real one. */
+  function capturing(): { readonly seen: TriageOptions[]; readonly report: (options: TriageOptions) => Promise<TriageResult> } {
+    const seen: TriageOptions[] = [];
+    return {
+      seen,
+      report: (options) => {
+        seen.push(options);
+        return triageReport(options);
+      },
+    };
+  }
+
+  const oneBug = sessionOutput({ bugs: [['The parser drops a line', 'ERR_ONE', false]] });
+
+  it('carries the checkout, the fake git runner, the environment and the bug rules read from the config', async () => {
+    captureLines();
+    const f = fixture();
+    const checkout = mkdtempSync(join(tempBase, 'checkout-'));
+    const { git, calls } = fakeGit();
+    const env = { CI: 'true' };
+    const config: StartTriageOptions['config'] = {
+      ...CONFIG,
+      issuesEnvironments: ['staging'],
+      issuesVocabularyModules: ['parser'],
+      errorsCodes: [{ code: 'parse:dropped-line', description: 'a line is dropped', hint: 'keep the line', level: 'error' }],
+    };
+    const { seen, report } = capturing();
+
+    await triageFor(f, chainLanding(f.publicSpy.tracker), { checkout, git, env, config, triageReport: report })(taskInput(f, oneBug));
+
+    expect(seen).toHaveLength(1);
+    const [handed] = seen;
+    expect(handed?.repoRoot).toBe(f.root);
+    expect(handed?.checkout).toBe(checkout);
+    expect(handed?.git).toBe(git);
+    expect(handed?.env).toBe(env);
+    expect(handed?.bugRules).toEqual(bugRulesOf(config));
+    expect(handed?.bugRules?.environments).toContain('staging');
+    expect(handed?.bugRules?.modules).toEqual(['parser']);
+    expect(handed?.bugRules?.codes.map((entry) => entry.code)).toContain('parse:dropped-line');
+    // The record reads the code version through the runner handed, and the
+    // place through the environment handed: the fake's answer to the status
+    // read is a changed file, so the commit reads dirty. The store and the
+    // issue stay at the repo root all the same.
+    expect(calls).toEqual([['rev-parse', '--short', 'HEAD'], ['status', '--porcelain', '--untracked-files=no']]);
+    expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    const [filed] = issueFiles(f.publicDir);
+    expect(filed?.contents).toContain('## Environment\n\nci\n');
+    expect(filed?.contents).toContain(`## Versions\n\n\`\`\`\nrafa: ${RAFA_VERSION}\ncode: abc1234-dirty\n\`\`\`\n`);
+  });
+
+  it('left without a checkout, a git runner or an environment, hands the repo root, a runner of its own and the process environment', async () => {
+    captureLines();
+    const f = fixture();
+    const { git } = fakeGit();
+    const { seen, report } = capturing();
+
+    await createStartTriage({
+      repoRoot: f.root,
+      config: CONFIG,
+      resolve: chainLanding(f.publicSpy.tracker).resolve,
+      privateTracker: f.privateSpy.tracker,
+      triageReport: report,
+    })(taskInput(f, oneBug));
+
+    const [handed] = seen;
+    expect(handed?.checkout).toBe(f.root);
+    expect(typeof handed?.git).toBe('function');
+    expect(handed?.git).not.toBe(git);
+    expect(handed?.env).toBe(process.env);
+    expect(handed?.bugRules).toEqual(bugRulesOf(CONFIG));
+  });
+
+  it('takes a worktree path outside the project out of the filed body, where a triage without the checkout leaves it in', async () => {
+    captureLines();
+    const outside = mkdtempSync(join(tempBase, 'outside-worktree-'));
+    const what = `The parser drops a line in ${join(outside, 'src', 'parse.ts')}`;
+    const output = sessionOutput({ bugs: [[what, 'ERR_OUTSIDE', false]] });
+
+    const handed = fixture();
+    await triageFor(handed, chainLanding(handed.publicSpy.tracker), { checkout: outside, git: fakeGit().git })(taskInput(handed, output));
+    const plain = fixture();
+    await triageFor(plain, chainLanding(plain.publicSpy.tracker))(taskInput(plain, output));
+
+    const [filed] = issueFiles(handed.publicDir);
+    expect(filed?.contents).toContain('The parser drops a line in src/parse.ts');
+    expect(filed?.contents).not.toContain(outside);
+    const [control] = issueFiles(plain.publicDir);
+    expect(control?.contents).toContain(outside);
+  });
+
+  it('takes the default worktree\'s .rafa/worktrees/<stub>/ prefix out of the filed body, where a triage without the checkout leaves it in', async () => {
+    captureLines();
+    const stubPath = (root: string): string => join(root, '.rafa', 'worktrees', 'demo-stub');
+    const output = (root: string): string => sessionOutput({
+      bugs: [[`The parser drops a line in ${join(stubPath(root), 'src', 'parse.ts')}`, 'ERR_WORKTREE', false]],
+    });
+
+    const handed = fixture();
+    mkdirSync(stubPath(handed.root), { recursive: true });
+    await triageFor(handed, chainLanding(handed.publicSpy.tracker), { checkout: stubPath(handed.root), git: fakeGit().git })(
+      taskInput(handed, output(handed.root)),
+    );
+    const plain = fixture();
+    await triageFor(plain, chainLanding(plain.publicSpy.tracker))(taskInput(plain, output(plain.root)));
+
+    const [filed] = issueFiles(handed.publicDir);
+    expect(filed?.contents).toContain('The parser drops a line in src/parse.ts');
+    expect(filed?.contents).not.toContain('.rafa/worktrees/demo-stub');
+    const [control] = issueFiles(plain.publicDir);
+    expect(control?.contents).toContain('.rafa/worktrees/demo-stub/src/parse.ts');
+  });
+});
+
+/** The owner of the fake repository and of its project. */
+const PROJECT_OWNER = 'open-tomato';
+
+/** The project's number, set in {@link PROJECT_CONFIG}. */
+const PROJECT_NUMBER = 6;
+
+/** The issue the `github` public tracker files a bug as: one the fake repository holds. */
+const FILED_ISSUE = 41;
+
+/** {@link CONFIG} with `board.project.number` set. */
+const PROJECT_CONFIG: StartTriageOptions['config'] = { ...CONFIG, boardProjectNumber: PROJECT_NUMBER };
+
+/** GitHub's documented refusal for a token with no project scope, as `board/project/add-issue.test.ts` plants it; NOT a reading. */
+const SCOPE_STDERR = 'gh: Your token has not been granted the required scopes to execute this query. The \'projectV2\' field requires one of the following scopes: [\'read:project\'], but your token has only been granted the: [\'repo\'] scopes.\n';
+
+/** The bug every project case's report lists, public, with an artifact. */
+const PROJECT_BUG: BugEntry = ['The parser drops a line', 'ERR_ONE', false];
+
+function answered(value: unknown): GhResult {
+  return { ok: true, stdout: JSON.stringify(value), stderr: '' };
+}
+
+/** The ref the `github` public tracker answers for the bug it files as `issue`. */
+function githubRefOf(issue: number): IssueRef {
+  return {
+    opt: 0,
+    kind: 'github',
+    externalId: String(issue),
+    url: `https://github.com/${FAKE_PROJECT_REPOSITORY}/issues/${String(issue)}`,
+  };
+}
+
+/** The ref the `github` public tracker answers for each bug it files. */
+const FILED_REF: IssueRef = githubRefOf(FILED_ISSUE);
+
+/** One case's fixture, its `github` public tracker, the project fake and the runner routing to it. */
+interface ProjectScene {
+  readonly f: Fixture;
+  readonly github: Spied;
+  readonly project: ReturnType<typeof createFakeProjectGh>;
+  readonly gh: GhRunner;
+  /** Every `gh` call the runner was handed, in order. */
+  readonly calls: readonly (readonly string[])[];
+}
+
+/**
+ * A fresh fixture whose public tracker is of kind `github` and files its
+ * bugs as `issues`, in order (the last again for any bug beyond them),
+ * beside a project holding no item and a runner answering the repository
+ * read and the board listing itself and routing every `gh api` call to
+ * the facts or the project fake. The tracker reads every issue back open
+ * and takes every comment, as GitHub would for the issues it filed.
+ */
+function projectScene(issues: readonly number[] = [FILED_ISSUE]): ProjectScene {
+  const f = fixture();
+  let filedCount = 0;
+  const local = createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+  const inner: Tracker = {
+    ...local,
+    get: (ref) => Promise.resolve({ ...draftFixture({ title: 'a bug' }), ref, state: 'todo' }),
+    comment: () => Promise.resolve(),
+  };
+  const github = spy(inner, {
+    kind: 'github',
+    create: () => {
+      const issue = issues[Math.min(filedCount, issues.length - 1)] ?? FILED_ISSUE;
+      filedCount += 1;
+      return Promise.resolve(githubRefOf(issue));
+    },
+  });
+  const project = createFakeProjectGh({
+    projects: [{ owner: PROJECT_OWNER, number: PROJECT_NUMBER, items: [] }],
+    owners: [PROJECT_OWNER],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues }],
+  });
+  const facts = createFakeFactsGh({
+    issues: [
+      { number: 1, state: 'OPEN', labels: ['type:roadmap'] },
+      ...issues.map((number) => ({ number, state: 'OPEN' as const, labels: ['type:bug'] })),
+    ],
+  });
+  const listed = (number: number, labels: readonly string[], body: string): Readonly<Record<string, unknown>> => ({
+    number,
+    title: `#${String(number)}`,
+    body,
+    state: 'OPEN',
+    stateReason: '',
+    labels: labels.map((name) => ({ name })),
+  });
+  const roadmap = listed(1, ['type:roadmap'], '');
+  const calls: (readonly string[])[] = [];
+  const gh: GhRunner = (args) => {
+    calls.push(args);
+    const line = args.join(' ');
+    if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
+    if (line.startsWith('issue list --label type:roadmap --state open')) return Promise.resolve(answered([roadmap]));
+    if (line.startsWith('issue list --state all')) return Promise.resolve(answered([roadmap, ...issues.map((number) => listed(number, ['type:bug'], ''))]));
+    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api') return project.gh(args);
+    return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
+  };
+  return { f, github, project, gh, calls };
+}
+
+/** The Stage each issue's item on the project holds, by issue number, read through the project port. */
+async function projectStages(gh: GhRunner): Promise<Readonly<Record<number, string | null>>> {
+  const port = createGhProjectPort(gh);
+  const found = await port.find({ owner: PROJECT_OWNER, number: PROJECT_NUMBER });
+  const items = await port.items(found?.id ?? '');
+  return Object.fromEntries(items.flatMap(({ content, values }) => {
+    if (content.kind !== 'issue') return [];
+    const stage = values.get('Stage');
+    return [[content.number, stage?.kind === 'option'
+      ? stage.name
+      : null] as const];
+  }));
+}
+
+/** One line the active output was handed, with its level, in the order handed. */
+type OrderedLine = readonly [level: 'info' | 'warn', message: string];
+
+/** Sets a sink output as the active output, answering its info and warn lines in one list, in order. */
+function captureOrdered(): OrderedLine[] {
+  const lines: OrderedLine[] = [];
+  setActiveOutput(sinkOutput({
+    info: (message) => {
+      lines.push(['info', message]);
+    },
+    warn: (message) => {
+      lines.push(['warn', message]);
+    },
+  }));
+  return lines;
+}
+
+/** The scene's triage, its chain landing on the `github` tracker and every project call routed to the fakes. */
+function projectTriage(
+  scene: ProjectScene,
+  config: StartTriageOptions['config'] = PROJECT_CONFIG,
+  projectRefresh?: RefreshAddedItems,
+): StartTriage {
+  return triageFor(scene.f, chainLanding(scene.github.tracker), {
+    config,
+    project: {
+      gh: scene.gh,
+      sleep: () => Promise.resolve(),
+      ...projectRefresh === undefined
+        ? {}
+        : { projectRefresh },
+    },
+  });
+}
+
+/** The line a {@link plantedRefresh} answers for `issue`, as its first warning. */
+function plantedLine(issue: number): string {
+  return `refreshed #${String(issue)}`;
+}
+
+/** The line a {@link plantedRefresh} answers for `issue`, as its second warning. */
+function plantedSecondLine(issue: number): string {
+  return `refreshed #${String(issue)} again`;
+}
+
+/** A refresh that records each issue list it is asked for and answers `lines` warnings for each issue. */
+function plantedRefresh(
+  asked: (readonly number[])[],
+  lines: readonly ((issue: number) => string)[] = [plantedLine],
+): RefreshAddedItems {
+  return (_options, issues) => {
+    asked.push(issues);
+    return Promise.resolve<ProjectRefresh>({
+      kind: 'skipped',
+      reason: 'no-issues',
+      warnings: issues.flatMap((issue) => lines.map((line) => line(issue))),
+    });
+  };
+}
+
+/** The issues the scene's project holds as items, in the order added. */
+async function projectHeld(scene: ProjectScene): Promise<number[]> {
+  const port = createGhProjectPort(scene.gh);
+  const found = await port.find({ owner: PROJECT_OWNER, number: PROJECT_NUMBER });
+  const items = await port.items(found?.id ?? '');
+  return items.flatMap(({ content }) => (content.kind === 'issue'
+    ? [content.number]
+    : []));
+}
+
+/** A bug that recurs: filed by one report, commented on by the next. */
+const RECURRING_BUG: BugEntry = ['The cache serves a stale row', 'ERR_RECUR', false];
+
+/** A second public bug, distinct from {@link PROJECT_BUG}. */
+const SECOND_BUG: BugEntry = ['The writer truncates a file', 'ERR_TWO', false];
+
+/** A bug the report marks security: it goes to the private tracker. */
+const SECURITY_BUG: BugEntry = ['The token is written to the log', 'ERR_TOKEN', true];
+
+/** A bug with no `what`: nothing is filed for it. */
+const NO_WHAT_BUG: BugEntry = ['', null, null];
+
+/** The lines of `lines` handed at `level`, in order. */
+function atLevel(lines: readonly OrderedLine[], level: OrderedLine[0]): string[] {
+  return lines
+    .filter(([handed]) => handed === level)
+    .map(([, message]) => message);
+}
+
+describe('the bugs of one report, onto the project', () => {
+  it('adds the filed bug alone, where the recurring bug commented on, the security bug and the bug with no what send nothing', async () => {
+    captureLines();
+    const scene = projectScene([40, 41]);
+    const asked: (readonly number[])[] = [];
+    const triage = projectTriage(scene, PROJECT_CONFIG, plantedRefresh(asked));
+    await triage(taskInput(scene.f, sessionOutput({ bugs: [RECURRING_BUG] }), 'session-1'));
+    expect(asked).toEqual([[40]]);
+
+    const lines = captureOrdered();
+    const result = await triage(taskInput(
+      scene.f,
+      sessionOutput({ bugs: [RECURRING_BUG, PROJECT_BUG, SECURITY_BUG, NO_WHAT_BUG] }),
+      'session-2',
+    ));
+
+    expect(result?.bugs.map((bug) => [bug.channel, bug.action])).toEqual([
+      ['public', 'commented'],
+      ['public', 'filed'],
+      ['private', 'filed'],
+      ['private', 'skipped'],
+    ]);
+    expect(result?.bugs.map((bug) => bug.ref?.externalId ?? null).slice(0, 2)).toEqual(['40', '41']);
+    expect(asked).toEqual([[40], [41]]);
+    expect(await projectHeld(scene)).toEqual([40, 41]);
+    expect(atLevel(lines, 'warn').filter((line) => line.includes('refreshed'))).toEqual([`   Triage: ${plantedLine(41)}`]);
+  });
+
+  it('control: the same report without the filed bug adds nothing beyond the issue the first report filed', async () => {
+    captureLines();
+    const scene = projectScene([40, 41]);
+    const asked: (readonly number[])[] = [];
+    const triage = projectTriage(scene, PROJECT_CONFIG, plantedRefresh(asked));
+    await triage(taskInput(scene.f, sessionOutput({ bugs: [RECURRING_BUG] }), 'session-1'));
+
+    const lines = captureOrdered();
+    const result = await triage(taskInput(
+      scene.f,
+      sessionOutput({ bugs: [RECURRING_BUG, SECURITY_BUG, NO_WHAT_BUG] }),
+      'session-2',
+    ));
+
+    expect(result?.bugs.map((bug) => bug.action)).toEqual(['commented', 'filed', 'skipped']);
+    expect(asked).toEqual([[40]]);
+    expect(await projectHeld(scene)).toEqual([40]);
+    expect(atLevel(lines, 'warn').filter((line) => line.includes('refreshed'))).toEqual([]);
+  });
+
+  it('adds each of two filed bugs in the order the report lists them, and prints their lines in that order', async () => {
+    const lines = captureOrdered();
+    const scene = projectScene([42, 41]);
+    const asked: (readonly number[])[] = [];
+
+    const result = await projectTriage(scene, PROJECT_CONFIG, plantedRefresh(asked))(
+      taskInput(scene.f, sessionOutput({ bugs: [PROJECT_BUG, SECOND_BUG] })),
+    );
+
+    expect(result?.bugs.map((bug) => bug.ref?.externalId ?? null)).toEqual(['42', '41']);
+    expect(asked).toEqual([[42], [41]]);
+    expect(await projectHeld(scene)).toEqual([42, 41]);
+    expect(atLevel(lines, 'warn')).toEqual([`   Triage: ${plantedLine(42)}`, `   Triage: ${plantedLine(41)}`]);
+  });
+});
+
+describe('a report with board.project.number unset', () => {
+  it('records no gh call and prints no line, where the same report with the number set sends calls and prints the refresh\'s line', async () => {
+    const report = sessionOutput({ bugs: [PROJECT_BUG] });
+
+    const unsetLines = captureOrdered();
+    const unset = projectScene();
+    const unsetAsked: (readonly number[])[] = [];
+    await projectTriage(unset, CONFIG, plantedRefresh(unsetAsked))(taskInput(unset.f, report));
+    const unsetCalls = [...unset.calls];
+
+    const setLines = captureOrdered();
+    const set = projectScene();
+    const setAsked: (readonly number[])[] = [];
+    await projectTriage(set, PROJECT_CONFIG, plantedRefresh(setAsked))(taskInput(set.f, report));
+
+    expect(unsetCalls).toEqual([]);
+    expect(unsetAsked).toEqual([]);
+    expect(atLevel(unsetLines, 'warn')).toEqual([]);
+    expect(set.calls.length).toBeGreaterThan(0);
+    expect(setAsked).toEqual([[FILED_ISSUE]]);
+    expect(atLevel(setLines, 'warn')).toEqual([`   Triage: ${plantedLine(FILED_ISSUE)}`]);
+    expect(unsetLines.filter(([level]) => level === 'info')).toEqual(setLines.filter(([level]) => level === 'info'));
+  });
+});
+
+describe('the project add under json output', () => {
+  it('writes each warning the add answers as a warn log event, after the bug\'s filed note, in the order answered', async () => {
+    const chunks: string[] = [];
+    setActiveOutput(createJsonOutput({ stream: { write: (chunk) => chunks.push(chunk) } }), 'json');
+    const scene = projectScene([42, 41]);
+
+    await projectTriage(scene, PROJECT_CONFIG, plantedRefresh([], [plantedLine, plantedSecondLine]))(
+      taskInput(scene.f, sessionOutput({ bugs: [PROJECT_BUG, SECOND_BUG] })),
+    );
+
+    const events = chunks.join('').split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as CliEventLog);
+    const warned = events.filter((event) => event.type === 'log' && event.level === 'warn');
+    expect(warned.map((event) => event.message)).toEqual([
+      `   Triage: ${plantedLine(42)}`,
+      `   Triage: ${plantedSecondLine(42)}`,
+      `   Triage: ${plantedLine(41)}`,
+      `   Triage: ${plantedSecondLine(41)}`,
+    ]);
+    const lastNote = events.map((event) => event.level).lastIndexOf('info');
+    expect(lastNote).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf(warned[0] as CliEventLog)).toBeGreaterThan(lastNote);
+  });
+});
+
+describe('a bug filed on the public github tracker, onto the project', () => {
+  it('is added to the project with its Stage set, the filed note printed and no warning', async () => {
+    const lines = captureOrdered();
+    const scene = projectScene();
+
+    const result = await projectTriage(scene)(taskInput(scene.f, sessionOutput({ bugs: [PROJECT_BUG] })));
+
+    expect(result?.bugs.map((bug) => [bug.channel, bug.action, bug.ref])).toEqual([['public', 'filed', FILED_REF]]);
+    expect(await projectStages(scene.gh)).toEqual({ [FILED_ISSUE]: 'Backlog' });
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([]);
+    expect(lines).toContainEqual(['info', `   Triage: out_of_scope_bugs[0]: filed on the public tracker as ${FILED_REF.url ?? ''}.`]);
+  });
+
+  it('is refused for the project scope: the tracker line and stored reference stand as with no project, the filed note then the scope warning printed', async () => {
+    const report = sessionOutput({ blockers: ['The hook refused the commit'], bugs: [PROJECT_BUG] });
+
+    const lines = captureOrdered();
+    const refused = projectScene();
+    refused.project.failNext(SCOPE_STDERR);
+    const result = await projectTriage(refused)(taskInput(refused.f, report));
+
+    captureLines();
+    const unset = projectScene();
+    await projectTriage(unset, CONFIG)(taskInput(unset.f, report));
+
+    expect(result?.bugs.map((bug) => bug.action)).toEqual(['filed']);
+    const tracker = readFileSync(refused.f.trackerPath, 'utf8');
+    expect(tracker).not.toBe(TRACKER_TEXT);
+    expect(tracker).toBe(readFileSync(unset.f.trackerPath, 'utf8'));
+    const refs = (root: string): string[] => refRows(root).map((row) => row.tracker_ref);
+    expect(refs(refused.f.root)).toHaveLength(1);
+    expect(refs(refused.f.root)).toEqual(refs(unset.f.root));
+    expect(await projectStages(refused.gh)).toEqual({});
+
+    const filedNote: OrderedLine = ['info', `   Triage: out_of_scope_bugs[0]: filed on the public tracker as ${FILED_REF.url ?? ''}.`];
+    const scope: OrderedLine = ['warn', `   Triage: ${scopeWarning()}`];
+    expect(lines.filter(([level]) => level === 'warn')).toEqual([scope]);
+    expect(lines.at(-1)).toEqual(scope);
+    expect(lines.findIndex((line) => line[0] === filedNote[0] && line[1] === filedNote[1])).toBeGreaterThanOrEqual(0);
+    expect(lines.findIndex((line) => line[0] === filedNote[0] && line[1] === filedNote[1])).toBeLessThan(lines.length - 1);
   });
 });

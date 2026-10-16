@@ -25,27 +25,24 @@
  *     `--body-file` is, and refused when it lies outside the checkout or
  *     names no file. The package is the one that file belongs to
  *     (`../../project/package-of.ts`), or the checkout's own with no file.
- *  6. **Redaction** of every free text, local paths then named secrets,
- *     as triage composes the two (`../../triage/triage.ts`).
- *  7. **What rafa says itself:** the artifact cut to
- *     {@link ARTIFACT_MAX_LINES} lines, the error line from the
- *     artifact's first line, and the `Versions` section, which replaces
- *     one a body file carries.
+ *  6. **Redaction** of every free text (`redacted`,
+ *     `../../bugs/fill.ts`), local paths then named secrets, as triage
+ *     composes the two (`../../triage/triage.ts`).
+ *  7. **What rafa says itself** (`settled`, `../../bugs/fill.ts`): the
+ *     artifact cut to `ARTIFACT_MAX_LINES` lines, the error line from
+ *     the artifact's first line, and the `Versions` section, which
+ *     replaces one a body file carries.
  *  8. **The check** (`bugProblems`). A record with a problem is refused
  *     with exit code 1, every problem on a line of its own, before any
  *     tracker is resolved.
  *
  * ## The checkout
  *
- * A project's root is its MAIN checkout, where `.rafa/config.yaml`
- * lives, and a command run from a worktree resolves to it. The code that
- * failed is the worktree's, so the path, the package and the commit are
- * read in the checkout the command runs in: the top level `git` answers
- * from the directory rafa runs in ({@link IssueSeams.cwd}). A top level
- * that holds the project root is no worktree: it is the repository the
- * project is a folder of, or a home that is itself a repository, and the
- * project root is read then, as it is outside any repository. Reading
- * the top level there would name the outer repository's package.
+ * The path, the package and the commit are read in the checkout the
+ * command runs in, which `checkoutOf` (`../../bugs/fill.ts`, whose note
+ * holds the rule) reads from the directory rafa runs in
+ * ({@link IssueSeams.cwd}), never in the project root a worktree
+ * resolves to.
  *
  * Both roots are taken out of the text in ONE pass
  * (`localPathRedactor`, `../../triage/local-paths.ts`), the longer
@@ -54,21 +51,17 @@
  *
  * ## The draft
  *
- * The title is rendered from the fields, and the body is the record's
- * sections, then the sections of the body file that are no field of the
- * record (`Expected`, `Refs`), redacted and kept as written. The draft's
- * module is the record's, `unassigned` for `unknown`, so the board's
- * `module:` label keeps its convention, and its `cause` is the record's,
- * which the tracker files as a label.
+ * The draft is built by `bodyOf` and `draftOf` (`../../bugs/fill.ts`,
+ * whose note holds the title, the body, the module and the cause they
+ * file).
  *
  * The config is read here, before the chain resolves it again. Its
  * warnings are written through `warn`, which the caller silences when
  * the chain will write them for the same config.
  */
 import type { IssueSeams, LineFlags } from './issue-tracker.js';
-import type { BugRecord, BugRules } from '../../bugs/record.js';
+import type { BugRecord } from '../../bugs/record.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
-import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft } from '@open-tomato/rafa/ports';
 
 import { existsSync } from 'node:fs';
@@ -77,31 +70,21 @@ import { relative, resolve } from 'node:path';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
+import { bodyOf, checkoutOf, draftOf, redacted, settled } from '../../bugs/fill.js';
 import { suggestedEnvironment } from '../../bugs/places.js';
-import {
-  bugProblems,
-  bugTitle,
-  EMPTY_BUG_RECORD,
-  hasBugSections,
-  otherSections,
-  parseBugRecord,
-  renderBugBody,
-} from '../../bugs/record.js';
+import { bugProblems, EMPTY_BUG_RECORD, hasBugSections, parseBugRecord } from '../../bugs/record.js';
 import { firstProjectPath } from '../../bugs/stack-path.js';
-import { parseTitle, UNKNOWN_VALUE } from '../../bugs/title.js';
-import { codeVersionOf, errorLineOf, versionsText } from '../../bugs/versions.js';
+import { parseTitle } from '../../bugs/title.js';
+import { codeVersionOf, versionsText } from '../../bugs/versions.js';
 import { bugRulesOf } from '../../config-schema-issues.js';
 import { isInside, packageOf, rootPackageOf } from '../../project/package-of.js';
 import { localPathRedactor } from '../../triage/local-paths.js';
-import { namedSecrets, redactSecrets, TRIAGE_MODULE } from '../../triage/triage.js';
+import { namedSecrets, redactSecrets } from '../../triage/triage.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal, readNonBlankFlag } from './issue-tracker.js';
 
 /** The flags only a bug line reads; `--module` and `--title` are every type's. */
 export const BUG_FLAGS = ['summary', 'action', 'env', 'cause', 'proposed', 'reproduce', 'rerun', 'project', 'path'] as const;
-
-/** The most lines of an artifact a bug is filed with. */
-export const ARTIFACT_MAX_LINES = 60;
 
 /** The field each flag fills. `--path` fills none: it names the file the versions are read for. */
 const FLAG_FIELDS: readonly (readonly [flag: string, field: keyof BugRecord])[] = [
@@ -118,11 +101,6 @@ const FLAG_FIELDS: readonly (readonly [flag: string, field: keyof BugRecord])[] 
 
 /** The fields a title is read back into. */
 const TITLE_FIELDS = ['project', 'module', 'action', 'summary'] as const;
-
-/** The fields holding free text, which is redacted before it is filed. */
-const FREE_TEXT_FIELDS: readonly (keyof BugRecord)[] = [
-  'summary', 'what', 'reproduce', 'rerun', 'errorLine', 'artifact', 'suspected', 'project',
-];
 
 /** What a bug line makes: the draft to file, and the record it was rendered from. */
 export interface BugLine {
@@ -186,19 +164,6 @@ function withTitle(record: BugRecord, title: string, template: string, usage: st
   return { ...record, ...Object.fromEntries(taken) };
 }
 
-/**
- * The checkout a bug's files are read in: the top level `git` answers
- * when it is a worktree apart from the project root, and `root` outside
- * a repository or under a top level that holds it. See the module note.
- */
-function checkoutOf(git: GitRunner, root: string): string {
-  const toplevel = git(['rev-parse', '--show-toplevel']);
-  const path = toplevel.stdout.trim();
-  return toplevel.ok && path !== '' && !isInside(path, root)
-    ? path
-    : root;
-}
-
 /** Where a bug line's files are read: the checkout, and the directory rafa runs in. */
 interface Places {
   readonly checkout: string;
@@ -220,73 +185,6 @@ function pathOf(record: BugRecord, flags: LineFlags, places: Places, usage: stri
   if (!isInside(checkout, absolute)) throw lineRefusal(`--path is outside the project: ${JSON.stringify(typed)}`, usage);
   if (!existsSync(absolute)) throw lineRefusal(`--path names no file: ${JSON.stringify(typed)}`, usage);
   return relative(checkout, absolute);
-}
-
-/** `record` with each free text passed through `redact`. */
-function redacted(record: BugRecord, redact: (text: string) => string): BugRecord {
-  return {
-    ...record,
-    ...Object.fromEntries(FREE_TEXT_FIELDS.flatMap((field) => {
-      const value = record[field];
-      return value === null
-        ? []
-        : [[field, redact(value)] as const];
-    })),
-  };
-}
-
-/** `artifact` cut to {@link ARTIFACT_MAX_LINES} lines, a last line saying how many were left out. */
-export function cappedArtifact(artifact: string): string {
-  const lines = artifact.split(/\r?\n/);
-  const cut = lines.length - ARTIFACT_MAX_LINES;
-  return cut <= 0
-    ? artifact
-    : [...lines.slice(0, ARTIFACT_MAX_LINES), `… ${cut} more lines cut`].join('\n');
-}
-
-/** `record` with what rafa says itself: the capped artifact, the error line, the description and the module's word. */
-function settled(record: BugRecord): BugRecord {
-  const artifact = record.artifact === null
-    ? null
-    : cappedArtifact(record.artifact);
-  const derived = artifact === null
-    ? null
-    : errorLineOf(artifact);
-  return {
-    ...record,
-    artifact,
-    errorLine: record.errorLine ?? derived,
-    what: record.what ?? record.summary,
-    module: record.module === TRIAGE_MODULE
-      ? UNKNOWN_VALUE
-      : record.module,
-  };
-}
-
-/** The body a bug is filed with: the record's sections, then the body's other sections, redacted. */
-function bodyOf(record: BugRecord, typed: string, redact: (text: string) => string): string {
-  const own = renderBugBody(record);
-  const others = hasBugSections(typed)
-    ? redact(otherSections(typed))
-    : '';
-  return others === ''
-    ? own
-    : `${own}\n${others}`;
-}
-
-/** The draft a checked record is filed as; see the module note. */
-function draftOf(base: IssueDraft, record: BugRecord, rules: BugRules, body: string): IssueDraft {
-  return {
-    ...base,
-    title: bugTitle(record, rules),
-    body,
-    module: record.module === null || record.module === UNKNOWN_VALUE
-      ? TRIAGE_MODULE
-      : record.module,
-    ...record.cause === null
-      ? {}
-      : { cause: record.cause },
-  };
 }
 
 /**

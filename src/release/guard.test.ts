@@ -56,6 +56,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** When every guard runs; a merge at this UTC day is what the forecast dates. */

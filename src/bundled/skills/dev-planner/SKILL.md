@@ -258,6 +258,10 @@ out_of_scope_bugs:
     artifact: "SQLITE_MISUSE"
     security: false
     kind: bug
+    module: "store"
+    action: "appending to an open store"
+    reproduce: "run the store tests against a shared connection"
+    cause: "the handle is shared across calls"
 changes:
   - level: minor
     area: "store"
@@ -309,14 +313,25 @@ Stale doc entry fields:
 | `where` | string | no | The file, with the line when known, as one string (e.g., `context/triage.md:12`). An entry without one is kept |
 | `what` | string | yes | What no longer matches. An entry without one is reported as an issue and dropped |
 
-Blocker/bug entry fields:
+Blocker entry fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `what` | string | yes | Description of the blocker or bug |
+| `what` | string | yes | Description of the blocker |
 | `artifact` | string | no | Error message or diagnostic output |
-| `security` | boolean | yes (bugs only) | Whether this is a security issue; never defaulted when missing |
-| `kind` | string | no (bugs only) | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
+
+Out-of-scope bug entry fields:
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `what` | string | yes | none | Description of the bug |
+| `artifact` | string | no | none | Error message or diagnostic output |
+| `security` | boolean | yes | none | Whether this is a security issue; never defaulted when missing |
+| `kind` | string | no | `bug` | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
+| `module` | string | no | `unknown` | The module the bug is in. Checked against the project's `issues.vocabulary.modules` when that is set, and read as any name of the shape when it is empty. A name outside the set is filed as `unknown`, with the word kept in the bug's record as `Reported module`; triage never refuses a bug over it |
+| `action` | string | no | `unknown` | What was running: a command, a step, a test. Checked against `issues.vocabulary.actions` the same way, the word kept as `Reported action` |
+| `reproduce` | string | no | "seen while running task <task line> of plan <stub>", or "seen while running `<command>`" for a dispatch with no plan stub | The steps, or the condition that revealed it. Double-quote it. A blank value or `unknown` takes the default: the bug record never holds `unknown` here |
+| `cause` | string | no | `unknown:new-context` | A cause code from `rafa bug codes`, or the cause in words. Double-quote it. A code the list lacks is filed as `<family>:new-context`, with the code kept as proposed, or as `unknown:new-context` when its family is unlisted; words that are no code are filed as `unknown:new-context`, with the words kept as the suspected cause |
 
 Out-of-scope entry kinds:
 
@@ -460,6 +475,10 @@ A task's text never asks its session for a whole-suite run, or for any command t
   `src/start.ts`" task grows it enough for its own diff to flag, and phase
   0's six took `src/start.ts` from 798 lines to 960 with no task owning the
   split; only a whole-change-set review caught it.
+* When the project's entry test lists command modules, a task that adds
+  a command module or an import to one updates that list in the same
+  task and names the file in its Description: in rafa, `COMMAND_MODULES`
+  in `src/index.test.ts`.
 * Keep as SEPARATE tasks: cross-cutting verification (fan-out gates,
   invariant sweeps), live-seam runs, migrations, and close-out — these
   preserve resumability where a halt is most likely.

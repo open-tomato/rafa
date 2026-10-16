@@ -4,7 +4,7 @@
  * changes nothing for, and the line refusals.
  *
  * Every case drives a recorded `gh` runner of its own, answering the
- * three commands from a literal board and failing every other command,
+ * four commands from a literal board and failing every other command,
  * beside a scripted answer and a recording board. So no case reaches
  * GitHub, spawns `gh` or waits on an answer, and the argument lists are
  * kept, which is how the cases about the SECOND command hold that it
@@ -13,7 +13,7 @@
  *
  * ## The controls
  *
- * Four readings here could pass while wrong, and each is paired:
+ * Five readings here could pass while wrong, and each is paired:
  *
  *  - The removal case runs one board twice, answering the question yes
  *    and then no, and holds the write against no write. Without the
@@ -24,9 +24,15 @@
  *    is held against the run that does change something.
  *  - The half-read board runs the same blocker against a state listing
  *    answering the limit without it and against a shorter one holding
- *    it closed: the label stays on the first and comes off the second.
+ *    it closed: the first sends one view for it and the second none,
+ *    and the label follows what each answered. A blocker past the full
+ *    listing is then read four ways — closed, open, not found and a view
+ *    that failed — and only the closed one comes off.
  *  - The second-command case pairs a body whose line names ids with one
  *    that names none, and holds two commands against one.
+ *  - The `--yes` removal case runs the same board without the flag and
+ *    without a terminal, and holds one `gh issue edit` against none, so
+ *    an edit sent whatever the line said would not pass.
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
@@ -42,6 +48,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { KNOWN_LIST_LIMIT } from '../../board/blocked-issues.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { NOT_FOUND } from '../../board/blocker-states.js';
 import { isUnblockFailure, runUnblock, unblockQuestion } from '../../board/unblock.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
@@ -74,6 +81,8 @@ interface FakeBoard {
   readonly blockedResult?: GhResult;
   /** What the state listing answers instead. */
   readonly stateResult?: GhResult;
+  /** What `gh issue view <n> --json number,state` answers instead, by issue number. */
+  readonly stateViews?: Readonly<Record<string, GhResult>>;
   /** What `gh issue edit` answers instead. */
   readonly editResult?: GhResult;
 }
@@ -106,9 +115,22 @@ function fakeGh(board: FakeBoard = {}): {
   const held = heldIssues(board);
   const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
 
+  /** One blocker's view: the case's answer, the held issue's number and state, or what `gh` writes for no issue. */
+  const stateView = (number: string): Promise<GhResult> => {
+    const planted = board.stateViews?.[number];
+    if (planted !== undefined) return Promise.resolve(planted);
+    const found = held.find((issue) => String(issue.number) === number);
+    if (found === undefined) {
+      const stderr = `GraphQL: ${NOT_FOUND} ${number}. (repository.issue)`;
+      return Promise.resolve({ ok: false, stdout: '', stderr });
+    }
+    return ok(JSON.stringify({ number: found.number, state: found.state }));
+  };
+
   const run: GhRunner = (args) => {
     calls.push(args);
     const route = args.slice(0, 2).join(' ');
+    if (route === 'issue view' && args.includes('number,state')) return stateView(args[2] ?? '');
     if (route === 'issue view') {
       if (board.viewResult !== undefined) return Promise.resolve(board.viewResult);
       const found = held.find((issue) => String(issue.number) === args[2]);
@@ -139,6 +161,13 @@ function fakeGh(board: FakeBoard = {}): {
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${args.join(' ')}` });
   };
   return { run, calls: () => calls, routes: () => calls.map((args) => args.slice(0, 2).join(' ')) };
+}
+
+/** The ids `gh` was asked to view the state of, one `gh issue view <n> --json number,state` each, in order. */
+function stateViews(gh: ReturnType<typeof fakeGh>): readonly string[] {
+  return gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue view' && args.includes('number,state'))
+    .map((args) => args[2] ?? '');
 }
 
 /** An answer to each question in turn, then no, recording what was asked. */
@@ -571,9 +600,12 @@ describe('a board this run could not read whole', () => {
     expect(report.issues[0]?.message).toContain('so the state of the issues it names was not read');
   });
 
-  it('leaves the label on a blocker the full listing never named, and takes it off a shorter listing', async () => {
+  it('reads a blocker the full listing never named through one view, and sends none for a shorter listing', async () => {
     const full = fakeGh({
-      issues: { 12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') } },
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        24: { state: 'CLOSED' },
+      },
       stateResult: { ok: true, stdout: closedRows(KNOWN_LIST_LIMIT), stderr: '' },
     });
     const short = fakeGh({
@@ -582,18 +614,16 @@ describe('a board this run could not read whole', () => {
     });
     const board = recordingBoard();
 
-    const halfRead = await runUnblock({ gh: full.run, issues: [12], ask: scriptedAsk([true]).ask, board: board.board });
+    const viewed = await runUnblock({ gh: full.run, issues: [12], ask: scriptedAsk([true]).ask, board: board.board });
     const whole = await runUnblock({ gh: short.run, issues: [12], ask: scriptedAsk([true]).ask, board: board.board });
 
-    expect(halfRead.issues[0]).toMatchObject({
-      status: 'waiting',
-      unread: [24],
-      message: '#12 is blocked by #24 (state not read), so spec:blocked stays',
-    });
-    expect(halfRead.unchecked).toBe('the board answered the 500 issues the listing asked for and may hold more,'
-      + ' so no blocker id was checked against it');
+    expect(full.routes()).toEqual(['issue view', 'issue list', 'issue view']);
+    expect(stateViews(full)).toEqual(['24']);
+    expect(viewed.issues[0]).toMatchObject({ status: 'removed', unread: [] });
+    expect(viewed.unchecked).toBeNull();
+    expect(short.routes()).toEqual(['issue view', 'issue list']);
     expect(whole.issues[0]).toMatchObject({ status: 'removed' });
-    expect(board.removed()).toEqual(['#12 spec:blocked']);
+    expect(board.removed()).toEqual(['#12 spec:blocked', '#12 spec:blocked']);
   });
 
   it('reads a state it does not know as no state read, and OPEN and CLOSED however gh cases them', async () => {
@@ -611,6 +641,142 @@ describe('a board this run could not read whole', () => {
 
     expect(unread.issues[0]).toMatchObject({ status: 'waiting', unread: [24] });
     expect(closed.issues[0]).toMatchObject({ status: 'unasked', blockers: [24] });
+  });
+});
+
+describe('a blocker the full state listing did not hold, read by a view of its own', () => {
+  /** A project of this file's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'view-')));
+
+  /** A state listing answering its limit, none of whose rows is a blocker any case names. */
+  const fullListing: GhResult = { ok: true, stdout: closedRows(KNOWN_LIST_LIMIT), stderr: '' };
+
+  /** #12 blocked by #24 over the full listing, with #24 held as `blocker` for its view, or not at all. */
+  function pastListing(blocker?: FakeIssue, stateViewsBy?: Readonly<Record<string, GhResult>>): ReturnType<typeof fakeGh> {
+    const issues: Record<string, FakeIssue> = { 12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') } };
+    if (blocker !== undefined) issues['24'] = blocker;
+    const planted = stateViewsBy === undefined
+      ? {}
+      : { stateViews: stateViewsBy };
+    return fakeGh({ issues, stateResult: fullListing, ...planted });
+  }
+
+  /** The `gh issue edit` commands `gh` was handed. */
+  const edits = (gh: ReturnType<typeof fakeGh>): readonly (readonly string[])[] => gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue edit');
+
+  it('removes the label under --yes once the view answers closed, and asks about it without the flag', async () => {
+    const yes = pastListing({ state: 'CLOSED' });
+    const plain = pastListing({ state: 'CLOSED' });
+    const asked: string[] = [];
+    const yesCommand = createIssueUnblockCommand({
+      openGh: () => yes.run,
+      isTerminal: () => false,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --yes');
+      },
+    });
+    const plainCommand = createIssueUnblockCommand({
+      openGh: () => plain.run,
+      isTerminal: () => true,
+      openPrompter: () => ({
+        say: () => undefined,
+        ask: (question) => {
+          asked.push(question);
+          return Promise.resolve('n');
+        },
+        close: () => undefined,
+      }),
+    });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [yesCommand], plant());
+    const control = await dispatchInProject(['issue', 'unblock', '12'], SUBJECTS, [plainCommand], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: 'Removed spec:blocked from #12 under --yes; every blocker is closed: #24\n',
+      stderr: '',
+    });
+    expect(yes.routes()).toEqual(['issue view', 'issue list', 'issue view', 'issue edit']);
+    expect(stateViews(yes)).toEqual(['24']);
+    expect(edits(yes)).toEqual([['issue', 'edit', '12', '--remove-label', 'spec:blocked']]);
+    expect(asked).toEqual(['#12 was blocked by #24, all closed. Remove spec:blocked? [y/N] ']);
+    expect(control).toEqual({ exitCode: 0, stdout: '#12 keeps spec:blocked\n', stderr: '' });
+    expect(edits(plain)).toEqual([]);
+  });
+
+  it('names the blocker the view answers open, and keeps the label', async () => {
+    const gh = pastListing({ state: 'OPEN' });
+    const ask = scriptedAsk([true]);
+    const board = recordingBoard();
+
+    const report = await runUnblock({ gh: gh.run, issues: [12], ask: ask.ask, board: board.board });
+
+    expect(stateViews(gh)).toEqual(['24']);
+    expect([ask.asked(), board.removed()]).toEqual([[], []]);
+    expect(report.issues).toEqual([{
+      issue: 12,
+      status: 'waiting',
+      blockers: [24],
+      open: [24],
+      unread: [],
+      message: '#12 is blocked by #24 (open), so spec:blocked stays',
+    }]);
+    expect(report.unchecked).toBeNull();
+  });
+
+  it('reports a blocker the view answers not found as the id the board has no issue for, removing nothing', async () => {
+    const gh = pastListing();
+    const ask = scriptedAsk([true]);
+    const board = recordingBoard();
+
+    const report = await runUnblock({ gh: gh.run, issues: [12], ask: ask.ask, board: board.board });
+
+    expect(stateViews(gh)).toEqual(['24']);
+    expect([ask.asked(), board.removed()]).toEqual([[], []]);
+    expect(report.issues[0]).toMatchObject({ issue: 12, status: 'fault', blockers: [24], unread: [] });
+    expect(report.issues[0]?.message).toContain('naming #24, which the board has no issue for');
+    expect(report.unchecked).toBeNull();
+  });
+
+  it('keeps the label over a view that failed, naming the blocker as not read and saying so in unchecked', async () => {
+    const failed: GhResult = { ok: false, stdout: '', stderr: 'gh: HTTP 502: Bad Gateway' };
+    const gh = pastListing({ state: 'CLOSED' }, { 24: failed });
+    const ask = scriptedAsk([true]);
+    const board = recordingBoard();
+
+    const report = await runUnblock({ gh: gh.run, issues: [12], ask: ask.ask, board: board.board });
+
+    expect(stateViews(gh)).toEqual(['24']);
+    expect([ask.asked(), board.removed()]).toEqual([[], []]);
+    expect(report.issues[0]).toMatchObject({
+      issue: 12,
+      status: 'waiting',
+      open: [],
+      unread: [24],
+      message: '#12 is blocked by #24 (state not read), so spec:blocked stays',
+    });
+    expect(report.unchecked).toBe('the state of #24 could not be read off the board, so none of them counts as closed');
+  });
+
+  it('views one id named by two issues under --all once, and each id of its own once', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        13: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+        24: { state: 'CLOSED' },
+        26: { state: 'CLOSED' },
+      },
+      stateResult: fullListing,
+    });
+    const board = recordingBoard();
+
+    const report = await runUnblock({ gh: gh.run, issues: null, ask: scriptedAsk([true, true]).ask, board: board.board });
+
+    expect(gh.routes()).toEqual(['issue list', 'issue list', 'issue view', 'issue view']);
+    expect(stateViews(gh)).toEqual(['24', '26']);
+    expect(report.issues.map((issue) => [issue.issue, issue.status])).toEqual([[12, 'removed'], [13, 'removed']]);
+    expect(board.removed()).toEqual(['#12 spec:blocked', '#13 spec:blocked']);
   });
 });
 
@@ -743,6 +909,180 @@ describe('rafa issue unblock, dispatched', () => {
   });
 });
 
+describe('rafa issue unblock --yes, on an issue the line names', () => {
+  /** A project of this file's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'yes-')));
+
+  /** The command over `gh`, with no terminal and a prompter that fails the case when opened. */
+  function yesCommand(gh: ReturnType<typeof fakeGh>): ReturnType<typeof createIssueUnblockCommand> {
+    return createIssueUnblockCommand({
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --yes');
+      },
+    });
+  }
+
+  /** The `gh issue edit` commands `gh` was handed. */
+  const edits = (gh: ReturnType<typeof fakeGh>): readonly (readonly string[])[] => gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue edit');
+
+  it('removes the label with one edit and no prompter when every blocker is closed, and not without it', async () => {
+    const issues = {
+      12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+      24: { state: 'CLOSED' as const },
+      26: { state: 'CLOSED' as const },
+    };
+    const yes = fakeGh({ issues });
+    const plain = fakeGh({ issues });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [yesCommand(yes)], plant());
+    const control = await dispatchInProject(['issue', 'unblock', '12'], SUBJECTS, [yesCommand(plain)], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: 'Removed spec:blocked from #12 under --yes; every blocker is closed: #24 #26\n',
+      stderr: '',
+    });
+    expect(edits(yes)).toEqual([['issue', 'edit', '12', '--remove-label', 'spec:blocked']]);
+    expect(control.exitCode).toBe(0);
+    expect(control.stdout).toContain('there is no terminal to ask on, so spec:blocked stays');
+    expect(edits(plain)).toEqual([]);
+  });
+
+  it('names the open blocker and sends no edit', async () => {
+    const gh = fakeGh({
+      issues: {
+        57: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24 #26') },
+        24: { state: 'OPEN' },
+        26: { state: 'CLOSED' },
+      },
+    });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '57', '--yes'], SUBJECTS, [yesCommand(gh)], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: '#57 is blocked by #24 (open), so spec:blocked stays\n',
+      stderr: '',
+    });
+    expect(gh.routes()).toEqual(['issue view', 'issue list']);
+    expect(edits(gh)).toEqual([]);
+  });
+
+  it('reports a line naming an id the board has no issue for, and sends no edit', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        26: { state: 'CLOSED' },
+      },
+    });
+
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [yesCommand(gh)], plant());
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.startsWith('warn: #12 ')).toBe(true);
+    expect(outcome.stdout).toContain('naming #24, which the board has no issue for');
+    expect(edits(gh)).toEqual([]);
+  });
+
+  it('gives the removal line as the outcome message in json mode', async () => {
+    const gh = fakeGh({
+      issues: {
+        12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') },
+        24: { state: 'CLOSED' },
+      },
+    });
+    const words = ['issue', 'unblock', '12', '--yes', '--output=json'];
+
+    const outcome = await dispatchInProject(words, SUBJECTS, [yesCommand(gh)], plant());
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect(eventsOf(outcome.stdout)[1]).toMatchObject({
+      ok: true,
+      data: { issues: [{
+        issue: 12,
+        status: 'removed',
+        blockers: [24],
+        message: 'Removed spec:blocked from #12 under --yes; every blocker is closed: #24',
+      }] },
+    });
+  });
+});
+
+describe('rafa issue unblock --all --yes, over a board of four kinds of issue', () => {
+  /** A project of this file's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'all-yes-')));
+
+  /** One issue per kind: #10 all closed, #11 one open, #12 no line, #13 a dangling id. */
+  const boardOfFour = (): ReturnType<typeof fakeGh> => fakeGh({
+    issues: {
+      10: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #20 #21') },
+      11: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #22') },
+      12: { labels: [SPEC_BLOCKED_LABEL], body: '## Spec\n\nSomething to build.\n' },
+      13: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #99') },
+      20: { state: 'CLOSED' },
+      21: { state: 'CLOSED' },
+      22: { state: 'OPEN' },
+    },
+  });
+
+  /** The command over `gh`, with no terminal and a prompter that fails the case when opened. */
+  const commandOver = (gh: ReturnType<typeof fakeGh>, opened: string[]): ReturnType<typeof createIssueUnblockCommand> => createIssueUnblockCommand({
+    openGh: () => gh.run,
+    isTerminal: () => false,
+    openPrompter: () => {
+      opened.push('opened');
+      throw new Error('the run opened a prompter without a terminal');
+    },
+  });
+
+  /** The `gh issue edit` commands `gh` was handed. */
+  const edits = (gh: ReturnType<typeof fakeGh>): readonly (readonly string[])[] => gh.calls()
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue edit');
+
+  it('removes the label from the passing issue alone and reports the other three as it does without --yes', async () => {
+    const yes = boardOfFour();
+    const plain = boardOfFour();
+    const yesOpened: string[] = [];
+    const plainOpened: string[] = [];
+
+    const outcome = await dispatchInProject(
+      ['issue', 'unblock', '--all', '--yes'],
+      SUBJECTS,
+      [commandOver(yes, yesOpened)],
+      plant(),
+    );
+    const control = await dispatchInProject(
+      ['issue', 'unblock', '--all'],
+      SUBJECTS,
+      [commandOver(plain, plainOpened)],
+      plant(),
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stderr).toBe('');
+    expect(yesOpened).toEqual([]);
+    expect(edits(yes)).toEqual([['issue', 'edit', '10', '--remove-label', 'spec:blocked']]);
+    expect(outcome.stdout).toContain('Removed spec:blocked from #10 under --yes; every blocker is closed: #20 #21');
+
+    // The other three lines are the control's own, word for word.
+    const keptLines = (text: string): readonly string[] => text.split('\n')
+      .filter((line) => line !== '' && !line.includes('#10'));
+    expect(keptLines(outcome.stdout)).toEqual(keptLines(control.stdout));
+    expect(outcome.stdout).toContain('#11 is blocked by #22 (open), so spec:blocked stays');
+    expect(outcome.stdout).toContain('carries no "Blocked by:" line');
+    expect(outcome.stdout).toContain('naming #99, which the board has no issue for');
+
+    // The control: --all alone, no terminal, removes nothing and opens nothing.
+    expect(control.exitCode).toBe(0);
+    expect(plainOpened).toEqual([]);
+    expect(edits(plain)).toEqual([]);
+    expect(control.stdout).toContain('there is no terminal to ask on, so spec:blocked stays');
+  });
+});
+
 describe('the line', () => {
   /** What a refused line wrote, dispatched over a runner nobody may reach. */
   async function refuse(words: readonly string[]): Promise<{ exitCode: number | null; stderr: string; sent: number }> {
@@ -789,5 +1129,12 @@ describe('the line', () => {
 
     expect(outcome.exitCode).toBe(1);
     expect(outcome.stderr).toContain('--all takes no value, and read "maybe" as one');
+  });
+
+  it('refuses a value given to --yes, naming the flag and the usage and sending no command', async () => {
+    const outcome = await refuse(['12', '--yes=maybe']);
+
+    expect([outcome.exitCode, outcome.sent]).toEqual([1, 0]);
+    expect(outcome.stderr).toBe(`❌ --yes takes no value, and read "maybe" as one\nUsage: ${UNBLOCK_USAGE}\n`);
   });
 });

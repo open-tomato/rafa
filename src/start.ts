@@ -43,11 +43,12 @@
  * Two directories, never confused (`start/checkout.ts`). The PROJECT
  * ROOT is the dispatcher's root, the one holding `.rafa/`: the config,
  * the plan and its tracker, `PROMPT.md`, the session record, the
- * preflight, the store, the learning adapter and triage are all read
- * and written there. The CHECKOUT is the working tree the run was
- * started in, when it is one of the project's own: every git command
- * runs there — the branch read, offered and guarded, each task's
- * commit, the release's files, commit and push, and the CI gate — and
+ * preflight, the store, the learning adapter and triage's issues are
+ * all read and written there. The CHECKOUT is the working tree the run
+ * was started in, when it is one of the project's own: every git
+ * command runs there — the branch read, offered and guarded, each
+ * task's commit, the release's files, commit and push, the CI gate and
+ * triage's git runner and `Refs` — and
  * every session, task, wrap-up and CI repair alike, is spawned there,
  * with `progress.txt` written there for it to read. From a linked
  * worktree that is the worktree, and under `--as-worktree` it is the
@@ -628,7 +629,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.
-    const triageTask = createStartTriage({ repoRoot, config: runConfig.config, kinds: { checkout, prBase: runConfig.config.prBase, retries: runRetries } });
+    const triageTask = createStartTriage({ repoRoot, checkout, config: runConfig.config, kinds: { checkout, prBase: runConfig.config.prBase, retries: runRetries } });
 
     // The runner's suite steps around the sessions (`start/suite-steps-run.ts`):
     // `bun test` run here, in the checkout, and recorded on the run record.

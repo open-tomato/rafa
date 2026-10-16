@@ -53,17 +53,17 @@ back into every turn and the split would save nothing.
 - `context/pull-requests.md` — the `pr` subject, the provider and its
   preflight items, merge, triage assessment and --resolve, trust, and the
   readiness gate for plans from the board.
-- `context/triage.md` — the channels, the two-step match and the keys,
-  inherited failures, the state read on a repeat, and similarity settings.
+- `context/triage.md` — the channels, the body the loop files, the keys and
+  the two-step match, inherited failures, repeats, and the config keys.
 - `context/error-codes.md` — cause codes: the `<family>:<leaf>` list,
   reserved values, a project's `errors.codes`, and `rafa bug codes`.
-- `context/bug-record.md` — a bug's fields, body sections and title template.
+- `context/bug-record.md` — a bug's fields, what rafa fills, and its title.
 - `context/logging.md` — the `Logger` port, levels and the `api` type, the
   console adapter, the gate on `Output`, config, and moving a module.
 - `context/terminology.md` — formal and colloquial names: the ledger,
   lore and hindsight, and how prose introduces them.
 - `context/release.md` — fragments and the fold, settle and its deliveries,
-  the receipt rule with adoption boundary, the guards, readers, and seven keys.
+  the receipt rule with adoption boundary, the guards, readers, and eight keys.
 - `context/board-project.md` — the template, the five fields, the Stage
   outline and its rules, the refresh and its callers, and the warnings.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
