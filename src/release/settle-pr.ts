@@ -7,7 +7,7 @@
  * `./settle-push.ts`'s direct push is refused.
  *
  * ```text
- * settleByPr(worktree, settings, pulls) → build, read, push, open or update
+ * settleByPr(worktree, settings, pulls, tag) → build, read, push, open or update
  * ```
  *
  * ## The steps
@@ -73,8 +73,11 @@
  * lists each unit's move from its base version (`The root package:
  * 0.45.0 → 0.46.0`, `` `@scope/plugin`: 0.1.0 → 0.2.0 ``) and every
  * folded fragment in fold order with its package after its level when
- * it names one, says to tag with `rafa release tag` after the merge —
- * tagging a `pr` delivery is that command's, never settle's — and ends
+ * it names one, says who tags after the merge — tagging a `pr`
+ * delivery is never settle's: under `release.tag: manual` the body says
+ * to tag with `rafa release tag`, and under `release.tag: settle` (level
+ * 3 of the ladder, `./ladder.ts`) that CI tags and publishes on the
+ * merge through `release-tag.yml` ({@link TAG_WORKFLOW}) — and ends
  * with one changelog section per unit, receipt included, each under a
  * line naming the unit and the changelog it goes into: the root's
  * first, then the packages in workspace order. A package's name is in
@@ -94,11 +97,13 @@ import type { SettleExitCode } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleFragment, SettleSettings, SettleUnitFold } from './settle.js';
 import type { GitRunner, PullRequestDetail, PullRequestDraft, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { gitSaid } from '../pr/index.js';
 
+import { TAG_WORKFLOW } from './ladder.js';
 import { releaseCommitSubject } from './release-move.js';
 import { pushSaid } from './settle-push.js';
 import { buildSettle, settleMoves } from './settle.js';
@@ -204,8 +209,15 @@ function fragmentLine(each: SettleFragment): string {
   return `- \`${each.path}\` (\`${each.id}\`, ${each.fragment.level}${named})`;
 }
 
-/** The pull request's body; see the module note. Holds no hash and no clock. */
-export function releasePullBody(build: SettleBuilt, base: string): string {
+/** The body's sentence on who tags the merge, by `release.tag`; see the module note. */
+function taggingSentence(tag: ReleaseTagMode): string {
+  return tag === 'settle'
+    ? `Merging this pull request releases each section below: CI tags and publishes it on the merge through \`${TAG_WORKFLOW.file}\`.`
+    : 'Merging this pull request releases each section below; tag it afterwards with `rafa release tag`.';
+}
+
+/** The pull request's body under `release.tag` `tag`; see the module note. Holds no hash and no clock. */
+export function releasePullBody(build: SettleBuilt, base: string, tag: ReleaseTagMode): string {
   const moves = build.units.map((unit) => `- ${unitName(unit)}: ${unit.baseVersion} → ${unit.version}`);
   const sections = build.units.flatMap((unit) => [`${unitName(unit)}, into \`${unit.changelog}\`:`, '', unit.section, '']);
   return [
@@ -217,7 +229,7 @@ export function releasePullBody(build: SettleBuilt, base: string): string {
     '',
     ...build.fragments.map(fragmentLine),
     '',
-    `Merging this pull request releases each section below; tag it afterwards with \`rafa release tag\`. \`rafa release settle\` replaces \`${RELEASE_PR_BRANCH}\` and this body whenever the batch changes, so an edit made here does not last.`,
+    `${taggingSentence(tag)} \`rafa release settle\` replaces \`${RELEASE_PR_BRANCH}\` and this body whenever the batch changes, so an edit made here does not last.`,
     '',
     ...sections,
   ].join('\n');
@@ -321,14 +333,16 @@ async function deliverPull(
 /**
  * Builds the release commit in `worktree`, pushes it to `rafa/release`
  * under a lease, and opens or updates the one pending release pull
- * request into the worktree's base branch through `pulls`; see the
- * module note for the steps and each outcome's exit code. Never pushes
- * to the base branch, and touches no checkout but the worktree's.
+ * request into the worktree's base branch through `pulls`, its body
+ * naming who tags the merge by `release.tag` `tag`; see the module note
+ * for the steps and each outcome's exit code. Never pushes to the base
+ * branch, and touches no checkout but the worktree's.
  */
 export async function settleByPr(
   worktree: SettleWorktree,
   settings: SettleSettings,
   pulls: PullRequests,
+  tag: ReleaseTagMode,
 ): Promise<SettlePrOutcome> {
   const build = buildSettle(worktree, settings);
   if (build.outcome !== 'built') {
@@ -363,7 +377,7 @@ export async function settleByPr(
     head: RELEASE_PR_BRANCH,
     base: worktree.branch,
     title: releasePullTitle(settleMoves(build)),
-    body: releasePullBody(build, worktree.branch),
+    body: releasePullBody(build, worktree.branch, tag),
   };
   try {
     const delivered = await deliverPull(pulls, open, draft);

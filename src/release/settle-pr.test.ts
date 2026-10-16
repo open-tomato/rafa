@@ -252,7 +252,7 @@ async function settleIn(
       afterPush?.(result);
       return result;
     };
-    return settleByPr({ ...made, git }, SETTINGS, double.pulls);
+    return settleByPr({ ...made, git }, SETTINGS, double.pulls, 'manual');
   });
   if (!outcome.ok) throw new Error(outcome.problem);
   return { outcome: outcome.value, argv };
@@ -305,7 +305,7 @@ describe('settleByPr, the first delivery', () => {
       head: RELEASE_PR_BRANCH,
       base: 'main',
       title: 'chore: release 0.5.0',
-      body: releasePullBody(build, 'main'),
+      body: releasePullBody(build, 'main', 'manual'),
     });
     expect(double.sent()).toEqual(['findOpen rafa/release', 'create [object Object]']);
   });
@@ -330,7 +330,7 @@ describe('settleByPr, the first delivery', () => {
     const settled = await settleIn(w, createPullRequestsDouble(noPull()));
 
     if (settled.outcome.outcome !== 'delivered') throw new Error(settled.outcome.outcome);
-    const body = releasePullBody(settled.outcome.build, 'main');
+    const body = releasePullBody(settled.outcome.build, 'main', 'manual');
     expect(body).toStartWith('Settles the change fragments waiting on `main`: the `semver-by-level` strategy folded them into one version per unit.\n\n- The root package: 0.4.0 → 0.5.0\n\n');
     expect(body).toContain('- `.changes/rafa-9.md` (`rafa-9`, minor)\n- `.changes/rafa-1.md` (`rafa-1`, patch)\n');
     expect(body).toContain('tag it afterwards with `rafa release tag`');
@@ -339,6 +339,37 @@ describe('settleByPr, the first delivery', () => {
     expect(body).toContain('<!-- rafa:fragments rafa-9 rafa-1 -->');
     expect(body).toContain('## 0.5.0 — ');
     expect(body).not.toContain(settled.outcome.build.release);
+  });
+
+  it('says CI tags and publishes through release-tag.yml under release.tag: settle, and names rafa release tag under manual', async () => {
+    const w = world();
+    landTwo(w);
+
+    const settled = await settleIn(w, createPullRequestsDouble(noPull()));
+
+    if (settled.outcome.outcome !== 'delivered') throw new Error(settled.outcome.outcome);
+    const ci = releasePullBody(settled.outcome.build, 'main', 'settle');
+    const manual = releasePullBody(settled.outcome.build, 'main', 'manual');
+    expect(ci).toContain('Merging this pull request releases each section below: CI tags and publishes it on the merge through `release-tag.yml`. `rafa release settle` replaces');
+    expect(ci).not.toContain('rafa release tag');
+    expect(manual).toContain('Merging this pull request releases each section below; tag it afterwards with `rafa release tag`. `rafa release settle` replaces');
+    expect(manual).not.toContain('release-tag.yml');
+  });
+
+  it('opens the pull request with the body of the release.tag it is given', async () => {
+    const w = world();
+    landTwo(w);
+    const double = createPullRequestsDouble(noPull());
+
+    const outcome = await withSettleWorktree(
+      { git: createGitRunner(w.caller), scratchRoot: w.scratchRoot },
+      (made: SettleWorktree) => settleByPr(made, SETTINGS, double.pulls, 'settle'),
+    );
+
+    if (!outcome.ok || outcome.value.outcome !== 'delivered') throw new Error('not delivered');
+    const create = double.calls().find((call) => call.member === 'create');
+    expect((create?.args[0] as PullRequestDraft | undefined)?.body).toBe(releasePullBody(outcome.value.build, 'main', 'settle'));
+    expect((create?.args[0] as PullRequestDraft | undefined)?.body).toContain('`release-tag.yml`');
   });
 });
 
@@ -358,7 +389,7 @@ describe('settleByPr, a release moving the root and a package', () => {
     const create = double.calls().find((call) => call.member === 'create');
     expect(create?.args[0]).toMatchObject({ title: 'chore: release 0.5.0, @scope/plugin@0.2.0' });
 
-    const body = releasePullBody(build, 'main');
+    const body = releasePullBody(build, 'main', 'manual');
     expect(body).toContain('\n\n- The root package: 0.4.0 → 0.5.0\n- `@scope/plugin`: 0.1.0 → 0.2.0\n\n');
     expect(body).toContain('- `.changes/rafa-9.md` (`rafa-9`, minor)\n- `.changes/rafa-7.md` (`rafa-7`, minor, `@scope/plugin`)\n');
     expect(body).toEndWith([
@@ -413,7 +444,7 @@ describe('settleByPr, a settle run again', () => {
     landTwo(w);
     const first = await settleIn(w, createPullRequestsDouble(noPull()));
     if (first.outcome.outcome !== 'delivered') throw new Error(first.outcome.outcome);
-    const body = releasePullBody(first.outcome.build, 'main');
+    const body = releasePullBody(first.outcome.build, 'main', 'manual');
     const double = createPullRequestsDouble(openPull({ body }));
 
     const second = await settleIn(w, double);
@@ -430,7 +461,7 @@ describe('settleByPr, a settle run again', () => {
     const first = await settleIn(w, createPullRequestsDouble(noPull()));
     if (first.outcome.outcome !== 'delivered') throw new Error(first.outcome.outcome);
     const arrived = w.land({ '.changes/rafa-4.md': fragmentText('rafa-4', 'major', ['- Store: new shape']) }, 'merge rafa-4');
-    const double = createPullRequestsDouble(openPull({ body: releasePullBody(first.outcome.build, 'main') }));
+    const double = createPullRequestsDouble(openPull({ body: releasePullBody(first.outcome.build, 'main', 'manual') }));
 
     const second = await settleIn(w, double);
 
@@ -444,7 +475,7 @@ describe('settleByPr, a settle run again', () => {
       'findOpen rafa/release',
       `get ${String(PULL)}`,
       `editTitle ${String(PULL)} chore: release 1.0.0`,
-      `editBody ${String(PULL)} ${releasePullBody(second.outcome.build, 'main')}`,
+      `editBody ${String(PULL)} ${releasePullBody(second.outcome.build, 'main', 'manual')}`,
     ]);
   });
 

@@ -386,7 +386,7 @@ export async function runSettle(
     if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch);
     const delivered: SettleDelivered = pulls === null
       ? { delivery: 'push', outcome: settleByPush(worktree, settings, configFile) }
-      : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls) };
+      : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls, config.releaseTag) };
     const tag = tagSettle(worktree, config.releaseTag, delivered);
     return settledResult(delivered, tag, worktree.ref, branch);
   });

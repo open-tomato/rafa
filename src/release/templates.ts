@@ -17,6 +17,13 @@
  * a pushed tag, or a `workflow_call` naming a `ref`, runs the gates and
  * then `rafa release publish`.
  *
+ * `release-tag.yml` ({@link RELEASE_TAG_FILE}) is level 3's: the merge
+ * of the release pull request from `rafa/release` checks the base
+ * branch out at the merge commit, runs `rafa release tag --push`, and
+ * calls the publish workflow through `workflow_call` with the merge
+ * commit as `ref`, since a tag pushed with the workflow's token starts
+ * no other run.
+ *
  * {@link writeReleaseWorkflow} writes through `../board/setup.ts`'s
  * {@link writeShippedFile}, the writer the epic guard uses: an existing
  * file is left byte for byte as it is, whatever it holds, and a
@@ -38,6 +45,9 @@ export const RELEASE_TEMPLATES_DIRNAME = 'release-templates';
 
 /** The level 2 publish workflow's name, in the templates directory and under `.github/workflows/`. */
 export const RELEASE_PUBLISH_FILE = 'release-publish.yml';
+
+/** The level 3 tag workflow's name, in the templates directory and under `.github/workflows/`. */
+export const RELEASE_TAG_FILE = 'release-tag.yml';
 
 /** Where a project's workflows live, under its root. */
 const WORKFLOWS_DIR: string = join('.github', 'workflows');

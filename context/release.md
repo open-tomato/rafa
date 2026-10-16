@@ -368,8 +368,10 @@ branch) or `pr` (open or update one pending release pull request on
 the commit it pushed, one tag per unit it moves: `v<version>` for the root,
 `<name>@<version>` for a package, in unit order, stopping at the first that
 fails). Read by `rafa release settle` and `rafa release tag`. Under
-`release.settle: pr`, the tag waits for `rafa release tag` after that pull
-request merges.
+`release.settle: pr`, settle never tags: the tag waits for `rafa release tag`
+after that pull request merges, run by hand under `tag: manual`, and by the
+`release-tag.yml` workflow under `tag: settle`, which the release pull
+request's body then names as tagging and publishing on the merge.
 
 **`release.publishCommand`** — The command `rafa release tag` prints for the
 publish, default `npm publish`. Free text: `rafa release tag` prints it as

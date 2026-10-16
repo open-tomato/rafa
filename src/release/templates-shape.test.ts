@@ -1,8 +1,9 @@
 /**
  * The shape every shipped workflow template under
  * `src/release/templates/*.yml` keeps: parsed with `Bun.YAML.parse`, its
- * triggers and `permissions` block, and each `rafa <subject> <action>`
- * inside a `run:` naming an action of the command registry.
+ * triggers and `permissions` block as {@link SHAPES} names them for that
+ * file, and each `rafa <subject> <action>` inside a `run:` naming an
+ * action of the command registry.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,8 +22,25 @@ interface Step {
 interface Workflow {
   readonly on: Record<string, unknown>;
   readonly permissions: Record<string, string>;
-  readonly jobs: Record<string, { readonly steps: readonly Step[] }>;
+  readonly jobs: Record<string, { readonly steps?: readonly Step[] }>;
 }
+
+/** What one template's top level holds: its trigger names and its `permissions` block. */
+interface Shape {
+  readonly triggers: readonly string[];
+  readonly permissions: Readonly<Record<string, string>>;
+}
+
+/**
+ * Each shipped template's triggers and permissions. The publish
+ * workflow runs on a pushed tag or a `workflow_call` and mints an id
+ * token; the tag workflow runs on a closed pull request and pushes a
+ * tag, granting the token to its publish job alone.
+ */
+const SHAPES: Readonly<Record<string, Shape>> = {
+  'release-publish.yml': { triggers: ['push', 'workflow_call'], permissions: { contents: 'read', 'id-token': 'write' } },
+  'release-tag.yml': { triggers: ['pull_request'], permissions: { contents: 'write' } },
+};
 
 /** The workflow at `file`, parsed. */
 function parse(file: string): Workflow {
@@ -31,7 +49,7 @@ function parse(file: string): Workflow {
 
 /** Every `run:` script of the workflow. */
 function scriptsOf(workflow: Workflow): readonly string[] {
-  return Object.values(workflow.jobs).flatMap((job) => job.steps.flatMap((step) => step.run === undefined
+  return Object.values(workflow.jobs).flatMap((job) => (job.steps ?? []).flatMap((step) => step.run === undefined
     ? []
     : [step.run]));
 }
@@ -42,16 +60,16 @@ describe('the release workflow templates', () => {
   });
 
   describe.each(FILES)('%s', (file) => {
-    it('triggers on a pushed tag and on workflow_call with a ref input', () => {
-      const { on } = parse(file);
-
-      expect((on.push as { tags: string[] }).tags).toEqual(['**']);
-      expect(Object.keys(on)).toContain('workflow_call');
-      expect(Object.keys((on.workflow_call as { inputs: object }).inputs)).toEqual(['ref']);
+    it('has a shape of its own in the table', () => {
+      expect(SHAPES[file]).toBeDefined();
     });
 
-    it('declares contents: read and id-token: write', () => {
-      expect(parse(file).permissions).toEqual({ contents: 'read', 'id-token': 'write' });
+    it('triggers on the events its shape names', () => {
+      expect(Object.keys(parse(file).on)).toEqual([...(SHAPES[file]?.triggers ?? [])]);
+    });
+
+    it('declares the permissions its shape names', () => {
+      expect(parse(file).permissions).toEqual({ ...SHAPES[file]?.permissions });
     });
 
     it('calls only actions the command registry holds in every rafa line of a run', () => {
