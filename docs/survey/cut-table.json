@@ -3709,7 +3709,9 @@
     }
   ],
   "order": [
-    "@open-tomato/rafa",
+    "rafa-eslint-config",
+    "rafa-typescript-config",
+    "@open-tomato/rafa-core",
     "rafa-inventory",
     "rafa-board",
     "rafa-pr",
@@ -3718,9 +3720,51 @@
     "rafa-effort",
     "rafa-hub",
     "rafa-sync-service",
-    "@open-tomato/rafa-cli"
+    "@open-tomato/rafa"
   ],
   "packages": [
+    {
+      "clearedByIssue118": 0,
+      "edges": [],
+      "fileCounts": {
+        "source": 0,
+        "test": 0,
+        "testSupport": 0
+      },
+      "files": [],
+      "filesByFolder": {
+        "packages/eslint-config/": 0
+      },
+      "folders": [
+        "packages/eslint-config/"
+      ],
+      "name": "rafa-eslint-config",
+      "named": [],
+      "rank": 1,
+      "remaining": 0,
+      "upwardEdges": 0
+    },
+    {
+      "clearedByIssue118": 0,
+      "edges": [],
+      "fileCounts": {
+        "source": 0,
+        "test": 0,
+        "testSupport": 0
+      },
+      "files": [],
+      "filesByFolder": {
+        "packages/typescript-config/": 0
+      },
+      "folders": [
+        "packages/typescript-config/"
+      ],
+      "name": "rafa-typescript-config",
+      "named": [],
+      "rank": 2,
+      "remaining": 0,
+      "upwardEdges": 0
+    },
     {
       "clearedByIssue118": 0,
       "edges": [],
@@ -3939,9 +3983,9 @@
       "folders": [
         "packages/rafa/"
       ],
-      "name": "@open-tomato/rafa",
+      "name": "@open-tomato/rafa-core",
       "named": [],
-      "rank": 1,
+      "rank": 3,
       "remaining": 0,
       "upwardEdges": 0
     },
@@ -3960,7 +4004,7 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/backfill/derive.ts",
@@ -4023,21 +4067,21 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/cli/prompt/page.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/browse.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/cli/prompt/select.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/browse.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/cli/prompt/terminal.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/disabled.ts",
@@ -4051,21 +4095,21 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/plugins.ts",
           "fromPackage": "rafa-inventory",
           "kind": "type",
           "to": "src/modules/load.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/plugins.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/modules/manifest.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/inventory/record.ts",
@@ -4107,7 +4151,7 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/schema/instinct.ts",
@@ -4259,7 +4303,7 @@
       ],
       "name": "rafa-inventory",
       "named": [],
-      "rank": 2,
+      "rank": 4,
       "remaining": 25,
       "upwardEdges": 25
     },
@@ -4271,28 +4315,28 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/adapters/logger/active.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/blocker-epic.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/board-cache.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/gate.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/plan/validate.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/issue-edit-state.ts",
@@ -4306,7 +4350,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/project/facts.ts",
@@ -4327,14 +4371,14 @@
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/config-schema-board-project.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/project/retry.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/config-schema-board-project.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/project/rules.ts",
@@ -4348,7 +4392,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/roadmap-claims.ts",
@@ -4376,14 +4420,14 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/roadmap.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/setup.ts",
@@ -4397,14 +4441,14 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/next/hop-record.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/spec-source-roadmap.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/spec-source.ts",
@@ -4418,28 +4462,28 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/switch.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/board/list.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close-docs.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/docs/release-issue.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close-docs.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close-docs.ts",
@@ -4453,7 +4497,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close.ts",
@@ -4467,14 +4511,14 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/epic/verify-run.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/close.ts",
@@ -4516,105 +4560,105 @@
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/new.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/switch.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/show.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/show.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/epic/show.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/check.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/check.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/comment.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/places.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/record.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/stack-path.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/title.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/versions.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/package-of.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
@@ -4635,7 +4679,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/create.ts",
@@ -4656,49 +4700,49 @@
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/issue-tracker.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/list.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/title.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/list.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/list.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/list.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/ready.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/ready.ts",
@@ -4712,56 +4756,56 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/issue/unblock-native.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/extract.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/outline-cache.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/verify.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/cli/describe.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/verify.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/cli/help.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/verify.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/cli/registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/refs/verify.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
@@ -5110,7 +5154,7 @@
         "src/board/spec-source.ts",
         "src/board/trust.ts"
       ],
-      "rank": 3,
+      "rank": 5,
       "remaining": 71,
       "upwardEdges": 71
     },
@@ -5157,7 +5201,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/runtime/live-loops.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/merge-cleanup.ts",
@@ -5171,7 +5215,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/runtime/install.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/merge-guard.ts",
@@ -5206,7 +5250,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/cleanup/worktrees.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/merge-loop-worktree.ts",
@@ -5220,14 +5264,14 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/pr-context.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/pr-context.ts",
@@ -5297,14 +5341,14 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/wait.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/pr/wait.ts",
@@ -5402,35 +5446,35 @@
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/triage/leftover-repair.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/triage/leftover-repair.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/triage/refs-section.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/cli/describe.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/triage/triage.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
@@ -5630,7 +5674,7 @@
       "named": [
         "src/pr/index.ts"
       ],
-      "rank": 4,
+      "rank": 6,
       "remaining": 45,
       "upwardEdges": 45
     },
@@ -5642,168 +5686,168 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/claim/hand.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/claim/release.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/claim/take.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/budget.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/checkout-watch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/checkout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/project/roots.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/checkout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/project/worktree-root.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/commit.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/continue-args.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/continue-run.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/decision-prompt.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-loop-continue.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/decision-prompt.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/decision-prompt.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/report/lessons.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/progress.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/dispatch.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/doc-task.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/cleanup/branches.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/doc-task.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/docs/task-reading.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/handout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/handout.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/loop-events.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/adapters/output/events.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/loop-events.ts",
@@ -5824,35 +5868,35 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/loop-events.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/pass-over.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/pr-lifecycle.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/pr-lifecycle.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/git.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/preflight-sync.ts",
@@ -5866,21 +5910,21 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/preflight.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/store-rules.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/preflight.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/release-body.ts",
@@ -5936,56 +5980,56 @@
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/retry-budget.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/risk-total.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/risk.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/risk-total.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/plan/risk/accounts.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/run-checkout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/cleanup/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/run-checkout.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/git.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/run-config.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/run-setup.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/runner-pr.ts",
@@ -5999,42 +6043,42 @@
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/session.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/loop/events-file.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/session.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/next/hop-record.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/session.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/project/position.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/session.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/docs/release-issue.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/stale-docs.ts",
@@ -6083,42 +6127,42 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/suite-step.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-tests.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/suite-step.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/suite-steps-run.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/utils/tracker.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/triage-kinds.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/cleanup/branches.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/triage-kinds.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/wrap-up-retry.ts",
@@ -6132,21 +6176,21 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/cleanup/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/wrap-up-run.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/config-schema-wrap-up.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/wrap-up-run.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/wrap-up.ts",
@@ -6160,7 +6204,7 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/git.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
@@ -6409,7 +6453,7 @@
       "named": [
         "src/start/branch-decision.ts"
       ],
-      "rank": 5,
+      "rank": 7,
       "remaining": 75,
       "upwardEdges": 75
     },
@@ -6421,28 +6465,28 @@
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/settle.ts",
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/status-stale-docs.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "src/docs/open-lines.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/status-stale-docs.ts",
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/status.ts",
@@ -6456,28 +6500,28 @@
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/tag.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "src/commands/plan/plan-files.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/commands/release/tag.ts",
           "fromPackage": "rafa-release",
           "kind": "type",
           "to": "src/project/scope.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/release/scaffold.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
@@ -6570,7 +6614,7 @@
       ],
       "name": "rafa-release",
       "named": [],
-      "rank": 6,
+      "rank": 8,
       "remaining": 9,
       "upwardEdges": 9
     },
@@ -6582,28 +6626,28 @@
           "fromPackage": "rafa-effort",
           "kind": "value",
           "to": "src/config-registry.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/effort/sync/contact.ts",
           "fromPackage": "rafa-effort",
           "kind": "value",
           "to": "src/modules/load.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/effort/sync/doctor-reading.ts",
           "fromPackage": "rafa-effort",
           "kind": "value",
           "to": "src/modules/load.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/effort/sync/select.ts",
           "fromPackage": "rafa-effort",
           "kind": "value",
           "to": "src/config-schema-hub.ts",
-          "toPackage": "@open-tomato/rafa-cli"
+          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
@@ -6693,7 +6737,7 @@
       "named": [
         "src/schema/frontmatter.ts"
       ],
-      "rank": 7,
+      "rank": 9,
       "remaining": 4,
       "upwardEdges": 4
     },
@@ -6746,7 +6790,7 @@
       ],
       "name": "rafa-hub",
       "named": [],
-      "rank": 8,
+      "rank": 10,
       "remaining": 0,
       "upwardEdges": 0
     },
@@ -6778,7 +6822,7 @@
       ],
       "name": "rafa-sync-service",
       "named": [],
-      "rank": 9,
+      "rank": 11,
       "remaining": 0,
       "upwardEdges": 0
     },
@@ -7575,13 +7619,13 @@
       "folders": [
         "src/cli/"
       ],
-      "name": "@open-tomato/rafa-cli",
+      "name": "@open-tomato/rafa",
       "named": [
         "src/commands/index.ts",
         "src/rafa.ts",
         "src/schema/agent.ts"
       ],
-      "rank": 10,
+      "rank": 12,
       "remaining": 0,
       "upwardEdges": 0
     }
@@ -7608,12 +7652,12 @@
       ],
       "folder": "src/ci/",
       "importedBy": {
-        "@open-tomato/rafa-cli": 3,
+        "@open-tomato/rafa": 3,
         "src/commands/stretch/": 1,
         "src/stretch/": 3
       },
       "importsFrom": {
-        "@open-tomato/rafa": 1,
+        "@open-tomato/rafa-core": 1,
         "rafa-board": 3,
         "rafa-pr": 1
       }
@@ -7631,11 +7675,11 @@
       ],
       "folder": "src/commands/stretch/",
       "importedBy": {
-        "@open-tomato/rafa-cli": 5
+        "@open-tomato/rafa": 5
       },
       "importsFrom": {
-        "@open-tomato/rafa": 16,
-        "@open-tomato/rafa-cli": 10,
+        "@open-tomato/rafa": 10,
+        "@open-tomato/rafa-core": 16,
         "rafa-board": 5,
         "rafa-pr": 3,
         "src/ci/": 1,
@@ -7660,11 +7704,11 @@
       ],
       "folder": "src/stretch/",
       "importedBy": {
-        "@open-tomato/rafa-cli": 1,
+        "@open-tomato/rafa": 1,
         "src/commands/stretch/": 12
       },
       "importsFrom": {
-        "@open-tomato/rafa": 10,
+        "@open-tomato/rafa-core": 10,
         "rafa-board": 1,
         "rafa-pr": 1,
         "rafa-release": 1,
