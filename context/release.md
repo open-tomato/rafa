@@ -243,8 +243,11 @@ last fetched) and prints:
 - Untagged versions marked in `release.changelog` (a changelog section with no
   matching `v<version>` tag)
 - The fragments waiting on the base branch, one line each in fold order with
-  level, add date and title, and the release that settle would produce from
-  them (or an error if a fragment does not parse)
+  level, add date and title, then `for <name>` when the fragment names a
+  package, and the release that settle would produce from them: the root's,
+  then `; <name> <base> → <next>` for each package a fragment names, each
+  forecast over its own base version (or an error if a fragment does not
+  parse, or names a package the workspace lacks or a private one)
 - An audit of released history: versions two headings name, gaps (a version not
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary
