@@ -26,12 +26,17 @@
  *     names `@open-tomato/rafa-core`), and a member's own name is always
  *     declared. For a member with no `private: true`, a specifier naming
  *     `@open-tomato/rafa` names the root package, and the publish rules
- *     hold it in place of this one.
+ *     hold it in place of this one: in a file the member ships. One in a
+ *     file it does not ship never leaves the repository, and no rule
+ *     refuses it.
  *
  * A member with no `private: true`, which publishes, is refused on three
  * more counts, `scripts/workspace/publish-rules.ts`'s: an installed
  * dependency on a private member, an import of `@open-tomato/rafa` with no
- * peer on it, and an import that does not resolve once published.
+ * peer on it, and an import that does not resolve once published. The two
+ * import counts read only the files the member ships (its `files` list,
+ * or with none every code file but its tests and root tool configs),
+ * while the undeclared-import rule above reads every code file.
  *
  * Specifiers are those `ts.preProcessFile` finds, so `import type`,
  * `export … from`, a dynamic `import()` and a `require()` are read, and
@@ -54,7 +59,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 import ts from 'typescript';
 
-import { exportKeys, isPublishable, namesRootPackage, publishReasons } from './publish-rules';
+import { exportKeys, isPublishable, namesRootPackage, publishReasons, shippedImports } from './publish-rules';
 
 /** The root file whose `tasks` keys every member must have a script for. */
 export const TURBO_FILE = 'turbo.json';
@@ -362,7 +367,8 @@ function scopedImports(member: Member): FileImports[] {
 /**
  * The reasons a member's bare `@open-tomato/*` imports refuse it: one per
  * undeclared package, naming each file that imports it. A publishable
- * member's imports of the root package are the publish rules' to hold.
+ * member's imports of the root package are the publish rules' to hold,
+ * in the files it ships; in the others they are not read.
  *
  * @param member - The member.
  * @param imports - The member's scoped imports, from {@link scopedImports}.
@@ -522,7 +528,7 @@ export function checkGraph(root: string): GraphReport {
           ...tsconfigReasons(member, solution.dirs, members),
           ...importReasons(member, imports, aliases, members),
           ...error === undefined && isPublishable(member.manifest)
-            ? publishReasons(member.manifest, imports, privateNames, keys)
+            ? publishReasons(member.manifest, shippedImports(member.manifest, imports), privateNames, keys)
             : [],
         ],
       };

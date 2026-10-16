@@ -11,13 +11,27 @@
  *     name a private member, which never publishes, so npm could not
  *     install it. `devDependencies` are not read: they never leave the
  *     repository;
- *   - a code file under it imports `@open-tomato/rafa` or
+ *   - a shipped code file imports `@open-tomato/rafa` or
  *     `@open-tomato/rafa/<subpath>` while its `peerDependencies` do not
  *     name `@open-tomato/rafa`, so it would carry or miss the installed
  *     rafa instead of sharing it;
- *   - a code file under it imports `@open-tomato/rafa/<subpath>` whose
+ *   - a shipped code file imports `@open-tomato/rafa/<subpath>` whose
  *     `./<subpath>` is not a key of the root manifest's `exports`, or
  *     imports a private member by name: neither resolves once published.
+ *
+ * The two import rules read only the files the member ships, which
+ * {@link shippedImports} keeps: an import in a file npm never packs never
+ * reaches a consumer. With a `files` list, a file ships when an entry,
+ * read relative to the member's directory, names it or a folder holding
+ * it (`src`, `src/`, `./src`), or matches either as a `Bun.Glob`
+ * (`src/*.ts`, `*.js`). An entry opening with `!` is skipped, so a
+ * file it would exclude is still read. With no `files`, every code file
+ * ships but a test file (a name holding `.test.`, or a folder of its path
+ * named `__tests__`, `test` or `tests`) and a tool config at the member's
+ * root (`*.config.{js,mjs,cjs,ts,mts,cts}`). npm's always-packed files
+ * (`package.json`, `README*`, `LICENSE*`) are no code files, and the
+ * targets of `main` and `bin` are not read: a file they name that `files`
+ * leaves out is not read either.
  *
  * For a publishable member, `@open-tomato/rafa` and its subpaths name the
  * root package, the one npm installs, and not the member the `paths` map
@@ -35,6 +49,24 @@ const PEER_FIELD = 'peerDependencies';
 
 /** The bare scope every `@open-tomato/*` specifier opens with. */
 const SCOPE_SEPARATOR = '/';
+
+/** The manifest field listing what npm packs. */
+const FILES_FIELD = 'files';
+
+/** A test file's name, read when the manifest has no `files`. */
+const TEST_FILE_NAME = /\.test\./;
+
+/** The folders whose files are tests, read when the manifest has no `files`. */
+const TEST_FOLDERS: ReadonlySet<string> = new Set(['__tests__', 'test', 'tests']);
+
+/** A tool config at the member's root, read when the manifest has no `files`. */
+const ROOT_TOOL_CONFIG = /^[^/]+\.config\.(?:js|mjs|cjs|ts|mts|cts)$/;
+
+/** The opening of a `files` entry that excludes rather than names. */
+const NEGATION = '!';
+
+/** The separator of a member-relative path, as the rules read it. */
+const PATH_SEPARATOR = '/';
 
 /** The scoped specifiers one code file of a member imports. */
 export interface FileImports {
@@ -64,6 +96,59 @@ function recordOf(value: unknown): Readonly<Record<string, unknown>> {
  */
 export function isPublishable(manifest: Readonly<Record<string, unknown>>): boolean {
   return manifest.private !== true;
+}
+
+/**
+ * The entries of a manifest's `files`, each with its leading `./` and
+ * trailing `/` dropped; `undefined` when the field is not a list.
+ *
+ * @param manifest - A parsed `package.json`.
+ * @returns The entries that name files, `!` entries left out.
+ */
+function filesEntries(manifest: Readonly<Record<string, unknown>>): string[] | undefined {
+  const field = manifest[FILES_FIELD];
+  if (!Array.isArray(field)) {
+    return undefined;
+  }
+  return field
+    .filter((entry): entry is string => typeof entry === 'string' && !entry.startsWith(NEGATION))
+    .map((entry) => entry.replace(/^(?:\.\/)+/, '').replace(/\/+$/, ''))
+    .filter((entry) => entry !== '');
+}
+
+/**
+ * Whether a file of a member is in the package npm publishes for it.
+ *
+ * @param manifest - The member's `package.json`.
+ * @param file - The file, relative to the member's directory.
+ * @returns `true` when the file ships.
+ */
+export function isShipped(manifest: Readonly<Record<string, unknown>>, file: string): boolean {
+  const path = file.split('\\').join(PATH_SEPARATOR);
+  const segments = path.split(PATH_SEPARATOR);
+  const entries = filesEntries(manifest);
+  if (entries !== undefined) {
+    const named = segments.map((_, index) => segments.slice(0, index + 1).join(PATH_SEPARATOR));
+    return entries.some((entry) => {
+      const glob = new Bun.Glob(entry);
+      return named.some((candidate) => candidate === entry || glob.match(candidate));
+    });
+  }
+  const name = segments.at(-1) ?? path;
+  return !TEST_FILE_NAME.test(name)
+    && !segments.slice(0, -1).some((folder) => TEST_FOLDERS.has(folder))
+    && !ROOT_TOOL_CONFIG.test(path);
+}
+
+/**
+ * The imports of the files a member ships, the ones its publish rules read.
+ *
+ * @param manifest - The member's `package.json`.
+ * @param imports - The member's scoped imports, per file.
+ * @returns The entries of shipped files, in their order.
+ */
+export function shippedImports(manifest: Readonly<Record<string, unknown>>, imports: readonly FileImports[]): FileImports[] {
+  return imports.filter(({ file }) => isShipped(manifest, file));
 }
 
 /**
@@ -178,7 +263,7 @@ function unresolvedEnding(specifier: string, keys: readonly string[], privateNam
  * published.
  *
  * @param manifest - The member's `package.json`.
- * @param imports - The member's scoped imports, per file, sorted by file.
+ * @param imports - The scoped imports of the files the member ships, from {@link shippedImports}, sorted by file.
  * @param privateNames - The names of every private member.
  * @param keys - The keys of the root manifest's `exports`, from {@link exportKeys}.
  * @returns The reasons; empty when the member may publish.

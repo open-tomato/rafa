@@ -485,6 +485,48 @@ describe('a publishable member', () => {
   });
 });
 
+describe('a publishable member\'s shipped files', () => {
+  /** The base's private config member, the stand-in for the live `@open-tomato/rafa-eslint-config`. */
+  const CONFIG = '@open-tomato/rafa-config';
+
+  /** A file importing the private config member. */
+  const importsConfig = `import base from '${CONFIG}';\nexport default [...base];\n`;
+
+  /** The plugin's fields: the peer, and the config declared as the live members declare it. */
+  const linted = { ...PEER_FIELDS, devDependencies: { '@open-tomato/rafa': 'workspace:*', [CONFIG]: 'workspace:*' } };
+
+  /** The refusal one file importing the config earns once it ships. */
+  const refusalOf = (file: string): string => `${file} imports ${CONFIG}, which names ${CONFIG}, a private member that never publishes`;
+
+  test('a files list naming src holds a scripts/dev.ts outside it importing a private member', () => {
+    const listed = plantWith({ ...plugin({ ...linted, files: ['src'] }), [`${PLUGIN_DIR}/scripts/dev.ts`]: importsConfig });
+    const unlisted = plantWith({ ...plugin(linted), [`${PLUGIN_DIR}/scripts/dev.ts`]: importsConfig });
+
+    expect(reasonsOf(checkGraph(listed), PLUGIN_DIR)).toEqual([]);
+    expect(reasonsOf(checkGraph(unlisted), PLUGIN_DIR)).toEqual([refusalOf('scripts/dev.ts')]);
+  });
+
+  test('with no files list, a test file and a root eslint.config.mjs importing a private member hold', () => {
+    const root = plantWith({
+      ...plugin(linted),
+      [`${PLUGIN_DIR}/src/index.test.ts`]: importsConfig,
+      [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig,
+    });
+
+    expect(reasonsOf(checkGraph(root), PLUGIN_DIR)).toEqual([]);
+  });
+
+  test('with no files list, the same tree with src/index.ts importing the private member is refused for that file alone', () => {
+    const root = plantWith({
+      ...plugin(linted, importsConfig),
+      [`${PLUGIN_DIR}/src/index.test.ts`]: importsConfig,
+      [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig,
+    });
+
+    expect(reasonsOf(checkGraph(root), PLUGIN_DIR)).toEqual([refusalOf('src/index.ts')]);
+  });
+});
+
 describe('main over one planted root, before and after the fix', () => {
   test('a publishable member depending on rafa-core exits 1 with the refusal line; the peer entry instead exits 0', () => {
     const refusal = 'packages/plugin (@open-tomato/rafa-plugin): depends on @open-tomato/rafa-core in dependencies, which is private and never publishes';
@@ -505,5 +547,51 @@ describe('main over one planted root, before and after the fix', () => {
     expect(fixed.code).toBe(0);
     expect(fixed.lines).toContain('packages/plugin (@open-tomato/rafa-plugin): ok');
     expect(fixed.lines).not.toContain(refusal);
+  });
+});
+
+describe('main over a plugin whose shipped file and root config import a private member', () => {
+  /** The base's private config member, the stand-in for the live `@open-tomato/rafa-eslint-config`. */
+  const CONFIG = '@open-tomato/rafa-config';
+
+  /** A file importing the private config member. */
+  const importsConfig = `import base from '${CONFIG}';\nexport default [...base];\n`;
+
+  /** The plugin's fields: the peer, and the config declared as the live members declare it. */
+  const linted = { ...PEER_FIELDS, devDependencies: { '@open-tomato/rafa': 'workspace:*', [CONFIG]: 'workspace:*' } };
+
+  /** The lines of a run that name `file`. */
+  const naming = (lines: readonly string[], file: string): readonly string[] => lines.filter((line) => line.includes(file));
+
+  test('exits 1 with one refusal line naming src/index.ts and none naming eslint.config.mjs', () => {
+    const root = plantWith({ ...plugin(linted, importsConfig), [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig });
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(1);
+    expect(naming(lines, 'src/index.ts')).toHaveLength(1);
+    expect(naming(lines, 'eslint.config.mjs')).toEqual([]);
+  });
+
+  test('exits 0 over the same root once the src/index.ts import is removed', () => {
+    const root = plantWith({ ...plugin(linted, importsConfig), [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig });
+    writeFileSync(join(root, PLUGIN_DIR, 'src/index.ts'), 'export const id: string = \'plugin\';\n');
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(0);
+    expect(naming(lines, 'eslint.config.mjs')).toEqual([]);
+  });
+
+  test('a files list naming eslint.config.mjs explicitly earns the refusal, since a listed file ships', () => {
+    const root = plantWith({
+      ...plugin({ ...linted, files: ['src', 'eslint.config.mjs'] }),
+      [`${PLUGIN_DIR}/eslint.config.mjs`]: importsConfig,
+    });
+
+    const { code, lines } = run(root);
+
+    expect(code).toBe(1);
+    expect(naming(lines, 'eslint.config.mjs')).toHaveLength(1);
   });
 });

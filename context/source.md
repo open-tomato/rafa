@@ -414,9 +414,15 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `link:../..` there (`@x/root@workspace:* failed to resolve`), and
   `file:../..` installs a copy of the root instead. The in-repo import still
   resolves through the `paths` of `tsconfig.packages.json`, which bun reads at
-  run time. The publish rules hold the shape: a file that imports the root
-  while `peerDependencies` does not name it is refused. A plugin's manifest
-  reads:
+  run time. The publish rules hold the shape: a file the member ships that
+  imports the root while `peerDependencies` does not name it is refused. Their
+  import rules read only the shipped files: with a `files` list, each file an
+  entry names, directly, by a folder holding it or as a `Bun.Glob`; with none,
+  every code file but a test file (a name holding `.test.`, or a `__tests__`,
+  `test` or `tests` folder) and a tool config at the member's root
+  (`*.config.{js,mjs,cjs,ts,mts,cts}`). The targets of `main` and `bin` are
+  not read, and the undeclared-import rule of the graph check below still
+  reads every code file. A plugin's manifest reads:
 
   ```json
   { "name": "@open-tomato/rafa-plugin-example", "version": "0.1.0",
@@ -499,9 +505,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `peerDependencies` or `optionalDependencies` name a private member; a file
   imports `@open-tomato/rafa` or a subpath of it while `peerDependencies` does
   not name `@open-tomato/rafa`; or a file imports a subpath the root
-  manifest's `exports` lack, or a private member by name. For such a member
-  `@open-tomato/rafa/<subpath>` names the root package, not the member the
-  `paths` alias resolves it into, so the fourth refusal leaves it to these.
+  manifest's `exports` lack, or a private member by name. The last two read
+  only the files the member ships, as the bullet on a publishable member's
+  peer above sets out. For such a member `@open-tomato/rafa/<subpath>` names
+  the root package, not the member the `paths` alias resolves it into, so the
+  fourth refusal leaves it to these.
   It exits 0 with one `ok` line per member and exits 1 with a line per
   reason; a root it cannot read is a refusal too. Ring 1 runs it, and
   `src/tests/workspace-graph.sweep.test.ts` runs it over the live tree in every

@@ -14,6 +14,7 @@
 import type { SettleWaitingPlace } from './settle-waiting.js';
 import type { Fragment } from '../release/fragment.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { ReleaseMove } from '../release/release-move.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
@@ -26,6 +27,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { serializeFragment } from '../release/fragment.js';
+import { moveSpelling } from '../release/release-move.js';
 
 import { SETTLE_REMOTE, settleWaitingOn } from './settle-waiting.js';
 
@@ -85,6 +87,40 @@ describe('settleWaitingOn', () => {
     runGit(root, 'update-ref', `refs/remotes/${SETTLE_REMOTE}/main`, 'HEAD');
     return { place: { root, base: 'main', release: RELEASE }, git: createGitRunner(root) };
   }
+
+  /**
+   * A repository whose root is at 1.2.3 with a workspace holding the
+   * publishable `@scope/plugin` at 0.2.0, one root patch fragment and
+   * one patch fragment naming the plugin, `origin/main` at that commit.
+   */
+  function plantWorkspaceBase(): { place: SettleWaitingPlace; git: GitRunner } {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'settle-waiting-ws-')));
+    planted.push(root);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'other', version: '1.2.3', workspaces: ['packages/*'] }));
+    writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n');
+    mkdirSync(join(root, 'packages', 'plugin'), { recursive: true });
+    writeFileSync(join(root, 'packages', 'plugin', 'package.json'), JSON.stringify({ name: '@scope/plugin', version: '0.2.0' }));
+    mkdirSync(join(root, '.changes'), { recursive: true });
+    const base = { title: 'A change', level: 'patch' as const, notes: ['- loop: a change'] };
+    writeFileSync(join(root, '.changes', 'rafa-1.md'), serializeFragment({ ...base, plan: 'rafa-1', package: null }));
+    writeFileSync(join(root, '.changes', 'rafa-2.md'), serializeFragment({ ...base, plan: 'rafa-2', package: '@scope/plugin' }));
+    runGit(root, 'init', '--quiet', '--initial-branch=main');
+    runGit(root, 'add', '-A');
+    runGit(root, '-c', 'commit.gpgsign=false', 'commit', '--quiet', '--no-verify', '-m', 'base');
+    runGit(root, 'update-ref', `refs/remotes/${SETTLE_REMOTE}/main`, 'HEAD');
+    return { place: { root, base: 'main', release: RELEASE }, git: createGitRunner(root) };
+  }
+
+  it('spells a root fragment and a package fragment as two moves, the root bare and the package by name', () => {
+    const moves: readonly ReleaseMove[] = [
+      { package: null, dir: '.', from: '1.2.3', to: '1.2.4' },
+      { package: '@scope/plugin', dir: 'packages/plugin', from: '0.2.0', to: '0.2.1' },
+    ];
+    const { place, git } = plantWorkspaceBase();
+
+    expect(settleWaitingOn(place, git)).toEqual({ base: 'main', fragments: 2, version: moves.map(moveSpelling).join(', ') });
+    expect(settleWaitingOn(place, git)?.version).toBe('1.2.4, @scope/plugin@0.2.1');
+  });
 
   it('answers the base, the fragment count and the version they fold into', () => {
     const { place, git } = plantBase(['patch', 'minor']);

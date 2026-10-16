@@ -70,6 +70,21 @@ function manifest(version: string): string {
   return `{\n  "name": "demo",\n  "version": "${version}"\n}\n`;
 }
 
+/** A root manifest declaring `version` whose `workspaces` name `packages/*`. */
+function workspaceManifest(version: string): string {
+  return `{\n  "name": "demo",\n  "version": "${version}",\n  "workspaces": ["packages/*"]\n}\n`;
+}
+
+/**
+ * The files of a workspace on top of the root at 0.24.0: the publishable
+ * `@scope/plugin` at 0.2.0, and the private `@scope/core`.
+ */
+const WORKSPACE_FILES: Readonly<Record<string, string>> = {
+  'package.json': workspaceManifest('0.24.0'),
+  'packages/plugin/package.json': `${JSON.stringify({ name: '@scope/plugin', version: '0.2.0' }, null, 2)}\n`,
+  'packages/core/package.json': `${JSON.stringify({ name: '@scope/core', version: '0.1.0', private: true }, null, 2)}\n`,
+};
+
 /** A changelog holding `sections` under its preamble, newest first. */
 function changelog(...sections: readonly string[]): string {
   return ['# Changelog', '', ...sections.flatMap((section) => [section, ''])].join('\n');
@@ -439,6 +454,8 @@ describe('readGuard over a bare origin and a clone', () => {
 
   it('folds the waiting fragments of the branch fragment\'s own package, the control beside the root case', () => {
     const w = world();
+    w.commit(WORKSPACE_FILES, 'workspace');
+    w.git(['push', '-q', 'origin', 'main']);
     w.git(['switch', '-q', '-c', 'feat/plugin']);
     w.commit({ 'src/b.ts': 'b\n', '.changes/rafa-7.md': packageFragmentText('rafa-7', 'patch', '@scope/plugin', '- Plugin: a fix') }, 'plugin fragment branch');
     w.git(['switch', '-q', 'main']);
@@ -451,6 +468,106 @@ describe('readGuard over a bare origin and a clone', () => {
     const forecast = read(guard(w, 'feat/plugin')).forecast;
     if (forecast === null || !forecast.ok) throw new Error('no forecast');
     expect(forecast.waiting).toEqual(['rafa-4']);
+  });
+
+  it('folds a package slot from the package\'s own version, holding the branch\'s root fragment out', () => {
+    const w = world();
+    w.commit(WORKSPACE_FILES, 'workspace');
+    w.git(['push', '-q', 'origin', 'main']);
+    w.git(['switch', '-q', '-c', 'feat/two']);
+    w.commit({
+      'src/b.ts': 'b\n',
+      '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', '- Loop: a root fix'),
+      '.changes/rafa-2.md': packageFragmentText('rafa-2', 'minor', '@scope/plugin', '- Plugin: a feature'),
+    }, 'two fragments, the plugin\'s last by id');
+
+    const reading = read(guard(w, 'feat/two'));
+    const forecast = reading.forecast;
+    if (forecast === null || !forecast.ok || forecast.forecast.kind !== 'ships') throw new Error('no shipping forecast');
+    expect(forecast.baseVersion).toBe('0.2.0');
+    expect(forecast.forecast.version).toBe('0.3.0');
+    expect(forecast.forecast.section).toContain('<!-- rafa:fragments rafa-2 -->');
+    expect(forecast.forecast.section).toContain('- Plugin: a feature');
+    expect(forecast.forecast.section).not.toContain('- Loop: a root fix');
+    expect(reading.problems).toEqual([]);
+    expect(guardLines(reading, 'package.json')).toContain(
+      'Release forecast: this branch ships as the next minor, 0.3.0 if merged now (semver-by-level, origin/main at 0.2.0, no fragment waiting)',
+    );
+  });
+
+  it('folds the root slot from release.versionFile, holding the branch\'s package fragment out', () => {
+    const w = world();
+    w.commit(WORKSPACE_FILES, 'workspace');
+    w.git(['push', '-q', 'origin', 'main']);
+    w.git(['switch', '-q', '-c', 'feat/swapped']);
+    w.commit({
+      'src/b.ts': 'b\n',
+      '.changes/rafa-1.md': packageFragmentText('rafa-1', 'minor', '@scope/plugin', '- Plugin: a feature'),
+      '.changes/rafa-2.md': fragmentText('rafa-2', 'patch', '- Loop: a root fix'),
+    }, 'two fragments, the root\'s last by id');
+
+    const reading = read(guard(w, 'feat/swapped'));
+    const forecast = reading.forecast;
+    if (forecast === null || !forecast.ok || forecast.forecast.kind !== 'ships') throw new Error('no shipping forecast');
+    expect(forecast.baseVersion).toBe('0.24.0');
+    expect(forecast.forecast.version).toBe('0.24.1');
+    expect(forecast.forecast.section).toContain('<!-- rafa:fragments rafa-2 -->');
+    expect(forecast.forecast.section).toContain('- Loop: a root fix');
+    expect(forecast.forecast.section).not.toContain('- Plugin: a feature');
+    expect(reading.problems).toEqual([]);
+  });
+
+  describe('a package slot the base cannot fold', () => {
+    /** A branch off a `main` holding `files`, carrying one fragment of `pkg`. */
+    function packageBranch(files: Readonly<Record<string, string>> | null, pkg: string): World {
+      const w = world();
+      if (files !== null) {
+        w.commit(files, 'workspace');
+        w.git(['push', '-q', 'origin', 'main']);
+      }
+      w.git(['switch', '-q', '-c', 'feat/unfoldable']);
+      w.commit({
+        'src/b.ts': 'b\n',
+        '.changes/rafa-1.md': packageFragmentText('rafa-1', 'minor', pkg, '- Plugin: a feature'),
+      }, 'package fragment');
+      return w;
+    }
+
+    /** Expects no forecast and one problem naming `pkg`, which `guardLines` prints. */
+    function expectUnfolded(w: World, pkg: string, detail: string): void {
+      const reading = read(guard(w, 'feat/unfoldable'));
+      expect(reading.forecast).toBeNull();
+      expect(reading.problems).toHaveLength(1);
+      const problem = reading.problems[0] ?? '';
+      expect(problem).toContain(pkg);
+      expect(problem).toContain(detail);
+      expect(problem).toEndWith('so no forecast was folded');
+      expect(guardLines(reading, 'package.json')).toContain(`  note: ${problem}`);
+    }
+
+    it('answers no forecast for a package the base\'s workspace does not hold', () => {
+      const w = packageBranch(WORKSPACE_FILES, '@scope/missing');
+      expectUnfolded(w, '@scope/missing', 'holds no package');
+    });
+
+    it('answers no forecast for a private member, naming its manifest', () => {
+      const w = packageBranch(WORKSPACE_FILES, '@scope/core');
+      expectUnfolded(w, '@scope/core', 'packages/core/package.json');
+    });
+
+    it('answers no forecast for a member declaring no version, naming its manifest', () => {
+      const w = packageBranch({
+        ...WORKSPACE_FILES,
+        'packages/plugin/package.json': `${JSON.stringify({ name: '@scope/plugin' }, null, 2)}\n`,
+      }, '@scope/plugin');
+      expectUnfolded(w, '@scope/plugin', 'packages/plugin/package.json');
+    });
+
+    it('answers no forecast when the workspace is planted on the branch alone, the base still lacking it', () => {
+      const w = packageBranch(null, '@scope/plugin');
+      w.commit(WORKSPACE_FILES, 'workspace on the branch only');
+      expectUnfolded(w, '@scope/plugin', 'origin/main');
+    });
   });
 
   it('folds a waiting fragment the branch edits once, in the branch\'s place', () => {

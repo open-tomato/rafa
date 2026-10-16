@@ -234,10 +234,16 @@ whether or not the remote has it.
 ### Guards: the preflight check
 
 A preflight item in `rafa pr merge` (read also by `rafa pr triage`) runs the fold
-as a dry run over the base branch's current version and the fragments waiting
-there (the state at the time the branch was last pulled) that name the branch
-fragment's package, or none for the root, as the pull request body's forecast
-does: a package fragment waiting there does not move the root's forecast. It
+as a dry run for one unit: the package of the branch fragment that takes the
+forecast's last place, or the root when it names none. It folds from that
+unit's version on the base branch (the root's from `release.versionFile`, a
+package's from its own manifest, read through `readWorkspacePackagesAt`) and
+folds only the fragments that name the same package, or none for the root:
+those waiting on the base (the state at the time the branch was last pulled),
+as the pull request body's forecast does, and the branch's own others. A package
+fragment, waiting or on the branch, does not move the root's forecast, nor a
+root fragment a package's. A package the base's workspace lacks, a private one
+or one declaring no version gives no forecast and one note saying why. It
 answers one of four classes:
 
 - **`clean`**: A fragment is present and the branch changes neither the version
