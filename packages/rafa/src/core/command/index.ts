@@ -16,8 +16,9 @@
  *   - `confirm.ts`: the `Prompter` every yes-or-no question goes
  *     through, and the line prompter that reads one from a stream;
  *   - `registry-types.ts`: the contract of the dispatcher's registry,
- *     `CommandRegistry` and the five shapes it names, whose builder
- *     stays in `src/cli/registry.ts`;
+ *     `CommandRegistry` and the five shapes it names, and
+ *     `CommandFeature`, what one feature contributes to it, whose
+ *     builder stays in `src/cli/registry.ts`;
  *   - `running.ts`: the command this process is running with its parsed
  *     flags, recorded by the dispatcher and read by the spend guard;
  *   - `spends.ts`: a command's `spends` declaration, `CommandSpend`, its
@@ -100,6 +101,7 @@ export type {
 export type { PromptOutput, Prompter } from './confirm.js';
 export type {
   CommandAlias,
+  CommandFeature,
   CommandRegistry,
   CommandRegistryInput,
   ModuleMount,
