@@ -56,9 +56,9 @@
  * Nothing here redacts: a caller takes local paths and secrets out of
  * the values before it builds the record.
  */
-import type { ErrorCodeEntry } from '../errors/codes.js';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 
-import { CODE_PATTERN, familyOf, isKnownCode, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '../errors/codes.js';
+import { CODE_PATTERN, familyOf, isKnownCode, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '@open-tomato/rafa/errors/codes';
 
 import { closestNames } from './closest.js';
 import { fenced } from './fenced.js';

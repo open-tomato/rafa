@@ -396,7 +396,7 @@ describe('loop start refusing', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'command_exit', message: refusal(jsonScratch) },
+        error: { code: 'command_exit', message: refusal(jsonScratch), cause: 'cli:command-exit', module: 'loop', action: 'start' },
         ts: expect.any(String),
       },
     ]);

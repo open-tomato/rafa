@@ -1336,9 +1336,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/bug/codes.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../errors/codes.js', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
+    ['@open-tomato/rafa/errors/codes', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
+    ['@open-tomato/rafa/errors/rafa-codes', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
     ['../../errors/match.js', ['nearDuplicates', 'suggestCodes']],
-    ['../../errors/rafa-codes.js', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
     ['../issue/issue-tracker.js', ['lineRefusal', 'readNonBlankFlag']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
   ]],

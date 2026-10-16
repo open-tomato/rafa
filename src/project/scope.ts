@@ -136,6 +136,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { CONFIG_FILE, SCOPE_DIR, scopeAt } from '@open-tomato/rafa/core/config';
 import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 
@@ -218,6 +219,16 @@ export interface NoProject {
 /** What {@link resolveScope} answers: a project found, or the hint. */
 export type ScopeResolution = ProjectFound | NoProject;
 
+/** What a {@link ScopeError} is built from: its cause code, its message unprefixed, and its cause. */
+export interface ScopeErrorOptions {
+  /** The cause code, `<family>:<leaf>`, as `RafaError` takes it. */
+  readonly code: string;
+  /** The error line, without the `rafa scope: ` prefix the class adds. */
+  readonly message: string;
+  /** The error this one is reported for, as `ErrorOptions.cause`. */
+  readonly cause?: unknown;
+}
+
 /**
  * A start or a home the walk cannot begin from: a relative path, or a
  * start that does not resolve.
@@ -225,11 +236,24 @@ export type ScopeResolution = ProjectFound | NoProject;
  * Its own class so a caller can tell a refusal it should print from a
  * fault it should not swallow. "No project" is not one: that is the
  * {@link NoProject} answer.
+ *
+ * A coded `RafaError` of the `project` module. Its three throw sites
+ * code it: a relative start or home `input:invalid-value`, a start that
+ * does not resolve `fs:not-found`, and a git that cannot name the main
+ * checkout `git:new-context`, a code rafa's list holds no entry for
+ * yet, so it carries no hint.
  */
-export class ScopeError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(`rafa scope: ${message}`, options);
-    this.name = 'ScopeError';
+export class ScopeError extends RafaError {
+  static readonly module = 'project';
+
+  /**
+   * Builds the refusal from its cause code and message, the message
+   * prefixed `rafa scope: `, and the error it is reported for when
+   * there is one. `RafaError` names it `ScopeError`, after the class.
+   */
+  constructor(options: ScopeErrorOptions) {
+    const { message, ...rest } = options;
+    super({ ...rest, message: `rafa scope: ${message}` });
   }
 }
 
@@ -278,7 +302,8 @@ function lookupNames(): string {
 /** Refuses a path that is not absolute; see the module note. */
 function requireAbsolute(label: string, path: string): void {
   if (!isAbsolute(path)) {
-    throw new ScopeError(`${label} is ${describeValue(path)}, expected an absolute path`);
+    const message = `${label} is ${describeValue(path)}, expected an absolute path`;
+    throw new ScopeError({ code: 'input:invalid-value', message });
   }
 }
 
@@ -288,7 +313,7 @@ function realStartOf(start: string, fs: ScopeFileSystem): string {
     return fs.realpath(start);
   } catch (error) {
     const message = `start directory ${start} does not resolve (${messageOf(error)})`;
-    throw new ScopeError(message, { cause: error });
+    throw new ScopeError({ code: 'fs:not-found', message, cause: error });
   }
 }
 
@@ -361,7 +386,8 @@ function mainCheckoutAt(realStart: string, mainCheckout: (dir: string) => string
     return mainCheckout(realStart);
   } catch (error) {
     if (!(error instanceof WorktreeRootError)) throw error;
-    throw new ScopeError(`cannot read the main checkout of ${realStart} (${error.message})`, { cause: error });
+    const message = `cannot read the main checkout of ${realStart} (${error.message})`;
+    throw new ScopeError({ code: 'git:new-context', message, cause: error });
   }
 }
 

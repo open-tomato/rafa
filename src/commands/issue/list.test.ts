@@ -1188,7 +1188,7 @@ describe('rafa issue list --roadmap --check', () => {
     expect(events.at(-1)).toEqual({
       type: 'result',
       ok: false,
-      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE },
+      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE, cause: 'cli:command-exit', module: 'issue', action: 'list' },
       ts: expect.any(String),
     });
   });

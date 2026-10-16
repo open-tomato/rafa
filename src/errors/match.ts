@@ -16,11 +16,11 @@
  * picks: the caller (an agent) does.
  */
 
-import type { ErrorCodeEntry } from './codes.js';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
+
+import { familyOf } from '@open-tomato/rafa/errors/codes';
 
 import { jaccard, wordSetOf } from '../triage/similarity.js';
-
-import { familyOf } from './codes.js';
 
 /** How many suggestions `rafa bug codes --suggest` prints by default. */
 export const SUGGESTION_LIMIT = 5;

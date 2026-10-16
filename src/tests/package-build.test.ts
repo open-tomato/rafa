@@ -516,6 +516,8 @@ const EXPORTS = {
   './core/config': { types: './dist/core/config/index.d.ts' },
   './core/config/config-schema': { types: './dist/core/config/config-schema.d.ts' },
   './core/config/sections': { types: './dist/core/config/sections.d.ts' },
+  './errors/codes': { types: './dist/errors/codes.d.ts' },
+  './errors/rafa-codes': { types: './dist/errors/rafa-codes.d.ts' },
   './ports/log-level': { types: './dist/ports/log-level.d.ts' },
   './report/parse': { types: './dist/report/parse.d.ts' },
   './store/check-rows': { types: './dist/effort/store/check-rows.d.ts' },
@@ -1189,7 +1191,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(14);
+    expect(targets).toHaveLength(16);
     expect(missing).toEqual([]);
   });
 

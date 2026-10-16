@@ -34,7 +34,8 @@ export const FAILURE_STRING_MIN_LENGTH = 6;
 
 /**
  * The two codes this module's rule produces, as a list a test can read:
- * `src/errors/rafa-codes.test.ts` holds each to a cause code.
+ * `src/tests/core-coupled/errors/rafa-codes.test.ts` holds each to a cause
+ * code.
  */
 export const FAILURE_STRING_CODES = ['empty-failure-string', 'short-failure-string'] as const;
 

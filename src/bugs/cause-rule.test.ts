@@ -1,9 +1,10 @@
-import type { ErrorCodeEntry } from '../errors/codes.js';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 
 import { describe, expect, test } from 'bun:test';
 
+import { listedCodes } from '@open-tomato/rafa/errors/rafa-codes';
+
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '../adapters/tracker/github.js';
-import { listedCodes } from '../errors/rafa-codes.js';
 
 import { causeOf } from './cause-rule.js';
 

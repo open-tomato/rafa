@@ -81,12 +81,12 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 import { writeFindings } from '@open-tomato/rafa/store/findings';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
 
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
-import { RAFA_CODES } from '../errors/rafa-codes.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { DEFAULT_BUG_RULES } from './bug-filing.js';

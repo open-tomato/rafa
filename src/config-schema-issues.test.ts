@@ -18,11 +18,11 @@ import {
   parseConfigText,
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
 import { templateProblem } from './bugs/title.js';
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
-import { RAFA_CODES } from './errors/rafa-codes.js';
 import { projectConfigText } from './project/scaffold.js';
 
 /** What `setting` reads `raw` as, under its own file key. */

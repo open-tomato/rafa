@@ -123,8 +123,10 @@ pull-request code, but release code imports the git runner too, so it moved to
 `packages/rafa/src/core/git/`. `packages/rafa/src/report/parse.ts` reads like
 the run's report code, but the effort store reads it, so it is core. Core is
 also `packages/rafa/src/ports/`, the effort store under
-`packages/rafa/src/effort/store/` and `packages/rafa/src/report/record.ts`: core
-by assignment, kept where they are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
+`packages/rafa/src/effort/store/`, `packages/rafa/src/report/record.ts` and
+the cause codes of `packages/rafa/src/errors/codes.ts` and
+`packages/rafa/src/errors/rafa-codes.ts`: core by assignment, kept where they
+are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
 `scripts/survey/core-moves.ts` list core's folders and named files, and
 `isCoreFile` reads them: the one place a sweep, a survey script or a spawned
 loader takes core's location from.
@@ -568,10 +570,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps six `types`-only entries for core's
+  them. The root `exports` also keeps eight `types`-only entries for core's
   files (`./core/config`, `./core/config/config-schema`,
-  `./core/config/sections`, `./ports/log-level`, `./report/parse` and
-  `./store/check-rows`), which #808 retires.
+  `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
+  `./ports/log-level`, `./report/parse` and `./store/check-rows`), which
+  #808 retires.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a

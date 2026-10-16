@@ -11,23 +11,22 @@
  * `config-sections.ts` at 744 when it was added.
  *
  * Each entry is read with the same rules `defineErrorCodes`
- * (`src/errors/codes.ts`) applies to rafa's list, except that `since`
- * may be left out: a project often has no version to name. Then the
- * list as a
+ * (`packages/rafa/src/errors/codes.ts`) applies to rafa's list, except
+ * that `since` may be left out: a project often has no version to name.
+ * Then the list as a
  * whole is checked: a code given twice, or one rafa already declares, is
  * refused with both places named, so neither meaning wins silently. An
  * unknown key inside an entry is kept and warned about, as every other
  * list of mappings does.
  */
 
-import type { ErrorCodeEntry } from './errors/codes.js';
 import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
 import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 
 import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from '@open-tomato/rafa/core/config/sections';
-
-import { codeProblem, ERROR_LEVELS } from './errors/codes.js';
-import { RAFA_CODES } from './errors/rafa-codes.js';
+import { codeProblem, ERROR_LEVELS } from '@open-tomato/rafa/errors/codes';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
 declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `errors` section's fields, added to core's. */

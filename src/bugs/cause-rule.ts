@@ -25,10 +25,11 @@
  * cap falls back to `unknown:new-context`. The function is pure: the
  * text it keeps is the trimmed input, and redacting it is the caller's.
  */
-import type { ErrorCodeEntry } from '../errors/codes.js';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
+
+import { CODE_PATTERN, codeProblem, familyOf, isKnownCode, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '@open-tomato/rafa/errors/codes';
 
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '../adapters/tracker/github.js';
-import { CODE_PATTERN, codeProblem, familyOf, isKnownCode, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '../errors/codes.js';
 
 /** What the rule answers for one reported cause. */
 export interface CauseReading {
