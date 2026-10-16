@@ -4,7 +4,10 @@
  *
  * The git runner is scripted and records its argv, so a case pins that
  * the base version is read at the COMMIT step 1 read the waiting
- * fragments at, not at the ref, which could have moved. The fold is the
+ * fragments at, not at the ref, which could have moved. A second,
+ * path-answering runner plants a workspace at that commit, so a package
+ * slot is pinned to fold from its member's manifest while the root slot
+ * on the same tree folds from `release.versionFile`. The fold is the
  * real `semver-by-level` strategy, so a forecast here is the answer
  * settle would give over the same tree.
  */
@@ -13,7 +16,7 @@ import type { TreeFragment } from './fragment-tree.js';
 import type { Fragment } from './fragment.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { ReleaseVerified } from './verify.js';
-import type { GitResult } from '@open-tomato/rafa/core/git';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -91,6 +94,31 @@ function gitAnswering(answer: GitResult): { readonly run: (args: readonly string
 const MANIFEST: GitResult = { ok: true, stdout: '{"name":"x","version":"0.25.0"}\n', stderr: '' };
 const NOW = new Date('2026-09-20T23:30:00Z');
 
+/** A planted base: a root manifest at 0.25.0 with one member, `@scope/plugin`, at 3.1.0. */
+const PLANTED: Readonly<Record<string, string>> = {
+  'package.json': '{"name":"x","version":"0.25.0","workspaces":["packages/*"]}\n',
+  'packages/plugin/package.json': '{"name":"@scope/plugin","version":"3.1.0"}\n',
+};
+
+/** A runner answering `git show` and `git ls-tree` over `files` at {@link COMMIT}, recording the argv. */
+function gitOver(files: Readonly<Record<string, string>>): { readonly run: GitRunner; readonly argv: string[] } {
+  const argv: string[] = [];
+  const run: GitRunner = (args) => {
+    argv.push(args.join(' '));
+    if (args[0] === 'show') {
+      const text = files[(args[1] ?? '').slice(`${COMMIT}:`.length)];
+      return text === undefined || !(args[1] ?? '').startsWith(`${COMMIT}:`)
+        ? { ok: false, stdout: '', stderr: `fatal: invalid object name '${args[1] ?? ''}'.` }
+        : { ok: true, stdout: text, stderr: '' };
+    }
+    if (args[0] === 'ls-tree' && args.at(-1) === COMMIT) {
+      return { ok: true, stdout: `${Object.keys(files).join('\0')}\0`, stderr: '' };
+    }
+    return { ok: false, stdout: '', stderr: `fatal: unscripted git ${args.join(' ')}` };
+  };
+  return { run, argv };
+}
+
 describe('readBranchForecast', () => {
   it('reads the base version at step 1 commit, without a leading ./', () => {
     const git = gitAnswering(MANIFEST);
@@ -141,7 +169,7 @@ describe('readBranchForecast', () => {
   });
 
   it('folds the waiting fragments of the branch fragment\'s own package, the control beside the root case', () => {
-    const git = gitAnswering(MANIFEST);
+    const git = gitOver(PLANTED);
     const ours: Fragment = { ...OURS, package: '@scope/plugin' };
     const queue = [
       waiting('rafa-18', { plan: 'rafa-18', title: 'plugin major', level: 'major', package: '@scope/plugin', notes: ['- plugin: break'] }),
@@ -152,7 +180,47 @@ describe('readBranchForecast', () => {
 
     if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
     expect(read.waiting).toEqual(['rafa-18']);
-    expect(read.forecast.version).toBe('1.0.0');
+    expect(read.forecast.version).toBe('4.0.0');
+  });
+
+  it('folds a package slot from the member manifest version at step 1 commit', () => {
+    const git = gitOver(PLANTED);
+    const ours: Fragment = { ...OURS, package: '@scope/plugin' };
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(ours), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.baseVersion).toBe('3.1.0');
+    expect(read.forecast.version).toBe('3.1.1');
+    expect(git.argv).toContain(`show ${COMMIT}:packages/plugin/package.json`);
+  });
+
+  it('folds a root slot on the same planted base from release.versionFile (control)', () => {
+    const git = gitOver(PLANTED);
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.baseVersion).toBe('0.25.0');
+    expect(read.forecast.version).toBe('0.25.1');
+    expect(git.argv).toEqual([`show ${COMMIT}:package.json`]);
+  });
+
+  it('answers no forecast with the guard\'s sentence for a package absent from the base', () => {
+    const git = gitOver(PLANTED);
+    const ours: Fragment = { ...OURS, package: '@scope/absent' };
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(ours), now: NOW });
+
+    expect(read).toEqual({
+      ok: false,
+      ref: 'origin/main',
+      problem: 'origin/main\'s workspace holds no package @scope/absent, so no forecast was folded',
+      problems: [],
+    });
+    expect(forecastLine(read)).toBe(
+      'Release forecast: none computed, because origin/main\'s workspace holds no package @scope/absent, so no forecast was folded',
+    );
   });
 
   it('leaves a waiting fragment that does not parse out of the fold and names it', () => {

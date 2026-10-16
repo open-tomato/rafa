@@ -58,7 +58,10 @@ same first-parent order. A package no fragment names is never folded, and it
 keeps its version through a release. The pull request body's forecast
 (`src/release/branch-forecast.ts`) applies the same split: it folds only the
 waiting fragments whose `package` equals the branch fragment's (null with null),
-so a package fragment waiting on the base does not move the root's forecast.
+so a package fragment waiting on the base does not move the root's forecast,
+and folds a package slot from the member's manifest at the base commit through
+`packageBaseVersionAt`, answering the merge guard's own sentence for a package
+the base cannot fold.
 
 Fragment order is first-parent commit order: the commit that ADDED each fragment
 to the base branch, read from git. First add wins if a fragment name appears

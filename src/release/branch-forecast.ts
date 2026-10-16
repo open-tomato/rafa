@@ -15,10 +15,19 @@
  * Step 1 (`./prepare.ts`) already fetched the base branch and read the
  * fragments waiting on it at ONE commit, which its record carries as
  * {@link ReleasePrepared.base}. The base version is read at that same
- * commit — `git show <commit>:<version file>` — rather than by a second
- * fetch of the ref, so the version and the waiting fragments the fold
- * runs over are one tree, and a base that moved between the two reads
- * cannot mix two trees into one forecast. The fold itself is
+ * commit rather than by a second fetch of the ref, so the version and
+ * the waiting fragments the fold runs over are one tree, and a base
+ * that moved between the two reads cannot mix two trees into one
+ * forecast.
+ *
+ * Which version depends on the slot the branch fragment names. The
+ * root slot (no `package`) folds from `release.versionFile`, read with
+ * `git show <commit>:<version file>`. A package slot folds from the
+ * `version` of that member's own manifest at the commit, read through
+ * `packageBaseVersionAt` (`./package-base-version.ts`), the reading the
+ * merge guard folds from too, so a package the base cannot fold (no
+ * readable workspace, no such member, a private one, one declaring no
+ * version) answers the guard's own problem line, word for word. The fold itself is
  * `./forecast.ts`, which goes through the strategy port like settle
  * does, so what the body forecasts and what settle writes cannot
  * disagree over the same tree.
@@ -66,6 +75,7 @@ import { gitSaid } from '../pr/index.js';
 
 import { forecastRelease } from './forecast.js';
 import { FRAGMENT_EXTENSION } from './fragment.js';
+import { packageBaseVersionAt } from './package-base-version.js';
 import { releaseStrategyFor } from './strategy.js';
 import { gitPathOf, readManifestVersion } from './version.js';
 
@@ -98,7 +108,7 @@ export interface BranchForecastRead {
   readonly ok: true;
   /** The base ref, e.g. `origin/main`. */
   readonly ref: string;
-  /** The version the base's version file declared at the read commit. */
+  /** The version the slot declared at the read commit: the version file's, or the member's. */
   readonly baseVersion: string;
   /** The ids of the waiting fragments folded before the branch's, in order. */
   readonly waiting: readonly string[];
@@ -168,16 +178,33 @@ function baseVersionAt(
 }
 
 /**
+ * The base version the slot `pkg` folds from: the version file's for
+ * the root (null), the member manifest's for a package; see the module
+ * note.
+ */
+function slotBaseVersion(
+  git: GitRunner,
+  prepared: ReleasePrepared,
+  versionFile: string,
+  pkg: string | null,
+): { readonly version: string } | { readonly problem: string } {
+  if (pkg === null) return baseVersionAt(git, prepared, versionFile);
+  const { ref, commit } = prepared.base;
+  return packageBaseVersionAt({ git, base: { ref, commit }, package: pkg });
+}
+
+/**
  * The forecast of the verified fragment against the base step 1 read.
  * Never throws: a strategy that throws is the forecast's own `failed`
- * answer, and an unreadable base version is `ok: false`. See the module
- * note for why the base is read at step 1's commit.
+ * answer, and a base version that cannot be read for the slot is
+ * `ok: false`. See the module note for why the base is read at step 1's
+ * commit, and where a package slot's version comes from.
  */
 export function readBranchForecast(input: BranchForecastInput): BranchForecast {
   const { git, settings, prepared, verified, now } = input;
   const ref = prepared.base.ref;
   const { folded, problems } = waitingFragments(prepared, verified.fragment.package);
-  const base = baseVersionAt(git, prepared, settings.releaseVersionFile);
+  const base = slotBaseVersion(git, prepared, settings.releaseVersionFile, verified.fragment.package);
   if ('problem' in base) return { ok: false, ref, problem: base.problem, problems };
 
   const branch: FoldFragment = {
