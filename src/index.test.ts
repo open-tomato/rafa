@@ -1083,6 +1083,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/roadmap-table.js', ['renderRoadmapTable']],
     ['../plan/plan-files.js', ['readSwitch']],
     ['../plan/refs-check.js', ['registryRoster']],
+    ['./declarations.js', ['EPIC_SHOW_DECLARATION']],
   ]],
   ['./commands/epic/new.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -1101,16 +1102,17 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/setup.js', ['LABEL_LIST_LIMIT', 'listBoardLabels']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./declarations.js', ['DEFAULT_HORIZON', 'EPIC_NEW_DECLARATION']],
     ['./epic-project.js', ['newEpicTarget', 'refreshProjectAfterEpic']],
     ['./move-native.js', ['NATIVE_MODE']],
   ]],
   ['./commands/epic/defer.js', [
-    ['../../board/epic-trail.js', ['REASON_FLAG']],
-    ['./horizon-change.js', ['DEFER_ACTION', 'runEpicHorizon', 'TO_FLAG']],
+    ['./declarations.js', ['EPIC_DEFER_DECLARATION']],
+    ['./horizon-change.js', ['DEFER_ACTION', 'runEpicHorizon']],
   ]],
   ['./commands/epic/promote.js', [
-    ['../../board/epic-trail.js', ['REASON_FLAG']],
-    ['./horizon-change.js', ['PROMOTE_ACTION', 'runEpicHorizon', 'TO_FLAG']],
+    ['./declarations.js', ['EPIC_PROMOTE_DECLARATION']],
+    ['./horizon-change.js', ['PROMOTE_ACTION', 'runEpicHorizon']],
   ]],
   ['./commands/epic/move.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
@@ -1125,8 +1127,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap.js', ['branchClaims', 'closedIssuesIn', 'createGhOpenPullRequests', 'parseRoadmapBody', 'scanClaimBranches']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
+    ['./declarations.js', ['EPIC_MOVE_DECLARATION', 'TO_FLAG']],
     ['./epic-project.js', ['moveTarget', 'refreshProjectAfterEpic']],
-    ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
+    ['./horizon-change.js', ['workPhrase']],
     ['./move-native.js', ['configuredMoveRelations', 'NATIVE_MODE', 'NATIVE_RETRY_HINT', 'nativeAlreadyMessage', 'nativeEpicLeft', 'nativeParentLine']],
   ]],
   ['./commands/epic/close.js', [
@@ -1151,6 +1154,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['readSwitch']],
     ['./close-docs.js', ['isDocsOnlyCriterion']],
     ['./close-triage.js', ['fileFailures']],
+    ['./declarations.js', ['ACCEPT_UNCHECKED_FLAG', 'EPIC_CLOSE_DECLARATION']],
     ['./epic-project.js', ['closeTarget', 'refreshProjectAfterEpic']],
   ]],
   ['./commands/epic/cancel.js', [
@@ -1170,6 +1174,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap.js', ['createGhOpenPullRequests']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
+    ['./declarations.js', ['EPIC_CANCEL_DECLARATION']],
     ['./epic-project.js', ['cancelTarget', 'refreshProjectAfterEpic']],
     ['./move.js', ['applyEpicMove', 'readEpicMove']],
   ]],

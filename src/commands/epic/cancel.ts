@@ -147,6 +147,7 @@ import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';
+import { EPIC_CANCEL_DECLARATION } from './declarations.js';
 import { cancelTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { applyEpicMove, readEpicMove } from './move.js';
 
@@ -748,40 +749,7 @@ export async function runEpicCancel(context: RafaContext, seams: EpicCancelSeams
 /** The command, reaching `gh`, `git`, the clock and the terminal through `seams`; see the module note. */
 export function createEpicCancelCommand(seams: EpicCancelSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic cancel',
-    subject: 'epic',
-    action: 'cancel',
-    summary: 'cancel an epic, asking what becomes of each issue outside it that its open members block',
-    description: 'Lists every open issue outside the epic whose "Blocked by:" line names one of its open members,'
-      + ' and asks for each one: move it to another epic (the same move as rafa epic move), unblock it (an'
-      + ' "Updated" note below its body, spec:blocked taken off when nothing else it names is open, and a'
-      + ' comment), or cancel it (closed as not planned with a comment). Every answer is taken before any write.'
-      + ' Then the epic is closed as not planned with a comment naming what became of each issue; an epic closed'
-      + ' as not planned already is not closed again. With no terminal and an issue to ask about, the list is'
-      + ' printed and nothing changes. An issue that is not an epic, and an epic closed as completed, are refused'
-      + ' with exit code 2. With `--output=json` what each write did is the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The epic\'s issue number.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: REASON_FLAG,
-        description: 'Why the epic is cancelled, written in its closing comment.',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic cancel 40 --reason="sign-in moved to the platform team"',
-        note: 'Asks about each issue #40\'s open members block, then closes #40 as not planned.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...EPIC_CANCEL_DECLARATION,
     run: (context) => runEpicCancel(context, seams),
   };
   return Object.freeze(command);

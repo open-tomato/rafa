@@ -39,10 +39,10 @@ import { createFakeProjectGh, fakeProjectId } from '../../board/project/project-
 import { writePositionFile } from '../../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
+import { DEFAULT_HORIZON } from './declarations.js';
 import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 import {
   createEpicNewCommand,
-  DEFAULT_HORIZON,
   EPIC_NEW_REFUSAL_EXIT,
   epicIssueLabels,
   epicLabelDescription,
