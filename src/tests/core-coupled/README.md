@@ -8,11 +8,11 @@ A file's text was not rewritten beyond its specifiers. An import of a core file 
 `@open-tomato/rafa/<subpath>`, barrel or not, and an import of a root file reads the relative path from here. A
 path built from `import.meta` was pointed by hand at the file or folder it named before the move.
 
-Two readers treat this folder as core's own, through `CORE_PARKED_TESTS` and `isCoreRead` of
-`scripts/survey/core-moves.ts`: the barrels sweep (`scripts/survey/core-barrels.ts`) reads these files as core's
-and does not hold their imports to the barrel rule, and the test-index comparison (`scripts/survey/test-index.ts`)
-holds each under its path before the move. A later spec sorts each file: back into the package once its coupling
-is gone, or into the module it really tests.
+The barrels sweep (`scripts/survey/core-barrels.ts`) treats this folder as core's own, through `CORE_PARKED_TESTS`
+and `isCoreRead` of `scripts/survey/core-moves.ts`: it reads these files as core's and does not hold their imports
+to the barrel rule. The test-index guard (`scripts/survey/test-index.ts --against`) reads them as any test: under
+its own path, in the unit the cut table lists it in, and held to the rule of its kind. A later spec sorts each
+file: back into the package once its coupling is gone, or into the module it really tests.
 
 ## What each file reaches above core
 

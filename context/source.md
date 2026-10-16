@@ -214,6 +214,20 @@ target under `packages/rafa/src/`, and each `exports` key of
 `packages/rafa/package.json` resolves through that map to the file its `exports`
 target names.
 
+**The public-entries sweep holds every member to its `exports`.**
+`src/tests/public-entries.sweep.test.ts` reads the members through
+`readMembers` of `scripts/survey/package-entries.ts`, never a list in code.
+Each bare `@open-tomato/` specifier in a code file outside a member that lands
+on a file of that member names one of its `exports` keys (`isPublicEntry`) and
+lands on the file the key's target names; a member with no `exports`, the hub
+and the sync service, is named by no bare specifier. A specifier that lands
+outside the checkout or nowhere is matched to a member by its package name, as
+a worktree resolves a workspace link through the main checkout's
+`node_modules`. The tests under `src/tests/core-coupled/` are read as core's
+own files, as `isCoreRead` reads them, so their deep subpaths into core are
+set aside and counted. It prints its counts at load, and a planted tree holds
+a control for each failure.
+
 **Core's tests that import above core wait in `src/tests/core-coupled/`.**
 Each keeps its path under `src/` from before the move:
 `core/config/config.test.ts` sits at
@@ -222,9 +236,10 @@ Each keeps its path under `src/` from before the move:
 specifiers, and `src/tests/core-coupled/README.md` lists what each reaches
 above core. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts` names the
 folder: the barrels sweep reads these files as core's and does not hold their
-imports to the barrel rule, and the test-index comparison holds each under its
-path from before the move. A later spec sorts each file back into the package
-once its coupling is gone, or into the module it really tests.
+imports to the barrel rule. The test-index guard reads them as any test: under
+its own path, in the unit the cut table lists it in, and held to the rule of
+its kind. A later spec sorts each file back into the package once its coupling
+is gone, or into the module it really tests.
 
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
@@ -315,11 +330,15 @@ the tracker, so the split stands as it was made.
 ### The cut table
 
 **The cut table ranks where the package lines could fall.**
-`docs/survey/cut-table.json` and `docs/survey/cut-table.md` list the ten
-packages of epic #801, lowest first: `@open-tomato/rafa` (core),
+`docs/survey/cut-table.json` and `docs/survey/cut-table.md` list the twelve
+packages of epic #801, lowest first: `rafa-eslint-config`,
+`rafa-typescript-config`, `@open-tomato/rafa-core` (core),
 `rafa-inventory`, `rafa-board`, `rafa-pr`, `rafa-run`, `rafa-release`,
-`rafa-effort`, `rafa-hub`, `rafa-sync-service` and
-`@open-tomato/rafa-cli`. For each it gives the folders and named files it
+`rafa-effort`, `rafa-hub`, `rafa-sync-service` and `@open-tomato/rafa`
+(the CLI, the root that publishes). The names are #808's: core keeps its
+manifest's private name and there is no `@open-tomato/rafa-cli`. The two
+shared-config packages sit lowest because nothing in the graph imports
+them. For each it gives the folders and named files it
 holds, and its count of upward edges: imports of kind `value` or `type`
 between two non-test files, from a package lower in the order into a
 higher one. `scripts/survey/cut-table.ts` writes both files from
@@ -330,7 +349,7 @@ the table and the graph cannot disagree.
 CLI.** A file a package names goes there, and a test follows the file it
 tests. Otherwise the longest folder that holds the file decides, among the
 package folders and the unassigned ones. A file no rule holds is left to
-place and counts as a file of `@open-tomato/rafa-cli`, which takes every
+place and counts as a file of `@open-tomato/rafa`, which takes every
 file no line holds. An edge with an end in an unassigned folder
 (`src/stretch/`, `src/commands/stretch/` or `src/ci/`) has no rank on that
 end, so it is never upward. Inside `src/schema/` the placement is per file,
@@ -338,7 +357,10 @@ as the Packages section below lists.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
-and the folder's closing `/` keeps `packages/rafa-hub/` out of it.
+and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub,
+the sync service and the two shared-config packages
+(`packages/eslint-config/`, `packages/typescript-config/`) follow the same
+one-folder rule.
 
 **The counts rank options and do not certify a cut.** An upward edge from
 `packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is
@@ -556,11 +578,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 - **Each schema under `src/schema/` lands in one package**, the one
   `docs/survey/content-schema-importers.md` names for it:
   - `tiers.ts` and `project-id.ts`, already under `packages/rafa/src/schema/`:
-    `@open-tomato/rafa` (core)
+    `@open-tomato/rafa-core` (core)
   - `frontmatter.ts`: `rafa-effort`
   - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
-  - `agent.ts`: `@open-tomato/rafa-cli`
+  - `agent.ts`: `@open-tomato/rafa` (the CLI)
 - **One upward edge survives the placement.** `src/effort/report-skills.ts`
   (rafa-effort) reads `readScopes` from `src/schema/scope-records.ts`,
   which lands in rafa-inventory. No placement clears it, because

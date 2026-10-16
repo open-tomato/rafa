@@ -21,7 +21,7 @@
  *      with its `/`, so `packages/rafa/` (core) does not hold
  *      `packages/rafa-hub/src/bin.ts`;
  *   3. otherwise the file is left to place, and counts as a file of the
- *      package named under `rest`, `@open-tomato/rafa-cli`, which takes
+ *      package named under `rest`, `@open-tomato/rafa`, which takes
  *      every file no line above holds.
  *
  * What the CLI holds by rule is the dispatcher (`src/cli/`, with the bin
@@ -228,11 +228,14 @@ export const SECTION_FILE: RegExp = /^src\/config-schema-[^/]+\.ts$/;
 /** How many files the summary lists by the upward edges that end on them. */
 export const TOP_TARGETS = 20;
 
-/** The name of the core package. */
-export const CORE_PACKAGE = '@open-tomato/rafa';
+/** The name of the core package, its manifest's private name (#808). */
+export const CORE_PACKAGE = '@open-tomato/rafa-core';
 
-/** The name of the CLI package, which takes every file no rule holds. */
-export const CLI_PACKAGE = '@open-tomato/rafa-cli';
+/**
+ * The name of the CLI package, which takes every file no rule holds: the
+ * root, the one package that publishes (#808).
+ */
+export const CLI_PACKAGE = '@open-tomato/rafa';
 
 /**
  * The fifteen `src/board/` files `docs/survey/cluster-map.json` puts in
@@ -257,13 +260,27 @@ export const BOARD_FILES_OF_C6: readonly string[] = [
 ];
 
 /**
- * The ten packages, lowest first, seeded from the survey's cluster order,
- * with the three folders left for the second architect pass. Core is its
- * workspace package, `CORE_PACKAGE` of `core-moves.ts`, which spells
- * where core is: one folder and no named file, as each service's rule.
+ * The twelve packages, lowest first, seeded from the survey's cluster
+ * order, with the three folders left for the second architect pass. The
+ * two shared-config packages sit lowest, since nothing in the graph
+ * imports them, `rafa-eslint-config` under `rafa-typescript-config`,
+ * whose manifest takes it as a dev dependency. Core is its workspace
+ * package, `CORE_PACKAGE` of `core-moves.ts`, which spells where core is:
+ * one folder and no named file, as each service's rule and each
+ * shared-config package's rule.
  */
 export const CUT_RULES: CutRules = {
   packages: [
+    {
+      folders: ['packages/eslint-config/'],
+      name: 'rafa-eslint-config',
+      named: [],
+    },
+    {
+      folders: ['packages/typescript-config/'],
+      name: 'rafa-typescript-config',
+      named: [],
+    },
     {
       folders: [CORE_PACKAGE_FOLDER],
       name: CORE_PACKAGE,
