@@ -14,6 +14,7 @@ module's note is the long form.
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
 | `packages/rafa/src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
+| `packages/rafa/src/core/command/lazy.ts` | `CommandDeclaration`, a `RafaCommand` less `run`, and `lazyCommand(declaration, load, feature)`, the declaration under a `run` that imports the command's module, holds its default export to a command of the same subject and action and delegates to it; a rejected import or a wrong export exits 1 with `feature "<feature>": command "<spelling>" failed to load: <reason>` |
 | `packages/rafa/src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, and `CommandFeature`, the name, subjects and commands one feature contributes, all seven re-exported by `src/cli/registry.ts` |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |

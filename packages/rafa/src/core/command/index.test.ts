@@ -1,24 +1,25 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name `command.ts`,
- * `confirm.ts`, `registry-types.ts`, `running.ts`, `spends.ts`,
- * `types.ts` and `version.ts` export, each once, as the same binding,
+ * `confirm.ts`, `lazy.ts`, `registry-types.ts`, `running.ts`,
+ * `spends.ts`, `types.ts` and `version.ts` export, each once, as the same binding,
  * and no other name.
  *
- * The barrel spells its names, so a name added to one of the seven files
+ * The barrel spells its names, so a name added to one of the eight files
  * and not to the barrel is a name no file outside `packages/rafa/src/core/` can import.
  * Nothing here is spelled a second time: both sides are read off the
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `packages/rafa/src/core/config/sections.test.ts`
  * reads its barrel.
  *
- * The seven files hold no name in common, which the second case holds on
+ * The eight files hold no name in common, which the second case holds on
  * its own: were one name on two files, the barrel could export one of
  * the two bindings only, and the joined list below would hide which.
  *
- * Ten names are held by name, so a reading that came back empty, or
+ * Twelve names are held by name, so a reading that came back empty, or
  * one that saw runtime names alone, fails rather than agreeing with
  * itself: `RafaCommand`, a type of `command.ts`; `Prompter`, a type of
- * `confirm.ts`; `CommandRegistry`, a type of `registry-types.ts`, which
+ * `confirm.ts`; `CommandDeclaration`, a type of `lazy.ts`, and
+ * `lazyCommand`, a function of it; `CommandRegistry`, a type of `registry-types.ts`, which
  * exports no runtime name; `RunningCommand`, a type of `running.ts`, and
  * `runningCommand`, a function of it; `CommandSpend`, a type of `spends.ts`, and `spendsMark`,
  * a function of it; `CliContext`, a type of `types.ts`, which exports no
@@ -32,6 +33,7 @@ import ts from 'typescript';
 
 import * as command from './command.js';
 import * as confirm from './confirm.js';
+import * as lazy from './lazy.js';
 import * as registryTypes from './registry-types.js';
 import * as running from './running.js';
 import * as spends from './spends.js';
@@ -45,6 +47,7 @@ const ROOT = resolve(import.meta.dir, '../../../../..');
 const BARREL = 'packages/rafa/src/core/command/index.ts';
 const COMMAND = 'packages/rafa/src/core/command/command.ts';
 const CONFIRM = 'packages/rafa/src/core/command/confirm.ts';
+const LAZY = 'packages/rafa/src/core/command/lazy.ts';
 const REGISTRY_TYPES = 'packages/rafa/src/core/command/registry-types.ts';
 const RUNNING = 'packages/rafa/src/core/command/running.ts';
 const SPENDS = 'packages/rafa/src/core/command/spends.ts';
@@ -93,10 +96,11 @@ function onTwo(lists: readonly (readonly string[])[]): string[] {
   return [...new Set(all.filter((name, index) => all.indexOf(name) !== index))].sort();
 }
 
-/** The runtime bindings of the seven files; the second case holds that no name is lost to the spread. */
+/** The runtime bindings of the eight files; the second case holds that no name is lost to the spread. */
 const BEHIND: Readonly<Record<string, unknown>> = {
   ...command,
   ...confirm,
+  ...lazy,
   ...registryTypes,
   ...running,
   ...spends,
@@ -105,10 +109,11 @@ const BEHIND: Readonly<Record<string, unknown>> = {
 };
 
 describe('the command barrel', () => {
-  it('exports the runtime names of the seven files, each once, and no other', () => {
+  it('exports the runtime names of the eight files, each once, and no other', () => {
     const expected = [
       ...Object.keys(command),
       ...Object.keys(confirm),
+      ...Object.keys(lazy),
       ...Object.keys(registryTypes),
       ...Object.keys(running),
       ...Object.keys(spends),
@@ -118,6 +123,7 @@ describe('the command barrel', () => {
 
     expect(Object.keys(command)).toContain('CommandExit');
     expect(Object.keys(confirm)).toContain('createLinePrompter');
+    expect(Object.keys(lazy)).toEqual(['lazyCommand']);
     expect(Object.keys(registryTypes)).toEqual([]);
     expect(Object.keys(running)).toContain('runningCommand');
     expect(Object.keys(spends)).toContain('spendsMark');
@@ -126,11 +132,12 @@ describe('the command barrel', () => {
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
-  it('reads seven files that hold no name in common, type or runtime', () => {
-    const names = readExportNames([COMMAND, CONFIRM, REGISTRY_TYPES, RUNNING, SPENDS, TYPES, VERSION]);
+  it('reads eight files that hold no name in common, type or runtime', () => {
+    const names = readExportNames([COMMAND, CONFIRM, LAZY, REGISTRY_TYPES, RUNNING, SPENDS, TYPES, VERSION]);
 
     expect(names[COMMAND]?.length).toBeGreaterThan(0);
     expect(names[CONFIRM]?.length).toBeGreaterThan(0);
+    expect(names[LAZY]?.length).toBeGreaterThan(0);
     expect(names[REGISTRY_TYPES]?.length).toBeGreaterThan(0);
     expect(names[RUNNING]?.length).toBeGreaterThan(0);
     expect(names[SPENDS]?.length).toBeGreaterThan(0);
@@ -140,6 +147,7 @@ describe('the command barrel', () => {
     expect(onTwo([
       names[COMMAND] ?? [],
       names[CONFIRM] ?? [],
+      names[LAZY] ?? [],
       names[REGISTRY_TYPES] ?? [],
       names[RUNNING] ?? [],
       names[SPENDS] ?? [],
@@ -157,11 +165,12 @@ describe('the command barrel', () => {
     }
   });
 
-  it('exports the type names of the seven files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, COMMAND, CONFIRM, REGISTRY_TYPES, RUNNING, SPENDS, TYPES, VERSION]);
+  it('exports the type names of the eight files with the runtime ones, each once, and no other', () => {
+    const names = readExportNames([BARREL, COMMAND, CONFIRM, LAZY, REGISTRY_TYPES, RUNNING, SPENDS, TYPES, VERSION]);
     const expected = [
       ...(names[COMMAND] ?? []),
       ...(names[CONFIRM] ?? []),
+      ...(names[LAZY] ?? []),
       ...(names[REGISTRY_TYPES] ?? []),
       ...(names[RUNNING] ?? []),
       ...(names[SPENDS] ?? []),
@@ -171,6 +180,7 @@ describe('the command barrel', () => {
 
     expect(names[COMMAND]).toContain('RafaCommand');
     expect(names[CONFIRM]).toContain('Prompter');
+    expect(names[LAZY]).toContain('CommandDeclaration');
     expect(names[REGISTRY_TYPES]).toContain('CommandRegistry');
     expect(names[RUNNING]).toContain('RunningCommand');
     expect(names[SPENDS]).toContain('CommandSpend');
@@ -178,6 +188,7 @@ describe('the command barrel', () => {
     expect(names[VERSION]).toContain('versionLine');
     expect(Object.keys(command)).not.toContain('RafaCommand');
     expect(Object.keys(confirm)).not.toContain('Prompter');
+    expect(Object.keys(lazy)).not.toContain('CommandDeclaration');
     expect(Object.keys(running)).not.toContain('RunningCommand');
     expect(Object.keys(spends)).not.toContain('CommandSpend');
     expect(names[BARREL]).toEqual(expected);
