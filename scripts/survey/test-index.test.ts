@@ -17,7 +17,6 @@ import {
   packageRules,
   readCommit,
   renderTestIndexJson,
-  spawnApis,
 } from './test-index';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 
@@ -116,13 +115,6 @@ describe('a spawning test', () => {
   it('does not spawn by naming a spawn call in a comment or a string, or by a type-only import', () => {
     expect(entryOf(index, MENTIONS)).toMatchObject({ index: 2, spawns: false });
     expect(entryOf(index, TYPE_ONLY)).toMatchObject({ index: 2, spawns: false });
-  });
-
-  it('reads each way of spawning from a parse', () => {
-    expect(spawnApis('a.ts', 'Bun.spawn([]);\nBun.spawnSync([]);\nawait Bun.$`ls`;\n')).toEqual(['Bun.$', 'Bun.spawn', 'Bun.spawnSync']);
-    expect(spawnApis('a.ts', 'import { $ } from \'bun\';\nimport { spawn } from \'child_process\';\n')).toEqual(['$ from bun', 'child_process']);
-    expect(spawnApis('a.mjs', 'import * as cp from \'node:child_process\';\n')).toEqual(['node:child_process']);
-    expect(spawnApis('a.ts', 'import { file } from \'bun\';\nimport { type $ } from \'bun\';\n')).toEqual([]);
   });
 });
 

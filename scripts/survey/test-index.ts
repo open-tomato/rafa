@@ -66,8 +66,9 @@
  *   - A test spawns a process when its own text, or the text of a support
  *     file it reaches, calls `Bun.spawn`, `Bun.spawnSync` or `Bun.$`,
  *     imports `$` from `bun`, or imports `node:child_process` by value.
- *     The calls are read from a TypeScript parse, so a comment or a string
- *     naming them is not one. A source file the test reaches may spawn too
+ *     The calls are read from a TypeScript parse (`spawnApis`, in
+ *     `test-index-spawn.ts`), so a comment or a string naming them is not
+ *     one. A source file the test reaches may spawn too
  *     (git, `gh`); that is the code under test, not the test, and does not
  *     double the index.
  *
@@ -115,8 +116,6 @@ import type { RecordInput, TestRecord } from './test-index-record';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 
-import ts from 'typescript';
-
 import { readCutMap } from './cut-map';
 import { classifyFile, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
@@ -131,6 +130,7 @@ import { parseMode } from './test-index-args';
 import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
+import { spawnApis } from './test-index-spawn';
 import { readTestKindGlobs } from './test-kinds';
 
 /** What the index is computed from, all of it passed in as data. */
@@ -217,8 +217,6 @@ export const BIN_ENTRY = 'src/rafa.ts';
 export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
 
 const PACKAGE_FILE = /^(packages\/[^/]+)\/src\//;
-const SPAWNING_MEMBERS: ReadonlySet<string> = new Set(['$', 'spawn', 'spawnSync']);
-const CHILD_PROCESS: ReadonlySet<string> = new Set(['child_process', 'node:child_process']);
 
 /**
  * The folder a file counts as: `packages/<name>` for a file of a package,
@@ -283,81 +281,6 @@ export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
     spawnedReach: [...units].sort(),
     spawnedUnplaced: unplaced.sort(),
   };
-}
-
-/**
- * Whether an import declaration brings in a binding that runs: not
- * `import type`, and not a named list whose every element is `type`.
- *
- * @param node - An import declaration.
- * @returns `true` when the import survives to run time.
- */
-function importsValue(node: ts.ImportDeclaration): boolean {
-  const clause = node.importClause;
-  if (clause === undefined) {
-    return true;
-  }
-  if (clause.isTypeOnly) {
-    return false;
-  }
-  const bindings = clause.namedBindings;
-  if (clause.name !== undefined || bindings === undefined || !ts.isNamedImports(bindings)) {
-    return true;
-  }
-  return bindings.elements.length === 0 || bindings.elements.some((element) => !element.isTypeOnly);
-}
-
-/**
- * The spawning call or import a node is, if it is one.
- *
- * @param node - Any node of a parsed source file.
- * @returns How it spawns (`Bun.spawn`, `node:child_process`, …), or `undefined`.
- */
-function spawnApiOf(node: ts.Node): string | undefined {
-  if (ts.isPropertyAccessExpression(node)
-    && ts.isIdentifier(node.expression)
-    && node.expression.text === 'Bun'
-    && SPAWNING_MEMBERS.has(node.name.text)) {
-    return `Bun.${node.name.text}`;
-  }
-  if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || !importsValue(node)) {
-    return undefined;
-  }
-  const module = node.moduleSpecifier.text;
-  if (CHILD_PROCESS.has(module)) {
-    return module;
-  }
-  const bindings = node.importClause?.namedBindings;
-  const importsDollar = bindings !== undefined
-    && ts.isNamedImports(bindings)
-    && bindings.elements.some((element) => !element.isTypeOnly && (element.propertyName ?? element.name).text === '$');
-  return module === 'bun' && importsDollar
-    ? '$ from bun'
-    : undefined;
-}
-
-/**
- * The ways a source text spawns a process, read from a TypeScript parse.
- *
- * @param path - The file's path, which picks the parser's script kind.
- * @param text - The file's source text.
- * @returns Each spawning call or import found, sorted, without duplicates.
- */
-export function spawnApis(path: string, text: string): string[] {
-  const kind = /\.(?:js|mjs)$/.test(path)
-    ? ts.ScriptKind.JS
-    : ts.ScriptKind.TS;
-  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false, kind);
-  const found = new Set<string>();
-  const visit = (node: ts.Node): void => {
-    const api = spawnApiOf(node);
-    if (api !== undefined) {
-      found.add(api);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return [...found].sort();
 }
 
 /**
