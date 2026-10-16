@@ -432,15 +432,17 @@ const SCRATCH_TABLE = `${JSON.stringify({
  * file out of scope, all staged and none committed.
  *
  * @param prefix - The temp folder's prefix.
+ * @param files - The files in scope, by path; the unit test and its sources unless handed.
+ * @param table - The cut table's text; {@link SCRATCH_TABLE} unless handed.
  * @returns The repository's root.
  */
-function plantScratch(prefix: string): string {
+function plantScratch(prefix: string, files: Readonly<Record<string, string>> = SCRATCH_FILES, table: string = SCRATCH_TABLE): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   git(root, ['init', '--quiet']);
-  for (const [path, text] of Object.entries(SCRATCH_FILES)) {
+  for (const [path, text] of Object.entries(files)) {
     plant(root, path, text);
   }
-  plant(root, SCRATCH_MAP, SCRATCH_TABLE);
+  plant(root, SCRATCH_MAP, table);
   plant(root, 'package.json', '{ "name": "scratch", "private": true, "workspaces": [] }\n');
   plant(root, 'README.md', 'A file out of scope.\n');
   git(root, ['add', '-A']);
@@ -633,5 +635,95 @@ describe('the guard over a scratch repository', () => {
       stderr: 'not a test-index record: it holds no `unit`\n',
       stdout: '',
     });
+  });
+});
+
+describe('the guard over a scratch repository, header refusals', () => {
+  let root = '';
+  let record = '';
+  let sha256 = '';
+
+  beforeAll(async () => {
+    root = plantScratch('survey-test-index-header-');
+    git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'plant']);
+    await main(root, RECORD_MODE);
+    record = readFileSync(join(root, BASELINE_PATH), 'utf8');
+    sha256 = new Bun.CryptoHasher('sha256').update(SCRATCH_TABLE)
+      .digest('hex');
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  it('refuses a record in unit folders, naming both units', () => {
+    expect(record).toContain('  "unit": "packages",');
+    plant(root, 'docs/survey/folders-record.json', record.replace('"unit": "packages"', '"unit": "folders"'));
+    const run = runGuard(root, 'docs/survey/folders-record.json');
+    expect(run.stdout).toContain('test-index: the record\'s unit is folders; the guard reads packages\n');
+    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
+  });
+
+  it('refuses a table edited after the record, naming both hashes', () => {
+    const edited = `${SCRATCH_TABLE}\n`;
+    const editedSha256 = new Bun.CryptoHasher('sha256').update(edited)
+      .digest('hex');
+    plant(root, SCRATCH_MAP, edited);
+    const run = runGuard(root, BASELINE_PATH);
+    expect(run.stdout).toContain(
+      `test-index: the record was taken on ${SCRATCH_MAP} at sha256 ${sha256}; the map handed is ${SCRATCH_MAP} at sha256 ${editedSha256}\n`,
+    );
+    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
+    plant(root, SCRATCH_MAP, SCRATCH_TABLE);
+    expect(runGuard(root, BASELINE_PATH).exitCode).toBe(0);
+  });
+
+  it('refuses --baseline without --map, writing no record', () => {
+    const run = runScript(root, ['--baseline']);
+    expect(run).toMatchObject({ exitCode: 1, stdout: '' });
+    expect(run.stderr).toStartWith('--baseline reads the map: pass --map=<file> beside it');
+    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(record);
+  });
+});
+
+describe('the guard over a scratch repository, a use-case test', () => {
+  const useCase = 'src/a/flow-integration.test.ts';
+  const header = 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n';
+  const footer = 'it(\'x\', () => expect(x).toBe(1));\n';
+  let root = '';
+
+  beforeAll(async () => {
+    const table = `${JSON.stringify({
+      packages: [
+        { files: [useCase, 'src/deep/x.ts', 'src/rafa.ts'], name: '@scratch/cli' },
+        { files: ['src/far/y.ts'], name: '@scratch/far' },
+      ],
+      unassigned: [],
+    }, null, 2)}\n`;
+    root = plantScratch('survey-test-index-usecase-', {
+      ...SCRATCH_FILES,
+      [useCase]: header + footer,
+    }, table);
+    git(root, ['rm', '--quiet', '--cached', '--', 'src/a/one.test.ts']);
+    rmSync(join(root, 'src/a/one.test.ts'));
+    git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'plant']);
+    await main(root, RECORD_MODE);
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  it('exits 0 on the tree it was recorded from', () => {
+    expect(runGuard(root, BASELINE_PATH)).toMatchObject({ exitCode: 0, stderr: '' });
+  });
+
+  it('exits 1 naming the test that gains a deep import into another unit', () => {
+    plant(root, useCase, `${header}import { y } from '../far/y.js';\n${footer}`);
+    const run = runGuard(root, BASELINE_PATH);
+    expect(run.stdout).toContain('1 risen');
+    expect(run.stdout).toContain(`  ${useCase} (use-case test in @scratch/cli): enters another unit through no public entry by `);
+    expect(run.stdout).toContain('../far/y.js');
+    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
   });
 });
