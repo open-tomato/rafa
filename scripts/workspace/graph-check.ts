@@ -24,7 +24,14 @@
  *     A specifier the `paths` map of `tsconfig.packages.json` resolves
  *     into a member names that member's package (`@open-tomato/rafa/store`
  *     names `@open-tomato/rafa-core`), and a member's own name is always
- *     declared.
+ *     declared. For a member with no `private: true`, a specifier naming
+ *     `@open-tomato/rafa` names the root package, and the publish rules
+ *     hold it in place of this one.
+ *
+ * A member with no `private: true`, which publishes, is refused on three
+ * more counts, `scripts/workspace/publish-rules.ts`'s: an installed
+ * dependency on a private member, an import of `@open-tomato/rafa` with no
+ * peer on it, and an import that does not resolve once published.
  *
  * Specifiers are those `ts.preProcessFile` finds, so `import type`,
  * `export … from`, a dynamic `import()` and a `require()` are read, and
@@ -40,10 +47,14 @@
  * (no manifest, no `workspaces`, no member, no task in `turbo.json`) is a
  * refusal too, so a check that read nothing never passes.
  */
+import type { FileImports } from './publish-rules';
+
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
 import ts from 'typescript';
+
+import { exportKeys, isPublishable, namesRootPackage, publishReasons } from './publish-rules';
 
 /** The root file whose `tasks` keys every member must have a script for. */
 export const TURBO_FILE = 'turbo.json';
@@ -334,25 +345,45 @@ function codeFiles(dir: string): string[] {
 }
 
 /**
- * The reasons a member's bare `@open-tomato/*` imports refuse it: one per
- * undeclared package, naming each file that imports it.
+ * The bare `@open-tomato/*` specifiers each code file of a member imports.
  *
  * @param member - The member.
+ * @returns One entry per code file, sorted by file, each specifier once.
+ */
+function scopedImports(member: Member): FileImports[] {
+  return codeFiles(member.absolute).map((file) => ({
+    file: relative(member.absolute, file),
+    specifiers: [...new Set(ts.preProcessFile(readFileSync(file, 'utf8'), true, true).importedFiles
+      .map((imported) => imported.fileName)
+      .filter((specifier) => specifier.startsWith(SCOPE)))],
+  }));
+}
+
+/**
+ * The reasons a member's bare `@open-tomato/*` imports refuse it: one per
+ * undeclared package, naming each file that imports it. A publishable
+ * member's imports of the root package are the publish rules' to hold.
+ *
+ * @param member - The member.
+ * @param imports - The member's scoped imports, from {@link scopedImports}.
  * @param aliases - The aliases of `tsconfig.packages.json`.
  * @param members - Every member.
  * @returns The reasons, sorted by package.
  */
-function importReasons(member: Member, aliases: readonly PathAlias[], members: readonly Member[]): string[] {
+function importReasons(
+  member: Member,
+  imports: readonly FileImports[],
+  aliases: readonly PathAlias[],
+  members: readonly Member[],
+): string[] {
   const declared = new Set([member.name, ...dependencyPairs(member.manifest, DECLARING_FIELDS).map(([name]) => name)]);
+  const publishable = isPublishable(member.manifest);
   const undeclared = new Map<string, string[]>();
-  for (const file of codeFiles(member.absolute)) {
-    const specifiers = ts.preProcessFile(readFileSync(file, 'utf8'), true, true).importedFiles
-      .map((imported) => imported.fileName)
-      .filter((specifier) => specifier.startsWith(SCOPE));
-    for (const specifier of new Set(specifiers)) {
+  for (const { file, specifiers } of imports) {
+    for (const specifier of specifiers.filter((entry) => !publishable || !namesRootPackage(entry))) {
       const name = namedPackage(specifier, aliases, members);
       if (!declared.has(name)) {
-        undeclared.set(name, [...undeclared.get(name) ?? [], `${relative(member.absolute, file)} (${specifier})`]);
+        undeclared.set(name, [...undeclared.get(name) ?? [], `${file} (${specifier})`]);
       }
     }
   }
@@ -457,6 +488,8 @@ export function checkGraph(root: string): GraphReport {
   const readings = memberDirs(absoluteRoot, globs).map((dir) => readMember(absoluteRoot, dir));
   const members = readings.map((reading) => reading.member);
   const aliases = pathAliases(absoluteRoot);
+  const privateNames = new Set(members.filter((member) => !isPublishable(member.manifest)).map((member) => member.name));
+  const keys = exportKeys(asRecord(rootManifest.value));
   const rootReasons = [
     ...rootManifest.error === undefined
       ? []
@@ -476,18 +509,24 @@ export function checkGraph(root: string): GraphReport {
   ];
   return {
     root: rootReasons,
-    members: readings.map(({ member, error }) => ({
-      dir: member.dir,
-      name: member.name,
-      reasons: [
-        ...error === undefined
-          ? []
-          : [error],
-        ...scriptReasons(member, turbo.tasks),
-        ...tsconfigReasons(member, solution.dirs, members),
-        ...importReasons(member, aliases, members),
-      ],
-    })),
+    members: readings.map(({ member, error }) => {
+      const imports = scopedImports(member);
+      return {
+        dir: member.dir,
+        name: member.name,
+        reasons: [
+          ...error === undefined
+            ? []
+            : [error],
+          ...scriptReasons(member, turbo.tasks),
+          ...tsconfigReasons(member, solution.dirs, members),
+          ...importReasons(member, imports, aliases, members),
+          ...error === undefined && isPublishable(member.manifest)
+            ? publishReasons(member.manifest, imports, privateNames, keys)
+            : [],
+        ],
+      };
+    }),
   };
 }
 

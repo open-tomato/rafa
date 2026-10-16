@@ -440,18 +440,26 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
   umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
   reads core's source through `paths` as before.
-- **The graph check refuses four things.** `scripts/workspace/graph-check.ts`
-  reads each member under `packages/*` and refuses it on four counts, one line
-  per reason: it has no script for a task in the root `turbo.json` (`lint`,
+- **The graph check refuses four things, and three more of a publishable
+  member.** `scripts/workspace/graph-check.ts` reads each member under
+  `packages/*` and refuses it on four counts, one line per reason: it has no script for a task in the root `turbo.json` (`lint`,
   `check-types` and `test` today), with `check-types` asked only of a member
   that holds a `tsconfig.json`; its `tsconfig.json` is not `composite`, or the
   solution file does not reference it; its `tsconfig.json` `references` omit a
   workspace dependency whose own `tsconfig.json` is composite; or a `.ts`,
   `.mjs` or `.js` file under it imports an `@open-tomato/*` package that its
   `dependencies`, `devDependencies` or `peerDependencies` do not declare, a
-  `paths` alias counting as the member it resolves into. It exits 0 with one
-  `ok` line per member and exits 1 with a line per reason; a root it cannot
-  read is a refusal too. Ring 1 runs it, and
+  `paths` alias counting as the member it resolves into. A member with no
+  `private: true`, which publishes, is refused on three more counts, kept in
+  `scripts/workspace/publish-rules.ts`: its `dependencies`,
+  `peerDependencies` or `optionalDependencies` name a private member; a file
+  imports `@open-tomato/rafa` or a subpath of it while `peerDependencies` does
+  not name `@open-tomato/rafa`; or a file imports a subpath the root
+  manifest's `exports` lack, or a private member by name. For such a member
+  `@open-tomato/rafa/<subpath>` names the root package, not the member the
+  `paths` alias resolves it into, so the fourth refusal leaves it to these.
+  It exits 0 with one `ok` line per member and exits 1 with a line per
+  reason; a root it cannot read is a refusal too. Ring 1 runs it, and
   `src/tests/workspace-graph.sweep.test.ts` runs it over the live tree in every
   task's gates. Each refusal has a planted-tree control in
   `scripts/workspace/graph-check.test.ts`.
