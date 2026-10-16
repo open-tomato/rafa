@@ -84,7 +84,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits, and the caller's clone. */

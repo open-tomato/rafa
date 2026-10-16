@@ -1,7 +1,7 @@
 /**
  * Tests for the change fragment format (`src/release/fragment.ts`):
- * the parser and its four refusals, the serialiser, and the name
- * allocation. Everything is driven from string literals; the module
+ * the parser and its four refusals, the optional `package` key, the
+ * serialiser, and the name allocation. Everything is driven from string literals; the module
  * opens no file.
  *
  * Things here that would pass while wrong:
@@ -16,6 +16,10 @@
  *  - An allocation that counted the names up from `-2` without looking
  *    would pass a set holding `-2` only, so one case leaves a gap
  *    (`.md` and `-3` taken, `-2` free) and asserts the gap is used.
+ *  - A serialiser that wrote `package: null` for a root fragment would
+ *    still read back equal if the parser read the word as null, so the
+ *    three-field round trip compares the written bytes to the original
+ *    text, not only the parsed fragment.
  */
 import type { Fragment } from './fragment.js';
 
@@ -39,6 +43,7 @@ const VALID_FRAGMENT: Fragment = {
   plan: 'rafa-247',
   title: 'rafa next --roadmap',
   level: 'minor',
+  package: null,
   notes: ['- next: one hop to a blocker\'s epic', '- board: the roadmap shows blockers'],
 };
 
@@ -72,7 +77,7 @@ describe('parseFragment', () => {
     const reading = parseFragment(text);
     expect(reading).toEqual({
       ok: true,
-      fragment: { plan: 'rafa-9', title: 'fix: a title: with colons', level: 'patch', notes: ['- loop: x'] },
+      fragment: { plan: 'rafa-9', title: 'fix: a title: with colons', level: 'patch', package: null, notes: ['- loop: x'] },
     });
   });
 
@@ -102,7 +107,7 @@ describe('parseFragment', () => {
     expect(reasonOf(head('major'))).toBe('empty-body');
     expect(parseFragment(head('none'))).toEqual({
       ok: true,
-      fragment: { plan: 'rafa-1', title: 't', level: 'none', notes: [] },
+      fragment: { plan: 'rafa-1', title: 't', level: 'none', package: null, notes: [] },
     });
     expect(reasonOf(`${head('patch')}- loop: x\n`)).toBe('ok');
   });
@@ -131,6 +136,39 @@ describe('parseFragment', () => {
     expect(reasonOf(VALID.replace('title: rafa next --roadmap', 'title:   '))).toBe('malformed-front-matter');
   });
 
+  test('reads a package line as the package, and no line as null', () => {
+    const text = VALID.replace('level: minor\n', 'level: minor\npackage: @scope/plugin\n');
+    expect(parseFragment(text)).toEqual({ ok: true, fragment: { ...VALID_FRAGMENT, package: '@scope/plugin' } });
+    expect(parseFragment(VALID)).toEqual({ ok: true, fragment: VALID_FRAGMENT });
+  });
+
+  test('refuses an empty package, and one holding whitespace, naming the key', () => {
+    const withPackage = (line: string) => VALID.replace('level: minor\n', `level: minor\n${line}\n`);
+    const empty = parseFragment(withPackage('package:   '));
+    expect(empty).toEqual({
+      ok: false,
+      reason: 'malformed-front-matter',
+      sentence: 'The fragment\'s front matter is malformed: the package is empty.',
+    });
+    const spaced = parseFragment(withPackage('package: @scope/ plugin'));
+    expect(spaced).toEqual({
+      ok: false,
+      reason: 'malformed-front-matter',
+      sentence: 'The fragment\'s front matter is malformed: the package "@scope/ plugin" holds whitespace.',
+    });
+    expect(reasonOf(withPackage('package: @scope/plugin'))).toBe('ok');
+  });
+
+  test('refuses a package key given twice', () => {
+    const twice = VALID.replace('level: minor\n', 'level: minor\npackage: a\npackage: a\n');
+    const reading = parseFragment(twice);
+    expect(reading.ok).toBe(false);
+    if (reading.ok) return;
+    expect(reading.reason).toBe('malformed-front-matter');
+    expect(reading.sentence).toContain('the key package is given twice');
+    expect(reasonOf(VALID.replace('level: minor\n', 'level: minor\npackage: a\n'))).toBe('ok');
+  });
+
   test('checks the front matter before the level, so a malformed block is not read as missing-level', () => {
     expect(reasonOf(withLevelLine(null).replace('plan: rafa-247\n', ''))).toBe('malformed-front-matter');
   });
@@ -142,7 +180,7 @@ describe('serializeFragment', () => {
   });
 
   test('writes a none fragment with no notes as the front matter alone', () => {
-    const text = serializeFragment({ plan: 'rafa-5', title: 'Docs only', level: 'none', notes: [] });
+    const text = serializeFragment({ plan: 'rafa-5', title: 'Docs only', level: 'none', package: null, notes: [] });
     expect(text).toBe('---\nplan: rafa-5\ntitle: Docs only\nlevel: none\n---\n');
   });
 
@@ -151,6 +189,37 @@ describe('serializeFragment', () => {
       const fragment: Fragment = { ...VALID_FRAGMENT, level };
       expect(parseFragment(serializeFragment(fragment))).toEqual({ ok: true, fragment });
     }
+  });
+
+  test('reads a three-field fragment back to the same bytes, with no package line', () => {
+    const reading = parseFragment(VALID);
+    if (!reading.ok) throw new Error(reading.sentence);
+    expect(reading.fragment.package).toBeNull();
+    const written = serializeFragment(reading.fragment);
+    expect(written).toBe(VALID);
+    expect(written).not.toContain('package');
+  });
+
+  test('writes the package line after level, and reads it back', () => {
+    const fragment: Fragment = { ...VALID_FRAGMENT, package: '@scope/plugin' };
+    const text = serializeFragment(fragment);
+    expect(text.split('\n').slice(0, 6)).toEqual([
+      '---',
+      'plan: rafa-247',
+      'title: rafa next --roadmap',
+      'level: minor',
+      'package: @scope/plugin',
+      '---',
+    ]);
+    expect(parseFragment(text)).toEqual({ ok: true, fragment });
+  });
+
+  test('throws on a package that is not one trimmed non-empty word', () => {
+    expect(() => serializeFragment({ ...VALID_FRAGMENT, package: '' })).toThrow('the package is empty');
+    expect(() => serializeFragment({ ...VALID_FRAGMENT, package: ' padded' })).toThrow('the package " padded"');
+    expect(() => serializeFragment({ ...VALID_FRAGMENT, package: 'a b' })).toThrow('the package "a b"');
+    expect(() => serializeFragment({ ...VALID_FRAGMENT, package: 'a\nb' })).toThrow('the package "a\\nb"');
+    expect(() => serializeFragment({ ...VALID_FRAGMENT, package: 'a' })).not.toThrow();
   });
 
   test('throws on a fragment the parser would refuse or read back differently', () => {

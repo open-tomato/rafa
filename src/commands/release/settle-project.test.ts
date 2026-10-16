@@ -54,7 +54,7 @@ function fragment(id: string, commit: string): SettleFragment {
     path: `.changes/${id}.md`,
     commit,
     addedOn: '2026-10-01',
-    fragment: { plan: id, title: `title of ${id}`, level: 'minor', notes: ['- Loop: a line'] },
+    fragment: { plan: id, title: `title of ${id}`, level: 'minor', package: null, notes: ['- Loop: a line'] },
   };
 }
 

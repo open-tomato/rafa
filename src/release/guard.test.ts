@@ -82,7 +82,7 @@ function stamped(version: string, title: string, ...notes: readonly string[]): s
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], ...notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** The base both sides of the 0.25.0 incident forked from. */

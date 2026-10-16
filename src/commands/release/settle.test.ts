@@ -88,7 +88,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[] = ['- Loop: a line']): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits on `main`, and the caller's clone as a project. */
@@ -187,7 +187,7 @@ function built(): SettleBuilt {
       path: '.changes/rafa-9.md',
       commit: 'b'.repeat(40),
       addedOn: '2026-09-01',
-      fragment: { plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', notes: ['- Loop: a line'] },
+      fragment: { plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', package: null, notes: ['- Loop: a line'] },
     }],
     version: '0.5.0',
     section: '## 0.5.0',

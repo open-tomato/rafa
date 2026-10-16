@@ -354,7 +354,7 @@ const NOTES = [
  * reading that changes the wording.
  */
 function preparedRelease(level: ReleasePrepared['level'] = 'minor'): ReleasePrepared {
-  const fragment = { plan: PLAN_ID, title: 'Releases settle on the base branch', level, notes: [...NOTES] };
+  const fragment = { plan: PLAN_ID, title: 'Releases settle on the base branch', level, package: null, notes: [...NOTES] };
   return {
     kind: 'prepared',
     level,

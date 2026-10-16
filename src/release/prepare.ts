@@ -375,7 +375,7 @@ export function prepareRelease(input: ReleasePreparationInput): ReleasePreparati
   const level = reading.level;
   const title = fragmentTitle(input.title, input.plan);
   const lines = fragmentNotes(input, level, title);
-  const fragment: Fragment = { plan: input.plan, title, level, notes: lines.notes };
+  const fragment: Fragment = { plan: input.plan, title, level, package: null, notes: lines.notes };
   const name = allocateFragmentName(input.plan, read.base.waiting.map((waiting) => nameOf(waiting.path)));
   const path = posix.join(input.settings.releaseFragments.replace(/\\/g, '/'), name);
   const resolved = join(input.repoRoot, path);

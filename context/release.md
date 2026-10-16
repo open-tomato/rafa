@@ -10,13 +10,17 @@ forecast of what version the branch would get if merged now.
 
 A fragment is one file per plan, named `<plan id>.md` (or `-2`, `-3` if a
 fragment of that name already waits on `origin/<pr.base>`). Each fragment holds
-a front-matter block with three lines and notes below:
+a front-matter block with three lines, an optional fourth, and notes below:
 
 ```yaml
 plan: rafa-247
 title: One line, the plan title
 level: patch | minor | major | none
 ```
+
+A fourth line, `package: <name>` after `level`, names the workspace package
+the fragment releases; a fragment without it is the root package's, read as
+`package: null`, and the serialiser writes the line only when it is set.
 
 Below the front matter, the notes are one line per area (`- area: summary`),
 the same as the wrapped changelog lines the session writes today. Level `none`

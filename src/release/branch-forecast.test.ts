@@ -35,7 +35,7 @@ const SETTINGS = {
 } as const;
 
 /** The branch's fragment, as step 3 verified it. */
-const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', notes: ['- loop: a fix'] };
+const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', package: null, notes: ['- loop: a fix'] };
 
 /** A fragment waiting on the base, parsed as the tree reader parses one. */
 function waiting(id: string, fragment: Fragment, addedOn = '2026-09-18'): TreeFragment {
@@ -102,7 +102,7 @@ describe('readBranchForecast', () => {
 
   it('folds the waiting fragments then the branch, and ships the batch level', () => {
     const git = gitAnswering(MANIFEST);
-    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', notes: ['- cli: new'] })];
+    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] })];
 
     const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(), now: NOW });
 

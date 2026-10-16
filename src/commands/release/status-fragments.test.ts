@@ -87,7 +87,7 @@ function fragmentText(plan: string, level: Fragment['level']): string {
   const notes = level === 'none'
     ? []
     : [`- Area: ${plan} change`];
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands on `main`, and the caller's clone. */

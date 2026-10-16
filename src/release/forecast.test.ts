@@ -39,7 +39,7 @@ function fragmentOf(id: string, level: PlanReleaseLevel, addedOn = '2026-09-29')
   const notes = level === 'none'
     ? []
     : [`- Area ${id}: change`];
-  return { id, addedOn, fragment: { plan: id, title: `title ${id}`, level, notes } };
+  return { id, addedOn, fragment: { plan: id, title: `title ${id}`, level, package: null, notes } };
 }
 
 /** A strategy that throws `message` whenever it is asked to fold. */
