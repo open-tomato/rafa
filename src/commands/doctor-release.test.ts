@@ -224,7 +224,9 @@ describe('readDoctorRelease', () => {
     const settle = readSettle(createGitRunner(w.caller), 'origin/main', CONFIG);
 
     if (settle.outcome !== 'folded') throw new Error(`expected folded, got ${settle.outcome}`);
-    expect(reading.waiting.forecast).toMatchObject({ kind: 'settles', version: settle.version });
+    const [root, ...more] = settle.units;
+    if (root?.package !== null || more.length > 0) throw new Error(`settle folded ${String(settle.units.length)} units, not the root alone`);
+    expect(reading.waiting.forecast).toMatchObject({ kind: 'settles', version: root.version });
   });
 
   it('warns for a fragment that does not parse, saying settle would refuse, with the reason under the row', () => {

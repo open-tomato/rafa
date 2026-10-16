@@ -166,8 +166,10 @@ describe('readWaiting', () => {
 
     if (settle.outcome !== 'folded') throw new Error(`expected folded, got ${settle.outcome}`);
     if (reading.forecast?.kind !== 'settles') throw new Error(`expected settles, got ${String(reading.forecast?.kind)}`);
-    expect(reading.forecast.version).toBe(settle.version);
-    expect(reading.forecast.section).toBe(settle.section);
+    const [root, ...more] = settle.units;
+    if (root?.package !== null || more.length > 0) throw new Error(`settle folded ${String(settle.units.length)} units, not the root alone`);
+    expect(reading.forecast.version).toBe(root.version);
+    expect(reading.forecast.section).toBe(root.section);
   });
 
   it('reads origin/main as last fetched: neither an unpushed nor an unfetched fragment is listed', () => {

@@ -66,11 +66,11 @@
  *
  * Its title is the release commit's subject, `chore: release
  * <version>`, so a squash merge lands the subject a `push` delivery
- * would have. Its body names the base branch, the version, the base
- * version, the strategy that answered and every folded fragment in fold
- * order, says to tag with `rafa release tag` after the merge — tagging
- * a `pr` delivery is that command's, never settle's — and ends with the
- * changelog section, receipt included. It holds no hash and no clock,
+ * would have. Its body names the base branch, each unit's version and
+ * base version, the strategy that answered and every folded fragment in
+ * fold order, says to tag with `rafa release tag` after the merge —
+ * tagging a `pr` delivery is that command's, never settle's — and ends
+ * with each unit's changelog section, receipt included. It holds no hash and no clock,
  * so an unchanged batch writes the same body and step 5 edits nothing.
  *
  * ## Exit codes
@@ -177,8 +177,9 @@ export function releasePullTitle(moves: readonly ReleaseMove[]): string {
 /** The pull request's body; see the module note. Holds no hash and no clock. */
 export function releasePullBody(build: SettleBuilt, base: string): string {
   const fragments = build.fragments.map((each) => `- \`${each.path}\` (\`${each.id}\`, ${each.fragment.level})`);
+  const settles = build.units.map((unit) => `Settles the change fragments waiting on \`${base}\` into ${unit.version}: the \`${build.strategy}\` strategy folded them from ${unit.baseVersion}.`);
   return [
-    `Settles the change fragments waiting on \`${base}\` into ${build.version}: the \`${build.strategy}\` strategy folded them from ${build.baseVersion}.`,
+    ...settles,
     '',
     `The fragments, in the order \`${base}\` received them:`,
     '',
@@ -186,8 +187,7 @@ export function releasePullBody(build: SettleBuilt, base: string): string {
     '',
     `Merging this pull request releases the section below; tag it afterwards with \`rafa release tag\`. \`rafa release settle\` replaces \`${RELEASE_PR_BRANCH}\` and this body whenever the batch changes, so an edit made here does not last.`,
     '',
-    build.section,
-    '',
+    ...build.units.flatMap((unit) => [unit.section, '']),
   ].join('\n');
 }
 

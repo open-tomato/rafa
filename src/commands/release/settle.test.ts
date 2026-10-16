@@ -26,7 +26,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { Fragment } from '../../release/fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
-import type { SettleBuilt, SettleFolded } from '../../release/settle.js';
+import type { SettleBuilt, SettleFolded, SettleFragment, SettleUnitFold } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
@@ -175,6 +175,30 @@ function originFragments(w: World): string[] {
     : listed.split('\n');
 }
 
+/** The one fragment the literal settles fold. */
+const FRAGMENT: SettleFragment = {
+  id: 'rafa-9',
+  path: '.changes/rafa-9.md',
+  commit: 'b'.repeat(40),
+  addedOn: '2026-09-01',
+  fragment: { plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', package: null, notes: ['- Loop: a line'] },
+};
+
+/** The root's unit the literal settles fold, with `changelogMissing` as given. */
+function rootUnit(changelogMissing = false): SettleUnitFold {
+  return {
+    package: null,
+    dir: '.',
+    versionFile: 'package.json',
+    changelog: 'CHANGELOG.md',
+    baseVersion: '0.4.0',
+    version: '0.5.0',
+    section: '## 0.5.0',
+    changelogMissing,
+    fragments: [FRAGMENT],
+  };
+}
+
 /** A built settle, as `settledResult` is handed one. */
 function built(): SettleBuilt {
   return {
@@ -182,16 +206,8 @@ function built(): SettleBuilt {
     strategy: 'semver-by-level',
     commit: 'a'.repeat(40),
     baseVersion: '0.4.0',
-    fragments: [{
-      id: 'rafa-9',
-      path: '.changes/rafa-9.md',
-      commit: 'b'.repeat(40),
-      addedOn: '2026-09-01',
-      fragment: { plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', package: null, notes: ['- Loop: a line'] },
-    }],
-    version: '0.5.0',
-    section: '## 0.5.0',
-    changelogMissing: false,
+    fragments: [FRAGMENT],
+    units: [rootUnit()],
     release: 'c'.repeat(40),
     deleted: ['.changes/rafa-9.md'],
     insertPoint: 'before-next-heading',
@@ -202,8 +218,8 @@ function built(): SettleBuilt {
 
 /** A folded reading, as `dryRunResult` is handed one, with `lock` as given. */
 function folded(lock: SettleFolded['lock']): SettleFolded {
-  const { strategy, commit, baseVersion, fragments, version, section, changelogMissing } = built();
-  return { outcome: 'folded', strategy, commit, baseVersion, fragments, version, section, changelogMissing, lock };
+  const { strategy, commit, baseVersion, fragments, units } = built();
+  return { outcome: 'folded', strategy, commit, baseVersion, fragments, units, lock };
 }
 
 /** A tag step that was not meant to write. */
@@ -228,7 +244,7 @@ describe('settledResult, the outcomes rendered from literals', () => {
   });
 
   it('names a changelog the release commit created, above the push line', () => {
-    const build: SettleBuilt = { ...built(), changelogMissing: true, insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
     const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build } };
 
     const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
@@ -243,7 +259,7 @@ describe('settledResult, the outcomes rendered from literals', () => {
   });
 
   it('names no created changelog when the push was refused, since nothing landed', () => {
-    const build: SettleBuilt = { ...built(), changelogMissing: true, insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const build: SettleBuilt = { ...built(), units: [rootUnit(true)], insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
     const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'protected', exitCode: 1, attempts: 1, build, sentence: 'main is protected' } };
 
     const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
@@ -311,14 +327,14 @@ describe('settledResult, the outcomes rendered from literals', () => {
 
 describe('the Lock: lines under release.moveLock, rendered from literals', () => {
   it('names no lock in a dry run whose reading leaves it alone', () => {
-    const result = dryRunResult(folded(null), 'origin/main', 'main', 'CHANGELOG.md');
+    const result = dryRunResult(folded(null), 'origin/main', 'main');
 
     expect(result.exitCode).toBe(0);
     expect(result.lines.some((line) => line.startsWith('Lock:'))).toBe(false);
   });
 
   it('says in a dry run that rafa.lock would move from the base\'s version to the new one, above the dry run line', () => {
-    const result = dryRunResult(folded({ path: 'rafa.lock', from: '0.4.0', to: '0.5.0' }), 'origin/main', 'main', 'CHANGELOG.md');
+    const result = dryRunResult(folded({ path: 'rafa.lock', from: '0.4.0', to: '0.5.0' }), 'origin/main', 'main');
 
     expect(result.exitCode).toBe(0);
     expect(result.lines.slice(-2)).toEqual([
@@ -328,16 +344,16 @@ describe('the Lock: lines under release.moveLock, rendered from literals', () =>
   });
 
   it('says in a dry run that the release commit creates a lock the base lacks', () => {
-    const result = dryRunResult(folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), 'origin/main', 'main', 'CHANGELOG.md');
+    const result = dryRunResult(folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), 'origin/main', 'main');
 
     expect(result.lines).toContain('Lock: rafa.lock is missing, so the release commit creates it at 0.5.0.');
     expect(result.lines.some((line) => line.includes('would move'))).toBe(false);
   });
 
   it('puts the lock line after the changelog line when the base lacks both', () => {
-    const reading: SettleFolded = { ...folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), changelogMissing: true };
+    const reading: SettleFolded = { ...folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), units: [rootUnit(true)] };
 
-    const result = dryRunResult(reading, 'origin/main', 'main', 'CHANGELOG.md');
+    const result = dryRunResult(reading, 'origin/main', 'main');
 
     expect(result.lines.slice(-3).map((line) => line.split(':')[0])).toEqual(['Changelog', 'Lock', 'Dry run']);
   });
@@ -471,10 +487,10 @@ describe('rafa release settle --dry-run', () => {
     const run = await settle(w, ['--dry-run', '--output=json']);
 
     expect(run.exitCode).toBe(0);
-    const data = (eventsOf(run.stdout).at(-1) as { data?: { dryRun: boolean; reading: { outcome: string; version: string } } }).data;
+    const data = (eventsOf(run.stdout).at(-1) as { data?: { dryRun: boolean; reading: { outcome: string; units: readonly { package: string | null; version: string }[] } } }).data;
     expect(data?.dryRun).toBe(true);
     expect(data?.reading.outcome).toBe('folded');
-    expect(data?.reading.version).toBe('0.5.0');
+    expect(data?.reading.units.map((unit) => [unit.package, unit.version])).toEqual([[null, '0.5.0']]);
   });
 });
 

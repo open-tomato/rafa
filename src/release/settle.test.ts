@@ -16,7 +16,7 @@
  */
 import type { Fragment } from './fragment.js';
 import type { SettleWorktree } from './settle-worktree.js';
-import type { SettleBuild, SettleSettings } from './settle.js';
+import type { SettleBuild, SettleSettings, SettleUnitFold } from './settle.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
@@ -71,6 +71,22 @@ const LOCK_AT_BASE = projectLockText('0.4.0');
 /** A lock in a format this rafa does not read, as a newer rafa would write it. */
 const UNKNOWN_LOCK = '{\n  "lockfileVersion": 99,\n  "rafa": "0.4.0"\n}\n';
 
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = MANIFEST.replace('\n}', ',\n\t"workspaces": ["packages/*"]\n}');
+
+/** The publishable member's manifest on `main`. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/** The private member's manifest on `main`. */
+const CORE_MANIFEST = '{\n  "name": "@scope/core",\n  "version": "0.0.0",\n  "private": true\n}\n';
+
+/** What a workspace world seeds `main` with: the root manifest, a publishable `packages/plugin` and a private `packages/core`. */
+const WORKSPACE_SEED: Seed = {
+  'package.json': WORKSPACE_MANIFEST,
+  'packages/plugin/package.json': PLUGIN_MANIFEST,
+  'packages/core/package.json': CORE_MANIFEST,
+};
+
 /** The changelog on `main`: a preamble, then the last release. */
 const CHANGELOG = '# Changelog\n\nEvery release.\n\n## 0.4.0 — 2026-08-01, older\n\n- Loop: old line\n';
 
@@ -94,6 +110,11 @@ function isolatedEnv(home: string, date: string): Record<string, string> {
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
   return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
+}
+
+/** A fragment's text naming `name` as its package. */
+function packageFragmentText(plan: string, level: Fragment['level'], name: string, notes: readonly string[]): string {
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: name, notes });
 }
 
 /** A bare origin, a clone that lands commits on `main`, and the caller's clone. */
@@ -150,6 +171,13 @@ function world(seed: Seed = {}): World {
   git(caller, ['switch', '-q', '-c', 'feat']);
   writeFileSync(join(caller, 'README.md'), 'work in flight\n');
   return { caller, other, scratchRoot, git, land };
+}
+
+/** The one unit a reading folded; throws when it folded none or several, so a case reading it cannot pass on the wrong unit. */
+function soleUnit(reading: { readonly units: readonly SettleUnitFold[] }): SettleUnitFold {
+  const [unit, ...more] = reading.units;
+  if (unit === undefined || more.length > 0) throw new Error(`expected one unit, read ${String(reading.units.length)}`);
+  return unit;
 }
 
 /** Lands two fragments in two commits: `rafa-9` (minor) first, then `rafa-1` (patch) a day later. */
@@ -224,13 +252,13 @@ describe('readSettle, the dry run', () => {
     expect(reading.strategy).toBe('semver-by-level');
     expect(reading.commit).toBe(second);
     expect(reading.baseVersion).toBe('0.4.0');
-    expect(reading.version).toBe('0.5.0');
+    expect(soleUnit(reading).version).toBe('0.5.0');
     expect(reading.fragments.map((each) => [each.id, each.path, each.commit, each.addedOn])).toEqual([
       ['rafa-9', '.changes/rafa-9.md', first, '2026-09-10'],
       ['rafa-1', '.changes/rafa-1.md', second, '2026-09-11'],
     ]);
-    expect(reading.changelogMissing).toBe(false);
-    expect(reading.section).toBe([
+    expect(soleUnit(reading).changelogMissing).toBe(false);
+    expect(soleUnit(reading).section).toBe([
       '## 0.5.0 — 2026-09-11, title of rafa-9; title of rafa-1',
       '<!-- rafa:fragments rafa-9 rafa-1 -->',
       '',
@@ -250,7 +278,7 @@ describe('readSettle, the dry run', () => {
 
     expect(reading.outcome).toBe('folded');
     if (reading.outcome !== 'folded') return;
-    expect(reading.changelogMissing).toBe(true);
+    expect(soleUnit(reading).changelogMissing).toBe(true);
   });
 
   it('writes nothing: the caller\'s status, branch and every ref read the same after', () => {
@@ -343,6 +371,173 @@ describe('readSettle, the dry run', () => {
   });
 });
 
+describe('readSettle over a workspace, one unit per package', () => {
+  it('refuses a fragment naming a package the workspace lacks as malformed, writing nothing', async () => {
+    const w = world(WORKSPACE_SEED);
+    landTwo(w);
+    const head = w.land({ '.changes/rafa-1200.md': packageFragmentText('rafa-1200', 'minor', '@scope/missing', ['- Plugin: a line']) }, 'merge rafa-1200');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+    const built = await buildIn(w);
+
+    expect(reading.outcome).toBe('malformed');
+    if (reading.outcome !== 'malformed') return;
+    expect(reading.problems).toEqual([
+      `.changes/rafa-1200.md names package @scope/missing, which the workspace at ${head.slice(0, 12)} does not hold`,
+    ]);
+    expect(built.build.outcome).toBe('malformed');
+    expect(built.head).toBe(built.before);
+    expect(built.status).toBe('');
+    expect(built.files['package.json']).toBe(WORKSPACE_MANIFEST);
+    expect(built.files['CHANGELOG.md']).toBe(CHANGELOG);
+  });
+
+  it('refuses a fragment naming the private core as malformed, writing nothing', async () => {
+    const w = world(WORKSPACE_SEED);
+    landTwo(w);
+    w.land({ '.changes/rafa-1201.md': packageFragmentText('rafa-1201', 'patch', '@scope/core', ['- Core: a line']) }, 'merge rafa-1201');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+    const built = await buildIn(w);
+
+    expect(reading.outcome).toBe('malformed');
+    if (reading.outcome !== 'malformed') return;
+    expect(reading.problems).toEqual(['.changes/rafa-1201.md names package @scope/core, which is private and never publishes']);
+    expect(built.build.outcome).toBe('malformed');
+    expect(built.head).toBe(built.before);
+    expect(built.status).toBe('');
+  });
+
+  it('names only the fragment that does not parse when the batch also names a missing package', () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-1200.md': packageFragmentText('rafa-1200', 'minor', '@scope/missing', ['- Plugin: a line']) }, 'merge rafa-1200');
+    w.land({ '.changes/rafa-5.md': '---\nplan: rafa-5\ntitle: t\nlevel: huge\n---\n\n- x\n' }, 'merge rafa-5');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('malformed');
+    if (reading.outcome !== 'malformed') return;
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]).toStartWith('.changes/rafa-5.md does not parse: ');
+  });
+
+  it('settles three-field fragments into the root alone, folding no package', () => {
+    const w = world(WORKSPACE_SEED);
+    landTwo(w);
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('folded');
+    if (reading.outcome !== 'folded') return;
+    const unit = soleUnit(reading);
+    expect({ ...unit, section: undefined, fragments: unit.fragments.map((each) => each.id) }).toEqual({
+      package: null,
+      dir: '.',
+      versionFile: 'package.json',
+      changelog: 'CHANGELOG.md',
+      baseVersion: '0.4.0',
+      version: '0.5.0',
+      section: undefined,
+      changelogMissing: false,
+      fragments: ['rafa-9', 'rafa-1'],
+    });
+    expect(reading.baseVersion).toBe('0.4.0');
+  });
+
+  it('folds one unit per package a fragment names, each from its own manifest and changelog at the base', () => {
+    const w = world(WORKSPACE_SEED);
+    const root = w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9', '2026-09-10T12:00:00Z');
+    const plugin = w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'minor', '@scope/plugin', ['- Plugin: a hook']) }, 'merge rafa-7', '2026-09-11T12:00:00Z');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+    // The caller's own checkout says otherwise, so a reading off the working tree would show.
+    writeFileSync(join(w.caller, 'packages/plugin/package.json'), PLUGIN_MANIFEST.replace('0.1.0', '9.9.9'));
+    writeFileSync(join(w.caller, 'packages/plugin/CHANGELOG.md'), CHANGELOG);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('folded');
+    if (reading.outcome !== 'folded') return;
+    expect(reading.units.map((unit) => [unit.package, unit.dir, unit.versionFile, unit.changelog, unit.baseVersion, unit.version, unit.changelogMissing])).toEqual([
+      [null, '.', 'package.json', 'CHANGELOG.md', '0.4.0', '0.5.0', false],
+      ['@scope/plugin', 'packages/plugin', 'packages/plugin/package.json', 'packages/plugin/CHANGELOG.md', '0.1.0', '0.2.0', true],
+    ]);
+    expect(reading.units.map((unit) => unit.fragments.map((each) => [each.id, each.commit]))).toEqual([[['rafa-9', root]], [['rafa-7', plugin]]]);
+    expect(reading.units[1]?.section).toBe([
+      '## 0.2.0 — 2026-09-11, title of rafa-7',
+      '<!-- rafa:fragments rafa-7 -->',
+      '',
+      '- Plugin: a hook',
+    ].join('\n'));
+    expect(reading.fragments.map((each) => each.id)).toEqual(['rafa-9', 'rafa-7']);
+    expect(reading.baseVersion).toBe('0.4.0');
+  });
+
+  it('folds a package alone and reads no lock when the root\'s only fragment is none', () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-3.md': fragmentText('rafa-3', 'none', []) }, 'merge rafa-3');
+    w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'patch', '@scope/plugin', ['- Plugin: a fix']) }, 'merge rafa-7');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+    const git = createGitRunner(w.caller);
+
+    const reading = readSettle(git, 'origin/main', LOCK_SETTINGS);
+
+    expect(reading.outcome).toBe('folded');
+    if (reading.outcome !== 'folded') return;
+    expect(soleUnit(reading).package).toBe('@scope/plugin');
+    expect(soleUnit(reading).version).toBe('0.1.1');
+    expect(reading.lock).toBeNull();
+    expect(reading.fragments.map((each) => each.id)).toEqual(['rafa-3', 'rafa-7']);
+    // The control: once the root folds too, the lock step runs and refuses this manifest, which is not rafa's.
+    w.land({ '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', ['- Loop: a fix']) }, 'merge rafa-1');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+    const both = readSettle(git, 'origin/main', LOCK_SETTINGS);
+    expect(both.outcome).toBe('unread');
+    if (both.outcome !== 'unread') return;
+    expect(both.problem).toContain('release.moveLock');
+  });
+
+  it('answers nothing when every unit folds nothing, a package\'s none fragment included', () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'none', '@scope/plugin', []) }, 'merge rafa-7');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('nothing');
+    if (reading.outcome !== 'nothing') return;
+    expect(reading.fragments.map((each) => each.id)).toEqual(['rafa-7']);
+  });
+
+  it('answers failed naming the package when its version is no semver', () => {
+    const w = world({ ...WORKSPACE_SEED, 'packages/plugin/package.json': '{ "name": "@scope/plugin", "version": "not-a-version" }\n' });
+    w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'minor', '@scope/plugin', ['- Plugin: a hook']) }, 'merge rafa-7');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('failed');
+    if (reading.outcome !== 'failed') return;
+    expect(reading.line).toBe('@scope/plugin: release strategy semver-by-level failed: the base version "not-a-version" is no semantic version to bump');
+    expect(reading.baseVersion).toBe('0.4.0');
+  });
+
+  it('answers unread when a named package\'s manifest declares no version', () => {
+    const w = world({ ...WORKSPACE_SEED, 'packages/plugin/package.json': '{ "name": "@scope/plugin" }\n' });
+    const head = w.land({ '.changes/rafa-7.md': packageFragmentText('rafa-7', 'minor', '@scope/plugin', ['- Plugin: a hook']) }, 'merge rafa-7');
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('unread');
+    if (reading.outcome !== 'unread') return;
+    expect(reading.problem).toBe(`${head}:packages/plugin/package.json declares no version`);
+  });
+});
+
 describe('buildSettle, the release commit', () => {
   it('commits the version, the section and the deletions on the base commit, and pushes nothing', async () => {
     const w = world();
@@ -356,7 +551,7 @@ describe('buildSettle, the release commit', () => {
 
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
-    expect(built.build.version).toBe('0.5.0');
+    expect(soleUnit(built.build).version).toBe('0.5.0');
     expect(built.build.strategy).toBe('semver-by-level');
     expect(built.build.release).toBe(built.head);
     expect(built.before).toBe(second);
@@ -390,7 +585,7 @@ describe('buildSettle, the release commit', () => {
       '',
       'Every release.',
       '',
-      built.build.section,
+      soleUnit(built.build).section,
       '',
       '## 0.4.0 — 2026-08-01, older',
       '',
@@ -410,9 +605,9 @@ describe('buildSettle, the release commit', () => {
 
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
-    expect(built.build.version).toBe('0.4.1');
+    expect(soleUnit(built.build).version).toBe('0.4.1');
     expect(built.build.deleted).toEqual(['.changes/rafa-3.md', '.changes/rafa-1.md']);
-    expect(built.build.section).toContain('<!-- rafa:fragments rafa-3 rafa-1 -->');
+    expect(soleUnit(built.build).section).toContain('<!-- rafa:fragments rafa-3 rafa-1 -->');
   });
 
   it('commits nothing when there is nothing to settle, leaving none fragments waiting', async () => {
@@ -462,10 +657,10 @@ describe('buildSettle, the release commit', () => {
 
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
-    expect(built.build.changelogMissing).toBe(true);
+    expect(soleUnit(built.build).changelogMissing).toBe(true);
     expect(built.build.createdChangelog).toBe('CHANGELOG.md');
     expect(built.build.insertPoint).toBe('file-end');
-    expect(built.files['CHANGELOG.md']).toBe(`${CHANGELOG_TITLE}\n\n${built.build.section}\n`);
+    expect(built.files['CHANGELOG.md']).toBe(`${CHANGELOG_TITLE}\n\n${soleUnit(built.build).section}\n`);
     expect(built.status).toBe('');
     expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toContain('A\tCHANGELOG.md');
   });
@@ -478,7 +673,7 @@ describe('buildSettle, the release commit', () => {
 
     expect(built.build.outcome).toBe('built');
     if (built.build.outcome !== 'built') return;
-    expect(built.build.changelogMissing).toBe(false);
+    expect(soleUnit(built.build).changelogMissing).toBe(false);
     expect(built.build.createdChangelog).toBeNull();
     expect(built.files['CHANGELOG.md']).toStartWith('# Changelog\n\nEvery release.\n\n## 0.5.0');
   });

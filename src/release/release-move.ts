@@ -17,6 +17,9 @@
  * chore: release @scope/plugin@0.2.0             a package alone
  * ```
  *
+ * {@link moveSpelling} is how one move reads there, which the settle
+ * follow-up (`src/pr/settle-waiting.ts`) prints too.
+ *
  * The root's move comes first wherever it sits in the list; the packages
  * follow in the order handed, which the caller keeps as workspace order.
  * Pure: imports nothing.
@@ -35,7 +38,7 @@ export interface ReleaseMove {
 }
 
 /** How one move reads in the subject: the bare version for the root, `<name>@<version>` for a package. */
-function moveSpelling(move: ReleaseMove): string {
+export function moveSpelling(move: ReleaseMove): string {
   return move.package === null
     ? move.to
     : `${move.package}@${move.to}`;

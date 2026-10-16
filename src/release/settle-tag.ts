@@ -1,7 +1,8 @@
 /**
  * The `release.tag: settle` step: once a `push` delivery
  * (`./settle-push.ts`) has put the release commit on the base branch,
- * settle writes `v<version>` on that commit and pushes the tag, so a
+ * settle writes the release's tag on that commit (`v<version>` for the
+ * root, `<name>@<version>` for a package) and pushes it, so a
  * CI job running `rafa release settle` after each merge leaves a tagged
  * release behind with no operator step.
  *
@@ -28,9 +29,10 @@
  *
  * ## The tag
  *
- * The tag name is `versionTag` from `./version-tag.ts`,
- * the one spelling `rafa release tag` writes too, so the two ways of
- * tagging cannot drift. It is a lightweight tag, as `rafa release tag`
+ * The tag name is `moveTag` from `./version-tag.ts` over the build's
+ * move — `v<version>` (`versionTag`) for the root, `<name>@<version>`
+ * (`packageTag`) for a package — the one spelling `rafa release tag`
+ * writes too, so the two ways of tagging cannot drift. It is a lightweight tag, as `rafa release tag`
  * writes. Tags are shared between a repository and its worktrees, so
  * writing it through the worktree's runner puts it in the caller's
  * repository as well — a ref, never the caller's checkout or index.
@@ -72,7 +74,8 @@ import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { pushSaid } from './settle-push.js';
-import { versionTag } from './version-tag.js';
+import { settleMoves } from './settle.js';
+import { moveTag } from './version-tag.js';
 
 /** The command that tags what settle leaves untagged. */
 export const RELEASE_TAG_COMMAND = 'rafa release tag';
@@ -162,8 +165,8 @@ function writeAndPush(worktree: SettleWorktree, tag: string, commit: string): Se
 }
 
 /**
- * Tags the commit a `push` delivery pushed with `v<version>` and pushes
- * the tag when `mode` is `settle`; answers `skipped` for every other
+ * Tags the commit a `push` delivery pushed with its move's tag
+ * (`moveTag`) and pushes the tag when `mode` is `settle`; answers `skipped` for every other
  * reading, a `pr` delivery included. See the module note.
  */
 export function tagSettle(
@@ -181,5 +184,7 @@ export function tagSettle(
   if (delivered.outcome.outcome !== 'pushed') return skipped('not-pushed', null);
 
   const { build } = delivered.outcome;
-  return writeAndPush(worktree, versionTag(build.version), build.release);
+  const [move] = settleMoves(build);
+  if (move === undefined) return skipped('not-pushed', null);
+  return writeAndPush(worktree, moveTag(move), build.release);
 }

@@ -392,8 +392,10 @@ describe('readGuard over a bare origin and a clone', () => {
     w.git(['merge', '-q', '--no-ff', '-m', 'Merge feat/frag', 'feat/frag'], '2026-09-29T15:00:00Z');
     const settled = readSettle(createGitRunner(w.clone), 'HEAD', SETTINGS);
     if (settled.outcome !== 'folded') throw new Error(`settle did not fold: ${settled.outcome}`);
-    expect(settled.version).toBe(forecast.forecast.version);
-    expect(settled.section).toBe(forecast.forecast.section);
+    const [root, ...more] = settled.units;
+    if (root?.package !== null || more.length > 0) throw new Error(`settle folded ${String(settled.units.length)} units, not the root alone`);
+    expect(root.version).toBe(forecast.forecast.version);
+    expect(root.section).toBe(forecast.forecast.section);
   });
 
   it('answers missing for a branch with no fragment, and reads a malformed fragment as none, saying why', () => {

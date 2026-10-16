@@ -35,9 +35,11 @@
  * version it declares, and the fragments in fold order — the order the
  * base received them, first-parent add commit first — each with its
  * level, its title and the commit and date that added it. A fold that
- * answered adds the version it moves to; a delivery adds one line for
- * what it did, and a tag one more. A settle whose base lacks
- * `release.changelog` creates it holding `# Changelog` and the section
+ * answered adds one `Version:` line per unit it moves, the root's
+ * first, a package's naming the package before its versions; a
+ * delivery adds one line for what it did, and a tag one more. A settle
+ * whose base lacks `release.changelog`, or a package's
+ * `<dir>/CHANGELOG.md`, creates it holding `# Changelog` and the section
  * (`buildSettle`, #842), and says so in a `Changelog:` line above the
  * delivery's — the dry run in the same words, before its own last line;
  * a delivery that refused prints no such line, since nothing landed.
@@ -55,7 +57,8 @@
  * folded or found nothing, a push or pull request delivered, a push
  * whose fragments another settle released first. 1 for everything
  * else — a base that could not be fetched or read, a fragment that
- * does not parse, a strategy that threw, a commit that could not be
+ * does not parse or names a package the workspace lacks or a private
+ * one, a strategy that threw, a commit that could not be
  * built, a push refused twice, by branch protection or by a repository
  * rule, a pull request step that failed, and a tag that could not be
  * written or pushed after a push that landed. The failure's sentence is
@@ -87,7 +90,7 @@ import type { ProjectFound } from '../../project/scope.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
-import type { SettleBuild, SettleReading, SettleSettings } from '../../release/settle.js';
+import type { SettleBuild, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
@@ -191,7 +194,7 @@ function short(hash: string): string {
 /**
  * The lines every reading prints: the strategy, then — for one that got
  * as far as the fold — the base, the fragments in fold order and the
- * version it moves to. `ref` names the base as the worktree was made.
+ * version each unit moves to. `ref` names the base as the worktree was made.
  */
 export function readingLines(reading: SettleReading | SettleBuild, ref: string): readonly string[] {
   const lines = [`Strategy: ${reading.strategy}`];
@@ -210,9 +213,17 @@ export function readingLines(reading: SettleReading | SettleBuild, ref: string):
     });
   }
   if (reading.outcome === 'folded' || reading.outcome === 'built' || reading.outcome === 'unbuilt') {
-    lines.push(`Version: ${reading.baseVersion} → ${reading.version}`);
+    for (const unit of reading.units) lines.push(versionLine(unit));
   }
   return lines;
+}
+
+/** One unit's `Version:` line: the root's bare, a package's naming the package first. */
+function versionLine(unit: SettleUnitFold): string {
+  const named = unit.package === null
+    ? ''
+    : `${unit.package} `;
+  return `Version: ${named}${unit.baseVersion} → ${unit.version}`;
 }
 
 /** The sentence a reading that folded nothing and wrote nothing ends on, and whether it refuses. */
@@ -255,16 +266,15 @@ function plannedLockLine(lock: SettleLockPlan): string {
 
 /**
  * The dry run's answer: the reading, and what a settle would commit.
- * `changelog` is `release.changelog`, named in a line of its own when
- * the base lacks it and the settle would create it; a reading whose
- * `lock` is set, under `release.moveLock`, adds how `rafa.lock` would
- * move.
+ * Each unit's changelog the base lacks, and the settle would create, is
+ * named in a line of its own; a reading whose `lock` is set, under
+ * `release.moveLock`, adds how `rafa.lock` would move.
  */
-export function dryRunResult(reading: SettleReading, ref: string, branch: string, changelog: string): ReleaseSettleResult {
+export function dryRunResult(reading: SettleReading, ref: string, branch: string): ReleaseSettleResult {
   const base = { dryRun: true, delivery: null, reading, delivered: null, tag: null };
   const lines = [...readingLines(reading, ref)];
   if (reading.outcome === 'folded') {
-    if (reading.changelogMissing) lines.push(createdChangelogLine(changelog));
+    for (const unit of reading.units.filter((each) => each.changelogMissing)) lines.push(createdChangelogLine(unit.changelog));
     if (reading.lock !== null) lines.push(plannedLockLine(reading.lock));
     lines.push(`Dry run: settle would commit "${releaseCommitSubject(settleMoves(reading))}" on ${branch}; nothing was written.`);
     return resultOf(base, lines, null);
@@ -360,7 +370,7 @@ export async function runSettle(
   };
 
   const ran = await withSettleWorktree(options, async (worktree) => {
-    if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch, settings.releaseChangelog);
+    if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch);
     const delivered: SettleDelivered = pulls === null
       ? { delivery: 'push', outcome: settleByPush(worktree, settings, configFile) }
       : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls) };
