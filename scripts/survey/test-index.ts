@@ -3,17 +3,23 @@
  * source file, the test files that reach it. Run from the repository root,
  * `bun scripts/survey/test-index.ts` writes `docs/survey/test-index.json`
  * and `docs/survey/test-index.md`, the survey's record. Run with
- * `--baseline`, it writes `docs/survey/test-index.baseline.json` instead
- * and leaves the other two as they are: the baseline epic #801 holds the
- * package cut to, no test file's index may rise above it. The baseline
- * names the commit it read, and the mode refuses to run when a tracked
- * file in scope differs from that commit, since the script reads the
- * working tree and the commit would then name other text.
+ * `--baseline --map=<file>`, it writes `docs/survey/test-index.baseline.json`
+ * instead and leaves the other two as they are: the baseline epic #801
+ * holds the package cut to, no test file's index may rise above it. The
+ * baseline names the commit it read, and the mode refuses to run when a
+ * tracked file in scope differs from that commit, since the script reads
+ * the working tree and the commit would then name other text.
  *
- * Run with `--against=<baseline>`, it writes nothing: it reads the working
- * tree, compares each test file's index with the one that baseline holds,
- * prints the comparison, and exits 1 when an index rose (see "The
- * comparison" below).
+ * Run with `--against=<baseline> --map=<file>`, it writes nothing: it reads
+ * the working tree, compares each test file's index with the one that
+ * baseline holds, prints the comparison, and exits 1 when an index rose
+ * (see "The comparison" below).
+ *
+ * Either flag is refused without `--map=<file>`, and `--map=<file>` is
+ * refused alone. The map is the cut table (`cut-map.ts`), read through
+ * `packageRules` (see "The index in projected packages" below); the two
+ * modes as they stand read the tree by their folder rules and do not read
+ * the file `--map` names.
  *
  * The index of a test file is the number of folders its transitive imports
  * reach, doubled when it spawns a process:
@@ -48,6 +54,23 @@
  * A test file `bun build` did not reach has no recorded imports: it gets
  * no index, is named under `unindexed`, and counts as not read in the
  * coverage line.
+ *
+ * The index in projected packages
+ *
+ * `packageRules(map, graph)` reads the tree by the cut map instead: a
+ * file's folder is its unit, the package row or unassigned folder of the
+ * map that lists it, so three folders in one package count once and one
+ * folder cut across two packages counts twice. The rules carry the
+ * spawned reach, the sorted units of every source file reachable from
+ * the bin entry `src/rafa.ts` along the graph (edges of either kind), and
+ * a spawning test then counts the union of its own units and that reach
+ * instead of doubling: the process it spawns loads the bin, not the test's
+ * imports twice. A file the map lists nowhere has no unit and is unplaced:
+ * the index names under `unplaced` every test file, every source file a
+ * test's walk reaches (through support files or not) and, when a test
+ * spawns, every source file of the bin's reach, that the map holds no
+ * unit for. An unplaced file counts toward no index. Under the survey's
+ * rules and `coreRules` every file has a folder and `unplaced` is empty.
  *
  * The comparison
  *
@@ -104,6 +127,7 @@
  */
 
 import type { CoreMove } from './core-moves';
+import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
 import type { ImportGraph } from './import-graph';
 
@@ -142,11 +166,15 @@ export interface TestIndexInput {
 export interface TestIndexEntry {
   /** The repository-relative path of the test file. */
   readonly test: string;
-  /** The test's own folder, by the index's unit. */
-  readonly folder: string;
-  /** The folders its walk reaches through source files, sorted: the ones counted. */
+  /** The test's own folder, by the index's unit; `undefined` when the rules place it nowhere. */
+  readonly folder: string | undefined;
+  /**
+   * The folders its walk reaches through source files, sorted: the ones
+   * counted. When it spawns and the rules carry a spawned reach, the
+   * reach's units are among them.
+   */
   readonly folders: readonly string[];
-  /** `folders.length`, doubled when the test spawns. */
+  /** `folders.length`, doubled when the test spawns and the rules carry no spawned reach. */
   readonly index: number;
   /** How many source files the walk reaches. */
   readonly sourceFiles: number;
@@ -164,8 +192,8 @@ export interface TestIndexEntry {
 export interface SourceReach {
   /** The repository-relative path of the source file. */
   readonly source: string;
-  /** Its folder, by the index's unit. */
-  readonly folder: string;
+  /** Its folder, by the index's unit; `undefined` when the rules place it nowhere. */
+  readonly folder: string | undefined;
   /** The test files whose walk reaches it, sorted. */
   readonly tests: readonly string[];
   /** How many of `tests` lie in another folder. */
@@ -184,14 +212,23 @@ export interface TestIndex {
   readonly unindexed: readonly string[];
   /** The files whose imports were read, for the coverage line. */
   readonly read: readonly string[];
+  /** The test files and reached source files the rules place nowhere, sorted; empty unless the rules can leave a file without a folder. */
+  readonly unplaced: readonly string[];
 }
 
-/** How a walk reads a file: the folder it counts as, and whether it is set aside. */
+/** How a walk reads a file: the folder it counts as, whether it is set aside, and what a spawned process loads. */
 export interface IndexRules {
-  /** The folder a file counts as. */
-  readonly folderOf: (path: string) => string;
+  /** The folder a file counts as; `undefined` when the rules place it nowhere, and the file is unplaced. */
+  readonly folderOf: (path: string) => string | undefined;
   /** Whether a source file is read as a support file is: reached, not counted, not walked past. */
   readonly setsAside: (path: string) => boolean;
+  /**
+   * The folders a spawned process loads, sorted. When present, a spawning
+   * test counts them beside its own instead of doubling its index.
+   */
+  readonly spawnedReach?: readonly string[];
+  /** The source files a spawned process loads that the rules place nowhere, sorted. */
+  readonly spawnedUnplaced?: readonly string[];
 }
 
 /** One test's record in the baseline. */
@@ -255,20 +292,36 @@ export interface BaselineComparison {
 /** A mode that writes files: the survey's two, or the baseline. */
 export type WritingMode = 'baseline' | 'survey';
 
-/** The comparing mode, with the baseline it reads. */
+/** The baseline mode, with the map it reads. */
+export interface BaselineMode {
+  /** Always `true`: the mode writes the baseline. */
+  readonly baseline: true;
+  /** The map's path, absolute or relative to the repository root. */
+  readonly map: string;
+}
+
+/** The comparing mode, with the baseline and the map it reads. */
 export interface AgainstMode {
   /** The baseline's path, absolute or relative to the repository root. */
   readonly against: string;
+  /** The map's path, absolute or relative to the repository root. */
+  readonly map: string;
 }
 
-/** What a command line asks for: files written, or a comparison. */
-export type TestIndexMode = AgainstMode | WritingMode;
+/** What a command line asks for: the survey's files, the baseline, or a comparison. */
+export type TestIndexMode = 'survey' | AgainstMode | BaselineMode;
 
 /** The flag that picks the baseline mode. */
 export const BASELINE_FLAG = '--baseline';
 
 /** The flag that picks the comparing mode, up to the baseline's path. */
 export const AGAINST_FLAG = '--against=';
+
+/** The flag that names the map either mode reads, up to the map's path. */
+export const MAP_FLAG = '--map=';
+
+/** The bin's entry, the file a spawned `rafa` process starts from. */
+export const BIN_ENTRY = 'src/rafa.ts';
 
 /** The one folder every file under `packages/rafa/src/core/` counts as under `coreRules`, while that folder lies outside the package. */
 export const CORE_UNIT: string = CORE_FOLDER.replace(/\/$/, '');
@@ -329,6 +382,57 @@ export function coreRules(barrels: readonly string[] = barrelPaths(), coreFolder
     return indexFolder(path);
   };
   return { folderOf, setsAside: (path) => aside.has(path) };
+}
+
+/**
+ * Each file's import targets, edges of either kind, in the graph's order.
+ *
+ * @param graph - The import graph.
+ * @returns The targets of each file that imports one.
+ */
+function importTargets(graph: ImportGraph): Map<string, string[]> {
+  const next = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    next.set(edge.from, [...(next.get(edge.from) ?? []), edge.to]);
+  }
+  return next;
+}
+
+/**
+ * The rules of the index in projected packages: a file counts as its
+ * unit in the cut map, none is set aside, and a spawning test counts the
+ * units of every source file reachable from `BIN_ENTRY` along the graph
+ * instead of doubling (see "The index in projected packages" in the
+ * module note).
+ *
+ * @param map - The cut map; its `unitOf` is the rules' `folderOf`.
+ * @param graph - The import graph the bin's reach is walked along.
+ * @returns The rules, with the bin's units under `spawnedReach` and its unplaced source files under `spawnedUnplaced`.
+ * @throws When `BIN_ENTRY` is not a file of the graph, so no reach could be read.
+ */
+export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
+  if (!graph.nodes.includes(BIN_ENTRY)) {
+    throw new Error(`cannot read the spawned reach: the bin entry ${BIN_ENTRY} is not a file of the import graph`);
+  }
+  const nodes = new Set(graph.nodes);
+  const loaded = [...reach([BIN_ENTRY], importTargets(graph), () => true)]
+    .filter((path) => nodes.has(path) && classifyFile(path) === 'source');
+  const units = new Set<string>();
+  const unplaced: string[] = [];
+  for (const path of loaded) {
+    const unit = map.unitOf(path);
+    if (unit === undefined) {
+      unplaced.push(path);
+    } else {
+      units.add(unit);
+    }
+  }
+  return {
+    folderOf: (path) => map.unitOf(path),
+    setsAside: () => false,
+    spawnedReach: [...units].sort(),
+    spawnedUnplaced: unplaced.sort(),
+  };
 }
 
 /**
@@ -475,16 +579,19 @@ function walkTest(test: string, next: ReadonlyMap<string, readonly string[]>, ki
   return { direct, throughSupport: new Set([...past].filter((path) => !direct.has(path))) };
 }
 
-/** How one index reads a file: its kind once the rules have set files aside, and its folder. */
+/** How one index reads a file: its kind once the rules have set files aside, its folder, and what a spawned process loads. */
 interface FileReading {
   /** Each file's kind; a source file the rules set aside reads as `test-support`. */
   readonly kindOf: (path: string) => FileKind;
-  /** The folder a file counts as. */
-  readonly folderOf: (path: string) => string;
+  /** The folder a file counts as; `undefined` when the rules place it nowhere. */
+  readonly folderOf: (path: string) => string | undefined;
+  /** The folders a spawned process loads, when the rules carry them. */
+  readonly spawnedReach: readonly string[] | undefined;
 }
 
 /**
- * The sorted folders of the source files among `paths`.
+ * The sorted folders of the source files among `paths`; a file the rules
+ * place nowhere counts none.
  *
  * @param paths - Files reached.
  * @param reading - Each file's kind and folder.
@@ -493,8 +600,11 @@ interface FileReading {
 function sourceFolders(paths: Iterable<string>, reading: FileReading): string[] {
   const folders = new Set<string>();
   for (const path of paths) {
-    if (reading.kindOf(path) === 'source') {
-      folders.add(reading.folderOf(path));
+    const folder = reading.kindOf(path) === 'source'
+      ? reading.folderOf(path)
+      : undefined;
+    if (folder !== undefined) {
+      folders.add(folder);
     }
   }
   return [...folders].sort();
@@ -502,24 +612,29 @@ function sourceFolders(paths: Iterable<string>, reading: FileReading): string[] 
 
 /**
  * One test's entry, from its walk and the spawning calls of the files read.
+ * A spawning test counts the spawned reach beside its own folders when the
+ * rules carry one, and doubles its count when they do not.
  *
  * @param test - The test file.
  * @param walk - What its walk reached.
  * @param spawning - The files whose text spawns.
- * @param reading - Each file's kind and folder.
+ * @param reading - Each file's kind and folder, and the spawned reach.
  * @returns The entry.
  */
 function indexEntry(test: string, walk: TestWalk, spawning: ReadonlySet<string>, reading: FileReading): TestIndexEntry {
-  const { kindOf } = reading;
-  const folders = sourceFolders(walk.direct, reading);
-  const counted = new Set(folders);
+  const { kindOf, spawnedReach } = reading;
+  const own = sourceFolders(walk.direct, reading);
   const support = [...walk.direct].filter((path) => kindOf(path) === 'test-support').sort();
   const spawnsVia = [test, ...support].filter((path) => spawning.has(path)).sort();
   const spawns = spawnsVia.length > 0;
+  const folders = spawns && spawnedReach !== undefined
+    ? [...new Set([...own, ...spawnedReach])].sort()
+    : own;
+  const counted = new Set(folders);
   return {
     folder: reading.folderOf(test),
     folders,
-    index: spawns
+    index: spawns && spawnedReach === undefined
       ? folders.length * 2
       : folders.length,
     sourceFiles: [...walk.direct].filter((path) => kindOf(path) === 'source').length,
@@ -531,12 +646,45 @@ function indexEntry(test: string, walk: TestWalk, spawning: ReadonlySet<string>,
   };
 }
 
+/** The test files whose walk reaches one source file, directly and only through support files. */
+interface Reaching {
+  readonly direct: string[];
+  readonly support: string[];
+}
+
+/**
+ * The files an index places nowhere: every test file, every source file a
+ * test's walk reaches, and, when an indexed test spawns, every source file
+ * of the spawned reach, that the rules give no folder.
+ *
+ * @param tests - Every test file of the graph, indexed or not.
+ * @param reaching - Each source file with the tests that reach it.
+ * @param entries - The indexed tests.
+ * @param rules - How a file is read.
+ * @returns The unplaced files, sorted, without duplicates.
+ */
+function unplacedFiles(
+  tests: readonly string[],
+  reaching: ReadonlyMap<string, Reaching>,
+  entries: readonly TestIndexEntry[],
+  rules: IndexRules,
+): string[] {
+  const reached = [...reaching]
+    .filter(([, found]) => found.direct.length > 0 || found.support.length > 0)
+    .map(([source]) => source);
+  const spawned = entries.some((entry) => entry.spawns)
+    ? rules.spawnedUnplaced ?? []
+    : [];
+  const unplaced = [...tests, ...reached].filter((path) => rules.folderOf(path) === undefined);
+  return [...new Set([...unplaced, ...spawned])].sort();
+}
+
 /**
  * Computes every test file's index and every source file's reaching tests.
  * Pure: the caller builds the graph and reads the texts (see `main`).
  *
  * @param input - The import graph and the source texts.
- * @param rules - How a file is read; the survey's rules unless the comparison passes its own.
+ * @param rules - How a file is read; the survey's rules unless the comparison or `packageRules` passes its own.
  * @returns The index, every list sorted.
  */
 export function computeTestIndex(input: TestIndexInput, rules: IndexRules = SURVEY_RULES): TestIndex {
@@ -547,18 +695,15 @@ export function computeTestIndex(input: TestIndexInput, rules: IndexRules = SURV
       ? 'test-support'
       : kind;
   };
-  const reading: FileReading = { folderOf: rules.folderOf, kindOf };
-  const next = new Map<string, string[]>();
-  for (const edge of graph.edges) {
-    next.set(edge.from, [...(next.get(edge.from) ?? []), edge.to]);
-  }
+  const reading: FileReading = { folderOf: rules.folderOf, kindOf, spawnedReach: rules.spawnedReach };
+  const next = importTargets(graph);
   // By its own kind, not the rules': a file set aside is a source file still, and its spawning is the code under test's.
   const spawning = new Set(
     graph.nodes.filter((path) => classifyFile(path) !== 'source' && spawnApis(path, input.sources.get(path) ?? '').length > 0),
   );
   const read = new Set(graph.read);
   const allTests = graph.nodes.filter((path) => kindOf(path) === 'test');
-  const reaching = new Map<string, { direct: string[]; support: string[] }>(
+  const reaching = new Map<string, Reaching>(
     graph.nodes.filter((path) => kindOf(path) === 'source').map((path) => [path, { direct: [], support: [] }]),
   );
   const tests: TestIndexEntry[] = [];
@@ -578,7 +723,13 @@ export function computeTestIndex(input: TestIndexInput, rules: IndexRules = SURV
       testsFromOtherFolders: found.direct.filter((test) => rules.folderOf(test) !== folder).length,
     };
   });
-  return { read: [...read].sort(), sources, tests, unindexed: allTests.filter((path) => !read.has(path)) };
+  return {
+    read: [...read].sort(),
+    sources,
+    tests,
+    unindexed: allTests.filter((path) => !read.has(path)),
+    unplaced: unplacedFiles(allTests, reaching, tests, rules),
+  };
 }
 
 /**
@@ -950,28 +1101,88 @@ export function renderComparison(comparison: BaselineComparison, baselinePath: s
 }
 
 /**
- * The mode a command line asks for.
+ * The value after `flag` in `arg`, when `arg` opens with it and holds one.
+ *
+ * @param arg - One argument.
+ * @param flag - A flag that takes its value after `=`.
+ * @returns The value, or `undefined` when `arg` is not the flag or holds no value.
+ */
+function flagValue(arg: string, flag: string): string | undefined {
+  return arg.startsWith(flag) && arg.length > flag.length
+    ? arg.slice(flag.length)
+    : undefined;
+}
+
+/** The arguments a command line holds, each read once. */
+interface ParsedArgs {
+  readonly baseline: boolean;
+  readonly against: string | undefined;
+  readonly map: string | undefined;
+}
+
+/**
+ * Reads each argument as one of the three flags, refusing any other and
+ * any flag passed twice.
  *
  * @param args - The arguments after the script's path.
- * @returns `survey` when there is no argument, `baseline` when the one
- *   argument is `--baseline`, and the baseline's path under `against`
- *   when it is `--against=<baseline>`.
- * @throws When any other argument is passed, more than one, or `--against=` with no path.
+ * @param usage - The refusal's text for an argument that is none of them.
+ * @returns The flags read.
+ * @throws When an argument is none of the flags, or one is passed twice.
+ */
+function readArgs(args: readonly string[], usage: string): ParsedArgs {
+  let baseline = false;
+  let against: string | undefined;
+  let map: string | undefined;
+  for (const arg of args) {
+    const againstValue = flagValue(arg, AGAINST_FLAG);
+    const mapValue = flagValue(arg, MAP_FLAG);
+    if (arg === BASELINE_FLAG && !baseline) {
+      baseline = true;
+    } else if (againstValue !== undefined && against === undefined) {
+      against = againstValue;
+    } else if (mapValue !== undefined && map === undefined) {
+      map = mapValue;
+    } else {
+      throw new Error(usage);
+    }
+  }
+  return { against, baseline, map };
+}
+
+/**
+ * The mode a command line asks for, its arguments in any order.
+ *
+ * @param args - The arguments after the script's path.
+ * @returns `survey` when there is no argument, the map's path under `map`
+ *   with `baseline` when the arguments are `--baseline` and
+ *   `--map=<file>`, and the baseline's path under `against` beside the
+ *   map's when they are `--against=<baseline>` and `--map=<file>`.
+ * @throws When any other argument is passed, one twice, `--baseline` with
+ *   `--against=`, a flag ending in `=` with no path, either mode without
+ *   `--map=<file>`, or `--map=<file>` alone.
  */
 export function parseMode(args: readonly string[]): TestIndexMode {
-  const [only] = args;
-  if (only === undefined) {
+  if (args.length === 0) {
     return 'survey';
   }
-  if (args.length === 1 && only === BASELINE_FLAG) {
-    return 'baseline';
+  const usage = `unknown arguments: ${args.join(' ')}. Usage: bun scripts/survey/test-index.ts `
+    + `[${BASELINE_FLAG} ${MAP_FLAG}<file> | ${AGAINST_FLAG}<baseline> ${MAP_FLAG}<file>]`;
+  const { against, baseline, map } = readArgs(args, usage);
+  if (baseline && against !== undefined) {
+    throw new Error(usage);
   }
-  if (args.length === 1 && only.startsWith(AGAINST_FLAG) && only.length > AGAINST_FLAG.length) {
-    return { against: only.slice(AGAINST_FLAG.length) };
+  if (!baseline && against === undefined) {
+    throw new Error(`${MAP_FLAG}<file> names the map of ${BASELINE_FLAG} or ${AGAINST_FLAG}<baseline>, and neither was passed`);
   }
-  throw new Error(
-    `unknown arguments: ${args.join(' ')}. Usage: bun scripts/survey/test-index.ts [${BASELINE_FLAG} | ${AGAINST_FLAG}<baseline>]`,
-  );
+  const flag = baseline
+    ? BASELINE_FLAG
+    : `${AGAINST_FLAG}<baseline>`;
+  if (map === undefined) {
+    throw new Error(`${flag} reads the map: pass ${MAP_FLAG}<file> beside it`);
+  }
+  return against === undefined
+    ? { baseline: true, map }
+    : { against, map };
 }
 
 /**
@@ -1096,8 +1307,11 @@ export async function main(root: string, mode: WritingMode = 'survey'): Promise<
 if (import.meta.main) {
   try {
     const mode = parseMode(process.argv.slice(2));
-    if (typeof mode === 'string') {
-      for (const path of await main(process.cwd(), mode)) {
+    if (mode === 'survey' || 'baseline' in mode) {
+      const writing = mode === 'survey'
+        ? 'survey'
+        : 'baseline';
+      for (const path of await main(process.cwd(), writing)) {
         console.log(`wrote ${path}`);
       }
     } else {

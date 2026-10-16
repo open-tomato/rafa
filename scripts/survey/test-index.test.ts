@@ -1,6 +1,6 @@
 import type { CoreMove } from './core-moves';
 import type { ImportEdge, ImportGraph } from './import-graph';
-import type { BaselineComparison, TestIndex, TestIndexEntry, TestIndexInput } from './test-index';
+import type { BaselineComparison, IndexRules, TestIndex, TestIndexEntry, TestIndexInput } from './test-index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,8 +9,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { CORE_FOLDER, CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from './core-moves';
+import { parseCutMap } from './cut-map';
 import {
   BASELINE_PATH,
+  BIN_ENTRY,
   CORE_PACKAGE_UNIT,
   CORE_TEST_PREFIXES,
   against,
@@ -20,6 +22,7 @@ import {
   holdsBaseline,
   indexFolder,
   main,
+  packageRules,
   parseBaseline,
   parseMode,
   pathBeforePackage,
@@ -231,11 +234,19 @@ describe('the baseline', () => {
     expect(renderTestIndexBaselineJson(index, 'def456')).toBe(first.replace('abc123', 'def456'));
   });
 
-  it('is picked by --baseline alone, and any other argument is refused', () => {
+  it('is picked by --baseline beside --map=<file>, and any other argument is refused', () => {
     expect(parseMode([])).toBe('survey');
-    expect(parseMode(['--baseline'])).toBe('baseline');
+    expect(parseMode(['--baseline', '--map=docs/survey/cut-table.json'])).toEqual({ baseline: true, map: 'docs/survey/cut-table.json' });
+    expect(parseMode(['--map=m.json', '--baseline'])).toEqual({ baseline: true, map: 'm.json' });
     expect(() => parseMode(['--base'])).toThrow('unknown arguments: --base.');
-    expect(() => parseMode(['--baseline', '--baseline'])).toThrow('unknown arguments');
+    expect(() => parseMode(['--baseline', '--baseline', '--map=m.json'])).toThrow('unknown arguments');
+  });
+
+  it('refuses --baseline without --map=<file>, and --map=<file> alone', () => {
+    expect(() => parseMode(['--baseline'])).toThrow('--baseline reads the map: pass --map=<file> beside it');
+    expect(() => parseMode(['--map=m.json'])).toThrow('--map=<file> names the map of --baseline or --against=<baseline>, and neither was passed');
+    expect(() => parseMode(['--baseline', '--map='])).toThrow('unknown arguments: --baseline --map=.');
+    expect(() => parseMode(['--baseline', '--map=a.json', '--map=b.json'])).toThrow('unknown arguments');
   });
 });
 
@@ -499,11 +510,19 @@ describe('the comparison against a baseline', () => {
     ]);
   });
 
-  it('is picked by --against=<baseline> alone, with a path', () => {
-    expect(parseMode(['--against=docs/survey/test-index.baseline.json'])).toEqual({ against: 'docs/survey/test-index.baseline.json' });
-    expect(() => parseMode(['--against='])).toThrow('unknown arguments: --against=.');
+  it('is picked by --against=<baseline> beside --map=<file>, each with a path', () => {
+    expect(parseMode(['--against=docs/survey/test-index.baseline.json', '--map=docs/survey/cut-table.json'])).toEqual({
+      against: 'docs/survey/test-index.baseline.json',
+      map: 'docs/survey/cut-table.json',
+    });
+    expect(() => parseMode(['--against=', '--map=m.json'])).toThrow('unknown arguments: --against= --map=m.json.');
     expect(() => parseMode(['--against'])).toThrow('unknown arguments: --against.');
-    expect(() => parseMode(['--baseline', '--against=a.json'])).toThrow('unknown arguments');
+    expect(() => parseMode(['--baseline', '--against=a.json', '--map=m.json'])).toThrow('unknown arguments');
+    expect(() => parseMode(['--against=a.json', '--against=b.json', '--map=m.json'])).toThrow('unknown arguments');
+  });
+
+  it('refuses --against=<baseline> without --map=<file>', () => {
+    expect(() => parseMode(['--against=a.json'])).toThrow('--against=<baseline> reads the map: pass --map=<file> beside it');
   });
 
   it('refuses a text that is not a baseline', () => {
@@ -629,6 +648,113 @@ describe('the comparison once core is its package', () => {
     expect(unfollowed.gone).toEqual([MOVED_MATE, MOVED]);
     // The prefix rule needs no list: the store and parked tests are held still.
     expect([...unfollowed.equal, ...unfollowed.fallen].map((change) => change.baselineTest).sort()).toEqual([COUPLED, STORE_TEST]);
+  });
+});
+
+describe('the index in projected packages', () => {
+  const COMMAND = 'src/commands/run.ts';
+  const FRESH_CLI = 'src/cli/fresh.ts';
+  const FEATURE = 'src/feature/f.ts';
+  const ONE = 'src/a/one.ts';
+  const TWO = 'src/b/two.ts';
+  const THREE = 'src/c/three.ts';
+  const KEPT = 'src/split/kept.ts';
+  const MOVED = 'src/split/moved.ts';
+  const STRAY = 'src/stray/stray.ts';
+  const LOOSE = 'src/stray/loose.ts';
+  const THREE_TEST = 'src/a/three.test.ts';
+  const SPLIT_TEST = 'src/split/split.test.ts';
+  const SPAWNS = 'src/feature/spawns.test.ts';
+  const QUIET = 'src/feature/quiet.test.ts';
+  const STRAY_TEST = 'src/stray/stray.test.ts';
+
+  // Three folders in `rafa-three`, `src/split/` cut across `rafa-three` and `rafa-other`, and `src/stray/` listed nowhere.
+  const map = parseCutMap(JSON.stringify({
+    packages: [
+      { files: [BIN_ENTRY, COMMAND], name: 'rafa-cli' },
+      { files: [FEATURE, SPAWNS, QUIET], name: 'rafa-feature' },
+      { files: [ONE, TWO, THREE, THREE_TEST, KEPT, SPLIT_TEST], name: 'rafa-three' },
+      { files: [MOVED], name: 'rafa-other' },
+    ],
+    unassigned: [{ files: [], folder: 'src/ci/' }],
+  }), 'cut-table.json');
+  const linked = plantedGraph(
+    [BIN_ENTRY, COMMAND, FRESH_CLI, FEATURE, ONE, TWO, THREE, KEPT, MOVED, STRAY, LOOSE, THREE_TEST, SPLIT_TEST, SPAWNS, QUIET, STRAY_TEST],
+    [
+      [BIN_ENTRY, COMMAND],
+      [BIN_ENTRY, FRESH_CLI],
+      [THREE_TEST, ONE],
+      [THREE_TEST, TWO],
+      [THREE_TEST, THREE],
+      [SPLIT_TEST, KEPT],
+      [SPLIT_TEST, MOVED],
+      [SPAWNS, FEATURE],
+      [SPAWNS, ONE],
+      [QUIET, FEATURE],
+      [STRAY_TEST, STRAY],
+    ],
+  );
+  // The command reaches the feature by a type-only import: the bin's walk follows it as the index's walk does.
+  const graph = { ...linked, edges: [...linked.edges, { from: COMMAND, kind: 'type' as const, to: FEATURE }] };
+  const input: TestIndexInput = { graph, sources: new Map([[SPAWNS, 'Bun.spawnSync([\'rafa\', \'start\']);\n']]) };
+  const rules = packageRules(map, graph);
+  const packaged = computeTestIndex(input, rules);
+  const surveyed = computeTestIndex(input);
+
+  it('reads each file as the map\'s unit, sets none aside, and walks the bin for the spawned reach', () => {
+    for (const path of [BIN_ENTRY, KEPT, MOVED, THREE_TEST, STRAY, 'src/nowhere.ts']) {
+      expect(rules.folderOf(path)).toBe(map.unitOf(path));
+    }
+    expect(rules.folderOf(KEPT)).toBe('rafa-three');
+    expect(rules.folderOf(STRAY)).toBeUndefined();
+    expect(rules.setsAside(COMMAND)).toBe(false);
+    // `rafa-three` holds files no path from the bin reaches, so it is not loaded: the control for the walk.
+    expect(rules.spawnedReach).toEqual(['rafa-cli', 'rafa-feature']);
+    expect(rules.spawnedUnplaced).toEqual([FRESH_CLI]);
+  });
+
+  it('refuses a graph with no bin entry to walk from', () => {
+    const headless = plantedGraph([ONE, THREE_TEST], [[THREE_TEST, ONE]]);
+    expect(() => packageRules(map, headless)).toThrow(`the bin entry ${BIN_ENTRY} is not a file of the import graph`);
+  });
+
+  it('counts three folders in one package once, so the index falls', () => {
+    expect(entryOf(surveyed, THREE_TEST)).toMatchObject({ folders: ['src/a', 'src/b', 'src/c'], index: 3 });
+    expect(entryOf(packaged, THREE_TEST)).toMatchObject({ folder: 'rafa-three', folders: ['rafa-three'], index: 1 });
+  });
+
+  it('counts one folder cut across two packages twice, so the index rises', () => {
+    expect(entryOf(surveyed, SPLIT_TEST)).toMatchObject({ folders: ['src/split'], index: 1 });
+    expect(entryOf(packaged, SPLIT_TEST)).toMatchObject({ folders: ['rafa-other', 'rafa-three'], index: 2 });
+  });
+
+  it('gives a spawning test the bin\'s packages beside its own instead of doubling', () => {
+    expect(entryOf(packaged, SPAWNS)).toMatchObject({
+      folders: ['rafa-cli', 'rafa-feature', 'rafa-three'],
+      index: 3,
+      spawns: true,
+      spawnsVia: [SPAWNS],
+    });
+    // The bin's feature is the test's own: counted once, not twice.
+    expect(entryOf(packaged, SPAWNS).folders.filter((unit) => unit === 'rafa-feature')).toHaveLength(1);
+    // A test that does not spawn is not given the reach.
+    expect(entryOf(packaged, QUIET)).toMatchObject({ folders: ['rafa-feature'], index: 1, spawns: false });
+  });
+
+  it('doubles as today when the rules carry no reach, the control', () => {
+    const unreached: IndexRules = { folderOf: rules.folderOf, setsAside: rules.setsAside };
+    expect(entryOf(computeTestIndex(input, unreached), SPAWNS)).toMatchObject({ folders: ['rafa-feature', 'rafa-three'], index: 4 });
+    expect(entryOf(surveyed, SPAWNS)).toMatchObject({ folders: ['src/a', 'src/feature'], index: 4 });
+  });
+
+  it('names each test file, reached source file and loaded bin file the map holds no unit for', () => {
+    // `loose.ts` is listed nowhere either, but nothing reaches it.
+    expect(packaged.unplaced).toEqual([FRESH_CLI, STRAY_TEST, STRAY]);
+    expect(entryOf(packaged, STRAY_TEST)).toMatchObject({ folder: undefined, folders: [], index: 0 });
+    expect(packaged.sources.find((source) => source.source === STRAY)?.folder).toBeUndefined();
+    // With no test spawning, nothing loads the bin, so its unplaced file is not reached.
+    expect(computeTestIndex({ graph, sources: new Map() }, rules).unplaced).toEqual([STRAY_TEST, STRAY]);
+    expect(surveyed.unplaced).toEqual([]);
   });
 });
 
@@ -761,9 +887,15 @@ describe('the baseline mode over a scratch repository', () => {
   });
 });
 
-/** Runs the script itself in `root` with `--against=<baseline>` and returns its exit code and what it printed. */
+/**
+ * Runs the script itself in `root` with `--against=<baseline>` and the
+ * `--map=<file>` it is refused without, and returns its exit code and what
+ * it printed. The folder-unit comparison does not read the map, so none is
+ * planted.
+ */
 function runAgainst(root: string, baseline: string): { exitCode: number; stderr: string; stdout: string } {
-  const result = Bun.spawnSync([process.execPath, join(import.meta.dir, 'test-index.ts'), `--against=${baseline}`], {
+  const args = [`--against=${baseline}`, '--map=docs/survey/cut-table.json'];
+  const result = Bun.spawnSync([process.execPath, join(import.meta.dir, 'test-index.ts'), ...args], {
     cwd: root,
     stderr: 'pipe',
     stdout: 'pipe',
