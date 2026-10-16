@@ -484,3 +484,26 @@ describe('a publishable member', () => {
     expect(report.members.length).toBeGreaterThan(0);
   });
 });
+
+describe('main over one planted root, before and after the fix', () => {
+  test('a publishable member depending on rafa-core exits 1 with the refusal line; the peer entry instead exits 0', () => {
+    const refusal = 'packages/plugin (@open-tomato/rafa-plugin): depends on @open-tomato/rafa-core in dependencies, which is private and never publishes';
+    const root = plantWith(plugin({ dependencies: { '@open-tomato/rafa-core': 'workspace:*' } }));
+
+    const refused = run(root);
+
+    expect(refused.code).toBe(1);
+    expect(refused.lines).toContain(refusal);
+
+    writeFileSync(join(root, PLUGIN_DIR, 'package.json'), `${JSON.stringify({
+      name: '@open-tomato/rafa-plugin',
+      scripts: { lint: 'eslint .', test: 'bun test' },
+      peerDependencies: { '@open-tomato/rafa': '>=0.46.0' },
+    }, null, 2)}\n`);
+    const fixed = run(root);
+
+    expect(fixed.code).toBe(0);
+    expect(fixed.lines).toContain('packages/plugin (@open-tomato/rafa-plugin): ok');
+    expect(fixed.lines).not.toContain(refusal);
+  });
+});

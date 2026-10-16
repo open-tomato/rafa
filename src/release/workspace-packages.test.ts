@@ -13,9 +13,10 @@
 import type { WorkspacePackage } from './workspace-packages.js';
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -272,5 +273,21 @@ describe('publishableOf and packageNamed', () => {
     expect(packageNamed(MIXED_PACKAGES, '@x/core')?.dir).toBe('packages/core');
     expect(packageNamed(MIXED_PACKAGES, 'core')).toBeNull();
     expect(packageNamed([], '@x/core')).toBeNull();
+  });
+});
+
+describe('readWorkspacePackages over this repository', () => {
+  it('reads exactly the folders under packages/ that hold a manifest, the members the workspace-graph sweep lists', () => {
+    const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+    const packagesDir = join(repoRoot, 'packages');
+    const folders = readdirSync(packagesDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && existsSync(join(packagesDir, entry.name, 'package.json')))
+      .map((entry) => `packages/${entry.name}`)
+      .sort();
+
+    const members = packagesOf(readWorkspacePackages(repoRoot));
+
+    expect(folders.length).toBeGreaterThan(0);
+    expect(members.map((member) => member.dir).sort()).toEqual(folders);
   });
 });
