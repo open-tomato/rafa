@@ -482,7 +482,7 @@ import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js'
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
-import { expectExit, plantProjectConfig } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
@@ -523,7 +523,11 @@ const EXPORTS = {
 /** The prefix of a specifier that names one of the package's own subpaths. */
 const OWN_SUBPATH = '@open-tomato/rafa/';
 
-/** The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line. */
+/**
+ * The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line.
+ * It follows the build since: six lines from `7306b06` (`config-schema-features.d.ts`,
+ * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`).
+ */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
 /** A chunk the `--splitting` build names by its content hash, directly in `dist/`. */
@@ -1202,7 +1206,7 @@ describe('the build script, run in a copy of the package', () => {
     expect(missing).toEqual([]);
   });
 
-  it('writes the files a build before core moved into its package wrote, chunk hashes set aside', () => {
+  it('writes the files the build at c920603 wrote and has since, chunk hashes set aside', () => {
     const before = readFileSync(join(import.meta.dir, DIST_FILES_BEFORE_MOVE), 'utf8')
       .split('\n')
       .filter((line) => line !== '')
@@ -1213,7 +1217,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(149);
+    expect(before).toHaveLength(155);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1274,7 +1278,12 @@ describe('the built CLI', () => {
     const fromBuild = run([process.execPath, join(DIST, 'cli.js'), 'describe', '--output=json'], tempRoot, env);
 
     expectExit(fromBuild, 0, { cwd: tempRoot });
-    const document = JSON.parse(fromBuild.stdout) as {
+    const last = eventsOf(fromBuild.stdout).at(-1);
+    expect(last?.type).toBe('result');
+    expect(last?.type === 'result' && last.ok).toBe(true);
+    const document = (last?.type === 'result'
+      ? last.data
+      : undefined) as {
       subjects: { name: string; actions: { name: string }[] }[];
     };
     const pr = document.subjects.find((subject) => subject.name === 'pr');
