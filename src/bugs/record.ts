@@ -21,7 +21,7 @@
  * One `## <Heading>` section per field that holds a value, in the order
  * of {@link BUG_FIELDS}. Two headings are triage's own: the description
  * is `What` and the error output is `Artifact`, both in the fence
- * `fenced` writes (`../triage/issue-text.ts`). So triage's similarity
+ * `fenced` writes (`./fenced.ts`). So triage's similarity
  * step (`issueTextOf`, `../triage/similarity.ts`) reads a record as it
  * reads a body the loop filed, and a body the loop filed parses as a
  * record with the other fields missing.
@@ -59,9 +59,9 @@
 import type { ErrorCodeEntry } from '../errors/codes.js';
 
 import { CODE_PATTERN, familyOf, isKnownCode, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '../errors/codes.js';
-import { fenced } from '../triage/issue-text.js';
 
 import { closestNames } from './closest.js';
+import { fenced } from './fenced.js';
 import { ACTION_SHAPE, MODULE_SHAPE, renderTitle, titleRoundTrips, UNKNOWN_VALUE } from './title.js';
 
 /** A bug's fields, each null until something fills it. */

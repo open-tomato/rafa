@@ -1,10 +1,9 @@
 /**
- * The text loop-owned triage (`./triage.ts`) files a bug with: the title,
- * and the body or comment its sections make up.
+ * The text loop-owned triage (`./triage.ts`) files a bug with: the body
+ * or comment its sections make up.
  *
- * The title is the bug's `what` on one line, cut to
- * {@link TITLE_MAX_LENGTH} code points ({@link issueTitle}). The body
- * opens with a sentence saying where the issue came from
+ * Triage titles a bug from its record (`bugTitle`, `../bugs/record.ts`,
+ * #991). The body opens with a sentence saying where the issue came from
  * ({@link ISSUE_OPENING}), then six sections, each value in a fence one
  * backtick longer than any backtick run it holds ({@link fenced}), so the
  * text a session wrote is shown verbatim and never rendered: `What`,
@@ -49,23 +48,42 @@
  * met, so whoever reads the issue can tell a match by words from one by
  * key. The sections after it are a recurrence's as ever.
  *
- * Every value goes through the caller's `redact` before it is shown, and
- * the title is cut from text already redacted, so no cut leaves part of a
- * secret behind.
+ * ## The record's sections
+ *
+ * An issue built with the bug record (#991, {@link BugValues.record})
+ * carries the record's sections after `Feedback` and before `Possible
+ * duplicates` ({@link recordSections}): one per field holding a value,
+ * in `BUG_FIELDS` order (`../bugs/record.ts`), with `What`, `Artifact`
+ * and `Error line` left out, since `What` and `Artifact` are written
+ * above and the recurrence key holds the error line's stripped text. So
+ * `Reproduce`, `Rerun`, `Cause`, `Proposed cause`, `Suspected cause`,
+ * `Module`, `Action`, `Project`, `Environment`, `Versions`. A free text
+ * is fenced and a token (the cause codes, the module, the action and the
+ * place) is written plain, as `renderBugBody` writes them, so the
+ * record's own parser (`parseBugRecord`) reads the body back. Then
+ * `Reported module` and `Reported action`, fenced, for a session's word
+ * the record holds as `unknown` ({@link BugValues.reported}); the record
+ * reads no field from them.
+ *
+ * The sections above `Feedback` keep their text byte for byte, so
+ * `./similarity.ts`'s `issueTextOf` and `./bug-key.ts` read a body with
+ * the record as they read one without.
+ *
+ * A recurrence's comment carries no record field but `Versions`
+ * ({@link BugValues.versions}), the versions the bug was seen again on,
+ * after `Feedback`. A `versions` beside a `record` is not written: the
+ * record's own `Versions` section is.
+ *
+ * Every value goes through the caller's `redact` before it is shown.
  */
 import type { ScoredIssue } from './similarity.js';
+import type { BugRecord } from '../bugs/record.js';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 
-import { oneLine } from './bug-key.js';
+import { fenced } from '../bugs/fenced.js';
+import { BUG_FIELDS } from '../bugs/record.js';
 
-/** The most code points a filed title holds, its cut marker included. */
-export const TITLE_MAX_LENGTH = 120;
-
-/** What ends a title that was cut. */
-const TITLE_CUT = '...';
-
-/** The shortest fence a value is shown in. */
-const MIN_FENCE_LENGTH = 3;
+export { fenced };
 
 /** What opens a filed issue's body. */
 export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
@@ -73,25 +91,6 @@ export const ISSUE_OPENING: string = 'An out-of-scope bug a rafa task session re
 
 /** What opens a recurrence's comment. */
 export const COMMENT_OPENING = 'Reported again by a rafa task session.';
-
-/** A value in a fence one backtick longer than any run of backticks it holds. */
-export function fenced(value: string): string {
-  const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
-  const fence = '`'.repeat(Math.max(MIN_FENCE_LENGTH, ...runs.map((length) => length + 1)));
-  const body = value.endsWith('\n')
-    ? value
-    : `${value}\n`;
-  return `${fence}\n${body}${fence}`;
-}
-
-/** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
-export function issueTitle(redactedWhat: string): string {
-  const line = oneLine(redactedWhat);
-  const points = Array.from(line);
-  if (points.length <= TITLE_MAX_LENGTH) return line;
-  const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
-  return `${kept.trimEnd()}${TITLE_CUT}`;
-}
 
 /** The values one bug's issue and comment show, before redaction. */
 export interface BugValues {
@@ -114,6 +113,72 @@ export interface BugValues {
    * or absent when that step did not run, as for every comment.
    */
   readonly duplicates?: PossibleDuplicates;
+  /**
+   * The bug record an issue is filed with, its free text redacted, or
+   * absent for a comment and for a body without one; see the module note.
+   */
+  readonly record?: BugRecord;
+  /** The session's module and action words the record holds as `unknown`; see the module note. */
+  readonly reported?: ReportedWords;
+  /**
+   * The versions a recurrence was seen again on, written in a comment's
+   * `Versions` section, or absent; see the module note.
+   */
+  readonly versions?: string;
+}
+
+/** The session's own words beside an `unknown` module or action, redacted; null where none was set aside. */
+export interface ReportedWords {
+  readonly module: string | null;
+  readonly action: string | null;
+}
+
+/** The fields of the record written above `Feedback`, or never, and so left out of {@link recordSections}. */
+const FIELDS_WRITTEN_ELSEWHERE: ReadonlySet<keyof BugRecord> = new Set(['what', 'artifact', 'errorLine']);
+
+/** The heading of the session's module word the record holds as `unknown`. */
+export const REPORTED_MODULE_HEADING = 'Reported module';
+
+/** The heading of the session's action word the record holds as `unknown`. */
+export const REPORTED_ACTION_HEADING = 'Reported action';
+
+/** The heading of the record's and a comment's versions. */
+const VERSIONS_HEADING = 'Versions';
+
+/** One section holding `value`, redacted, fenced or plain; none for a null value. */
+function valueSection(
+  heading: string,
+  value: string | null,
+  shape: 'fenced' | 'plain',
+  redact: (text: string) => string,
+): string[] {
+  if (value === null) return [];
+  const shown = shape === 'fenced'
+    ? fenced(redact(value))
+    : redact(value);
+  return [`## ${heading}\n\n${shown}`];
+}
+
+/** The record's sections after `Feedback`, the reported words last; see the module note. */
+export function recordSections(
+  record: BugRecord,
+  reported: ReportedWords | undefined,
+  redact: (text: string) => string,
+): string[] {
+  const fields = BUG_FIELDS.flatMap(({ key, heading, shape }) => shape === 'unwritten' || FIELDS_WRITTEN_ELSEWHERE.has(key)
+    ? []
+    : valueSection(heading, record[key], shape, redact));
+  return [
+    ...fields,
+    ...valueSection(REPORTED_MODULE_HEADING, reported?.module ?? null, 'fenced', redact),
+    ...valueSection(REPORTED_ACTION_HEADING, reported?.action ?? null, 'fenced', redact),
+  ];
+}
+
+/** What follows `Feedback` in a body or a comment, short of `Possible duplicates`; see the module note. */
+function afterFeedback(values: BugValues, redact: (text: string) => string): string[] {
+  if (values.record !== undefined) return recordSections(values.record, values.reported, redact);
+  return valueSection(VERSIONS_HEADING, values.versions ?? null, 'fenced', redact);
 }
 
 /** What a new issue's `Possible duplicates` section shows; see the module note. */
@@ -188,6 +253,7 @@ export function issueText(opening: string, values: BugValues, redact: (text: str
     section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
     section('Task', values.taskText, '', redact),
     section('Feedback', values.feedback, 'The report gave no feedback.', redact),
+    ...afterFeedback(values, redact),
     ...values.duplicates === undefined
       ? []
       : [possibleDuplicatesSection(values.duplicates, redact)],

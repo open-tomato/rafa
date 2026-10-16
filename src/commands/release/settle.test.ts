@@ -26,7 +26,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { Fragment } from '../../release/fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
-import type { SettleBuilt } from '../../release/settle.js';
+import type { SettleBuilt, SettleFolded } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
@@ -45,7 +45,7 @@ import { serializeFragment } from '../../release/fragment.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
-import { createReleaseSettleCommand, settledResult } from './settle.js';
+import { createReleaseSettleCommand, dryRunResult, settledResult } from './settle.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-settle-')));
@@ -196,7 +196,14 @@ function built(): SettleBuilt {
     deleted: ['.changes/rafa-9.md'],
     insertPoint: 'before-next-heading',
     createdChangelog: null,
+    lock: null,
   };
+}
+
+/** A folded reading, as `dryRunResult` is handed one, with `lock` as given. */
+function folded(lock: SettleFolded['lock']): SettleFolded {
+  const { strategy, commit, baseVersion, fragments, version, section, changelogMissing } = built();
+  return { outcome: 'folded', strategy, commit, baseVersion, fragments, version, section, changelogMissing, lock };
 }
 
 /** A tag step that was not meant to write. */
@@ -299,6 +306,88 @@ describe('settledResult, the outcomes rendered from literals', () => {
     expect(result.exitCode).toBe(1);
     expect(result.problem).toBe('❌ Nothing was written: semver-by-level threw: boom');
     expect(result.lines).not.toContain('Version: 0.4.0 → 0.5.0');
+  });
+});
+
+describe('the Lock: lines under release.moveLock, rendered from literals', () => {
+  it('names no lock in a dry run whose reading leaves it alone', () => {
+    const result = dryRunResult(folded(null), 'origin/main', 'main', 'CHANGELOG.md');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines.some((line) => line.startsWith('Lock:'))).toBe(false);
+  });
+
+  it('says in a dry run that rafa.lock would move from the base\'s version to the new one, above the dry run line', () => {
+    const result = dryRunResult(folded({ path: 'rafa.lock', from: '0.4.0', to: '0.5.0' }), 'origin/main', 'main', 'CHANGELOG.md');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines.slice(-2)).toEqual([
+      'Lock: rafa.lock would move from 0.4.0 to 0.5.0.',
+      'Dry run: settle would commit "chore: release 0.5.0" on main; nothing was written.',
+    ]);
+  });
+
+  it('says in a dry run that the release commit creates a lock the base lacks', () => {
+    const result = dryRunResult(folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), 'origin/main', 'main', 'CHANGELOG.md');
+
+    expect(result.lines).toContain('Lock: rafa.lock is missing, so the release commit creates it at 0.5.0.');
+    expect(result.lines.some((line) => line.includes('would move'))).toBe(false);
+  });
+
+  it('puts the lock line after the changelog line when the base lacks both', () => {
+    const reading: SettleFolded = { ...folded({ path: 'rafa.lock', from: null, to: '0.5.0' }), changelogMissing: true };
+
+    const result = dryRunResult(reading, 'origin/main', 'main', 'CHANGELOG.md');
+
+    expect(result.lines.slice(-3).map((line) => line.split(':')[0])).toEqual(['Changelog', 'Lock', 'Dry run']);
+  });
+
+  it('says rafa.lock moved after a push that landed, above the push line', () => {
+    const build: SettleBuilt = { ...built(), lock: { path: 'rafa.lock', from: '0.4.0', to: '0.5.0' } };
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines.slice(-2)).toEqual([
+      'Lock: rafa.lock moved to 0.5.0.',
+      '✅ Pushed "chore: release 0.5.0" (cccccccccccc) to main.',
+    ]);
+    // The control: the same push of a build that left the lock alone names no lock.
+    const untouched = settledResult({ delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build: built() } }, NO_TAG, 'origin/main', 'main');
+    expect(untouched.lines.some((line) => line.startsWith('Lock:'))).toBe(false);
+  });
+
+  it('says rafa.lock moved after a release pull request was opened', () => {
+    const build: SettleBuilt = { ...built(), lock: { path: 'rafa.lock', from: null, to: '0.5.0' } };
+    const pull: PullRequestSummary = {
+      number: 7,
+      title: 'chore: release 0.5.0',
+      url: 'https://github.com/open-tomato/demo/pull/7',
+      state: 'open',
+      headRefName: 'rafa/release',
+      baseRefName: 'main',
+      author: { login: 'rafa', isBot: false },
+      isCrossRepository: false,
+      updatedAt: '2026-09-01T12:00:00Z',
+    };
+    const delivered: SettleDelivered = { delivery: 'pr', outcome: { outcome: 'delivered', exitCode: 0, build, head: build.release, pushed: true, pull, action: 'opened' } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.lines.at(-2)).toBe('Lock: rafa.lock moved to 0.5.0.');
+    expect(result.lines.at(-1)).toContain('✅ Release pull request #7 opened');
+  });
+
+  it('names no moved lock when the push was refused, since nothing landed', () => {
+    const build: SettleBuilt = { ...built(), lock: { path: 'rafa.lock', from: '0.4.0', to: '0.5.0' } };
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'protected', exitCode: 1, attempts: 1, build, sentence: 'main is protected' } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(1);
+    expect(result.lines.some((line) => line.startsWith('Lock:'))).toBe(false);
   });
 });
 

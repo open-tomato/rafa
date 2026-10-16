@@ -66,10 +66,11 @@ Blocked by: #42, #57
 The `rafa plan create --next` command reads this line and skips the spec,
 offering instead the first unblocked spec under it. Once the blockers
 close, `rafa issue unblock #<n>` removes the `spec:blocked` label and the
-spec is ready for planning. `rafa pr merge` runs that same unblock logic
-when a merged PR closes one or more blockers. The line names one or more
-issue numbers separated by commas or spaces; missing, malformed or invalid
-lines are reported by `rafa doctor`.
+spec is ready for planning. `--yes` removes it with no question, from a
+script or an agent, and every refusal stays. `rafa pr merge` runs that
+same unblock logic when a merged PR closes one or more blockers. The line
+names one or more issue numbers separated by commas or spaces; missing,
+malformed or invalid lines are reported by `rafa doctor`.
 
 ### A prompt for drafting one
 

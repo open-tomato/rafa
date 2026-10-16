@@ -1,9 +1,11 @@
 /**
  * Tests for `rafa epic close` (`close.ts`): the line, the epic read off
- * the listing and its refusals, the planning step, the report a failed
- * check is filed as, and the command dispatched over a planted `gh`, a
- * planted `git`, a planted Claude spawner, a planted effort store and a
- * public tracker that is a `local` one under the case's own project.
+ * the listing and its refusals, the planning step, and the command
+ * dispatched over a planted `gh`, a planted `git`, a planted Claude
+ * spawner, a planted effort store and a public tracker that is a `local`
+ * one under the case's own project. The report a failed check is filed
+ * as, and the line each filed bug is reported with, are tested in
+ * `./close-triage.test.ts`.
  *
  * The board: epic #40 on `epic:auth`, open, with two criteria and an
  * estimate, whose members #12 and #13 are closed. Epic #41 on
@@ -34,16 +36,29 @@
  * - Epic #46's two criteria fail in one run: the one naming a source file
  *   is filed as a bug, so the page-only one reaching no bug is its route
  *   and not a tracker that files nothing.
+ *
+ * ## The project's own cases
+ *
+ * The cases adding a filed bug to the project set `board.project.number`
+ * and plant a public tracker spied as kind `github`, whose `create`
+ * answers a GitHub ref to {@link FILED_ISSUE}. Their `gh` answers the
+ * repository read, the roadmap and the listing (the board's, with the
+ * filed issue and the roadmap beside it) itself, and routes every
+ * `gh api` call to the facts fake (`board/project/facts-fake.ts`) or the
+ * project fake (`board/project/project-fake.ts`), as
+ * `src/start/triage.test.ts` builds it, so the real refresh fills the
+ * added item and no case reaches `gh`. The refused add is read beside the
+ * same close with the number unset, whose exit code, bug line and
+ * refusal line it matches.
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { EpicCriterion } from '../../epic/verify-plan.js';
-import type { CheckAnswered } from '../../epic/verify-run.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { TriageOptions, TriageResult } from '../../triage/triage.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
-import type { Tracker } from '@open-tomato/rafa/ports';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import '../../adapter-registry.js';
@@ -60,21 +75,21 @@ import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../../board/epic-template.js';
 import { renderCloseComment } from '../../board/epic-trail.js';
+import { createFakeFactsGh } from '../../board/project/facts-fake.js';
+import { createGhProjectPort } from '../../board/project/gh.js';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../../board/project/project-fake.js';
+import { scopeWarning } from '../../board/project/refresh-warnings.js';
 import { parseBoardListing } from '../../board/roadmap-board.js';
 import { staleDocsTitle } from '../../docs/release-issue.js';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '../../effort/epic-cost.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { bugKeyOf } from '../../triage/triage.js';
+import { triageReport } from '../../triage/triage.js';
 
 import closeCommand, {
-  bugLine,
-  closeTriageFile,
   createEpicCloseCommand,
   EPIC_CLOSE_REFUSAL_EXIT,
-  failedCheckArtifact,
-  failedCheckReport,
   planFlags,
   planVerification,
   readCloseLine,
@@ -196,7 +211,7 @@ function plantedSpawner(script: Script): { spawn: CapturingSpawner; spawned: Spa
 }
 
 /** A `gh` answering the listing and every close, recording each call. */
-function plantedGh(options: { failClose?: boolean } = {}): { gh: GhRunner; calls: (readonly string[])[] } {
+function plantedGh(options: { failClose?: boolean; route?: GhRunner } = {}): { gh: GhRunner; calls: (readonly string[])[] } {
   const calls: (readonly string[])[] = [];
   const gh: GhRunner = (args) => {
     calls.push([...args]);
@@ -210,6 +225,7 @@ function plantedGh(options: { failClose?: boolean } = {}): { gh: GhRunner; calls
         ? { ok: false, stdout: '', stderr: 'HTTP 403: Resource not accessible' }
         : { ok: true, stdout: '', stderr: '' });
     }
+    if (options.route !== undefined) return options.route(args);
     return answer({ ok: false, stdout: '', stderr: `unplanted: gh ${words}` });
   };
   return { gh, calls };
@@ -240,16 +256,36 @@ function plantedStore(): EffortStore {
   return { read, append: () => { throw new Error('the gate appends nothing'); }, keys: () => new Set() } as unknown as EffortStore;
 }
 
-/** A tracker that records every create and comment before a `local` tracker makes them. */
-function spiedTracker(inner: Tracker): { tracker: Tracker; calls: string[] } {
+/**
+ * A tracker that records every create and comment before a `local` tracker
+ * makes them; with `github`, one of kind `github` whose every create
+ * answers that ref instead.
+ */
+function spiedTracker(inner: Tracker, githubRefs?: IssueRef | readonly IssueRef[]): { tracker: Tracker; calls: string[]; bodies: string[] } {
   const calls: string[] = [];
+  const bodies: string[] = [];
+  const refs = githubRefs === undefined || Array.isArray(githubRefs)
+    ? githubRefs as readonly IssueRef[] | undefined
+    : [githubRefs as IssueRef];
+  const github = refs?.[0];
+  let created = 0;
   return {
     calls,
+    bodies,
     tracker: {
       ...inner,
+      kind: github === undefined
+        ? inner.kind
+        : 'github',
       create: (draft) => {
         calls.push(`create ${draft.title}`);
-        return inner.create(draft);
+        bodies.push(draft.body);
+        // The nth create answers the nth ref, the last one thereafter.
+        const ref = refs?.[Math.min(created, (refs.length) - 1)];
+        created += 1;
+        return ref === undefined
+          ? inner.create(draft)
+          : Promise.resolve(ref);
       },
       comment: (issue, body) => {
         calls.push(`comment ${issue.externalId}`);
@@ -271,6 +307,12 @@ interface CaseSetup {
   readonly env?: Readonly<Record<string, string>>;
   /** The project refresh; the system's own when left out. */
   readonly projectRefresh?: EpicCloseSeams['projectRefresh'];
+  /** Triages each failed check; the system's own when left out. */
+  readonly triageReport?: EpicCloseSeams['triageReport'];
+  /** The ref each create answers in turn (the last one repeating), on a public tracker of kind `github`; a `local` one's own when left out. */
+  readonly github?: IssueRef | readonly IssueRef[];
+  /** Answers the `gh` calls the planted `gh` was not planted for; refused when left out. */
+  readonly route?: GhRunner;
 }
 
 /** The version every case's stale-docs issue is titled for. */
@@ -287,10 +329,10 @@ function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
 /** Dispatches `rafa epic close <words>` over every planted seam. */
 async function run(words: readonly string[], setup: CaseSetup = {}) {
   const project = setup.project ?? plantCase();
-  const gh = plantedGh({ failClose: setup.failClose });
+  const gh = plantedGh({ failClose: setup.failClose, route: setup.route });
   const git = plantedGit({ failFetch: setup.failFetch, silentRemove: setup.silentRemove });
   const claude = plantedSpawner(setup.script ?? {});
-  const publicTracker = spiedTracker(createLocalTracker({ issuesDir: join(project.root, '.rafa', 'issues'), fallbackReason: null }));
+  const publicTracker = spiedTracker(createLocalTracker({ issuesDir: join(project.root, '.rafa', 'issues'), fallbackReason: null }), setup.github);
   let ids = 0;
   const seams: EpicCloseSeams = {
     gh: gh.gh,
@@ -306,25 +348,25 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     },
     resolve: () => Promise.resolve({ tracker: publicTracker.tracker, degraded: false, reason: null } as never),
     staleDocsVersion: () => STALE_DOCS_VERSION,
+    sleep: () => Promise.resolve(),
     ...setup.projectRefresh === undefined
       ? {}
       : { projectRefresh: setup.projectRefresh },
+    ...setup.triageReport === undefined
+      ? {}
+      : { triageReport: setup.triageReport },
   };
   const commands: RafaCommand[] = [createEpicCloseCommand(seams)];
   const outcome = await dispatchInProject(['epic', 'close', ...words], [EPIC_SUBJECT], commands, project, setup.env);
-  return { ...outcome, project, ghCalls: gh.calls, gitCalls: git.calls, spawned: claude.spawned, trackerCalls: publicTracker.calls };
+  return {
+    ...outcome, project, git: git.git, ghCalls: gh.calls, gitCalls: git.calls, spawned: claude.spawned, trackerCalls: publicTracker.calls,
+    trackerBodies: publicTracker.bodies,
+  };
 }
 
 /** The `gh issue close` calls a run made. */
 function closesOf(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
   return calls.filter((call) => call[0] === 'issue' && call[1] === 'close');
-}
-
-/** One criterion by its text, as `splitCriteria` cuts #40's section. */
-function criterionOf(text: string): EpicCriterion {
-  const found = splitCriteria(`${CRITERION_1}\n${CRITERION_2}`).find((each) => each.text === text);
-  if (found === undefined) throw new Error(`no criterion ${text}`);
-  return found;
 }
 
 describe('readCloseLine', () => {
@@ -417,42 +459,6 @@ describe('planVerification', () => {
   });
 });
 
-describe('failedCheckReport', () => {
-  it('is one public bug and no blocker, its artifact the epic and criterion on one line', () => {
-    const criterion = criterionOf(CRITERION_2);
-    const failure: CheckAnswered = {
-      kind: 'answered',
-      check: { kind: 'check', criterion, check: 'Run rafa epics' },
-      sessionId: 's',
-      result: 'fail',
-      evidence: 'it printed nothing',
-    };
-
-    const report = failedCheckReport(40, failure, COMMIT);
-
-    expect(report.blockers).toEqual([]);
-    expect(report.outOfScopeBugs).toHaveLength(1);
-    expect(report.outOfScopeBugs[0]?.security).toBe(false);
-    expect(report.outOfScopeBugs[0]?.what).toBe(`Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`);
-    expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
-    expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
-    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic # acceptance criterion: ${CRITERION_2}`);
-  });
-});
-
-describe('bugLine', () => {
-  it('warns that a row routed by its kind was not filed, and notes a filed one', () => {
-    const criterion = criterionOf(CRITERION_2);
-    const row = { index: 0, channel: 'public', ref: null, foundBy: null, stored: null, problem: null } as const;
-
-    const routed = bugLine(criterion, { ...row, action: 'pr-body' });
-    const filed = bugLine(criterion, { ...row, action: 'filed' });
-
-    expect(routed).toEqual({ text: 'Criterion 2: not filed: routed to pr-body by its kind.', warn: true });
-    expect(filed).toEqual({ text: 'Criterion 2: filed on the public tracker as an issue.', warn: false });
-  });
-});
-
 describe('rafa epic close, dispatched', () => {
   it('refuses with exit 2 while a member is open, naming it, with no session, no git and no write', async () => {
     const outcome = await run(['41']);
@@ -495,7 +501,9 @@ describe('rafa epic close, dispatched', () => {
 
     expect(first.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(first.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
-    expect(first.trackerCalls).toEqual([`create Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`]);
+    // The title is rendered from the record: the epic's module and action
+    // ahead of the summary, which is cut to the default 80 code points.
+    expect(first.trackerCalls).toEqual(['create epic - close: Epic #40 acceptance criterion 2 fails against main: - `rafa epics` shows one...']);
     expect(first.stdout).toContain('Criterion 2: filed on the public tracker as local issue');
     expect(closesOf(first.ghCalls)).toEqual([]);
 
@@ -504,6 +512,37 @@ describe('rafa epic close, dispatched', () => {
     expect(second.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(second.trackerCalls.map((call) => call.split(' ')[0])).toEqual(['comment']);
     expect(second.stdout).toContain('Criterion 2: recurs in local issue');
+  });
+
+  it('hands triage the root as the checkout, the run\'s git, its environment and its config, and the bug its module, action and reproduce', async () => {
+    const script: Script = {
+      checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
+    };
+    const handed: TriageOptions[] = [];
+    const spy = (options: TriageOptions): Promise<TriageResult> => {
+      handed.push(options);
+      return triageReport(options);
+    };
+    const env = { RAFA_CLOSE_PROBE: 'on' };
+
+    const project = plantCase(`${LOCAL_CONFIG}issues:\n  vocabulary:\n    modules: [epic, triage]\n`);
+
+    const outcome = await run(['40'], { script, env, project, triageReport: spy });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(handed).toHaveLength(1);
+    const [options] = handed;
+    expect(options?.checkout).toBe(outcome.project.root);
+    expect(options?.repoRoot).toBe(outcome.project.root);
+    expect(options?.git).toBe(outcome.git);
+    expect(options?.env?.RAFA_CLOSE_PROBE).toBe('on');
+    expect(options?.bugRules?.modules).toEqual(['epic', 'triage']);
+    const bug = options?.report.outOfScopeBugs[0];
+    expect([bug?.module, bug?.action, bug?.reproduce, bug?.cause]).toEqual(['epic', 'close', 'rafa epic close 40', null]);
+    expect(outcome.trackerBodies).toHaveLength(1);
+    const body = outcome.trackerBodies[0] ?? '';
+    expect(body).toContain(`## What\n\n\`\`\`\n${bug?.what ?? 'no what'}\n\`\`\``);
+    expect(body).toContain('## Task\n\n```\nrafa epic close 40\n```');
   });
 
   it('sends a failed page-only criterion to the docs channel and still files one naming a source file as a bug', async () => {
@@ -520,7 +559,7 @@ describe('rafa epic close, dispatched', () => {
     expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(outcome.trackerCalls).toHaveLength(2);
     expect(outcome.trackerCalls[0]).toBe(`create ${staleDocsTitle(STALE_DOCS_VERSION)}`);
-    expect(outcome.trackerCalls[1]).toStartWith('create Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
+    expect(outcome.trackerCalls[1]).toStartWith('create epic - close: Epic #46 acceptance criterion 2 fails against main: - `src/triage/triage.ts`');
     expect(outcome.stdout).toContain(`Criterion 1: names only documentation, so no bug is filed; opened local issue 1, ${staleDocsTitle(STALE_DOCS_VERSION)}, with the line.`);
     expect(outcome.stdout).toContain('Criterion 2: filed on the public tracker as local issue 2.');
     expect(outcome.stderr).toContain('1 criterion failed its check, each filed as a bug, and 1 criterion naming only documentation failed,'
@@ -726,5 +765,182 @@ describe('rafa epic close, and the project', () => {
 
     expect([open.exitCode, refused.exitCode]).toEqual([EPIC_CLOSE_REFUSAL_EXIT, 1]);
     expect(recorded.calls()).toEqual([]);
+  });
+});
+
+/** The owner of the fake repository and of its project. */
+const PROJECT_OWNER = 'open-tomato';
+
+/** The issue the `github` public tracker files each bug as: one the fake repository holds, on no epic. */
+const FILED_ISSUE = 70;
+
+/** The issue the second failed check's bug is filed as. */
+const SECOND_FILED_ISSUE = 71;
+
+/** The ref the `github` public tracker answers for the second bug it files. */
+const SECOND_FILED_REF: IssueRef = {
+  opt: 0,
+  kind: 'github',
+  externalId: String(SECOND_FILED_ISSUE),
+  url: `https://github.com/${FAKE_PROJECT_REPOSITORY}/issues/${String(SECOND_FILED_ISSUE)}`,
+};
+
+/** Both criteria's checks failing. */
+const FAIL_BOTH: Script = {
+  checks: {
+    'Run rafa roadmap': { exitCode: 0, stdout: verdictOutput('fail', 'it showed no epic') },
+    'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') },
+  },
+};
+
+/** The roadmap issue the scene's listing and facts hold. */
+const ROADMAP_ISSUE = 1;
+
+/** The ref the `github` public tracker answers for each bug it files. */
+const FILED_REF: IssueRef = {
+  opt: 0,
+  kind: 'github',
+  externalId: String(FILED_ISSUE),
+  url: `https://github.com/${FAKE_PROJECT_REPOSITORY}/issues/${String(FILED_ISSUE)}`,
+};
+
+/** GitHub's documented refusal for a token with no project scope, as `board/project/add-issue.test.ts` plants it; NOT a reading. */
+const SCOPE_STDERR = 'gh: Your token has not been granted the required scopes to execute this query. The \'projectV2\' field requires one of the following scopes: [\'read:project\'], but your token has only been granted the: [\'repo\'] scopes.\n';
+
+/** A failed check of criterion 2, the one each project case files. */
+const FAIL_2: Script = {
+  checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
+};
+
+/** The line criterion 2's bug is reported with once filed as {@link FILED_REF}. */
+const FILED_LINE = `Criterion 2: filed on the public tracker as ${FILED_REF.url ?? ''}.`;
+
+/** The project fake holding no item, and the router answering what the planted `gh` was not planted for. */
+interface ProjectScene {
+  readonly project: ReturnType<typeof createFakeProjectGh>;
+  readonly route: GhRunner;
+}
+
+/** {@link ProjectScene}: the repository read and the roadmap answered here, every `gh api` call routed to a fake. */
+function projectScene(): ProjectScene {
+  const project = createFakeProjectGh({
+    projects: [{ owner: PROJECT_OWNER, number: EPIC_PROJECT_NUMBER, items: [] }],
+    owners: [PROJECT_OWNER],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [FILED_ISSUE, SECOND_FILED_ISSUE] }],
+  });
+  const facts = createFakeFactsGh({
+    issues: [
+      { number: ROADMAP_ISSUE, state: 'OPEN', labels: ['type:roadmap'] },
+      { number: FILED_ISSUE, state: 'OPEN', labels: ['type:bug'] },
+      { number: SECOND_FILED_ISSUE, state: 'OPEN', labels: ['type:bug'] },
+    ],
+  });
+  const answered = (value: unknown): Promise<GhResult> => Promise.resolve({ ok: true, stdout: JSON.stringify(value), stderr: '' });
+  const route: GhRunner = (args) => {
+    const line = args.join(' ');
+    if (line === 'repo view --json nameWithOwner') return answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY });
+    if (line.startsWith('issue list --label type:roadmap --state open')) return answered([raw(ROADMAP_ISSUE, ['type:roadmap'], { state: 'OPEN' })]);
+    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api') return project.gh(args);
+    return Promise.resolve({ ok: false, stdout: '', stderr: `unrouted: gh ${line}` });
+  };
+  return { project, route };
+}
+
+/** The Stage each issue's item on the project holds, by issue number, read through the project port. */
+async function projectStages(gh: GhRunner): Promise<Readonly<Record<number, string | null>>> {
+  return Object.fromEntries(await projectItems(gh));
+}
+
+/** The issues on the project with their Stage, in the order its items were added, read through the project port. */
+async function projectItems(gh: GhRunner): Promise<readonly (readonly [number, string | null])[]> {
+  const port = createGhProjectPort(gh);
+  const found = await port.find({ owner: PROJECT_OWNER, number: EPIC_PROJECT_NUMBER });
+  const items = await port.items(found?.id ?? '');
+  return items.flatMap(({ content, values }) => {
+    if (content.kind !== 'issue') return [];
+    const stage = values.get('Stage');
+    return [[content.number, stage?.kind === 'option'
+      ? stage.name
+      : null] as const];
+  });
+}
+
+/** The lines of a text run's stdout, each as written. */
+function linesOf(stdout: string): readonly string[] {
+  return stdout.split('\n').filter((line) => line !== '');
+}
+
+describe('rafa epic close, a failed check\'s bug onto the project', () => {
+  it('adds the bug filed on a github tracker to the project with its Stage set, and still refuses the close', async () => {
+    const scene = projectScene();
+
+    const outcome = await run(['40'], { script: FAIL_2, project: plantCase(withProjectNumber(LOCAL_CONFIG)), github: FILED_REF, route: scene.route });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
+    expect(linesOf(outcome.stdout)).toContain(FILED_LINE);
+    expect(await projectStages(scene.project.gh)).toEqual({ [FILED_ISSUE]: 'Backlog' });
+    // The gate's own line for the failed check, and no warning of the add.
+    expect(linesOf(outcome.stdout).filter((line) => line.startsWith('warn: '))).toEqual([`warn: ✗ Failed criterion 2: ${CRITERION_2} — it printed no issues`]);
+    expect(closesOf(outcome.ghCalls)).toEqual([]);
+  });
+
+  it('keeps the exit code, the bug line and the refusal line of the close with no project when the add is refused for the scope, the scope warning after the bug line', async () => {
+    const refused = projectScene();
+    refused.project.failNext(SCOPE_STDERR);
+    const outcome = await run(['40'], { script: FAIL_2, project: plantCase(withProjectNumber(LOCAL_CONFIG)), github: FILED_REF, route: refused.route });
+
+    const unset = projectScene();
+    const control = await run(['40'], { script: FAIL_2, github: FILED_REF, route: unset.route });
+
+    expect(control.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.exitCode).toBe(control.exitCode);
+    expect(outcome.stderr).toBe(control.stderr);
+    expect(outcome.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
+    const lines = linesOf(outcome.stdout);
+    expect(lines).toContain(FILED_LINE);
+    expect(linesOf(control.stdout)).toContain(FILED_LINE);
+    const scope = `warn: ${scopeWarning()}`;
+    expect(lines).toContain(scope);
+    expect(linesOf(control.stdout)).not.toContain(scope);
+    expect(lines.indexOf(scope)).toBeGreaterThan(lines.indexOf(FILED_LINE));
+    expect(await projectStages(refused.project.gh)).toEqual({});
+  });
+
+  it('records no project call for a bug filed on a local public tracker, beside the same close with board.project.number unset on a github tracker', async () => {
+    const local = projectScene();
+    const outcome = await run(['40'], { script: FAIL_2, project: plantCase(withProjectNumber(LOCAL_CONFIG)), route: local.route });
+
+    const unset = projectScene();
+    const control = await run(['40'], { script: FAIL_2, github: FILED_REF, route: unset.route });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(control.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.trackerCalls).toHaveLength(1);
+    expect(local.project.calls()).toEqual([]);
+    expect(linesOf(control.stdout)).toContain(FILED_LINE);
+    expect(unset.project.calls()).toEqual([]);
+  });
+
+  it('adds the bugs of two failed checks in criterion order, each add warning a warn event in json mode', async () => {
+    const scene = projectScene();
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const outcome = await run(['40', '--output=json'], {
+      script: FAIL_BOTH,
+      project: plantCase(withProjectNumber(LOCAL_CONFIG)),
+      github: [FILED_REF, SECOND_FILED_REF],
+      route: scene.route,
+      projectRefresh: recorded.refresh,
+    });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(await projectItems(scene.project.gh)).toEqual([[FILED_ISSUE, null], [SECOND_FILED_ISSUE, null]]);
+    const warnings = eventsOf(outcome.stdout)
+      .filter((event) => event.type === 'log' && event.level === 'warn')
+      .map((event) => (event as { message: string }).message)
+      .filter((message) => message.includes('a project warning'));
+    expect(warnings).toHaveLength(2);
   });
 });

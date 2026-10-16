@@ -125,10 +125,11 @@
  *     `tracker.fallback` resolve to through the chain.
  *   - `issue ready <n> [--yes] [--dry-run] [--no-hint]`, an issue marked
  *     `spec:ready` once its author and its body check out, and
- *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
- *     whose `Blocked by:` line names only closed issues. Both read the
- *     GitHub board rather than the tracker chain. `issue unblock` always
- *     asks; `issue ready` asks unless `--yes` or `--dry-run` is typed.
+ *     `issue unblock [<n>] [--all] [--yes]`, `spec:blocked` taken off an
+ *     issue whose `Blocked by:` line names only closed issues. Both read
+ *     the GitHub board rather than the tracker chain. `issue unblock`
+ *     asks unless `--yes` is typed; `issue ready` asks unless `--yes` or
+ *     `--dry-run` is typed.
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.

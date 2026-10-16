@@ -147,6 +147,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['releaseMoveLock', 'release.moveLock'],
   ['errorsCodes', 'errors.codes'],
   ['loggerKind', 'logger.kind'],
   ['loggerLevel', 'logger.level'],
@@ -515,6 +516,7 @@ describe('knownKeysAbove', () => {
         'settle',
         'tag',
         'publishCommand',
+        'moveLock',
       ],
     ]);
     expect(knownKeysAbove('cleanup.staleDayz')).toEqual([

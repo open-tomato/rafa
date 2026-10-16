@@ -166,14 +166,21 @@ function reviewOutput(...lines: readonly string[]): string {
   return ['I read the issue first.', '', '```rafa:spec-review', ...lines, '```', ''].join('\n');
 }
 
-/** A verdict naming the two gaps the code check itself would have caught, had it not judged the issue complete. */
+/**
+ * A verdict naming the two gaps the code check itself would have caught,
+ * had it not judged the issue complete. Each says `blocking: true`
+ * outright: one left unsaid is read as blocking all the same, but with an
+ * issue the gate warns about, and the refusal cases hold its own lines.
+ */
 const NOT_READY_OUTPUT = reviewOutput(
   'verdict: not-ready',
   'gaps:',
   '  - heading: "Definition of done"',
   '    what: "no item says how the label swap is verified"',
+  '    blocking: true',
   '  - heading: "Tasks the plan must carry"',
   '    what: "the second task does not name what file it adds the check to"',
+  '    blocking: true',
 );
 
 /**

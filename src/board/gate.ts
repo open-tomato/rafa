@@ -93,6 +93,15 @@
  * command ends at {@link SPEC_NOT_READY_EXIT} with
  * {@link unreadReviewMessage}.
  *
+ * ## What the reader could not read as written is said aloud
+ *
+ * Every {@link SpecReviewIssue} a reading carries is warned as one line
+ * ({@link reviewIssueWarning}) before the verdict is weighed, a
+ * `verdict: ready` included: a block `./spec-review.ts` read only after
+ * quoting its free text, or a gap whose `blocking` it read as a
+ * default, would otherwise stand with nobody told. An `absent` or
+ * `malformed` reading carries no issue, so it still warns once.
+ *
  * ## The session is not trusted to have written no plan
  *
  * The prompt tells a session that judged a spec not ready to write no
@@ -157,7 +166,7 @@
  */
 import type { IssueBoard } from './issue-board.js';
 import type { ReviewStamp } from './review-stamp.js';
-import type { SpecReviewGap, SpecReviewReading } from './spec-review.js';
+import type { SpecReviewGap, SpecReviewIssue, SpecReviewReading } from './spec-review.js';
 import type { BoardTrust } from './trust.js';
 import type { Output } from '@open-tomato/rafa/ports';
 
@@ -518,6 +527,26 @@ async function swapLabels(issue: GateIssue, output: Output): Promise<void> {
   }
 }
 
+/**
+ * The one line a {@link SpecReviewIssue} is warned with: what the
+ * reader dropped, read as a default, or had to help read. The issue's
+ * text already names its field or the block's line, so only the review
+ * it came from is added.
+ */
+export function reviewIssueWarning(issue: SpecReviewIssue): string {
+  return `spec review: ${issue.text}`;
+}
+
+/**
+ * Warns one line per issue the reading carries, whatever its verdict,
+ * so a review the parser read only after quoting its free text, or one
+ * whose fields it read as a default, names that on the terminal rather
+ * than standing silent (#1128).
+ */
+function warnReviewIssues(review: SpecReviewReading, output: Output): void {
+  for (const issue of review.issues) output.warn(reviewIssueWarning(issue));
+}
+
 /** True for a review no gap of which blocks planning; see the module note. */
 function nothingBlocks(review: SpecReviewReading): boolean {
   return !review.gaps.some((gap) => gap.blocking);
@@ -579,9 +608,11 @@ async function planUnderAssumptions(
 export async function enforceSpecReview(options: SpecReviewGateOptions): Promise<SpecReviewStanding> {
   const { review, issue } = options;
   if (review === undefined) return 'unjudged';
-  if (review.ready) return 'ready';
 
   const output = options.output ?? activeOutput();
+  warnReviewIssues(review, output);
+  if (review.ready) return 'ready';
+
   if (review.answer !== 'not-ready') return standOrRefuse(options, review, output);
   if (nothingBlocks(review)) return planUnderAssumptions(options, review, output);
 

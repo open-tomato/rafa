@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { LOCK_FILE, LOCKFILE_VERSION, ProjectLockError, projectLockText, readProjectLock, writeProjectLock } from './lock.js';
+import { LOCK_FILE, LOCKFILE_VERSION, parseProjectLock, ProjectLockError, projectLockText, readProjectLock, writeProjectLock } from './lock.js';
 
 let root = '';
 
@@ -50,6 +50,31 @@ describe('readProjectLock', () => {
     writeFileSync(join(root, LOCK_FILE), JSON.stringify({ lockfileVersion: 1, rafa: 'latest' }), 'utf8');
 
     expect(() => readProjectLock(root)).toThrow('"latest"');
+  });
+});
+
+describe('parseProjectLock', () => {
+  it('reads back the text a lock is written as', () => {
+    expect(parseProjectLock(projectLockText('0.34.0'))).toEqual({ lockfileVersion: LOCKFILE_VERSION, rafa: '0.34.0' });
+  });
+
+  it('refuses text that is not JSON, naming the file', () => {
+    expect(() => parseProjectLock('rafa: 0.34.0\n')).toThrow(ProjectLockError);
+    expect(() => parseProjectLock('rafa: 0.34.0\n')).toThrow(`${LOCK_FILE} is not JSON`);
+  });
+
+  it('refuses a format this rafa does not read, naming the file', () => {
+    const text = JSON.stringify({ lockfileVersion: 2, rafa: '1.4.0' });
+
+    expect(() => parseProjectLock(text)).toThrow(ProjectLockError);
+    expect(() => parseProjectLock(text)).toThrow(`${LOCK_FILE} is in lockfileVersion 2`);
+  });
+
+  it('refuses a lock whose rafa is no version, naming the file', () => {
+    const text = JSON.stringify({ lockfileVersion: 1, rafa: 'latest' });
+
+    expect(() => parseProjectLock(text)).toThrow(ProjectLockError);
+    expect(() => parseProjectLock(text)).toThrow(`${LOCK_FILE} names rafa "latest"`);
   });
 });
 

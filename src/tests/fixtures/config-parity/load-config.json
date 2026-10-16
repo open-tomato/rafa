@@ -252,6 +252,10 @@
       "value": "## {version} — {date}, {title}",
       "source": "default"
     },
+    "releaseMoveLock": {
+      "value": false,
+      "source": "default"
+    },
     "releasePublishCommand": {
       "value": "npm publish",
       "source": "default"

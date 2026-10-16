@@ -107,17 +107,23 @@ nothing; the pit stop does.
 
 The filed-since line reads `Filed since <time>: <n>.`, where the time is the
 last ledger line's, or the stretch's start when the ledger holds none. Then one
-indented line per bug, `#<n> <title> (<filed time>)`, oldest first. Each bug's
-filed time is the `createdAt` its open issue carries in the tracker's one
-listing (`openIssues('bug')`, `packages/rafa/src/ports/index.ts`), so no `gh
-issue view` runs per bug. GitHub answers it from `gh issue list`
-(`src/adapters/tracker/github-open-issues.ts`); the local tracker answers the
-record's `capturedAt`, the time the issue was created, not a file's time on
-disk. A bug with no time, or one whose time does not parse, turns the line into
-`Filed since the last item: not read: no filing time for #<n>`, since a bug left
-out would read as not filed. A tracker with no open-issue listing reads the same
-way, with its own reason. A bug filed and closed between two items is not open,
-so it is not listed.
+indented line per bug, `#<n> <title>: <first line>`, oldest first, the first
+line being the body's first non-blank line, trimmed, cut to 100 characters; a
+body with none prints `#<n> <title>` alone. The bugs come from a listing of
+their own, the tracker's `filedIssues('bug', since)`
+(`packages/rafa/src/ports/index.ts`), in any state: a bug filed and closed
+between two items is listed, while the open-bug count still reads
+`openIssues('bug')` alone. Each bug's filed time is the `createdAt` that listing
+carries, so no `gh issue view` runs per bug. GitHub answers it from `gh issue
+list --state all --search created:>=<since>`
+(`src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
+filing by seconds, so a bug filed in the moments before the reading may be
+missing from the line; the local tracker answers the record's `capturedAt`, the
+time the issue was created, not a file's time on disk. A bug whose time does not
+parse turns the line into `Filed since the last item: not read: no filing time
+for #<n>`, since a bug left out would read as not filed. A tracker with no
+filed-issue listing reads the same way, with its own reason, and so does one
+whose listing threw; the count still prints beside it.
 
 `rafa stretch end [--dry-run]` opens the integration branch into the
 default branch with `report.md` as its body and every merged item's `Closes`

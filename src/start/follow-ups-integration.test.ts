@@ -62,6 +62,7 @@ import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, SUMMARY } from '../tests/release-stage-fixtures.js';
@@ -100,6 +101,8 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 3,
+  ...ISSUES_DEFAULTS,
+  errorsCodes: [],
 };
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-follow-ups-int-')));

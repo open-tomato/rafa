@@ -1,0 +1,52 @@
+rafa issue unblock — take spec:blocked off an issue whose blockers have all
+  closed
+
+Usage:
+  rafa issue unblock [n] [--all] [--yes]
+
+Description:
+  Reads the "Blocked by: #24 #26" line of an issue labelled spec:blocked on the
+  GitHub board, asks the board for each blocker's state, and when every blocker
+  is closed asks whether to remove spec:blocked and removes it on a yes. With a
+  blocker still open it names it and changes nothing. An issue labelled
+  spec:blocked whose "Blocked by:" line is missing, names itself or names an id
+  the board has no issue for is reported and never guessed at. Without a
+  terminal and without `--yes` it asks nothing and writes nothing. `--yes`
+  answers the question yes without putting it, terminal or not, and names the
+  blockers it read closed; it never removes spec:blocked from an issue with a
+  blocker open or a line it refuses to guess at. With `--output=json` the
+  outcome of each issue is the data of the terminal result event. With
+  board.relationships set to native it reads nothing and writes nothing: GitHub
+  clears a blocker by itself when the blocking issue closes.
+
+Arguments:
+  n   string
+      The issue number on the GitHub board. Left out, `--all` reads every
+      blocked issue.
+
+Flags:
+  --all   boolean
+      Read every open issue labelled spec:blocked, asking about each one in
+      turn.
+  --yes   boolean
+      Answer the question yes without putting it, so spec:blocked comes off
+      every issue whose blockers are all closed, with no terminal needed. An
+      open blocker or an unreadable "Blocked by:" line still changes nothing.
+
+Examples:
+  rafa issue unblock 57
+      Asks whether to remove spec:blocked from #57 when every issue its "Blocked
+      by:" line names is closed.
+  rafa issue unblock 57 --yes
+      Removes spec:blocked from #57 with no question when every blocker it names
+      is closed.
+  rafa issue unblock --all
+      Walks every open blocked issue on the board, asking about each one whose
+      blockers have all closed.
+
+Outputs:
+  text, json
+
+See also:
+  rafa issue list, rafa issue show, rafa issue create, rafa issue comment, rafa
+  issue move, rafa issue ready, rafa issue check, rafa issue edit

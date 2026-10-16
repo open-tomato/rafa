@@ -1,6 +1,7 @@
 PROMPT.md
 adapters/logger/settings.d.ts
 bugs/closest.d.ts
+bugs/fenced.d.ts
 bugs/places.d.ts
 bugs/record.d.ts
 bugs/title.d.ts
@@ -146,7 +147,3 @@ schema/tiers.d.ts
 templates/epic-guard.yml
 templates/epic.md
 templates/spec.md
-triage/bug-key.d.ts
-triage/issue-text.d.ts
-triage/similarity.d.ts
-triage/test-failure.d.ts

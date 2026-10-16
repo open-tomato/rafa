@@ -126,6 +126,15 @@
  *     published with `npm publish`: the tool a project installs with is
  *     not the tool it publishes with.
  *
+ * One more `release` setting is for the repository that releases rafa:
+ *
+ *   - `release.moveLock` defaults to `false`. When it is `true`, settle
+ *     also writes `rafa.lock` at the repository root to the version it
+ *     settles, in the same release commit as the version file and the
+ *     changelog, so the repository's own lock follows the rafa it
+ *     publishes. It is read through `flag`, so `"true"`, `yes` and `1`
+ *     are refused, and it is not a `CommandLineSetting`.
+ *
  * ## The `dangerous` key
  *
  * `dangerous.acceptVersionCollision` has `rafa pr merge` accept, on
@@ -194,6 +203,7 @@ export interface ReleaseShape {
     readonly settle: ReleaseSettleMode;
     readonly tag: ReleaseTagMode;
     readonly publishCommand: string;
+    readonly moveLock: boolean;
   };
 }
 
@@ -264,6 +274,11 @@ export interface ReleaseSettings {
   releaseTag: ReleaseTagMode;
   /** The command `rafa release tag` prints for the publish, which it never runs. `release.publishCommand`. */
   releasePublishCommand: string;
+  /**
+   * Whether settle also writes `rafa.lock` to the version it settles,
+   * in the same release commit. `release.moveLock`.
+   */
+  releaseMoveLock: boolean;
 }
 
 /** The `dangerous` setting the release plan adds, resolved. */
@@ -295,6 +310,7 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  releaseMoveLock: false,
 });
 
 /** What the release plan's `dangerous` setting resolves to when no layer names it. */
@@ -362,6 +378,7 @@ export const RELEASE_SETTINGS: {
     read: text('a publish command'),
     cli: false,
   },
+  releaseMoveLock: { key: 'release.moveLock', read: flag, cli: false },
 };
 
 /** The release plan's `dangerous` setting spec. */

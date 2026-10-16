@@ -83,7 +83,10 @@
  * rule throws exit code 1 with one line per broken rule, the plan and
  * its PREREQUISITES file moved into `rejected/` first
  * (`commands/plan/store-check.ts`); that check runs straight after the
- * session and before the gate. Text mode writes
+ * session and before the gate. Straight after it, never as a refusal,
+ * a plan whose task edits an agent or a skill rafa bundles gets a note
+ * per item, its tier pin written as a `[human]` item of the plan's
+ * PREREQUISITES file (`commands/plan/bundled-check.ts`). Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
  *
@@ -241,6 +244,7 @@ import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
+import { notePlanBundledEdits } from './commands/plan/bundled-check.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { checkCreateRefs } from './commands/plan/refs-check.js';
@@ -702,12 +706,16 @@ export default async function plan(
   await requireNoticesAnswered(settingSources);
 
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
-  const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
+  const answered = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
 
   // The store rules `loop start`'s preflight repeats, read as
   // `plan validate` reads them, before the gate settles a verdict over a
   // plan the loop would refuse anyway.
-  enforceStoreRules(repoRoot, generated);
+  enforceStoreRules(repoRoot, answered);
+
+  // Never a refusal: a note per bundled agent or skill a task edits, its
+  // tier pin written as a [human] prerequisite of the plan.
+  const generated = notePlanBundledEdits(repoRoot, answered);
 
   await settleReview(gate, generated, flags.skipReview);
 

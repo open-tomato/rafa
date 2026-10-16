@@ -338,8 +338,11 @@
  * specifiers, and a consumer resolves each through the manifest's
  * `exports`: a `types`-only entry for each core subpath they name, at the
  * declaration already under `dist/` (#1090). The `dist/` file list is
- * held to the one a build at `ec376a8`, before the move, wrote, chunk
- * hashes set aside (`fixtures/dist-files-ec376a8.txt`).
+ * held to the one a build before the move wrote, chunk hashes set aside
+ * (`fixtures/dist-files-c920603.txt`): `c920603` is stretch 9's head
+ * before it merged the move, which differs from `ec376a8`'s list only by
+ * #991's declarations (`bugs/fenced.d.ts` added, four `triage/` ones no
+ * longer reached).
  *
  * `tsc` writes a declaration for every file of its program, and the
  * program is every file the entry reaches in source, value imports
@@ -504,8 +507,8 @@ const EXPORTS = {
 /** The prefix of a specifier that names one of the package's own subpaths. */
 const OWN_SUBPATH = '@open-tomato/rafa/';
 
-/** The `dist/` file list a build at `ec376a8`, before core moved into its package, wrote: one path a line. */
-const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-ec376a8.txt';
+/** The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line. */
+const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
 /** A chunk the `--splitting` build names by its content hash, directly in `dist/`. */
 const HASHED_CHUNK = /^([^/]+)-[a-z0-9]{8}\.js$/;
@@ -1181,7 +1184,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(152);
+    expect(before).toHaveLength(149);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

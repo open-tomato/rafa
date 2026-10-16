@@ -20,7 +20,7 @@
  *
  * Regenerating is opt-in, read as `src/tests/report-ask-live.test.ts`
  * reads its recapture flag. With `RAFA_UPDATE_HELP_SNAPSHOTS=1` this file
- * writes all seven before any case reads them, so a run that regenerates
+ * writes all nine before any case reads them, so a run that regenerates
  * compares against what it just wrote and is green by construction: the
  * change is read in the diff. With the variable unset, or set to anything
  * else, nothing is written, and a snapshot that no longer matches is red.
@@ -101,6 +101,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['next --help', 'rafa-next.txt'],
   ['issue ready --help', 'rafa-issue-ready.txt'],
   ['issue edit --help', 'rafa-issue-edit.txt'],
+  ['issue unblock --help', 'rafa-issue-unblock.txt'],
   ['release tag --help', 'rafa-release-tag.txt'],
 ];
 

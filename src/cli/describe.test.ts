@@ -268,6 +268,8 @@ describe('the document over the core registry', () => {
     expect(spendsOf('skill', 'backfill')?.when).toBe('with');
     expect(spendsOf('loop', 'start')?.when).toBe('always');
     expect(spendsOf('loop', 'wait')).toBeNull();
+    expect(spendsOf('issue', 'unblock')).toBeNull();
+    expect(actionOf(document, 'issue', 'unblock')?.flags.map((flag) => flag.name)).toContain('yes');
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();

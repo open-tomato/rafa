@@ -152,10 +152,42 @@
  *
  * `Bun.YAML.parse` reads the body, so the readings `report/parse.ts`
  * records apply here too. The ones that bite a review: an unquoted
- * value opening with a backtick, `@`, `%` or `[` throws and makes the
- * whole block `malformed`; a `#` after a space opens a comment and
- * silently cuts a `what` short; and an empty body parses as null, which
- * is no mapping and so `malformed`.
+ * value holding `: `, or opening with a backtick, `@`, `%` or `[`,
+ * throws; a `#` after a space opens a comment and silently cuts a
+ * `what` short when the block parses; and an empty body parses as null,
+ * which is no mapping and so `malformed`.
+ *
+ * ## The second read
+ *
+ * A body the parser throws on is read once more before it is called
+ * `malformed` (#1128). The planner writes a gap's sentences as plain
+ * scalars, and one holding `: ` — #1089's assumption "The definition of
+ * done is note 5's: scripts/survey/cut-table.ts reports ..." — threw
+ * the whole review away, a `verdict: ready` with it. So
+ * {@link quoteFreeText} rewrites each line keyed `heading:`, `what:` or
+ * `assumption:` (a list dash before the key included) whose value is
+ * unquoted into a double-quoted scalar of that same text, `\` and `"`
+ * escaped and trailing blanks dropped, and the body is parsed again.
+ * Everything after the key's colon is the value, a ` #` included, so a
+ * sentence the first parse would have cut short or refused reads back
+ * as written.
+ *
+ * Only those three keys are touched, because they are the free text; a
+ * `verdict` or `blocking` line is read by YAML as written on both tries,
+ * so a broken verdict still answers `malformed`, as does any body the
+ * second parse refuses too, whose message is the FIRST parse's error.
+ * A value already a whole double- or single-quoted scalar, an empty
+ * value and a block-scalar header (`|`, `>-`) are left as they are. A
+ * block read on the second try answers what its verdict says, with one
+ * {@link SpecReviewIssue} filed against `gaps` that names the block's
+ * line and says it was read after quoting the three keys, so a review
+ * the parser had to help is never silent. A body the FIRST parse reads
+ * is never quoted, so a `#` cutting a sentence short there stays cut:
+ * the second read rescues what threw, not what parsed.
+ *
+ * A hand-written parser for the block was the rejected alternative: it
+ * would read `verdict` and `blocking` by rules of its own, where this
+ * keeps YAML the reader of both.
  */
 import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 import type {
@@ -205,6 +237,51 @@ type Mapping = Readonly<Record<string, unknown>>;
 
 /** What separates the words of a verdict before it is matched. */
 const VERDICT_BREAK = /[\s_]+/gu;
+
+/** The keys whose values the second read quotes: a gap's free text. */
+export const QUOTED_KEYS = ['heading', 'what', 'assumption'] as const;
+
+/**
+ * A line keyed by one of {@link QUOTED_KEYS}: its indent and optional
+ * list dash, the key and its colon with the blanks after it, and the
+ * value to the end of the line.
+ */
+const FREE_TEXT_LINE = new RegExp(
+  `^(\\s*(?:-\\s+)?(?:${QUOTED_KEYS.join('|')}):[ \\t]+)(\\S.*)$`,
+  'u',
+);
+
+/**
+ * A value left as written by the second read: a whole double-quoted or
+ * single-quoted scalar, with an optional comment after it, or a block
+ * scalar header.
+ */
+const ALREADY_READABLE = /^(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[|>][-+]?\d?)[ \t]*(?:#.*)?$/u;
+
+/** A value as a double-quoted YAML scalar of the same text. */
+function doubleQuoted(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+}
+
+/**
+ * `body` with the unquoted value of every `heading:`, `what:` and
+ * `assumption:` line double-quoted; see the module note on the second
+ * read. Every other line is returned as written.
+ */
+export function quoteFreeText(body: string): string {
+  return body
+    .split('\n')
+    .map((line) => {
+      const match = FREE_TEXT_LINE.exec(line);
+      if (match === null) return line;
+      const [, head = '', written = ''] = match;
+      const value = written.trimEnd();
+      return ALREADY_READABLE.test(value)
+        ? line
+        : `${head}${doubleQuoted(value)}`;
+    })
+    .join('\n');
+}
 
 /** True for a mapping; false for a list, a scalar or null. */
 function isMapping(value: unknown): value is Mapping {
@@ -384,6 +461,37 @@ function judged(
   };
 }
 
+/** A body's parse: the document and what reading it took, or why it was not read. */
+type BodyParse =
+  | { readonly read: true; readonly document: unknown; readonly issues: readonly SpecReviewIssue[] }
+  | { readonly read: false; readonly text: string };
+
+/**
+ * The block body parsed as written, or, when that throws, after
+ * {@link quoteFreeText}; see the module note on the second read. A body
+ * both parses refuse is reported with the first parse's error.
+ */
+function parseBody(body: string, line: string): BodyParse {
+  let firstError: unknown;
+  try {
+    return { read: true, document: Bun.YAML.parse(body), issues: [] };
+  } catch (error) {
+    firstError = error;
+  }
+
+  try {
+    const document: unknown = Bun.YAML.parse(quoteFreeText(body));
+    const text = `the rafa:spec-review block at line ${line} is not valid YAML as written `
+      + `(${messageOf(firstError)}); it was read after quoting the values of its `
+      + 'heading, what and assumption keys';
+    return { read: true, document, issues: [issueAt('gaps', text)] };
+  } catch {
+    const text = `the rafa:spec-review block at line ${line} is not valid YAML `
+      + `(${messageOf(firstError)})`;
+    return { read: false, text };
+  }
+}
+
 /**
  * Reads the last `rafa:spec-review` block out of a plan session's
  * captured output.
@@ -411,14 +519,9 @@ export function parseSpecReview(output: string): SpecReviewReading {
     );
   }
 
-  let document: unknown;
-  try {
-    document = Bun.YAML.parse(block.body);
-  } catch (error) {
-    const text = `the rafa:spec-review block at line ${line} is not valid YAML `
-      + `(${messageOf(error)})`;
-    return unreadable('malformed', block, text);
-  }
+  const parsed = parseBody(block.body, line);
+  if (!parsed.read) return unreadable('malformed', block, parsed.text);
+  const { document } = parsed;
 
   if (!isMapping(document)) {
     const text = `the rafa:spec-review block at line ${line} holds ${describeValue(document)}, `
@@ -434,6 +537,6 @@ export function parseSpecReview(output: string): SpecReviewReading {
     return unreadable('malformed', block, text);
   }
 
-  const issues: SpecReviewIssue[] = [];
+  const issues: SpecReviewIssue[] = [...parsed.issues];
   return judged(verdict, readGaps(document, issues), block, issues);
 }
