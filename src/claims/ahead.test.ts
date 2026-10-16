@@ -190,6 +190,14 @@ describe('resolveAheadTarget', () => {
       : noHome.report).toMatchObject({ cause: 'other-board', reason: expect.stringContaining('the board of #7 was not read') });
   });
 
+  it('names the branch under the template it is given, where the default template names feat/', () => {
+    const target = resolveAheadTarget(aheadRequest({ candidate: candidate({ title: 'y' }) }), 7, 'work/{stub}');
+    const control = resolveAheadTarget(aheadRequest({ candidate: candidate({ title: 'y' }) }), 7);
+
+    expect(target).toEqual({ ok: true, issue: 8, branch: 'work/rafa-8-y', labels: null });
+    expect(control).toEqual({ ok: true, issue: 8, branch: 'feat/rafa-8-y', labels: null });
+  });
+
   it('reports no line ahead when there is none, or the line is the home issue itself', () => {
     for (const request of [aheadRequest({ candidate: null }), aheadRequest({ candidate: candidate({ issue: 7 }) })]) {
       const target = resolveAheadTarget(request, 7);
@@ -291,6 +299,37 @@ describe('pushClaimsAtomic', () => {
     const outcomes = cases.map((refs) => pushClaimsAtomic(git, refs).outcome);
 
     expect(outcomes).toEqual(['failed', 'failed', 'failed', 'failed', 'failed']);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('pushClaimsAtomic under the naming.branch template', () => {
+  const WORK = 'work/{stub}';
+
+  it('lands work/ claims under work/{stub}, and refuses them unpushed under the default template', () => {
+    const trio = plantTrio('work-pair');
+    const main = must(trio.a, ['rev-parse', 'main']);
+    const refs: AtomicClaimRef[] = [
+      { branch: 'work/rafa-7-x', sha: claimCommit(trio.a, main, 7, 'store-a'), lease: null },
+      { branch: 'work/rafa-8-y', sha: claimCommit(trio.a, main, 8, 'store-a'), lease: null },
+    ];
+    const { git, calls } = recorder();
+
+    const control = pushClaimsAtomic(git, refs);
+    const pushed = pushClaimsAtomic(trio.a, refs, WORK);
+
+    expect(control).toEqual({ outcome: 'failed', reason: '"work/rafa-7-x" is not a feat/rafa-* claim branch' });
+    expect(calls).toEqual([]);
+    expect(pushed).toEqual({ outcome: 'pushed' });
+    expect([remoteTip(trio, 'work/rafa-7-x'), remoteTip(trio, 'work/rafa-8-y')]).toEqual([refs[0]?.sha ?? '', refs[1]?.sha ?? '']);
+  });
+
+  it('refuses a feat/ ref unpushed under work/{stub}', () => {
+    const { git, calls } = recorder();
+
+    const pushed = pushClaimsAtomic(git, [{ branch: HOME, sha: 'a'.repeat(40), lease: null }], WORK);
+
+    expect(pushed).toEqual({ outcome: 'failed', reason: `${JSON.stringify(HOME)} is not a work/rafa-* claim branch` });
     expect(calls).toEqual([]);
   });
 });

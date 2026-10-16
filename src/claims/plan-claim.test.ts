@@ -701,3 +701,122 @@ describe('claimPlanIssue: claim ahead', () => {
     expect(tipAt(trio.a, `refs/heads/${AHEAD_BRANCH}`)).toBeNull();
   });
 });
+
+/** A `naming.branch` template other than the default, and the branches it names. */
+const WORK = 'work/{stub}';
+const WORK_STUB = 'rafa-7-x';
+const WORK_BRANCH = 'work/rafa-7-x';
+/** {@link WORK_BRANCH}'s stub under the default template. */
+const FEAT_BRANCH = 'feat/rafa-7-x';
+const WORK_AHEAD_BRANCH = 'work/rafa-8-y';
+const FEAT_AHEAD_BRANCH = 'feat/rafa-8-y';
+
+/**
+ * Pushes a claim on `issue` by `store` to `branch` under {@link WORK}
+ * from clone b, or throws; answers its sha. Pushed from b, so clone a
+ * holds no remote-tracking ref of it until a fetch of its own reads it.
+ */
+function plantWorkClaim(trio: Trio, store: string, branch: string, issue: number = ISSUE): string {
+  const made = makeOwnershipCommit(trio.b, 'origin/main', { action: 'claim', issue, store });
+  if (!made.ok) throw new Error(made.reason);
+  const pushed = pushNewClaimBranch(trio.b, made.sha, branch, WORK);
+  if (pushed.outcome !== 'pushed') throw new Error(`claim: ${JSON.stringify(pushed)}`);
+  return made.sha;
+}
+
+/** The ahead request whose line ahead is #8, titled so its stub is `rafa-8-y`. */
+function workAhead(): AheadRequest {
+  return aheadOf({}, { title: 'y' });
+}
+
+describe('claimPlanIssue: under the naming.branch template', () => {
+  it('reads a held work/rafa-7-x as held under work/{stub}, a branch the default template does not see', async () => {
+    const trio = plantTrio('work-held');
+    const ours = plantWorkClaim(trio, STORE_A, WORK_BRANCH);
+
+    const held = await claimPlanIssue(request({ stub: WORK_STUB }), context(trio.a, STORE_A, { branchTemplate: WORK }));
+    const control = await claimPlanIssue(request({ stub: WORK_STUB }), context(trio.a, STORE_A));
+
+    expect(held).toMatchObject({ outcome: 'claimed', issue: ISSUE, branch: WORK_BRANCH, storeId: STORE_A, via: 'held' });
+    expect(remoteTip(trio, WORK_BRANCH)).toBe(ours);
+    // Control: left out, the template is feat/{stub}, so the claim is made afresh on feat/rafa-7-x.
+    expect(control).toMatchObject({ outcome: 'claimed', issue: ISSUE, branch: FEAT_BRANCH, storeId: STORE_A, via: 'claim' });
+    expect(remoteTip(trio, FEAT_BRANCH)).not.toBeNull();
+    expect(remoteTip(trio, WORK_BRANCH)).toBe(ours);
+  });
+
+  it('lists another branch of the issue under work/{stub} and refuses on it, which the default template passes over', async () => {
+    const trio = plantTrio('work-other');
+    plantWorkClaim(trio, STORE_B, 'work/rafa-7-other');
+
+    const answer = as(await claimPlanIssue(request({ stub: WORK_STUB }), context(trio.a, STORE_A, { branchTemplate: WORK })), 'refused');
+    const control = await claimPlanIssue(request({ stub: WORK_STUB }), context(trio.a, STORE_A));
+
+    expect(answer).toEqual({
+      outcome: 'refused',
+      issue: ISSUE,
+      branch: 'work/rafa-7-other',
+      owner: STORE_B,
+      reason: `#${String(ISSUE)} is claimed by store ${STORE_B} on work/rafa-7-other`,
+    });
+    expect(remoteTip(trio, WORK_BRANCH)).toBeNull();
+    expect(control).toMatchObject({ outcome: 'claimed', branch: FEAT_BRANCH, via: 'claim' });
+  });
+
+  it('refuses a --stub whose branch under work/{stub} names another issue, naming the template\'s branch', async () => {
+    const { git, calls } = { calls: [] as (readonly string[])[], git: ((args) => {
+      calls.push(args);
+      return { ok: false, stdout: '', stderr: 'not run' };
+    }) as GitRunner };
+
+    const answer = as(await claimPlanIssue(request({ stub: 'rafa-70-x' }), context(git, STORE_A, { branchTemplate: WORK })), 'unclaimed');
+    const fits = resolveClaimTarget(request({ stub: WORK_STUB }), WORK);
+    const control = resolveClaimTarget(request({ stub: 'rafa-70-x' }));
+
+    expect(answer.cause).toBe('branch-mismatch');
+    expect(answer.reason).toBe('the plan\'s branch work/rafa-70-x is not work/rafa-7-<slug>,'
+      + ' so no claim on #7 can live on it; pass --stub=rafa-7-<slug>');
+    expect(calls).toEqual([]);
+    expect(fits).toEqual({ ok: true, issue: ISSUE, branch: WORK_BRANCH });
+    // Control: left out, the template is feat/{stub}, and the reason names that branch and no other.
+    if (control.ok) throw new Error('expected no target');
+    const reason = as(control.answer, 'unclaimed').reason;
+    expect(reason).toContain('feat/rafa-70-x is not feat/rafa-7-<slug>');
+    expect(reason).not.toContain('work/');
+  });
+
+  it('claims ahead on work/rafa-8-y under work/{stub}, where the default template claims feat/rafa-8-y', async () => {
+    const trio = plantTrio('work-ahead');
+    const plain = plantTrio('work-ahead-control');
+
+    const answer = as(await claimPlanIssue(request({ stub: WORK_STUB, ahead: workAhead() }), aheadContext(trio.a, STORE_A, { branchTemplate: WORK })), 'claimed');
+    const control = as(await claimPlanIssue(request({ stub: WORK_STUB, ahead: workAhead() }), aheadContext(plain.a, STORE_A)), 'claimed');
+
+    expect(answer.branch).toBe(WORK_BRANCH);
+    expect(answer.ahead).toEqual({ outcome: 'claimed', issue: AHEAD_ISSUE, branch: WORK_AHEAD_BRANCH, via: 'claim' });
+    const ahead = remoteTip(trio, WORK_AHEAD_BRANCH);
+    if (ahead === null) throw new Error('the claim ahead did not land');
+    expect(recordAt(trio, ahead)).toEqual({ action: 'claim', issue: AHEAD_ISSUE, store: STORE_A });
+    expect(remoteTip(trio, FEAT_AHEAD_BRANCH)).toBeNull();
+    // Control: left out, the template is feat/{stub}, and neither claim lands under work/.
+    expect(control.ahead).toEqual({ outcome: 'claimed', issue: AHEAD_ISSUE, branch: FEAT_AHEAD_BRANCH, via: 'claim' });
+    expect([remoteTip(plain, WORK_BRANCH), remoteTip(plain, WORK_AHEAD_BRANCH)]).toEqual([null, null]);
+  });
+
+  it('reads another store\'s claim on work/rafa-8-y as the line ahead taken, which the default template does not see', async () => {
+    const trio = plantTrio('work-ahead-taken');
+    const theirs = plantWorkClaim(trio, STORE_B, WORK_AHEAD_BRANCH, AHEAD_ISSUE);
+
+    const answer = as(await claimPlanIssue(request({ stub: WORK_STUB, ahead: workAhead() }), aheadContext(trio.a, STORE_A, { branchTemplate: WORK })), 'unclaimed');
+    const control = as(await claimPlanIssue(request({ stub: WORK_STUB, ahead: workAhead() }), aheadContext(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.cause).toBe('ahead-taken');
+    expect(answer.ahead).toMatchObject({ outcome: 'not-claimed', issue: AHEAD_ISSUE, cause: 'taken' });
+    expect(answer.reason).toContain(`#${String(AHEAD_ISSUE)} is claimed by store ${STORE_B} on ${WORK_AHEAD_BRANCH}`);
+    expect(remoteTip(trio, WORK_BRANCH)).toBeNull();
+    expect(remoteTip(trio, WORK_AHEAD_BRANCH)).toBe(theirs);
+    // Control: left out, the template is feat/{stub}, so both claims land beside the work/ branch.
+    expect(control.ahead).toMatchObject({ outcome: 'claimed', branch: FEAT_AHEAD_BRANCH });
+    expect(remoteTip(trio, WORK_AHEAD_BRANCH)).toBe(theirs);
+  });
+});

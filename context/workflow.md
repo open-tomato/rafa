@@ -488,9 +488,10 @@ when it names none), not scratch/notes`. A run started on the base prints
 nothing, and a run started on a detached HEAD says `not a detached HEAD`.
 
 **An existing branch under `--as-worktree` catches up with its base when it
-holds only claims.** `rafa plan create` claims a plan by pushing `feat/<stub>`
-at the base's tip, so a run started later finds a branch cut from a base that
-has moved since. When `--as-worktree` takes a branch that already exists
+holds only claims.** `rafa plan create` claims a plan by pushing its branch,
+the `naming.branch` template with the stub (`feat/<stub>` by default), at the
+base's tip, so a run started later finds a branch cut from a base that has
+moved since. When `--as-worktree` takes a branch that already exists
 (local, remote-only, or held by the worktree an earlier start left), it
 fetches `origin/<base>` (the base, read as above, never the branch) and reads
 the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding

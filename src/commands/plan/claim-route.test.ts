@@ -29,6 +29,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { sinkOutput } from '../../tests/output-sinks.js';
 
@@ -482,6 +483,9 @@ describe('resolveAndClaim before the claim', () => {
 /** The project refresh's keys, no project set: a label write sends no refresh. */
 const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardProjectRetries: false, boardProjectRetryWaitSeconds: 1, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 
+/** The settings every context below is built from, `naming.branch` at its default. */
+const BASE = { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', namingBranch: DEFAULT_BRANCH_TEMPLATE, ...NO_PROJECT } as const;
+
 describe('createPlanClaimContext', () => {
   let root = '';
 
@@ -494,8 +498,8 @@ describe('createPlanClaimContext', () => {
   });
 
   it('opens no board for a provider that is not gh, and one for gh', () => {
-    const none = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
-    const gh = createPlanClaimContext(root, { prProvider: 'gh', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
+    const none = createPlanClaimContext(root, BASE);
+    const gh = createPlanClaimContext(root, { ...BASE, prProvider: 'gh' });
 
     expect(none.board).toBeNull();
     expect(gh.board).not.toBeNull();
@@ -503,15 +507,22 @@ describe('createPlanClaimContext', () => {
   });
 
   it('carries claims.ahead as configured', () => {
-    const allow = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'allow', ...NO_PROJECT });
-    const off = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
+    const allow = createPlanClaimContext(root, { ...BASE, claimsAhead: 'allow' });
+    const off = createPlanClaimContext(root, BASE);
 
     expect([allow.claimsAhead, off.claimsAhead]).toEqual(['allow', 'off']);
   });
 
+  it('carries naming.branch as the template the claim branches are named and read under', () => {
+    const work = createPlanClaimContext(root, { ...BASE, namingBranch: 'work/{stub}' });
+    const plain = createPlanClaimContext(root, BASE);
+
+    expect([work.branchTemplate, plain.branchTemplate]).toEqual(['work/{stub}', DEFAULT_BRANCH_TEMPLATE]);
+  });
+
   it('reads the store id under the configured store: an NDJSON store names no claimant', () => {
-    const ndjson = createPlanClaimContext(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
-    const sqlite = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
+    const ndjson = createPlanClaimContext(root, { ...BASE, store: 'ndjson' });
+    const sqlite = createPlanClaimContext(root, BASE);
 
     const fromNdjson = ndjson.readStoreId();
     const fromSqlite = sqlite.readStoreId();

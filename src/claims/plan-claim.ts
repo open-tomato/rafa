@@ -16,26 +16,33 @@
  *
  * The issue is the one the run read (`--issue`, `--next`), else the one
  * the spec's basename opens with (`rafa-<n>-`). The claim lives on the
- * branch the loop runs on, `feat/<stub>`, so that branch must be a claim
- * branch of THAT issue: a `--stub` naming no issue, or another one,
- * answers `unclaimed` (`branch-mismatch`) rather than claim a branch the
- * loop would never run on.
+ * branch the loop runs on, the `naming.branch` template with the stub in
+ * it (`PlanClaimContext.branchTemplate`, `feat/{stub}` when left out, so
+ * `feat/rafa-<n>-<slug>` by default); below it is "the stub's branch".
+ * That branch must be a claim branch of THAT issue under the template: a
+ * `--stub` naming no issue, or another one, answers `unclaimed`
+ * (`branch-mismatch`) rather than claim a branch the loop would never
+ * run on. Only the template given is read: a branch named under another
+ * template is no branch of the issue here, whatever its stub.
  *
  * ## What the remote decides
  *
- * One fetch of the `feat/rafa-*` branches (`./git.ts`), then:
+ * One fetch of the template's claim branches, `feat/rafa-*` by default
+ * (`./git.ts`), then the remote-tracking refs under that glob, listed
+ * and kept to the ones the template names a stub of:
  *
  * | Reading | Answer |
  * |---|---|
  * | another branch of the issue that keeps it taken, or is this device's or a takeover candidate | `refused`, naming the branch to plan on (`--stub`) |
- * | `feat/<stub>` absent | a claim commit pushed WITHOUT force; the remote's refusal is the compare-and-set |
- * | `feat/<stub>` held by this device, stale or not | `claimed` via `held`: nothing is pushed |
- * | `feat/<stub>` released, or a stale `rafa:claimed` claim | a take commit on its tip, pushed with the tip as lease |
- * | `feat/<stub>` held by another store, stale in development included | `refused` naming the owner |
- * | `feat/<stub>` with no claim commit, or unreadable | `refused`, owner null: taken as a branch always was |
+ * | the stub's branch absent | a claim commit pushed WITHOUT force; the remote's refusal is the compare-and-set |
+ * | the stub's branch held by this device, stale or not | `claimed` via `held`: nothing is pushed |
+ * | the stub's branch released, or a stale `rafa:claimed` claim | a take commit on its tip, pushed with the tip as lease |
+ * | the stub's branch held by another store, stale in development included | `refused` naming the owner |
+ * | the stub's branch with no claim commit, or unreadable | `refused`, owner null: taken as a branch always was |
  *
  * A released or stale branch of the issue under ANOTHER name is not
- * taken over from here: the loop would run on `feat/<stub>`, not on it.
+ * taken over from here: the loop would run on the stub's branch, not on
+ * it.
  * A released one is passed over; a stale one refuses, naming the stub
  * to plan it under. Staleness is weighed as the roadmap walk weighs it
  * (`weighBranchClaim`), with the labels the run read off the issue; a
@@ -47,7 +54,7 @@
  * `holdsClaim` (`./device.ts`) decides whether a branch's claim is this
  * device's: the holder is the store's id, or an id the store carried
  * before its file got a new device or inode under the same host and
- * path. Both readings above ask it. A `feat/<stub>` claimed under such
+ * path. Both readings above ask it. A stub's branch claimed under such
  * a replaced id answers `claimed` via `held`, and nothing is pushed
  * over it: bringing the branch to the store's id is `loop start`'s
  * claim check. Another branch of the issue claimed under one refuses
@@ -62,12 +69,12 @@
  *
  * ## The local branch
  *
- * The claim commit is made on the local `feat/<stub>` when this checkout
+ * The claim commit is made on the local stub's branch when this checkout
  * has one, so its commits stay on the branch, and otherwise on `base`
  * (`HEAD` unless the caller names another). A local tip that is already
  * this store's claim commit for the issue is pushed again as it stands,
  * so a retried run makes no second commit. On a failed fetch or push
- * the commit stays on the local `feat/<stub>`, created or fast-forwarded
+ * the commit stays on the local stub's branch, created or fast-forwarded
  * to it, with no upstream, and the answer names it as `pending` for
  * `loop start`'s preflight to push. On a landed push the local branch is
  * fast-forwarded when it exists and is not created when it does not:
@@ -93,7 +100,8 @@
  * refuses the run with no ahead tried. A C that is not on the home
  * issue's board is reported not claimed, and the home issue is claimed
  * alone. Otherwise C's branches are read the same way, off the same
- * fetch, and the answer carries an `ahead` report:
+ * fetch and under the same template, and the answer carries an `ahead`
+ * report:
  *
  * | C's reading | Home | C |
  * |---|---|---|
@@ -119,13 +127,16 @@ import type { ClaimsAhead, ClaimsStaleAfter } from '@open-tomato/rafa/core/confi
 
 import path from 'node:path';
 
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
+
 import { weighBranchClaim } from '../board/roadmap-claims.js';
 import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
+import { branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
 
 import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
 import { holdsClaim } from './device.js';
 import {
+  claimBranchGlob,
   claimBranchIssue,
   fetchClaimBranches,
   makeOwnershipCommit,
@@ -194,11 +205,11 @@ export interface PlanClaimRequest {
   readonly issue: number | null;
   /** The spec's path, whose basename names the issue under `--spec`. */
   readonly specPath: string;
-  /** The plan's stub: the loop runs on `feat/<stub>`. */
+  /** The plan's stub: the loop runs on the template's branch of it, `feat/<stub>` by default. */
   readonly stub: string;
   /** The labels on the issue as the run read them, or null when it read none. */
   readonly labels: readonly string[] | null;
-  /** What a claim commit is made on when this checkout has no `feat/<stub>`; `HEAD` when left out. */
+  /** What a claim commit is made on when this checkout has no local stub's branch; `HEAD` when left out. */
   readonly base?: string;
   /** The line ahead, for a run that walked a board; left out, claim ahead does not run. */
   readonly ahead?: AheadRequest;
@@ -217,6 +228,11 @@ export interface PlanClaimContext {
   readonly claimsAhead: ClaimsAhead;
   /** The clock a claim's idle time is read against. */
   readonly now: Date;
+  /**
+   * The `naming.branch` template the claim branches are named and read
+   * under, `config.namingBranch`; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** One claim attempt: the issue, its branch, and who claims it. */
@@ -229,6 +245,8 @@ interface Attempt {
   readonly replacedIds: DeviceStoreIds['replacedIds'];
   readonly base: string;
   readonly labels: readonly string[] | null;
+  /** The `naming.branch` template the attempt's branches are named and read under. */
+  readonly template: string;
 }
 
 /** The branch-mismatch or no-issue answer, or the issue and branch to claim. */
@@ -255,18 +273,21 @@ function claimed(attempt: Attempt, via: ClaimVia, warnings: readonly string[] = 
   return { outcome: 'claimed', issue, branch, storeId, via, warnings };
 }
 
-/** The issue and branch a run claims, or why it claims none; see the module note. */
-export function resolveClaimTarget(request: PlanClaimRequest): Target {
+/**
+ * The issue and branch a run claims under `template`, or why it claims
+ * none; see the module note. The branch is the template with the stub.
+ */
+export function resolveClaimTarget(request: PlanClaimRequest, template: string = DEFAULT_BRANCH_TEMPLATE): Target {
   const specStub = path.basename(request.specPath).replace(/\.md$/, '');
-  const issue = request.issue ?? claimBranchIssue(branchNameFor(specStub));
+  const issue = request.issue ?? claimBranchIssue(branchNameFor(specStub, template), template);
   if (issue === null) {
     const reason = 'the run names no issue (no --issue or --next, and the spec\'s name does not open rafa-<n>-),'
       + ' so there is nothing to claim';
     return { ok: false, answer: unclaimed(null, 'no-issue', reason) };
   }
-  const branch = branchNameFor(request.stub);
-  if (claimBranchIssue(branch) !== issue) {
-    const reason = `the plan's branch ${branch} is not ${BRANCH_PREFIX}rafa-${String(issue)}-<slug>,`
+  const branch = branchNameFor(request.stub, template);
+  if (claimBranchIssue(branch, template) !== issue) {
+    const reason = `the plan's branch ${branch} is not ${branchFromTemplate(template, `rafa-${String(issue)}-<slug>`)},`
       + ` so no claim on #${String(issue)} can live on it; pass --stub=rafa-${String(issue)}-<slug>`;
     return { ok: false, answer: unclaimed(issue, 'branch-mismatch', reason) };
   }
@@ -285,7 +306,8 @@ function needsClaimedLabel(labels: readonly string[] | null): boolean {
  * throws for a store it cannot read.
  */
 export async function claimPlanIssue(request: PlanClaimRequest, context: PlanClaimContext): Promise<PlanClaim> {
-  const target = resolveClaimTarget(request);
+  const template = context.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const target = resolveClaimTarget(request, template);
   if (!target.ok) return target.answer;
   const device = context.readStoreId();
   if (!device.ok) return unclaimed(target.issue, 'no-store-id', device.reason);
@@ -297,6 +319,7 @@ export async function claimPlanIssue(request: PlanClaimRequest, context: PlanCla
     replacedIds: device.replacedIds,
     base: request.base ?? 'HEAD',
     labels: request.labels,
+    template,
   };
   const ahead = request.ahead !== undefined && aheadEnabled(context.claimsAhead, request.ahead.flag)
     ? request.ahead
@@ -333,7 +356,7 @@ function withAhead(answer: PlanClaim, ahead: AheadClaim): PlanClaim {
 /** The claim as the remote decides it, after one fetch; the pair when claim ahead runs. */
 function claimOnRemote(attempt: Attempt, ahead: AheadRequest | null, context: PlanClaimContext): PlanClaim {
   const { git } = context;
-  const fetched = fetchClaimBranches(git);
+  const fetched = fetchClaimBranches(git, attempt.template);
   if (!fetched.ok) {
     const answer = keepLocally(attempt, git, 'offline', fetched.reason);
     return ahead === null
@@ -341,15 +364,18 @@ function claimOnRemote(attempt: Attempt, ahead: AheadRequest | null, context: Pl
       : withAhead(answer, notTried(ahead, `${REMOTE} could not be reached`));
   }
 
-  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${BRANCH_PREFIX}`]);
+  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${claimBranchGlob(attempt.template)}`]);
   if (!listed.ok) {
     return refused(attempt, attempt.branch, null, `the ${REMOTE} branches of #${String(attempt.issue)} could not be listed: ${gitSaid(listed)}`);
   }
-  const names = listed.stdout.split('\n').map((line) => line.trim());
+  const names = listed.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((name) => stubOfBranch(attempt.template, name) !== null);
   const move = readMove(attempt, names, context);
   if (ahead === null || move.kind === 'answer') return carryOut(attempt, move, git);
 
-  const target = resolveAheadTarget(ahead, attempt.issue);
+  const target = resolveAheadTarget(ahead, attempt.issue, attempt.template);
   if (!target.ok) return withAhead(carryOut(attempt, move, git), target.report);
   const forward: Attempt = { ...attempt, issue: target.issue, branch: target.branch, labels: target.labels };
   return claimPair({ attempt, move }, { attempt: forward, move: readMove(forward, names, context) }, git);
@@ -374,12 +400,13 @@ type Move =
 /** What {@link claimOwnBranch} and the other branches of the issue among `names` leave to do. */
 function readMove(attempt: Attempt, names: readonly string[], context: PlanClaimContext): Move {
   const { git } = context;
-  const others = names.filter((name) => name !== attempt.branch && claimBranchIssue(name) === attempt.issue);
+  const { template } = attempt;
+  const others = names.filter((name) => name !== attempt.branch && claimBranchIssue(name, template) === attempt.issue);
   for (const other of others) {
-    const refusal = otherBranchRefusal(attempt, readClaimBranch(git, other), context);
+    const refusal = otherBranchRefusal(attempt, readClaimBranch(git, other, template), context);
     if (refusal !== null) return { kind: 'answer', answer: refusal };
   }
-  return claimOwnBranch(attempt, readClaimBranch(git, attempt.branch), context);
+  return claimOwnBranch(attempt, readClaimBranch(git, attempt.branch, template), context);
 }
 
 /** Carries out one attempt's move alone, as a run without claim ahead does. */
@@ -409,32 +436,28 @@ function unnamedRefusal(attempt: Attempt, reading: ClaimBranchReading): PlanClai
   return null;
 }
 
-/** The stub a branch is planned under: `feat/rafa-7-x` is `rafa-7-x`. */
-function stubOf(branch: string): string {
-  return branch.slice(BRANCH_PREFIX.length);
-}
-
-/** Why a branch of the issue other than `feat/<stub>` refuses the run, or null; see the module note. */
+/** Why a branch of the issue other than the stub's branch refuses the run, or null; see the module note. */
 function otherBranchRefusal(attempt: Attempt, reading: ClaimBranchReading, context: PlanClaimContext): PlanClaim | null {
   if (reading.state === 'absent') return null;
   const unnamed = unnamedRefusal(attempt, reading);
   if (unnamed !== null || reading.state !== 'found') return unnamed;
 
   const { branch } = reading;
+  const stub = stubOfBranch(attempt.template, branch) ?? branch;
   const issue = `#${String(attempt.issue)}`;
   const weighed = weighBranchClaim(reading, { labels: attempt.labels ?? [], staleAfter: context.staleAfter, now: context.now });
   if (weighed.state === 'released' || weighed.state === 'none' || weighed.state === 'unreadable') return null;
   const { owner } = weighed;
   if (holdsClaim(attempt, owner)) {
     const { storeId } = attempt;
-    return refused(attempt, branch, storeId, `this device (store ${storeId}) already holds ${issue} on ${branch}; plan it there with --stub=${stubOf(branch)}`);
+    return refused(attempt, branch, storeId, `this device (store ${storeId}) already holds ${issue} on ${branch}; plan it there with --stub=${stub}`);
   }
   return weighed.state === 'stale-claimed'
-    ? refused(attempt, branch, owner, `${issue} is claimed by store ${owner} on ${branch}, stale; take it over by planning there with --stub=${stubOf(branch)}`)
+    ? refused(attempt, branch, owner, `${issue} is claimed by store ${owner} on ${branch}, stale; take it over by planning there with --stub=${stub}`)
     : refused(attempt, branch, owner, `${issue} is claimed by store ${owner} on ${branch}`);
 }
 
-/** What the claim on `feat/<stub>` itself leaves to do; see the module note's table. */
+/** What the claim on the stub's branch itself leaves to do; see the module note's table. */
 function claimOwnBranch(attempt: Attempt, reading: ClaimBranchReading, context: PlanClaimContext): Move {
   if (reading.state === 'absent') return { kind: 'fresh' };
   const unreadable = (): Move => ({
@@ -561,11 +584,11 @@ function raceReason(attempt: Attempt, race: Race, owner: string | null): string 
   return `${attempt.branch} moved on ${REMOTE} while ${issue} was being taken over${holder}`;
 }
 
-/** The store holding `branch` after one more fetch, or null when none is named or the fetch failed. */
-function refetchedOwner(git: GitRunner, branch: string): string | null {
-  const fetched = fetchClaimBranches(git);
+/** The store holding `attempt`'s branch after one more fetch, or null when none is named or the fetch failed. */
+function refetchedOwner(git: GitRunner, attempt: Attempt): string | null {
+  const fetched = fetchClaimBranches(git, attempt.template);
   return fetched.ok
-    ? ownerOf(readClaimBranch(git, branch))
+    ? ownerOf(readClaimBranch(git, attempt.branch, attempt.template))
     : null;
 }
 
@@ -604,7 +627,7 @@ function landLocal(attempt: Attempt, staged: Extract<Staged, { ok: true }>, git:
 function pushFreshClaim(attempt: Attempt, git: GitRunner): PlanClaim {
   const staged = stage(attempt, { kind: 'fresh' }, git);
   if (!staged.ok) return unclaimed(attempt.issue, 'commit-failed', staged.reason);
-  const pushed = pushNewClaimBranch(git, staged.sha, attempt.branch);
+  const pushed = pushNewClaimBranch(git, staged.sha, attempt.branch, attempt.template);
   if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, staged.sha, staged.localTip);
   if (pushed.outcome === 'claimed') {
     const owner = ownerOf(pushed.holder);
@@ -617,10 +640,10 @@ function pushFreshClaim(attempt: Attempt, git: GitRunner): PlanClaim {
 function pushTake(attempt: Attempt, tip: string, git: GitRunner): PlanClaim {
   const staged = stage(attempt, { kind: 'take', tip }, git);
   if (!staged.ok) return unclaimed(attempt.issue, 'commit-failed', staged.reason);
-  const pushed = pushOwnershipCommit(git, staged.sha, attempt.branch, tip);
+  const pushed = pushOwnershipCommit(git, staged.sha, attempt.branch, tip, attempt.template);
   if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, staged.sha, staged.localTip);
   if (pushed.outcome === 'moved') {
-    const owner = refetchedOwner(git, attempt.branch);
+    const owner = refetchedOwner(git, attempt);
     return refused(attempt, attempt.branch, owner, raceReason(attempt, 'moved', owner));
   }
   return claimed(attempt, 'take', warningsOf(landLocal(attempt, staged, git)));
@@ -707,7 +730,7 @@ function pushPair(home: Side, homeStaged: Extract<Staged, { ok: true }> | null, 
   const refs = homeStaged === null
     ? [refOf(forward, ahead.staged)]
     : [refOf(home.attempt, homeStaged), refOf(forward, ahead.staged)];
-  const pushed = pushClaimsAtomic(git, refs);
+  const pushed = pushClaimsAtomic(git, refs, home.attempt.template);
   const line = `#${String(forward.issue)}, the line ahead, was not claimed`;
 
   if (pushed.outcome === 'pushed') {
@@ -721,11 +744,11 @@ function pushPair(home: Side, homeStaged: Extract<Staged, { ok: true }> | null, 
     return withAhead(claimed(home.attempt, via, warnings), aheadClaimed(forward, ahead.staged.via));
   }
   if (pushed.outcome === 'refused' && pushed.branch === home.attempt.branch) {
-    const owner = refetchedOwner(git, home.attempt.branch);
+    const owner = refetchedOwner(git, home.attempt);
     return refused(home.attempt, home.attempt.branch, owner, raceReason(home.attempt, pushed.by, owner));
   }
   const reason = pushed.outcome === 'refused'
-    ? raceReason(forward, pushed.by, refetchedOwner(git, forward.branch))
+    ? raceReason(forward, pushed.by, refetchedOwner(git, forward))
     : pushed.reason;
   const cause = pushed.outcome === 'refused'
     ? 'taken'
