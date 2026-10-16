@@ -23,6 +23,9 @@
  */
 import type { Fragment } from './fragment.js';
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, test } from 'bun:test';
 
 import { allocateFragmentName, parseFragment, serializeFragment } from './fragment.js';
@@ -250,5 +253,30 @@ describe('allocateFragmentName', () => {
     expect(() => allocateFragmentName('', [])).toThrow('the plan id is empty');
     expect(() => allocateFragmentName('rafa 1', [])).toThrow('the plan id "rafa 1"');
     expect(() => allocateFragmentName('.hidden', [])).toThrow('the plan id ".hidden"');
+  });
+});
+
+describe('package key against real and scoped fragments', () => {
+  test('every fragment under this repository\'s .changes/ parses with package null', () => {
+    const dir = join(import.meta.dir, '..', '..', '.changes');
+    const names = readdirSync(dir).filter((name) => name.endsWith('.md'));
+
+    for (const name of names) {
+      const reading = parseFragment(readFileSync(join(dir, name), 'utf8'));
+      expect(reading.ok).toBe(true);
+      if (reading.ok) expect(reading.fragment.package).toBeNull();
+    }
+  });
+
+  test('a fragment naming @scope/plugin parses to it and serialises with the line after level', () => {
+    const text = '---\nplan: p-1\ntitle: T\nlevel: minor\npackage: @scope/plugin\n---\n\n- a note\n';
+
+    const reading = parseFragment(text);
+
+    expect(reading.ok).toBe(true);
+    if (!reading.ok) return;
+    expect(reading.fragment.package).toBe('@scope/plugin');
+    const lines = serializeFragment(reading.fragment).split('\n');
+    expect(lines[lines.indexOf('level: minor') + 1]).toBe('package: @scope/plugin');
   });
 });
