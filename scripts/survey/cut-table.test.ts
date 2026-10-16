@@ -68,9 +68,11 @@ const TWO_PACKAGES: CutRules = {
 };
 
 describe('CUT_RULES', () => {
-  it('lists the ten packages lowest first, core at the bottom and the CLI at the top', () => {
+  it('lists the twelve packages lowest first, the shared configs and core at the bottom and the CLI at the top', () => {
     expect(CUT_RULES.packages.map((rule) => rule.name)).toEqual([
-      '@open-tomato/rafa',
+      'rafa-eslint-config',
+      'rafa-typescript-config',
+      '@open-tomato/rafa-core',
       'rafa-inventory',
       'rafa-board',
       'rafa-pr',
@@ -79,7 +81,7 @@ describe('CUT_RULES', () => {
       'rafa-effort',
       'rafa-hub',
       'rafa-sync-service',
-      '@open-tomato/rafa-cli',
+      '@open-tomato/rafa',
     ]);
     expect(CUT_RULES.rest).toBe(CLI_PACKAGE);
   });
@@ -160,6 +162,20 @@ describe('placeFile', () => {
       folder: 'packages/rafa-hub/',
       package: 'rafa-hub',
     });
+  });
+
+  it('places each shared-config package\'s files by its one folder', () => {
+    expect(placeFile('packages/eslint-config/base.test.ts')).toEqual({
+      by: 'folder',
+      folder: 'packages/eslint-config/',
+      package: 'rafa-eslint-config',
+    });
+    expect(placeFile('packages/typescript-config/base.test.ts')).toEqual({
+      by: 'folder',
+      folder: 'packages/typescript-config/',
+      package: 'rafa-typescript-config',
+    });
+    expect(placeFile('packages/eslint-config-extra/base.ts').package).toBe(CLI_PACKAGE);
   });
 
   it('places every file under packages/rafa/ in core, and the rest of src/effort/ in rafa-effort', () => {
@@ -244,16 +260,18 @@ describe('buildCutTable: upward edges', () => {
     );
 
     expect(countsOf(table)).toEqual({
-      '@open-tomato/rafa': 1,
-      '@open-tomato/rafa-cli': 0,
+      '@open-tomato/rafa': 0,
+      '@open-tomato/rafa-core': 1,
       'rafa-board': 0,
       'rafa-effort': 0,
+      'rafa-eslint-config': 0,
       'rafa-hub': 0,
       'rafa-inventory': 1,
       'rafa-pr': 0,
       'rafa-release': 1,
       'rafa-run': 0,
       'rafa-sync-service': 0,
+      'rafa-typescript-config': 0,
     });
     expect(rowOf(table, 'rafa-inventory').edges).toEqual([
       {
@@ -402,7 +420,7 @@ describe('buildCutTable: files', () => {
       filesByFolder: { 'src/commands/pr/': 0, 'src/pr/': 2, 'src/triage/': 0 },
       folders: ['src/commands/pr/', 'src/pr/', 'src/triage/'],
       named: ['src/pr/index.ts'],
-      rank: 4,
+      rank: 6,
     });
     expect(rowOf(table, CORE_PACKAGE).files).toEqual(['packages/rafa/src/report/parse.test.ts', 'packages/rafa/src/report/parse.ts']);
     expect(rowOf(table, 'rafa-board').filesByFolder).toMatchObject({ 'src/board/': 1, 'src/board/project/': 1 });
@@ -528,11 +546,11 @@ describe('the two outputs', () => {
     ]),
   );
 
-  it('renders the JSON with the graph it was read from, ten packages and an integer count on each', () => {
+  it('renders the JSON with the graph it was read from, twelve packages and an integer count on each', () => {
     const data = JSON.parse(renderCutTableJson(table)) as CutTable & { readonly graph: string };
 
     expect(data.graph).toBe('docs/survey/import-graph.json');
-    expect(data.packages).toHaveLength(10);
+    expect(data.packages).toHaveLength(12);
     expect(data.packages.every((row) => Number.isInteger(row.upwardEdges))).toBe(true);
     expect(data.order).toEqual(CUT_RULES.packages.map((rule) => rule.name));
     expect(data.unassigned.map((entry) => entry.folder)).toEqual([...CUT_RULES.unassigned]);
@@ -551,7 +569,7 @@ describe('the two outputs', () => {
 
     expect(lines[0]).toBe('# Cut table');
     expect(lines[2]).toBe(
-      'Read from `docs/survey/import-graph.json`: 6 files, 5 of them in 10 packages (2 left to place) and 1 in 3 '
+      'Read from `docs/survey/import-graph.json`: 6 files, 5 of them in 12 packages (2 left to place) and 1 in 3 '
       + 'unassigned folders. Of the 4 edges between two files neither of which is a test, value and type alike, 3 '
       + 'point upward, 1 of them cleared by #118, and 1 have an end in an unassigned folder and no rank.',
     );
@@ -563,19 +581,19 @@ describe('the two outputs', () => {
   it('gives each package one row with its count, what #118 clears and what remains', () => {
     const lines = renderCutTableMarkdown(table).split('\n');
 
-    expect(lines).toContain('| 1 | `@open-tomato/rafa` | 1 | 1 | 0 | 0 | 1 | 1 | 0 |');
-    expect(lines).toContain('| 3 | `rafa-board` | 1 | 1 | 0 | 0 | 2 | 0 | 2 |');
-    expect(lines).toContain('| 10 | `@open-tomato/rafa-cli` | 2 | 2 | 0 | 0 | 0 | 0 | 0 |');
-    expect(lines.filter((line) => /^\| \d+ \| `/.test(line))).toHaveLength(10);
+    expect(lines).toContain('| 3 | `@open-tomato/rafa-core` | 1 | 1 | 0 | 0 | 1 | 1 | 0 |');
+    expect(lines).toContain('| 5 | `rafa-board` | 1 | 1 | 0 | 0 | 2 | 0 | 2 |');
+    expect(lines).toContain('| 12 | `@open-tomato/rafa` | 2 | 2 | 0 | 0 | 0 | 0 | 0 |');
+    expect(lines.filter((line) => /^\| \d+ \| `/.test(line))).toHaveLength(12);
   });
 
   it('names the pairs of packages, the cleared edge, the folder left to place and the unassigned folder', () => {
     const lines = renderCutTableMarkdown(table).split('\n');
 
     expect(lines).toContain('| `rafa-board` | `rafa-run` | 1 |');
-    expect(lines).toContain('| `rafa-board` | `@open-tomato/rafa-cli` | 1 |');
+    expect(lines).toContain('| `rafa-board` | `@open-tomato/rafa` | 1 |');
     expect(lines).toContain('- `packages/rafa/src/core/config/config-schema.ts` imports `src/config-schema-hub.ts` (value)');
-    expect(lines).toContain('| `src/utils/tracker.ts` | 1 | `@open-tomato/rafa-cli` | left to place |');
+    expect(lines).toContain('| `src/utils/tracker.ts` | 1 | `@open-tomato/rafa` | left to place |');
     expect(lines).toContain('| `src/start/session.ts` | 1 | `rafa-run` | by rule |');
     expect(lines).toContain('| `src/utils/` | 1 | 1 | 1 |');
     expect(lines).toContain('| `src/stretch/` | 1 | `rafa-board` (1) | - |');

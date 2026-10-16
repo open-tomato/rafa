@@ -24,6 +24,9 @@
  * config resolves its plugins from this package's own `node_modules`, and
  * a plugin left out of the manifest fails to load wherever the package
  * is used.
+ *
+ * The `.mts` cases hold that the config parses the module-TypeScript
+ * extensions rather than ignoring them.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -111,6 +114,20 @@ describe('base.mjs', () => {
 
     expect(outcome.errorCount).toBeGreaterThan(0);
     expect(outcome.findings).toContainEqual({ ruleId: '@stylistic/quotes', severity: 2 });
+  }, LINT_CASE_TIMEOUT_MS);
+
+  it('reads a double-quoted string in a .mts file red under @stylistic/quotes', async () => {
+    const outcome = await lintPlanted('quoted.mts', DOUBLE_QUOTED);
+
+    expect(outcome.errorCount).toBeGreaterThan(0);
+    expect(outcome.findings).toContainEqual({ ruleId: '@stylistic/quotes', severity: 2 });
+  }, LINT_CASE_TIMEOUT_MS);
+
+  it('reads a clean .mts file green', async () => {
+    const outcome = await lintPlanted('clean.mts', CLEAN);
+
+    expect(outcome.findings).toEqual([]);
+    expect(outcome.errorCount).toBe(0);
   }, LINT_CASE_TIMEOUT_MS);
 
   it('reads a literal zero-width space red under ar/no-unsafe-unicode', async () => {
