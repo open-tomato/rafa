@@ -1,28 +1,52 @@
 /**
  * The survey's test index: per test file, the epic's index, and per
- * source file, the test files that reach it. Run from the repository root,
- * `bun scripts/survey/test-index.ts` writes `docs/survey/test-index.json`
- * and `docs/survey/test-index.md`, the survey's record. Run with
- * `--baseline --map=<file>`, it writes `docs/survey/test-index.baseline.json`
- * instead and leaves the other two as they are: the baseline epic #801
- * holds the package cut to, no test file's index may rise above it. The
- * baseline names the commit it read, and the mode refuses to run when a
- * tracked file in scope differs from that commit, since the script reads
- * the working tree and the commit would then name other text.
+ * source file, the test files that reach it. The script has three modes,
+ * each run from the repository root:
  *
- * Run with `--against=<baseline> --map=<file>`, it writes nothing: it reads
- * the working tree, compares each test file's index with the one that
- * baseline holds, prints the comparison, and exits 1 when an index rose
- * (see "The comparison" below).
+ *   - `bun scripts/survey/test-index.ts` (the survey) writes
+ *     `docs/survey/test-index.json` and `docs/survey/test-index.md`, the
+ *     survey's record, counting folders (see below).
+ *   - `--baseline --map=<file>` (the record) writes
+ *     `docs/survey/test-index.baseline.json` instead and leaves the other
+ *     two as they are: the record epic #801 holds the package cut to, read
+ *     in projected packages (`test-index-record.ts`). It reads the commit
+ *     (`readCommit`), the map, the test kinds (`readTestKindGlobs`) and the
+ *     workspace members (`readMembers`), computes the index under
+ *     `packageRules`, and writes the record through `renderRecordJson`,
+ *     its header naming the map as passed with the sha256 of its bytes,
+ *     the commit and the bin's reach. It reads the tracked files in scope,
+ *     the text of the commit it names, and refuses to run when a tracked
+ *     file in scope differs from that commit, since it reads the working
+ *     tree and the commit would then name other text. When a file is
+ *     unplaced it writes nothing and exits 1 naming each one.
+ *   - `--against=<record> --map=<file>` (the guard) writes nothing: it
+ *     reads the record (`parseRecord`) and the map, computes the index of
+ *     the working tree under `packageRules`, runs `checkHeader` and
+ *     `compareToRecord` (`test-index-guard.ts`), prints `renderGuard` and
+ *     then each unplaced file, and exits 1 when `holdsRecord` is `false`
+ *     (a refusal, a risen test or an unread one) or a file is unplaced.
  *
  * Either flag is refused without `--map=<file>`, and `--map=<file>` is
- * refused alone. The map is the cut table (`cut-map.ts`), read through
- * `packageRules` (see "The index in projected packages" below); the two
- * modes as they stand read the tree by their folder rules and do not read
- * the file `--map` names.
+ * refused alone. The map is the cut table, `docs/survey/cut-table.json`
+ * as `scripts/survey/cut-table.ts` writes it, read by `cut-map.ts`: a
+ * file's unit is the `name` of the `packages[]` row whose `files` list it,
+ * or the `folder` of the `unassigned[]` entry whose `files` list it
+ * (`src/ci/`). No other key of the table is read, and a file it lists
+ * nowhere is unplaced.
  *
- * The index of a test file is the number of folders its transitive imports
- * reach, doubled when it spawns a process:
+ * The rule per kind, which the record and the guard apply: a test's kind
+ * is read from its name through `tests.contract` and `tests.integration`
+ * of the project's config, every other test file a unit test. A unit test
+ * and a contract test meet their rule when the units their walk reaches
+ * are their own unit alone; a use-case test reaches real code everywhere
+ * and meets its rule when none of its own specifiers enters another unit
+ * through no public entry (the `exports` keys of the workspace member
+ * that holds the landing). A test that does not meet its rule lies on the
+ * record's `unsorted` list, which may only shrink: the guard names a test
+ * that does not meet its rule and is not on the list as risen.
+ *
+ * The index of a test file under the survey's rules is the number of
+ * folders its transitive imports reach, doubled when it spawns a process:
  *
  *   - A folder is the unit a package cut moves: a file under
  *     `packages/<name>/src/` counts as its package, `packages/<name>`; any
@@ -57,79 +81,50 @@
  *
  * The index in projected packages
  *
- * `packageRules(map, graph)` reads the tree by the cut map instead: a
- * file's folder is its unit, the package row or unassigned folder of the
- * map that lists it, so three folders in one package count once and one
- * folder cut across two packages counts twice. The rules carry the
- * spawned reach, the sorted units of every source file reachable from
- * the bin entry `src/rafa.ts` along the graph (edges of either kind), and
- * a spawning test then counts the union of its own units and that reach
- * instead of doubling: the process it spawns loads the bin, not the test's
- * imports twice. A file the map lists nowhere has no unit and is unplaced:
- * the index names under `unplaced` every test file, every source file a
- * test's walk reaches (through support files or not) and, when a test
- * spawns, every source file of the bin's reach, that the map holds no
- * unit for. An unplaced file counts toward no index. Under the survey's
- * rules and `coreRules` every file has a folder and `unplaced` is empty.
+ * `packageRules(map, graph)`, which the record and the guard read the tree
+ * by, reads it by the cut map instead: a file's folder is its unit, so
+ * three folders in one package count once and one folder cut across two
+ * packages counts twice. The spawned rule: the rules carry the spawned
+ * reach, the sorted units of every source file reachable from the bin
+ * entry `src/rafa.ts` along the graph (edges of either kind), and a
+ * spawning test then counts the union of its own units and that reach
+ * instead of doubling, since the process it spawns loads the bin, not the
+ * test's imports twice. A file the map lists nowhere has no unit and is
+ * unplaced: the index names under `unplaced` every test file, every
+ * source file a test's walk reaches (through support files or not) and,
+ * when a test spawns, every source file of the bin's reach, that the map
+ * holds no unit for. An unplaced file counts toward no index. Under the
+ * survey's rules and `coreRules` every file has a folder and `unplaced`
+ * is empty.
  *
- * The comparison
+ * The files the guard reads are the ones `git add -A` would commit:
+ * tracked, or untracked and covered by no ignore rule, and present on
+ * disk. A test file written by the task under check is untracked until
+ * the loop commits it, a listing of tracked files alone would leave it
+ * out, and the graph keeps an edge only to a file it was handed
+ * (`addEdge`, `import-graph.ts`).
  *
- * `--against=<baseline>` holds the moves of #905 and #1090 to the
- * baseline, and reads the tree by two rules of its own (`coreRules`), both
- * of which leave the index of a tree with no `packages/rafa/src/core/` and no core
- * package as the survey counts it:
+ * The folder-unit comparison
  *
- *   - every file under `packages/rafa/src/core/` counts as one folder, `packages/rafa/src/core`, as a
- *     package's files count as their package: the folder is the core
- *     package after the cut (#808). Every file under `CORE_SOURCE`
- *     (`packages/rafa/src/`) counts as the package's one folder,
- *     `packages/rafa`, and so does a file under `packages/rafa/src/core/` once that
- *     folder lies in the package: a test that counted `packages/rafa/src/core`,
- *     `packages/rafa/src/effort/store` and `packages/rafa/src/ports` counts `packages/rafa` once;
- *   - a core barrel, one of the files `core-moves.ts` lists as the only
- *     ones a file outside `packages/rafa/src/core/` may import, is read as a support
- *     file is: reached, not counted, not walked past. The folders behind
- *     it are listed under `supportFolders` and the barrel under `support`.
- *     A barrel's own text is never read for a spawning call.
- *
- * So a test outside `packages/rafa/src/core/` counts nothing for what it imports through
- * a barrel, and a test inside it, which imports its sibling files directly,
- * counts `packages/rafa/src/core` once and every folder those files reach.
- *
- * The files read are the ones `git add -A` would commit: tracked, or
- * untracked and covered by no ignore rule, and present on disk. A barrel
- * or a test file written by the task under check is untracked until the
- * loop commits it. A listing of tracked files alone leaves such a test
- * file out of the comparison, and the graph keeps an edge only to a file
- * it was handed (`addEdge`, `import-graph.ts`).
- *
- * Each test file of the tree is one of:
- *
- *   - `risen`, `equal` or `fallen`: it has an index now and the baseline
- *     holds one for it. A test file under `CORE_SOURCE` or under
- *     `CORE_PARKED_TESTS` (`src/tests/core-coupled/`) is first brought back
- *     to its path with that prefix replaced by `src/`. A test file whose
- *     path, so brought back, is one `core-moves.ts` moves a test to (its
- *     target brought back the same way) is
- *     compared with the entry under the path it moved from, when the
- *     baseline holds one; any other with the entry under its path brought
- *     back, and last under its own path;
- *   - `added`: the baseline holds no index for it. It is new, and held to
- *     nothing;
- *   - `unread`: the baseline holds an index for it and `bun build` reached
- *     no imports of it now, so nothing says its index did not rise.
- *
- * A baseline entry no test file answers is `gone`. The mode exits 1 when a
- * test file is `risen` or `unread`, and 0 otherwise: `added` and `gone`
- * are printed and fail nothing. A test file renamed by hand, outside
- * `core-moves.ts` and the two prefixes, therefore shows as one `added` and
- * one `gone`.
+ * `against`, `compareToBaseline` and `coreRules` hold a tree to the
+ * folder-unit baseline the record replaced, the moves of #905 and #1090
+ * followed through `core-moves.ts`, and no mode runs them: a later task
+ * of the plan removes them with their tests. Under `coreRules` every file
+ * under `CORE_SOURCE` (`packages/rafa/src/`) counts as `packages/rafa`,
+ * every file under the handed core folder as that one folder, and a core
+ * barrel is read as a support file is. `compareToBaseline` brings a test
+ * file under `CORE_SOURCE` or `CORE_PARKED_TESTS` back to `src/`, follows
+ * a moved test file to the entry under the path it moved from, and sorts
+ * each test file into `risen`, `equal`, `fallen`, `added` or `unread`, a
+ * baseline entry no test file answers being `gone`.
  */
 
 import type { CoreMove } from './core-moves';
 import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
 import type { ImportGraph } from './import-graph';
+import type { RecordComparison } from './test-index-guard';
+import type { RecordInput, TestRecord } from './test-index-record';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
@@ -145,6 +140,7 @@ import {
   barrelPaths,
   movedPaths,
 } from './core-moves';
+import { readCutMap } from './cut-map';
 import { classifyFile, coverageLine, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
   OUTPUT_DIR,
@@ -153,6 +149,10 @@ import {
   readMetafile,
   stableJson,
 } from './import-graph';
+import { readMembers } from './package-entries';
+import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
+import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
+import { readTestKindGlobs } from './test-kinds';
 
 /** What the index is computed from, all of it passed in as data. */
 export interface TestIndexInput {
@@ -289,32 +289,32 @@ export interface BaselineComparison {
   readonly unread: readonly string[];
 }
 
-/** A mode that writes files: the survey's two, or the baseline. */
-export type WritingMode = 'baseline' | 'survey';
-
-/** The baseline mode, with the map it reads. */
+/** The record mode, with the map it reads. */
 export interface BaselineMode {
-  /** Always `true`: the mode writes the baseline. */
+  /** Always `true`: the mode writes the record. */
   readonly baseline: true;
   /** The map's path, absolute or relative to the repository root. */
   readonly map: string;
 }
 
-/** The comparing mode, with the baseline and the map it reads. */
+/** The guard, with the record and the map it reads. */
 export interface AgainstMode {
-  /** The baseline's path, absolute or relative to the repository root. */
+  /** The record's path, absolute or relative to the repository root. */
   readonly against: string;
   /** The map's path, absolute or relative to the repository root. */
   readonly map: string;
 }
 
-/** What a command line asks for: the survey's files, the baseline, or a comparison. */
-export type TestIndexMode = 'survey' | AgainstMode | BaselineMode;
+/** A mode that writes files: the survey's two, or the record. */
+export type WritingMode = 'survey' | BaselineMode;
 
-/** The flag that picks the baseline mode. */
+/** What a command line asks for: the survey's files, the record, or the guard. */
+export type TestIndexMode = WritingMode | AgainstMode;
+
+/** The flag that picks the record mode. */
 export const BASELINE_FLAG = '--baseline';
 
-/** The flag that picks the comparing mode, up to the baseline's path. */
+/** The flag that picks the guard, up to the record's path. */
 export const AGAINST_FLAG = '--against=';
 
 /** The flag that names the map either mode reads, up to the map's path. */
@@ -332,7 +332,7 @@ export const CORE_PACKAGE_UNIT: string = CORE_PACKAGE.replace(/\/$/, '');
 /** The prefixes a test file is brought back to `src/` from before it is compared, each with its closing `/`. */
 export const CORE_TEST_PREFIXES: readonly string[] = [CORE_SOURCE, CORE_PARKED_TESTS];
 
-/** The baseline's path, relative to the repository root. */
+/** The record's path, relative to the repository root; the folder-unit baseline lay at the same path. */
 export const BASELINE_PATH: string = `${OUTPUT_DIR}/test-index.baseline.json`;
 
 /** How many test files the summary lists by index. */
@@ -1155,8 +1155,8 @@ function readArgs(args: readonly string[], usage: string): ParsedArgs {
  * @param args - The arguments after the script's path.
  * @returns `survey` when there is no argument, the map's path under `map`
  *   with `baseline` when the arguments are `--baseline` and
- *   `--map=<file>`, and the baseline's path under `against` beside the
- *   map's when they are `--against=<baseline>` and `--map=<file>`.
+ *   `--map=<file>`, and the record's path under `against` beside the
+ *   map's when they are `--against=<record>` and `--map=<file>`.
  * @throws When any other argument is passed, one twice, `--baseline` with
  *   `--against=`, a flag ending in `=` with no path, either mode without
  *   `--map=<file>`, or `--map=<file>` alone.
@@ -1166,17 +1166,17 @@ export function parseMode(args: readonly string[]): TestIndexMode {
     return 'survey';
   }
   const usage = `unknown arguments: ${args.join(' ')}. Usage: bun scripts/survey/test-index.ts `
-    + `[${BASELINE_FLAG} ${MAP_FLAG}<file> | ${AGAINST_FLAG}<baseline> ${MAP_FLAG}<file>]`;
+    + `[${BASELINE_FLAG} ${MAP_FLAG}<file> | ${AGAINST_FLAG}<record> ${MAP_FLAG}<file>]`;
   const { against, baseline, map } = readArgs(args, usage);
   if (baseline && against !== undefined) {
     throw new Error(usage);
   }
   if (!baseline && against === undefined) {
-    throw new Error(`${MAP_FLAG}<file> names the map of ${BASELINE_FLAG} or ${AGAINST_FLAG}<baseline>, and neither was passed`);
+    throw new Error(`${MAP_FLAG}<file> names the map of ${BASELINE_FLAG} or ${AGAINST_FLAG}<record>, and neither was passed`);
   }
   const flag = baseline
     ? BASELINE_FLAG
-    : `${AGAINST_FLAG}<baseline>`;
+    : `${AGAINST_FLAG}<record>`;
   if (map === undefined) {
     throw new Error(`${flag} reads the map: pass ${MAP_FLAG}<file> beside it`);
   }
@@ -1236,9 +1236,26 @@ export function listCommittableFiles(root: string): TrackedFiles {
 
 /**
  * Builds the import graph of `files` in the repository at `root` and
- * computes the index from it. The graph is built here again rather than
- * read from `docs/survey/import-graph.json`, so the scripts run in any
- * order.
+ * reads their texts. The graph is built here again rather than read from
+ * `docs/survey/import-graph.json`, so the scripts run in any order.
+ *
+ * @param root - The repository root.
+ * @param files - The files to read, repository-relative.
+ * @returns The graph and the texts the index is computed from.
+ * @throws When a file cannot be read or `bun build` exits non-zero.
+ */
+async function readTree(root: string, files: readonly string[]): Promise<TestIndexInput> {
+  const sources = new Map<string, string>();
+  for (const path of files) {
+    sources.set(path, await Bun.file(join(root, path)).text());
+  }
+  const metafile = await readMetafile(root, files);
+  const graph = buildImportGraph({ files, metafile, resolve: bunResolver(root), root, sources });
+  return { graph, sources };
+}
+
+/**
+ * Builds the import graph of `files` and computes the index from it.
  *
  * @param root - The repository root.
  * @param files - The files to read, repository-relative.
@@ -1247,18 +1264,19 @@ export function listCommittableFiles(root: string): TrackedFiles {
  * @throws When a file cannot be read or `bun build` exits non-zero.
  */
 async function readIndex(root: string, files: readonly string[], rules: IndexRules): Promise<TestIndex> {
-  const sources = new Map<string, string>();
-  for (const path of files) {
-    sources.set(path, await Bun.file(join(root, path)).text());
-  }
-  const metafile = await readMetafile(root, files);
-  const graph = buildImportGraph({ files, metafile, resolve: bunResolver(root), root, sources });
-  return computeTestIndex({ graph, sources }, rules);
+  return computeTestIndex(await readTree(root, files), rules);
+}
+
+/** A path as passed, read against the repository root when it is relative. */
+function fromRoot(root: string, path: string): string {
+  return isAbsolute(path)
+    ? path
+    : join(root, path);
 }
 
 /**
  * Reads the repository at `root` under `coreRules` and compares it with a
- * baseline. Writes nothing.
+ * folder-unit baseline. Writes nothing, and no mode runs it.
  *
  * @param root - The repository root.
  * @param baselinePath - The baseline's path, absolute or relative to `root`.
@@ -1266,9 +1284,7 @@ async function readIndex(root: string, files: readonly string[], rules: IndexRul
  * @throws When the baseline cannot be read or is not one, or the tree cannot be read.
  */
 export async function against(root: string, baselinePath: string): Promise<BaselineComparison> {
-  const file = isAbsolute(baselinePath)
-    ? baselinePath
-    : join(root, baselinePath);
+  const file = fromRoot(root, baselinePath);
   if (!existsSync(file)) {
     throw new Error(`cannot read the baseline: no file at ${file}`);
   }
@@ -1277,26 +1293,160 @@ export async function against(root: string, baselinePath: string): Promise<Basel
   return compareToBaseline(index, baseline);
 }
 
+/** The tree read in projected packages: the index, the rules it was computed under, and what a test's record is read by. */
+interface PackageReading {
+  /** The index under `packageRules`. */
+  readonly index: TestIndex;
+  /** The rules, the bin's reach among them. */
+  readonly rules: IndexRules;
+  /** The map, the kind globs, the members, the texts and the resolver. */
+  readonly input: RecordInput;
+}
+
 /**
- * Reads the repository at `root` and writes the survey's two outputs under
- * `docs/survey/`, or the baseline alone in `baseline` mode.
+ * Reads the map, the test kinds and the workspace members of the
+ * repository at `root`, builds the graph of `files` and computes the index
+ * under `packageRules`.
  *
  * @param root - The repository root.
- * @param mode - What to write; the survey's two files unless `baseline`.
+ * @param files - The files to read, repository-relative.
+ * @param mapPath - The map's path as passed, absolute or relative to `root`.
+ * @returns The index, its rules and the record input.
+ * @throws When the map, the config or a manifest cannot be read or is
+ *   refused, the tree cannot be read, or the graph holds no bin entry.
+ */
+async function readPackages(root: string, files: readonly string[], mapPath: string): Promise<PackageReading> {
+  const map = readCutMap(root, mapPath);
+  const globs = readTestKindGlobs(root);
+  const members = readMembers(root);
+  const tree = await readTree(root, files);
+  const rules = packageRules(map, tree.graph);
+  const input: RecordInput = { globs, map, members, resolve: bunResolver(root), sources: tree.sources };
+  return { index: computeTestIndex(tree, rules), input, rules };
+}
+
+/**
+ * The lines that name the unplaced files.
+ *
+ * @param unplaced - The files the map holds no unit for, sorted.
+ * @param mapPath - The map's path as passed.
+ * @returns A heading naming the map and the count, then one indented line per file; empty when none is unplaced.
+ */
+export function unplacedLines(unplaced: readonly string[], mapPath: string): string[] {
+  return unplaced.length === 0
+    ? []
+    : [`test-index: ${unplaced.length} file(s) the map ${mapPath} lists nowhere:`, ...unplaced.map((path) => `  ${path}`)];
+}
+
+/**
+ * Reads the repository at `root` in projected packages and writes the
+ * record (see the module note).
+ *
+ * @param root - The repository root.
+ * @param mapPath - The map's path as passed; the record names it so.
+ * @returns The record's path, relative to `root`.
+ * @throws When `readCommit` cannot name the commit read, the map, the
+ *   config or a manifest is refused, or a file is unplaced, the message
+ *   then naming each; the record is left as it was.
+ */
+async function takeRecord(root: string, mapPath: string): Promise<string> {
+  const commit = readCommit(root);
+  const { index, input, rules } = await readPackages(root, listTrackedFiles(root).all, mapPath);
+  if (index.unplaced.length > 0) {
+    throw new Error([...unplacedLines(index.unplaced, mapPath), 'test-index: no record was written'].join('\n'));
+  }
+  const tests = new Map<string, TestRecord>(index.tests.map((entry) => [entry.test, recordEntry(entry, input)]));
+  const header = {
+    binReach: rules.spawnedReach ?? [],
+    commit,
+    map: { path: mapPath, sha256: input.map.sha256 },
+  };
+  mkdirSync(join(root, OUTPUT_DIR), { recursive: true });
+  writeFileSync(join(root, BASELINE_PATH), renderRecordJson({ tests, unindexed: index.unindexed }, header));
+  return BASELINE_PATH;
+}
+
+/** What the guard read: the comparison, the header's refusals and the unplaced files. */
+export interface GuardReading {
+  /** Every test file of the tree against the record. */
+  readonly comparison: RecordComparison;
+  /** The lines `checkHeader` answered; empty when the record and the map agree. */
+  readonly refusals: readonly string[];
+  /** Every file the index places nowhere, sorted: test files, reached source files and the bin's. */
+  readonly unplaced: readonly string[];
+  /** The map's path as passed. */
+  readonly mapPath: string;
+}
+
+/**
+ * Reads the record and the repository at `root` in projected packages and
+ * holds the tree to the record. Writes nothing.
+ *
+ * @param root - The repository root.
+ * @param mode - The record's and the map's paths, each absolute or relative to `root`.
+ * @returns What the guard read; {@link guardHolds} says whether it passes.
+ * @throws When the record is missing or `parseRecord` refuses it, the map,
+ *   the config or a manifest is refused, or the tree cannot be read.
+ */
+export async function guard(root: string, mode: AgainstMode): Promise<GuardReading> {
+  const file = fromRoot(root, mode.against);
+  if (!existsSync(file)) {
+    throw new Error(`cannot read the record: no file at ${file}`);
+  }
+  const record = parseRecord(readFileSync(file, 'utf8'));
+  const { index, input } = await readPackages(root, listCommittableFiles(root).all, mode.map);
+  return {
+    comparison: compareToRecord(index, record, input),
+    mapPath: mode.map,
+    refusals: checkHeader(record, input.map),
+    unplaced: index.unplaced,
+  };
+}
+
+/**
+ * Whether the guard passes: `holdsRecord`, and no file unplaced.
+ *
+ * @param reading - What the guard read.
+ * @returns `false` when the guard exits 1.
+ */
+export function guardHolds(reading: GuardReading): boolean {
+  return holdsRecord(reading.comparison, reading.refusals) && reading.unplaced.length === 0;
+}
+
+/**
+ * What the guard prints: `renderGuard`, then each unplaced file.
+ *
+ * @param reading - What the guard read.
+ * @param recordPath - The record's path as it was passed.
+ * @returns The text, without a closing newline.
+ */
+export function renderGuardReading(reading: GuardReading, recordPath: string): string {
+  const unplaced = unplacedLines(reading.unplaced, reading.mapPath);
+  return [
+    renderGuard(reading.comparison, reading.refusals, recordPath),
+    ...unplaced.length > 0
+      ? ['', ...unplaced]
+      : [],
+  ].join('\n');
+}
+
+/**
+ * Reads the repository at `root` and writes the survey's two outputs under
+ * `docs/survey/`, or the record alone in the record mode.
+ *
+ * @param root - The repository root.
+ * @param mode - What to write; the survey's two files unless the record mode is handed with its map.
  * @returns The paths written, relative to `root`.
- * @throws In `baseline` mode, when `readCommit` cannot name the commit read.
+ * @throws In the record mode, as `takeRecord` refuses: no commit to name,
+ *   a refused map, config or manifest, or an unplaced file.
  */
 export async function main(root: string, mode: WritingMode = 'survey'): Promise<string[]> {
-  const commit = mode === 'baseline'
-    ? readCommit(root)
-    : undefined;
+  if (mode !== 'survey') {
+    return [await takeRecord(root, mode.map)];
+  }
   const tracked = listTrackedFiles(root);
   const index = await readIndex(root, tracked.all, SURVEY_RULES);
   mkdirSync(join(root, OUTPUT_DIR), { recursive: true });
-  if (commit !== undefined) {
-    writeFileSync(join(root, BASELINE_PATH), renderTestIndexBaselineJson(index, commit));
-    return [BASELINE_PATH];
-  }
   const jsonPath = `${OUTPUT_DIR}/test-index.json`;
   const markdownPath = `${OUTPUT_DIR}/test-index.md`;
   writeFileSync(join(root, jsonPath), renderTestIndexJson(index));
@@ -1308,16 +1458,13 @@ if (import.meta.main) {
   try {
     const mode = parseMode(process.argv.slice(2));
     if (mode === 'survey' || 'baseline' in mode) {
-      const writing = mode === 'survey'
-        ? 'survey'
-        : 'baseline';
-      for (const path of await main(process.cwd(), writing)) {
+      for (const path of await main(process.cwd(), mode)) {
         console.log(`wrote ${path}`);
       }
     } else {
-      const comparison = await against(process.cwd(), mode.against);
-      console.log(renderComparison(comparison, mode.against));
-      if (!holdsBaseline(comparison)) {
+      const reading = await guard(process.cwd(), mode);
+      console.log(renderGuardReading(reading, mode.against));
+      if (!guardHolds(reading)) {
         process.exit(1);
       }
     }

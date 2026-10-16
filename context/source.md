@@ -222,9 +222,10 @@ Each keeps its path under `src/` from before the move:
 specifiers, and `src/tests/core-coupled/README.md` lists what each reaches
 above core. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts` names the
 folder: the barrels sweep reads these files as core's and does not hold their
-imports to the barrel rule, and the test-index comparison holds each under its
-path from before the move. A later spec sorts each file back into the package
-once its coupling is gone, or into the module it really tests.
+imports to the barrel rule. The test-index guard reads them as any test: under
+its own path, in the unit the cut table lists it in, and held to the rule of
+its kind. A later spec sorts each file back into the package once its coupling
+is gone, or into the module it really tests.
 
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`

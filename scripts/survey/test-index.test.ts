@@ -10,6 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { CORE_FOLDER, CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from './core-moves';
 import { parseCutMap } from './cut-map';
+import { listTrackedFiles } from './files';
+import { buildImportGraph, bunResolver, readMetafile } from './import-graph';
 import {
   BASELINE_PATH,
   BIN_ENTRY,
@@ -233,7 +235,9 @@ describe('the baseline', () => {
     expect(renderTestIndexBaselineJson(plantedIndex(), 'abc123')).toBe(first);
     expect(renderTestIndexBaselineJson(index, 'def456')).toBe(first.replace('abc123', 'def456'));
   });
+});
 
+describe('the command line', () => {
   it('is picked by --baseline beside --map=<file>, and any other argument is refused', () => {
     expect(parseMode([])).toBe('survey');
     expect(parseMode(['--baseline', '--map=docs/survey/cut-table.json'])).toEqual({ baseline: true, map: 'docs/survey/cut-table.json' });
@@ -244,9 +248,24 @@ describe('the baseline', () => {
 
   it('refuses --baseline without --map=<file>, and --map=<file> alone', () => {
     expect(() => parseMode(['--baseline'])).toThrow('--baseline reads the map: pass --map=<file> beside it');
-    expect(() => parseMode(['--map=m.json'])).toThrow('--map=<file> names the map of --baseline or --against=<baseline>, and neither was passed');
+    expect(() => parseMode(['--map=m.json'])).toThrow('--map=<file> names the map of --baseline or --against=<record>, and neither was passed');
     expect(() => parseMode(['--baseline', '--map='])).toThrow('unknown arguments: --baseline --map=.');
     expect(() => parseMode(['--baseline', '--map=a.json', '--map=b.json'])).toThrow('unknown arguments');
+  });
+
+  it('is picked by --against=<record> beside --map=<file>, each with a path', () => {
+    expect(parseMode(['--against=docs/survey/test-index.baseline.json', '--map=docs/survey/cut-table.json'])).toEqual({
+      against: 'docs/survey/test-index.baseline.json',
+      map: 'docs/survey/cut-table.json',
+    });
+    expect(() => parseMode(['--against=', '--map=m.json'])).toThrow('unknown arguments: --against= --map=m.json.');
+    expect(() => parseMode(['--against'])).toThrow('unknown arguments: --against.');
+    expect(() => parseMode(['--baseline', '--against=a.json', '--map=m.json'])).toThrow('unknown arguments');
+    expect(() => parseMode(['--against=a.json', '--against=b.json', '--map=m.json'])).toThrow('unknown arguments');
+  });
+
+  it('refuses --against=<record> without --map=<file>', () => {
+    expect(() => parseMode(['--against=a.json'])).toThrow('--against=<record> reads the map: pass --map=<file> beside it');
   });
 });
 
@@ -508,21 +527,6 @@ describe('the comparison against a baseline', () => {
       'test-index: 8 test file(s) held to base.json, read at commit abc123: 0 risen, 8 equal, 0 fallen',
       'test-index: 0 new, 0 gone, 0 not read',
     ]);
-  });
-
-  it('is picked by --against=<baseline> beside --map=<file>, each with a path', () => {
-    expect(parseMode(['--against=docs/survey/test-index.baseline.json', '--map=docs/survey/cut-table.json'])).toEqual({
-      against: 'docs/survey/test-index.baseline.json',
-      map: 'docs/survey/cut-table.json',
-    });
-    expect(() => parseMode(['--against=', '--map=m.json'])).toThrow('unknown arguments: --against= --map=m.json.');
-    expect(() => parseMode(['--against'])).toThrow('unknown arguments: --against.');
-    expect(() => parseMode(['--baseline', '--against=a.json', '--map=m.json'])).toThrow('unknown arguments');
-    expect(() => parseMode(['--against=a.json', '--against=b.json', '--map=m.json'])).toThrow('unknown arguments');
-  });
-
-  it('refuses --against=<baseline> without --map=<file>', () => {
-    expect(() => parseMode(['--against=a.json'])).toThrow('--against=<baseline> reads the map: pass --map=<file> beside it');
   });
 
   it('refuses a text that is not a baseline', () => {
@@ -824,24 +828,65 @@ describe('a real bun build over a scratch repository', () => {
   });
 });
 
-describe('the baseline mode over a scratch repository', () => {
+/** The map a scratch repository of the record and the guard is read by. */
+const SCRATCH_MAP = 'docs/survey/cut-table.json';
+
+/**
+ * A scratch repository's files in scope: the bin, a test of its own unit,
+ * and a second unit no test reaches yet.
+ */
+const SCRATCH_FILES: Readonly<Record<string, string>> = {
+  'src/a/one.test.ts': 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
+    + 'it(\'x\', () => expect(x).toBe(1));\n',
+  'src/deep/x.ts': 'export const x = 1;\n',
+  'src/far/y.ts': 'export const y = 2;\n',
+  'src/rafa.ts': 'import { x } from \'./deep/x.js\';\nexport const bin = x;\n',
+};
+
+/**
+ * The cut table the scratch repositories plant: the bin, its test and
+ * `fresh.test.ts`, listed before it is written, in `@scratch/cli`, and
+ * `y.ts` alone in `@scratch/far`. `untracked.test.ts`, `stray.test.ts`
+ * and `stray/z.ts` are listed nowhere.
+ */
+const SCRATCH_TABLE = `${JSON.stringify({
+  packages: [
+    { files: ['src/a/fresh.test.ts', 'src/a/one.test.ts', 'src/deep/x.ts', 'src/rafa.ts'], name: '@scratch/cli' },
+    { files: ['src/far/y.ts'], name: '@scratch/far' },
+  ],
+  unassigned: [],
+}, null, 2)}\n`;
+
+/**
+ * Plants a scratch repository of the record and the guard: the files in
+ * scope, the cut table, a root manifest with no workspace member, and a
+ * file out of scope, all staged and none committed.
+ *
+ * @param prefix - The temp folder's prefix.
+ * @returns The repository's root.
+ */
+function plantScratch(prefix: string): string {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  git(root, ['init', '--quiet']);
+  for (const [path, text] of Object.entries(SCRATCH_FILES)) {
+    plant(root, path, text);
+  }
+  plant(root, SCRATCH_MAP, SCRATCH_TABLE);
+  plant(root, 'package.json', '{ "name": "scratch", "private": true, "workspaces": [] }\n');
+  plant(root, 'README.md', 'A file out of scope.\n');
+  git(root, ['add', '-A']);
+  return root;
+}
+
+/** The record mode of a scratch repository, its map passed relative to the root. */
+const RECORD_MODE = { baseline: true, map: SCRATCH_MAP } as const;
+
+describe('the record mode over a scratch repository', () => {
   let root = '';
   let head = '';
-  const files: Record<string, string> = {
-    'src/a/one.test.ts': 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
-      + 'it(\'x\', () => expect(x).toBe(1));\n',
-    'src/deep/x.ts': 'export const x = 1;\n',
-    'src/far/y.ts': 'export const y = 2;\n',
-  };
 
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'survey-test-index-baseline-'));
-    git(root, ['init', '--quiet']);
-    for (const [path, text] of Object.entries(files)) {
-      plant(root, path, text);
-    }
-    plant(root, 'README.md', 'A file out of scope.\n');
-    git(root, ['add', '-A']);
+    root = plantScratch('survey-test-index-record-');
   });
 
   afterAll(() => {
@@ -849,25 +894,44 @@ describe('the baseline mode over a scratch repository', () => {
   });
 
   it('refuses a repository with no commit to name', async () => {
-    await expect(main(root, 'baseline')).rejects.toThrow('git rev-parse --verify HEAD^{commit} failed');
+    await expect(main(root, RECORD_MODE)).rejects.toThrow('git rev-parse --verify HEAD^{commit} failed');
     expect(existsSync(join(root, BASELINE_PATH))).toBe(false);
   });
 
-  it('writes the baseline alone, naming HEAD, byte-identical twice', async () => {
+  it('writes the record alone, its header first, naming HEAD and the map\'s hash, byte-identical twice', async () => {
     git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'plant']);
     head = git(root, ['rev-parse', 'HEAD']).trim();
     expect(head).toMatch(/^[0-9a-f]{40}$/);
-    expect(await main(root, 'baseline')).toEqual(['docs/survey/test-index.baseline.json']);
+    expect(await main(root, RECORD_MODE)).toEqual(['docs/survey/test-index.baseline.json']);
     const json = readFileSync(join(root, BASELINE_PATH), 'utf8');
-    expect(JSON.parse(json)).toEqual({
+    const sha256 = new Bun.CryptoHasher('sha256').update(SCRATCH_TABLE)
+      .digest('hex');
+    expect(json.split('\n')[1]).toBe('  "unit": "packages",');
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(Object.keys(parsed)).toEqual(['unit', 'map', 'commit', 'binReach', 'tests', 'unsorted', 'unindexed']);
+    expect(parsed).toEqual({
+      binReach: ['@scratch/cli'],
       commit: head,
-      tests: { 'src/a/one.test.ts': { folders: ['src/deep'], index: 1, spawns: false, spawnsVia: [] } },
+      map: { path: SCRATCH_MAP, sha256 },
+      tests: {
+        'src/a/one.test.ts': {
+          deep: [],
+          kind: 'unit',
+          meets: true,
+          package: '@scratch/cli',
+          packages: ['@scratch/cli'],
+          spawns: false,
+          spawnsVia: [],
+        },
+      },
       unindexed: [],
+      unit: 'packages',
+      unsorted: [],
     });
     // The survey's two files are another mode's: this one leaves them unwritten.
     expect(existsSync(join(root, 'docs/survey/test-index.json'))).toBe(false);
     expect(existsSync(join(root, 'docs/survey/test-index.md'))).toBe(false);
-    await main(root, 'baseline');
+    await main(root, RECORD_MODE);
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(json);
   });
 
@@ -877,24 +941,31 @@ describe('the baseline mode over a scratch repository', () => {
     expect(readCommit(root)).toBe(head);
   });
 
-  it('refuses when a tracked file in scope differs from HEAD, unstaged or staged, and leaves the baseline as it was', async () => {
+  it('refuses when a tracked file in scope differs from HEAD, unstaged or staged, and leaves the record as it was', async () => {
     const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
     plant(root, 'src/a/one.test.ts', 'import { y } from \'../far/y.js\';\n');
-    await expect(main(root, 'baseline')).rejects.toThrow(`1 tracked file(s) in scope differ from ${head}: src/a/one.test.ts`);
+    await expect(main(root, RECORD_MODE)).rejects.toThrow(`1 tracked file(s) in scope differ from ${head}: src/a/one.test.ts`);
     git(root, ['add', '--', 'src/a/one.test.ts', 'src/a/untracked.test.ts']);
     expect(() => readCommit(root)).toThrow(`2 tracked file(s) in scope differ from ${head}: src/a/one.test.ts, src/a/untracked.test.ts`);
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
+
+  it('refuses naming each file the map lists nowhere, a test and the source file it reaches, and leaves the record as it was', async () => {
+    const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
+    git(root, ['reset', '--quiet', '--hard', 'HEAD']);
+    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+    plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
+    git(root, ['add', '-A']);
+    git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'stray']);
+    const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json lists nowhere:\n'
+      + '  src/a/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
+    await expect(main(root, RECORD_MODE)).rejects.toThrow(refusal);
+    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
+  });
 });
 
-/**
- * Runs the script itself in `root` with `--against=<baseline>` and the
- * `--map=<file>` it is refused without, and returns its exit code and what
- * it printed. The folder-unit comparison does not read the map, so none is
- * planted.
- */
-function runAgainst(root: string, baseline: string): { exitCode: number; stderr: string; stdout: string } {
-  const args = [`--against=${baseline}`, '--map=docs/survey/cut-table.json'];
+/** Runs the script itself in `root` with `args`, and returns its exit code and what it printed. */
+function runScript(root: string, args: readonly string[]): { exitCode: number; stderr: string; stdout: string } {
   const result = Bun.spawnSync([process.execPath, join(import.meta.dir, 'test-index.ts'), ...args], {
     cwd: root,
     stderr: 'pipe',
@@ -903,7 +974,112 @@ function runAgainst(root: string, baseline: string): { exitCode: number; stderr:
   return { exitCode: result.exitCode, stderr: result.stderr.toString(), stdout: result.stdout.toString() };
 }
 
-describe('the comparing mode over a scratch repository', () => {
+/** Runs the guard in `root` against `record`, the map passed beside it. */
+function runGuard(root: string, record: string): { exitCode: number; stderr: string; stdout: string } {
+  return runScript(root, [`--against=${record}`, `--map=${SCRATCH_MAP}`]);
+}
+
+describe('the guard over a scratch repository', () => {
+  let root = '';
+  let head = '';
+
+  beforeAll(async () => {
+    root = plantScratch('survey-test-index-guard-');
+    git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'plant']);
+    head = git(root, ['rev-parse', 'HEAD']).trim();
+    await main(root, RECORD_MODE);
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  it('exits 0 on the tree the record was taken from, and writes nothing', () => {
+    const record = readFileSync(join(root, BASELINE_PATH), 'utf8');
+    const run = runGuard(root, BASELINE_PATH);
+    expect(run.stdout).toBe(
+      `test-index: 1 test file(s) held to ${BASELINE_PATH}, taken at commit ${head} on ${SCRATCH_MAP}: `
+      + '0 risen, 0 sorted, 0 unsorted (0 widened), 1 held, 0 new\n'
+      + 'test-index: 0 gone, 0 not read, 0 unindexed still, 0 unplaced\n',
+    );
+    expect(run).toMatchObject({ exitCode: 0, stderr: '' });
+    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(record);
+    expect(git(root, ['status', '--porcelain', '--', 'src'])).toBe('');
+  });
+
+  it('exits 1 naming a unit test that reaches a second unit, and reads an untracked test meeting its rule as new', () => {
+    plant(root, 'src/a/one.test.ts', 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
+      + 'import { y } from \'../far/y.js\';\nit(\'x\', () => expect(x + y).toBe(3));\n');
+    plant(root, 'src/a/fresh.test.ts', 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
+      + 'it(\'x\', () => expect(x).toBe(1));\n');
+    const run = runGuard(root, BASELINE_PATH);
+    expect(run.stdout.split('\n')).toEqual([
+      `test-index: 2 test file(s) held to ${BASELINE_PATH}, taken at commit ${head} on ${SCRATCH_MAP}: `
+      + '1 risen, 0 sorted, 0 unsorted (0 widened), 0 held, 1 new',
+      'test-index: 0 gone, 0 not read, 0 unindexed still, 0 unplaced',
+      '',
+      'Risen, the test does not meet its rule and is not on the unsorted list (1):',
+      '  src/a/one.test.ts (unit test in @scratch/cli): reaches @scratch/far beyond its own unit',
+      '',
+      'New, not in the record and meeting its rule (1):',
+      '  src/a/fresh.test.ts',
+      '',
+    ]);
+    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
+    git(root, ['checkout', '--quiet', '--', 'src/a/one.test.ts']);
+    rmSync(join(root, 'src/a/fresh.test.ts'));
+  });
+
+  it('exits 1 naming each file the map lists nowhere, with no test risen', () => {
+    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+    plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
+    const run = runGuard(root, BASELINE_PATH);
+    expect(run.stdout.split('\n')).toEqual([
+      `test-index: 1 test file(s) held to ${BASELINE_PATH}, taken at commit ${head} on ${SCRATCH_MAP}: `
+      + '0 risen, 0 sorted, 0 unsorted (0 widened), 1 held, 0 new',
+      'test-index: 0 gone, 0 not read, 0 unindexed still, 1 unplaced',
+      '',
+      `test-index: 2 file(s) the map ${SCRATCH_MAP} lists nowhere:`,
+      '  src/a/stray.test.ts',
+      '  src/stray/z.ts',
+      '',
+    ]);
+    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
+    rmSync(join(root, 'src/a/stray.test.ts'));
+    rmSync(join(root, 'src/stray'), { force: true, recursive: true });
+  });
+
+  it('exits 1 with the reason when the record is missing, is not one, or is the folder-unit baseline', () => {
+    const missing = runGuard(root, 'docs/survey/absent.json');
+    expect(missing).toMatchObject({ exitCode: 1, stdout: '' });
+    // The folder is left out: the script names it by its own working directory, which a symlinked temp folder spells otherwise.
+    expect(missing.stderr).toStartWith('cannot read the record: no file at ');
+    expect(missing.stderr).toEndWith('docs/survey/absent.json\n');
+    const wrong = runGuard(root, 'src/deep/x.ts');
+    expect(wrong).toMatchObject({ exitCode: 1, stdout: '' });
+    expect(wrong.stderr).toStartWith('not a test-index record: ');
+    plant(root, 'docs/survey/folders.json', '{ "commit": "abc123", "tests": {}, "unindexed": [] }\n');
+    expect(runGuard(root, 'docs/survey/folders.json')).toMatchObject({
+      exitCode: 1,
+      stderr: 'not a test-index record: it holds no `unit`\n',
+      stdout: '',
+    });
+  });
+});
+
+/**
+ * Writes the folder-unit baseline of the repository at `root`, as the
+ * baseline mode wrote it before the record replaced it: the index of the
+ * tracked files under the survey's rules, naming `HEAD`.
+ */
+async function writeFolderBaseline(root: string): Promise<void> {
+  const files = listTrackedFiles(root).all;
+  const sources = new Map(files.map((path) => [path, readFileSync(join(root, path), 'utf8')]));
+  const graph = buildImportGraph({ files, metafile: await readMetafile(root, files), resolve: bunResolver(root), root, sources });
+  plant(root, BASELINE_PATH, renderTestIndexBaselineJson(computeTestIndex({ graph, sources }), git(root, ['rev-parse', 'HEAD']).trim()));
+}
+
+describe('the folder-unit comparison over a scratch repository', () => {
   let root = '';
   let head = '';
   // `src/pr/git.ts` and its test are a move `core-moves.ts` lists, to `packages/rafa/src/core/git/`, behind the barrel `index.ts`.
@@ -920,7 +1096,7 @@ describe('the comparing mode over a scratch repository', () => {
     'src/pr/merge.ts': 'import { git } from \'./git.js\';\nexport const merge = git;\n',
   };
 
-  beforeAll(() => {
+  beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), 'survey-test-index-against-'));
     git(root, ['init', '--quiet']);
     for (const [path, text] of Object.entries(files)) {
@@ -929,24 +1105,17 @@ describe('the comparing mode over a scratch repository', () => {
     git(root, ['add', '-A']);
     git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'plant']);
     head = git(root, ['rev-parse', 'HEAD']).trim();
+    await writeFolderBaseline(root);
   });
 
   afterAll(() => {
     rmSync(root, { force: true, recursive: true });
   });
 
-  it('exits 0 on the tree the baseline was read from, and writes nothing', async () => {
-    await main(root, 'baseline');
-    const baseline = readFileSync(join(root, BASELINE_PATH), 'utf8');
-    const run = runAgainst(root, BASELINE_PATH);
-    expect(run.stdout).toBe(
-      `test-index: 3 test file(s) held to ${BASELINE_PATH}, read at commit ${head}: 0 risen, 3 equal, 0 fallen\n`
-      + 'test-index: 0 new, 0 gone, 0 not read\n',
-    );
-    expect(run).toMatchObject({ exitCode: 0, stderr: '' });
-    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(baseline);
-    expect(git(root, ['status', '--porcelain', '--', 'src'])).toBe('');
-    expect(existsSync(join(root, 'docs/survey/test-index.json'))).toBe(false);
+  it('holds the tree the baseline was read from, every test file equal', async () => {
+    const comparison = await against(root, BASELINE_PATH);
+    expect(comparison).toMatchObject({ added: [], commit: head, fallen: [], gone: [], risen: [], unread: [] });
+    expect(comparison.equal.map((change) => change.test)).toEqual(['src/a/one.test.ts', 'src/pr/git.test.ts', 'src/pr/merge.test.ts']);
   });
 
   it('holds a moved test file under its old path, and a test file that reaches the moved file through its barrel', async () => {
@@ -981,36 +1150,5 @@ describe('the comparing mode over a scratch repository', () => {
     ]);
     plant(root, 'src/pr/merge.ts', `import { git } from '../../${CORE_FOLDER}git/index.js';\nexport const merge = git;\n`);
     expect((await against(root, BASELINE_PATH)).risen).toEqual([]);
-  });
-
-  it('exits 1 naming the risen test file, and reads an untracked test file as new', () => {
-    plant(root, 'src/a/one.test.ts', 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
-      + 'import { y } from \'../far/y.js\';\nit(\'x\', () => expect(x + y).toBe(3));\n');
-    plant(root, 'src/a/fresh.test.ts', 'import { expect, it } from \'bun:test\';\nimport { y } from \'../far/y.js\';\n'
-      + 'it(\'y\', () => expect(y).toBe(2));\n');
-    const run = runAgainst(root, BASELINE_PATH);
-    expect(run.stdout.split('\n')).toEqual([
-      `test-index: 3 test file(s) held to ${BASELINE_PATH}, read at commit ${head}: 1 risen, 2 equal, 0 fallen`,
-      'test-index: 1 new, 0 gone, 0 not read',
-      '',
-      'Risen, the index is above the baseline (1):',
-      '  src/a/one.test.ts: 1 -> 2 (gained src/far)',
-      '',
-      'New, the baseline holds no index and nothing is held (1):',
-      '  src/a/fresh.test.ts',
-      '',
-    ]);
-    expect(run).toMatchObject({ exitCode: 1, stderr: '' });
-  });
-
-  it('exits 1 with the reason when the baseline is missing or is not one', () => {
-    const missing = runAgainst(root, 'docs/survey/absent.json');
-    expect(missing).toMatchObject({ exitCode: 1, stdout: '' });
-    // The folder is left out: the script names it by its own working directory, which a symlinked temp folder spells otherwise.
-    expect(missing.stderr).toStartWith('cannot read the baseline: no file at ');
-    expect(missing.stderr).toEndWith('docs/survey/absent.json\n');
-    const wrong = runAgainst(root, 'src/deep/x.ts');
-    expect(wrong).toMatchObject({ exitCode: 1, stdout: '' });
-    expect(wrong.stderr).toStartWith('not a test-index baseline: ');
   });
 });

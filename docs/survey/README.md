@@ -56,16 +56,21 @@ repository.
 - **`test-index.baseline.json`**: The baseline the move of #905 is held to for the fourth criterion of epic #801: the
   index of each of 1031 test files (383 of them spawning a process, none unindexed), with the folders it was counted
   from and the files it spawns through. Made by `bun scripts/survey/test-index.ts --baseline` reading `src/` and
-  `packages/*/src/` at commit 1e088cc, which the file names in full under `commit`. The mode writes this file alone
-  and leaves `test-index.{json,md}` above as they are; it refuses to run when a tracked file in scope differs from
-  `HEAD`. It is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent,
-  sorted keys, `commit`, `tests` keyed by path, `unindexed`. It is read back by
-  `bun scripts/survey/test-index.ts --against=docs/survey/test-index.baseline.json --map=docs/survey/cut-table.json`
-  (the script refuses either mode without `--map=<file>`, and this comparison does not read the map), which writes
-  nothing and exits 1 naming each test file whose index rose: a test file under `packages/rafa/src/` or
-  `src/tests/core-coupled/` is brought back to `src/` first, a test file `scripts/survey/core-moves.ts` moves is held
-  under its old path, `src/core/` counts as one folder and every file under `packages/rafa/src/` as `packages/rafa`,
-  and the walk stops at a core barrel.
+  `packages/*/src/` at commit 1e088cc, which the file names in full under `commit`. That mode now takes `--map=<file>`
+  and writes the record in projected packages instead (`scripts/survey/test-index-record.ts`): a header naming the
+  unit `packages`, the map's path and sha256, the commit and the bin's reach, then per test file its kind, its unit,
+  the units it reaches, the specifiers it enters another unit by through no public entry and whether it meets its
+  kind's rule, the `unsorted` list and `unindexed`. The file as tracked is still the folder-unit baseline until the
+  record is taken on the agreed table. The mode writes this file alone and leaves `test-index.{json,md}` above as they
+  are; it refuses to run when a tracked file in scope differs from `HEAD`, and writes nothing and exits 1 naming each
+  file the map lists nowhere. It is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON
+  as tracked: 2-space indent, sorted keys, `commit`, `tests` keyed by path, `unindexed`. It is read back by
+  `bun scripts/survey/test-index.ts --against=docs/survey/test-index.baseline.json --map=docs/survey/cut-table.json`,
+  the guard of `scripts/survey/test-index-guard.ts`, which writes nothing and exits 1 when the record's unit is not
+  `packages` or its map's sha256 is not the handed map's (each refusal naming both sides), when a test file does not
+  meet its kind's rule and is not on the record's `unsorted` list (a unit or contract test reaching a unit beyond its
+  own, a use-case test entering another unit through no public entry), when a test the record holds has no imports
+  read now, or when the map lists a file nowhere. It refuses the file as tracked, which holds no `unit`.
 
 - **`cut-table.{json,md}`**: The twelve future packages of epic #801, lowest first, each with the folders and files
   it holds by rule and its count of upward edges: imports of kind `value` or `type`, between two files neither of
