@@ -1190,6 +1190,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/branch-decision.js', ['BRANCH_PREFIX', 'REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject', 'resolveProjectConfig']],
+    ['./declarations.js', ['CLAIM_RELEASE_DECLARATION']],
   ]],
   ['./commands/claim/hand.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -1197,6 +1198,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
+    ['./declarations.js', ['CLAIM_HAND_DECLARATION', 'CLAIM_HAND_TO_FLAG', 'CLAIM_HAND_WITHDRAW_FLAG']],
     ['./release.js', ['findOwnedBranch', 'pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/claim/accept.js', [
@@ -1206,6 +1208,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
+    ['./declarations.js', ['CLAIM_ACCEPT_DECLARATION']],
     ['./release.js', ['pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/claim/take.js', [
@@ -1219,6 +1222,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
+    ['./declarations.js', ['CLAIM_TAKE_DECLARATION', 'CLAIM_TAKE_STALE_FLAG']],
     ['./release.js', ['pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/update/current.js', [
