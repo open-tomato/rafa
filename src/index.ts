@@ -73,9 +73,13 @@
  * the twelve sections of the config schema to core, so every setting
  * is registered before any module behind this entry loads or reads a
  * config. {@link CONFIG_DEFAULTS} is the registry's own. The second is
- * `adapter-registry.ts`, for its effect too: it hands core's adapters
- * to the adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers
- * every core kind before a caller of this entry resolves one.
+ * `adapter-registry.ts`, which registers nothing as it is imported: the
+ * entry calls its {@link registerCoreAdapters} once its imports have
+ * loaded, which hands core's adapters to the adapter registry, so
+ * {@link CORE_ADAPTER_REGISTRY} answers every core kind before a caller
+ * of this entry resolves one. A call is what survives a bundler that
+ * drops an import kept for its effect alone. The entry exports it and
+ * {@link CORE_ADAPTERS} too; a second call registers nothing.
  *
  * ## Why the commands carry a `Command` suffix
  *
@@ -128,7 +132,8 @@
  * it, so the entry needs Bun.
  */
 import './config-registry.js';
-import './adapter-registry.js';
+
+import { registerCoreAdapters } from './adapter-registry.js';
 
 export type {
   Adapter,
@@ -277,6 +282,7 @@ export {
   restoreAdapters,
 } from '@open-tomato/rafa/core/adapters';
 export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS } from './config-registry.js';
 export {
   CONFIG_FILE,
@@ -357,3 +363,5 @@ export {
   selfAndAncestors,
 } from './project/scope.js';
 export { default as startCommand } from './start.js';
+
+registerCoreAdapters();

@@ -1180,7 +1180,8 @@ describe('runWrapUp over the spawn seam', () => {
     const driver = join(scratch.bin, 'driver.ts');
     writeFileSync(driver, [
       'import { writeFileSync } from \'node:fs\';',
-      `import '${join(here, '../adapter-registry.js')}';`,
+      `import { registerCoreAdapters } from '${join(here, '../adapter-registry.js')}';`,
+      'registerCoreAdapters();',
       `import { setActiveOutput } from '${fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'))}';`,
       `import { sinkOutput } from '${join(here, '../tests/output-sinks.js')}';`,
       `import { runWrapUp } from '${join(here, 'wrap-up-run.js')}';`,

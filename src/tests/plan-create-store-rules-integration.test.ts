@@ -66,7 +66,8 @@ const PREREQUISITES = '## Store [auto]\n'
 const PROBE = [
   'import { mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
-  `import ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+  `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+  'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,

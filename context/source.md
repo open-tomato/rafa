@@ -263,13 +263,17 @@ imports no adapter: the adapters the registry lists sit above core, under
 `src/adapters/` and `src/effort/sync/`, while the two store backends,
 `store/sqlite` and `store/ndjson`, sit in the package under
 `packages/rafa/src/effort/store/`. `src/adapter-registry.ts`, outside
-`packages/rafa/src/core/`, lists them and hands them to `registerAdapters` as
-it is imported. `src/rafa.ts` and `src/index.ts` import it right after
-`src/config-registry.ts`, before anything resolves an adapter, so the two
-composition roots are the two entries' imports. Until the root is imported,
-every member of `CORE_ADAPTER_REGISTRY` refuses, naming it. A test that reads
-core's adapters off the registry imports the root for its effect, as the
-entries do.
+`packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
+as it is imported: its `registerCoreAdapters()` hands them to
+`registerAdapters` and answers the registry that call made. `src/rafa.ts` and
+`src/index.ts` call it before anything resolves an adapter, since `bun build`
+drops an import kept for its effect alone from a package declaring
+`"sideEffects": false`. A second call registers nothing. Until something calls
+it, every member of `CORE_ADAPTER_REGISTRY` refuses, naming the root.
+`bun test` calls it once per test process from `src/tests/preload.ts`, which
+`bunfig.toml` names under `[test] preload`, so a test reads core's adapters
+registered; a child process a test spawns runs no preload and calls the root
+itself.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's

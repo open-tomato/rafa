@@ -39,7 +39,7 @@
  * The CLI cases read imports off source. `src/rafa.ts` imports the
  * config registry (`src/config-registry.ts`) for its effect, then the
  * adapter registry's composition root (`src/adapter-registry.ts`) for
- * its effect, then the dispatcher, the help renderer, the core registry, the module loader
+ * the `registerCoreAdapters` it calls, then the dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
  * registry is held to
  * hold exactly the commands of the core command modules spelled here, so
@@ -184,6 +184,7 @@ import {
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
 
+import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { CONFIG_DEFAULTS } from './config-registry.js';
 import effortCollect from './effort/collect.js';
@@ -242,6 +243,7 @@ const RUNTIME_EXPORTS = [
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
   'CONFIG_VERSIONS',
+  'CORE_ADAPTERS',
   'CORE_ADAPTER_REGISTRY',
   'ConfigError',
   'DISK_FILE_SYSTEM',
@@ -301,6 +303,7 @@ const RUNTIME_EXPORTS = [
   'readConfigFile',
   'readRafaBlocks',
   'registerAdapters',
+  'registerCoreAdapters',
   'renderInjection',
   'resolveConfig',
   'resolveScope',
@@ -322,6 +325,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
   ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
+  ['CORE_ADAPTERS', entry.CORE_ADAPTERS, CORE_ADAPTERS],
   ['CORE_ADAPTER_REGISTRY', entry.CORE_ADAPTER_REGISTRY, CORE_ADAPTER_REGISTRY],
   ['ConfigError', entry.ConfigError, ConfigError],
   ['DISK_FILE_SYSTEM', entry.DISK_FILE_SYSTEM, DISK_FILE_SYSTEM],
@@ -381,6 +385,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['readConfigFile', entry.readConfigFile, readConfigFile],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
+  ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
   ['resolveScope', entry.resolveScope, resolveScope],
@@ -468,7 +473,7 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 /** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
   ['./config-registry.js', []],
-  ['./adapter-registry.js', []],
+  ['./adapter-registry.js', ['registerCoreAdapters']],
   ['./cli/dispatch.js', ['dispatch']],
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['CORE_REGISTRY']],

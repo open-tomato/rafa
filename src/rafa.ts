@@ -35,23 +35,28 @@
  *
  * Its first import is `src/config-registry.ts`, for its effect: the
  * twelve sections of the config schema are handed to core before any
- * module loaded here reads a config. Its second is
- * `src/adapter-registry.ts`, for its effect too: core's adapters are
- * registered before anything loaded here resolves one.
+ * module loaded here reads a config. It also imports
+ * `src/adapter-registry.ts`, which registers nothing as it is imported:
+ * the module calls its `registerCoreAdapters` before it loads the
+ * project's modules, so core's adapters are registered before anything
+ * run here resolves one, and the call survives a bundler that drops an
+ * import kept for its effect alone.
  *
  * Importing the module dispatches `process.argv`, so no library module
  * imports it (`src/index.ts`).
  */
 import './config-registry.js';
-import './adapter-registry.js';
 
 import { homedir } from 'node:os';
 
+import { registerCoreAdapters } from './adapter-registry.js';
 import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { CORE_REGISTRY } from './commands/index.js';
 import { loadInvocationModules } from './modules/load.js';
 import { createStatusHook } from './status/hook.js';
+
+registerCoreAdapters();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
 const { exitCode } = await dispatch(process.argv.slice(2), {
