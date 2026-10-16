@@ -5,7 +5,9 @@
  * calls released that carry no tag, the change notes waiting for
  * the current plan's release, the change fragments waiting on the
  * base branch with the release settling them would make (read in
- * `./status-fragments.ts`), the audit of the changelog's released
+ * `./status-fragments.ts`), the workspace packages that publish on
+ * their own with their versions, waiting fragments and tags (read in
+ * `./status-packages.ts`), the audit of the changelog's released
  * history (`src/release/audit.ts`), and how many lines the release's
  * stale-docs issues hold open (read in `./status-stale-docs.ts`).
  *
@@ -57,9 +59,9 @@
  *
  * Each of the eight is read on its own and each is allowed to fail:
  * a missing version file, a git that cannot list tags, an unreadable
- * changelog, a store this rafa cannot open, a tracker the chain cannot
- * land on or list. A cell nothing could be
- * read for renders {@link UNREADABLE} and the reason goes on its own
+ * changelog, a workspace manifest that does not parse, a store this
+ * rafa cannot open, a tracker the chain cannot land on or list. A cell
+ * nothing could be read for renders {@link UNREADABLE} and the reason goes on its own
  * line under the block, which is the convention `pr list` keeps for
  * its per-row probes. Refusing the whole command for one of them
  * would hide the ones that were readable, and every one of the eight is worth
@@ -72,6 +74,7 @@
  * `loadConfig` refuses. Both exit 1.
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
+import type { PackagesReading } from './status-packages.js';
 import type { StaleDocsReader, StaleDocsReading, StaleDocsSettings } from './status-stale-docs.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -99,6 +102,7 @@ import { readTags, readUntagged, rootTags } from '../../release/status-readings.
 import { readManifestVersion } from '../../release/version.js';
 
 import { readWaiting, waitingCell, waitingLines, waitingSettingsOf } from './status-fragments.js';
+import { packagesCell, packagesLines, readPackages } from './status-packages.js';
 import { readStaleDocs, readStaleDocsSafely, staleDocsCell, staleDocsProblem } from './status-stale-docs.js';
 
 /** The usage line this action's refusals name. */
@@ -185,6 +189,8 @@ export interface ReleaseStatusReading {
   readonly plan: PendingNotesReading;
   /** The fragments waiting on the base branch, and their forecast. */
   readonly waiting: WaitingReading;
+  /** The publishable workspace packages, each with its version, waiting fragments and newest tag. */
+  readonly packages: PackagesReading;
   /** The audit of the changelog's released history. */
   readonly audit: AuditReading;
   /** How many lines the release's stale-docs issues hold open. */
@@ -364,6 +370,7 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
       : reading.untagged.problem,
     reading.plan.problem,
     ...reading.waiting.problems,
+    reading.packages.problem,
     reading.staleDocs.problem === null
       ? null
       : staleDocsProblem(reading.staleDocs.problem),
@@ -371,11 +378,12 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
 }
 
 /** The label of each of the eight lines, in the order the block writes them. */
-const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'audit', 'stale docs'] as const;
+const LABELS = ['version file', 'latest tag', 'untagged', 'pending', 'waiting', 'packages', 'audit', 'stale docs'] as const;
 
 /**
  * The whole block for one reading: a line per reading, the pending
- * notes under theirs, the waiting fragments under theirs, the audit's
+ * notes under theirs, the waiting fragments under theirs, a line per
+ * publishable package under the packages line, the audit's
  * findings under its line, the open stale-docs lines last, and a line
  * for every reading that failed.
  * Pure and total.
@@ -388,18 +396,20 @@ export function renderStatus(reading: ReleaseStatusReading): string {
     untaggedCell(reading.untagged),
     pendingCell(reading.plan),
     waitingCell(reading.waiting) ?? UNREADABLE,
+    packagesCell(reading.packages, NOTHING) ?? UNREADABLE,
     auditCell(reading.audit) ?? (reading.untagged.missing
       ? MISSING_CHANGELOG_CELL
       : UNREADABLE),
     staleDocsCell(reading.staleDocs, NOTHING) ?? UNREADABLE,
   ];
-  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, auditLine, staleDocsLine] = LABELS
+  const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, packagesLine, auditLine, staleDocsLine] = LABELS
     .map((label, index) => `${INDENT}${label.padEnd(width)}${GAP}${cells[index] ?? ''}`);
   const under = (line: string): string => `${INDENT}${' '.repeat(width)}${GAP}${line}`;
   const problems = problemsOf(reading).map((problem) => `${INDENT}${problem}`);
   const block = [
     versionLine, tagLine, untaggedLine, pendingLine, ...pendingLines(reading.plan).map(under),
     waitingLine, ...waitingLines(reading.waiting).map(under),
+    packagesLine, ...packagesLines(reading.packages, UNREADABLE).map(under),
     auditLine, ...auditLines(reading.audit).map(under),
     staleDocsLine,
   ].join('\n');
@@ -483,6 +493,7 @@ export async function readStatus(
   const readNotes = seams.readNotes ?? readPlanChanges;
 
   const tags = readTags(git);
+  const waiting = readWaiting(git, config.waiting);
   const reading: ReleaseStatusReading = {
     versionFile: readVersionFile(project.root, config.versionFile),
     tags,
@@ -494,7 +505,8 @@ export async function readStatus(
       planStubsUnder(project.root, config.planDir),
       readNotes,
     ),
-    waiting: readWaiting(git, config.waiting),
+    waiting,
+    packages: readPackages(project.root, git, config.waiting, { tags, waiting }),
     audit: readAudit(project.root, config.changelog, rootTags(tags).map((tag) => tag.version)),
     staleDocs: await readStaleDocsSafely(seams.readStaleDocs ?? readStaleDocs, project, config.tracker),
   };
@@ -514,6 +526,8 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
       + ' precedence, the versions `release.changelog` calls released that carry no tag, the change notes'
       + ' the current plan\'s sessions have stored for its next release, and the change fragments waiting on'
       + ' `origin/<pr.base>` as last fetched, with the release `rafa release settle` would fold them into,'
+      + ' the workspace packages that are not `private`, each with the version its manifest declares, the'
+      + ' fragments waiting for it and its newest `<name>@<version>` tag,'
       + ' and an audit of the changelog\'s released history: a version two headings name, a gap between'
       + ' versions, dates out of order, and a heading newer than the releases made before settle with no tag,'
       + ' and how many lines the open stale-docs issues of the tracker the chain lands on hold unticked,'

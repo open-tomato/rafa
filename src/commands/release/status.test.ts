@@ -156,6 +156,7 @@ function reading(over: Partial<ReleaseStatusReading> = {}): ReleaseStatusReading
     untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], missing: false, problem: null },
     plan: { stub: STUB, source: 'roster', branch: BRANCH, notes: [note()], level: 'minor', problem: null },
     waiting: { ref: 'origin/main', read: true, baseVersion: '0.5.0', fragments: [], malformed: 0, forecast: null, problems: [] },
+    packages: { read: true, packages: [], tagsRead: true, problem: null },
     audit: { path: 'CHANGELOG.md', read: true, sections: 2, findings: [] },
     staleDocs: { count: 0, problem: null },
     ...over,
@@ -600,9 +601,41 @@ describe('the block', () => {
       `  pending       1 note for ${STUB}, worth a minor release`,
       '                - release: a line a user would understand',
       '  waiting       none on origin/main',
+      '  packages      none',
       '  audit         clean, 2 sections of CHANGELOG.md',
       '  stale docs    none',
     ]);
+  });
+
+  it('writes a line per publishable package under the packages line, after the waiting fragments', () => {
+    const lines = linesOf(renderStatus(reading({
+      packages: {
+        read: true,
+        tagsRead: true,
+        problem: null,
+        packages: [
+          { name: '@scope/plugin', dir: 'packages/plugin', version: '0.1.0', waiting: 1, tag: '@scope/plugin@0.1.0' },
+          { name: '@scope/tool', dir: 'packages/tool', version: '2.0.0', waiting: 0, tag: null },
+        ],
+      },
+    })));
+
+    expect(lines.slice(5, 9)).toEqual([
+      '  waiting       none on origin/main',
+      '  packages      2 publishable',
+      '                @scope/plugin  0.1.0  1 waiting  @scope/plugin@0.1.0',
+      '                @scope/tool    2.0.0  0 waiting  untagged',
+    ]);
+    expect(lines[9]).toBe('  audit         clean, 2 sections of CHANGELOG.md');
+  });
+
+  it('marks an unread workspace in the packages cell, and says why under the block', () => {
+    const text = renderStatus(reading({
+      packages: { read: false, packages: [], tagsRead: true, problem: 'the workspace packages could not be read: x' },
+    }));
+
+    expect(cellOf(text, 'packages')).toBe(UNREADABLE);
+    expect(linesOf(text).at(-1)).toBe('  the workspace packages could not be read: x');
   });
 
   it('writes the block with an unreadable stale-docs count, and says why under it', () => {
@@ -677,7 +710,7 @@ describe('the block', () => {
     }));
 
     expect(cellOf(text, 'pending')).toBe(`${NOTHING}: no current plan`);
-    expect(linesOf(text)).toHaveLength(7);
+    expect(linesOf(text)).toHaveLength(8);
   });
 
   it('says a plan with no stored note has none pending', () => {
@@ -720,7 +753,7 @@ describe('the block', () => {
       },
     }));
 
-    const notes = linesOf(text).slice(4, -3);
+    const notes = linesOf(text).slice(4, -4);
 
     expect(notes.map((line) => line.trim()))
       .toEqual(['- release: one', '- release: three', '- two']);
@@ -786,6 +819,28 @@ describe('the dispatched action', () => {
     expect(packageOnly.reading.audit.findings).toEqual([{ kind: 'untagged', version: '0.5.0' }]);
     expect(rootTagged.reading.untagged.versions).toEqual([]);
     expect(rootTagged.reading.audit.findings).toEqual([]);
+  });
+
+  it('reads the publishable workspace packages off the checkout, with the tags git lists', async () => {
+    const project = freshProject();
+    writeFileSync(join(project.root, 'package.json'), '{"version": "0.5.0", "workspaces": ["packages/*"]}', 'utf8');
+    mkdirSync(join(project.root, 'packages/plugin'), { recursive: true });
+    writeFileSync(join(project.root, 'packages/plugin/package.json'), '{"name": "@scope/plugin", "version": "0.1.0"}', 'utf8');
+    mkdirSync(join(project.root, 'packages/hub'), { recursive: true });
+    writeFileSync(join(project.root, 'packages/hub/package.json'), '{"name": "@scope/hub", "private": true}', 'utf8');
+    const seams = recorded(gitTable('v0.4.0\n@scope/plugin@0.1.0\n'));
+
+    const run = await ran(seams.seams, project);
+    const json = dataOf((await ran(recorded(gitTable('v0.4.0\n')).seams, project, ['--output=json'])).events) as ReleaseStatusResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(cellOf(run.stdout, 'packages')).toBe('1 publishable');
+    // The waiting tree the table does not answer leaves the count unknown, said under the waiting row.
+    expect(run.stdout).toContain(`                @scope/plugin  0.1.0  ${UNREADABLE} waiting  @scope/plugin@0.1.0`);
+    expect(run.stdout).not.toContain('@scope/hub');
+    expect(json.reading.packages.packages).toEqual([
+      { name: '@scope/plugin', dir: 'packages/plugin', version: '0.1.0', waiting: null, tag: null },
+    ]);
   });
 
   it('reads the pending notes for the stub --plan names', async () => {

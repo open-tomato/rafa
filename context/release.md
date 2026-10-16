@@ -262,6 +262,11 @@ last fetched) and prints:
   then `; <name> <base> → <next>` for each package a fragment names, each
   forecast over its own base version (or an error if a fragment does not
   parse, or names a package the workspace lacks or a private one)
+- The `packages` row: `none` for a workspace with no publishable member,
+  `<n> publishable` otherwise, with one line per package under it, its
+  name, the version its manifest declares, how many waiting fragments name
+  it and its newest tag (`latestTagOf`) or `untagged`; read in
+  `src/commands/release/status-packages.ts` (`readPackages`)
 - An audit of released history: versions two headings name, gaps (a version not
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary

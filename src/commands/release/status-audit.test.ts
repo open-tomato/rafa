@@ -13,6 +13,7 @@ function reading(audit: AuditReading): ReleaseStatusReading {
     untagged: { path: 'CHANGELOG.md', released: ['0.3.0'], versions: ['0.3.0'], problem: null },
     plan: { stub: null, source: 'none', branch: 'main', notes: [], level: null, problem: null },
     waiting: { ref: 'origin/main', read: true, baseVersion: '0.3.0', fragments: [], malformed: 0, forecast: null, problems: [] },
+    packages: { read: true, packages: [], tagsRead: true, problem: null },
     audit,
     staleDocs: { count: 0, problem: null },
   };
