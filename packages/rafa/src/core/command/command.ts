@@ -213,14 +213,21 @@ const MAX_EXIT_CODE = 255;
  *
  * The message, when it is not empty, is what the dispatcher tells the
  * reader: on stderr in text mode, in the terminal event in json mode.
+ *
+ * `options` goes to `Error` as it is, so a `cause` given there is kept on
+ * the refusal: `new CommandExit(3, 'refused', { cause: error })` reads the
+ * error back as `exit.cause`.
  */
 export class CommandExit extends Error {
   /** The exit code the invocation ends with, from 0 to 255. */
   readonly exitCode: number;
 
-  /** Throws a `TypeError` when `exitCode` is not a whole number from 0 to 255. */
-  constructor(exitCode: number, message = '') {
-    super(message);
+  /**
+   * Throws a `TypeError` when `exitCode` is not a whole number from 0 to 255,
+   * whatever `options` holds.
+   */
+  constructor(exitCode: number, message = '', options?: ErrorOptions) {
+    super(message, options);
     if (!Number.isInteger(exitCode) || exitCode < 0 || exitCode > MAX_EXIT_CODE) {
       throw new TypeError(
         `CommandExit: exit code is ${describeValue(exitCode)}, expected a whole number from 0 to ${MAX_EXIT_CODE}`,

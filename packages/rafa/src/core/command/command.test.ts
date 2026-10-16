@@ -71,6 +71,23 @@ describe('CommandExit', () => {
     expect(new CommandExit(2).message).toBe('');
   });
 
+  it('keeps the cause it is given', () => {
+    const cause = new Error('underneath');
+
+    const exit = new CommandExit(3, 'refused', { cause });
+
+    expect(exit.cause).toBe(cause);
+    expect(exit.exitCode).toBe(3);
+    expect(exit.message).toBe('refused');
+  });
+
+  it('refuses a bad exit code with a TypeError when a cause is given', () => {
+    const make = (): CommandExit => new CommandExit(256, 'refused', { cause: new Error('x') });
+
+    expect(make).toThrow(TypeError);
+    expect(make).toThrow('CommandExit: exit code is 256, expected a whole number from 0 to 255');
+  });
+
   it.each([
     [-1, 'CommandExit: exit code is -1, expected a whole number from 0 to 255'],
     [256, 'CommandExit: exit code is 256, expected a whole number from 0 to 255'],
