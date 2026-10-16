@@ -2836,29 +2836,40 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   three, so a linked worktree beside it, which has no `.rafa/` of its
   own, runs in the main checkout's project even under a parent folder
   holding its own config; only then does the
-  walk go on above the top level. The project found is the context's
-  `project`. With none, the invocation ends as `no_project`
-  with exit code 1: `rafa: ` and the `rafa init` hint on stderr in text
-  mode, the hint as the result's message in json mode. The command never
-  runs, so it prints no deprecation line. A relative working directory or
-  home, a start that does not resolve, and a git that cannot name the
-  main checkout end as `no_project` too, with the walk's message and the
-  cause of the `ScopeError` it threw: `input:invalid-value`,
-  `fs:not-found` and `git:new-context`, the line's bracket and the
-  code's hint with them where it has one. A help request, a
-  routing refusal, `invalid_spec` and a command declaring
-  `needsProject: false` read neither the working directory nor the home.
+  walk go on above the top level. The project found is the context's `project`.
+  With none, the invocation ends as `no_project` with exit code 1 and the walk's
+  message, the `rafa init` hint. Its `cause` is `cli:no-project`. It carries no
+  `hint`, `module` or `action`, since the walk threw no coded error and the
+  command never runs, so it prints no deprecation line. In text mode it is the
+  `rafa: <message>` line on stderr; in json mode it is the result's
+  `error.message`. A relative working directory or home, a start that does not
+  resolve, and a git that cannot name the main checkout end as `no_project` too,
+  with the walk's message and the `ScopeError` it threw. That error is coded:
+  its `cause` is `input:invalid-value`, `fs:not-found` or `git:new-context`, its
+  `hint` is written where it has one, and its `module` and `action` are the
+  command's subject and action unless the error names its own. In text mode that
+  line ends with the bracket and the hint line follows, as for any coded
+  failure. A help request, a routing refusal, `invalid_spec` and a command
+  declaring `needsProject: false` read neither the working directory nor the
+  home.
 
-- **json mode writes one `start` event first and one terminal `result`
-  last**, every line NDJSON. Text mode writes neither event. A failure's
-  message goes to stderr, a `CommandExit` message as the command gave
-  it and anything else as `rafa: <message>`. A coded failure, one whose
-  error or `cause` chain holds a `RafaError` (`failureOf`,
-  `src/errors/handler.ts`), ends that line with its code in brackets,
-  `rafa: x [git:no-identity]`, and writes its hint below it as
-  `  hint: <hint>`; events mode writes the bracket and no hint line, and
-  `--no-hint` never hides it (`src/cli/ending.ts`). A result a command
-  gave is written as the `text` adapter writes one.
+- **json mode writes one `start` event first and one terminal `result` last**,
+  every line NDJSON. Text mode writes neither event. `writeEnding` in
+  `src/cli/ending.ts` writes a failed ending in the mode the invocation runs in.
+  In json mode the terminal `result` carries it, its `error` holding `code`,
+  `message` and the `cause`, `hint`, `module` and `action` members set out in
+  the result error codes bullet below, and nothing goes to stderr. In text mode
+  the stderr line is a `CommandExit` message as the command gave it, or `rafa:
+  <message>` for any other failure. A coded failure, one whose error or `cause`
+  chain holds a `RafaError` (`failureOf`, `src/errors/handler.ts`), ends that
+  line with its `cause` in brackets, `rafa: x [git:no-identity]`, and writes its
+  `hint` on a line below it, `  hint: <hint>`, when it has one. An uncoded
+  failure's line has no bracket and no hint line. Events mode writes the bracket
+  alone: its one `error` line through the events output ends with the `cause` in
+  brackets and has no hint line, and a failure with no stderr line writes `exit
+  code <n>` in its place, its bracket after it when it is coded. Nothing is
+  written for a success. No flag hides the hint line, since the writer reads
+  none. A result a command gave is written as the `text` adapter writes one.
 - **events mode is given only to a command declaring `events` among its
   outputs**, which today is `loop start` alone; any other command reads
   `--output=events` or `RAFA_OUTPUT=events` as text
@@ -2948,16 +2959,21 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   such flag, so it runs in json mode. `deprecated` sits on `RafaFlagSpec`
   (`packages/rafa/src/core/command/command.ts`), not on the copied `FlagSpec`,
   and `commandProblem` refuses one naming no `use`.
-- **The result error codes** are the five routing refusals, `invalid_spec` (a
-  spec `parseArgs` refuses), `no_project` (a command run outside a
-  project), `command_exit`, `command_error` and `result_unwritable`.
-  Beside `code` and `message` the result's `error` carries `cause` on
-  every failure: a coded failure's own code, else the `cli:` code whose
-  `legacy` is the dispatcher code, and `unknown:new-context` for
-  `command_error`. A coded failure with a hint carries `hint`, and a
-  coded failure or one of a command that ran carries `module` and
-  `action`, the command's subject and action where no coded error names
-  them (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
+- **The result error codes** are the five route refusals, `unknown_subject`,
+  `missing_action`, `unknown_action`, `unknown_module` and `unexpected_version`,
+  and five more: `invalid_spec` (a spec `parseArgs` refuses), `no_project` (a
+  command run outside a project), `command_exit` (a command that set its own
+  exit code), `command_error` (a command that threw, or an error past it) and
+  `result_unwritable` (an event JSON refuses to write). Beside `code` and
+  `message` the result's `error` carries, as `endingError` in
+  `src/cli/ending.ts` builds it: `cause` on every failure, the coded failure's
+  own code, else the `cli:` code whose `legacy` is the dispatcher code, and
+  `unknown:new-context` for `command_error` when no coded error explains it;
+  `hint` when a coded error has one; and `module` and `action` for a coded
+  failure or for a command that ran, the coded error's, else the command's
+  subject and action. A refusal made before any command ran carries them only
+  from a coded error; an uncoded failure of a command that ran carries the
+  command's own (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 - **So is the version.** A version route writes `rafa <version>`
