@@ -91,6 +91,7 @@ import { plantProjectConfig } from '../tests/cli-capture.js';
 import { BOARD_FEATURE } from './board/index.js';
 import { RUN_FEATURE } from './claim/index.js';
 import { PR_FEATURE } from './pr/index.js';
+import { RELEASE_FEATURE } from './release/index.js';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
 
@@ -692,6 +693,17 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([...RUN_FEATURE.subjects]);
     expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? '')).map(lessRun))
       .toEqual(RUN_FEATURE.commands.map(lessRun));
+  });
+
+  it('lists the release subject and commands RELEASE_FEATURE declares, each its lazy command less the run', () => {
+    const subjects = RELEASE_FEATURE.subjects.map((subject) => subject.name);
+    const lessRun = (command: (typeof CORE_COMMANDS)[number]): object => Object.fromEntries(
+      Object.entries(command).filter(([field]) => field !== 'run'),
+    );
+
+    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([...RELEASE_FEATURE.subjects]);
+    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? '')).map(lessRun))
+      .toEqual(RELEASE_FEATURE.commands.map(lessRun));
   });
 
   it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and its outputs', (spelling, command) => {

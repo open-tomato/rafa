@@ -1007,6 +1007,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/level.js', ['highestChangeLevel']],
     ['../../release/status-readings.js', ['readTags', 'readUntagged']],
     ['../../release/version.js', ['readManifestVersion']],
+    ['./declarations.js', ['RELEASE_STATUS_DECLARATION', 'RELEASE_STATUS_PLAN_FLAG']],
     ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
     ['./status-stale-docs.js', ['readStaleDocs', 'readStaleDocsSafely', 'staleDocsCell', 'staleDocsProblem']],
   ]],
@@ -1022,6 +1023,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/settle.js', ['CHANGELOG_TITLE', 'readSettle', 'releaseCommitSubject']],
     ['../../release/version.js', ['RELEASE_BASE_BRANCH', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
+    ['./declarations.js', ['RELEASE_SETTLE_DECLARATION', 'RELEASE_SETTLE_DRY_RUN_FLAG']],
     ['./settle-project.js', ['refreshProjectAfterSettle']],
   ]],
   ['./commands/release/tag.js', [
@@ -1035,6 +1037,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/version-tag.js', ['versionTag']],
     ['../../release/version.js', ['readManifestVersion', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
+    ['./declarations.js', ['RELEASE_TAG_DECLARATION', 'RELEASE_TAG_PUSH_FLAG']],
     ['./release-commit.js', ['readReleaseCommit']],
     ['./status.js', ['DEFAULT_RELEASE_SEAMS']],
   ]],
