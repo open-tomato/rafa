@@ -1446,14 +1446,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the eleven section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the twelve section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'errors', 'hub', 'issues', 'logger', 'loop-continue',
+      'board-project', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
       'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(11);
+    expect(sections).toHaveLength(12);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);

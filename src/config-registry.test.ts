@@ -1,5 +1,5 @@
 /**
- * Tests for the registry: the twelve sections it lists, the
+ * Tests for the registry: the thirteen sections it lists, the
  * registration its root, `registerCoreConfigSections`, makes, and the
  * merged schema it exports.
  *
@@ -12,7 +12,7 @@
  * section and every package name is SPELLED here, never read off the
  * module, so a section dropped, renamed or reordered fails rather than
  * agreeing with itself. The list merged into `EMPTY_CONFIG_REGISTRY`
- * is held to meet no refusal, so no two of the twelve define one file
+ * is held to meet no refusal, so no two of the thirteen define one file
  * key under two setting names; `section.test.ts` holds the refusal that
  * case could meet.
  *
@@ -79,7 +79,7 @@ import {
   SETTINGS,
 } from './config-registry.js';
 
-/** The twelve packages, in the order the registry lists their sections. */
+/** The thirteen packages, in the order the registry lists their sections. */
 const PACKAGES = [
   'core',
   'hub',
@@ -93,6 +93,7 @@ const PACKAGES = [
   'logger',
   'issues',
   'tests',
+  'features',
 ];
 
 /** Every setting and the file key it is spelled with, in schema order. */
@@ -190,6 +191,10 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['testsContract', 'tests.contract'],
   ['testsAlwaysRun', 'tests.alwaysRun'],
   ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
+  ['featuresBoard', 'features.board'],
+  ['featuresPr', 'features.pr'],
+  ['featuresRun', 'features.run'],
+  ['featuresRelease', 'features.release'],
 ];
 
 /** The keys known at the top level, in schema order. */
@@ -226,6 +231,7 @@ const TOP = [
   'merge',
   'naming',
   'tests',
+  'features',
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -268,7 +274,7 @@ function probeRegistered(module: string, call = false): { settings: number; defa
 }
 
 describe('CONFIG_SECTIONS', () => {
-  it('lists the twelve sections, core\'s first', () => {
+  it('lists the thirteen sections, core\'s first', () => {
     expect(CONFIG_SECTIONS.map((section) => section.package)).toEqual(PACKAGES);
   });
 
@@ -332,6 +338,7 @@ describe('the registration the preload made', () => {
         'release',
         'core',
         'tests',
+        'features',
       ]);
     } finally {
       restoreConfigSections(held);
@@ -508,6 +515,7 @@ describe('SECTIONS', () => {
       'dangerous',
       'effort',
       'errors',
+      'features',
       'hub',
       'issues',
       'issues.titles',

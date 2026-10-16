@@ -40,7 +40,7 @@
  * It imports `src/config-registry.ts` and `src/adapter-registry.ts`,
  * neither of which registers anything as it is imported: once its
  * imports have loaded, the module calls `registerCoreConfigSections`,
- * which hands the twelve sections of the config schema to core, then
+ * which hands the thirteen sections of the config schema to core, then
  * `registerCoreAdapters`, both before it loads the project's modules,
  * so every setting is registered before anything run here reads a
  * config and core's adapters before anything resolves one. A call

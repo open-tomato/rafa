@@ -1,13 +1,14 @@
 /**
- * The registry: the twelve sections of the config schema, handed to
+ * The registry: the thirteen sections of the config schema, handed to
  * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
- * the twelve are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the eleven files `src/config-schema-*.ts`.
+ * the thirteen are listed, {@link CONFIG_SECTIONS}: core's own
+ * (`CORE_SECTION`) and the twelve files `src/config-schema-*.ts` that
+ * each export one.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -97,6 +98,7 @@ import {
   BOARD_PROJECT_SECTION,
 } from './config-schema-board-project.js';
 import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
+import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from './config-schema-features.js';
 import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
 import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
 import {
@@ -128,7 +130,7 @@ import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-t
 import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 
-/** The twelve sections, core's first, in the order they are registered. */
+/** The thirteen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CORE_SECTION,
   HUB_SECTION,
@@ -142,6 +144,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   LOGGER_SECTION,
   ISSUES_SECTION,
   TESTS_SECTION,
+  FEATURES_SECTION,
 ]);
 
 /**
@@ -251,6 +254,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...DANGEROUS_RELEASE_DEFAULTS,
   ...run(CORE_VALUES, CORE_TAIL),
   ...TESTS_DEFAULTS,
+  ...FEATURES_DEFAULTS,
 });
 
 /**
@@ -279,6 +283,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = Objec
   ...DANGEROUS_RELEASE_SETTINGS,
   ...run(CORE_SPECS, CORE_TAIL),
   ...TESTS_SETTINGS,
+  ...FEATURES_SETTINGS,
 });
 
 /** Every setting name, read off the closed record above. */
