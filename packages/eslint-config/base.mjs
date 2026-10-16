@@ -28,7 +28,7 @@ export default defineConfig([
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
   {
-    files: ['**/*.js', '**/*.mjs', '**/*.ts'],
+    files: ['**/*.js', '**/*.mjs', '**/*.ts', '**/*.mts', '**/*.cts'],
     extends: [
       eslint.configs.recommended,
       tsLintConfig.recommended,
@@ -107,7 +107,7 @@ export default defineConfig([
     // blocks above; this block only adds the rule. The byte-level floor
     // under it is scripts/control-byte-gate/ (also covers unlinted files).
     files: [
-      '**/*.js', '**/*.mjs', '**/*.cjs', '**/*.ts', '**/*.tsx', '**/*.jsx',
+      '**/*.js', '**/*.mjs', '**/*.cjs', '**/*.ts', '**/*.mts', '**/*.cts', '**/*.tsx', '**/*.jsx',
       '**/*.md', '**/*.json',
     ],
     plugins: {
