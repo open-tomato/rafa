@@ -13,9 +13,9 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred registered so far wrap a
- * phase 0 command (`wrap.ts`), which keeps its own parser and its own
- * writes. `describe` wraps none: it builds its document from the registry
+ * of each is its command. Four of the hundred and one registered so far
+ * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
+ * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, which read plan files
  * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
@@ -57,7 +57,7 @@
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the ten `pr` actions, which read, open, retarget, close, wait on,
  * merge and triage one repository's pull requests through the
- * PullRequests port and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
@@ -235,11 +235,14 @@
  *     a scratch worktree, commits `chore: release <version>` and
  *     delivers it by `release.settle`, printing the fragments in fold
  *     order, the strategy and the version and exiting 0 or 1 by the
- *     settle's outcome, `--dry-run` writing nothing; and `release tag`,
+ *     settle's outcome, `--dry-run` writing nothing; `release tag`,
  *     which puts `v<version>` on the release branch's HEAD and prints
  *     the push and publish lines rather than running them, refusing on
  *     another branch, on a tag already there, and where the two release
- *     files disagree.
+ *     files disagree; and `release list`, one row per unit that
+ *     releases on its own, the root first and then each publishable
+ *     workspace package, with its version, the fragments waiting for it
+ *     and its newest tag, writing nothing.
  *   - `board list`, every open `type:roadmap` board, and the default
  *     board when it lacks the label, one line each: its number and
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
@@ -488,6 +491,7 @@ import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
 import prWait from './pr/wait.js';
+import releaseList from './release/list.js';
 import releaseSettle from './release/settle.js';
 import releaseStatus from './release/status.js';
 import releaseTag from './release/tag.js';
@@ -600,6 +604,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseStatus,
   releaseSettle,
   releaseTag,
+  releaseList,
   boardList,
   boardSync,
   epicShow,

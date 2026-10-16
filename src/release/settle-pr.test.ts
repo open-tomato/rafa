@@ -84,7 +84,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits, and the caller's clone. */
@@ -156,6 +156,22 @@ function world(): World {
 function landTwo(w: World): void {
   w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
   w.land({ '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', ['- Loop: a fix']) }, 'merge rafa-1');
+}
+
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = MANIFEST.replace('\n}', ',\n\t"workspaces": ["packages/*"]\n}');
+
+/** The publishable member's manifest. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/**
+ * Makes `main` a workspace holding a publishable `packages/plugin`, then
+ * lands `rafa-9` (minor) for the root and `rafa-7` (minor) for the plugin.
+ */
+function landBothUnits(w: World): void {
+  w.land({ 'package.json': WORKSPACE_MANIFEST, 'packages/plugin/package.json': PLUGIN_MANIFEST }, 'add the plugin');
+  w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
+  w.land({ '.changes/rafa-7.md': serializeFragment({ plan: 'rafa-7', title: 'title of rafa-7', level: 'minor', package: '@scope/plugin', notes: ['- Plugin: a hook'] }) }, 'merge rafa-7');
 }
 
 /** The pending release pull request as a list answers it. */
@@ -315,12 +331,79 @@ describe('settleByPr, the first delivery', () => {
 
     if (settled.outcome.outcome !== 'delivered') throw new Error(settled.outcome.outcome);
     const body = releasePullBody(settled.outcome.build, 'main');
-    expect(body).toStartWith('Settles the change fragments waiting on `main` into 0.5.0: the `semver-by-level` strategy folded them from 0.4.0.\n');
+    expect(body).toStartWith('Settles the change fragments waiting on `main`: the `semver-by-level` strategy folded them into one version per unit.\n\n- The root package: 0.4.0 → 0.5.0\n\n');
     expect(body).toContain('- `.changes/rafa-9.md` (`rafa-9`, minor)\n- `.changes/rafa-1.md` (`rafa-1`, patch)\n');
     expect(body).toContain('tag it afterwards with `rafa release tag`');
+    const [root] = settled.outcome.build.units;
+    expect(body).toEndWith(`\nThe root package, into \`CHANGELOG.md\`:\n\n${String(root?.section)}\n`);
     expect(body).toContain('<!-- rafa:fragments rafa-9 rafa-1 -->');
     expect(body).toContain('## 0.5.0 — ');
     expect(body).not.toContain(settled.outcome.build.release);
+  });
+});
+
+describe('settleByPr, a release moving the root and a package', () => {
+  it('titles the pull request with both moves and holds one section per unit, each under a line naming it', async () => {
+    const w = world();
+    landBothUnits(w);
+    const double = createPullRequestsDouble(noPull());
+
+    const settled = await settleIn(w, double);
+
+    if (settled.outcome.outcome !== 'delivered') throw new Error(settled.outcome.outcome);
+    const { build } = settled.outcome;
+    const [root, plugin] = build.units;
+    expect(build.units.map((unit) => unit.package)).toEqual([null, '@scope/plugin']);
+    expect(w.git(w.origin, ['log', '-1', '--format=%s', RELEASE_PR_BRANCH])).toBe('chore: release 0.5.0, @scope/plugin@0.2.0');
+    const create = double.calls().find((call) => call.member === 'create');
+    expect(create?.args[0]).toMatchObject({ title: 'chore: release 0.5.0, @scope/plugin@0.2.0' });
+
+    const body = releasePullBody(build, 'main');
+    expect(body).toContain('\n\n- The root package: 0.4.0 → 0.5.0\n- `@scope/plugin`: 0.1.0 → 0.2.0\n\n');
+    expect(body).toContain('- `.changes/rafa-9.md` (`rafa-9`, minor)\n- `.changes/rafa-7.md` (`rafa-7`, minor, `@scope/plugin`)\n');
+    expect(body).toEndWith([
+      '',
+      'The root package, into `CHANGELOG.md`:',
+      '',
+      String(root?.section),
+      '',
+      '`@scope/plugin`, into `packages/plugin/CHANGELOG.md`:',
+      '',
+      String(plugin?.section),
+      '',
+    ].join('\n'));
+    expect(plugin?.section).toContain('<!-- rafa:fragments rafa-7 -->');
+    // No bare `@scope` in the body: every package name is in backticks, so GitHub mentions nobody.
+    const bareMention = /(^|[^`])@scope/m;
+    expect(body).not.toMatch(bareMention);
+    // The control: the same probe finds the bare name the title carries.
+    expect(w.git(w.origin, ['log', '-1', '--format=%s', RELEASE_PR_BRANCH])).toMatch(bareMention);
+  });
+
+  it('names both moves in the sentence of a push that failed', async () => {
+    const w = world();
+    landBothUnits(w);
+
+    const settled = await settleIn(w, createPullRequestsDouble(noPull()), undefined, undefined, { ok: false, stdout: 'Done\n', stderr: '' });
+
+    expect(settled.outcome).toMatchObject({ outcome: 'unpushed', exitCode: 1, pushed: false });
+    if (settled.outcome.outcome !== 'unpushed') return;
+    expect(settled.outcome.sentence).toBe(`chore: release 0.5.0, @scope/plugin@0.2.0 could not be pushed to origin ${RELEASE_PR_BRANCH}: ${PUSH_SAID_NOTHING}`);
+  });
+
+  it('names both moves in the sentence of a pull request that could not be opened after the push', async () => {
+    const w = world();
+    landBothUnits(w);
+    const double = createPullRequestsDouble({
+      findOpen: () => Promise.resolve(null),
+      create: () => Promise.reject(new Error('gh said no')),
+    });
+
+    const settled = await settleIn(w, double);
+
+    expect(settled.outcome).toMatchObject({ outcome: 'unopened', exitCode: 1, pushed: true });
+    if (settled.outcome.outcome !== 'unopened') return;
+    expect(settled.outcome.sentence).toBe(`${RELEASE_PR_BRANCH} holds chore: release 0.5.0, @scope/plugin@0.2.0, but the release pull request into main could not be opened or updated; settle again to finish it: gh said no`);
   });
 });
 

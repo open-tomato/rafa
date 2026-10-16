@@ -98,7 +98,7 @@ function isolatedEnv(home: string, date: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level']): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes: [`- Area: ${plan} change`] });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes: [`- Area: ${plan} change`] });
 }
 
 /** A bare origin, a clone that lands on `main`, and the caller's clone. */
@@ -224,7 +224,9 @@ describe('readDoctorRelease', () => {
     const settle = readSettle(createGitRunner(w.caller), 'origin/main', CONFIG);
 
     if (settle.outcome !== 'folded') throw new Error(`expected folded, got ${settle.outcome}`);
-    expect(reading.waiting.forecast).toMatchObject({ kind: 'settles', version: settle.version });
+    const [root, ...more] = settle.units;
+    if (root?.package !== null || more.length > 0) throw new Error(`settle folded ${String(settle.units.length)} units, not the root alone`);
+    expect(reading.waiting.forecast).toMatchObject({ kind: 'settles', version: root.version });
   });
 
   it('warns for a fragment that does not parse, saying settle would refuse, with the reason under the row', () => {

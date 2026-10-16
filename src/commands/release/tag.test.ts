@@ -1,8 +1,10 @@
 /**
- * Tests for `rafa release tag` (`tag.ts`): the four readings, the
- * decision they make, the tag it writes, the three refusals the spec
- * asks for and the two that keep an unreadable input from passing,
- * and the lines a run that tagged prints.
+ * Tests for `rafa release tag` (`tag.ts`): the branch reading, the
+ * decision the readings make, the tag it writes, the three refusals the
+ * spec asks for and the two that keep an unreadable input from passing,
+ * a run over a workspace that tags every unit after every decision, and
+ * the lines a run that tagged prints. The version and changelog readers
+ * are `tag-units.ts`'s, tested in `tag-units.test.ts`.
  *
  * The decision is pure and total, so every combination of the readings
  * is driven from literals: provoking a real repository into a tag list
@@ -17,7 +19,7 @@
  * reading of the exit code alone could not tell from a tag that was
  * written and then reported as a refusal.
  *
- * Three more controls carry readings that would otherwise pass while
+ * More controls carry readings that would otherwise pass while
  * wrong:
  *
  *   - the changelog fixture opens with a FENCED `## 9.9.9` heading
@@ -25,6 +27,10 @@
  *     working would name 9.9.9 as the newest release and redden;
  *   - the private-package case is paired with the same manifest
  *     without `"private": true`, which DOES get a publish line;
+ *   - the workspace case whose package refuses holds a root that alone
+ *     would be ready, so its missing write is the refusal's doing, and
+ *     the package that passes over the root's tag of its version is
+ *     paired with the same tags refusing the root;
  *   - the manifest names `packageManager: bun@…`, as this repository's
  *     does, and the dispatched run still prints `npm publish`, so a
  *     publish line read off that field again would redden;
@@ -36,10 +42,10 @@
  *     0.24.0 shape `./release-commit.ts` measures.
  */
 import type { ReleaseSeams } from './status.js';
+import type { PublishTarget } from './tag-follow-ups.js';
 import type {
-  ChangelogReading,
-  PublishTarget,
   ReleaseTagResult,
+  ReleaseTagUnit,
   TagDecision,
   TagInputs,
   TagReady,
@@ -65,16 +71,12 @@ import { parseSemanticVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
+import { DEFAULT_REGISTRY, followUpsFor } from './tag-follow-ups.js';
 import {
   createReleaseTagCommand,
   DEFAULT_RELEASE_BRANCH,
-  DEFAULT_REGISTRY,
   decideTag,
-  followUpsFor,
   readBranch,
-  readNewestRelease,
-  readPublishTarget,
-  readVersion,
   RELEASE_TAG_USAGE,
   pastReleaseWarning,
   renderTagged,
@@ -160,7 +162,7 @@ function tag(raw: string): ReleaseTag {
     : raw;
   const parsed = version(bare);
   if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
-  return { tag: raw, version: bare, parsed };
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** A git result git writes for a command that worked. */
@@ -181,6 +183,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
   return {
     releaseBranch: DEFAULT_RELEASE_BRANCH,
     branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null },
+    package: null,
     version: { path: 'package.json', text: MANIFEST, version: VERSION, problem: null },
     changelog: { path: 'CHANGELOG.md', version: VERSION, problem: null },
     tags: { tags: [tag('v0.4.0')], latest: tag('v0.4.0'), problem: null },
@@ -296,134 +299,6 @@ describe('the branch reading', () => {
   });
 });
 
-describe('the version file reading', () => {
-  it('reads the version and keeps the text the publish line is read from', () => {
-    const root = scratch();
-    writeFileSync(join(root, 'package.json'), MANIFEST, 'utf8');
-
-    const reading = readVersion(root, 'package.json');
-
-    expect(reading.version).toBe(VERSION);
-    expect(reading.text).toBe(MANIFEST);
-    expect(reading.problem).toBeNull();
-  });
-
-  it('says where it looked for a version file that is not there', () => {
-    const root = scratch();
-
-    const reading = readVersion(root, 'package.json');
-
-    expect(reading.version).toBeNull();
-    expect(reading.text).toBeNull();
-    expect(reading.problem).toContain(join(root, 'package.json'));
-  });
-
-  it('says so for a manifest that declares no version', () => {
-    const root = scratch();
-    writeFileSync(join(root, 'package.json'), '{"name": "a"}', 'utf8');
-
-    expect(readVersion(root, 'package.json').problem).toContain('declares no version');
-  });
-});
-
-describe('the changelog reading', () => {
-  it('takes the version of the newest section, passing over a fenced heading above it', () => {
-    const root = scratch();
-    writeFileSync(join(root, 'CHANGELOG.md'), CHANGELOG, 'utf8');
-
-    const reading = readNewestRelease(root, 'CHANGELOG.md');
-
-    // The control: the fenced heading names a HIGHER version, so a skip that stopped working would show.
-    expect(reading.version).toBe(VERSION);
-    expect(reading.problem).toBeNull();
-  });
-
-  it('answers no version for a changelog naming no release at all', () => {
-    const root = scratch();
-    writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n\n## Unreleased\n', 'utf8');
-
-    expect(readNewestRelease(root, 'CHANGELOG.md')).toMatchObject({ version: null, problem: null });
-  });
-
-  it('says where it looked for a changelog that is not there', () => {
-    const root = scratch();
-
-    const reading: ChangelogReading = readNewestRelease(root, 'CHANGELOG.md');
-
-    expect(reading.version).toBeNull();
-    expect(reading.problem).toContain(join(root, 'CHANGELOG.md'));
-  });
-});
-
-describe('where a publish would go', () => {
-  it('reads the name and the registry publishConfig names, and nothing off packageManager', () => {
-    const manifest = JSON.stringify({
-      name: '@open-tomato/rafa',
-      version: VERSION,
-      packageManager: 'bun@1.3.14',
-      publishConfig: { registry: 'https://npm.example.com' },
-    });
-
-    expect(readPublishTarget(manifest)).toEqual({
-      registry: 'https://npm.example.com',
-      name: '@open-tomato/rafa',
-      isPrivate: false,
-    });
-  });
-
-  it('falls back to the npm registry when the manifest names none', () => {
-    expect(readPublishTarget('{"name": "a", "version": "1.0.0"}'))
-      .toEqual({ registry: DEFAULT_REGISTRY, name: 'a', isPrivate: false });
-  });
-
-  it('reads a private manifest as private', () => {
-    expect(readPublishTarget('{"name": "a", "private": true}').isPrivate).toBe(true);
-  });
-
-  it('names no package for a text that is no JSON object, and for no text at all', () => {
-    expect(readPublishTarget('not json').name).toBeNull();
-    expect(readPublishTarget('[]').name).toBeNull();
-    expect(readPublishTarget(null).name).toBeNull();
-  });
-});
-
-describe('what the operator is told to do next', () => {
-  it('names the push and the publish, the publish saying what goes where', () => {
-    const followUps = followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH);
-
-    expect(followUps.map((followUp) => followUp.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
-    expect(followUps[1]?.why).toBe(`publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
-  });
-
-  it('names the publish command it is handed, flags and all', () => {
-    expect(followUpsFor(TAG, VERSION, target(), 'pnpm publish --tag next')[1]?.command)
-      .toBe('pnpm publish --tag next');
-  });
-
-  it('names the push alone for a private package, where the same one public gets a publish line', () => {
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH).map((each) => each.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`]);
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: false }), DEFAULT_PUBLISH)).toHaveLength(2);
-  });
-
-  it('names the push alone when the version file names no package to publish', () => {
-    expect(followUpsFor(TAG, VERSION, target({ name: null }), DEFAULT_PUBLISH)).toHaveLength(1);
-  });
-
-  it('names the remote it is handed in the push line', () => {
-    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, 'upstream')[0])
-      .toEqual({ command: `git push upstream ${TAG}`, why: 'the tag is local until upstream has it' });
-  });
-
-  it('drops the push line once the run pushed the tag, keeping the publish line', () => {
-    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null)
-      .map((each) => each.command)).toEqual([DEFAULT_PUBLISH]);
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null))
-      .toEqual([]);
-  });
-});
-
 describe('the decision one run makes', () => {
   /** The refusal `decision` is, or a throw naming what it was instead. */
   function refusalOf(decision: TagDecision): TagRefused {
@@ -490,6 +365,40 @@ describe('the decision one run makes', () => {
 
     expect(refusal.reason).toBe('tagged');
     expect(refusal.message).toBe(`${VERSION} already names ${VERSION}, so there is nothing to tag`);
+  });
+
+  it('does not refuse for a package\'s tag naming the same version, which is no root tag', () => {
+    const plugin = { ...tag(VERSION), tag: `@scope/plugin@${VERSION}`, package: '@scope/plugin' };
+
+    expect(decideTag(inputs({ tags: { tags: [plugin, tag('v0.4.0')], latest: tag('v0.4.0'), problem: null } })))
+      .toEqual(READY);
+  });
+
+  it('spells a package\'s tag with its name, and passes over the root\'s tag of the same version', () => {
+    const decision = decideTag(inputs({
+      package: '@scope/plugin',
+      tags: { tags: [tag(TAG)], latest: tag(TAG), problem: null },
+    }));
+
+    // The control: the same tags refuse the root, so the package's pass is its own reading.
+    expect(refusalOf(decideTag(inputs({ tags: { tags: [tag(TAG)], latest: tag(TAG), problem: null } }))).reason)
+      .toBe('tagged');
+    expect(decision).toEqual({ ...READY, tag: `@scope/plugin@${VERSION}` });
+  });
+
+  it('refuses tagged for a package whose own tag names its version', () => {
+    const plugin = { ...tag(VERSION), tag: `@scope/plugin@${VERSION}`, package: '@scope/plugin' };
+
+    const refusal = refusalOf(decideTag(inputs({
+      package: '@scope/plugin',
+      tags: { tags: [plugin], latest: plugin, problem: null },
+    })));
+
+    expect(refusal).toEqual({
+      kind: 'refused',
+      reason: 'tagged',
+      message: `@scope/plugin@${VERSION} already names ${VERSION}, so there is nothing to tag`,
+    });
   });
 
   it('refuses when the newest changelog section names another version, naming both files', () => {
@@ -573,12 +482,22 @@ describe('the decision one run makes', () => {
   });
 });
 
+/** A unit of a run that tagged: the root's, ready on HEAD, narrowed by `over`. */
+function unit(over: Partial<ReleaseTagUnit> = {}): ReleaseTagUnit {
+  return { package: null, dir: null, inputs: inputs(), decision: READY, followUps: [], ...over };
+}
+
+/** The tag a package unit of the render cases writes. */
+const PLUGIN_TAG = '@scope/plugin@0.2.0';
+
+/** The decision of a package unit ready on HEAD. */
+const PLUGIN_READY: TagReady = Object.freeze({ ...READY, version: '0.2.0', tag: PLUGIN_TAG });
+
 describe('the lines a run that tagged prints', () => {
   it('names the tag, the branch, and every follow-up under one heading', () => {
     const lines = renderTagged(
-      READY,
+      [unit({ followUps: followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH) })],
       'main',
-      followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH),
     );
 
     expect(lines).toEqual([
@@ -592,17 +511,49 @@ describe('the lines a run that tagged prints', () => {
   it('names the push under the tag once it went, with no push line among the follow-ups', () => {
     const pushed: TagPushed = { outcome: 'pushed', exitCode: 0, tag: TAG, remote: 'upstream', sentence: '' };
     const onHead = { ahead: 0, branch: 'main' };
+    const followUps = followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, null);
 
-    expect(renderTagged(READY, 'main', followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, null), pushed))
+    expect(renderTagged([unit({ followUps, pushed })], 'main'))
       .toEqual([
         `✅ Tagged ${TAG} at the HEAD of main.`,
         `✅ Pushed ${TAG} to upstream.`,
         'Next:',
         `  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
       ]);
-    expect(renderTagged(READY, 'main', [], pushed)).toEqual([
+    expect(renderTagged([unit({ pushed })], 'main')).toEqual([
       `✅ Tagged ${TAG} at the HEAD of main.`,
       `✅ Pushed ${TAG} to upstream.`,
+    ]);
+  });
+
+  it('prints one Tagged line per tag in unit order, then every unit\'s follow-ups, the package\'s in its folder', () => {
+    const root = unit({ followUps: followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH) });
+    const place = { ahead: 0, branch: 'main', dir: 'packages/plugin' };
+    const plugin = unit({
+      package: '@scope/plugin',
+      dir: 'packages/plugin',
+      decision: PLUGIN_READY,
+      followUps: followUpsFor(PLUGIN_TAG, '0.2.0', target({ name: '@scope/plugin' }), DEFAULT_PUBLISH, place),
+    });
+
+    expect(renderTagged([root, plugin], 'main')).toEqual([
+      `✅ Tagged ${TAG} at the HEAD of main.`,
+      `✅ Tagged ${PLUGIN_TAG} at the HEAD of main.`,
+      'Next:',
+      `  git push ${RELEASE_REMOTE} ${TAG} — the tag is local until ${RELEASE_REMOTE} has it`,
+      `  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
+      `  git push ${RELEASE_REMOTE} ${PLUGIN_TAG} — the tag is local until ${RELEASE_REMOTE} has it`,
+      `  (cd packages/plugin && ${DEFAULT_PUBLISH}) — publishes @scope/plugin@0.2.0 to ${DEFAULT_REGISTRY}`,
+    ]);
+  });
+
+  it('names a skipped unit in its place, with no follow-ups of its own', () => {
+    const skipped = unit({ decision: { kind: 'skipped', message: `${TAG} already names ${VERSION}, so there is nothing to tag` } });
+    const plugin = unit({ package: '@scope/plugin', dir: 'packages/plugin', decision: PLUGIN_READY });
+
+    expect(renderTagged([skipped, plugin], 'main')).toEqual([
+      `Skipped: ${TAG} already names ${VERSION}, so there is nothing to tag.`,
+      `✅ Tagged ${PLUGIN_TAG} at the HEAD of main.`,
     ]);
   });
 });
@@ -630,7 +581,7 @@ describe('a tag written behind HEAD', () => {
   });
 
   it('names the commit it tagged in place of the HEAD of the branch', () => {
-    const lines = renderTagged(behind, 'main', followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 3, branch: 'main' }));
+    const lines = renderTagged([unit({ decision: behind })], 'main');
 
     expect(lines[0]).toBe(`✅ Tagged ${TAG} at 7db04a2, the commit of main that set ${VERSION}.`);
   });
@@ -736,7 +687,8 @@ describe('the dispatched action', () => {
     expect(data.inputs.changelog.version).toBe(VERSION);
     expect(data.followUps.map((followUp) => followUp.command))
       .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
-    expect(Object.keys(data)).toEqual(['inputs', 'written', 'followUps']);
+    expect(Object.keys(data)).toEqual(['inputs', 'written', 'followUps', 'units']);
+    expect(data.units.map((each) => [each.package, each.decision.kind])).toEqual([[null, 'ready']]);
   });
 
   it('sends no push without --push, reading only the remote the push line names', async () => {
@@ -828,6 +780,170 @@ describe('the dispatched action', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('The config cannot be used:');
     expect(seams.roots).toEqual([]);
+  });
+});
+
+describe('a run over a workspace', () => {
+  /** The package the workspace cases publish, and its folder. */
+  const PLUGIN = '@scope/plugin';
+  const PLUGIN_DIR = 'packages/plugin';
+  const PLUGIN_VERSION = '0.2.0';
+
+  /** The package's manifest, private when asked. */
+  function pluginManifest(isPrivate = false): string {
+    return JSON.stringify(isPrivate
+      ? { name: PLUGIN, version: PLUGIN_VERSION, private: true }
+      : { name: PLUGIN, version: PLUGIN_VERSION });
+  }
+
+  /** A changelog whose newest section names `version`. */
+  function changelogOf(version: string): string {
+    return `# Changelog\n\n## ${version} — 2026-10-01, rafa-1172: package publishes\n\n- a change\n`;
+  }
+
+  /** A project whose root manifest names `packages/*`, holding the plugin with its own changelog. */
+  function workspaceProject(pluginChangelog = changelogOf(PLUGIN_VERSION), isPrivate = false): PlantedProject {
+    const project = releaseProject(JSON.stringify({ ...JSON.parse(MANIFEST) as object, workspaces: ['packages/*'] }));
+    mkdirSync(join(project.root, PLUGIN_DIR), { recursive: true });
+    writeFileSync(join(project.root, PLUGIN_DIR, 'package.json'), pluginManifest(isPrivate), 'utf8');
+    writeFileSync(join(project.root, PLUGIN_DIR, 'CHANGELOG.md'), pluginChangelog, 'utf8');
+    return project;
+  }
+
+  /** {@link gitTable} with the plugin's history, set on the same commit, and its write. */
+  function workspaceTable(tags = 'v0.4.0\n', over: GitTable = {}): GitTable {
+    return {
+      ...gitTable(DEFAULT_RELEASE_BRANCH, tags),
+      [`log --first-parent --format=%H HEAD -- ./${PLUGIN_DIR}/package.json`]: said(`${SET_COMMIT}\n`),
+      [`show ${SET_COMMIT}:./${PLUGIN_DIR}/package.json`]: said(pluginManifest()),
+      [`tag ${PLUGIN}@${PLUGIN_VERSION} ${SET_COMMIT}`]: said(''),
+      ...over,
+    };
+  }
+
+  /** The tag writes a run sent, in order. */
+  function writes(calls: readonly string[]): readonly string[] {
+    return calls.filter((call) => call.startsWith('tag ') && call !== 'tag --list');
+  }
+
+  const pluginTag = `${PLUGIN}@${PLUGIN_VERSION}`;
+
+  it('tags the root and the package in unit order, printing a Tagged line and a publish line for each', async () => {
+    const seams = recorded(workspaceTable());
+
+    const run = await ran(seams.seams, workspaceProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(writes(seams.calls)).toEqual([`tag ${TAG} ${SET_COMMIT}`, `tag ${pluginTag} ${SET_COMMIT}`]);
+    expect(run.stdout).toContain(`✅ Tagged ${TAG} at the HEAD of main.\n✅ Tagged ${pluginTag} at the HEAD of main.`);
+    expect(run.stdout).toContain(`  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION}`);
+    expect(run.stdout).toContain(`  git push ${RELEASE_REMOTE} ${pluginTag} — `);
+    expect(run.stdout).toContain(`  (cd ${PLUGIN_DIR} && ${DEFAULT_PUBLISH}) — publishes ${pluginTag} to ${DEFAULT_REGISTRY}`);
+  });
+
+  it('tags the package alone, and exits 0, when a tag already names the root\'s version', async () => {
+    const seams = recorded(workspaceTable(`v0.4.0\n${TAG}\n`));
+
+    const run = await ran(seams.seams, workspaceProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(writes(seams.calls)).toEqual([`tag ${pluginTag} ${SET_COMMIT}`]);
+    expect(run.stdout).toContain(`Skipped: ${TAG} already names ${VERSION}, so there is nothing to tag.`);
+    expect(run.stdout).not.toContain(`Tagged ${TAG}`);
+  });
+
+  it('refuses tagged, naming both tags and writing nothing, when every unit is tagged', async () => {
+    const seams = recorded(workspaceTable(`${TAG}\n${pluginTag}\n`));
+
+    const run = await ran(seams.seams, workspaceProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`❌ ${TAG} already names ${VERSION}, so there is nothing to tag\n`
+      + `❌ ${pluginTag} already names ${PLUGIN_VERSION}, so there is nothing to tag\nUsage: ${RELEASE_TAG_USAGE}`);
+    expect(writes(seams.calls)).toEqual([]);
+  });
+
+  it('writes no tag at all, the root\'s included, when the package\'s changelog disagrees', async () => {
+    const seams = recorded(workspaceTable());
+
+    const run = await ran(seams.seams, workspaceProject(changelogOf('0.1.0')));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${PLUGIN_DIR}/package.json says ${PLUGIN_VERSION} and the newest section of`
+      + ` ${PLUGIN_DIR}/CHANGELOG.md says 0.1.0`);
+    // The control: the root alone would have been ready, so its missing write is the refusal's doing.
+    expect(run.stderr).not.toContain(TAG);
+    expect(writes(seams.calls)).toEqual([]);
+  });
+
+  it('reads the branch once and refuses on it before any package is read', async () => {
+    const seams = recorded({ ...workspaceTable(), 'rev-parse --abbrev-ref HEAD': said('feat/x\n') });
+
+    const run = await ran(seams.seams, workspaceProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('a release is tagged on main, and feat/x is checked out');
+    expect(seams.calls.filter((call) => call === 'rev-parse --abbrev-ref HEAD')).toHaveLength(1);
+    expect(seams.calls.filter((call) => call.includes(PLUGIN_DIR))).toEqual([]);
+  });
+
+  it('passes over a private member, which never publishes', async () => {
+    const seams = recorded(workspaceTable());
+
+    const run = await ran(seams.seams, workspaceProject(changelogOf(PLUGIN_VERSION), true));
+
+    expect(run.exitCode).toBe(0);
+    expect(writes(seams.calls)).toEqual([`tag ${TAG} ${SET_COMMIT}`]);
+  });
+
+  it('pushes every tag in unit order with --push, giving each unit its push in json mode', async () => {
+    const pushOf = (name: string): string => `push --porcelain origin refs/tags/${name}:refs/tags/${name}`;
+    const seams = recorded(workspaceTable('v0.4.0\n', { [pushOf(TAG)]: said(''), [pushOf(pluginTag)]: said('') }));
+
+    const run = await ran(seams.seams, workspaceProject(), ['--push', '--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.calls.filter((call) => call.startsWith('push'))).toEqual([pushOf(TAG), pushOf(pluginTag)]);
+    expect(data.units.map((each) => each.pushed?.tag)).toEqual([TAG, pluginTag]);
+    expect(data.pushed?.tag).toBe(TAG);
+    expect(data.written?.tag).toBe(TAG);
+    expect(data.followUps.map((followUp) => followUp.command))
+      .toEqual([DEFAULT_PUBLISH, `(cd ${PLUGIN_DIR} && ${DEFAULT_PUBLISH})`]);
+  });
+
+  it('stops at the first push that fails, naming the tags written and not pushed after it', async () => {
+    const pushOf = (name: string): string => `push --porcelain origin refs/tags/${name}:refs/tags/${name}`;
+    const seams = recorded(workspaceTable('v0.4.0\n', { [pushOf(TAG)]: refused('rejected') }));
+
+    const run = await ran(seams.seams, workspaceProject(), ['--push']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${TAG} is written and kept locally, but could not be pushed to origin`);
+    expect(run.stderr).toContain(`; ${pluginTag} is written and not pushed`);
+    expect(seams.calls.filter((call) => call.startsWith('push'))).toEqual([pushOf(TAG)]);
+  });
+
+  it('names the tags written before a write that failed', async () => {
+    const seams = recorded(workspaceTable('v0.4.0\n', { [`tag ${pluginTag} ${SET_COMMIT}`]: refused('fatal: bad ref') }));
+
+    const run = await ran(seams.seams, workspaceProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${pluginTag} could not be written: fatal: bad ref; ${TAG} is written already`);
+  });
+
+  it('gives the root as written and every unit in json mode when the root is skipped', async () => {
+    const seams = recorded(workspaceTable(`${TAG}\n`));
+
+    const run = await ran(seams.seams, workspaceProject(), ['--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(data.written).toBeNull();
+    expect(data.units.map((each) => [each.package, each.dir, each.decision.kind]))
+      .toEqual([[null, null, 'skipped'], [PLUGIN, PLUGIN_DIR, 'ready']]);
+    expect(data.units[1]?.inputs.version.path).toBe(`${PLUGIN_DIR}/package.json`);
   });
 });
 

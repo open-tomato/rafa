@@ -104,7 +104,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits on `main`, and the caller's clone. */
@@ -174,6 +174,22 @@ function world(): World {
 function landTwo(w: World): void {
   w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
   w.land({ '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', ['- Loop: a fix']) }, 'merge rafa-1');
+}
+
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = MANIFEST.replace('\n}', ',\n\t"workspaces": ["packages/*"]\n}');
+
+/** The publishable member's manifest. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/**
+ * Makes `main` a workspace holding a publishable `packages/plugin`, then
+ * lands `rafa-9` (minor) for the root and `rafa-7` (minor) for the plugin.
+ */
+function landBothUnits(w: World): void {
+  w.land({ 'package.json': WORKSPACE_MANIFEST, 'packages/plugin/package.json': PLUGIN_MANIFEST }, 'add the plugin');
+  w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
+  w.land({ '.changes/rafa-7.md': serializeFragment({ plan: 'rafa-7', title: 'title of rafa-7', level: 'minor', package: '@scope/plugin', notes: ['- Plugin: a hook'] }) }, 'merge rafa-7');
 }
 
 /** What a settle answered, with every argv its worktree ran. */
@@ -331,8 +347,8 @@ describe('settleByPush, the refused-push rule', () => {
     if (settled.outcome.outcome !== 'pushed') return;
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.commit).toBe(arrived);
-    expect(settled.outcome.build.version).toBe('1.0.0');
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md']);
+    expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['1.0.0']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
     expect(w.git(w.origin, ['log', '-1', '--format=%s%n%P', 'main'])).toBe(`chore: release 1.0.0\n${arrived}`);
     expect(originFragments(w)).toEqual([]);
@@ -351,8 +367,8 @@ describe('settleByPush, the refused-push rule', () => {
     if (settled.outcome.outcome !== 'pushed') return;
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.baseVersion).toBe('0.5.0');
-    expect(settled.outcome.build.version).toBe('0.5.1');
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-1.md']);
+    expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['0.5.1']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-1.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
   });
 
@@ -455,6 +471,36 @@ describe('settleByPush, a protected base', () => {
     expect(settled.outcome.outcome).toBe('protected');
     expect(settled.outcome.attempts).toBe(2);
     expect(pushesOf(settled)).toHaveLength(2);
+  });
+});
+
+describe('settleByPush, a release moving the root and a package', () => {
+  it('pushes one commit under the subject naming both moves', async () => {
+    const w = world();
+    landBothUnits(w);
+
+    const settled = await settleIn(w);
+
+    expect(settled.outcome).toMatchObject({ outcome: 'pushed', exitCode: 0, attempts: 1 });
+    expect(w.git(w.origin, ['log', '-1', '--format=%s', 'main'])).toBe('chore: release 0.5.0, @scope/plugin@0.2.0');
+    expect(originFragments(w)).toEqual([]);
+  });
+
+  it('names both moves in the sentences of a protected base and of a hook that declined', async () => {
+    const w = world();
+    landBothUnits(w);
+    w.refuseWith(`#!/bin/sh\necho "${GH006}" >&2\nexit 1\n`);
+
+    const protectedRun = await settleIn(w);
+    w.refuseWith('#!/bin/sh\necho "planted: commit messages must carry a ticket" >&2\nexit 1\n');
+    const declined = await settleIn(w);
+
+    expect(protectedRun.outcome.outcome).toBe('protected');
+    if (protectedRun.outcome.outcome !== 'protected') return;
+    expect(protectedRun.outcome.sentence).toStartWith('origin main refused chore: release 0.5.0, @scope/plugin@0.2.0 as a protected branch');
+    expect(declined.outcome.outcome).toBe('unpushed');
+    if (declined.outcome.outcome !== 'unpushed') return;
+    expect(declined.outcome.sentence).toStartWith('chore: release 0.5.0, @scope/plugin@0.2.0 could not be pushed to origin main: ');
   });
 });
 

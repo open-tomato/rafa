@@ -28,6 +28,12 @@
  * base yet — a merge now would add it today — so its `addedOn` is the
  * UTC date of the `now` the caller passes, and no clock is read here.
  *
+ * Only the waiting fragments whose `package` equals the branch
+ * fragment's (null with null, for the root) are folded: a package's
+ * fragment waiting on the base releases that package, not the root, so
+ * it does not move the root's forecast. One left out this way is not a
+ * problem, and is not named in {@link BranchForecastRead.waiting}.
+ *
  * A waiting fragment that does not parse is left out of the fold and
  * named in {@link BranchForecastRead.problems}: settle would refuse to
  * fold it too, and a forecast that failed over another plan's fragment
@@ -125,8 +131,11 @@ export const RELEASE_BLOCK_CLOSE = '<!-- /rafa:release -->';
 /** How long `YYYY-MM-DD` is at the head of an ISO timestamp. */
 const ISO_DATE_LENGTH = 10;
 
-/** The waiting fragments that parsed, as the fold reads them, and the ones that did not. */
-function waitingFragments(prepared: ReleasePrepared): {
+/**
+ * The waiting fragments that parsed and release `pkg` (null for the
+ * root), as the fold reads them, and the ones that did not parse.
+ */
+function waitingFragments(prepared: ReleasePrepared, pkg: string | null): {
   readonly folded: readonly FoldFragment[];
   readonly problems: readonly string[];
 } {
@@ -134,6 +143,7 @@ function waitingFragments(prepared: ReleasePrepared): {
   const problems: string[] = [];
   for (const waiting of prepared.base.waiting) {
     if (waiting.reading.ok) {
+      if (waiting.reading.fragment.package !== pkg) continue;
       folded.push({ id: waiting.id, fragment: waiting.reading.fragment, addedOn: waiting.addedOn });
     } else {
       problems.push(`${prepared.base.ref}'s ${waiting.path} was left out of the forecast: ${waiting.reading.sentence}`);
@@ -166,7 +176,7 @@ function baseVersionAt(
 export function readBranchForecast(input: BranchForecastInput): BranchForecast {
   const { git, settings, prepared, verified, now } = input;
   const ref = prepared.base.ref;
-  const { folded, problems } = waitingFragments(prepared);
+  const { folded, problems } = waitingFragments(prepared, verified.fragment.package);
   const base = baseVersionAt(git, prepared, settings.releaseVersionFile);
   if ('problem' in base) return { ok: false, ref, problem: base.problem, problems };
 

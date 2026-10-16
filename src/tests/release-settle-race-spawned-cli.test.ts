@@ -92,7 +92,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text, one note. */
 function fragmentText(plan: string, level: Fragment['level'], note: string): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes: [`- ${note}`] });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes: [`- ${note}`] });
 }
 
 /** A bare origin, and the clone that lands fragments on `main` the way a merge would. */

@@ -88,6 +88,7 @@ export const FRAGMENT: Fragment = {
   plan: PLAN_ID,
   title: 'rafa-21 — changelog and release',
   level: 'minor',
+  package: null,
   notes: ['- loop: the wrap-up now commits the release'],
 };
 

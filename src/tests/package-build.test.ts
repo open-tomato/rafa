@@ -8,7 +8,8 @@
  * first three and phase 1's publishing stage the rest, so a target
  * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest and lockfile, its tsconfig files, the README, `src/`,
+ * (its manifest and lockfile, its tsconfig files, the README, the bundle
+ * script `scripts/build/bundle.ts`, `src/`,
  * core's workspace package `packages/rafa/` and the tsconfig base's
  * `packages/typescript-config/`) into a scratch directory and runs
  * `bun run build` there,
@@ -26,6 +27,10 @@
  *     both. An unused export appended to a module changed no chunk at
  *     all, which is why that reading was taken on a change the bundle
  *     keeps.
+ *   - `bun scripts/build/bundle.ts` runs the next two builds, each with
+ *     every publishable workspace package as `--external`, and fails
+ *     when a bundle holds a file of one (see that script's module note).
+ *     It is copied into the scratch package beside the manifest.
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
@@ -600,6 +605,8 @@ const PACKAGE_FILES = [
   'tsconfig.packages.json',
   'tsconfig.config-types.json',
   'README.md',
+  // The `build` script's first segment after `rm -rf dist`: both `bun build` runs and their guard.
+  'scripts/build/bundle.ts',
 ];
 
 /** Core's workspace package, which the build reads core's source and first declarations pass from. */

@@ -64,14 +64,23 @@
  *
  * ## The pull request
  *
- * Its title is the release commit's subject, `chore: release
- * <version>`, so a squash merge lands the subject a `push` delivery
- * would have. Its body names the base branch, the version, the base
- * version, the strategy that answered and every folded fragment in fold
- * order, says to tag with `rafa release tag` after the merge — tagging
- * a `pr` delivery is that command's, never settle's — and ends with the
- * changelog section, receipt included. It holds no hash and no clock,
- * so an unchanged batch writes the same body and step 5 edits nothing.
+ * Its title is the release commit's subject (`releaseCommitSubject`,
+ * `./release-move.ts`) — `chore: release 0.46.0`, or
+ * `chore: release 0.46.0, @scope/plugin@0.2.0` for a commit moving the
+ * root and a package — so a squash merge lands the subject a `push`
+ * delivery would have, and every sentence below names the commit by it
+ * too. Its body names the base branch and the strategy that answered,
+ * lists each unit's move from its base version (`The root package:
+ * 0.45.0 → 0.46.0`, `` `@scope/plugin`: 0.1.0 → 0.2.0 ``) and every
+ * folded fragment in fold order with its package after its level when
+ * it names one, says to tag with `rafa release tag` after the merge —
+ * tagging a `pr` delivery is that command's, never settle's — and ends
+ * with one changelog section per unit, receipt included, each under a
+ * line naming the unit and the changelog it goes into: the root's
+ * first, then the packages in workspace order. A package's name is in
+ * backticks, so GitHub reads no `@scope` as a mention. It holds no hash
+ * and no clock, so an unchanged batch writes the same body and step 5
+ * edits nothing.
  *
  * ## Exit codes
  *
@@ -80,17 +89,19 @@
  * true: `rafa/release` holds the release and only the pull request step
  * is left to a settle run again.
  */
+import type { ReleaseMove } from './release-move.js';
 import type { SettleExitCode } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
-import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
+import type { SettleBuild, SettleBuilt, SettleFragment, SettleSettings, SettleUnitFold } from './settle.js';
 import type { GitRunner, PullRequestDetail, PullRequestDraft, PullRequests, PullRequestSummary } from '../pr/index.js';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { gitSaid } from '../pr/index.js';
 
+import { releaseCommitSubject } from './release-move.js';
 import { pushSaid } from './settle-push.js';
-import { buildSettle, releaseCommitSubject } from './settle.js';
+import { buildSettle, settleMoves } from './settle.js';
 
 /** The branch the `pr` delivery pushes the release commit to. */
 export const RELEASE_PR_BRANCH = 'rafa/release';
@@ -167,25 +178,48 @@ function failed(
   return { outcome, exitCode: 1, build, pushed, sentence };
 }
 
-/** The pull request's title: the release commit's subject. */
-export function releasePullTitle(version: string): string {
-  return releaseCommitSubject(version);
+/** The pull request's title: the subject of the release commit making `moves`. */
+export function releasePullTitle(moves: readonly ReleaseMove[]): string {
+  return releaseCommitSubject(moves);
+}
+
+/** The root package as the body names its unit. */
+const ROOT_UNIT = 'The root package';
+
+/**
+ * A unit as the body names it: the root package, or the package's
+ * name in backticks, so GitHub reads no `@scope` in it as a mention.
+ */
+function unitName(unit: SettleUnitFold): string {
+  return unit.package === null
+    ? ROOT_UNIT
+    : `\`${unit.package}\``;
+}
+
+/** One fragment's line in the body, naming its package after its level when it has one. */
+function fragmentLine(each: SettleFragment): string {
+  const named = each.fragment.package === null
+    ? ''
+    : `, \`${each.fragment.package}\``;
+  return `- \`${each.path}\` (\`${each.id}\`, ${each.fragment.level}${named})`;
 }
 
 /** The pull request's body; see the module note. Holds no hash and no clock. */
 export function releasePullBody(build: SettleBuilt, base: string): string {
-  const fragments = build.fragments.map((each) => `- \`${each.path}\` (\`${each.id}\`, ${each.fragment.level})`);
+  const moves = build.units.map((unit) => `- ${unitName(unit)}: ${unit.baseVersion} → ${unit.version}`);
+  const sections = build.units.flatMap((unit) => [`${unitName(unit)}, into \`${unit.changelog}\`:`, '', unit.section, '']);
   return [
-    `Settles the change fragments waiting on \`${base}\` into ${build.version}: the \`${build.strategy}\` strategy folded them from ${build.baseVersion}.`,
+    `Settles the change fragments waiting on \`${base}\`: the \`${build.strategy}\` strategy folded them into one version per unit.`,
+    '',
+    ...moves,
     '',
     `The fragments, in the order \`${base}\` received them:`,
     '',
-    ...fragments,
+    ...build.fragments.map(fragmentLine),
     '',
-    `Merging this pull request releases the section below; tag it afterwards with \`rafa release tag\`. \`rafa release settle\` replaces \`${RELEASE_PR_BRANCH}\` and this body whenever the batch changes, so an edit made here does not last.`,
+    `Merging this pull request releases each section below; tag it afterwards with \`rafa release tag\`. \`rafa release settle\` replaces \`${RELEASE_PR_BRANCH}\` and this body whenever the batch changes, so an edit made here does not last.`,
     '',
-    build.section,
-    '',
+    ...sections,
   ].join('\n');
 }
 
@@ -226,7 +260,7 @@ function pushReleaseBranch(worktree: SettleWorktree, build: SettleBuilt, current
   const lease = `--force-with-lease=${RELEASE_PR_REF}:${current ?? ''}`;
   const pushed = worktree.git(['push', '--porcelain', lease, worktree.remote, `${build.release}:${RELEASE_PR_REF}`]);
   if (pushed.ok) return null;
-  const subject = releaseCommitSubject(build.version);
+  const subject = releaseCommitSubject(settleMoves(build));
   const said = pushSaid(pushed);
   if (pushed.stdout.split('\n').some((line) => STALE_LEASE.test(line.trimEnd()))) {
     const read = current === null
@@ -328,13 +362,13 @@ export async function settleByPr(
   const draft: PullRequestDraft = {
     head: RELEASE_PR_BRANCH,
     base: worktree.branch,
-    title: releasePullTitle(build.version),
+    title: releasePullTitle(settleMoves(build)),
     body: releasePullBody(build, worktree.branch),
   };
   try {
     const delivered = await deliverPull(pulls, open, draft);
     return { outcome: 'delivered', exitCode: 0, build, head, pushed: !branch.same, ...delivered };
   } catch (error) {
-    return failed('unopened', build, true, `${RELEASE_PR_BRANCH} holds ${releaseCommitSubject(build.version)}, but the release pull request into ${worktree.branch} could not be opened or updated; settle again to finish it: ${messageOf(error)}`);
+    return failed('unopened', build, true, `${RELEASE_PR_BRANCH} holds ${releaseCommitSubject(settleMoves(build))}, but the release pull request into ${worktree.branch} could not be opened or updated; settle again to finish it: ${messageOf(error)}`);
   }
 }

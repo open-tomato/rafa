@@ -35,7 +35,7 @@ const SETTINGS = {
 } as const;
 
 /** The branch's fragment, as step 3 verified it. */
-const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', notes: ['- loop: a fix'] };
+const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', package: null, notes: ['- loop: a fix'] };
 
 /** A fragment waiting on the base, parsed as the tree reader parses one. */
 function waiting(id: string, fragment: Fragment, addedOn = '2026-09-18'): TreeFragment {
@@ -102,7 +102,7 @@ describe('readBranchForecast', () => {
 
   it('folds the waiting fragments then the branch, and ships the batch level', () => {
     const git = gitAnswering(MANIFEST);
-    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', notes: ['- cli: new'] })];
+    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] })];
 
     const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(), now: NOW });
 
@@ -122,6 +122,37 @@ describe('readBranchForecast', () => {
     const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(), now: NOW });
 
     expect(read.ok && read.forecast.kind === 'ships' && read.forecast.version).toBe('0.25.1');
+  });
+
+  it('holds a waiting package fragment out of the root forecast, and folds a waiting root fragment', () => {
+    const git = gitAnswering(MANIFEST);
+    const queue = [
+      waiting('rafa-18', { plan: 'rafa-18', title: 'plugin major', level: 'major', package: '@scope/plugin', notes: ['- plugin: break'] }),
+      waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] }),
+    ];
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.waiting).toEqual(['rafa-19']);
+    expect(read.forecast.version).toBe('0.26.0');
+    expect(read.forecast.section).toContain('<!-- rafa:fragments rafa-19 rafa-21 -->');
+    expect(read.problems).toEqual([]);
+  });
+
+  it('folds the waiting fragments of the branch fragment\'s own package, the control beside the root case', () => {
+    const git = gitAnswering(MANIFEST);
+    const ours: Fragment = { ...OURS, package: '@scope/plugin' };
+    const queue = [
+      waiting('rafa-18', { plan: 'rafa-18', title: 'plugin major', level: 'major', package: '@scope/plugin', notes: ['- plugin: break'] }),
+      waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] }),
+    ];
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(ours), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.waiting).toEqual(['rafa-18']);
+    expect(read.forecast.version).toBe('1.0.0');
   });
 
   it('leaves a waiting fragment that does not parse out of the fold and names it', () => {

@@ -289,7 +289,7 @@ describe('convertStampedVersion over the 0.25.0 incident', () => {
     const reading = parseFragment(readFileSync(join(w.clone, '.changes/rafa-356-parallel-thing.md'), 'utf8'));
     expect(reading).toEqual({
       ok: true,
-      fragment: { plan: 'rafa-356-parallel-thing', title: TITLE, level: 'minor', notes: BRANCH_NOTES },
+      fragment: { plan: 'rafa-356-parallel-thing', title: TITLE, level: 'minor', package: null, notes: BRANCH_NOTES },
     });
   });
 
@@ -327,7 +327,7 @@ describe('convertStampedVersion over the 0.25.0 incident', () => {
     w.commit({
       'package.json': manifest('0.25.0', true),
       'CHANGELOG.md': w.git(['show', 'origin/main:CHANGELOG.md']).concat('\n'),
-      '.changes/rafa-356-parallel-thing.md': serializeFragment({ plan: 'rafa-356-parallel-thing', title: TITLE, level: 'minor', notes: BRANCH_NOTES }),
+      '.changes/rafa-356-parallel-thing.md': serializeFragment({ plan: 'rafa-356-parallel-thing', title: TITLE, level: 'minor', package: null, notes: BRANCH_NOTES }),
     }, 'the tip\'s values, by hand');
 
     expect(guardAnswer(w)).toBe('stale released');
@@ -383,13 +383,13 @@ describe('convertStampedVersion edges', () => {
     expect(conversion.outcome).toBe('converted');
     expect(conversion.problems).toEqual([`${BRANCH} stamped 0.24.1 with no changelog notes, so the fragment carries its title as its one note`]);
     const reading = parseFragment(readFileSync(join(w.clone, '.changes/rafa-356-parallel-thing.md'), 'utf8'));
-    expect(reading).toEqual({ ok: true, fragment: { plan: 'rafa-356-parallel-thing', title: TITLE, level: 'patch', notes: [TITLE] } });
+    expect(reading).toEqual({ ok: true, fragment: { plan: 'rafa-356-parallel-thing', title: TITLE, level: 'patch', package: null, notes: [TITLE] } });
   });
 
   it('names the fragment past one of the same name waiting on the base', () => {
     const { w, head } = incident();
     w.git(['switch', '-q', 'main']);
-    w.commit({ '.changes/rafa-356-parallel-thing.md': serializeFragment({ plan: 'rafa-356-parallel-thing', title: 'earlier', level: 'patch', notes: ['- Loop: earlier'] }) }, 'an earlier fragment');
+    w.commit({ '.changes/rafa-356-parallel-thing.md': serializeFragment({ plan: 'rafa-356-parallel-thing', title: 'earlier', level: 'patch', package: null, notes: ['- Loop: earlier'] }) }, 'an earlier fragment');
     w.git(['push', '-q', 'origin', 'main']);
     w.git(['switch', '-q', BRANCH]);
     const conversion = convert(w, head);

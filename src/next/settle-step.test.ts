@@ -189,7 +189,7 @@ describe('settleReaderFor, over a planted base', () => {
     mkdirSync(join(root, '.changes'), { recursive: true });
     levels.forEach((level, index) => {
       const plan = `rafa-${String(index + 1)}`;
-      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], notes: ['- loop: a change'] };
+      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], package: null, notes: ['- loop: a change'] };
       writeFileSync(join(root, '.changes', `${plan}.md`), serializeFragment(fragment));
     });
     runGit(root, 'init', '--quiet', '--initial-branch=main');

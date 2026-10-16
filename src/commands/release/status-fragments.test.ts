@@ -19,7 +19,11 @@
  *     NOT listed, so the reading is known to be of `origin/main` and not
  *     of the checkout;
  *   - a fragment landed after the caller's last fetch is not listed
- *     until the caller fetches, which is what "as last fetched" says.
+ *     until the caller fetches, which is what "as last fetched" says;
+ *   - the per-package forecasts are compared with `readSettle`'s units
+ *     over the same ref, and the root and the plugin land different
+ *     levels from different base versions, so a package forecast over
+ *     the root's version, or over the whole batch, would fail.
  */
 import type { WaitingSettings } from './status-fragments.js';
 import type { Fragment } from '../../release/fragment.js';
@@ -82,12 +86,28 @@ function isolatedEnv(home: string, date: string): Record<string, string> {
   };
 }
 
-/** A fragment's text. */
-function fragmentText(plan: string, level: Fragment['level']): string {
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = '{\n  "name": "demo",\n  "version": "0.25.0",\n  "workspaces": ["packages/*"]\n}\n';
+
+/** The publishable member's manifest on `main`. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/** The private member's manifest on `main`. */
+const CORE_MANIFEST = '{\n  "name": "@scope/core",\n  "version": "0.0.0",\n  "private": true\n}\n';
+
+/** What a workspace world seeds `main` with: the root manifest, a publishable `packages/plugin` and a private `packages/core`. */
+const WORKSPACE_SEED: Readonly<Record<string, string>> = {
+  'package.json': WORKSPACE_MANIFEST,
+  'packages/plugin/package.json': PLUGIN_MANIFEST,
+  'packages/core/package.json': CORE_MANIFEST,
+};
+
+/** A fragment's text, for the root unless `pkg` names a package. */
+function fragmentText(plan: string, level: Fragment['level'], pkg: string | null = null): string {
   const notes = level === 'none'
     ? []
     : [`- Area: ${plan} change`];
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: pkg, notes });
 }
 
 /** A bare origin, a clone that lands on `main`, and the caller's clone. */
@@ -166,8 +186,10 @@ describe('readWaiting', () => {
 
     if (settle.outcome !== 'folded') throw new Error(`expected folded, got ${settle.outcome}`);
     if (reading.forecast?.kind !== 'settles') throw new Error(`expected settles, got ${String(reading.forecast?.kind)}`);
-    expect(reading.forecast.version).toBe(settle.version);
-    expect(reading.forecast.section).toBe(settle.section);
+    const [root, ...more] = settle.units;
+    if (root?.package !== null || more.length > 0) throw new Error(`settle folded ${String(settle.units.length)} units, not the root alone`);
+    expect(reading.forecast.version).toBe(root.version);
+    expect(reading.forecast.section).toBe(root.section);
   });
 
   it('reads origin/main as last fetched: neither an unpushed nor an unfetched fragment is listed', () => {
@@ -248,6 +270,118 @@ describe('readWaiting', () => {
   });
 });
 
+describe('readWaiting, per package', () => {
+  it('makes no forecast while a fragment names a package the workspace lacks, and names it under the block', () => {
+    const w = world({ ...WORKSPACE_SEED, '.changes/rafa-7.md': fragmentText('rafa-7', 'minor', '@scope/missing') });
+    const head = w.git(w.caller, ['rev-parse', 'origin/main']);
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.forecast).toBeNull();
+    expect(reading.refused).toBe(1);
+    expect(reading.fragments.map((each) => [each.id, each.package])).toEqual([['rafa-7', '@scope/missing']]);
+    expect(reading.problems).toEqual([
+      `.changes/rafa-7.md names package @scope/missing, which the workspace at ${head.slice(0, 12)} does not hold, so settle would refuse`,
+    ]);
+    expect(waitingCell(reading))
+      .toBe('1 fragment on origin/main at 0.25.0, 1 names a package settle cannot release, so settle would refuse');
+  });
+
+  it('makes no forecast while a fragment names the private core', () => {
+    const w = world({
+      ...WORKSPACE_SEED,
+      '.changes/rafa-1.md': fragmentText('rafa-1', 'minor'),
+      '.changes/rafa-8.md': fragmentText('rafa-8', 'patch', '@scope/core'),
+    });
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.forecast).toBeNull();
+    expect(reading.packages).toEqual([]);
+    expect(reading.problems).toEqual([
+      '.changes/rafa-8.md names package @scope/core, which is private and never publishes, so settle would refuse',
+    ]);
+    expect(waitingCell(reading))
+      .toBe('2 fragments on origin/main at 0.25.0, 1 names a package settle cannot release, so settle would refuse');
+  });
+
+  it('makes no forecast when a fragment names a package and the workspace cannot be read', () => {
+    const w = world({
+      ...WORKSPACE_SEED,
+      'packages/plugin/package.json': 'not json\n',
+      '.changes/rafa-7.md': fragmentText('rafa-7', 'minor', '@scope/plugin'),
+    });
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.forecast).toBeNull();
+    expect(reading.packages).toBeNull();
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]).toStartWith('the workspace could not be read: ');
+    expect(waitingCell(reading)).toBe('1 fragment on origin/main at 0.25.0, no forecast, the workspace could not be read');
+  });
+
+  it('forecasts a three-field fragment into the root alone, the workspace unread', () => {
+    const w = world({ ...WORKSPACE_SEED, '.changes/rafa-1.md': fragmentText('rafa-1', 'patch') });
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.packages).toEqual([]);
+    expect(reading.forecast).toMatchObject({ kind: 'settles', version: '0.25.1' });
+    expect(waitingCell(reading)).toBe('1 fragment on origin/main at 0.25.0, settles as the next patch, 0.25.1');
+  });
+
+  it('forecasts the root and the plugin each over its own base version, as `readSettle` folds them', () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'patch') }, 'merge rafa-9', '2026-09-10T12:00:00Z');
+    w.land({ '.changes/rafa-4.md': fragmentText('rafa-4', 'minor', '@scope/plugin') }, 'merge rafa-4', '2026-09-11T12:00:00Z');
+    w.git(w.caller, ['fetch', '-q', 'origin']);
+    const git = createGitRunner(w.caller);
+
+    const reading = readWaiting(git, SETTINGS);
+    const settle = readSettle(git, 'origin/main', { ...SETTINGS, releaseChangelog: 'CHANGELOG.md', releaseMoveLock: false });
+
+    if (settle.outcome !== 'folded') throw new Error(`expected folded, got ${settle.outcome}`);
+    expect(reading.problems).toEqual([]);
+    expect(reading.forecast).toMatchObject({ kind: 'settles', baseVersion: '0.25.0', waiting: ['rafa-9'] });
+    expect(reading.packages?.map((each) => [each.package, each.baseVersion, each.forecast?.kind])).toEqual([
+      ['@scope/plugin', '0.1.0', 'settles'],
+    ]);
+    const forecasts = [reading.forecast, ...(reading.packages ?? []).map((each) => each.forecast)];
+    expect(forecasts.map((each) => (each?.kind === 'settles'
+      ? [each.version, each.section]
+      : null))).toEqual(settle.units.map((unit) => [unit.version, unit.section]));
+    expect(waitingCell(reading))
+      .toBe('2 fragments on origin/main at 0.25.0, settles as the next patch, 0.25.1; @scope/plugin 0.1.0 → 0.2.0');
+  });
+
+  it('leaves the root\'s phrase out when only the plugin has fragments waiting', () => {
+    const w = world({ ...WORKSPACE_SEED, '.changes/rafa-4.md': fragmentText('rafa-4', 'patch', '@scope/plugin') });
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.forecast?.kind).toBe('empty');
+    expect(waitingCell(reading)).toBe('1 fragment on origin/main at 0.25.0, @scope/plugin 0.1.0 → 0.1.1');
+  });
+
+  it('says a package has no forecast when its manifest declares no version', () => {
+    const w = world({
+      ...WORKSPACE_SEED,
+      'packages/plugin/package.json': '{ "name": "@scope/plugin" }\n',
+      '.changes/rafa-1.md': fragmentText('rafa-1', 'minor'),
+      '.changes/rafa-4.md': fragmentText('rafa-4', 'patch', '@scope/plugin'),
+    });
+
+    const reading = readWaiting(createGitRunner(w.caller), SETTINGS);
+
+    expect(reading.packages).toEqual([{ package: '@scope/plugin', baseVersion: null, forecast: null }]);
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]).toStartWith('the base version of @scope/plugin could not be read: ');
+    expect(waitingCell(reading)).toBe('2 fragments on origin/main at 0.25.0, settles as the next minor, 0.26.0;'
+      + ' @scope/plugin no forecast, its base version could not be read');
+  });
+});
+
 describe('waitingLines', () => {
   it('writes one line per fragment, its id and level padded to one column', () => {
     const w = world();
@@ -260,6 +394,20 @@ describe('waitingLines', () => {
     expect(lines).toEqual([
       'rafa-9    minor  2026-09-10  title of rafa-9',
       'rafa-100  patch  2026-09-11  title of rafa-100',
+    ]);
+  });
+
+  it('names a fragment\'s package after its title', () => {
+    const w = world(WORKSPACE_SEED);
+    w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor') }, 'merge rafa-9', '2026-09-10T12:00:00Z');
+    w.land({ '.changes/rafa-4.md': fragmentText('rafa-4', 'patch', '@scope/plugin') }, 'merge rafa-4', '2026-09-11T12:00:00Z');
+    w.git(w.caller, ['fetch', '-q', 'origin']);
+
+    const lines = waitingLines(readWaiting(createGitRunner(w.caller), SETTINGS));
+
+    expect(lines).toEqual([
+      'rafa-9  minor  2026-09-10  title of rafa-9',
+      'rafa-4  patch  2026-09-11  title of rafa-4  for @scope/plugin',
     ]);
   });
 });

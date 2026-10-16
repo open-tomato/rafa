@@ -368,7 +368,7 @@ describe('prepareRelease at level none', () => {
 describe('prepareRelease naming the fragment', () => {
   it('takes -2 when the base already holds a waiting fragment of the plan, pushed after the clone', () => {
     const at = world();
-    const waiting = serializeFragment({ plan: PLAN, title: 'an earlier run', level: 'patch', notes: ['- loop: first'] });
+    const waiting = serializeFragment({ plan: PLAN, title: 'an earlier run', level: 'patch', package: null, notes: ['- loop: first'] });
     at.push({ '.changes/rafa-367.md': waiting });
 
     const made = prepareRelease(input(at, recordingGit(at.root).run));
