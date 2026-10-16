@@ -28,6 +28,8 @@ import { describe, expect, it } from 'bun:test';
 
 import { commandSpelling } from '@open-tomato/rafa/core/command';
 
+import { createRosterRegistry } from '../commands/index.js';
+
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
@@ -401,5 +403,21 @@ describe('routing', () => {
 
     expect(first).toEqual(second);
     expect(argv).toEqual(['-v', 'loop', 'start', '--plan=PLAN.md']);
+  });
+});
+
+describe('a roster with a feature turned off', () => {
+  const OFF_PR = createRosterRegistry({ off: ['pr'] });
+
+  it('refuses rafa pr list as an unknown subject', () => {
+    expect(summaryOf(routeLine(OFF_PR, ['pr', 'list']))).toEqual(
+      refused('unknown_subject', 'unknown subject or command "pr"', 'pr', ['list']),
+    );
+  });
+
+  it('still routes rafa plan list', () => {
+    const route = routeLine(OFF_PR, ['plan', 'list']);
+
+    expect(route.kind).toBe('command');
   });
 });
