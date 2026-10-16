@@ -32,7 +32,6 @@ import type { RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
 import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
 import { DEFAULT_ISSUE_SEAMS } from './issue/issue-tracker.js';
-import { runIssueList } from './issue/list.js';
 
 /** The `issue list` flags `rafa roadmap` leaves undeclared: the one it sets, and the one refused beside it. */
 const NOT_DECLARED: readonly string[] = ['roadmap', 'state'];
@@ -105,7 +104,11 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
       },
     ],
     outputs: ['text', 'json'],
-    run: (context) => runIssueList({ ...context, flags: { ...context.flags, roadmap: true } }, seams),
+    run: async (context) => {
+      // Imported here, not at the top: `issue list` is the `board` feature's command module, loaded when it is used.
+      const { runIssueList } = await import('./issue/list.js');
+      await runIssueList({ ...context, flags: { ...context.flags, roadmap: true } }, seams);
+    },
   };
   return Object.freeze(command);
 }

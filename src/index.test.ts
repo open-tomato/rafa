@@ -903,7 +903,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/items.js', ['malformedItemLines', 'readItems']],
     ['../../stretch/launch.js', ['lineText']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['../pr/open.js', ['baseWarning', 'openPull', 'renderOpen']],
     ['../pr/pr-context.js', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext']],
     ['./item.js', ['stretchOfBase']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
@@ -954,7 +953,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/roadmap.js', [
     ['./issue/declarations.js', ['ISSUE_LIST_FLAGS']],
     ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
-    ['./issue/list.js', ['runIssueList']],
   ]],
   ['./commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],

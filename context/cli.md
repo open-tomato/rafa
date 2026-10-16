@@ -362,6 +362,21 @@ New; it replaces no earlier text. What a row or an action added to
   four bundled features' commands are not on that list: each feature's
   `index.ts` holds a lazy command per action, which imports its module
   when it runs, and `createRosterRegistry` registers them after core's.
+- **No feature command module loads until its command runs, and no
+  module's adapters until the config names it.** `src/cli/feature-load-cli.test.ts`
+  spawns `src/cli/feature-load-probe.ts` fresh and reads the modules off
+  `require.cache`: after the probe registers core's sections and
+  adapters, builds `createRosterRegistry()` and renders every help level
+  and `describeRegistry`, no `src/commands/<subject>/<action>.ts` of a
+  declared feature action is loaded; after it runs one (`--run=claim
+  release`), that module alone of its feature is; and over a scratch
+  project `loadInvocationModules` plus `activateModuleAdapters` load
+  nothing under `src/modules/testdata/` with no module configured, and
+  load `sync-fixture`'s entry and resolve its kind when the `allowList`
+  names it. A core command that needs a feature command's function
+  (`roadmap`'s `runIssueList`, `stretch end`'s `openPull`) imports it
+  inside its `run` (`await import(...)`), never at the top of the file,
+  so the roster stays a reading of declarations.
 - **Each core command module's static imports are spelled out too**, in
   `src/index.test.ts`'s `COMMAND_MODULES`: per module, the exact
   specifiers and the exact names taken from each, in the order the module
