@@ -126,6 +126,7 @@ import {
 import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
+import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
 
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
@@ -557,6 +558,97 @@ describe('the events of one invocation', () => {
     const { stdout } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'json' } });
 
     expect(eventsOf(stdout).map((event) => event.type)).toEqual(['start', 'log', 'step', 'result']);
+  });
+});
+
+/** A module's error class, as `ScopeError` is the project's: the module is a static. */
+class LoopError extends RafaError {
+  static readonly module = 'loop';
+}
+
+describe('a coded failure', () => {
+  const HINT = 'set user.name and user.email where the commit runs';
+
+  /** The coded error the two coded fixtures throw or wrap. */
+  const coded = (): LoopError => new LoopError({ code: 'git:no-identity', message: 'x' });
+
+  /** The fixture commands: one throwing the coded error, one refusing with it as the cause, and a plain crash. */
+  const CODED_REGISTRY = createCommandRegistry({
+    subjects: [{ name: 'loop', summary: 'the loop' }],
+    commands: [
+      command('loop', 'coded', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw coded(); },
+      }),
+      command('loop', 'coded-exit', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw new CommandExit(3, 'refused', { cause: coded() }); },
+      }),
+      command('loop', 'crash', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw new Error('boom'); },
+      }),
+    ],
+  });
+
+  it('writes the code in brackets and the hint line to stderr, exit 1', async () => {
+    const { outcome, stdout, stderr } = await run(['loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(stderr).toBe(`rafa: x [git:no-identity]\n  hint: ${HINT}\n`);
+    expect(stdout).toBe('');
+  });
+
+  it('carries cause, hint and module in the json error of a thrown coded error', async () => {
+    const { outcome } = await run(['--output=json', 'loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.result).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_error', message: 'x', cause: 'git:no-identity', hint: HINT, module: 'loop', action: 'coded' },
+      ts: NOW.toISOString(),
+    });
+  });
+
+  it('exits 3 as command_exit with the cause of the error it wraps', async () => {
+    const { outcome } = await run(['--output=json', 'loop', 'coded-exit'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.result).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: 'refused', cause: 'git:no-identity', hint: HINT, module: 'loop', action: 'coded-exit' },
+      ts: NOW.toISOString(),
+    });
+  });
+
+  it('writes an uncoded crash as its message alone, with the unknown cause and the boundary module', async () => {
+    const { outcome, stderr } = await run(['loop', 'crash'], { registry: CODED_REGISTRY });
+    const json = await run(['--output=json', 'loop', 'crash'], { registry: CODED_REGISTRY });
+
+    expect(stderr).toBe('rafa: boom\n');
+    expect(json.outcome.result).toMatchObject({
+      error: { code: 'command_error', cause: 'unknown:new-context', module: 'loop' },
+    });
+    expect(json.outcome.result).not.toHaveProperty('error.hint');
+    expect(outcome.exitCode).toBe(1);
+  });
+
+  it('writes the events-mode line with the bracket and no hint line', async () => {
+    const { stdout, stderr } = await run(['loop', 'coded'], { env: { RAFA_OUTPUT: 'events' }, registry: CODED_REGISTRY });
+
+    expect(stdout).toBe('rafa· error            rafa: x [git:no-identity]\n');
+    expect(stdout).not.toContain('hint');
+    expect(stderr).toBe('');
+  });
+
+  it('keeps the stack of a coded error at debug verbosity 2', async () => {
+    const { stdout, stderr } = await run(['--verbose=2', 'loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(stdout).toMatch(/^debug: /);
+    expect(stdout).toContain('LoopError');
+    expect(stderr).toBe(`rafa: x [git:no-identity]\n  hint: ${HINT}\n`);
   });
 });
 
