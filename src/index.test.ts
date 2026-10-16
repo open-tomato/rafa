@@ -1050,6 +1050,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/setup.js', ['ROADMAP_LABEL']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./declarations.js', ['BOARD_LIST_DECLARATION']],
   ]],
   ['./commands/board/sync.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -1060,6 +1061,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
     ['../../board/project/sync.js', ['syncProject']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+    ['./declarations.js', ['BOARD_SYNC_DECLARATION', 'BOARD_SYNC_DRY_RUN_FLAG']],
   ]],
   ['./commands/epic/show.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
