@@ -433,7 +433,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release settle`, `release tag`, `release publish`, `release list`, `board list`, `board sync`, `epic show`, aliased
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release list`, `board list`, `board sync`, `epic show`, aliased
   `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `claim release`,
   `claim hand`, `claim accept`, `claim take`, `update current` with the
   stubs `update self`, `update project`, `update board`, `update next`,

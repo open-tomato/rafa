@@ -1026,6 +1026,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./tag-follow-ups.js', ['readPublishTarget']],
     ['./tag-units.js', ['readTagPackages', 'readVersion']],
   ]],
+  ['./commands/release/workflows.js', [
+    ['../../release/ladder.js', ['LADDER_WORKFLOWS', 'ladderLevel', 'ladderWorkflowNeeded']],
+    ['../../release/templates.js', ['readReleaseTemplate', 'writeReleaseWorkflow']],
+    ['../doctor-ladder.js', ['readLadderFiles']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+  ]],
   ['./commands/release/list.js', [
     ['../../pr/index.js', ['createGitRunner']],
     ['../../release/status-readings.js', ['readTags']],
@@ -1690,6 +1696,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/settle.js',
       './commands/release/tag.js',
       './commands/release/publish.js',
+      './commands/release/workflows.js',
       './commands/release/list.js',
       './commands/board/list.js',
       './commands/board/sync.js',
