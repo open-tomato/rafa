@@ -341,5 +341,6 @@ do not settle on `develop`.
 ## See also
 
 - `rafa release settle --help` — command reference
+- `rafa release workflows --help` — the ladder's workflow files and `--write`
 - `context/release.md` — design, guards, readers, and all config keys
 - `docs/specs-and-roadmap.md` — how specs become plans and fragments
