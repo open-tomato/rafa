@@ -315,11 +315,15 @@ the tracker, so the split stands as it was made.
 ### The cut table
 
 **The cut table ranks where the package lines could fall.**
-`docs/survey/cut-table.json` and `docs/survey/cut-table.md` list the ten
-packages of epic #801, lowest first: `@open-tomato/rafa` (core),
+`docs/survey/cut-table.json` and `docs/survey/cut-table.md` list the twelve
+packages of epic #801, lowest first: `rafa-eslint-config`,
+`rafa-typescript-config`, `@open-tomato/rafa-core` (core),
 `rafa-inventory`, `rafa-board`, `rafa-pr`, `rafa-run`, `rafa-release`,
-`rafa-effort`, `rafa-hub`, `rafa-sync-service` and
-`@open-tomato/rafa-cli`. For each it gives the folders and named files it
+`rafa-effort`, `rafa-hub`, `rafa-sync-service` and `@open-tomato/rafa`
+(the CLI, the root that publishes). The names are #808's: core keeps its
+manifest's private name and there is no `@open-tomato/rafa-cli`. The two
+shared-config packages sit lowest because nothing in the graph imports
+them. For each it gives the folders and named files it
 holds, and its count of upward edges: imports of kind `value` or `type`
 between two non-test files, from a package lower in the order into a
 higher one. `scripts/survey/cut-table.ts` writes both files from
@@ -330,7 +334,7 @@ the table and the graph cannot disagree.
 CLI.** A file a package names goes there, and a test follows the file it
 tests. Otherwise the longest folder that holds the file decides, among the
 package folders and the unassigned ones. A file no rule holds is left to
-place and counts as a file of `@open-tomato/rafa-cli`, which takes every
+place and counts as a file of `@open-tomato/rafa`, which takes every
 file no line holds. An edge with an end in an unassigned folder
 (`src/stretch/`, `src/commands/stretch/` or `src/ci/`) has no rank on that
 end, so it is never upward. Inside `src/schema/` the placement is per file,
@@ -338,7 +342,10 @@ as the Packages section below lists.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
-and the folder's closing `/` keeps `packages/rafa-hub/` out of it.
+and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub,
+the sync service and the two shared-config packages
+(`packages/eslint-config/`, `packages/typescript-config/`) follow the same
+one-folder rule.
 
 **The counts rank options and do not certify a cut.** An upward edge from
 `packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is
@@ -493,11 +500,11 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 - **Each schema under `src/schema/` lands in one package**, the one
   `docs/survey/content-schema-importers.md` names for it:
   - `tiers.ts` and `project-id.ts`, already under `packages/rafa/src/schema/`:
-    `@open-tomato/rafa` (core)
+    `@open-tomato/rafa-core` (core)
   - `frontmatter.ts`: `rafa-effort`
   - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
-  - `agent.ts`: `@open-tomato/rafa-cli`
+  - `agent.ts`: `@open-tomato/rafa` (the CLI)
 - **One upward edge survives the placement.** `src/effort/report-skills.ts`
   (rafa-effort) reads `readScopes` from `src/schema/scope-records.ts`,
   which lands in rafa-inventory. No placement clears it, because

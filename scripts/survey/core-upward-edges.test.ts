@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 const CUT_TABLE_PATH = fileURLToPath(new URL('../../docs/survey/cut-table.json', import.meta.url));
-const CORE_PACKAGE_NAME = '@open-tomato/rafa';
+const CORE_PACKAGE_NAME = '@open-tomato/rafa-core';
 
 interface TableEdge {
   readonly from: string;

@@ -65,13 +65,16 @@ repository.
   `src/core/` counts as one folder and every file under `packages/rafa/src/` as `packages/rafa`, and the walk stops
   at a core barrel.
 
-- **`cut-table.{json,md}`**: The ten future packages of epic #801, lowest first, each with the folders and files it
-  holds by rule and its count of upward edges: imports of kind `value` or `type`, between two files neither of which
-  is a test, from a package lower in the order into a higher one. Made by `bun scripts/survey/cut-table.ts` at commit
-  f7a7e25, reading `import-graph.json` above as written for #905 and never a build of its own, so the table and the
-  graph cannot disagree: 1843 files, 1815 of them in the ten packages (675 held by no rule, left to place and counted
-  in `@open-tomato/rafa-cli`) and 28 in the three unassigned folders `src/ci/`, `src/commands/stretch/` and
-  `src/stretch/`. Of 4095 edges between non-test files 285 point upward, 13 of them from `src/core/config/` into a
+- **`cut-table.{json,md}`**: The twelve future packages of epic #801, lowest first, each with the folders and files
+  it holds by rule and its count of upward edges: imports of kind `value` or `type`, between two files neither of
+  which is a test, from a package lower in the order into a higher one. The two shared-config packages,
+  `rafa-eslint-config` and `rafa-typescript-config`, sit lowest, since nothing in the graph imports them; core is
+  `@open-tomato/rafa-core` above them and the CLI `@open-tomato/rafa` at the top, #808's names. The files as tracked
+  were made by `bun scripts/survey/cut-table.ts` at commit f7a7e25, before the two shared-config rows and the rename,
+  reading `import-graph.json` above as written for #905 and never a build of its own, so the table and the graph
+  cannot disagree: 1843 files, 1815 of them in the ten packages the script then listed (675 held by no rule, left to
+  place and counted in the CLI, then named `@open-tomato/rafa-cli`) and 28 in the three unassigned folders `src/ci/`,
+  `src/commands/stretch/` and `src/stretch/`. Of 4095 edges between non-test files 285 point upward, 13 of them from `src/core/config/` into a
   config section file and marked as cleared by #118, and 78 touch an unassigned folder and have no rank. The counts
   rank options and do not certify a cut: `tsc --build` with project references is that gate (#807). It is not one of
   the four maps, so `scripts/survey/maps.test.ts` does not check it, and it goes stale when `import-graph.json` is
