@@ -21,6 +21,10 @@ level: patch | minor | major | none
 A fourth line, `package: <name>` after `level`, names the workspace package
 the fragment releases; a fragment without it is the root package's, read as
 `package: null`, and the serialiser writes the line only when it is set.
+The name is the workspace member's manifest `name`, matched exactly.
+`parseFragment` refuses an empty name or one holding whitespace; settle refuses
+a name the workspace lacks or a private member's (see "Settle and its
+deliveries").
 
 Below the front matter, the notes are one line per area (`- area: summary`),
 the same as the wrapped changelog lines the session writes today. Level `none`
@@ -46,6 +50,16 @@ branch). All three get the same answer because the fold's inputs are committed
 data only: the base branch's current version and the ordered fragments. It reads
 no network, label, or clock.
 
+The fold runs once per unit that releases, not once per branch. The root's
+batch folds from `release.versionFile` over the fragments with no `package`
+line; each workspace package a fragment names folds from the `version` of its
+own `<dir>/package.json` over that package's fragments. Every batch keeps the
+same first-parent order. A package no fragment names is never folded, and it
+keeps its version through a release. The pull request body's forecast
+(`src/release/branch-forecast.ts`) applies the same split: it folds only the
+waiting fragments whose `package` equals the branch fragment's (null with null),
+so a package fragment waiting on the base does not move the root's forecast.
+
 Fragment order is first-parent commit order: the commit that ADDED each fragment
 to the base branch, read from git. First add wins if a fragment name appears
 twice (it should not).
@@ -65,8 +79,17 @@ calendar-based versioning) while keeping the default simple.
 
 `rafa release settle [--dry-run]` builds its commit in a scratch worktree of
 `origin/<pr.base>`, reading the fragments from that tree, ordering them by
-first-parent commit, folding them to a version and section, then delivering by
-one of two methods:
+first-parent commit, splitting them into one batch per unit, folding each batch
+to a version and section, then delivering by one of two methods:
+
+**Refusals**: a fragment that does not parse, or that names a package the
+workspace at the base lacks or a private one, refuses the whole batch. Settle
+prints one sentence per refused fragment, naming its path and the reason
+(`<path> names package <name>, which the workspace at <hash> does not hold`, or
+`<path> names package <name>, which is private and never publishes`), and exits
+1 with nothing written. The rest of the batch is not folded either, since a
+fragment left out would release later than the order the base received it. A
+dry run reads the same and gives the same refusal.
 
 **Push delivery** (default): Settle writes each unit's version and section on
 the base branch (the root's, and each workspace package a fragment names),

@@ -220,6 +220,14 @@ merged now. The fragment is stored under `release.fragments` (default
 waiting and suggests running settle. `rafa pr list` marks forecasts as
 `(base moved)` if the base branch changed since the forecast was written.
 
+A workspace package under `packages/` that is not `private: true` can release
+on its own. A fragment names it with a fourth front-matter line,
+`package: <name>` (the package's manifest `name`); a fragment without the line
+is the root's. Settle then moves that package's version, changelog and tag
+beside the root's, and `rafa release list` prints one row per unit that
+releases: the root, then each publishable package, with its version, waiting
+fragments and newest tag. `context/release.md` has the rules.
+
 Every project starts with fragments settling to the base branch and tagging
 by hand. You can configure settle to open a pending release pull request
 instead (for protected base branches), and have settle tag the commit
