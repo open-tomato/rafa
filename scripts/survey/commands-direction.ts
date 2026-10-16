@@ -16,7 +16,7 @@
  *     classify as `test`. A test-support file (a fixture, a fake, a helper
  *     under `src/tests/`) is read: it is not a test file;
  *   - less the files under `src/commands/` themselves;
- *   - less the two files of {@link EXEMPT_IMPORTERS}, exempt by name as
+ *   - less the files of {@link EXEMPT_IMPORTERS}, exempt by name as
  *     the CLI's own layer.
  *
  * Which imports count: every specifier `ts.preProcessFile` finds in the
@@ -48,9 +48,9 @@ export const COMMANDS_FOLDER = 'src/commands/';
 /**
  * The files outside `src/commands/` that may import it, as the CLI's own
  * layer: the bin entry, which loads the command registry, and the body of
- * `rafa plan create`.
+ * `rafa plan create`, and the load probe the feature-load test spawns.
  */
-export const EXEMPT_IMPORTERS: readonly string[] = ['src/plan.ts', 'src/rafa.ts'];
+export const EXEMPT_IMPORTERS: readonly string[] = ['src/cli/feature-load-probe.ts', 'src/plan.ts', 'src/rafa.ts'];
 
 const CODE_EXTENSION = /\.(?:ts|tsx|mts|js|mjs)$/;
 const EDGE_ARROW = ' -> ';
