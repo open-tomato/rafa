@@ -2,8 +2,9 @@
  * Tests for the level 4 settle workflow template
  * (`./templates/release-settle.yml`, `RELEASE_SETTLE_FILE` in
  * `./templates.ts`): its trigger, the guard on its settle job, its
- * permissions, the full-history checkout, the git identity, the settle
- * step and the publish job it calls.
+ * permissions, the full-history checkout, the git identity, the step
+ * writing the CI config before the settle step, the settle step and the
+ * publish job it calls.
  *
  * The workflow is read with `Bun.YAML.parse`, so a case holds the keys
  * GitHub reads rather than a substring of the text. The identity step
@@ -93,8 +94,16 @@ describe('the shipped settle workflow', () => {
     expect(at(stepNamed('Set up bun'), ['with', 'bun-version-file'])).toBe('package.json');
   });
 
-  it('runs its steps in order: checkout, the identity, bun, then settle, whose output the job carries', () => {
-    expect(settleSteps().map((step) => step['name'])).toEqual(['Checkout', 'Set git identity', 'Set up bun', 'Settle']);
+  it('runs its steps in order: checkout, the identity, bun, the CI config, then settle, whose output the job carries', () => {
+    expect(settleSteps().map((step) => step['name'])).toEqual([
+      'Checkout',
+      'Set git identity',
+      'Set up bun',
+      'Write the CI config',
+      'Settle',
+    ]);
+    expect(at(stepNamed('Write the CI config'), ['shell'])).toBe('bash');
+    expect(stepNamed('Write the CI config')?.['if']).toBeUndefined();
     expect(at(stepNamed('Settle'), ['id'])).toBe('settle');
     expect(at(settleWorkflow(), ['jobs', 'settle', 'outputs'])).toEqual({ release: '${{ steps.settle.outputs.release }}' });
   });

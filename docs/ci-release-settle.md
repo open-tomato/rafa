@@ -91,6 +91,14 @@ jobs:
         with:
           bun-version-file: package.json
 
+      - name: Write the CI config
+        shell: bash
+        run: |
+          if [ ! -f rafa.config.ts ] && [ ! -f rafa.config.mjs ] && [ ! -f .rafa/config.yaml ]; then
+            mkdir -p .rafa
+            printf '%s\n' '# Written by the Release settle workflow: the checkout holds no rafa config.' 'release:' '  enabled: true' > .rafa/config.yaml
+          fi
+
       - name: Settle
         id: settle
         shell: bash
@@ -126,6 +134,10 @@ writes it whole. The workflow:
   turn rather than racing.
 - Checks out full history so fragment ordering by first-parent commit works.
 - Sets a git identity before settle, which writes the release commit.
+- Writes `.rafa/config.yaml` with `release.enabled: true` when the checkout
+  holds none of `rafa.config.ts`, `rafa.config.mjs` and `.rafa/config.yaml`,
+  since rafa refuses to run without a config. A committed config is left as it
+  is, so a project that needs other release keys in CI commits them.
 - Runs settle (which is idempotent: if fragments already settled, it finds
   nothing to do). Settle pushes the release commit to the base branch itself,
   and under `release.tag: settle` tags it; no separate push or tag step runs.

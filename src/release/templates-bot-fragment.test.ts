@@ -3,8 +3,10 @@
  * (`./templates/release-bot-fragment.yml`, `RELEASE_BOT_FRAGMENT_FILE` in
  * `./templates.ts`): its trigger, the guard on its job, its permissions,
  * the metadata step, the two checkouts, that no step runs the head
- * branch's code, and the three scripts: the look for a fragment already
- * on the branch, the write, and the commit pushed to the head branch.
+ * branch's code, the step writing the CI config in `base/` before the
+ * write, and the three scripts: the look for a fragment already on the
+ * branch, the write, and the commit pushed to the head branch, which
+ * stages the fragment alone with the written config beside it.
  *
  * The workflow is read with `Bun.YAML.parse`, so a case holds the keys
  * GitHub reads rather than a substring of the text. Each script runs
@@ -144,16 +146,19 @@ describe('the shipped bot fragment workflow', () => {
     ]);
   });
 
-  it('runs its steps in order: metadata, the base, the head, the look, bun, the write, then the commit', () => {
+  it('runs its steps in order: metadata, the base, the head, the look, bun, the CI config, the write, then the commit', () => {
     expect(botSteps().map((step) => step['name'])).toEqual([
       'Fetch metadata',
       'Checkout the base',
       'Checkout the head',
       'Look for the fragment',
       'Set up bun',
+      'Write the CI config',
       'Write the fragment',
       'Commit and push',
     ]);
+    expect(at(stepNamed('Write the CI config'), ['shell'])).toBe('bash');
+    expect(at(stepNamed('Write the CI config'), ['working-directory'])).toBe('base');
   });
 
   it('reads the dependency type off dependabot/fetch-metadata into the write', () => {
@@ -195,8 +200,8 @@ describe('the shipped bot fragment workflow', () => {
     expect(at(stepNamed('Write the fragment'), ['env', 'PR_TITLE'])).toBe('${{ github.event.pull_request.title }}');
   });
 
-  it('skips bun, the write and the commit when the branch already holds the fragment', () => {
-    for (const name of ['Set up bun', 'Write the fragment', 'Commit and push']) {
+  it('skips bun, the CI config, the write and the commit when the branch already holds the fragment', () => {
+    for (const name of ['Set up bun', 'Write the CI config', 'Write the fragment', 'Commit and push']) {
       expect(at(stepNamed(name), ['if'])).toBe('steps.held.outputs.held == \'false\'');
     }
   });
@@ -367,6 +372,10 @@ describe.skipIf(Bun.which('bash') === null)('the commit and push', () => {
     const root = mkdtempSync(join(tempBase, 'commit-'));
     const { origin, head } = headClone(root);
     put(head, FRAGMENT, 'plan: x\n');
+    const written = Bun.spawnSync(['bash', '-e', '-o', 'pipefail', '-c', scriptOf('Write the CI config')], { cwd: head, env: envUnder(root) });
+    // The control: the config the step writes sits beside the fragment, so the commit could take it.
+    expect(written.exitCode).toBe(0);
+    expect(existsSync(join(head, '.rafa', 'config.yaml'))).toBe(true);
     put(head, 'stray.txt', 'not the fragment\n');
     const before = git(root, root, ['--git-dir', origin, 'rev-parse', 'dependabot/bun/zod']);
 

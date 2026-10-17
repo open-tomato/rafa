@@ -79,6 +79,27 @@ The four templates:
 - `release-bot-fragment.yml` (levels 3 and 4, while `.github/dependabot.yml`
   exists): see "Fragments" below.
 
+Each template runs one rafa line in the runner's checkout, and that checkout may
+hold no rafa config: `.rafa/config.yaml` is gitignored in this repository, and
+no `rafa.config.*` is committed, so rafa refuses with exit 1 (#1203). Each
+template therefore has a step named `Write the CI config`, placed straight
+before the step that runs rafa, in the directory rafa runs in: the root for the
+three workflows that run from it, and `base/` for the bot fragment workflow.
+When none of `rafa.config.ts`, `rafa.config.mjs` and `.rafa/config.yaml` is
+there, the step writes `.rafa/config.yaml` holding the lightest config that
+turns the release on, with a header naming the workflow:
+
+```yaml
+# Written by the Release tag workflow: the checkout holds no rafa config.
+release:
+  enabled: true
+```
+
+A config already there under any of the three names is left byte for byte, so
+a project that needs other release keys in CI commits its config, and the
+template's header comment says so. The written file lives only in the runner's
+checkout, and nothing commits it.
+
 The two tagging workflows publish in their own run because of GitHub's
 recursion guard: a tag or commit pushed with the workflow's `GITHUB_TOKEN`
 starts no other workflow run, so the `push: tags` trigger of the publish
@@ -135,15 +156,21 @@ The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
 a Dependabot pull request. It runs on `pull_request_target` for
 `dependabot[bot]` pulls from the repository itself, so its token is writable
 and no code from the pull request runs: rafa runs from the base branch's
-checkout, and the branch is checked out only to receive one file. A branch
-that already adds a fragment named for the pull request
-(`dependabot-<number>.md`, or `-2`, `-3` and on) is left as it is. Otherwise
-the fragment is written at `patch` when `dependabot/fetch-metadata` reads the
-update as `direct:production`, and at `none` otherwise, committed as
+checkout, under `base/`, and the branch is checked out only to receive one
+file. Its `Write the CI config` step runs in `base/` before the fragment is
+written, and writes `.rafa/config.yaml` there when the base holds no rafa
+config (see "Workflows and the GITHUB_TOKEN rule"), since rafa reads its config
+from the directory it runs in. A branch that already adds a fragment named for
+the pull request (`dependabot-<number>.md`, or `-2`, `-3` and on) is left as it
+is, and the config step is skipped with the rest. Otherwise the fragment is
+written at `patch` when `dependabot/fetch-metadata` reads the update as
+`direct:production`, and at `none` otherwise, committed as
 `chore: release fragment dependabot-<number>` and pushed to the pull request's
-branch. That push uses `GITHUB_TOKEN`, so it starts no other run. Dependabot
-stops rebasing a branch someone else has pushed to, so a rebase it asks for
-drops that commit, and the `synchronize` run that follows writes it again.
+branch. The commit stages the fragment alone, so the config written in `base/`
+is never committed. That push uses `GITHUB_TOKEN`, so it starts no other run.
+Dependabot stops rebasing a branch someone else has pushed to, so a rebase it
+asks for drops that commit, and the `synchronize` run that follows writes it
+again.
 
 ### The fold: one strategy, pure function
 
