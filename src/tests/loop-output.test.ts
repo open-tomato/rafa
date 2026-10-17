@@ -294,17 +294,12 @@ const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/
 const COMMITTED_LINE = /^info: {3}Committed [0-9a-f]{7} .+$/;
 
 /**
- * A runner suite step's line, `label` naming the step. The scratch
- * project holds no test file, so Bun answers exit 1 and no summary
- * line, which the step reads as green.
+ * What the first dispatch says of the baseline, and the step run before
+ * the wrap-up. The scratch project's config names no `checks.*` entry,
+ * so no baseline is taken and the pre-wrap-up step runs nothing.
  */
-function suiteStepLine(label: string): RegExp {
-  return new RegExp(`^🧪 ${label}: bun test .+ exited 1; no summary line$`);
-}
-
-/** The baseline the first dispatch runs, and the step run before the wrap-up. */
-const BASELINE_LINE = suiteStepLine('suite baseline');
-const PRE_WRAP_UP_LINE = suiteStepLine('pre-wrap-up step');
+const BASELINE_LINE = '📏 No check-point entry names a check; no suite baseline is taken.';
+const PRE_WRAP_UP_LINE = '🧪 pre-wrap-up step: no check configured (checks.loop is empty); nothing ran.';
 
 /** Every line of a json-mode stdout, parsed. Throws on a line that is no JSON. */
 function eventsOf(stdout: string): CliEvent[] {
@@ -690,7 +685,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       'info:🧪 task step: no check configured (checks.task is empty); nothing ran.',
       expect.stringMatching(/^info:🧹 lint step after .+: no eslint\.config file at the checkout root; nothing to lint\.$/),
       expect.stringMatching(/^info:🔎 type step after .+: no tsconfig\.json at the checkout root; nothing to type-check\.$/),
-      expect.stringMatching(/^info:🧪 pre-wrap-up step: .+ exited 1; no summary line$/),
+      `info:${PRE_WRAP_UP_LINE}`,
       'info:\n✅ All tasks completed!',
       `info:${WRAP_UP_STARTING}`,
       `info:${WRAP_UP_QUIET}`,

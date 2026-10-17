@@ -11,7 +11,8 @@
  * it shares with the other steps live in `suite-step.ts`, imported back
  * here, as `suite-stage-step.ts` imports them: the cycle is safe because
  * neither module reads the other's bindings at load, only inside the
- * functions.
+ * functions. {@link checkRunsOf} is exported for the pre-wrap-up step
+ * (`suite-step.ts`), which runs a path list or `affected` as this step does.
  */
 
 import type { Settling, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
@@ -82,10 +83,15 @@ function taskEntryOf(context: SuiteStepContext, input: TaskStepInput): TaskEntry
   return { names, moduleRead, related: moduleRead || names.includes('related') };
 }
 
-/** The runs a task's check run asks for, with the `tests.alwaysRun` files `alwaysRun` reads added where the module note says. */
-function taskNarrowing(run: CheckRun, entry: TaskEntry, base: string, alwaysRun: () => readonly string[]): StepRuns {
+/**
+ * The runs a check run asks for from `base`, with the `tests.alwaysRun`
+ * files `alwaysRun` reads added where the module note says; `related`
+ * is true when the entry's `related` is in play. The task step's, and
+ * the pre-wrap-up step's (`suite-step.ts`).
+ */
+export function checkRunsOf(run: CheckRun, related: boolean, base: string, alwaysRun: () => readonly string[]): StepRuns {
   if (run.kind === 'paths') {
-    const joined = run.affectedToo || entry.related
+    const joined = run.affectedToo || related
       ? alwaysRun()
       : [];
     return { narrowing: { paths: withAlwaysRun(run.paths, joined) }, alwaysRun: [], timed: joined };
@@ -194,7 +200,7 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const scope = await taskScopeOf(context, seams, input, entry, diff);
   const runs = scope === null
     ? { narrowing: {}, alwaysRun: [], timed: [] }
-    : taskNarrowing(scope, entry, input.base, () => readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
+    : checkRunsOf(scope, entry.related, input.base, () => readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
   const label = `task step after "${input.task}"`;
   if (runs.narrowing.paths?.length === 0) return settleNothingRan(context, seams, input, null, `🧪 ${label}: no test file in the paths checks.task names; nothing to run.`);
   const result = await runWithAlwaysRun(context, seams, 'task', runs);

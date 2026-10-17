@@ -116,8 +116,8 @@ const TEST_FILE_SOURCE = [
 /** The flags every `loop start` in this file runs with. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push needs no remote and no `gh`. */
-const CONFIG = 'pr:\n  provider: none\n';
+/** The project config: `pr.provider: none`, so the wrap-up's push needs no remote and no `gh`; and `checks.loop: [full]`, so the pre-wrap-up step runs the whole project. */
+const CONFIG = 'pr:\n  provider: none\nchecks:\n  loop: [full]\n';
 
 /** The repair task's line, a pre-wrap-up step's, in any checkbox, with the blocker comment it may carry. */
 const REPAIR_LINE = /^- \[(?: |x|BLOCKED)\] Repair the red pre-wrap-up step at commit [0-9a-f]{12} {2}\{agent=build-error-resolver\}(?: {2}<!-- blocked: .* -->)?$/gm;

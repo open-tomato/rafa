@@ -12,7 +12,9 @@
  * `suite-stage-ledger.ts`'s. The run, record, settle and retake helpers
  * it shares with the other steps live in `suite-step.ts`, imported back
  * here: the cycle is safe because neither module reads the other's
- * bindings at load, only inside the functions.
+ * bindings at load, only inside the functions. {@link entryChecksOf} is
+ * exported for the pre-wrap-up step (`suite-step.ts`), which resolves
+ * `checks.loop` with no `tests=` value as this step resolves `checks.stage`.
  */
 
 import type { DueStage } from './suite-stage-ledger.js';
@@ -73,8 +75,13 @@ function stagePreload(context: SuiteStepContext, seams: Required<SuiteStepSeams>
   return reading.files;
 }
 
-/** `checks.stage`'s answer over the stage's diff; `Owns:`, the test files and the preload files are read only when the entry needs them. */
-async function stageChecksOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, names: readonly CheckName[], diff: readonly string[]): Promise<CheckRun> {
+/**
+ * An entry's answer over `diff` with no `tests=` value: `checks.stage`'s
+ * over the stage's diff, and `checks.loop`'s over the plan's
+ * (`suite-step.ts`). `Owns:`, the test files and the preload files are
+ * read only when the entry needs them.
+ */
+export async function entryChecksOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, names: readonly CheckName[], diff: readonly string[]): Promise<CheckRun> {
   return resolveChecks({
     names,
     declared: null,
@@ -114,7 +121,7 @@ async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSe
   if (since === null) return { run: { scope: 'full', reason: undefined }, diff: null };
   const diff = readDiff(seams.git, since);
   if (diff === null) return { run: { scope: 'full', reason: undefined }, diff };
-  const checks = await stageChecksOf(context, seams, names, diff);
+  const checks = await entryChecksOf(context, seams, names, diff);
   // An empty entry never reaches here: `runStageStep` answers it first.
   return checks.kind === 'none'
     ? { run: { scope: 'paths', paths: [] }, diff }

@@ -26,7 +26,7 @@ describe('suite-stage-step', () => {
     expect(stageStep.runDueStageSteps).not.toBe(stageStep.runStageStep);
   });
 
-  it('keeps its helpers private: only the two stage functions are exported', () => {
-    expect(Object.keys(stageStep).sort()).toEqual(['runDueStageSteps', 'runStageStep']);
+  it('keeps its helpers private: only the two stage functions and entryChecksOf, shared with the pre-wrap-up step, are exported', () => {
+    expect(Object.keys(stageStep).sort()).toEqual(['entryChecksOf', 'runDueStageSteps', 'runStageStep']);
   });
 });

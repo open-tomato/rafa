@@ -1,11 +1,14 @@
 /**
  * The `tests.alwaysRun` files in the runner's task step (`runTaskStep`,
- * `suite-task-step.ts`) and in a stage step's `affected` run
+ * `suite-task-step.ts`), in a stage step's `affected` run
  * (`suite-stage-step.ts`), which `checks.stage` names or its `related`
- * falls back to when the plan has no `Owns:` folder: which tracked files
- * the setting names, and how the run over them joins the step's own run,
- * so that one settling reads the failures of both. The stage step takes
- * them as the `affected` row below, over `--changed=<since>`.
+ * falls back to when the plan has no `Owns:` folder, and in the
+ * pre-wrap-up step's path list or `affected` run (`suite-step.ts`),
+ * which takes them as the task step does: which tracked files the
+ * setting names, and how the run over them joins the step's own run, so
+ * that one settling reads the failures of both. The stage step takes
+ * them as the `affected` row below, over `--changed=<since>`, and the
+ * pre-wrap-up step over `--changed` from the baseline's commit.
  *
  * ## Why the step runs them
  *
@@ -103,7 +106,7 @@ export const FOLDED_COMMAND_JOINER = ';';
  * for no glob, without asking git; none with a warning naming the `step`
  * reading them when git does not answer. See the module note.
  */
-export function readTaskAlwaysRun(git: GitRunner, globs: readonly string[], step: 'task' | 'stage' = 'task'): readonly string[] {
+export function readTaskAlwaysRun(git: GitRunner, globs: readonly string[], step: 'task' | 'stage' | 'pre-wrap-up' = 'task'): readonly string[] {
   if (globs.length === 0) return [];
   const result = git(['ls-files', '-z']);
   if (!result.ok) {

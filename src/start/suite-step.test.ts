@@ -219,8 +219,8 @@ describe('ensureBaseline', () => {
     expect(seen.runs[0]?.paths).toBeUndefined();
     expect(seen.runs[0]?.changedSince).toBeUndefined();
     expect(seen.runs[0]?.junitFile).toBe(junitFileFor(dir, SESSION, 'baseline'));
-    expect(outcome.baseline.commit).toBe(HEAD);
-    expect(outcome.baseline.failures).toEqual([KNOWN]);
+    expect(outcome.baseline?.commit).toBe(HEAD);
+    expect(outcome.baseline?.failures).toEqual([KNOWN]);
     expect(seen.steps).toEqual([{ ...outcome.step!, kind: 'baseline', scope: 'full', failures: [KNOWN], newFailures: [] }]);
     const stored = readBaseline(baselinePathFor(trackerPath));
     expect(stored.state === 'read' && stored.baseline.recordedAt).toBe('2026-10-01T00:00:00.000Z');
@@ -484,12 +484,13 @@ describe('the recorded step\'s reason', () => {
     expect(Object.keys(seen.steps[0] ?? {})).not.toContain('reason');
   });
 
-  it('records no reason for the baseline and the pre-wrap-up step', async () => {
+  it('records no reason for the baseline, and declared for a pre-wrap-up step over [full]', async () => {
     const { context, seen } = contextWith([result(), result()]);
     await ensureBaseline(context);
     await runPreWrapUpStep(context, baselineWith());
     expect(seen.steps.map((step) => step.kind)).toEqual(['baseline', 'pre-wrap-up']);
-    expect(seen.steps.flatMap((step) => Object.keys(step))).not.toContain('reason');
+    expect(Object.keys(seen.steps[0] ?? {})).not.toContain('reason');
+    expect(seen.steps[1]).toMatchObject({ scope: 'full', reason: 'declared' });
   });
 });
 

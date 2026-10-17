@@ -221,8 +221,8 @@ describe('suite-task-step', () => {
     expect(taskStep.runTaskStep).not.toBe(runPreWrapUpStep);
   });
 
-  it('keeps its helpers private: only runTaskStep is exported', () => {
-    expect(Object.keys(taskStep).sort()).toEqual(['runTaskStep']);
+  it('keeps its helpers private: only runTaskStep and checkRunsOf, shared with the pre-wrap-up step, are exported', () => {
+    expect(Object.keys(taskStep).sort()).toEqual(['checkRunsOf', 'runTaskStep']);
   });
 });
 

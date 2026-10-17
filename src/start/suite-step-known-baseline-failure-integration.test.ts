@@ -140,9 +140,11 @@ const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'
  * run's only reach for a remote, and it never throws without one; and
  * {@link ALWAYS_RED_FILE} in `tests.alwaysRun`, so the stage step's
  * `--changed` fallback re-runs it too; `checks.stage` names
- * `[related, integration]`, so that stage step runs at all.
+ * `[related, integration]`, so that stage step runs at all, and
+ * `checks.loop` names `[full]`, so the pre-wrap-up step runs the whole
+ * project.
  */
-const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${ALWAYS_RED_FILE}]\nchecks:\n  task: [affected]\n  stage: [related, integration]\n`;
+const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${ALWAYS_RED_FILE}]\nchecks:\n  task: [affected]\n  stage: [related, integration]\n  loop: [full]\n`;
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {

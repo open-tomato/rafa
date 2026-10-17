@@ -202,7 +202,8 @@ gate later anyway.
 
 **Runner recorded steps** run at fixed points in the loop to establish
 baseline expectations and stage-end failures:
-- `baseline` — Full suite once at plan start (first dispatch)
+- `baseline` — Full suite once at plan start (first dispatch); none when
+  `checks.task`, `checks.stage` and `checks.loop` are all empty
 - `task` — the run `resolveChecks` (`src/suite/checks.ts`) answers for
   `checks.task` over the task's diff, after each task's session ends and
   commits (`tests=`, below); an empty `checks.task`, the default, runs no
@@ -215,7 +216,10 @@ baseline expectations and stage-end failures:
   --changed=<since>` with `tests.alwaysRun` files when the plan has no
   `Owns:` folder (reason `fallback`); an empty `checks.stage`, the
   default, runs no test and is recorded as a `none` step
-- `pre-wrap-up` — Full suite before wrap-up session starts
+- `pre-wrap-up` — Before the wrap-up session starts: the run
+  `resolveChecks` answers for `checks.loop` over the plan's diff from the
+  baseline's commit; an empty `checks.loop`, the default, runs no test,
+  is recorded as a `none` step, and the wrap-up starts on it
 
 Each recorded step names its scope, its reason (`declared`, `trigger`,
 `fallback`, `no-module-tests`, `stage`, `no-check` or `unit`), the command,

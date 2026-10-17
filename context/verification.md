@@ -19,7 +19,9 @@ A change still asks for the full suite before the merge-time run when:
   so the full run is the capture that names it.
 
 The runner's recorded steps below run at fixed points of a loop. The
-baseline and the pre-wrap-up step are always full runs, a task step is
+baseline is always a full run, taken once any check-point entry names a
+check, the pre-wrap-up step is full when `checks.loop` names `full` or a
+trigger escalates its `affected`, a task step is
 full when `checks.task` names a check and its line declares `tests=full`
 or a trigger escalates it, and a session never adds its own between them. A whole-suite run is the
 runner's to take: a session that runs `bun test` with no path in one Bash
@@ -76,7 +78,9 @@ directory, so a changed package file belongs in the scoped
 
 **Runner recorded steps** (recorded at fixed points, each with its scope):
 - `baseline` — Full suite once at plan start (first dispatch); a run that
-  failed outside any test case halts the run and is not written
+  failed outside any test case halts the run and is not written; none,
+  and nothing recorded, when `checks.task`, `checks.stage` and
+  `checks.loop` are all empty
 - `task` — Scope from `resolveChecks` of `checks.task` over the task's
   diff after each task's session ends and commits; a `none` step when
   the entry is empty
@@ -85,7 +89,10 @@ directory, so a changed package file belongs in the scoped
   tests under the `Owns:` folders it changed with the integration tier,
   or `bun test --changed=<since>` with the `tests.alwaysRun` files when
   the plan has no `Owns:` folder; a `none` step when the entry is empty
-- `pre-wrap-up` — Full suite before wrap-up session starts
+- `pre-wrap-up` — Before the wrap-up session starts: scope from
+  `resolveChecks` of `checks.loop` over the plan's diff from the
+  baseline's commit, a path list or `affected` run as the task step runs
+  it; a `none` step when the entry is empty, and the wrap-up starts on it
 
 Each recorded step names its scope (affected, module, full, `none`, or
 a file/folder list it ran on) and its reason where it has one (`declared`
@@ -99,8 +106,9 @@ names `tests=module` but the module has no test files; `stage` for a
 stage step's path list; `no-check` for a `none` step, whose
 check-point entry names no check and which holds an empty command, exit
 code 0, no failures and a `declared` key naming the `tests=` value it
-set aside; `unit` for a run the entry's `unit` check chose). The baseline and the pre-wrap-up step
-carry no reason, as they always run the full suite. Each also records
+set aside; `unit` for a run the entry's `unit` check chose). The baseline
+carries no reason, as it always runs the full suite; a pre-wrap-up step
+carries its answer's reason as a task step does. Each also records
 the command, exit code, Bun's summary line, every failing test (file +
 full test name pairs), and which failures are new against the baseline
 (not present in `baseline`'s captured failures).
@@ -205,8 +213,12 @@ invisible codepoint. The hook is live only where `git config core.hooksPath
 
 ### Baseline and known failures
 
-**Every run starts by recording a baseline.** The first step of every plan
-is a full-suite run that establishes what the tree held at that moment.
+**A run that checks anything starts by recording a baseline.** The first
+step of every plan whose `checks.task`, `checks.stage` or `checks.loop`
+names a check is a full-suite run that establishes what the tree held at
+that moment. With all three empty no step runs a test, so none is taken:
+the runner prints `📏 No check-point entry names a check; no suite
+baseline is taken.` and records nothing.
 Later steps compare their failures against this baseline to separate
 inherited failures from new ones. A baseline failure (one present in the
 baseline step) does not block work; a new failure (one that first appears

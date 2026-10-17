@@ -9,13 +9,16 @@
  *   - {@link RunSuiteSteps.beforeSession}, once the loop guard has let
  *     the turn through and before `progress.txt` is rendered for the
  *     session. The first call of the run ensures the baseline
- *     (`ensureBaseline`: the stored one, or the full suite at HEAD), so
- *     the baseline is taken at the plan's first dispatch whether that is
- *     a task or, on a run with none left open, the wrap-up. Before an
- *     open task every stage step due runs (`runDueStageSteps`: the step
- *     after a stage's last task, and the catch-up for a stage whose step
- *     never ran); before the wrap-up the pre-wrap-up step runs, the full
- *     suite. Before a `[BLOCKED]` task no stage step runs: the blocked
+ *     (`ensureBaseline`: the stored one, the full suite at HEAD, or none
+ *     when `checks.task`, `checks.stage` and `checks.loop` are all
+ *     empty), so the baseline is taken at the plan's first dispatch
+ *     whether that is a task or, on a run with none left open, the
+ *     wrap-up. A null baseline turns no step off: each runs over it as
+ *     its `none` step. Before an open task every stage step due runs
+ *     (`runDueStageSteps`: the step after a stage's last task, and the
+ *     catch-up for a stage whose step never ran); before the wrap-up the
+ *     pre-wrap-up step runs what `checks.loop` names (`runPreWrapUpStep`).
+ *     Before a `[BLOCKED]` task no stage step runs: the blocked
  *     line is the repair (or retry) a red step left, and a due stage
  *     step run first would only meet the same failures again and stop
  *     the run before the repair gets its session. The ledger is read
@@ -42,8 +45,14 @@
  *
  * ## A red pre-wrap-up step
  *
- * The pre-wrap-up step stays a full suite run. Red with failures the
- * baseline does not hold, it inserts a `[BLOCKED]` repair task after the
+ * The pre-wrap-up step runs what `resolveChecks` answers for
+ * `checks.loop` over the plan's diff from the baseline's commit: the
+ * full suite for `[full]`, and a path list or `affected` as the task
+ * step runs them. An empty `checks.loop` runs nothing and is recorded as
+ * a `none` step, which is never red, so `beforeSession(null)` answers
+ * `go-on` and the wrap-up starts on it; so does a path list empty of
+ * files, which records no step. Red with failures the baseline does
+ * not hold, it inserts a `[BLOCKED]` repair task after the
  * checklist's last task (`suite-blocker.ts`), and `beforeSession(null)`
  * answers `repair`: `start.ts` goes back to `findNextTask` instead of
  * starting the wrap-up, which answers that repair first, so it is
@@ -205,8 +214,12 @@ export interface RunSuiteSteps {
   readonly lastPreWrapUp: () => StepOutcome | null;
 }
 
-/** The baseline, `off` when ensuring it threw, `interrupted` when SIGINT stopped it, or `halted` when it failed outside any test case. */
-type BaselineHeld = SuiteBaseline | 'off' | 'interrupted' | 'halted';
+/**
+ * The baseline, null when no check-point entry names a check, `off` when
+ * ensuring it threw, `interrupted` when SIGINT stopped it, or `halted`
+ * when it failed outside any test case.
+ */
+type BaselineHeld = SuiteBaseline | null | 'off' | 'interrupted' | 'halted';
 
 /** True when the baseline stopped the run: no step runs at any later call. */
 function isStopped(known: BaselineHeld): known is 'interrupted' | 'halted' {
@@ -220,7 +233,9 @@ function announceInterrupted(): void {
 
 /** Says the run stops on the halted baseline `outcome`, whose step holds its run's output tail; see the module note. */
 function announceHalted(outcome: BaselineOutcome): void {
-  const lines = baselineHaltLines({ exitCode: outcome.baseline.exitCode, outputTail: outcome.step?.outputTail ?? [] });
+  // A halted outcome holds the baseline it did not write, and its step the same exit code.
+  const exitCode = outcome.baseline?.exitCode ?? outcome.step?.exitCode ?? 1;
+  const lines = baselineHaltLines({ exitCode, outputTail: outcome.step?.outputTail ?? [] });
   for (const line of lines) activeOutput().error(line);
 }
 
@@ -334,7 +349,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
   // Set once this run has gone back to dispatch a pre-wrap-up repair.
   let repairSent = false;
   let lastPreWrapUp: StepOutcome | null = null;
-  const preWrapUp = async (known: SuiteBaseline): Promise<BeforeSessionAnswer> => {
+  const preWrapUp = async (known: SuiteBaseline | null): Promise<BeforeSessionAnswer> => {
     const outcome = await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known));
     lastPreWrapUp = outcome;
     if (insertedRepair(outcome) && !repairSent) {
