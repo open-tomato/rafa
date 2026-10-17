@@ -7,22 +7,28 @@
  * 1. The listing: the row whose `files` list the file. When a file is
  *    listed twice, the first listing wins, the `packages` rows read
  *    before the `unassigned` entries.
- * 2. The directory's listed files: a file listed nowhere takes the unit
- *    of the listed files of its own directory (`posix.dirname(file)`,
- *    never an ancestor or a subfolder) when every one of them has the
- *    same unit.
+ * 2. The directory, then the walk: a file listed nowhere takes the unit
+ *    of the listed files directly in its own directory
+ *    (`posix.dirname(file)`) when every one of them has the same unit; a
+ *    directory whose direct listed files span two units goes to step 3.
+ *    When its own directory holds no listed file, the walk reads that
+ *    directory and then each parent in turn, the repository root (`.`)
+ *    never read, by the listed files at any depth below it: the first
+ *    directory holding any answers, one unit placing the file and two or
+ *    more stopping the walk with no answer, and a directory holding
+ *    nothing below it is passed over.
  * 3. The row folders: otherwise the unit of the row whose folder is the
  *    longest prefix of the file's directory, read with its trailing `/`
  *    (so `src/ci/` holds `src/ci/runs2.ts` and not `src/cia/x.ts`), when
  *    exactly one row names that folder. A row's folders are its
  *    `packages[].folders`, or an `unassigned` entry's `folder`.
  *
- * A file is unplaced, its unit `undefined`, when no row lists it, its
- * directory holds no listed file or listed files of more than one unit,
- * and no single row names its longest folder: a longest folder two rows
- * name places nothing, and no shorter folder is tried. The two fallback
- * steps are computed once when the table is read, so `unitOf` is a
- * lookup.
+ * A file is unplaced, its unit `undefined`, when no row lists it, no
+ * listed files of one unit lie in its directory or below the nearest
+ * folder above it holding any, and no single row names its longest
+ * folder: a longest folder two rows name places nothing, and no shorter
+ * folder is tried. The fallback steps are computed once when the table
+ * is read, so `unitOf` is a lookup.
  *
  * Only `packages[].name`, `packages[].files`, `packages[].folders`
  * (absent read as empty), `unassigned[].folder` and `unassigned[].files`
@@ -42,8 +48,10 @@ export interface CutMap {
   readonly units: readonly string[];
   /**
    * The unit of `file`: the row that lists it, else the one unit of its
-   * directory's listed files, else the one row naming its longest folder;
-   * `undefined` when none of the three places it.
+   * directory's direct listed files, else, when it holds none, the one
+   * unit below the nearest folder above it holding any (two units stop
+   * the walk, the root never read), else the one row naming its longest
+   * folder; `undefined` when none of them places it.
    */
   unitOf(file: string): string | undefined;
   /** The files of `files` the map holds no unit for, sorted and unique. */
@@ -129,6 +137,44 @@ function directoryUnits(units: ReadonlyMap<string, string>): Map<string, string 
 }
 
 /**
+ * The walk's table: each ancestor directory of each listed file, from
+ * `posix.dirname(file)` up to and not including the root (`.`), with the
+ * one unit of the listed files at any depth below it, or `undefined` once
+ * two units are met there.
+ */
+function ancestorUnits(units: ReadonlyMap<string, string>): Map<string, string | undefined> {
+  const byAncestor = new Map<string, string | undefined>();
+  for (const [file, unit] of units) {
+    for (let directory = posix.dirname(file); isWalked(directory); directory = posix.dirname(directory)) {
+      const seen = byAncestor.get(directory);
+      byAncestor.set(directory, byAncestor.has(directory) && seen !== unit
+        ? undefined
+        : unit);
+    }
+  }
+  return byAncestor;
+}
+
+/** Whether the walk reads `directory`: never the root `.`, nor `/`. */
+function isWalked(directory: string): boolean {
+  return directory !== '.' && directory !== '/';
+}
+
+/**
+ * The walk from `directory` upward: the entry of the first directory
+ * `ancestors` holds, `undefined` for a mixed one or when none is held
+ * below the root.
+ */
+function walkedUnit(ancestors: ReadonlyMap<string, string | undefined>, directory: string): string | undefined {
+  for (let current = directory; isWalked(current); current = posix.dirname(current)) {
+    if (ancestors.has(current)) {
+      return ancestors.get(current);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Each folder a row names, with the unit of its row, or `undefined` when
  * more than one row names it.
  */
@@ -206,6 +252,7 @@ export function parseCutMap(text: string, path: string): CutMap {
     }
   }
   const directories = directoryUnits(units);
+  const ancestors = ancestorUnits(units);
   const folders = folderUnits(placements);
   const unitOf = (file: string): string | undefined => {
     const listed = units.get(file);
@@ -213,7 +260,10 @@ export function parseCutMap(text: string, path: string): CutMap {
       return listed;
     }
     const directory = posix.dirname(file);
-    return directories.get(directory) ?? longestFolderUnit(folders, directory);
+    const nearby = directories.has(directory)
+      ? directories.get(directory)
+      : walkedUnit(ancestors, directory);
+    return nearby ?? longestFolderUnit(folders, directory);
   };
   return {
     path,

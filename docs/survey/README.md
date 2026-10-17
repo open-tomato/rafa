@@ -95,11 +95,13 @@ repository.
   files neither of which is a test, from a package lower in the order into a higher one. Its unit is the map: a
   `packages` row is a unit, an `unassigned` row is a folder unit, and a file's unit is the name of the row that lists
   it, spelled as the table spells it. A file the table lists nowhere, such as a test added after it was written, is
-  placed by its folder: the unit of the listed files of its own directory when they share one, else the unit of the one
-  row naming its longest folder (`packages[].folders` or an `unassigned` folder), read by `scripts/survey/cut-map.ts`;
-  it stays unplaced otherwise, and the table is not touched, so its sha256 is kept. The two shared-config packages,
-  `rafa-eslint-config` and `rafa-typescript-config`, sit lowest, since nothing in the graph imports them; core is
-  `@open-tomato/rafa-core` above them and the root `@open-tomato/rafa` at the top, #808's names. Written by `bun
+  placed by its folder: the unit of the listed files of its own directory when they share one, else the unit of the
+  nearest folder above it whose listed files, at any depth, share one (a folder whose files span two units ends the
+  walk), else the unit of the one row naming its longest folder (`packages[].folders` or an `unassigned` folder), read
+  by `scripts/survey/cut-map.ts`; it stays unplaced otherwise, and the table is not touched, so its sha256 is kept. The
+  two shared-config packages, `rafa-eslint-config` and `rafa-typescript-config`, sit lowest, since nothing in the graph
+  imports them; core is `@open-tomato/rafa-core` above them and the root `@open-tomato/rafa` at the top, #808's names.
+  Written by `bun
   scripts/survey/cut-table.ts`, which reads `docs/survey/import-graph.json` and never a build of its own, so the table
   and the graph cannot disagree; the files as tracked were written at commit d70b783, with the graph at the same commit:
   2025 files, 1997 of them in 12 packages (758 left to place and counted in `@open-tomato/rafa`) and 28 in the three
