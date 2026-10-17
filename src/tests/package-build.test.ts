@@ -545,7 +545,8 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
 /**
  * The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line.
  * It follows the build since: six lines from `7306b06` (`config-schema-features.d.ts`,
- * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`).
+ * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`), and
+ * `config-schema-bugs.d.ts` from the `bugs` section (#953).
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1239,7 +1240,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(160);
+    expect(before).toHaveLength(161);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1499,14 +1500,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the twelve section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the thirteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
+      'board-project', 'bugs', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
       'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(12);
+    expect(sections).toHaveLength(13);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);

@@ -111,7 +111,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)';
+  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -178,6 +178,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releasePublish',
   'releaseMoveLock',
   'errorsCodes',
+  'bugsRecheckRuns',
+  'bugsRecheckTimeoutSeconds',
   'loggerKind',
   'loggerLevel',
   'loggerTheme',
@@ -280,6 +282,8 @@ const DEFAULTS: RafaConfig = {
   releasePublish: 'manual',
   releaseMoveLock: false,
   errorsCodes: [],
+  bugsRecheckRuns: 5,
+  bugsRecheckTimeoutSeconds: 300,
   loggerKind: 'console',
   loggerLevel: 'warn',
   loggerTheme: 'default',
@@ -435,6 +439,10 @@ const FULL = [
   '      hint: set the secret',
   '      level: error',
   '      since: v1',
+  'bugs:',
+  '  recheck:',
+  '    runs: 12',
+  '    timeoutSeconds: 900',
   'logger:',
   '  kind: winston',
   '  level: debug',
@@ -568,6 +576,8 @@ const FULL_VALUES: RafaConfig = {
   releasePublish: 'ci',
   releaseMoveLock: true,
   errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+  bugsRecheckRuns: 12,
+  bugsRecheckTimeoutSeconds: 900,
   loggerKind: 'winston',
   loggerLevel: 'debug',
   loggerTheme: 'plain',
@@ -1151,6 +1161,16 @@ describe('parseConfigText', () => {
         'errors.codes is "git:x", expected a list of error code entries',
         'errors:\n  codes:\n    - code: deploy:missing-secret\n      description: a deploy reads an unset secret\n      hint: set the secret\n      level: error\n      since: v1',
         'errorsCodes', [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+      ],
+      [
+        'bugs.recheck.runs', 'bugs:\n  recheck:\n    runs: 0',
+        'bugs.recheck.runs is 0, expected a whole number from 1 to 20',
+        'bugs:\n  recheck:\n    runs: 12', 'bugsRecheckRuns', 12,
+      ],
+      [
+        'bugs.recheck.timeoutSeconds', 'bugs:\n  recheck:\n    timeoutSeconds: 3601',
+        'bugs.recheck.timeoutSeconds is 3601, expected a whole number from 1 to 3600',
+        'bugs:\n  recheck:\n    timeoutSeconds: 900', 'bugsRecheckTimeoutSeconds', 900,
       ],
       [
         'logger.kind', 'logger:\n  kind: ""',
