@@ -18,8 +18,8 @@
  * | Step | Runs | Blocks |
  * |---|---|---|
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
- * | task ({@link runTaskStep}) | `resolveChecks` (`suite/checks.ts`) of `[affected]` over the task's diff | a repair task it inserts, or the repair it followed |
- * | stage ({@link runStageStep}) | `resolveChecks` of `[related, integration]` over the stage's diff | a repair task it inserts |
+ * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `[affected]` over the task's diff | a repair task it inserts, or the repair it followed |
+ * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `[related, integration]` over the stage's diff | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
  *
  * **The baseline** is read from `SUITE_BASELINE-<stub>.json` beside the
@@ -233,14 +233,14 @@
  * at most once per run. Every line goes through the active output
  * (`core/output/active.ts`).
  *
- * ## Where the stage step lives
+ * ## Where the task and stage steps live
  *
- * The stage step's code is in `suite-stage-step.ts` and re-exported
- * here; this note stays its account. The helpers it shares with the
- * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
- * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
- * {@link settleStep}, {@link Settling} and {@link StepRuns}) are
- * exported for it alone.
+ * The task step's code is in `suite-task-step.ts`, the stage step's in
+ * `suite-stage-step.ts`, both re-exported here; this note stays their
+ * account. The helpers they share with the other steps ({@link seamsOf},
+ * {@link readHead}, {@link readDiff}, {@link addToLedger}, {@link runOne},
+ * {@link runWithAlwaysRun}, {@link settleStep}, {@link planDiffReader},
+ * {@link Settling} and {@link StepRuns}) are exported for them.
  *
  * ## Where the task step's diff checks live
  *
@@ -262,11 +262,9 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
-import type { CheckRun } from '../suite/checks.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { PreloadReading } from '../suite/scope.js';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
-import type { TestScope } from '@open-tomato/rafa/core/plan';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
@@ -286,24 +284,23 @@ import {
   splitFailures,
   writeBaseline,
 } from '../suite/baseline.js';
-import { resolveChecks } from '../suite/checks.js';
 import { readPlanOwns } from '../suite/owns.js';
 import { runSuite } from '../suite/run.js';
 import { listTestFiles, readPreloadFiles } from '../suite/scope.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
-import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
 import { failedOutsideAnyCase, outsideCaseRecord, storedOutsideCaseLine } from './suite-outside-case.js';
 import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
-import { reportSlowSweeps } from './sweep-timing.js';
-import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
-import { taskDiffChecks } from './task-step-checks.js';
+import { foldResults } from './task-always-run.js';
 import { runTsc } from './type-step.js';
 
 export { blockerText } from './suite-blocker.js';
 export { runDueStageSteps, runStageStep } from './suite-stage-step.js';
+export { runTaskStep } from './suite-task-step.js';
 export type { StepVerdict } from './suite-blocker.js';
+export type { TaskStepInput } from './suite-task-step.js';
 
 /** The stage ledger's file name before its stub. */
 export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
@@ -400,17 +397,6 @@ export interface StageLedgerEntry {
 export interface DueStage {
   readonly stage: number;
   readonly name: string;
-}
-
-/** What {@link runTaskStep} is handed about the task just committed. */
-export interface TaskStepInput {
-  readonly baseline: SuiteBaseline | null;
-  /** The commit the task started from, which its diff and `--changed` are taken against. */
-  readonly base: string;
-  /** The task line's `tests=` value, or its default. */
-  readonly declared: TestScope;
-  /** The task's sentence, for the blocker text. */
-  readonly task: string;
 }
 
 /** The seams, each filled with the system's own. */
@@ -794,71 +780,13 @@ export interface StepRuns {
   readonly timed: readonly string[];
 }
 
-/** The entry a task step resolves, today's `affected`; the line's `tests=` value narrows or widens it. */
-const TASK_ENTRY = ['affected'] as const;
-
-/** The runs a task's check run asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
-function taskNarrowing(run: CheckRun, base: string, alwaysRun: readonly string[]): StepRuns {
-  if (run.kind === 'paths') return { narrowing: { paths: withAlwaysRun(run.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
-  if (run.kind === 'affected') return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
-  return { narrowing: {}, alwaysRun: [], timed: [] };
-}
-
-/** The scope the run record holds for a task's check run: `module` for its path list, which only a `tests=module` line reaches. */
-function taskRecordedScope(run: CheckRun | null): TestScope {
-  if (run === null || run.kind === 'full' || run.kind === 'none') return 'full';
-  return run.kind === 'paths'
-    ? 'module'
-    : 'affected';
-}
-
-/**
- * The reason the run record holds for a task's check run: the run's own,
- * or `declared` for a path list, which only a `tests=module` line
- * reaches; none for a diff that did not read. See the module note.
- */
-function taskStepReason(run: CheckRun | null): SessionStepReason | undefined {
-  if (run === null || run.kind === 'none') return undefined;
-  return run.kind === 'paths'
-    ? 'declared'
-    : run.reason;
-}
-
-/** The preload files, with a warning when `bunfig.toml` does not read. */
-function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): readonly string[] {
-  const reading = seams.readPreloadFiles(context.checkout);
-  if (reading.state === 'unreadable') activeOutput().warn(`⚠️  bunfig.toml does not read (${reading.reason}); no preload file is a full-suite trigger.`);
-  return reading.files;
-}
-
-/** The task step's check run over `diff`, the task's own, or null when that did not read. */
-async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<CheckRun | null> {
-  if (diff === null) return null;
-  const moduleLine = input.declared === 'module';
-  return resolveChecks({
-    names: TASK_ENTRY,
-    declared: input.declared,
-    diff,
-    owns: moduleLine
-      ? await context.owns()
-      : null,
-    testFiles: moduleLine
-      ? seams.listTestFiles(context.checkout)
-      : [],
-    preload: preloadOf(context, seams),
-    fullSuiteTriggers: context.settings.testsFullSuiteTriggers,
-    contract: [],
-    integration: [],
-  });
-}
-
 /**
  * Reads the plan's diff when asked: from the baseline's commit to HEAD,
  * or `without` when the baseline holds no commit. It is what a
  * pre-wrap-up step, and the task step of a repair task, check their
  * files green alone against (`suite-retake-alone.ts`).
  */
-function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
+export function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
   const commit = baseline?.commit ?? null;
   return () => (commit === null
     ? without
@@ -872,30 +800,6 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
   const junitFile = alwaysRunJunitFileFor(context.repoRoot, context.sessionId, kind);
   const second = await runOne(context, seams, kind, { paths: runs.alwaysRun }, junitFile);
   return foldResults(first, second, SIGINT_EXIT_CODE);
-}
-
-/** Runs the task step after a task commits; see the module note. */
-export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
-  const seams = seamsOf(context);
-  const diff = readDiff(seams.git, input.base);
-  const scope = await taskScopeOf(context, seams, input, diff);
-  const runs = scope === null || scope.kind === 'full' || scope.kind === 'none'
-    ? { narrowing: {}, alwaysRun: [], timed: [] }
-    : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
-  const recorded = taskRecordedScope(scope);
-  const result = await runWithAlwaysRun(context, seams, 'task', runs);
-  const label = `task step after "${input.task}"`;
-  const checks = await taskDiffChecks(context, seams, input, result);
-  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
-  const touched = isRepairTask(input.task)
-    ? planDiffReader(seams, input.baseline, diff)
-    : () => diff;
-  const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs), touched));
-  const timedIn = runs.alwaysRun.length > 0
-    ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
-    : junitFileFor(context.repoRoot, context.sessionId, 'task');
-  if (!outcome.interrupted) reportSlowSweeps(timedIn, runs.timed);
-  return outcome;
 }
 
 /** Runs the full suite before the wrap-up; a red one writes its blocker on a pre-wrap-up repair. See the module note. */

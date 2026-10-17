@@ -1,5 +1,5 @@
 /**
- * `runTaskStep` (`./suite-step.ts`) driven over a real scratch git
+ * `runTaskStep` (`./suite-task-step.ts`) driven over a real scratch git
  * repository, proving the type step (`./type-step.ts`) end to end through
  * the runner's own task step: real git for the diff and the base
  * worktree, the real `tsc` of this repository (the scratch's

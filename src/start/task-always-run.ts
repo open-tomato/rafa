@@ -1,6 +1,6 @@
 /**
  * The `tests.alwaysRun` files in the runner's task step (`runTaskStep`,
- * `suite-step.ts`) and in a stage step's `affected` fallback, taken when
+ * `suite-task-step.ts`) and in a stage step's `affected` fallback, taken when
  * the plan has no `Owns:` folder (`suite-stage-step.ts`): which tracked
  * files the setting names, and how the run over them joins the step's
  * own run, so that one settling reads the failures of both. The stage
