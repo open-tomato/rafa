@@ -29,6 +29,7 @@
  * root, and each case asserts the paths written sit there.
  */
 import type { ScopeWrite, ScopeWriteKind } from './scaffold.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import {
   chmodSync,
@@ -71,6 +72,17 @@ const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-scaffold-')));
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/** The seven `checks` settings, spelled, in the order the template writes them. */
+const CHECK_SETTINGS: readonly ConfigSetting[] = [
+  'checksTask',
+  'checksStage',
+  'checksLoop',
+  'checksPullRequest',
+  'checksStretch',
+  'checksReleasePullRequest',
+  'checksPublish',
+];
 
 /** The instant every path is set to before a rerun: 2001-09-09T01:46:40Z. */
 const PAST = new Date(1_000_000_000_000);
@@ -216,18 +228,19 @@ describe('the config files', () => {
     ]);
   });
 
-  it('carries the tests section last, its globs quoted, which resolve from the file once uncommented', () => {
-    const tests = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# tests:'));
+  it('carries the tests section before checks, three lists empty naming the template, its globs quoted, which resolve from the file once uncommented', () => {
+    const tests = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# tests:'), CONFIG_SETTINGS_LINES.indexOf('# checks:'));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...tests].join('\n')), 'c.yaml') });
 
     expect(tests.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
       '# tests:',
-      '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
-      '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
-      '#   contract: ["**/*.contract.test.ts"]',
+      '#   fullSuiteTriggers: []',
+      '#   integration: []',
+      '#   contract: []',
       '#   alwaysRun: ["src/**/*.sweep.test.ts"]',
       '#   retakeRedAlone: true',
     ]);
+    expect(tests.slice(1, 4).map((line) => line.includes('the escalation template names'))).toEqual([true, true, true]);
     expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsContract, resolved.config.testsAlwaysRun])
       .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsContract, CONFIG_DEFAULTS.testsAlwaysRun]);
     expect(resolved.config.testsRetakeRedAlone).toBe(true);
@@ -242,6 +255,33 @@ describe('the config files', () => {
     expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 5);
     expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsContract, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
       .toEqual(['default', 'default', 'default', 'default', 'default']);
+  });
+
+  it('carries the checks section last, seven empty lists naming the six checks, which resolve from the file once uncommented', () => {
+    const checks = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# checks:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...checks].join('\n')), 'c.yaml') });
+
+    expect(checks.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# checks:',
+      '#   task: []',
+      '#   stage: []',
+      '#   loop: []',
+      '#   pullRequest: []',
+      '#   stretch: []',
+      '#   releasePullRequest: []',
+      '#   publish: []',
+    ]);
+    expect(checks[1]).toEndWith('each one of: affected, related, unit, contract, integration, full');
+    expect(CHECK_SETTINGS.map((setting) => resolved.config[setting])).toEqual([[], [], [], [], [], [], []]);
+    expect(CHECK_SETTINGS.map((setting) => resolved.sources[setting])).toEqual(CHECK_SETTINGS.map(() => 'file'));
+  });
+
+  it('answers each checks setting from the default once its line is dropped, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:task|stage|loop|pullRequest|stretch|releasePullRequest|publish): \[/.test(line));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 7);
+    expect(CHECK_SETTINGS.map((setting) => resolved.sources[setting])).toEqual(CHECK_SETTINGS.map(() => 'default'));
   });
 
   it('carries the triage section, threshold at 0.3 and candidates at 3, which resolve from the file once uncommented', () => {

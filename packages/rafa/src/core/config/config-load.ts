@@ -72,6 +72,29 @@
  * reddens no case of `config-load.test.ts`. It is the guard against the
  * two drifting apart.
  *
+ * ## Templates
+ *
+ * A scope whose file holds `templates` reads each template it names as an
+ * entry ahead of the file's own: the active template hook
+ * (`activeConfigTemplateHook`, `section.ts`) answers the entry a name
+ * stands for, and `layTemplatesUnder` (`config.ts`) lays each under the
+ * file, a later name over an earlier one. So the file's own keys outrank
+ * its templates' and a project's template outranks the user's file,
+ * which the project scope outranks whole. A setting a template answered
+ * and no file outranked reports source `template`, its `provenance`
+ * naming the template and the file that named it. The entries are laid
+ * here, after define-config's merge of the file: the loader reads a
+ * file's entries and nothing else, and a template's `false` is a value,
+ * as a YAML file's is, with no removal to set back.
+ *
+ * Each template's entry is judged as a file is, labelled with the file
+ * and the template, and a key in it that names no setting is refused
+ * rather than warned about: the template is rafa's, not the operator's.
+ * A name the hook does not know is refused naming the file and the names
+ * the hook carries (`ConfigTemplateHook.names`), and so is a `templates`
+ * key naming any template while no hook is set, the known names then
+ * none. Core imports no template: `src/config-registry.ts` sets the hook.
+ *
  * ## Refusals
  *
  * Every refusal is a {@link ConfigError}, and each file is judged whole,
@@ -143,7 +166,7 @@
  */
 import type { ConfigScopeName, ShadowedFile } from './config-origins.js';
 import type { DuplicatesLevel, Mapping } from './config-sections.js';
-import type { ConfigFile, ConfigOverrides, ConfigSetting, ResolvedConfig } from './config.js';
+import type { ConfigFile, ConfigOverrides, ConfigSetting, ResolvedConfig, TemplateLayer } from './config.js';
 import type { Diagnostic, LoadResult, Provenance } from '@open-tomato/define-config';
 
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -159,13 +182,20 @@ import {
   CONFIG_FILE,
   ConfigError,
   configFilePath,
+  layTemplatesUnder,
   parseConfigDocument,
   parseConfigText,
   readConfigDocument,
   resolveConfig,
 } from './config.js';
 import { writeDangerousPassLines } from './dangerous.js';
-import { activeConfigLoadHook, activeSections, activeSettingByKey, activeSettings } from './section.js';
+import {
+  activeConfigLoadHook,
+  activeConfigTemplateHook,
+  activeSections,
+  activeSettingByKey,
+  activeSettings,
+} from './section.js';
 import { schemaSectionsOf } from './standard-schema.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
@@ -475,6 +505,52 @@ async function loadScope(place: ScopePlace, held: Map<string, YamlRead>): Promis
   }
 }
 
+/**
+ * One template's entry read as `place`'s file is, labelled with the file
+ * at `path` and the template, and refused for a key that names no
+ * setting; see "Templates" in the module note.
+ */
+function readTemplate(place: ScopePlace, path: string, name: string, entry: Mapping): TemplateLayer {
+  const label = `${path} (template ${name})`;
+  refuseProjectOnlyKeys(place, label, entry);
+  const read = readConfigDocument(entry, label);
+  if (read.extras.length > 0) {
+    throw new ConfigError(read.extras.map((extra) => `${label}: ${extra.key} names no setting`));
+  }
+  return { name, values: read.values };
+}
+
+/** The refusal of the template names in `unknown`, which the file at `path` gives; see the module note. */
+function unknownTemplates(path: string, unknown: readonly string[]): ConfigError {
+  const hook = activeConfigTemplateHook();
+  const known = hook?.names ?? [];
+  const listed = known.length === 0
+    ? 'none'
+    : known.join(', ');
+  const why = hook === null
+    ? 'but no template hook is set to read it'
+    : 'which no template holds';
+  return new ConfigError(unknown.map((name) => `${path}: templates names ${JSON.stringify(name)}, ${why} `
+    + `(known templates: ${listed})`));
+}
+
+/**
+ * `file` with each template its `templates` key names laid under its
+ * own keys, read through the active template hook; see "Templates" in
+ * the module note.
+ */
+function withNamedTemplates(place: ScopePlace, file: ConfigFile): ConfigFile {
+  const names = file.values.templates ?? [];
+  if (names.length === 0) return file;
+  const hook = activeConfigTemplateHook();
+  const found = names.map((name) => ({ name, entry: hook?.(name) ?? null }));
+  const unknown = found.filter(({ entry }) => entry === null).map(({ name }) => name);
+  if (unknown.length > 0) throw unknownTemplates(file.path, unknown);
+  return layTemplatesUnder(file, found.flatMap(({ name, entry }) => entry === null
+    ? []
+    : [readTemplate(place, file.path, name, entry)]));
+}
+
 /** Reads and judges one scope's file; see the module note. */
 async function readScope(place: ScopePlace): Promise<ScopeReading> {
   const held = new Map<string, YamlRead>();
@@ -498,9 +574,9 @@ async function readScope(place: ScopePlace): Promise<ScopeReading> {
   if (schema.length > 0) throw new ConfigError(schema.map((diagnostic) => `${path}: ${diagnostic.message}`));
 
   return {
-    file: yaml === undefined
+    file: withNamedTemplates(place, yaml === undefined
       ? { ...read, entries: entriesOf(result.provenance) }
-      : read,
+      : read),
     mapping: isMapping(document)
       ? document
       : {},
@@ -573,6 +649,10 @@ function printWarning(message: string): void {
  * The resolved `effort.busyTimeoutMs` is handed to the effort store
  * (`effort/store/settings.ts`), so every store open after this call
  * waits that long for a lock.
+ *
+ * Each scope's file has the templates its `templates` key names laid
+ * under its own keys, read through the active template hook; a name the
+ * hook does not know is refused. See "Templates" in the module note.
  *
  * The files are read and judged before the command line is looked at,
  * the user's first, so a run with problems in all three reports the

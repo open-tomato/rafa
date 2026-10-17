@@ -407,7 +407,8 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 /**
  * The runtime names the config barrel holds and the root does not
  * publish: core's section, the routing defaults, the item readers and
- * the section registry with its key indexes and its load hook.
+ * the section registry with its key indexes and its load hook, and the
+ * laying of a file's templates under its keys.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
   'CORE_SECTION',
@@ -420,6 +421,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'REQUIRED_ITEM_KEYS',
   'activeChecks',
   'activeConfigLoadHook',
+  'activeConfigTemplateHook',
   'activeDefaults',
   'activeKnownKeysAbove',
   'activeSectionPaths',
@@ -429,6 +431,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'dangerousKeys',
   'dangerousPassLines',
   'dangerousPhrases',
+  'layTemplatesUnder',
   'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
@@ -440,6 +443,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'restoreDangerousPhrases',
   'runWithDangerousPhrases',
   'setConfigLoadHook',
+  'setConfigTemplateHook',
   'setDangerousPhrases',
   'writeDangerousPassLines',
 ];

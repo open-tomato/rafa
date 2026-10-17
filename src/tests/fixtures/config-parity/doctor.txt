@@ -1,7 +1,7 @@
 exit 0
 --- stdout
 rafa <version>
-warn: rafa config: unknown key "unknownParityKey" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)
+warn: rafa config: unknown key "unknownParityKey" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)
 Preflight with no plan, none being at .rafa/plans/PLAN.md or PLAN.md: nothing to check, no run started.
 Preflight passed: rafa loop start would go on to its first session.
 Skill tiers:

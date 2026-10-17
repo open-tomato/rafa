@@ -198,6 +198,7 @@ export {
   isPidAlive,
   isPositiveWhole,
   isSessionId,
+  NONE_STEP_SCOPE,
   parseSessionRecord,
   readSession,
   readSessions,

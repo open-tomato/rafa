@@ -14,6 +14,14 @@
  * skipped. `file` names the project's file, as it did when that was the
  * only file read, and `user` names the user scope's.
  *
+ * A file may name config templates with its `templates` key, and each
+ * template's entry sits under that file's own keys and over every lower
+ * layer: the project's file over its templates over the user's file over
+ * its templates over the default. A setting a template answered and no
+ * file outranked reports `template`, and its `provenance` names the
+ * template and the file that named it. {@link layTemplatesUnder} lays
+ * them; `config-load.ts` reads them through the template hook.
+ *
  * This module is the pure half: text, or a document already parsed,
  * into a layer, and layers into one resolution. Finding and reading each
  * scope's file, behind a home seam, is `config-load.ts`, which reads a
@@ -84,7 +92,7 @@
  * `section.ts` (`activeSettings()`) and take each default from
  * `activeDefaults()`, so a layer and a resolution hold every registered
  * setting, in registration order. `src/config-registry.ts`, outside
- * `packages/rafa/src/core/`, registers the thirteen sections when its
+ * `packages/rafa/src/core/`, registers the fourteen sections when its
  * `registerCoreConfigSections` is called; a process that has not called
  * it reads no setting at all, where the
  * literal this loop replaced held every setting whatever was registered.
@@ -260,9 +268,10 @@ export { MODULE_SOURCE_KINDS, PREREQUISITE_KINDS } from './config-items.js';
 
 /**
  * The layer that answered a setting: the command line, the project's
- * file, the user scope's file, or the default.
+ * file, the user scope's file, a template either file named, or the
+ * default. Which file named the template is the setting's `provenance`.
  */
-export type ConfigSource = 'cli' | 'file' | 'user' | 'default';
+export type ConfigSource = 'cli' | 'file' | 'user' | 'template' | 'default';
 
 /**
  * One layer's say on every setting: a value, or undefined for silence.
@@ -300,6 +309,20 @@ export interface ConfigFile {
    * setting is entry 0.
    */
   entries?: ReadonlyMap<ConfigSetting, number>;
+  /**
+   * The template that answered each setting the file's own keys left
+   * silent, by name, as {@link layTemplatesUnder} laid it. Absent for a
+   * file naming no template.
+   */
+  templates?: ReadonlyMap<ConfigSetting, string>;
+}
+
+/** One template a file named, read: its name and its say on every setting. */
+export interface TemplateLayer {
+  /** The name the file's `templates` key gave. */
+  readonly name: string;
+  /** Its value for each setting, or undefined where it said nothing. */
+  readonly values: ConfigLayer;
 }
 
 /** The layers {@link resolveConfig} ranks, highest first. */
@@ -587,6 +610,42 @@ function unloadedPinWarnings(layer: ConfigFile): string[] {
       + 'which is not loaded (tiers.rafa is off), so the pin has no effect'));
 }
 
+/**
+ * `file` with each of `templates` laid under its own keys, in the order
+ * named, a later template over an earlier one: a setting the file left
+ * silent takes the last template's value that answers it, and a map
+ * setting merges by key, the templates under the file. Each setting a
+ * template answered and the file did not is recorded in
+ * {@link ConfigFile.templates} under that template's name. Pure; answers
+ * `file` itself when no template is given.
+ *
+ * @param file - The file as its own keys read.
+ * @param templates - The templates its `templates` key named, read.
+ * @returns The file with the templates' values beneath its own.
+ */
+export function layTemplatesUnder(file: ConfigFile, templates: readonly TemplateLayer[]): ConfigFile {
+  if (templates.length === 0) return file;
+  const answered = new Map<ConfigSetting, string>();
+  const entries = registeredNames().map((setting) => {
+    const own = file.values[setting];
+    const under = templates.filter((template) => template.values[setting] !== undefined);
+    const last = under.at(-1);
+    if (last === undefined) return [setting, own] as const;
+    if (own === undefined) answered.set(setting, last.name);
+    if (isMapSetting(setting)) return [setting, mergeMaps(...under.map((template) => template.values[setting]), own)] as const;
+    return [setting, own ?? last.values[setting]] as const;
+  });
+  const values = Object.fromEntries(entries) as unknown as ConfigLayer;
+  return { ...file, values, templates: answered };
+}
+
+/** The source a setting `layer` answered reports: `template` where a template answered it, else `own`. */
+function sourceIn(layer: ConfigFile | null, setting: ConfigSetting, own: ConfigSource): ConfigSource {
+  return layer?.templates?.has(setting) === true
+    ? 'template'
+    : own;
+}
+
 /** One setting's answer, and the layer that gave it. */
 interface Ranked<K extends ConfigSetting> {
   value: RafaConfig[K];
@@ -608,7 +667,9 @@ function unknownKeyWarning(key: string, path: string): string {
  * Ranks the layers: for each registered setting, the command line over
  * the project's file, the project's over the user scope's, and the
  * user's over its registered default (`activeDefaults()` in
- * `section.ts`).
+ * `section.ts`). A file's templates are already laid under it
+ * ({@link layTemplatesUnder}), so a setting one answered ranks with its
+ * file and reports `template`.
  *
  * Pure. Warnings come back as data — one per unknown key either file
  * retained, the user file's first — and are never printed here. A command-line value no
@@ -642,14 +703,14 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     if (isMapSetting(setting)) {
       const merged = mergeMaps(defaults[setting], fromUser, fromFile);
       const source = fromFile !== undefined
-        ? 'file'
+        ? sourceIn(file, setting, 'file')
         : fromUser !== undefined
-          ? 'user'
+          ? sourceIn(user, setting, 'user')
           : 'default';
       return { value: merged as RafaConfig[K], source };
     }
-    if (fromFile !== undefined) return { value: fromFile, source: 'file' };
-    if (fromUser !== undefined) return { value: fromUser, source: 'user' };
+    if (fromFile !== undefined) return { value: fromFile, source: sourceIn(file, setting, 'file') };
+    if (fromUser !== undefined) return { value: fromUser, source: sourceIn(user, setting, 'user') };
     return { value: defaults[setting] as RafaConfig[K], source: 'default' };
   };
   const ranked = registeredNames().map((setting) => [setting, rank(setting)] as const);

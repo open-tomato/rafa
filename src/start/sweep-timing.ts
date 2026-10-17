@@ -1,6 +1,6 @@
 /**
  * How long each `tests.alwaysRun` file took in the runner's task step
- * (`runTaskStep`, `suite-step.ts`), and the one line that names the slow
+ * (`runTaskStep`, `suite-task-step.ts`), and the one line that names the slow
  * ones.
  *
  * ## Why the step times them

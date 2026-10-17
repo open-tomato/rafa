@@ -2,10 +2,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { templateEntry } from '../../src/config/templates';
+
 import { readCutMap } from './cut-map';
 import { listTrackedFiles } from './files';
 import { readMembers } from './package-entries';
-import { readTestKindGlobs, testKind, type TestKind } from './test-kinds';
+import { testKind, type TestKind } from './test-kinds';
 
 /** The repository root, two folders above this file. */
 const ROOT = join(import.meta.dir, '..', '..');
@@ -60,7 +62,10 @@ describe('the survey readers over the live tree', () => {
   });
 
   it('classifies the tracked test files, with at least one use-case and one unit test', () => {
-    const globs = readTestKindGlobs(ROOT);
+    // The escalation template's lists: a checkout holds no .rafa/config.yaml
+    // to name it, and the section's own defaults are empty.
+    const escalation = templateEntry('escalation')?.tests;
+    const globs = { contract: escalation?.contract ?? [], integration: escalation?.integration ?? [] };
     const counts: Record<TestKind, number> = { contract: 0, 'use-case': 0, unit: 0 };
     for (const file of tracked.test) {
       counts[testKind(file, globs)] += 1;

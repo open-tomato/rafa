@@ -541,6 +541,29 @@ the user's, key by key; a setting neither file names takes its default.
 `rafa init` writes both YAML files with every setting commented out at
 its default, so uncomment a line, with its section line, to change it.
 
+Two keys choose the tests a check point runs: `checks`, one list per
+check point, and `templates`, which adopts a named set of values. A
+project with no entries runs no check at any check point:
+
+```yaml
+# .rafa/config.yaml
+checks:
+  task: []
+```
+
+`templates: [escalation]` adopts the `escalation` template, which sets
+`checks.task: [affected]`, `checks.stage: [related, integration]` and
+`checks.loop: [full]`, and restores the steps rafa ran before these keys
+existed:
+
+```yaml
+# .rafa/config.yaml
+templates: [escalation]
+```
+
+For this project, decision 0009's table is written in its own gitignored
+`.rafa/config.yaml`, not in the tree; `context/verification.md` records it.
+
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
 the line that carries a tab; use spaces only.

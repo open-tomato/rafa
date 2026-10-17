@@ -6,12 +6,16 @@
  *
  * {@link testKind} is the pure core: it takes the globs and matches each
  * with `Bun.Glob` against a path relative to the repository root, as
- * `integrationFiles` of `src/suite/scope.ts` does. {@link readTestKindGlobs}
+ * `integrationFiles` of `src/suite/checks.ts` does. {@link readTestKindGlobs}
  * reads the two lists from the project's `.rafa/config.yaml` through
- * `readConfigFile`, each falling back to `TESTS_DEFAULTS` of
- * `src/config-schema-tests.ts` when the file sets no such key. A list the
+ * `readConfigFile`. The file's own `tests` keys come first; under them
+ * lie the templates its `templates` key names, read through
+ * `templateEntry` of `src/config/templates.ts`, a later one over an
+ * earlier as `loadConfig` lays them; and under those `TESTS_DEFAULTS` of
+ * `src/config-schema-tests.ts`, whose two lists are empty. A list the
  * file sets empty stays empty, since a list written `[]` has been said.
- * No pattern is copied here.
+ * A name no template holds is refused naming the file and the known
+ * names. No pattern is copied here.
  *
  * `readConfigFile` reads the file without the config registry. Measured on
  * bun 1.3.14: with the registry unloaded the `tests` mapping arrives in the
@@ -26,6 +30,7 @@ import type { ConfigFile } from '@open-tomato/rafa/core/config';
 
 import { readConfigFile } from '@open-tomato/rafa/core/config/load';
 
+import { templateEntry } from '../../src/config/templates';
 import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
 
 /** The kind of a test file: a unit, contract or use-case test. */
@@ -95,10 +100,37 @@ function fileList(
     : globList(file, key, value);
 }
 
+/** The names the file's `templates` key gives, from its values or, unread, its extras. */
+function templateNames(file: ConfigFile): readonly string[] {
+  if (file.values.templates !== undefined) return file.values.templates;
+  const value = file.extras.find((entry) => entry.key === 'templates')?.value;
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw new Error(`${file.path}: templates is not a list of strings`);
+  }
+  return value;
+}
+
+/** The two lists the templates the file names answer, the last that sets a key winning. */
+function templateLists(file: ConfigFile): Partial<TestKindGlobs> {
+  return templateNames(file).reduce<Partial<TestKindGlobs>>((under, name) => {
+    const entry = templateEntry(name);
+    if (entry === null) {
+      throw new Error(`${file.path}: templates names ${JSON.stringify(name)}, which no template holds `
+        + `(known templates: ${templateEntry.names.join(', ')})`);
+    }
+    return {
+      contract: entry.tests?.contract ?? under.contract,
+      integration: entry.tests?.integration ?? under.integration,
+    };
+  }, {});
+}
+
 /**
  * The two glob lists of the project at `root`, read from its
- * `.rafa/config.yaml`, each falling back to `TESTS_DEFAULTS` where the
- * file sets no such key or there is no file. An empty list stays empty.
+ * `.rafa/config.yaml`: the file's own key, else the last template it
+ * names that sets the key, else `TESTS_DEFAULTS`, as there is no file.
+ * An empty list stays empty.
  *
  * @param root - the repository root whose `.rafa/config.yaml` is read.
  * @returns the `tests.contract` and `tests.integration` lists.
@@ -108,8 +140,13 @@ export function readTestKindGlobs(root: string): TestKindGlobs {
   if (file === null) {
     return { contract: TESTS_DEFAULTS.testsContract, integration: TESTS_DEFAULTS.testsIntegration };
   }
+  const under = templateLists(file);
   return {
-    contract: fileList(file, 'contract', file.values.testsContract) ?? TESTS_DEFAULTS.testsContract,
-    integration: fileList(file, 'integration', file.values.testsIntegration) ?? TESTS_DEFAULTS.testsIntegration,
+    contract: fileList(file, 'contract', file.values.testsContract)
+      ?? under.contract
+      ?? TESTS_DEFAULTS.testsContract,
+    integration: fileList(file, 'integration', file.values.testsIntegration)
+      ?? under.integration
+      ?? TESTS_DEFAULTS.testsIntegration,
   };
 }

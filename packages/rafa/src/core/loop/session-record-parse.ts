@@ -65,6 +65,19 @@
  * keeps the pair, after `stepOnly`, when `outsideCase` is `true`, with
  * the tail as its list of strings or as an empty list when it is
  * anything else, and leaves out both keys for any other `outsideCase`.
+ *
+ * A step's `declared`, likewise. The frozen step keeps it, right after
+ * `reason`, on a `none` step when it is one of `TEST_SCOPES`, and leaves
+ * it out of every other step and for any other value.
+ *
+ * ## A `none` step
+ *
+ * A step at scope {@link NONE_STEP_SCOPE} ran nothing: its check-point
+ * entry named no check. Its `command` is an empty list, its `exitCode`
+ * 0 and its `failures` and `newFailures` empty; a `none` step outside
+ * that shape is refused, naming each field. An empty `command` at any
+ * other scope is refused as it was before the scope existed, so a record
+ * from rafa 0.35.0, which holds no `none` step, reads as it did.
  */
 import type { HopRecord } from './hop-record.js';
 import type {
@@ -75,6 +88,7 @@ import type {
   SessionTaskRef,
 } from './sessions.js';
 import type { SuiteFailure } from './suite-failure.js';
+import type { TestScope } from '../plan/declaration.js';
 
 import { basename, isAbsolute } from 'node:path';
 
@@ -118,12 +132,20 @@ export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
  * Why a suite step ran at the scope it did: the task's own `tests=`
  * declaration, a full-suite trigger, the `--changed` fallback taken when
  * no `Owns:` folder narrows the run, a `tests=module` task whose module
- * holds no test file, and a stage step's own scope.
+ * holds no test file, a stage step's own scope, a check-point entry that
+ * names no check (a `none` step), and the entry's `unit` check.
  */
-export const SESSION_STEP_REASONS: readonly ['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
+export const SESSION_STEP_REASONS: readonly ['declared', 'trigger', 'fallback', 'no-module-tests', 'stage', 'no-check', 'unit'] = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage', 'no-check', 'unit'] as const);
 
 /** One of {@link SESSION_STEP_REASONS}. */
 export type SessionStepReason = (typeof SESSION_STEP_REASONS)[number];
+
+/**
+ * The scope of a step that ran nothing: its check-point entry named no
+ * check. Such a step holds an empty `command`, exit code 0 and no
+ * failures; see the module note, "A `none` step".
+ */
+export const NONE_STEP_SCOPE = 'none' as const;
 
 /** The strategies a saved decision may name: the two that pass over a task. */
 export const SESSION_DECISION_STRATEGIES: readonly ['jump', 'defer'] = Object.freeze(['jump', 'defer'] as const);
@@ -248,24 +270,56 @@ function stepInterruptedProblem(step: object, at: string): string | null {
     : `${at}.interrupted is ${describeValue(interrupted)}, expected true or no key`;
 }
 
+/** The problem with a step's `scope`, or null: a named scope, `none`, or a list of paths. */
+function stepScopeProblem(scope: unknown, at: string): string | null {
+  return (TEST_SCOPES as readonly unknown[]).includes(scope) || scope === NONE_STEP_SCOPE || isTextList(scope)
+    ? null
+    : `${at}.scope is ${describeValue(scope)}, expected one of ${TEST_SCOPES.join(', ')}, ${NONE_STEP_SCOPE} or a list of paths`;
+}
+
+/** The problem with a step's `command`, or null: empty on a `none` step, a non-empty list of arguments on any other. */
+function stepCommandProblem(command: unknown, scope: unknown, at: string): string | null {
+  if (scope === NONE_STEP_SCOPE) {
+    return Array.isArray(command) && command.length === 0
+      ? null
+      : `${at}.command is ${describeValue(command)}, expected an empty list on a ${NONE_STEP_SCOPE} step`;
+  }
+  return isTextList(command) && command.length > 0
+    ? null
+    : `${at}.command is ${describeValue(command)}, expected a non-empty list of arguments`;
+}
+
+/**
+ * Every problem a `none` step holds beyond its scope and command: a
+ * whole exit code other than 0, or a failing test. A value of the wrong
+ * type is named by the checks every step meets, never twice.
+ */
+function noneStepProblems(step: object, at: string): string[] {
+  const exitCode = field(step, 'exitCode');
+  const failures = field(step, 'failures');
+  return [
+    Number.isSafeInteger(exitCode) && exitCode !== 0
+      ? `${at}.exitCode is ${describeValue(exitCode)}, expected 0 on a ${NONE_STEP_SCOPE} step`
+      : null,
+    Array.isArray(failures) && failures.length > 0
+      ? `${at}.failures is ${describeValue(failures)}, expected none on a ${NONE_STEP_SCOPE} step`
+      : null,
+  ].filter((problem): problem is string => problem !== null);
+}
+
 /** Every problem with one step, the `at` naming its place in the record. */
 export function stepProblems(step: unknown, at: string): string[] {
   if (!isObject(step)) return [`${at} is ${describeValue(step)}, expected a step`];
   const kind = field(step, 'kind');
   const scope = field(step, 'scope');
-  const command = field(step, 'command');
   const exitCode = field(step, 'exitCode');
   const summary = field(step, 'summary');
   const problems = [
     (SESSION_STEP_KINDS as readonly unknown[]).includes(kind)
       ? null
       : `${at}.kind is ${describeValue(kind)}, expected one of ${SESSION_STEP_KINDS.join(', ')}`,
-    (TEST_SCOPES as readonly unknown[]).includes(scope) || isTextList(scope)
-      ? null
-      : `${at}.scope is ${describeValue(scope)}, expected one of ${TEST_SCOPES.join(', ')} or a list of paths`,
-    isTextList(command) && command.length > 0
-      ? null
-      : `${at}.command is ${describeValue(command)}, expected a non-empty list of arguments`,
+    stepScopeProblem(scope, at),
+    stepCommandProblem(field(step, 'command'), scope, at),
     typeof exitCode === 'number' && Number.isSafeInteger(exitCode)
       ? null
       : `${at}.exitCode is ${describeValue(exitCode)}, expected a whole number`,
@@ -273,6 +327,9 @@ export function stepProblems(step: unknown, at: string): string[] {
       ? null
       : `${at}.summary is ${describeValue(summary)}, expected null or a string`,
     stepFailuresProblem(step, at),
+    ...scope === NONE_STEP_SCOPE
+      ? noneStepProblems(step, at)
+      : [],
     stepInterruptedProblem(step, at),
   ];
   return problems.filter((problem): problem is string => problem !== null);
@@ -487,10 +544,18 @@ function reasonEntry(reason: unknown): { readonly reason?: SessionStepReason } {
     : {};
 }
 
+/** The `declared` entry of a frozen step: on a `none` step alone, and only when it is one of `TEST_SCOPES`. */
+function declaredEntry(scope: unknown, declared: unknown): Pick<SessionStep, 'declared'> {
+  return scope === NONE_STEP_SCOPE && (TEST_SCOPES as readonly unknown[]).includes(declared)
+    ? { declared: declared as TestScope }
+    : {};
+}
+
 /**
  * A frozen step already checked, its fields in the order they are
  * written: `reason` right after `scope`, only when it is one of
- * {@link SESSION_STEP_REASONS}, `stepOnly` right after `newFailures`,
+ * {@link SESSION_STEP_REASONS}, `declared` after it, only on a `none`
+ * step whose value is one of `TEST_SCOPES`, `stepOnly` right after `newFailures`,
  * only when it holds a whole entry, `outsideCase` with `outputTail`
  * after it, only when the mark is `true`, and `interrupted` last, only
  * when there.
@@ -502,6 +567,7 @@ function freezeStep(step: SessionStep): SessionStep {
       ? step.scope
       : Object.freeze([...step.scope]),
     ...reasonEntry(field(step, 'reason')),
+    ...declaredEntry(step.scope, field(step, 'declared')),
     command: Object.freeze([...step.command]),
     exitCode: step.exitCode,
     summary: step.summary,

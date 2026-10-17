@@ -9,7 +9,10 @@
  * or every one `project`, would fail on one of them. The module-file
  * case sets `naming.branch` in the second entry of a `rafa.config.ts`,
  * so an entry index read as 0 for every setting would fail there, and
- * its first entry's `pr.base` is the control reading 0.
+ * its first entry's `pr.base` is the control reading 0. The template
+ * case names `escalation` and sets `checks.stage` itself, so a key the
+ * template answered reads `template:escalation` beside one the file's own
+ * key outranked it on, which reads `project`.
  */
 import type { ConfigShowResult, ConfigShowSource } from './show.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
@@ -163,6 +166,20 @@ describe('rafa config show', () => {
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain(`naming.branch: "work/{stub}"  from project ${moduleFile} entry 1\n`);
     expect(outcome.stdout).toContain(`pr.base: "trunk"  from project ${moduleFile} entry 0\n`);
+  });
+
+  it('names template:<name> and the file naming it for a key a template answered and no file outranked', async () => {
+    const project = plant('version: 1\ntemplates: [escalation]\nchecks:\n  stage: [related]\n');
+    const projectFile = join(project.root, '.rafa', 'config.yaml');
+
+    const outcome = await run(project, ['--sources']);
+    const data = dataOf(await run(project, ['--sources', '--output=json']));
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain(`checks.task: ["affected"]  from template:escalation ${projectFile} entry 0\n`);
+    expect(outcome.stdout).toContain(`checks.stage: ["related"]  from project ${projectFile} entry 0\n`);
+    expect(rowOf(data, 'checks.loop')).toEqual({ key: 'checks.loop', value: ['full'], layer: 'template:escalation', file: projectFile, entry: 0 });
+    expect(rowOf(data, 'checks.publish')).toEqual({ key: 'checks.publish', value: [], layer: 'default', file: null, entry: null });
   });
 
   it('refuses both flags at once with exit code 1, naming the usage', async () => {

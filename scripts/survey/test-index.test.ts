@@ -663,6 +663,9 @@ describe('the guard over a scratch repository, a use-case test', () => {
     root = plantScratch('survey-test-index-usecase-', {
       ...SCRATCH_FILES,
       [useCase]: header + footer,
+      // The escalation template names the -integration spelling that makes
+      // the file a use-case test; the section's own default is empty.
+      '.rafa/config.yaml': 'templates: [escalation]\n',
     }, table);
     git(root, ['rm', '--quiet', '--cached', '--', 'src/a/one.test.ts']);
     rmSync(join(root, 'src/a/one.test.ts'));

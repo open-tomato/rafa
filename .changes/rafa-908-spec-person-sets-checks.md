@@ -1,0 +1,8 @@
+---
+plan: rafa-908-spec-person-sets-checks
+title: The person sets the checks each step runs
+level: minor
+---
+
+- config: A new `checks` section sets which checks run at each of seven points (`checks.task`, `checks.stage`, `checks.loop`, `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest`, `checks.publish`), each a list of `affected`, `related`, `unit`, `contract`, `integration` or `full`, empty by default. The new top-level `templates` key names config templates whose values sit under the file's own keys, with an unknown name refused with the known names and `rafa config show --sources` reporting such settings as `template:<name>`. rafa ships one template, `escalation`, holding the former full-suite trigger files, integration and contract globs and the former check points; `tests.fullSuiteTriggers`, `tests.integration` and `tests.contract` now default to empty lists, `templates: [escalation]` restores them, `rafa init`'s scaffold says so, and `@open-tomato/rafa/config` exports `templates.escalation` for a `rafa.config.ts` to spread.
+- loop: The task, stage and pre-wrap-up steps run what `checks.task`, `checks.stage` and `checks.loop` name. An empty entry (the default) runs no test, is recorded as a `none` step with reason `no-check`, prints that no check is configured, blocks nothing at the stage and lets the wrap-up start; lint and type checks still run. A task line's `tests=` value widens a configured `checks.task` entry and is set aside and named when the entry is empty. With all three entries empty the loop takes no suite baseline and says so. Records from rafa 0.35.0 still read.

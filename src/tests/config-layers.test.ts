@@ -286,12 +286,21 @@ const PROJECT_TEXT = [
   '  duplicates: allow',
   'naming:',
   '  branch: "project/{stub}"',
+  'templates: [escalation]',
   'tests:',
   '  fullSuiteTriggers: ["project/*.toml"]',
   '  integration: ["project/**/*.e2e.ts"]',
   '  contract: ["project/**/*.pact.ts"]',
   '  alwaysRun: ["project/**/*.sweep.ts"]',
   '  retakeRedAlone: false',
+  'checks:',
+  '  task: [affected]',
+  '  stage: [related, integration]',
+  '  loop: [full]',
+  '  pullRequest: [unit, contract, integration]',
+  '  stretch: [related, contract]',
+  '  releasePullRequest: [integration]',
+  '  publish: [full]',
   'features:',
   '  board: false',
   '  pr: false',
@@ -408,11 +417,19 @@ const PROJECT_VALUES: RafaConfig = {
   taskLessons: 'off',
   mergeDuplicates: 'allow',
   namingBranch: 'project/{stub}',
+  templates: ['escalation'],
   testsFullSuiteTriggers: ['project/*.toml'],
   testsIntegration: ['project/**/*.e2e.ts'],
   testsContract: ['project/**/*.pact.ts'],
   testsAlwaysRun: ['project/**/*.sweep.ts'],
   testsRetakeRedAlone: false,
+  checksTask: ['affected'],
+  checksStage: ['related', 'integration'],
+  checksLoop: ['full'],
+  checksPullRequest: ['unit', 'contract', 'integration'],
+  checksStretch: ['related', 'contract'],
+  checksReleasePullRequest: ['integration'],
+  checksPublish: ['full'],
   featuresBoard: false,
   featuresPr: false,
   featuresRun: false,
@@ -553,12 +570,21 @@ const USER_TEXT = [
   '  duplicates: error',
   'naming:',
   '  branch: "user/{stub}"',
+  'templates: []',
   'tests:',
   '  fullSuiteTriggers: []',
   '  integration: ["user/**/*.e2e.ts"]',
   '  contract: ["user/**/*.pact.ts"]',
   '  alwaysRun: []',
   '  retakeRedAlone: true',
+  'checks:',
+  '  task: [unit]',
+  '  stage: []',
+  '  loop: [related, contract]',
+  '  pullRequest: [full]',
+  '  stretch: []',
+  '  releasePullRequest: [unit, full]',
+  '  publish: [integration]',
   'features:',
   '  board: true',
   '  pr: true',
@@ -661,11 +687,19 @@ const USER_VALUES: RafaConfig = {
   taskLessons: 'on',
   mergeDuplicates: 'error',
   namingBranch: 'user/{stub}',
+  templates: [],
   testsFullSuiteTriggers: [],
   testsIntegration: ['user/**/*.e2e.ts'],
   testsContract: ['user/**/*.pact.ts'],
   testsAlwaysRun: [],
   testsRetakeRedAlone: true,
+  checksTask: ['unit'],
+  checksStage: [],
+  checksLoop: ['related', 'contract'],
+  checksPullRequest: ['full'],
+  checksStretch: [],
+  checksReleasePullRequest: ['unit', 'full'],
+  checksPublish: ['integration'],
   featuresBoard: true,
   featuresPr: true,
   featuresRun: true,
@@ -1201,6 +1235,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'naming:\n  branch: "feat/{stub}"', 'namingBranch', 'feat/{stub}',
   ],
   [
+    'templates', 'templates: [escalation, ""]',
+    'templates[1] is "", expected a template name',
+    'templates: [escalation]', 'templates', ['escalation'],
+  ],
+  [
     'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: [""]',
     'tests.fullSuiteTriggers[0] is "", expected a glob pattern relative to the repository root',
     'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1224,6 +1263,41 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: "false"',
     'tests.retakeRedAlone is "false", expected true or false',
     'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+  ],
+  [
+    'checks.task', 'checks:\n  task: [affected, affected]',
+    'checks.task is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "affected" is written twice',
+    'checks:\n  task: [affected]', 'checksTask', ['affected'],
+  ],
+  [
+    'checks.stage', 'checks:\n  stage: [related, e2e]',
+    'checks.stage[1] is "e2e", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  stage: [related, integration]', 'checksStage', ['related', 'integration'],
+  ],
+  [
+    'checks.loop', 'checks:\n  loop: full',
+    'checks.loop is "full", expected a list of check names from: affected, related, unit, contract, integration, full',
+    'checks:\n  loop: [full]', 'checksLoop', ['full'],
+  ],
+  [
+    'checks.pullRequest', 'checks:\n  pullRequest: { unit: true }',
+    'checks.pullRequest is a mapping, expected a list of check names from: affected, related, unit, contract, integration, full',
+    'checks:\n  pullRequest: [unit, contract]', 'checksPullRequest', ['unit', 'contract'],
+  ],
+  [
+    'checks.stretch', 'checks:\n  stretch: ["bun test"]',
+    'checks.stretch[0] is "bun test", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  stretch: [related]', 'checksStretch', ['related'],
+  ],
+  [
+    'checks.releasePullRequest', 'checks:\n  releasePullRequest: [unit, full, unit]',
+    'checks.releasePullRequest is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "unit" is written twice',
+    'checks:\n  releasePullRequest: [integration]', 'checksReleasePullRequest', ['integration'],
+  ],
+  [
+    'checks.publish', 'checks:\n  publish: [Full]',
+    'checks.publish[0] is "Full", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  publish: [full]', 'checksPublish', ['full'],
   ],
   [
     'features.board', 'features:\n  board: 0',
@@ -1418,6 +1492,76 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
         + 'expected a relative directory path not under .rafa/',
     ]);
+  });
+});
+
+const TEMPLATE_GLOBS = {
+  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+  testsIntegration: [
+    '**/*-integration.test.ts',
+    '**/*.integration.test.ts',
+    '**/*-spawned*.test.ts',
+    '**/*-cli.test.ts',
+  ],
+  testsContract: ['**/*.contract.test.ts'],
+};
+
+const EMPTY_GLOBS = {
+  testsFullSuiteTriggers: [],
+  testsIntegration: [],
+  testsContract: [],
+};
+
+const EMPTY_CHECKS = {
+  checksTask: [],
+  checksStage: [],
+  checksLoop: [],
+  checksPullRequest: [],
+  checksStretch: [],
+  checksReleasePullRequest: [],
+  checksPublish: [],
+};
+
+describe('the escalation template over the checks and the three glob keys', () => {
+  it('resolves the template\'s globs and check points, and empties the four unnamed checks', async () => {
+    const resolved = await loadConfig(scopes('templates: [escalation]\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      ...TEMPLATE_GLOBS,
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
+      checksPullRequest: [],
+      checksStretch: [],
+      checksReleasePullRequest: [],
+      checksPublish: [],
+    });
+    expect(resolved.sources).toMatchObject({
+      testsFullSuiteTriggers: 'template',
+      checksTask: 'template',
+      checksStage: 'template',
+      checksLoop: 'template',
+    });
+  });
+
+  it('resolves every checks key and the three glob keys to empty lists with no template', async () => {
+    const resolved = await loadConfig(scopes('version: 1\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({ ...EMPTY_GLOBS, ...EMPTY_CHECKS });
+    expect(resolved.sources).toMatchObject({ checksTask: 'default', testsIntegration: 'default' });
+  });
+
+  it('lets a written checks.stage replace the template\'s entry alone, sourced from the file', async () => {
+    const resolved = await loadConfig(
+      scopes('templates: [escalation]\nchecks:\n  stage: [related]\n', null),
+      {},
+      quiet,
+    );
+
+    expect(resolved.config.checksStage).toEqual(['related']);
+    expect(resolved.sources.checksStage).toBe('file');
+    expect(resolved.config.checksTask).toEqual(['affected']);
+    expect(resolved.sources.checksTask).toBe('template');
   });
 });
 

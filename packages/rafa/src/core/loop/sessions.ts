@@ -80,19 +80,28 @@
  *     first dispatch, `task` after a task commits, `stage` after a stage's
  *     last task, `pre-wrap-up` before the wrap-up.
  *   - `scope`: `affected`, `module` or `full` (`TEST_SCOPES`,
- *     `core/plan/declaration.ts`), or the list of files and folders run, which
- *     may be empty.
+ *     `core/plan/declaration.ts`), `none` ({@link NONE_STEP_SCOPE}) for a
+ *     step that ran nothing because its check-point entry named no check,
+ *     or the list of files and folders run, which may be empty.
  *   - `reason`: optional, why the step ran at that scope, one of
  *     {@link SESSION_STEP_REASONS}: `declared` for the task's own `tests=`
- *     declaration, `trigger` for a full-suite trigger, `fallback` for the
+ *     declaration or the check-point entry, `trigger` for a full-suite trigger, `fallback` for the
  *     `--changed` run taken when no `Owns:` folder narrows it,
  *     `no-module-tests` for a `tests=module` task whose module holds no
- *     test file, and `stage` for a stage step's own scope. It is written
+ *     test file, `stage` for a stage step's own scope, `no-check` for a
+ *     `none` step, and `unit` for a run the entry's `unit` check chose. It is written
  *     as its own key right after `scope`. A step written by rafa 0.35.0
  *     or earlier carries no `reason` key and reads as having none; a
  *     value outside the set is left out on read, never refused, as an
  *     unknown `phase` is.
- *   - `command`: the argv spawned, `bun` first, never empty.
+ *   - `declared`: only on a `none` step whose task line declared a
+ *     `tests=` value, that value, which the step set aside; written right
+ *     after `reason`. On read a value outside `TEST_SCOPES`, or the key on
+ *     any other step, is left out, never refused.
+ *   - `command`: the argv spawned, `bun` first, never empty but on a
+ *     `none` step, whose command is the empty list, its `exitCode` 0 and
+ *     its `failures` and `newFailures` empty. A `none` step outside that
+ *     shape, and an empty command at any other scope, are refused on read.
  *   - `exitCode`: the command's exit code, a whole number.
  *   - `summary`: Bun's `Ran N tests across M files.` line, or null when it
  *     printed none.
@@ -242,6 +251,7 @@ import {
   freezeRecord,
   isPositiveWhole,
   isSessionId,
+  NONE_STEP_SCOPE,
   parseSessionRecord,
   RECORD_EXTENSION,
   recordProblems,
@@ -260,6 +270,7 @@ export type {
 export {
   isPositiveWhole,
   isSessionId,
+  NONE_STEP_SCOPE,
   parseSessionRecord,
   RECORD_EXTENSION,
   SESSION_DECISION_STRATEGIES,
@@ -301,11 +312,13 @@ export interface SessionStepOnly {
 /** One suite run the runner recorded for a session. See the module note. */
 export interface SessionStep {
   readonly kind: SessionStepKind;
-  /** A named scope, or the files and folders run. */
-  readonly scope: TestScope | readonly string[];
+  /** A named scope, `none` for a step that ran nothing, or the files and folders run. */
+  readonly scope: TestScope | typeof NONE_STEP_SCOPE | readonly string[];
   /** Why the step ran at {@link SessionStep.scope}; left out of a step from rafa 0.35.0 or earlier. See the module note. */
   readonly reason?: SessionStepReason;
-  /** The argv spawned, `bun` first. */
+  /** The `tests=` value a `none` step set aside; only on a `none` step whose task line had one. See the module note. */
+  readonly declared?: TestScope;
+  /** The argv spawned, `bun` first; empty on a `none` step alone. */
   readonly command: readonly string[];
   readonly exitCode: number;
   /** Bun's summary line, or null when it printed none. */
