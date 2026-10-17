@@ -73,7 +73,8 @@ Subjects:
   stretch    open a stretch: its integration branch, pr.base pointed at it, and
              the operators in tmux 🪙
   bug        list the cause codes a bug can carry, rank the closest to a cause
-             in words, and check for codes that read alike
+             in words, check for codes that read alike, and recheck whether a
+             bug still reproduces
   docs       write a plan repairing the open lines of the stale-docs issues
 
 Commands:

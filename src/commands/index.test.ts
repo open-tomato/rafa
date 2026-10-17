@@ -11,7 +11,7 @@
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
+ * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -213,6 +213,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'stretch item': ['text'],
   'stretch end': ['text'],
   'bug codes': ['text', 'json'],
+  'bug recheck': ['text', 'json'],
   'docs plan': ['text', 'json'],
 };
 
@@ -318,6 +319,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
   'bug codes': [[], ['suggest', 'family', 'check']],
+  'bug recheck': [['n'], ['all', 'comment']],
   'docs plan': [[], []],
   'self-update': [[], ['force']],
   'describe': [[], []],
@@ -436,6 +438,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
   ['stretch end --dry-run', 'stretch end', ['--dry-run'], ''],
   ['bug codes --family=git', 'bug codes', ['--family=git'], ''],
+  ['bug recheck 412 415 --comment', 'bug recheck', ['412', '415', '--comment'], ''],
   ['docs plan', 'docs plan', [], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
@@ -612,6 +615,7 @@ describe('the core roster', () => {
       'stretch item',
       'stretch end',
       'bug codes',
+      'bug recheck',
       'docs plan',
       'status',
       'next',
@@ -712,8 +716,8 @@ describe('the module note\'s count word', () => {
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
     expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
-    expect(numberWord('sixty-five')).toBe(CORE_COMMANDS.length);
-    expect(numberWord('sixty-five')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-six')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-six')).not.toBe(ROSTER_COMMANDS.length);
   });
 });
 
@@ -729,13 +733,13 @@ describe('createRosterRegistry', () => {
       .toEqual([0, 1, 2, 3]);
   });
 
-  it('holds the 104 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+  it('holds the 105 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
     const registry = createRosterRegistry();
 
-    expect(registry.commands({ includeHidden: true })).toHaveLength(104);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(105);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
     expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
-    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(104);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(105);
   });
 
   it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
@@ -744,7 +748,7 @@ describe('createRosterRegistry', () => {
 
     expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
     expect(PR_FEATURE.commands).toHaveLength(10);
-    expect(registry.commands({ includeHidden: true })).toHaveLength(94);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(95);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
     expect(registry.subjects().map((subject) => subject.name))
       .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));

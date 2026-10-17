@@ -32,7 +32,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred and four registered so far
+ * of each is its command. Four of the hundred and five registered so far
  * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
  * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -122,7 +122,9 @@
  * pull request through `pr open`'s `openPull` and puts `pr.base` back
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
  * codes of `src/errors/` beside the project's `errors.codes`, nor
- * `docs plan`, which writes a plan from the open lines of the
+ * `bug recheck`, which reads each bug's `Rerun` through
+ * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
+ * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
  * stale-docs issues through `src/docs/open-lines.ts`.
  *
  * ## What is registered
@@ -415,6 +417,14 @@
  *     cause in words, and `--check` exits 1 when two codes of one family
  *     read alike, the two refused together (`./bug/codes.ts`). It
  *     writes nothing and starts no session.
+ *   - `bug recheck [<n>…] [--all] [--comment]`: reruns the test each
+ *     bug's `Rerun` section names, read strictly as
+ *     `bun test <file> [-t "<case>"]` and run with no shell, and judges
+ *     each bug `reproduces`, `gone`, `flaky`, `stale`, `manual` or
+ *     `skipped`; only a trusted author's bug runs, off the `local`
+ *     tracker, and `--comment` posts the verdict on `gone` and `flaky`
+ *     bugs, redacted, closing none (`./bug/recheck.ts`). Exits 0 whatever
+ *     the verdicts, and starts no session.
  *   - `docs plan`: `<plan.dir>/PLAN-rafa-<n>-doc-update.md`, titled
  *     `chore(doc-update)`, written from every open line of the open
  *     stale-docs issues, one `{agent=doc-updater}` task each, every line
@@ -465,6 +475,7 @@ import agentVendor from './agent/vendor.js';
 import { BOARD_SUBJECT } from './board/declarations.js';
 import { BOARD_FEATURE } from './board/index.js';
 import bugCodes from './bug/codes.js';
+import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
 import { CLAIM_SUBJECT } from './claim/declarations.js';
 import { RUN_FEATURE } from './claim/index.js';
@@ -545,7 +556,7 @@ const UPDATE_SUBJECT: SubjectSpec = { name: 'update', summary: 'bring this proje
 const CONFIG_SUBJECT: SubjectSpec = { name: 'config', summary: 'show every setting and where it came from; set one key in the project\'s config, keeping every comment' };
 const CI_SUBJECT: SubjectSpec = { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' };
 const STRETCH_SUBJECT: SubjectSpec = { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' };
-const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' };
+const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, check for codes that read alike, and recheck whether a bug still reproduces' };
 const DOCS_SUBJECT: SubjectSpec = { name: 'docs', summary: 'write a plan repairing the open lines of the stale-docs issues' };
 
 /** Core's own subjects, in roster order: those no bundled feature declares. */
@@ -645,6 +656,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   stretchItem,
   stretchEnd,
   bugCodes,
+  bugRecheck,
   docsPlan,
   status,
   next,
