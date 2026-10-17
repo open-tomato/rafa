@@ -165,7 +165,7 @@ const COMPANION_FILES = [
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
 /** The project config: `pr.provider: none`, so the wrap-up's push is the run's only reach for a remote, and it never throws without one; and the sweep in `tests.alwaysRun`. */
-const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${SWEEP_FILE}]\n`;
+const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${SWEEP_FILE}]\nchecks:\n  task: [affected]\n`;
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {

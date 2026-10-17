@@ -85,7 +85,7 @@
  *     or the list of files and folders run, which may be empty.
  *   - `reason`: optional, why the step ran at that scope, one of
  *     {@link SESSION_STEP_REASONS}: `declared` for the task's own `tests=`
- *     declaration, `trigger` for a full-suite trigger, `fallback` for the
+ *     declaration or the check-point entry, `trigger` for a full-suite trigger, `fallback` for the
  *     `--changed` run taken when no `Owns:` folder narrows it,
  *     `no-module-tests` for a `tests=module` task whose module holds no
  *     test file, `stage` for a stage step's own scope, `no-check` for a

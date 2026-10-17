@@ -46,15 +46,18 @@
  *     `-spawned` and ending `.test.ts`, and one ending `-cli.test.ts`.
  *     Each of its patterns opens with the any-folder prefix, two stars
  *     and a slash, which this note cannot spell because it would close
- *     the comment.
+ *     the comment. A task step reads it too when `checks.task` names
+ *     `integration` or `unit`.
  *   - `tests.contract` names the contract tests. A contract test checks
  *     the promise a package makes to others, with a fixture, and runs in
  *     that package's own `test` task in ring 1 of CI, where a use-case
  *     test matching `tests.integration` runs in ring 0's full run. Its
  *     default is empty. The `escalation` template names one pattern: a
  *     name ending `.contract.test.ts`, in any folder, under the same
- *     any-folder prefix. No step reads the key
- *     yet; its readers come with the CI rings that run each kind.
+ *     any-folder prefix. The runner's task step reads it when
+ *     `checks.task` names `contract` or `unit`
+ *     (`start/suite-task-step.ts`); its CI readers come with the rings
+ *     that run each kind.
  *   - `tests.alwaysRun` names the test files a task's scoped run takes
  *     beside the ones `bun test --changed=<base>` selects. A content
  *     sweep, a test that imports no project file and reads the tree at
@@ -65,8 +68,9 @@
  *     since the sweeps it names may not have been written yet. The task
  *     prompt reads it (`start/task-gate-lines.ts`), naming the files it
  *     resolves to, and so does the runner's task step
- *     (`start/task-always-run.ts`), running those files beside a
- *     `module` or `affected` scope.
+ *     (`start/task-always-run.ts`), running those files beside an
+ *     `affected` run and in a path list where `related` is in play
+ *     (`start/suite-step.ts`'s module note).
  *
  * An empty list is a value every glob key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage

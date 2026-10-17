@@ -179,7 +179,7 @@ async function drive(options: { readonly retake: boolean; readonly broken: boole
     checkout: repo,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: [], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: options.retake },
+    settings: { testsFullSuiteTriggers: [], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: options.retake, testsContract: [], checksTask: ['affected'], checksStage: ['related', 'integration'], checksLoop: ['full'] },
     owns: () => Promise.resolve(['leak']),
     seams: { git: gitChanging(options.changed ?? UNTESTED), appendStep: (step) => steps.push(step) },
   };

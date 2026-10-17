@@ -24,8 +24,9 @@
  *   - `checks.publish`: what a publish runs.
  *
  * Each resolves as `checks` and its key's name capitalised:
- * `checksTask`, `checksPullRequest` and the like. No step reads them yet;
- * the runner's reading of them is a later task of the plan.
+ * `checksTask`, `checksPullRequest` and the like. The runner's task step
+ * reads `checksTask` (`start/suite-task-step.ts`); no step reads the
+ * others yet.
  *
  * ## The vocabulary
  *

@@ -165,6 +165,10 @@ function contextWith(
       testsIntegration: ['**/*-integration.test.ts'],
       testsAlwaysRun: options.alwaysRun ?? [],
       testsRetakeRedAlone: false,
+      testsContract: [],
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
     },
     owns: () => {
       seen.ownsReads += 1;

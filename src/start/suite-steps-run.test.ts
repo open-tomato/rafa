@@ -163,7 +163,7 @@ function stepsWith(
     checkout: dir,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: false },
+    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: false, testsContract: [], checksTask: ['affected'], checksStage: ['related', 'integration'], checksLoop: ['full'] },
     planContent: TRACKER,
     gh: () => Promise.reject(new Error('gh is not read by these cases')),
     calls,
@@ -355,13 +355,13 @@ describe('lastPreWrapUp', () => {
 });
 
 describe('afterTask', () => {
-  it('runs the task step from the task\'s base, with its sentence and the affected default', async () => {
+  it('runs the task step from the task\'s base, with its sentence and no tests= value for a line declaring none', async () => {
     const { calls, seen } = scripted();
     const steps = stepsWith(calls);
     await steps.beforeSession(taskAt('second task', 8));
 
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(true);
-    expect(seen.taskInputs).toEqual([{ baseline: BASELINE, base: BASE, declared: 'affected', task: 'second task' }]);
+    expect(seen.taskInputs).toEqual([{ baseline: BASELINE, base: BASE, declared: null, task: 'second task' }]);
   });
 
   it('reads the line\'s tests= value and hands the sentence without its declaration', async () => {

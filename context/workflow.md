@@ -204,8 +204,10 @@ gate later anyway.
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — the run `resolveChecks` (`src/suite/checks.ts`) answers for
-  `[affected]` over the task's diff, after each task's session ends and
-  commits (`tests=`, below)
+  `checks.task` over the task's diff, after each task's session ends and
+  commits (`tests=`, below); an empty `checks.task`, the default, runs no
+  test and is recorded as a `none` step, the lint and type checks still
+  running after it
 - `stage` — After a stage's last task: the tests under `Owns:` folders
   changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
   files when the plan has no `Owns:` folder (reason `fallback`)
@@ -229,9 +231,12 @@ next task.
 
 **Declaration key `tests=` on a task line** sets the scope of the runner's
 task step, which runs after the task's session commits; the session runs only
-what its change reaches. The stage step after a stage's last task follows the
-plan's `Owns:` folders instead, or falls back to `bun test --changed=<since>`
-(scope `affected`, reason `fallback`):
+what its change reaches. The value reads the `checks.task` entry, so the
+scopes below are those of an entry naming `affected`, as the `escalation`
+template's `[affected]` does; under an empty `checks.task` the step runs no
+test and records the value it set aside. The stage step after a stage's last
+task follows the plan's `Owns:` folders instead, or falls back to `bun test
+--changed=<since>` (scope `affected`, reason `fallback`):
 - `tests=affected` (default): the task step runs `bun test --changed=<base>`
   plus types and lint on the changed files
 - `tests=module`: the task step runs the test files under each `Owns:` folder
@@ -271,13 +276,15 @@ automatically, and which tests always run:**
   template names `**/*-integration.test.ts`, `**/*.integration.test.ts`,
   `**/*-spawned*.test.ts`, `**/*-cli.test.ts`) — the test files a stage
   step with `Owns:` folders runs beside the folders it changed; a task
-  step does not read this key
+  step reads this key only when `checks.task` names `integration` or
+  `unit`
 - `tests.contract` (glob list; defaults to empty, the `escalation`
   template names `**/*.contract.test.ts`) — the
   contract tests: a contract test checks the promise a package makes to
   others, with a fixture, and runs in that package's own `test` task in
   ring 1 of CI, where a use-case test matching `tests.integration` runs in
-  ring 0's full run; no step reads this key yet
+  ring 0's full run; a task step reads this key when `checks.task` names
+  `contract` or `unit`
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and

@@ -24,8 +24,8 @@
  *   - {@link RunSuiteSteps.afterTask}, once a task is committed as
  *     `done` and its report stored: the task step (`runTaskStep`) over
  *     what the task changed since `base`, the commit it was dispatched
- *     on, scoped by its line's `tests=` value (`readTestScope`, the
- *     `affected` default for a line with none).
+ *     on, resolving `checks.task` with its line's `tests=` value, or
+ *     with none for a line declaring none.
  *
  * `afterTask` answers true when the run goes on and false when it
  * stops; `beforeSession` answers `go-on` and `stop` for the same, and
@@ -129,7 +129,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-import { parseTaskDeclaration, readTestScope } from '@open-tomato/rafa/core/plan';
+import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 
@@ -160,7 +160,7 @@ export interface RunSuiteStepsOptions {
   readonly trackerPath: string;
   /** The run's session id, naming its record. */
   readonly sessionId: string;
-  /** The run's resolved config: its `tests.*` keys. */
+  /** The run's resolved config: its `tests.*` keys and its `checks.*` entries. */
   readonly settings: SuiteStepContext['settings'];
   /** The plan as the run read it: its header names the issue `Owns:` is read from. */
   readonly planContent: string;
@@ -364,7 +364,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     if (isStopped(known)) return false;
     if (known === 'off') return true;
     const { text, declaration } = parseTaskDeclaration(taskInfo.task);
-    const input: TaskStepInput = { baseline: known, base, declared: readTestScope(declaration), task: text };
+    const input: TaskStepInput = { baseline: known, base, declared: declaration?.tests ?? null, task: text };
     return goesOnNoting(await guarded('task step', () => calls.runTaskStep(context, input)));
   };
 

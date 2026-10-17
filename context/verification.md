@@ -20,8 +20,8 @@ A change still asks for the full suite before the merge-time run when:
 
 The runner's recorded steps below run at fixed points of a loop. The
 baseline and the pre-wrap-up step are always full runs, a task step is
-full when its line declares `tests=full` or a trigger escalates it, and a
-session never adds its own between them. A whole-suite run is the
+full when `checks.task` names a check and its line declares `tests=full`
+or a trigger escalates it, and a session never adds its own between them. A whole-suite run is the
 runner's to take: a session that runs `bun test` with no path in one Bash
 call can outlast that call's 10-minute limit, so `rafa plan risk` flags a
 task text that asks for one (the `long-run` note, `context/workflow.md`).
@@ -30,9 +30,10 @@ task text that asks for one (the `long-run` note, `context/workflow.md`).
 
 **A task session runs a targeted subset of checks; the runner runs the full
 suite at defined stages.** A task line declares `tests=affected` (the
-default), `tests=module`, or `tests=full`: the runner's task step runs that
-scope after the session commits, and the session itself checks only what
-its change reaches.
+default), `tests=module`, or `tests=full`: the runner's task step reads
+`checks.task` with that value after the session commits, running no test
+when the entry is empty, and the session itself checks only what its
+change reaches.
 
 **Task session gates** (read one exit code from each):
 - `bun test --changed=<base>` (affected tests), then `bun test
@@ -76,8 +77,9 @@ directory, so a changed package file belongs in the scoped
 **Runner recorded steps** (recorded at fixed points, each with its scope):
 - `baseline` — Full suite once at plan start (first dispatch); a run that
   failed outside any test case halts the run and is not written
-- `task` — Scope from `resolveChecks` over the task's diff after
-  each task's session ends and commits
+- `task` — Scope from `resolveChecks` of `checks.task` over the task's
+  diff after each task's session ends and commits; a `none` step when
+  the entry is empty
 - `stage` — After a stage's last task: the tests under the `Owns:`
   folders it changed, or `bun test --changed=<since>` with the
   `tests.alwaysRun` files when the plan has no `Owns:` folder
@@ -85,7 +87,8 @@ directory, so a changed package file belongs in the scoped
 
 Each recorded step names its scope (affected, module, full, `none`, or
 a file/folder list it ran on) and its reason where it has one (`declared`
-for a task step whose line declares `tests=module` or `tests=full`;
+for a task step whose line declares `tests=module` or `tests=full`, or
+whose `checks.task` chose the scope;
 `trigger` when changed files match `tests.fullSuiteTriggers` and
 escalate the scope; `fallback` for a stage step with no `Owns:` folder
 running `bun test --changed=<since>`; `no-module-tests` when a task
@@ -100,8 +103,10 @@ full test name pairs), and which failures are new against the baseline
 (not present in `baseline`'s captured failures).
 
 **Declaration key `tests=` on a task line** sets what the runner's task
-step runs after the task's session commits; the session runs only what
-its change reaches:
+step runs after the task's session commits, for a `checks.task` naming
+`affected` (the `escalation` template's); under an empty `checks.task` it
+is set aside and nothing runs. The session runs only what its change
+reaches:
 - `tests=affected` (default): `bun test --changed=<base>` plus types and
   lint on the changed files
 - `tests=module`: the test files under each `Owns:` folder the task's
@@ -129,7 +134,8 @@ its change reaches:
 - `tests.contract` (glob list, defaults to empty; the `escalation`
   template names `**/*.contract.test.ts`) — the
   contract tests, each checking the promise a package makes to others with
-  a fixture; no step reads this key yet
+  a fixture; a task step reads this key when `checks.task` names
+  `contract` or `unit`
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a

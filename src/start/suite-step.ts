@@ -18,7 +18,7 @@
  * | Step | Runs | Blocks |
  * |---|---|---|
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
- * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `[affected]` over the task's diff | a repair task it inserts, or the repair it followed |
+ * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `checks.task` over the task's diff; nothing for an empty entry | a repair task it inserts, or the repair it followed |
  * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `[related, integration]` over the stage's diff | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
  *
@@ -37,21 +37,34 @@
  * so (`suite-outside-case.ts` holds the lines and their account).
  *
  * **A task step** runs what `resolveChecks` answers for the entry
- * `[affected]` from the task line's `tests=` value and the diff from the
- * task's base commit to HEAD: `full` with no paths, a path list
- * (recorded as `module`) over its test files, `affected` as `bun test
- * --changed=<base>`. The plan's `Owns:` folders and the
- * project's test files are read only for a `tests=module` line, the one
- * answer that needs them. A diff git will not answer runs the full
- * suite, the scope that can miss nothing. A `module` or `affected` step
- * also runs the tracked files `tests.alwaysRun` names, the content
- * sweeps no changed file selects (`task-always-run.ts`): `module` in its
- * own path list, and `affected` as a second run, since Bun filters a
+ * `checks.task` from the task line's `tests=` value and the diff from the
+ * task's base commit to HEAD: `full` with no paths, `affected` as `bun
+ * test --changed=<base>`, and a path list as one `bun test` over its
+ * files, recorded as `module` when a `tests=module` line read the entry's
+ * `affected` as `related`, and as the files run otherwise. The plan's
+ * `Owns:` folders are read only when `related` is in play (named, or
+ * read so), and the project's test files only when a path check is. A
+ * diff git will not answer runs the full suite, the scope that can miss
+ * nothing. A task step also runs the tracked files `tests.alwaysRun`
+ * names, the content sweeps no changed file selects
+ * (`task-always-run.ts`): a path list takes them in its own list when
+ * `related` is in play or `affectedToo` is set, and takes none
+ * otherwise; `affected` takes them as a second run, since Bun filters a
  * path list by `--changed`, written to {@link alwaysRunJunitFileFor} and
- * folded into the first run's result before the step is settled. Once
+ * folded into the first run's result before the step is settled. A
+ * path list that comes out empty runs nothing and records no step, and
+ * the step prints that it had nothing to run. Once
  * settled, a step not read as a stop prints one line naming each of
  * those files its JUnit file times over `SLOW_SWEEP_SECONDS`
  * (`sweep-timing.ts`), and no line when none is.
+ *
+ * **An empty `checks.task`** runs no suite and reads no diff: the step is
+ * recorded at once as a `none` step (`core/loop/sessions.ts`), reason
+ * `no-check`, with the line's `tests=` value under `declared` when it had
+ * one, and prints `🧪 task step: no check configured (checks.task is
+ * empty); nothing ran.`, with `(tests=<value> set aside)` after it for
+ * such a line. The lint and the type step below still run after it, as
+ * after a green run, and settle the step ({@link Settling.recorded}).
  *
  * Unless its test run was a stop, a task step then lints the task's diff
  * (`lint-step.ts`: `bunx eslint --no-warn-ignored`, red on a nonzero
@@ -82,8 +95,9 @@
  * carries `reason` beside `scope`, so a fallback reads apart from a wide
  * change. A task step records its scope's own reason (`declared`,
  * `trigger`, `fallback` or `no-module-tests`, `suite/checks.ts`), and
- * `declared` for a `module` answer, which only its own `tests=module`
- * line reaches. A stage step records `fallback` for its `--changed` run
+ * for a path list `declared`, or `unit` when `checks.task` names `unit`
+ * and no `tests=module` line read its `affected`; a `none` step records
+ * `no-check`. A stage step records `fallback` for its `--changed` run
  * without `Owns:` folders and `stage` for its `Owns:` path list. A step
  * whose diff git would not answer, or a stage step with no commit to
  * take its diff from, runs the full suite by no scope rule and records
@@ -219,7 +233,7 @@
  * The task step's code is in `suite-task-step.ts`, the stage step's in
  * `suite-stage-step.ts`, both re-exported here; this note stays their
  * account. The helpers they share with the other steps ({@link seamsOf},
- * {@link readHead}, {@link readDiff}, {@link runOne},
+ * {@link readHead}, {@link readDiff}, {@link recordStep}, {@link runOne},
  * {@link runWithAlwaysRun}, {@link settleStep}, {@link planDiffReader},
  * {@link Settling} and {@link StepRuns}) are exported for them.
  *
@@ -240,6 +254,7 @@ import type { RepairSite, StepVerdict } from './suite-blocker.js';
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { ChecksSettings } from '../config-schema-checks.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
@@ -327,7 +342,9 @@ export interface SuiteStepContext {
   readonly trackerPath: string;
   /** The run's session id, naming its record. */
   readonly sessionId: string;
-  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsFullSuiteTriggers' | 'testsIntegration' | 'testsRetakeRedAlone'>;
+  /** The `tests.*` keys the steps read, and the check-point entries (`checks.*`) they resolve. */
+  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsContract' | 'testsFullSuiteTriggers' | 'testsIntegration' | 'testsRetakeRedAlone'>
+    & Pick<ChecksSettings, 'checksLoop' | 'checksStage' | 'checksTask'>;
   /** The plan's `Owns:` folders, or null without any; see {@link planOwnsReader}. */
   readonly owns: () => Promise<readonly string[] | null>;
   /** True once the runner has received SIGINT; never, when left out. See the module note. */
@@ -469,7 +486,7 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
 }
 
 /** Appends `step` to the run record; a record that cannot be written is a warning. */
-function recordStep(seams: Required<SuiteStepSeams>, step: SessionStep): void {
+export function recordStep(seams: Required<SuiteStepSeams>, step: SessionStep): void {
   try {
     seams.appendStep(step);
   } catch (error) {
@@ -506,6 +523,13 @@ export interface Settling {
   readonly types?: TypeOutcome;
   /** What the step's newly red files read when run alone, once they were (`suite-retake-alone.ts`). */
   readonly alone?: AloneReading;
+  /**
+   * Set on a step that ran no suite: the step its caller recorded and
+   * printed before its diff checks ran, or null when it recorded none.
+   * {@link settleStep} then records and prints no run, and settles the
+   * diff checks alone. See the module note.
+   */
+  readonly recorded?: SessionStep | null;
 }
 
 /** The task step's diff checks `settling` carries, in the order their blockers are written. */
@@ -527,7 +551,11 @@ function checkBlockers(settling: Pick<Settling, 'lint' | 'types'>): readonly str
 
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
 function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
-  const { kind, label, result } = settling;
+  const { kind, label, result, recorded } = settling;
+  if (recorded !== undefined) {
+    activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
+    return { kind, step: recorded, red: false, interrupted: true, blocker: null, blockedLine: null, repairInserted: false };
+  }
   const step: SessionStep = { ...stepOf(settling, result, { fresh: [], outsideCase: false }), interrupted: true };
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
@@ -535,14 +563,22 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
   return { kind, step, red: false, interrupted: true, blocker: null, blockedLine: null, repairInserted: false };
 }
 
+/** Records `settling`'s run with `verdict`, prints it, and answers the step recorded. */
+function recordRun(seams: Required<SuiteStepSeams>, settling: Settling, verdict: StepVerdict): SessionStep {
+  const step = stepOf(settling, settling.result, verdict, settling.alone?.stepOnly);
+  recordStep(seams, step);
+  announce(settling.label, settling.result, verdict.known);
+  return step;
+}
+
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
 export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result, baseline, alone } = settling;
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
-  const step = stepOf(settling, result, verdict, alone?.stepOnly);
-  recordStep(seams, step);
-  announce(label, result, verdict.known);
+  const step = settling.recorded === undefined
+    ? recordRun(seams, settling, verdict)
+    : settling.recorded;
   announceStepOnly(context, settling);
   const checked = checkBlockers(settling);
   if (!isRed(verdict) && checked.length === 0) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };

@@ -48,17 +48,19 @@
  *  5. `paths` otherwise: the files of every `related`, `unit`,
  *     `contract` and `integration` in the entry, each once, sorted,
  *     with `affectedToo` true when an `affected` (or a `related` falling
- *     back to it) stood beside them, which the caller runs as a second
- *     run. The list may come out empty, and `runSuite` (`./run.js`)
- *     refuses an empty list, so the caller runs nothing for it.
+ *     back to it) stood beside them, which the caller reads: the task
+ *     step joins the `tests.alwaysRun` files to the list for it
+ *     (`start/suite-task-step.ts`). The list may come out empty, and
+ *     `runSuite` (`./run.js`) refuses an empty list, so the caller runs
+ *     nothing for it.
  *
  * A task line's `tests=module` reads the entry's `affected` as
  * `related`, and keeps what `affected` promised on both sides: a trigger
  * still widens it to `full` (rule 3), and when no touched folder holds a
  * test file it runs as `affected` again, reason `no-module-tests`, so a
  * `module` line never runs less than the entry without it. `tests=affected`
- * reads the entry as written. A stage or loop step hands in no `tests=`
- * value.
+ * reads the entry as written, as does no value: a stage or loop step
+ * hands in none, and so does a task line declaring none.
  *
  * A path is touched in the DEEPEST `Owns:` folder holding it, the rule
  * `owningBoard` (`board/board-owns.ts`) applies, reused here: with `src`
@@ -116,7 +118,7 @@ export interface FullSuiteTriggers {
 export interface CheckInput {
   /** The check-point entry's names. */
   readonly names: readonly CheckName[];
-  /** The task line's `tests=` value, or null for a stage or loop step. */
+  /** The task line's `tests=` value, or null for a stage or loop step or a line declaring none. */
   readonly declared: TestScope | null;
   /** The changed paths, repo-relative. */
   readonly diff: readonly string[];

@@ -141,7 +141,7 @@ const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'
  * {@link ALWAYS_RED_FILE} in `tests.alwaysRun`, so the stage step's
  * `--changed` fallback re-runs it too.
  */
-const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${ALWAYS_RED_FILE}]\n`;
+const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${ALWAYS_RED_FILE}]\nchecks:\n  task: [affected]\n`;
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {
