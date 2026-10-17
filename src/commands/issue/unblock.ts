@@ -93,17 +93,12 @@ import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
 
+import { ISSUE_UNBLOCK_DECLARATION, UNBLOCK_ALL_FLAG, UNBLOCK_YES_FLAG } from './declarations.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';
 
 /** The usage line a refusal names. */
 export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all] [--yes]';
-
-/** The flag that reads every open issue labelled `spec:blocked`. */
-const ALL_FLAG = 'all';
-
-/** The flag that answers the question yes without putting it. */
-const YES_FLAG = 'yes';
 
 /** An issue number as a line types it: a whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -133,8 +128,8 @@ function readUnblockSwitch(flags: RafaContext['flags'], name: string): boolean {
 
 /** What the line asked for, or a refusal with exit code 1 naming the usage; see the module note. */
 export function readUnblockLine(context: RafaContext): UnblockLine {
-  const all = readUnblockSwitch(context.flags, ALL_FLAG);
-  const yes = readUnblockSwitch(context.flags, YES_FLAG);
+  const all = readUnblockSwitch(context.flags, UNBLOCK_ALL_FLAG);
+  const yes = readUnblockSwitch(context.flags, UNBLOCK_YES_FLAG);
   const { args } = context;
   if (args.length > 1) {
     throw lineRefusal(`Expected at most one issue number, got ${String(args.length)}: ${args.join(' ')}`, UNBLOCK_USAGE);
@@ -144,12 +139,12 @@ export function readUnblockLine(context: RafaContext): UnblockLine {
   if (word === undefined) {
     if (all) return { issues: null, yes };
     throw lineRefusal(
-      `Name an issue number, or pass --${ALL_FLAG} to read every open issue labelled ${SPEC_BLOCKED_LABEL}`,
+      `Name an issue number, or pass --${UNBLOCK_ALL_FLAG} to read every open issue labelled ${SPEC_BLOCKED_LABEL}`,
       UNBLOCK_USAGE,
     );
   }
   if (all) {
-    throw lineRefusal(`Name an issue number or pass --${ALL_FLAG}, not both`, UNBLOCK_USAGE);
+    throw lineRefusal(`Name an issue number or pass --${UNBLOCK_ALL_FLAG}, not both`, UNBLOCK_USAGE);
   }
   if (!ISSUE_NUMBER.test(word)) {
     throw lineRefusal(`"${word}" is no issue number, which is a whole number from 1`, UNBLOCK_USAGE);
@@ -210,7 +205,7 @@ const answeredByYesFlag: UnblockAsk = () => Promise.resolve(true);
 /** The line a removal `--yes` answered for is written as, naming the issue and its blockers. */
 export function yesRemovalLine(issue: number, blockers: readonly number[]): string {
   const named = blockers.map((id) => `#${String(id)}`).join(' ');
-  return `Removed ${SPEC_BLOCKED_LABEL} from #${String(issue)} under --${YES_FLAG}; every blocker is closed: ${named}`;
+  return `Removed ${SPEC_BLOCKED_LABEL} from #${String(issue)} under --${UNBLOCK_YES_FLAG}; every blocker is closed: ${named}`;
 }
 
 /** `report` with each removal's message spelled by {@link yesRemovalLine}; every other outcome as it was. */
@@ -295,58 +290,7 @@ async function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): 
 /** The command, reading the board with `seams`; see the module note. */
 export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue unblock',
-    subject: 'issue',
-    action: 'unblock',
-    summary: `take ${SPEC_BLOCKED_LABEL} off an issue whose blockers have all closed`,
-    description: `Reads the "Blocked by: #24 #26" line of an issue labelled ${SPEC_BLOCKED_LABEL} on the GitHub`
-      + ' board, asks the board for each blocker\'s state, and when every blocker is closed asks whether to'
-      + ` remove ${SPEC_BLOCKED_LABEL} and removes it on a yes. With a blocker still open it names it and`
-      + ` changes nothing. An issue labelled ${SPEC_BLOCKED_LABEL} whose "Blocked by:" line is missing, names`
-      + ' itself or names an id the board has no issue for is reported and never guessed at. Without a'
-      + ' terminal and without `--yes` it asks nothing and writes nothing. `--yes` answers the question yes'
-      + ' without putting it, terminal or not, and names the blockers it read closed; it never removes'
-      + ` ${SPEC_BLOCKED_LABEL} from an issue with a blocker open or a line it refuses to guess at.`
-      + ' With `--output=json` the outcome of each issue is the'
-      + ' data of the terminal result event. With board.relationships set to native it reads nothing and'
-      + ' writes nothing: GitHub clears a blocker by itself when the blocking issue closes.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number on the GitHub board. Left out, `--all` reads every blocked issue.',
-        type: 'string',
-        required: false,
-      },
-    ],
-    flags: [
-      {
-        name: ALL_FLAG,
-        description: `Read every open issue labelled ${SPEC_BLOCKED_LABEL}, asking about each one in turn.`,
-        type: 'boolean',
-      },
-      {
-        name: YES_FLAG,
-        description: `Answer the question yes without putting it, so ${SPEC_BLOCKED_LABEL} comes off every issue`
-          + ' whose blockers are all closed, with no terminal needed. An open blocker or an unreadable'
-          + ' "Blocked by:" line still changes nothing.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue unblock 57',
-        note: `Asks whether to remove ${SPEC_BLOCKED_LABEL} from #57 when every issue its "Blocked by:" line names is closed.`,
-      },
-      {
-        cmd: 'rafa issue unblock 57 --yes',
-        note: `Removes ${SPEC_BLOCKED_LABEL} from #57 with no question when every blocker it names is closed.`,
-      },
-      {
-        cmd: 'rafa issue unblock --all',
-        note: 'Walks every open blocked issue on the board, asking about each one whose blockers have all closed.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_UNBLOCK_DECLARATION,
     run: async (context) => {
       const line = readUnblockLine(context);
       if (await unblockRelationshipsMode(issueProject(context)) === 'native') {

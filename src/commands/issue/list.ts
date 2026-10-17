@@ -203,7 +203,7 @@ import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { Issue, IssueQuery, IssueType, TrackerKind } from '@open-tomato/rafa/ports';
 
@@ -227,6 +227,7 @@ import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
+import { ISSUE_LIST_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueProject,
@@ -651,145 +652,10 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
   if (failure !== null) throw new CommandExit(EPIC_CHECK_EXIT, failure);
 }
 
-/** The flags `issue list` declares, `--roadmap`, `--all`, `--full` and `--check` first. */
-export const ISSUE_LIST_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
-  {
-    name: 'roadmap',
-    description: 'List the unticked lines of the Roadmap issue instead, in its order, with the spec, blocked by,'
-      + ' has and refs columns, and the epics it names grouped by horizon. Reads the GitHub board whatever'
-      + ' tracker the chain lands on.',
-    type: 'boolean',
-  },
-  {
-    name: 'all',
-    description: 'With --roadmap, keep the ticked lines too, each in its place, and show the epics of every'
-      + ' horizon, not only now. Refused without --roadmap.',
-    type: 'boolean',
-  },
-  {
-    name: 'full',
-    description: 'With --roadmap, print each epic\'s issues under its row, on two rows each: number, state and'
-      + ' title, then labels and blockers. Refused without --roadmap.',
-    type: 'boolean',
-  },
-  {
-    name: 'check',
-    description: 'With --roadmap, exit 1 when any type:epic issue on the board is open with its work done, or'
-      + ' closed with it not done, or when the board could not be read, naming each. Refused without --roadmap.',
-    type: 'boolean',
-  },
-  {
-    name: 'labels',
-    description: 'With --roadmap, print each issue\'s labels on a row of their own under it, and under each --full'
-      + ' member; they are no column. Refused without --roadmap.',
-    type: 'boolean',
-  },
-  {
-    name: 'texts',
-    description: 'With --roadmap, spell the spec and blocked by columns in words instead of symbols, with no legend.'
-      + ' Refused without --roadmap.',
-    type: 'boolean',
-    aliases: ['t'],
-  },
-  {
-    name: 'refresh',
-    description: 'With --roadmap, read the whole board again instead of only what changed since the listing kept'
-      + ' under .rafa/cache/. Refused without --roadmap.',
-    type: 'boolean',
-  },
-  {
-    name: 'state',
-    description: `Only issues in this state: one of ${ISSUE_STATES.join(', ')}. Refused on the github tracker`
-      + ' and beside --roadmap.',
-    type: 'string',
-  },
-  {
-    name: 'type',
-    description: `Only issues of this type: one of ${ISSUE_TYPES.join(', ')}.`,
-    type: 'string',
-  },
-  {
-    name: 'module',
-    description: 'Only issues of this module.',
-    type: 'string',
-  },
-  {
-    name: 'search',
-    description: 'Only issues whose title or body holds this text.',
-    type: 'string',
-  },
-  {
-    name: 'limit',
-    description: 'At most this many issues, a positive whole number. The limit of the tracker when left out,'
-      + ' and none under --roadmap.',
-    type: 'number',
-  },
-]);
-
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue list',
-    subject: 'issue',
-    action: 'list',
-    summary: 'list the issues on the tracker, or the Roadmap\'s lines in its order, narrowed by type, module or text',
-    description: 'Lists the issues on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
-      + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-      + ' Prints the tracker, then one row per issue: its id, state, type and title; under `--type=bug`, a header'
-      + ' and the columns id, state, module, action and summary, read back from each title. Each flag narrows the'
-      + ' list, and a flag left out narrows by nothing. The github tracker holds an issue open or closed, so'
-      + ' it refuses `--state`, and lists 30 issues unless `--limit` says otherwise. With `--roadmap` it lists'
-      + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the lowest-numbered open type:roadmap'
-      + ' board, else the open issue titled Roadmap) in its'
-      + ' order instead, read off the GitHub board, as a table adding four columns: spec, whether the issue'
-      + ' can be planned (every section of the spec template filled, and the spec:ready label on it), as a'
-      + ' symbol; blocked by, the blockers grouped by whether they are still open;'
-      + ' has, a plan, a branch or a pull request already made for it; and refs, how many references of the'
-      + ' issue\'s saved copy under `specs.dir` read suspect or dangling, `-` with no copy. A legend names each'
-      + ' symbol, `--texts` (`-t`) spells them in words, and `--labels` prints the labels on a row under each'
-      + ' issue. A Roadmap naming epics prints them alone, grouped by horizon under a `Roadmap #<n> · <horizon>`'
-      + ' heading with the columns #, state, done/total, blocked, date and title, the now horizon only unless'
-      + ' `--all`, with one line counting the lines naming no epic; `--full` prints each epic\'s issues under'
-      + ' its row, and the lines naming no epic as the table. The board listing is kept under .rafa/cache/ and'
-      + ' read for what changed since; `--refresh` reads the whole board again. `--check` exits 1 when any'
-      + ' type:epic issue\'s stored state'
-      + ' disagrees with its computed one. `--type`, `--module`, `--search` and `--limit` then narrow the spec rows, keeping their'
-      + ' order, and an unreachable board is warned about with the rows still printed. With `--output=json`'
-      + ' the tracker, the query and every issue, or under `--roadmap` the roadmap, the rows, the epics and the'
-      + ' warnings, are the data of the terminal result event.',
-    args: [],
-    flags: [...ISSUE_LIST_FLAGS],
-    examples: [
-      {
-        cmd: 'rafa issue list',
-        note: 'Lists the issues on the tracker the chain lands on, one row each.',
-      },
-      {
-        cmd: 'rafa issue list --type=bug --search=timeout',
-        note: 'Lists the bugs whose title or body holds the word timeout, in the columns id, state, module, action and summary.',
-      },
-      {
-        cmd: 'rafa issue list --limit=5 --output=json',
-        note: 'Writes a start event, then a result event whose data holds the tracker, the query and five issues at most.',
-      },
-      {
-        cmd: 'rafa issue list --roadmap',
-        note: 'Prints the Roadmap\'s unticked lines in its order, with the spec, blocked by, has and refs of each.',
-      },
-      {
-        cmd: 'rafa issue list --roadmap --full',
-        note: 'Prints the Roadmap\'s now epics with each epic\'s issues underneath, then its spec lines.',
-      },
-      {
-        cmd: 'rafa issue list --roadmap --check',
-        note: 'Prints the Roadmap, then exits 1 when an epic is open with its work done or closed with it not done.',
-      },
-      {
-        cmd: 'rafa issue list --roadmap --all --type=bug',
-        note: 'Prints the bugs on the Roadmap, ticked lines included, in the Roadmap\'s order, beside its epics of every horizon.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_LIST_DECLARATION,
     run: (context) => runIssueList(context, seams),
   };
   return Object.freeze(command);

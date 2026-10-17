@@ -34,8 +34,8 @@ import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
+import { ALLOW_LOCAL_CONFIG_FLAG } from './declarations.js';
 import {
-  ALLOW_LOCAL_CONFIG_FLAG,
   CONFIG_TRUST_REFUSE_EXIT,
   headRevision,
   readConfigDrift,

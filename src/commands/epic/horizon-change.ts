@@ -115,10 +115,8 @@ import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
+import { DEFER_TARGETS, PROMOTE_TARGETS, TO_FLAG } from './declarations.js';
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';
-
-/** The flag naming the horizon the epic moves to. */
-export const TO_FLAG = 'to';
 
 /** An issue number as a line types it: a whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -139,14 +137,14 @@ export interface HorizonAction {
 /** `rafa epic defer`'s action. */
 export const DEFER_ACTION: HorizonAction = Object.freeze({
   name: 'defer',
-  targets: Object.freeze(['next', 'later'] as const),
+  targets: DEFER_TARGETS,
   usage: 'rafa epic defer <n> --to=next|later [--reason="<why>"]',
 });
 
 /** `rafa epic promote`'s action. */
 export const PROMOTE_ACTION: HorizonAction = Object.freeze({
   name: 'promote',
-  targets: Object.freeze(['now', 'next'] as const),
+  targets: PROMOTE_TARGETS,
   usage: 'rafa epic promote <n> --to=now|next [--reason="<why>"]',
 });
 

@@ -231,6 +231,7 @@ function moduleUrl(relative: string): string {
 const DRIVER = `
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { registerCoreConfigSections } from ${JSON.stringify(moduleUrl('../config-registry.ts'))};
 import { setActiveOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output')))};
 import { sinkOutput } from ${JSON.stringify(moduleUrl('../tests/output-sinks.ts'))};
 import { openCheckoutExpectation } from ${JSON.stringify(moduleUrl('./checkout-watch.ts'))};
@@ -238,6 +239,7 @@ import { bindEventsFile } from ${JSON.stringify(moduleUrl('./loop-events.ts'))};
 import { loadRunConfig } from ${JSON.stringify(moduleUrl('./run-config.ts'))};
 import { runWrapUp } from ${JSON.stringify(moduleUrl('./wrap-up-run.ts'))};
 
+registerCoreConfigSections();
 const [repo, home, runId, branch, stub, infosFile, plan] = process.argv.slice(1);
 const settings = (await loadRunConfig({ root: repo, home }, [])).config;
 setActiveOutput(sinkOutput({ info: (line) => appendFileSync(infosFile, line + '\\n') }), 'events');

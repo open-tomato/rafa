@@ -361,14 +361,18 @@ function refuseLiveLoop(path: string, options: DevelopmentProbe, sessionId: stri
   );
 }
 
-/** The other store opened read-only, or a copy of it brought forward when it lacks migrations. */
-function openOther(otherPath: string, plan: SchemaUse, stamp: MergeStamp): OtherStore {
+/**
+ * The other store opened read-only, or a copy of it brought forward when it lacks migrations.
+ * The copy lives in a scratch folder made under `tempRoot`, which the caller reads from
+ * `options.tempDir ?? tmpdir()`.
+ */
+function openOther(otherPath: string, plan: SchemaUse, stamp: MergeStamp, tempRoot: string): OtherStore {
   const needs = writeNames(plan);
   if (needs.length === 0) {
     const db = new Database(otherPath, { readonly: true });
     return { db, broughtForward: [], release: () => db.close() };
   }
-  const dir = mkdtempSync(join(tmpdir(), 'rafa-merge-other-'));
+  const dir = mkdtempSync(join(tempRoot, 'rafa-merge-other-'));
   const release = (db?: Database): void => {
     db?.close();
     rmSync(dir, { recursive: true, force: true });
@@ -483,7 +487,7 @@ export function mergeStore(options: MergeOptions): MergeResult {
     now: options.now ?? ((): Date => new Date()),
   };
   const mergeId = (options.newMergeId ?? randomUUID)();
-  const other = openOther(otherPath, otherPlan, mergeStamp);
+  const other = openOther(otherPath, otherPlan, mergeStamp, options.tempDir ?? tmpdir());
   try {
     const { built, backupPath } = rebuildAside({
       path,

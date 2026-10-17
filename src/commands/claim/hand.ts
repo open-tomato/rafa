@@ -85,6 +85,7 @@ import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { CLAIM_HAND_DECLARATION, CLAIM_HAND_TO_FLAG, CLAIM_HAND_WITHDRAW_FLAG } from './declarations.js';
 import {
   findOwnedBranch,
   pushOnClaimTip,
@@ -98,12 +99,6 @@ const USAGE = 'rafa claim hand <n> --to=<store id> | rafa claim hand <n> --withd
 
 /** The command's name, as refusals open with it. */
 const COMMAND = 'rafa claim hand';
-
-/** The flag naming the receiving store. */
-const TO_FLAG = 'to';
-
-/** The flag taking a pending handover back. */
-const WITHDRAW_FLAG = 'withdraw';
 
 /** A store id as a claim record holds it: one run of non-blank characters. */
 const STORE_ID = /^\S+$/;
@@ -144,19 +139,19 @@ function lineRefusal(message: string): CommandExit {
 
 /** Whether the line says `--withdraw`; a refusal for a value typed to it. */
 function readWithdraw(flags: RafaContext['flags']): boolean {
-  const value = flags[WITHDRAW_FLAG];
+  const value = flags[CLAIM_HAND_WITHDRAW_FLAG];
   if (value === undefined) return false;
   if (typeof value === 'boolean') return value;
-  throw lineRefusal(`--${WITHDRAW_FLAG} takes no value, and read "${value}" as one; type the issue number before the flags`);
+  throw lineRefusal(`--${CLAIM_HAND_WITHDRAW_FLAG} takes no value, and read "${value}" as one; type the issue number before the flags`);
 }
 
 /** The store `--to` names, null when the line gives none; a refusal for one that is no store id. */
 function readTo(flags: RafaContext['flags']): string | null {
-  const value = flags[TO_FLAG];
+  const value = flags[CLAIM_HAND_TO_FLAG];
   if (value === undefined) return null;
-  if (typeof value === 'boolean') throw lineRefusal(`--${TO_FLAG} needs a store id, as --${TO_FLAG}=<store id>`);
+  if (typeof value === 'boolean') throw lineRefusal(`--${CLAIM_HAND_TO_FLAG} needs a store id, as --${CLAIM_HAND_TO_FLAG}=<store id>`);
   const to = value.trim();
-  if (!STORE_ID.test(to)) throw lineRefusal(`--${TO_FLAG}=${JSON.stringify(value)} is no store id, which is one word with no blank`);
+  if (!STORE_ID.test(to)) throw lineRefusal(`--${CLAIM_HAND_TO_FLAG}=${JSON.stringify(value)} is no store id, which is one word with no blank`);
   return to;
 }
 
@@ -165,10 +160,10 @@ export function readHandRequest(flags: RafaContext['flags']): HandRequest {
   const withdraw = readWithdraw(flags);
   const to = readTo(flags);
   if (withdraw && to !== null) {
-    throw lineRefusal(`--${TO_FLAG} and --${WITHDRAW_FLAG} are two actions; give one`);
+    throw lineRefusal(`--${CLAIM_HAND_TO_FLAG} and --${CLAIM_HAND_WITHDRAW_FLAG} are two actions; give one`);
   }
   if (withdraw) return { action: 'withdraw' };
-  if (to === null) throw lineRefusal(`name the receiving store with --${TO_FLAG}=<store id>, or take a pending handover back with --${WITHDRAW_FLAG}`);
+  if (to === null) throw lineRefusal(`name the receiving store with --${CLAIM_HAND_TO_FLAG}=<store id>, or take a pending handover back with --${CLAIM_HAND_WITHDRAW_FLAG}`);
   return { action: 'hand', to };
 }
 
@@ -204,7 +199,7 @@ export async function handClaim(context: RafaContext, makeSeams: ClaimSeamsFacto
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
   if (request.action === 'hand' && holdsClaim(device, request.to)) {
-    throw refuse(`--${TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
+    throw refuse(`--${CLAIM_HAND_TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
   }
   const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
   const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse, template), { issue, device }, refuse, HANDING);
@@ -237,49 +232,7 @@ const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
 /** The command, reaching git and the store through `makeSeams`; see the module note. */
 export function createClaimHandCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'claim hand',
-    subject: 'claim',
-    action: 'hand',
-    summary: 'offer this device\'s claim on an issue to another store, or withdraw the offer',
-    description: 'Pushes one handover commit naming the receiving store to the issue\'s claim branch on'
-      + ' origin, leased on the tip it read, so no other device\'s push is overwritten. This device stays'
-      + ' the owner until the receiver runs `rafa claim accept`, and until then `--withdraw` pushes a'
-      + ' withdraw commit that ends the offer. Refused when this device does not own the claim, for a'
-      + ' repeat handover to the same store, for a withdraw with no handover pending, when the branch'
-      + ' moved meanwhile, and when origin cannot be reached. No label and no local branch moves. With'
-      + ' `--output=json` the issue, the branch, the stores and the commit are the data of the terminal'
-      + ' result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number whose claim this device hands over.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: TO_FLAG,
-        description: 'The store id to offer the claim to: the receiving store\'s `store_meta.store_id`.',
-        type: 'string',
-      },
-      {
-        name: WITHDRAW_FLAG,
-        description: 'Take a pending handover back instead; this device keeps the claim.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa claim hand 324 --to=0b9c6f1e-4d2a-4c55-9a8e-2f7d1c3b5a60',
-        note: 'Offers the claim on #324 to that store; it becomes the owner once it accepts.',
-      },
-      {
-        cmd: 'rafa claim hand 324 --withdraw',
-        note: 'Takes the pending offer back before the receiver accepts it.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...CLAIM_HAND_DECLARATION,
     run: async (context) => {
       const result = await handClaim(context, makeSeams);
       if (context.outputMode === 'json') {

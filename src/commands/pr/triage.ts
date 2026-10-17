@@ -178,7 +178,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
-import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
+import { endWithNextStep } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
@@ -186,6 +186,7 @@ import { buildFollowUpPrompt } from '../../pr/triage/follow-up.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { selectTriagePullRequests } from '../../pr/triage/select.js';
 
+import { ALLOW_LOCAL_CONFIG_FLAG, DEFAULT_MAX_ATTEMPTS, PR_TRIAGE_DECLARATION } from './declarations.js';
 import {
   lineRefusal,
   onProvider,
@@ -194,7 +195,6 @@ import {
   readBooleanFlag,
   readPullArgument,
 } from './pr-context.js';
-import { ALLOW_LOCAL_CONFIG_FLAG } from './triage-config-trust.js';
 import { readTriageGuard, triageVerdict } from './triage-guard.js';
 import { readConflictFiles, readFailedLogs, readWorkflowCount } from './triage-read.js';
 import { evidenceOf, renderTriages, workflowCountOf } from './triage-report.js';
@@ -203,9 +203,6 @@ import { ghPermissionsIn, readTrustedTriageComment, repoLabel } from './triage-t
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.triage;
-
-/** How many `--resolve` runs a pull request gets when the line names no cap. */
-export const DEFAULT_MAX_ATTEMPTS = 2;
 
 /**
  * What `git rev-parse --abbrev-ref HEAD` writes at a detached HEAD,
@@ -624,92 +621,7 @@ export async function runTriage(context: RafaContext, seams: TriageSeams): Promi
 /** The command, reaching the provider, git, the branch and the clock through `seams`. */
 export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr triage',
-    subject: 'pr',
-    action: 'triage',
-    summary: 'assess a pull request: its class, the evidence, and a follow-up prompt',
-    description: 'Assesses one pull request in code — no session is started and no model is asked. It reads the pull'
-      + ' request, its checks, the failing job logs and, for a head that does not merge, the conflicting files from'
-      + ' `git merge-tree`, and classifies it as one of `green`, `pending`, `conflict-lockfile`, `conflict-manifest`,'
-      + ' `conflict-other`, `conflict-version` (the release guard read a stamped version), `ci-install`, `ci-lint`,'
-      + ' `ci-types`, `ci-test` or `ci-other`. It prints the class, the'
-      + ' evidence it was read from with the failing log capped at 40 lines, and a follow-up prompt carrying all of'
-      + ' it, so a session handed that prompt assesses nothing again. It leaves one triage comment per pull request'
-      + ' and edits that comment on every later assessment; a pull request whose head has not moved since it was'
-      + ' assessed is shown its stored triage and assessed again by nothing. Without a number it assesses the open'
-      + ' pull request of the branch checked out at the project root; with no pull request there it takes the red'
-      + ' ones, assessing one, or the two or three of them that moved in the last 72 hours, and listing more than'
-      + ' three with the command for each. With `--resolve` a pull request whose class is simple is handed to the'
-      + ' ordinary loop over the pinned plan for that class, in a worktree under `~/.rafa/worktrees/pr-<n>` removed'
-      + ' on success, each session capped at `pr.resolveBudget`; it waits on the checks after every attempt and, at'
-      + ' `--max-attempts` or on an attempt ending as the one before it, updates the comment, removes the worktree,'
-      + ' prints the follow-up prompt and exits 3. A `conflict-version` pull request is not handed to the loop:'
-      + ' `--resolve` converts it in code, with no session and no attempt spent, turning the stamped changelog section'
-      + ' into a release fragment and setting the version file and the changelog back to the merge base\'s in one'
-      + ' commit it pushes to the branch, and exits 3 when the conversion or the push is refused.'
-      + ' It reads the triage comment only from an author holding write'
-      + ' access to the repository or listed in `board.trustedAuthors`, and ignores and reports one written by'
-      + ' anybody else. A cross-repository pull request, more than one candidate, and under `--resolve` a pull'
-      + ' request whose author is neither trusted nor a known dependency-bump bot, are refused with exit code 2;'
-      + ' under `--resolve` a head carrying a `rafa.config.ts` or `rafa.config.mjs` that `origin/<base>` does not hold'
-      + ' as the same file is refused with exit code 1 unless `--allow-local-config` is passed. With `--output=json` the selection, every'
-      + ' reading, what `--resolve` came to and the rendered text are the data of the terminal result event.'
-      + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [
-      {
-        name: 'n',
-        description: 'The pull request number. The open pull request of the current branch when it is left out.',
-        type: 'number',
-      },
-    ],
-    flags: [
-      {
-        name: 'comment',
-        description: 'Leave the triage as a comment on the pull request; `--no-comment` reads one and writes none.',
-        type: 'boolean',
-        default: true,
-      },
-      {
-        name: 'resolve',
-        description: 'Run the pinned plan for a simple class in a worktree of its own, waiting on CI after each'
-          + ' attempt, or convert a `conflict-version` stamp into a release fragment with no session. Exits 3 when'
-          + ' the attempt guard gives up or the conversion is refused.',
-        type: 'boolean',
-      },
-      {
-        name: ALLOW_LOCAL_CONFIG_FLAG,
-        description: 'Under `--resolve`, run a head whose `rafa.config.ts` or `rafa.config.mjs` `origin/<base>` does'
-          + ' not hold as the same file, printing one warning line; without it such a head is refused with exit 1.',
-        type: 'boolean',
-      },
-      {
-        name: 'max-attempts',
-        description: 'How many resolve runs a pull request gets. An assessment spends none and reports the count.',
-        type: 'number',
-        default: DEFAULT_MAX_ATTEMPTS,
-      },
-      HINT_FLAG_SPEC,
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr triage',
-        note: 'Assesses the open pull request of the branch checked out at the project root, or the red ones.',
-      },
-      {
-        cmd: 'rafa pr triage 41 --no-comment',
-        note: 'Assesses pull request 41 and writes nothing to it, reading the triage comment already there.',
-      },
-      {
-        cmd: 'rafa pr triage 41 --output=json',
-        note: 'Writes a result event holding the class, the evidence and the follow-up prompt.',
-      },
-      {
-        cmd: 'rafa pr triage 41 --resolve --max-attempts=3',
-        note: 'Runs the pinned plan for a simple class in ~/.rafa/worktrees/pr-41, up to three attempts.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    spends: { when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' },
+    ...PR_TRIAGE_DECLARATION,
     run: async (context) => {
       const triaged = await runTriage(context, seams);
       if (context.outputMode === 'json') {

@@ -179,9 +179,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
 
-import { lazyPrompter } from '../commands/issue/ready.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 

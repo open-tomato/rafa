@@ -293,6 +293,11 @@ const PROJECT_TEXT = [
   '  contract: ["project/**/*.pact.ts"]',
   '  alwaysRun: ["project/**/*.sweep.ts"]',
   '  retakeRedAlone: false',
+  'features:',
+  '  board: false',
+  '  pr: false',
+  '  run: false',
+  '  release: false',
   '',
 ].join('\n');
 
@@ -410,6 +415,10 @@ const PROJECT_VALUES: RafaConfig = {
   testsContract: ['project/**/*.pact.ts'],
   testsAlwaysRun: ['project/**/*.sweep.ts'],
   testsRetakeRedAlone: false,
+  featuresBoard: false,
+  featuresPr: false,
+  featuresRun: false,
+  featuresRelease: false,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -553,6 +562,11 @@ const USER_TEXT = [
   '  contract: ["user/**/*.pact.ts"]',
   '  alwaysRun: []',
   '  retakeRedAlone: true',
+  'features:',
+  '  board: true',
+  '  pr: true',
+  '  run: true',
+  '  release: true',
   '',
 ].join('\n');
 
@@ -656,6 +670,10 @@ const USER_VALUES: RafaConfig = {
   testsContract: ['user/**/*.pact.ts'],
   testsAlwaysRun: [],
   testsRetakeRedAlone: true,
+  featuresBoard: true,
+  featuresPr: true,
+  featuresRun: true,
+  featuresRelease: true,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -1215,6 +1233,26 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: "false"',
     'tests.retakeRedAlone is "false", expected true or false',
     'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+  ],
+  [
+    'features.board', 'features:\n  board: 0',
+    'features.board is 0, expected true or false',
+    'features:\n  board: false', 'featuresBoard', false,
+  ],
+  [
+    'features.pr', 'features:\n  pr: "false"',
+    'features.pr is "false", expected true or false',
+    'features:\n  pr: false', 'featuresPr', false,
+  ],
+  [
+    'features.run', 'features:\n  run: off',
+    'features.run is "off", expected true or false',
+    'features:\n  run: false', 'featuresRun', false,
+  ],
+  [
+    'features.release', 'features:\n  release: 1',
+    'features.release is 1, expected true or false',
+    'features:\n  release: false', 'featuresRelease', false,
   ],
 ];
 

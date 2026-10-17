@@ -44,6 +44,7 @@ import { readTags } from '../../release/status-readings.js';
 import { readManifestName } from '../../release/version.js';
 import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { RELEASE_LIST_DECLARATION } from './declarations.js';
 import { readWaiting, waitingSettingsOf } from './status-fragments.js';
 import { packagesLines, readPackages } from './status-packages.js';
 import { DEFAULT_RELEASE_SEAMS, readVersionFile, UNREADABLE } from './status.js';
@@ -178,26 +179,7 @@ export async function runList(
 /** The command, reaching git through `seams`; see the module note. */
 export function createReleaseListCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'release list',
-    subject: 'release',
-    action: 'list',
-    summary: 'list the root and each publishable workspace package with its version, waiting fragments and newest tag',
-    description: 'Writes one row per unit that releases on its own and writes nothing else: the root first,'
-      + ' named by the `name` of `release.versionFile`, then each workspace package that is not `private`.'
-      + ' Each row holds the version its file declares, how many change fragments waiting on'
-      + ' `origin/<pr.base>` as last fetched name it, and its newest release tag: `v<version>` for the root,'
-      + ' `<name>@<version>` for a package, or `untagged`. A column that could not be read is `?`, with the'
-      + ' reason on a line under the rows, and the command still exits 0. With `--output=json` the rows and'
-      + ' the rendered lines are the data of the terminal result event.',
-    args: [],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa release list',
-        note: 'Lists the root and each publishable package with its version, waiting fragments and newest tag.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_LIST_DECLARATION,
     run: async (context) => {
       const list = await runList(context, seams);
       if (context.outputMode === 'json') {

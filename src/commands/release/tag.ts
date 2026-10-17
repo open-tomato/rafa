@@ -218,6 +218,7 @@ import { pushTag, trackedRemote } from '../../release/tag-push.js';
 import { packageTag, versionTag } from '../../release/version-tag.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
+import { RELEASE_TAG_DECLARATION, RELEASE_TAG_PUSH_FLAG } from './declarations.js';
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
@@ -231,9 +232,6 @@ import {
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
-
-/** The flag that pushes the tag once it is written; see the module note. */
-export const PUSH_FLAG = 'push';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
@@ -688,7 +686,7 @@ export function renderTagged(units: readonly ReleaseTagUnit[], branch: string): 
  */
 export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): Promise<ReleaseTagResult> {
   expectNoArgument(context.args, RELEASE_TAG_USAGE);
-  const push = readSwitch(PUSH_FLAG, context.flags[PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
+  const push = readSwitch(RELEASE_TAG_PUSH_FLAG, context.flags[RELEASE_TAG_PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
   const project = projectOf(context);
   const config = await tagConfig(project, (message: string) => {
     context.output.warn(message);
@@ -722,56 +720,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
 /** The command, reaching git through `seams`; see the module note. */
 export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'release tag',
-    subject: 'release',
-    action: 'tag',
-    summary: 'tag the commit that set the version both release files agree on',
-    description: 'Writes `v<version>` on the release branch — `pr.base`, or `main` — when the'
-      + ' version `release.versionFile` declares is the one the newest section of `release.changelog` names,'
-      + ' and `<name>@<version>` for each workspace package that is not private when the version'
-      + ' `<dir>/package.json` declares is the one the newest section of `<dir>/CHANGELOG.md` names.'
-      + ' Each tag goes on the commit that set its version: HEAD, or, where later commits landed on the'
-      + ' branch, the earlier commit, with a warning naming how many commits HEAD is past it.'
-      + ' A unit whose version a tag already names is skipped. Every unit is decided before the first tag'
-      + ' is written, and the run writes nothing when another branch is checked out, when every unit is'
-      + ' skipped, or when any unit\'s two files disagree, its version\'s changelog section carries no'
-      + ' `<!-- rafa:fragments -->` receipt and is above the newest version released before settle,'
-      + ' no commit holds its version yet, or its version file, the tag list or the history could not be'
-      + ' read. After the tags it prints what to run next: per tag, the push that puts it on the remote'
-      + ' and the publish line for the registry its manifest configures, with the command'
-      + ' `release.publishCommand` names (`npm publish` by default), run in the package\'s folder for a'
-      + ' package and spelled to publish from the tag when HEAD is past it, which it does not run. Under'
-      + ' `release.publish: ci` a unit\'s publish line is replaced by one sentence saying the pushed tag'
-      + ' publishes through `.github/workflows/release-publish.yml`, and json carries `publish: "ci"` on'
-      + ' that unit. With'
-      + ' `--push` it pushes each tag itself to the remote the release branch tracks (`origin` when it'
-      + ' tracks none) and drops its push line; a push that fails exits 1 with what git said and keeps'
-      + ' the local tags. With `--output=json` the readings, the decisions, the follow-ups and the pushes'
-      + ' of every unit are the data of the terminal result event.',
-    args: [],
-    flags: [
-      {
-        name: PUSH_FLAG,
-        description: 'Push each tag to the remote the release branch tracks once every tag is written; a'
-          + ' push that fails exits 1 and keeps the local tags.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release tag',
-        note: 'Tags the merged release of every unit and prints the push and publish lines to run next.',
-      },
-      {
-        cmd: 'rafa release tag --push',
-        note: 'Tags the merged release of every unit, pushes the tags, and prints the publish lines to run next.',
-      },
-      {
-        cmd: 'rafa release tag --output=json',
-        note: 'Writes the same tags and gives every unit\'s readings, decision and follow-ups as a result event.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_TAG_DECLARATION,
     run: async (context) => {
       const result = await runTag(context, seams);
       for (const unit of result.units) {

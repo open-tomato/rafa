@@ -112,6 +112,7 @@ import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { CLAIM_TAKE_DECLARATION, CLAIM_TAKE_STALE_FLAG } from './declarations.js';
 import { pushOnClaimTip, readClaimDevice, readIssueArgument, readIssueBranches } from './release.js';
 
 /** The usage line a refusal names. */
@@ -119,9 +120,6 @@ const USAGE = 'rafa claim take <n> [--stale]';
 
 /** The command's name, as refusals open with it. */
 const COMMAND = 'rafa claim take';
-
-/** The flag that widens a takeover to a claim in development. */
-const STALE_FLAG = 'stale';
 
 /** How this command's refusals word a takeover. */
 const TAKING: ClaimDoing = { during: 'was being taken over', nothing: 'nothing was taken' };
@@ -188,10 +186,10 @@ function refuse(message: string): CommandExit {
 
 /** Whether the line says `--stale`; a refusal for a value typed to it. */
 export function readStaleFlag(flags: RafaContext['flags']): boolean {
-  const value = flags[STALE_FLAG];
+  const value = flags[CLAIM_TAKE_STALE_FLAG];
   if (value === undefined) return false;
   if (typeof value === 'boolean') return value;
-  throw refuse(`--${STALE_FLAG} takes no value, and read "${value}" as one; type the issue number before the flags\nUsage: ${USAGE}`);
+  throw refuse(`--${CLAIM_TAKE_STALE_FLAG} takes no value, and read "${value}" as one; type the issue number before the flags\nUsage: ${USAGE}`);
 }
 
 /** The labels' note a refusal of an in-development reading carries, or the empty string. */
@@ -233,7 +231,7 @@ function weighedTake(branch: string, idleMs: number, state: ClaimState, weights:
   return {
     state: 'refused',
     reason: `${issue} is claimed by store ${state.owner} on ${branch}, idle ${idleText(state.idleMs)} and stale, but in development${labelNote(weights)},`
-      + ` which is never taken over without --${STALE_FLAG}; run rafa claim take ${String(weights.issue)} --${STALE_FLAG} to take it`,
+      + ` which is never taken over without --${CLAIM_TAKE_STALE_FLAG}; run rafa claim take ${String(weights.issue)} --${CLAIM_TAKE_STALE_FLAG} to take it`,
   };
 }
 
@@ -349,43 +347,7 @@ const DEFAULT_SEAMS: ClaimTakeSeamsFactory = (root, config) => {
 /** The command, reaching git, the board, the store and the clock through `makeSeams`; see the module note. */
 export function createClaimTakeCommand(makeSeams: ClaimTakeSeamsFactory = DEFAULT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'claim take',
-    subject: 'claim',
-    action: 'take',
-    summary: 'take over another device\'s stale claim on an issue',
-    description: 'Pushes one take commit naming this device\'s store to the issue\'s claim branch on'
-      + ' origin, leased on the tip it read, so this device owns the claim from then on and an owner'
-      + ' that pushed meanwhile is never overwritten. Refused while the claim has stood less than'
-      + ' `claims.staleAfter`, whenever that is `disabled`, and for a stale claim in development'
-      + ' (`rafa:in-development`, or labels that cannot be read) unless `--stale` is given. A released'
-      + ' claim is taken as it is. No label and no local branch moves. With `--output=json` the issue,'
-      + ' the branch, the stores and the take commit are the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number whose claim this device takes over.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: STALE_FLAG,
-        description: 'Also take a stale claim in development, which is never taken over without it.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa claim take 324',
-        note: 'Takes over the claim on #324 once it has stood claims.staleAfter at rafa:claimed.',
-      },
-      {
-        cmd: 'rafa claim take 324 --stale',
-        note: 'Takes over a stale claim whose loop was started, at rafa:in-development.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...CLAIM_TAKE_DECLARATION,
     run: async (context) => {
       const result = await takeClaim(context, makeSeams);
       if (context.outputMode === 'json') {

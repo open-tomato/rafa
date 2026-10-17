@@ -127,7 +127,7 @@ export const SOURCE_ROOT = 'src/';
 export const PACKAGE_PREFIX = '@open-tomato/rafa/';
 
 /** The file whose two constants step 8 flips. */
-export const CORE_MOVES_FILE = 'scripts/survey/core-moves.ts';
+export const CORE_LOCATION_FILE = 'scripts/survey/core-moves.ts';
 
 /** The cluster map whose keys step 7 renames. */
 export const CLUSTER_MAP_FILE = 'docs/survey/cluster-map.json';
@@ -136,7 +136,7 @@ export const CLUSTER_MAP_FILE = 'docs/survey/cluster-map.json';
 export const PROSE_ROOTS: readonly string[] = ['context/', 'packages/', 'scripts/', 'src/'];
 
 /** The files whose core paths the move task rewrites by hand, read by no step 7. */
-export const LEFT_TO_HAND: readonly string[] = [CORE_MOVES_FILE, 'scripts/survey/cut-table.ts'];
+export const LEFT_TO_HAND: readonly string[] = [CORE_LOCATION_FILE, 'scripts/survey/cut-table.ts'];
 
 /**
  * What the codemod's own files open with. Step 7 leaves them: they spell
@@ -608,7 +608,7 @@ export function planCorePackage(input: CorePackageInput): CorePackagePlan {
         edits.push(...found);
         if (found.length > 0) mentions.push({ count: found.length, file });
       }
-      if (file === CORE_MOVES_FILE) {
+      if (file === CORE_LOCATION_FILE) {
         const flip = flipEdits(source);
         edits.push(...flip.edits);
         flipped = flip.flipped;
@@ -642,7 +642,7 @@ export function planCorePackage(input: CorePackageInput): CorePackagePlan {
     if (renamed.text !== clusterText) writes.set(CLUSTER_MAP_FILE, renamed.text);
   }
   if (flipped.length !== 2) {
-    refusals.push({ file: CORE_MOVES_FILE, line: 1, text: 'holds no CORE_FOLDERS and CORE_NAMED_FILES to flip' });
+    refusals.push({ file: CORE_LOCATION_FILE, line: 1, text: 'holds no CORE_FOLDERS and CORE_NAMED_FILES to flip' });
   }
   const entries = BUILD_ENTRIES.filter((entry) => moved.has(entry.path));
   for (const entry of entries) writes.set(entry.path, buildEntryText(entry));

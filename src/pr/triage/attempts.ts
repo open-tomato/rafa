@@ -77,7 +77,7 @@
  *
  * The cap itself is the command's: `--max-attempts` is parsed and
  * defaulted in `src/commands/pr/triage.ts`, whose `DEFAULT_MAX_ATTEMPTS`
- * is the one spelling of 2. This module takes the cap already read and
+ * (`src/commands/pr/declarations.ts`) is the one spelling of 2. This module takes the cap already read and
  * refuses a value that is not a positive whole number, rather than
  * clamping it: a cap of 0 would mean a `--resolve` that never runs
  * anything and reported a stop as though work had been tried.

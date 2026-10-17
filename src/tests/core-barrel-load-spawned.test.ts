@@ -14,7 +14,8 @@ import { expectExit } from './cli-capture.js';
  * A barrel that closes a runtime cycle fails with a `ReferenceError` in one
  * import order only, so a green `tsc` proves nothing. Each case here loads
  * one file first in a fresh `bun` process, then the registry
- * (`src/config-registry.ts`), which registers the sections with core, and
+ * (`src/config-registry.ts`), whose `registerCoreConfigSections` it calls
+ * to register the sections with core, and
  * reads a setting both off the registry's `SETTINGS` and off the specs the
  * core barrel's `activeSettings()` answers.
  *
@@ -45,7 +46,8 @@ const SECTION_FILES = readdirSync(SRC)
 const CHILD = `
 const [first, registry, barrel] = process.argv.slice(1);
 const loaded = await import(first);
-const { SETTINGS } = await import(registry);
+const { registerCoreConfigSections, SETTINGS } = await import(registry);
+registerCoreConfigSections();
 const config = await import(barrel);
 const active = config.activeSettings();
 const records = Object.entries(loaded)

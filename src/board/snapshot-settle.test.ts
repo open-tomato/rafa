@@ -6,7 +6,7 @@
  *
  * No process and no terminal. The offer is a scripted function that
  * records what it was handed, and the ended input is driven through
- * `lazyPrompter` (`src/commands/issue/ready.ts`) over a prompter whose
+ * `lazyPrompter` (`packages/rafa/src/core/command/confirm.ts`) over a prompter whose
  * input has ended — the composition `src/commands/plan/refresh-offer.ts`
  * is built on — so the `false` it reaches this module as is the real
  * one. Every file is written under a fresh temporary root per case, with
@@ -57,9 +57,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
 
-import { lazyPrompter } from '../commands/issue/ready.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

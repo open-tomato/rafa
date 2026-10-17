@@ -70,7 +70,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { renderCloseComment } from '../board/epic-trail.js';
 import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT } from '../board/roadmap-board.js';
-import { ACCEPT_UNCHECKED_FLAG, EPIC_CLOSE_REFUSAL_EXIT } from '../commands/epic/close.js';
+import { EPIC_CLOSE_REFUSAL_EXIT } from '../commands/epic/close.js';
+import { ACCEPT_UNCHECKED_FLAG } from '../commands/epic/declarations.js';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '../effort/epic-cost.js';
 import { VERIFY_PROMPT_PREFIX } from '../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX } from '../epic/verify-run.js';

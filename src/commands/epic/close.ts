@@ -160,13 +160,11 @@ import { readSwitch } from '../plan/plan-files.js';
 
 import { isDocsOnlyCriterion } from './close-docs.js';
 import { fileFailures } from './close-triage.js';
+import { ACCEPT_UNCHECKED_FLAG, EPIC_CLOSE_DECLARATION } from './declarations.js';
 import { closeTarget, refreshProjectAfterEpic } from './epic-project.js';
 
 /** The exit code every refusal of the gate ends the command with. */
 export const EPIC_CLOSE_REFUSAL_EXIT = 2;
-
-/** The flag that closes over criteria the plan could not turn into checks. */
-export const ACCEPT_UNCHECKED_FLAG = 'accept-unchecked';
 
 /** The only tools the planning session is given: it reads, and runs nothing. */
 export const PLAN_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob'];
@@ -574,45 +572,7 @@ export async function runEpicClose(context: RafaContext, seams: EpicCloseSeams):
 /** The command, reaching `gh`, `git`, Claude, the store and the tracker chain through `seams`; see the module note. */
 export function createEpicCloseCommand(seams: EpicCloseSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic close',
-    subject: 'epic',
-    action: 'close',
-    summary: 'close an epic through the gate: every member closed, then its criteria checked against main',
-    description: 'Refuses with exit code 2, naming them, while any member of the epic is open. Then one session'
-      + ' plans a check for each acceptance criterion, or names it uncheckable with a reason, and each check runs'
-      + ' as its own session in a detached worktree of origin/main. Any uncheckable criterion refuses the close'
-      + ` before a check runs, unless --${ACCEPT_UNCHECKED_FLAG} is passed; each failed check is filed as a bug, or`
-      + ' added as a line to the release\'s stale-docs issue when its criterion names only documentation, and'
-      + ' refuses the close. Otherwise the epic is closed as completed with a comment naming each criterion, and'
-      + ' what its members cost, summed from the effort store, is printed beside its estimate. With'
-      + ' `--output=json` the close is the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The epic\'s issue number.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: ACCEPT_UNCHECKED_FLAG,
-        description: 'Close over the criteria the verification plan could not turn into checks, naming each in the comment.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic close 40',
-        note: 'Checks #40\'s criteria against origin/main and closes it when every check passes.',
-      },
-      {
-        cmd: `rafa epic close 40 --${ACCEPT_UNCHECKED_FLAG}`,
-        note: 'The same, closing over any criterion that could not be turned into a check.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    spends: { when: 'always', what: 'one verification planning session and one session per check' },
+    ...EPIC_CLOSE_DECLARATION,
     run: (context) => runEpicClose(context, seams),
   };
   return Object.freeze(command);

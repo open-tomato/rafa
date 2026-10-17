@@ -76,7 +76,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { commandSpelling } from '@open-tomato/rafa/core/command';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
+import { CORE_REGISTRY, createRosterRegistry, ROSTER_SUBJECTS } from '../commands/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -265,8 +265,8 @@ describe('the frozen help snapshots', () => {
 
   it('differs from the root snapshot once one command leaves the roster, so the comparison can fail', () => {
     const lessDescribe = createCommandRegistry({
-      subjects: CORE_SUBJECTS,
-      commands: CORE_COMMANDS.filter((held) => commandSpelling(held) !== 'describe'),
+      subjects: ROSTER_SUBJECTS,
+      commands: CORE_REGISTRY.commands({ includeHidden: true }).filter((held) => commandSpelling(held) !== 'describe'),
     });
     const snapshot = readSnapshot('rafa.txt');
 
@@ -330,6 +330,24 @@ describe('the root help', () => {
     const bare = createCommandRegistry({ subjects: [{ name: 'loop', summary: 'the loop' }], commands: [command('loop', 'start')] });
 
     expect(headingsOf(helpFor(bare, ''))).toEqual(['Usage:', 'Quick start:', 'Subjects:', 'Global flags:']);
+  });
+});
+
+describe('the root help of a roster with a feature turned off', () => {
+  const text = helpFor(createRosterRegistry({ off: ['pr'] }), '');
+
+  it('lists no pr subject', () => {
+    const subjects = blockOf(text, 'Subjects').map((line) => line.trim().split(/\s+/)[0]);
+
+    expect(subjects).not.toContain('pr');
+    expect(subjects).toContain('plan');
+  });
+
+  it('has no rafa pr quick-start line', () => {
+    const quickStart = blockOf(text, 'Quick start');
+
+    expect(quickStart.filter((line) => line.startsWith('  rafa pr '))).toEqual([]);
+    expect(quickStart).toContain('  rafa plan create --spec=.rafa/specs/my-feature.md');
   });
 });
 
