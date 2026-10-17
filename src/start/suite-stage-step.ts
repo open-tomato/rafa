@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
-import { stageStepScope } from '../suite/scope.js';
+import { resolveChecks } from '../suite/checks.js';
 
 import { takeRetakes } from './suite-retake-alone.js';
 import {
@@ -44,6 +44,9 @@ type StageRun =
   | { readonly scope: 'paths'; readonly paths: readonly string[] }
   | { readonly scope: 'affected'; readonly since: string };
 
+/** The entry a stage step resolves, today's: the touched `Owns:` folders' files and the integration tier. */
+const STAGE_ENTRY = ['related', 'integration'] as const;
+
 /** The commit a stage's diff is taken from: the last stage step's, else the baseline's. */
 function stageSince(trackerPath: string, baseline: SuiteBaseline | null): string | null {
   const taken = readStageLedger(stageLedgerPathFor(trackerPath)).filter((entry) => entry.commit !== null);
@@ -62,15 +65,22 @@ async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSe
   if (since === null) return { run: { scope: 'full' }, diff: null };
   const diff = readDiff(seams.git, since);
   if (diff === null) return { run: { scope: 'full' }, diff };
-  const scope = stageStepScope({
+  const checks = resolveChecks({
+    names: STAGE_ENTRY,
+    declared: null,
     diff,
     owns: await context.owns(),
-    integration: context.settings.testsIntegration,
     testFiles: seams.listTestFiles(context.checkout),
+    preload: [],
+    fullSuiteTriggers: [],
+    contract: [],
+    integration: context.settings.testsIntegration,
   });
-  return scope.scope === 'affected'
-    ? { run: { scope: 'affected', since }, diff }
-    : { run: { scope: 'paths', paths: scope.paths }, diff };
+  // A `related` falling back without `Owns:` folders answers
+  // `affectedToo`: the stage then runs the fallback alone, as it did.
+  return checks.kind === 'paths' && !checks.affectedToo
+    ? { run: { scope: 'paths', paths: checks.paths }, diff }
+    : { run: { scope: 'affected', since }, diff };
 }
 
 /** The runs `run` asks for: the fallback joins the `tests.alwaysRun` files as a second run, the others none. */

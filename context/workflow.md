@@ -203,8 +203,9 @@ gate later anyway.
 **Runner recorded steps** run at fixed points in the loop to establish
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
-- `task` — the scope `taskStepScope` answers over the task's diff, after each
-  task's session ends and commits (`tests=`, below)
+- `task` — the run `resolveChecks` (`src/suite/checks.ts`) answers for
+  `[affected]` over the task's diff, after each task's session ends and
+  commits (`tests=`, below)
 - `stage` — After a stage's last task: the tests under `Owns:` folders
   changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
   files when the plan has no `Owns:` folder (reason `fallback`)

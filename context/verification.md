@@ -76,7 +76,7 @@ directory, so a changed package file belongs in the scoped
 **Runner recorded steps** (recorded at fixed points, each with its scope):
 - `baseline` — Full suite once at plan start (first dispatch); a run that
   failed outside any test case halts the run and is not written
-- `task` — Scope from `taskStepScope` over the task's diff after
+- `task` — Scope from `resolveChecks` over the task's diff after
   each task's session ends and commits
 - `stage` — After a stage's last task: the tests under the `Owns:`
   folders it changed, or `bun test --changed=<since>` with the

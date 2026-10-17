@@ -18,8 +18,8 @@
  * | Step | Runs | Blocks |
  * |---|---|---|
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
- * | task ({@link runTaskStep}) | `taskStepScope` (`suite/scope.ts`) over the task's diff | a repair task it inserts, or the repair it followed |
- * | stage ({@link runStageStep}) | `stageStepScope` over the stage's diff | a repair task it inserts |
+ * | task ({@link runTaskStep}) | `resolveChecks` (`suite/checks.ts`) of `[affected]` over the task's diff | a repair task it inserts, or the repair it followed |
+ * | stage ({@link runStageStep}) | `resolveChecks` of `[related, integration]` over the stage's diff | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
  *
  * **The baseline** is read from `SUITE_BASELINE-<stub>.json` beside the
@@ -36,10 +36,11 @@
  * stored baseline of that shape is recorded again, with a line saying
  * so (`suite-outside-case.ts` holds the lines and their account).
  *
- * **A task step** runs the scope `taskStepScope` answers from the task
- * line's `tests=` value and the diff from the task's base commit to
- * HEAD: `full` with no paths, `module` over its test files, `affected`
- * as `bun test --changed=<base>`. The plan's `Owns:` folders and the
+ * **A task step** runs what `resolveChecks` answers for the entry
+ * `[affected]` from the task line's `tests=` value and the diff from the
+ * task's base commit to HEAD: `full` with no paths, a path list
+ * (recorded as `module`) over its test files, `affected` as `bun test
+ * --changed=<base>`. The plan's `Owns:` folders and the
  * project's test files are read only for a `tests=module` line, the one
  * answer that needs them. A diff git will not answer runs the full
  * suite, the scope that can miss nothing. A `module` or `affected` step
@@ -63,13 +64,15 @@
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
- * baseline's commit, to HEAD. Without `Owns:` folders `stageStepScope`
- * answers `affected`, reason `fallback`, run as `bun test
+ * baseline's commit, to HEAD. It resolves the entry `[related,
+ * integration]` through `resolveChecks`. Without `Owns:` folders its
+ * `related` falls back to `affected`, reason `fallback`, and the stage
+ * runs that alone, as `bun test
  * --changed=<since>` from that same commit, with the `tests.alwaysRun`
  * files joined as a task step's `affected` run joins them: a second run,
  * its JUnit file {@link alwaysRunJunitFileFor} of `stage`, folded into
  * the first before the step is settled and recorded as `affected`. With
- * `Owns:` folders it answers the test files under the folders the diff
+ * `Owns:` folders it runs the test files under the folders the diff
  * touched plus the integration tier, and no always-run run is added. An
  * empty list runs nothing and records no step, since a step's command
  * is never empty. With neither commit, or a diff git will not answer,
@@ -78,7 +81,7 @@
  * **The recorded reason.** A task or stage step's {@link SessionStep}
  * carries `reason` beside `scope`, so a fallback reads apart from a wide
  * change. A task step records its scope's own reason (`declared`,
- * `trigger`, `fallback` or `no-module-tests`, `suite/scope.ts`), and
+ * `trigger`, `fallback` or `no-module-tests`, `suite/checks.ts`), and
  * `declared` for a `module` answer, which only its own `tests=module`
  * line reaches. A stage step records `fallback` for its `--changed` run
  * without `Owns:` folders and `stage` for its `Owns:` path list. A step
@@ -259,8 +262,9 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
+import type { CheckRun } from '../suite/checks.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
-import type { PreloadReading, TaskStepScope } from '../suite/scope.js';
+import type { PreloadReading } from '../suite/scope.js';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
 import type { TestScope } from '@open-tomato/rafa/core/plan';
 
@@ -282,13 +286,10 @@ import {
   splitFailures,
   writeBaseline,
 } from '../suite/baseline.js';
+import { resolveChecks } from '../suite/checks.js';
 import { readPlanOwns } from '../suite/owns.js';
 import { runSuite } from '../suite/run.js';
-import {
-  listTestFiles,
-  readPreloadFiles,
-  taskStepScope,
-} from '../suite/scope.js';
+import { listTestFiles, readPreloadFiles } from '../suite/scope.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
@@ -793,23 +794,34 @@ export interface StepRuns {
   readonly timed: readonly string[];
 }
 
-/** The runs a task scope asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
-function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): StepRuns {
-  if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [], timed: [] };
-  if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
-  return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
+/** The entry a task step resolves, today's `affected`; the line's `tests=` value narrows or widens it. */
+const TASK_ENTRY = ['affected'] as const;
+
+/** The runs a task's check run asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
+function taskNarrowing(run: CheckRun, base: string, alwaysRun: readonly string[]): StepRuns {
+  if (run.kind === 'paths') return { narrowing: { paths: withAlwaysRun(run.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
+  if (run.kind === 'affected') return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
+  return { narrowing: {}, alwaysRun: [], timed: [] };
+}
+
+/** The scope the run record holds for a task's check run: `module` for its path list, which only a `tests=module` line reaches. */
+function taskRecordedScope(run: CheckRun | null): TestScope {
+  if (run === null || run.kind === 'full' || run.kind === 'none') return 'full';
+  return run.kind === 'paths'
+    ? 'module'
+    : 'affected';
 }
 
 /**
- * The reason the run record holds for a task scope: the scope's own, or
- * `declared` for a `module` answer, which only a `tests=module` line
+ * The reason the run record holds for a task's check run: the run's own,
+ * or `declared` for a path list, which only a `tests=module` line
  * reaches; none for a diff that did not read. See the module note.
  */
-function taskStepReason(scope: TaskStepScope | null): SessionStepReason | undefined {
-  if (scope === null) return undefined;
-  return scope.scope === 'module'
+function taskStepReason(run: CheckRun | null): SessionStepReason | undefined {
+  if (run === null || run.kind === 'none') return undefined;
+  return run.kind === 'paths'
     ? 'declared'
-    : scope.reason;
+    : run.reason;
 }
 
 /** The preload files, with a warning when `bunfig.toml` does not read. */
@@ -819,20 +831,24 @@ function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): 
   return reading.files;
 }
 
-/** The task step's scope over `diff`, the task's own, or null when that did not read. */
-async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<TaskStepScope | null> {
+/** The task step's check run over `diff`, the task's own, or null when that did not read. */
+async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<CheckRun | null> {
   if (diff === null) return null;
   const moduleLine = input.declared === 'module';
-  return taskStepScope({
+  return resolveChecks({
+    names: TASK_ENTRY,
     declared: input.declared,
     diff,
-    triggers: { globs: context.settings.testsFullSuiteTriggers, preload: preloadOf(context, seams) },
     owns: moduleLine
       ? await context.owns()
       : null,
     testFiles: moduleLine
       ? seams.listTestFiles(context.checkout)
       : [],
+    preload: preloadOf(context, seams),
+    fullSuiteTriggers: context.settings.testsFullSuiteTriggers,
+    contract: [],
+    integration: [],
   });
 }
 
@@ -863,10 +879,10 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const seams = seamsOf(context);
   const diff = readDiff(seams.git, input.base);
   const scope = await taskScopeOf(context, seams, input, diff);
-  const runs = scope === null || scope.scope === 'full'
+  const runs = scope === null || scope.kind === 'full' || scope.kind === 'none'
     ? { narrowing: {}, alwaysRun: [], timed: [] }
     : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
-  const recorded = scope?.scope ?? 'full';
+  const recorded = taskRecordedScope(scope);
   const result = await runWithAlwaysRun(context, seams, 'task', runs);
   const label = `task step after "${input.task}"`;
   const checks = await taskDiffChecks(context, seams, input, result);

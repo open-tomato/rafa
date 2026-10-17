@@ -1,6 +1,6 @@
 /**
  * `rafa loop start` spawned end to end, over a real `bun test`, proving
- * `taskStepScope`'s ranking (`../suite/scope.ts`'s module note) through
+ * `resolveChecks`' ranking (`../suite/checks.ts`'s module note) through
  * the four recorded TASK steps of one plan, each a task line demonstrating
  * one of its answers:
  *
@@ -18,7 +18,7 @@
  *   3. A line declaring `{tests=full}` runs the full suite regardless of
  *      what its own diff touches (here, a new `NOTES.md` nothing imports
  *      and no trigger glob matches): `declared` outranks every other rule
- *      in `taskStepScope`'s ranking.
+ *      in `resolveChecks`' ranking.
  *   4. A line with no `tests=` whose diff touches a test file directly
  *      (`lib/other.test.ts`) still runs only `bun test --changed=<base>`,
  *      the `affected` default, and the step's summary again names exactly
@@ -367,7 +367,7 @@ function hasNoPathArguments(command: readonly string[]): boolean {
   return !command.some((arg) => arg.startsWith('./') || arg.startsWith('../'));
 }
 
-describe('the four answers taskStepScope ranks, over one real bun test --changed', () => {
+describe('the four answers resolveChecks ranks for a task step, over one real bun test --changed', () => {
   it('records affected, full (trigger), full (declared) and affected again, each on its own task step', () => {
     const scratch = plant();
     const run = runLoopStart(scratch);

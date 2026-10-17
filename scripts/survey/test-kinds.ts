@@ -6,7 +6,7 @@
  *
  * {@link testKind} is the pure core: it takes the globs and matches each
  * with `Bun.Glob` against a path relative to the repository root, as
- * `integrationFiles` of `src/suite/scope.ts` does. {@link readTestKindGlobs}
+ * `integrationFiles` of `src/suite/checks.ts` does. {@link readTestKindGlobs}
  * reads the two lists from the project's `.rafa/config.yaml` through
  * `readConfigFile`. The file's own `tests` keys come first; under them
  * lie the templates its `templates` key names, read through
