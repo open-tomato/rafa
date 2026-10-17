@@ -208,9 +208,13 @@ baseline expectations and stage-end failures:
   commits (`tests=`, below); an empty `checks.task`, the default, runs no
   test and is recorded as a `none` step, the lint and type checks still
   running after it
-- `stage` — After a stage's last task: the tests under `Owns:` folders
-  changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
-  files when the plan has no `Owns:` folder (reason `fallback`)
+- `stage` — After a stage's last task: the run `resolveChecks` answers for
+  `checks.stage` over the stage's diff, which for the `escalation`
+  template's `[related, integration]` is the tests under `Owns:` folders
+  changed by the stage with the integration tier, or `bun test
+  --changed=<since>` with `tests.alwaysRun` files when the plan has no
+  `Owns:` folder (reason `fallback`); an empty `checks.stage`, the
+  default, runs no test and is recorded as a `none` step
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope, its reason (`declared`, `trigger`,
@@ -235,7 +239,8 @@ what its change reaches. The value reads the `checks.task` entry, so the
 scopes below are those of an entry naming `affected`, as the `escalation`
 template's `[affected]` does; under an empty `checks.task` the step runs no
 test and records the value it set aside. The stage step after a stage's last
-task follows the plan's `Owns:` folders instead, or falls back to `bun test
+task reads `checks.stage` instead, with no `tests=` value: its `related`
+follows the plan's `Owns:` folders, or falls back to `bun test
 --changed=<since>` (scope `affected`, reason `fallback`):
 - `tests=affected` (default): the task step runs `bun test --changed=<base>`
   plus types and lint on the changed files
@@ -292,11 +297,14 @@ automatically, and which tests always run:**
   before it (`context/verification.md`)
 
 **A stage-end step with new failures blocks the next task.** After a stage's
-last task, the stage step runs the tests under the `Owns:` folders the stage
-changed, plus the `tests.integration` tier, or, with no `Owns:` folder, `bun
-test --changed=<since>` with the `tests.alwaysRun` files (scope `affected`,
-reason `fallback`), joining the always-run files so they still pass the
-slow-sweep share guard. The step captures failures. If any failure is new
+last task, the stage step runs what `checks.stage` names over the stage's
+diff. Under the `escalation` template's `[related, integration]` that is the
+tests under the `Owns:` folders the stage changed, plus the
+`tests.integration` tier, or, with no `Owns:` folder, `bun test
+--changed=<since>` with the `tests.alwaysRun` files (scope `affected`, reason
+`fallback`), joining the always-run files so they still pass the slow-sweep
+share guard. An empty `checks.stage` runs nothing, records a `none` step and
+blocks nothing. The step captures failures. If any failure is new
 against the baseline and still red when its file is run alone, or green alone
 after a test file the stage changed, the runner inserts a `[BLOCKED]` repair
 task above the first open task (`src/start/suite-blocker.ts`), its blocker the

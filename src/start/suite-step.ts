@@ -19,7 +19,7 @@
  * |---|---|---|
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
  * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `checks.task` over the task's diff; nothing for an empty entry | a repair task it inserts, or the repair it followed |
- * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `[related, integration]` over the stage's diff | a repair task it inserts |
+ * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `checks.stage` over the stage's diff; nothing for an empty entry | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
  *
  * **The baseline** is read from `SUITE_BASELINE-<stub>.json` beside the
@@ -77,19 +77,29 @@
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
- * baseline's commit, to HEAD. It resolves the entry `[related,
- * integration]` through `resolveChecks`. Without `Owns:` folders its
- * `related` falls back to `affected`, reason `fallback`, and the stage
- * runs that alone, as `bun test
+ * baseline's commit, to HEAD. It resolves the entry `checks.stage`
+ * through `resolveChecks`, with no `tests=` value; the `Owns:` folders
+ * are read only when the entry names `related`, the test files only when
+ * it names a path check, and the preload files only when it names
+ * `affected`. `full` runs the whole project. `affected` runs `bun test
  * --changed=<since>` from that same commit, with the `tests.alwaysRun`
  * files joined as a task step's `affected` run joins them: a second run,
  * its JUnit file {@link alwaysRunJunitFileFor} of `stage`, folded into
- * the first before the step is settled and recorded as `affected`. With
- * `Owns:` folders it runs the test files under the folders the diff
- * touched plus the integration tier, and no always-run run is added. An
- * empty list runs nothing and records no step, since a step's command
- * is never empty. With neither commit, or a diff git will not answer,
- * the full suite runs.
+ * the first before the step is settled and recorded as `affected`. So
+ * does a path list an `affected` stands beside (`affectedToo`): the
+ * stage runs that `affected` alone, which is how a `related` without
+ * `Owns:` folders falls back, reason `fallback`. A path list alone runs
+ * those files, the touched `Owns:` folders' and each named tier's, each
+ * once, and no always-run run is added. An empty list runs nothing,
+ * records no step and prints that it had nothing to run, since a step's
+ * command is never empty. With neither commit, or a diff git will not
+ * answer, the full suite runs.
+ *
+ * **An empty `checks.stage`** runs no suite and reads no diff: the step
+ * is recorded at once as a `none` step, reason `no-check`, prints
+ * `🧪 stage step for "<stage>": no check configured (checks.stage is
+ * empty); nothing ran.`, is never red and so inserts no repair, and is
+ * entered in the stage ledger as a step that ran.
  *
  * **The recorded reason.** A task or stage step's {@link SessionStep}
  * carries `reason` beside `scope`, so a fallback reads apart from a wide
@@ -97,8 +107,10 @@
  * `trigger`, `fallback` or `no-module-tests`, `suite/checks.ts`), and
  * for a path list `declared`, or `unit` when `checks.task` names `unit`
  * and no `tests=module` line read its `affected`; a `none` step records
- * `no-check`. A stage step records `fallback` for its `--changed` run
- * without `Owns:` folders and `stage` for its `Owns:` path list. A step
+ * `no-check`. A stage step records `stage` for a path list, its
+ * answer's own reason for `full` (`declared` or `trigger`) and for
+ * `affected` (`declared`, or `fallback` for a `related` without `Owns:`
+ * folders), and `no-check` for a `none` step. A step
  * whose diff git would not answer, or a stage step with no commit to
  * take its diff from, runs the full suite by no scope rule and records
  * no reason; nor do the baseline and the pre-wrap-up step, which always

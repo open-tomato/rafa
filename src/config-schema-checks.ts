@@ -25,8 +25,9 @@
  *
  * Each resolves as `checks` and its key's name capitalised:
  * `checksTask`, `checksPullRequest` and the like. The runner's task step
- * reads `checksTask` (`start/suite-task-step.ts`); no step reads the
- * others yet.
+ * reads `checksTask` (`start/suite-task-step.ts`) and its stage step
+ * `checksStage` (`start/suite-stage-step.ts`); no step reads the others
+ * yet.
  *
  * ## The vocabulary
  *

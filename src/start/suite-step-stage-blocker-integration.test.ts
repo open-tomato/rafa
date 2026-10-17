@@ -268,7 +268,8 @@ function plant(): Scratch {
 
   mkdirSync(join(repo, '.plans'));
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
-  plantProjectConfig(repo);
+  // `checks.stage` names an entry, so the stage step runs; empty, it would run nothing.
+  plantProjectConfig(repo, 'version: 1\nchecks:\n  stage: [related, integration]\n');
 
   return scratch;
 }

@@ -164,8 +164,8 @@ const COMPANION_FILES = [
 /** The flags every `loop start` in this file runs with: no CI wait, and `pr.provider: none` so the wrap-up push costs no `gh`. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push is the run's only reach for a remote, and it never throws without one; and the sweep in `tests.alwaysRun`. */
-const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${SWEEP_FILE}]\nchecks:\n  task: [affected]\n`;
+/** The project config: `pr.provider: none`, so the wrap-up's push is the run's only reach for a remote, and it never throws without one; the sweep in `tests.alwaysRun`; and `checks.stage: [related, integration]`, so the stage step runs. */
+const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${SWEEP_FILE}]\nchecks:\n  task: [affected]\n  stage: [related, integration]\n`;
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {

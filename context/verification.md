@@ -80,20 +80,23 @@ directory, so a changed package file belongs in the scoped
 - `task` — Scope from `resolveChecks` of `checks.task` over the task's
   diff after each task's session ends and commits; a `none` step when
   the entry is empty
-- `stage` — After a stage's last task: the tests under the `Owns:`
-  folders it changed, or `bun test --changed=<since>` with the
-  `tests.alwaysRun` files when the plan has no `Owns:` folder
+- `stage` — After a stage's last task: scope from `resolveChecks` of
+  `checks.stage` over the stage's diff, for `[related, integration]` the
+  tests under the `Owns:` folders it changed with the integration tier,
+  or `bun test --changed=<since>` with the `tests.alwaysRun` files when
+  the plan has no `Owns:` folder; a `none` step when the entry is empty
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope (affected, module, full, `none`, or
 a file/folder list it ran on) and its reason where it has one (`declared`
 for a task step whose line declares `tests=module` or `tests=full`, or
-whose `checks.task` chose the scope;
+a task or stage step whose `checks.task` or `checks.stage` chose the
+scope;
 `trigger` when changed files match `tests.fullSuiteTriggers` and
 escalate the scope; `fallback` for a stage step with no `Owns:` folder
 running `bun test --changed=<since>`; `no-module-tests` when a task
 names `tests=module` but the module has no test files; `stage` for a
-stage step's `Owns:` path list; `no-check` for a `none` step, whose
+stage step's path list; `no-check` for a `none` step, whose
 check-point entry names no check and which holds an empty command, exit
 code 0, no failures and a `declared` key naming the `tests=` value it
 set aside; `unit` for a run the entry's `unit` check chose). The baseline and the pre-wrap-up step
