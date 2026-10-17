@@ -8,7 +8,7 @@
  */
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
-import type { Tracker } from '@open-tomato/rafa/ports';
+import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -62,6 +62,49 @@ const SEAMS: IssueSeams = {
     { port: 'tracker', kind: EMPTY_KIND, portVersion: PORT_VERSIONS.tracker, create: emptyTracker },
   ]),
 };
+
+/** The code the planted bug proposes, a leaf the list does not hold. */
+const PROPOSED_CODE = 'git:branch-not-found';
+
+/** The planted bug's title. */
+const BUG_TITLE = 'checkout fails when the branch is missing';
+
+/** The planted bug's number, which the proposal's line names. */
+const BUG_NUMBER = '7';
+
+/** A bug body whose record proposes {@link PROPOSED_CODE}. */
+const BUG_BODY = ['## What', '', 'It breaks.', '', '## Proposed cause', '', PROPOSED_CODE, ''].join('\n');
+
+/** A tracker holding one open bug, recording the types it was asked to list. */
+function bugTracker(lists: string[]): Tracker {
+  const open: OpenIssue = {
+    ref: { opt: 0, kind: EMPTY_KIND, externalId: BUG_NUMBER, url: null },
+    title: BUG_TITLE,
+    body: BUG_BODY,
+    createdAt: null,
+  };
+  return {
+    ...emptyTracker(),
+    openIssues: (type: string) => {
+      lists.push(type);
+      return Promise.resolve([open]);
+    },
+  };
+}
+
+/** Seams whose registry holds the bug tracker; `lists` records its listings. */
+function bugSeams(lists: string[]): IssueSeams {
+  return {
+    registry: createAdapterRegistry([
+      { port: 'tracker', kind: EMPTY_KIND, portVersion: PORT_VERSIONS.tracker, create: () => bugTracker(lists) },
+    ]),
+  };
+}
+
+/** `rafa bug codes <words>` run over `seams`. */
+async function ranOver(seams: IssueSeams, words: readonly string[]): Promise<CapturedRun> {
+  return dispatchInProject(['bug', 'codes', ...words], SUBJECTS, [createCodesCommand(seams)], freshProject());
+}
 
 /** A project config adding one code in a family of the project's own. */
 const DEPLOY_CONFIG = [
@@ -180,6 +223,61 @@ describe('rafa bug codes --suggest', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('--suggest cannot be blank');
+  });
+});
+
+describe('rafa bug codes --suggest over a tracker holding a bug that proposes a code', () => {
+  const PROPOSAL_LINE = `  ${PROPOSED_CODE}  100%  proposed by ${EMPTY_KIND} issue ${BUG_NUMBER}`;
+
+  it('lists the proposal naming the issue in text mode', async () => {
+    const lists: string[] = [];
+    const run = await ranOver(bugSeams(lists), ['--suggest=branch not found']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.split('\n')).toContain(PROPOSAL_LINE);
+    expect(lists).toEqual(['bug']);
+  });
+
+  it('carries the proposal and its issue in the json suggestions', async () => {
+    const run = await ranOver(bugSeams([]), ['--suggest=branch not found', '--output=json']);
+    const result = eventsOf(run.stdout).at(-1);
+    const data = result?.type === 'result'
+      ? result.data as { suggestions: { code: string; issue: { externalId: string } | null }[] }
+      : undefined;
+    const row = data?.suggestions.find((entry) => entry.code === PROPOSED_CODE);
+
+    expect(run.exitCode).toBe(0);
+    expect(row?.issue?.externalId).toBe(BUG_NUMBER);
+  });
+
+  it('lists none and reads no tracker under --no-proposals', async () => {
+    const lists: string[] = [];
+    const run = await ranOver(bugSeams(lists), ['--suggest=branch not found', '--no-proposals']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).not.toContain(PROPOSED_CODE);
+    expect(run.stdout).not.toContain('proposed by');
+    expect(lists).toEqual([]);
+  });
+
+  it('warns and prints the suggestions without proposals when the chain lands nowhere', async () => {
+    const nowhere: IssueSeams = { registry: createAdapterRegistry([]) };
+    const run = await ranOver(nowhere, ['--suggest=git commit has no author identity']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('  git:no-identity  100%');
+    expect(run.stdout).not.toContain('proposed by');
+    expect(run.stdout).toContain('warn: bug codes: suggesting without the open bugs\' proposals: tracker chain: no tracker available');
+  });
+
+  it('refuses --no-proposals without --suggest', async () => {
+    const lists: string[] = [];
+    const run = await ranOver(bugSeams(lists), ['--no-proposals']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('--no-proposals only narrows --suggest: give both or neither');
+    expect(run.stdout).toBe('');
+    expect(lists).toEqual([]);
   });
 });
 
