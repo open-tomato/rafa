@@ -20,8 +20,6 @@ import type { StretchItem } from '../../stretch/items.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

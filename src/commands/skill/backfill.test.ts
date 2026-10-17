@@ -34,8 +34,6 @@
  */
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

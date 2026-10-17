@@ -24,8 +24,6 @@ import type { PlanSpecOptions, PlanSpecResolution } from '../../board/plan-spec.
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
