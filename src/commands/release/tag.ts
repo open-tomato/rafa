@@ -130,7 +130,8 @@
  *
  * Under `release.publish: ci` the pushed tag starts
  * `.github/workflows/release-publish.yml`, which publishes the unit, so
- * the publish line gives way to one sentence saying so
+ * the publish line gives way to one sentence saying so, and naming the
+ * repository variable `RAFA_RELEASE_PUBLISH` the publish job waits on
  * (`ciPublishSentence` in `./tag-follow-ups.ts`), and json carries
  * `publish: "ci"` on each unit that sentence was written for.
  *

@@ -127,6 +127,27 @@ describe('rafa release workflows over the shipped templates', () => {
     });
   }
 
+  it('writes at level 4 files whose publish job carries the exact switch and whose tag and settle jobs carry none', async () => {
+    const project = plant(4);
+    const switchIf = 'vars.RAFA_RELEASE_PUBLISH == \'ci\'';
+    const expected: Readonly<Record<string, string>> = {
+      [RELEASE_PUBLISH_FILE]: switchIf,
+      [RELEASE_SETTLE_FILE]: `needs.settle.outputs.release != '' && ${switchIf}`,
+    };
+
+    const { exitCode } = await run(project, ['--write']);
+
+    expect(exitCode).toBe(0);
+    for (const file of written(project)) {
+      const document = Bun.YAML.parse(readFileSync(join(project.root, wfPath(file)), 'utf8'));
+      expect(at(document, ['jobs', 'publish', 'if'])).toBe(expected[file]);
+      for (const job of ['tag', 'settle']) {
+        expect(String(at(document, ['jobs', job, 'if']) ?? '')).not.toContain('RAFA_RELEASE_PUBLISH');
+      }
+    }
+    expect(written(project)).toEqual(Object.keys(expected).sort());
+  });
+
   it('leaves an edited and a present copy byte for byte under --write and writes the one missing', async () => {
     const edited = `${readReleaseTemplate(RELEASE_PUBLISH_FILE)}# my edit\n`;
     const project = plant(4, { [RELEASE_PUBLISH_FILE]: edited });

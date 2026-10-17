@@ -19,6 +19,13 @@
 # its `push: tags` trigger. That job grants `id-token: write` for npm
 # trusted publishing; the tag job needs only `contents: write`.
 #
+# The publish job runs only when the repository variable
+# `RAFA_RELEASE_PUBLISH` is `ci`: with it unset or holding anything else,
+# GitHub skips the job, and a skipped job does not fail the run. Set it
+# under Settings, Secrets and variables, Actions, Variables, or with
+# `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+# Tagging runs either way; publishing waits for the switch.
+#
 # rafa needs a config with `release.enabled: true`, and the checkout may
 # hold none: when none of `rafa.config.ts`, `rafa.config.mjs` and
 # `.rafa/config.yaml` is there, the workflow writes `.rafa/config.yaml`
@@ -85,6 +92,7 @@ jobs:
 
   publish:
     needs: tag
+    if: vars.RAFA_RELEASE_PUBLISH == 'ci'
     permissions:
       contents: read
       id-token: write

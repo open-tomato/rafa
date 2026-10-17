@@ -116,11 +116,12 @@ describe('the shipped tag workflow', () => {
     expect(stepNamed('Write the CI config')?.['if']).toBeUndefined();
   });
 
-  it('calls the publish workflow after the tag job, with the merge commit as ref and the id token granted', () => {
+  it('calls the publish workflow after the tag job, with the merge commit as ref and the id token granted, behind the publishing switch', () => {
     const publish = at(tagWorkflow(), ['jobs', 'publish']);
 
     expect(publish).toEqual({
       'needs': 'tag',
+      'if': 'vars.RAFA_RELEASE_PUBLISH == \'ci\'',
       'permissions': { 'contents': 'read', 'id-token': 'write' },
       'uses': `./.github/workflows/${RELEASE_PUBLISH_FILE}`,
       'with': { ref: MERGE_COMMIT },

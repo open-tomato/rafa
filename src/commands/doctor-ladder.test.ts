@@ -14,7 +14,10 @@
  *   - the directory case sits beside the absent case, and the two read
  *     different kinds, so "not a file" is not "absent" by another name;
  *   - the row's level is checked for all five levels, so a row fixed at
- *     one level fails.
+ *     one level fails;
+ *   - the publish switch reminder is checked present at levels 2 to 4
+ *     and absent at levels 0 and 1, so a reminder on every row, or on
+ *     none, fails.
  */
 import type { DoctorLadderConfig } from './doctor-ladder.js';
 import type { Output } from '@open-tomato/rafa/ports';
@@ -33,6 +36,7 @@ import {
 } from '../release/ladder.js';
 
 import {
+  PUBLISH_SWITCH_REMINDER,
   WORKFLOWS_COMMAND,
   ladderRow,
   missingPhrase,
@@ -100,6 +104,16 @@ function configAt(level: number): DoctorLadderConfig {
   const row = LEVELS.find(([each]) => each === level);
   if (row === undefined) throw new Error(`no level ${String(level)}`);
   return row[2];
+}
+
+/** The reminder as it ends a row of level 2 and up. */
+const REMINDER_TAIL = ` ${PUBLISH_SWITCH_REMINDER}`;
+
+/** What follows a row's full stop at `level`: the reminder from level 2 up, else nothing. */
+function tailAt(level: number): string {
+  return level >= 2
+    ? REMINDER_TAIL
+    : '';
 }
 
 /** An output recording each line at the level it was written. */
@@ -175,7 +189,7 @@ describe('readDoctorLadder', () => {
 
       expect(reading.level).toEqual({ level: level as 0 | 1 | 2 | 3 | 4, name, misfit: null });
       expect(reading.missing).toEqual([]);
-      expect(ladderRow(reading)).toBe(`Release ladder: level ${String(level)}, ${name}.`);
+      expect(ladderRow(reading)).toBe(`Release ladder: level ${String(level)}, ${name}.${tailAt(level)}`);
     });
   }
 
@@ -192,7 +206,7 @@ describe('readDoctorLadder', () => {
     const reading = readDoctorLadder(root, configAt(3));
 
     expect(reading.missing).toEqual([{ kind: 'workflow', workflow: TAG_WORKFLOW, found: 'not-a-file' }]);
-    expect(ladderRow(reading)).toContain(`${TAG_WORKFLOW.path} is not a file (move it aside, then run ${WORKFLOWS_COMMAND})`);
+    expect(ladderRow(reading)).toContain(`${TAG_WORKFLOW.path} is not a file (move it aside, then run ${WORKFLOWS_COMMAND}).${REMINDER_TAIL}`);
   });
 
   it('names a private manifest, and reads the public twin as complete', () => {
@@ -201,7 +215,7 @@ describe('readDoctorLadder', () => {
     const reading = readDoctorLadder(root, configAt(2));
 
     expect(reading.missing).toEqual([{ kind: 'manifest-private', path: 'package.json' }]);
-    expect(ladderRow(reading)).toContain('package.json is private (remove "private": true to publish it)');
+    expect(ladderRow(reading)).toContain(`package.json is private (remove "private": true to publish it).${REMINDER_TAIL}`);
   });
 
   it('names the bot workflow while dependabot.yml exists, and needs none without it', () => {
@@ -216,7 +230,7 @@ describe('readDoctorLadder', () => {
       found: 'absent',
       dependabot: '.github/dependabot.yml',
     }]);
-    expect(ladderRow(withBot)).toContain(`${BOT_FRAGMENT_WORKFLOW.path} is absent (run ${WORKFLOWS_COMMAND}), needed while .github/dependabot.yml exists`);
+    expect(ladderRow(withBot)).toContain(`${BOT_FRAGMENT_WORKFLOW.path} is absent (run ${WORKFLOWS_COMMAND}), needed while .github/dependabot.yml exists.${REMINDER_TAIL}`);
     expect(noBot.missing).toEqual([]);
   });
 
@@ -238,7 +252,8 @@ describe('readDoctorLadder', () => {
       + `${PUBLISH_WORKFLOW.path} is absent (run ${WORKFLOWS_COMMAND}); `
       + `${TAG_WORKFLOW.path} is absent (run ${WORKFLOWS_COMMAND}); `
       + 'package.json is private (remove "private": true to publish it); '
-      + 'package.json has no name (add a "name" to publish it).',
+      + 'package.json has no name (add a "name" to publish it).'
+      + REMINDER_TAIL,
     );
   });
 
@@ -247,7 +262,32 @@ describe('readDoctorLadder', () => {
 
     const reading = readDoctorLadder(project(COMPLETE), config);
 
-    expect(ladderRow(reading)).toBe('Release ladder: level 2, CI publishes; release.settle is pr where the level reads push.');
+    expect(ladderRow(reading)).toBe(`Release ladder: level 2, CI publishes; release.settle is pr where the level reads push.${REMINDER_TAIL}`);
+  });
+});
+
+describe('the publish switch reminder', () => {
+  it('names RAFA_RELEASE_PUBLISH and never the word missing', () => {
+    expect(PUBLISH_SWITCH_REMINDER).toBe('Publishing waits for the repository variable RAFA_RELEASE_PUBLISH set to ci, which doctor cannot read.');
+    expect(PUBLISH_SWITCH_REMINDER).not.toContain('missing');
+  });
+
+  it('is absent at levels 0 and 1 and present at levels 2, 3 and 4', () => {
+    const root = project(COMPLETE);
+
+    const rows = LEVELS.map(([level, , config]) => [level, ladderRow(readDoctorLadder(root, config))] as const);
+
+    expect(rows.filter(([, row]) => row.includes('RAFA_RELEASE_PUBLISH')).map(([level]) => level)).toEqual([2, 3, 4]);
+  });
+
+  it('ends a level 3 row with items missing, after its list', () => {
+    const reading = readDoctorLadder(project({}), configAt(3));
+
+    const row = ladderRow(reading);
+
+    expect(reading.missing.length).toBeGreaterThan(0);
+    expect(row).toEndWith(`(run ${WORKFLOWS_COMMAND}).${REMINDER_TAIL}`);
+    expect(row.indexOf(' missing: ')).toBeLessThan(row.indexOf(PUBLISH_SWITCH_REMINDER));
   });
 });
 

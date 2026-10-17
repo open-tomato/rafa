@@ -108,12 +108,12 @@ describe('the shipped settle workflow', () => {
     expect(at(settleWorkflow(), ['jobs', 'settle', 'outputs'])).toEqual({ release: '${{ steps.settle.outputs.release }}' });
   });
 
-  it('calls the publish workflow after settle only when it names a release commit, passing it as ref', () => {
+  it('calls the publish workflow after settle only when it names a release commit and the publishing switch reads ci, passing it as ref', () => {
     const publish = at(settleWorkflow(), ['jobs', 'publish']);
 
     expect(publish).toEqual({
       'needs': 'settle',
-      'if': 'needs.settle.outputs.release != \'\'',
+      'if': 'needs.settle.outputs.release != \'\' && vars.RAFA_RELEASE_PUBLISH == \'ci\'',
       'permissions': { 'contents': 'read', 'id-token': 'write' },
       'uses': `./.github/workflows/${RELEASE_PUBLISH_FILE}`,
       'with': { ref: '${{ needs.settle.outputs.release }}' },

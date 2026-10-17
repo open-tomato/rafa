@@ -112,7 +112,7 @@ jobs:
 
   publish:
     needs: settle
-    if: needs.settle.outputs.release != ''
+    if: needs.settle.outputs.release != '' && vars.RAFA_RELEASE_PUBLISH == 'ci'
     permissions:
       contents: read
       id-token: write
@@ -145,8 +145,13 @@ writes it whole. The workflow:
   `GITHUB_TOKEN` starts no other workflow run, so the publish job calls
   `release-publish.yml` through `workflow_call` with the release commit as
   `ref` instead of waiting for that workflow's `push: tags` trigger. It runs
-  only when settle pushed a release commit and tagged it. `release-publish.yml`
-  is the level 2 template; `rafa release workflows --write` installs it too.
+  only when settle pushed a release commit and tagged it. The job is also
+  skipped until the repository variable `RAFA_RELEASE_PUBLISH` is `ci`, so a
+  tag pushed with the variable unset is not published and a skipped job is not
+  a red run. Set it in the repository's Settings, under Secrets and variables,
+  Actions, Variables, or with `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+  `release-publish.yml` is the level 2 template; `rafa release workflows
+  --write` installs it too.
 
 ## Configuration for CI settle
 

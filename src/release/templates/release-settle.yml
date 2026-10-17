@@ -20,6 +20,13 @@
 # commit and tagged it; the job grants `id-token: write` for npm trusted
 # publishing, and the settle job needs only `contents: write`.
 #
+# The publish job runs only when the repository variable
+# `RAFA_RELEASE_PUBLISH` is `ci`: with it unset or holding anything else,
+# GitHub skips the job, and a skipped job does not fail the run. Set it
+# under Settings, Secrets and variables, Actions, Variables, or with
+# `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+# Settling and tagging run either way; publishing waits for the switch.
+#
 # rafa needs a config with `release.enabled: true`, and the checkout may
 # hold none: when none of `rafa.config.ts`, `rafa.config.mjs` and
 # `.rafa/config.yaml` is there, the workflow writes `.rafa/config.yaml`
@@ -105,7 +112,7 @@ jobs:
 
   publish:
     needs: settle
-    if: needs.settle.outputs.release != ''
+    if: needs.settle.outputs.release != '' && vars.RAFA_RELEASE_PUBLISH == 'ci'
     permissions:
       contents: read
       id-token: write

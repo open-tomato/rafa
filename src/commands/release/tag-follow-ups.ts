@@ -24,11 +24,13 @@
  * and {@link ciPublishSentence} gives the one sentence that stands where
  * the publish line stood, for exactly the units that would have had
  * one. The workflow path is the ladder's {@link PUBLISH_WORKFLOW}, so
- * the sentence and the doctor row name the same file.
+ * the sentence and the doctor row name the same file, and the sentence
+ * names the ladder's {@link PUBLISH_SWITCH_VARIABLE} too, since the
+ * publish job runs only while that repository variable is `ci`.
  */
 import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections';
 
-import { PUBLISH_WORKFLOW } from '../../release/ladder.js';
+import { PUBLISH_SWITCH_VARIABLE, PUBLISH_WORKFLOW } from '../../release/ladder.js';
 import { RELEASE_REMOTE } from '../../release/version.js';
 
 /** The registry a publish reaches when the manifest names none. */
@@ -134,7 +136,8 @@ function publishFrom(publish: string, dir: string | null | undefined): string {
 export function ciPublishSentence(tag: string, version: string, target: PublishTarget): string | null {
   if (target.name === null || target.isPrivate) return null;
   return `Once pushed, ${tag} publishes ${target.name}@${version} to ${target.registry}`
-    + ` through ${PUBLISH_WORKFLOW.path} (release.publish: ci).`;
+    + ` through ${PUBLISH_WORKFLOW.path} when the repository variable`
+    + ` ${PUBLISH_SWITCH_VARIABLE} is ci (release.publish: ci).`;
 }
 
 /**

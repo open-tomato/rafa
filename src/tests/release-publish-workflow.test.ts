@@ -4,8 +4,10 @@
  * (`src/release/templates/release-publish.yml`) committed unchanged, so a
  * fix to the template reaches this repository's copy in the same commit.
  * The root eslint config lints no YAML, so this test is the copy's only
- * gate. The workflow publishes only once the operator has configured a
- * trusted publisher on npmjs.com naming this repository and the file.
+ * gate. Its publish job is skipped, not failed, until the repository
+ * variable `RAFA_RELEASE_PUBLISH` is `ci`, and publishes only once the
+ * operator has also configured a trusted publisher on npmjs.com naming
+ * this repository and the file.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

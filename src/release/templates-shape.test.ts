@@ -2,8 +2,9 @@
  * The shape every shipped workflow template under
  * `src/release/templates/*.yml` keeps: parsed with `Bun.YAML.parse`, its
  * triggers and `permissions` block as {@link SHAPES} names them for that
- * file, and each `rafa <subject> <action>` inside a `run:` naming an
- * action of the command registry.
+ * file, its publish job's `if` as the table names it and no other job's
+ * `if` naming the publishing switch, and each `rafa <subject> <action>`
+ * inside a `run:` naming an action of the command registry.
  */
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,14 +32,23 @@ interface Step {
 interface Workflow {
   readonly on: Record<string, unknown>;
   readonly permissions: Record<string, string>;
-  readonly jobs: Record<string, { readonly steps?: readonly Step[] }>;
+  readonly jobs: Record<string, { readonly if?: string; readonly steps?: readonly Step[] }>;
 }
 
-/** What one template's top level holds: its trigger names and its `permissions` block. */
+/**
+ * What one template's top level holds: its trigger names, its
+ * `permissions` block, and the exact `if` of its `publish` job, `null`
+ * when the template has no publish job.
+ */
 interface Shape {
   readonly triggers: readonly string[];
   readonly permissions: Readonly<Record<string, string>>;
+  readonly publishIf: string | null;
 }
+
+/** The repository variable that switches CI publishing on when it reads `ci`. */
+const SWITCH = 'RAFA_RELEASE_PUBLISH';
+const SWITCH_ON = `vars.${SWITCH} == 'ci'`;
 
 /**
  * Each shipped template's triggers and permissions. The publish
@@ -48,13 +58,28 @@ interface Shape {
  * workflow runs on a push and pushes a release commit and its tags, and
  * does the same; the bot fragment workflow runs on a bot's pull request
  * in the base's context, pushes one commit to its branch and reads the
- * pull request's metadata.
+ * pull request's metadata. Every publish job runs only when the
+ * repository variable `RAFA_RELEASE_PUBLISH` reads `ci`, the settle
+ * workflow's joined to its own condition; the bot fragment workflow has
+ * no publish job.
  */
 const SHAPES: Readonly<Record<string, Shape>> = {
-  'release-publish.yml': { triggers: ['push', 'workflow_call'], permissions: { contents: 'read', 'id-token': 'write' } },
-  'release-tag.yml': { triggers: ['pull_request'], permissions: { contents: 'write' } },
-  'release-settle.yml': { triggers: ['push'], permissions: { contents: 'write' } },
-  'release-bot-fragment.yml': { triggers: ['pull_request_target'], permissions: { 'contents': 'write', 'pull-requests': 'read' } },
+  'release-publish.yml': {
+    triggers: ['push', 'workflow_call'],
+    permissions: { contents: 'read', 'id-token': 'write' },
+    publishIf: SWITCH_ON,
+  },
+  'release-tag.yml': { triggers: ['pull_request'], permissions: { contents: 'write' }, publishIf: SWITCH_ON },
+  'release-settle.yml': {
+    triggers: ['push'],
+    permissions: { contents: 'write' },
+    publishIf: `needs.settle.outputs.release != '' && ${SWITCH_ON}`,
+  },
+  'release-bot-fragment.yml': {
+    triggers: ['pull_request_target'],
+    permissions: { 'contents': 'write', 'pull-requests': 'read' },
+    publishIf: null,
+  },
 };
 
 /** The workflow at `file`, parsed. */
@@ -110,6 +135,27 @@ describe('the release workflow templates', () => {
 
     it('declares the permissions its shape names', () => {
       expect(parse(file).permissions).toEqual({ ...SHAPES[file]?.permissions });
+    });
+
+    it('gives its publish job the if its shape names, or has none when the shape names none', () => {
+      const publish = parse(file).jobs['publish'];
+      const expected = SHAPES[file]?.publishIf;
+
+      expect(expected).toBeDefined();
+      if (expected === null) {
+        expect(publish).toBeUndefined();
+        return;
+      }
+      expect(publish?.if).toBe(expected as string);
+    });
+
+    it('names the publishing switch in no if but the publish job\'s', () => {
+      const others = Object.entries(parse(file).jobs)
+        .filter(([name]) => name !== 'publish')
+        .map(([, job]) => job.if ?? '');
+
+      expect(Object.keys(parse(file).jobs).length).toBeGreaterThan(0);
+      expect(others.filter((condition) => condition.includes(SWITCH))).toEqual([]);
     });
 
     it('calls only actions the command registry holds in every rafa line of a run', () => {
