@@ -11,7 +11,7 @@
  * the command (`packages/rafa/src/core/command/lazy.ts`).
  *
  * The commands are in roster order, the order `createRosterRegistry`
- * (`src/commands/index.ts`) registers them in. `index.test.ts` holds
+ * (`src/commands/index.ts`) registers them in. `index-integration.test.ts` holds
  * each one's spelling to its declaration's, and each loaded module's
  * command to its declaration.
  */

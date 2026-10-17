@@ -157,4 +157,26 @@ describe('lazyPrompter', () => {
   it.each([[''], ['  '], ['n'], ['yeah'], [null]])('reads %p as no', async (answer) => {
     expect(await lazyPrompter(scripted([answer]).open).ask('Go? ')).toBe(false);
   });
+
+  it('answers askLine with the line as typed, and null once the input has ended', async () => {
+    const script = scripted(['  Not now \n']);
+    const prompter = lazyPrompter(script.open);
+
+    const answers = [await prompter.askLine('Why? '), await prompter.askLine('Again? ')];
+
+    expect(answers).toEqual(['  Not now \n', null]);
+    expect(script.asked()).toEqual(['Why? ', 'Again? ']);
+  });
+
+  it('opens once across askLine and ask, and reads yes over the same prompter', async () => {
+    const script = scripted(['a reason', 'YES']);
+    const prompter = lazyPrompter(script.open);
+
+    const line = await prompter.askLine('Why? ');
+    const yes = await prompter.ask('Go? ');
+    prompter.close();
+
+    expect([line, yes]).toEqual(['a reason', true]);
+    expect([script.opened(), script.closed()]).toEqual([1, 1]);
+  });
 });

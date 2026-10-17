@@ -69,7 +69,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, HINT_FLAG } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
@@ -95,7 +95,6 @@ import {
   runsCommand,
   runsInProcess,
 } from './actions.js';
-import { HINT_FLAG } from './hint.js';
 
 /** The project root the caller's context carries. */
 const ROOT = join('/', 'scratch', 'project');

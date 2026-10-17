@@ -90,8 +90,10 @@
  * ## `--no-hint`
  *
  * Each of the six declares a boolean `hint` flag defaulting to true,
- * and {@link wantsHint} is what reads it here, so `--no-hint`
- * suppresses the ending without the six spelling the flag six times.
+ * `HINT_FLAG_SPEC` of core's command barrel, whose name
+ * {@link HINT_FLAG} comes from the same place, and {@link wantsHint} is
+ * what reads it here, so `--no-hint` suppresses the ending without the
+ * six spelling the flag six times.
  * A suppressed hint reads nothing at all: the flag is asked before the
  * sources are composed, so it costs no `gh` call. The flag is `hint`
  * rather than `next` because `plan create` declares `next` already and
@@ -104,13 +106,12 @@ import type { NextState } from './state.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
 
+import { HINT_FLAG } from '@open-tomato/rafa/core/command';
+
 import { actionInvocation } from './actions.js';
 import { openNextRelations } from './relations-mode.js';
 import { openNextSources } from './sources.js';
 import { readNextState } from './state.js';
-
-/** The flag each of the six commands declares to let a hint be turned off. */
-export const HINT_FLAG = 'hint';
 
 /** How long the reading may take before the hint gives up and says nothing. */
 export const HINT_TIMEOUT_MS = 2_000;

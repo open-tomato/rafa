@@ -149,9 +149,6 @@ import { readCheckedOutBranch } from '../utils/git.js';
 
 import { withStamp } from './stamp.js';
 
-/** How long to keep polling a PR's checks before giving up on them. */
-export const DEFAULT_CI_TIMEOUT_MIN = 20;
-
 /** Seconds between polls. CI here settles in 2-5 minutes. */
 export const CI_POLL_INTERVAL_MS = 20_000;
 
