@@ -5,16 +5,18 @@
  * next dispatch.
  *
  * The behaviour is described in `suite-step.ts`'s module note (the
- * stage step, the stage ledger and SIGINT), which stays the one account
+ * stage step and SIGINT), which stays the one account
  * of all four steps; this module only holds the stage step's code, and
  * `suite-step.ts` re-exports both functions so callers keep importing
- * them from there. The run, record, settle, retake and ledger helpers
+ * them from there. The ledger it reads and writes is
+ * `suite-stage-ledger.ts`'s. The run, record, settle and retake helpers
  * it shares with the other steps live in `suite-step.ts`, imported back
  * here: the cycle is safe because neither module reads the other's
  * bindings at load, only inside the functions.
  */
 
-import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
+import type { DueStage } from './suite-stage-ledger.js';
+import type { StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SessionStep, SessionStepReason } from '@open-tomato/rafa/core/loop';
 
@@ -25,16 +27,13 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { resolveChecks } from '../suite/checks.js';
 
 import { takeRetakes } from './suite-retake-alone.js';
+import { addToLedger, dueStages, readStageLedger, stageLedgerPathFor } from './suite-stage-ledger.js';
 import {
-  addToLedger,
-  dueStages,
   readDiff,
   readHead,
-  readStageLedger,
   runWithAlwaysRun,
   seamsOf,
   settleStep,
-  stageLedgerPathFor,
 } from './suite-step.js';
 import { readTaskAlwaysRun } from './task-always-run.js';
 

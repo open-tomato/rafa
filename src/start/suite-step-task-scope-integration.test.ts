@@ -25,10 +25,10 @@
  *      one file.
  *
  * The four tasks sit in one stage, its plan's only one, so its own stage
- * step never runs: `dueStages` (`./suite-step.ts`) never answers a stage
- * once no task is left open, which is true the moment the fourth task,
- * also the last task of the whole plan, commits. The pre-wrap-up step
- * stands in for it instead, as it does for any last stage
+ * step never runs: `dueStages` (`./suite-stage-ledger.ts`) never
+ * answers a stage once no task is left open, which is true the moment
+ * the fourth task, also the last task of the whole plan, commits. The
+ * pre-wrap-up step stands in for it instead, as it does for any last stage
  * (`./suite-step-no-owns-full-suite-tally-integration.test.ts`'s module
  * note says the same). Six suite runs in all — the baseline, the four
  * task steps, and the pre-wrap-up step — read back from the run record's

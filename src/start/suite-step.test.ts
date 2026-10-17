@@ -7,7 +7,8 @@
  * read off the options handed to the scripted `runSuite`, and every
  * claim that a step did NOT block, run or record is paired with a case
  * where the same step, handed a new failure or a due stage, does. The
- * task step's cases are in `suite-task-step.test.ts`.
+ * task step's cases are in `suite-task-step.test.ts`, the stage ledger's
+ * own in `suite-stage-ledger.test.ts`.
  */
 import type { SuiteStepContext, SuiteStepSeams } from './suite-step.js';
 import type { GhResult } from '../adapters/tracker/github.js';
@@ -314,25 +315,6 @@ describe('a red step\'s repair task', () => {
   });
 });
 
-describe('dueStages', () => {
-  it('answers a finished stage while a task is open, and nothing once the ledger names it', () => {
-    expect(dueStages(TRACKER, [])).toEqual([{ stage: 0, name: 'One' }]);
-    expect(dueStages(TRACKER, [{ stage: 0, name: 'One', commit: HEAD, via: 'step' }])).toEqual([]);
-  });
-
-  it('does not answer a stage holding a blocked task', () => {
-    expect(dueStages(TRACKER.replace('- [x] second task', '- [BLOCKED] second task'), [])).toEqual([]);
-  });
-
-  it('answers no stage once no task is open: the pre-wrap-up step stands in for the last one', () => {
-    expect(dueStages(TRACKER.replaceAll('- [ ]', '- [x]'), [])).toEqual([]);
-  });
-
-  it('takes an entry for a moved or renamed stage as another stage', () => {
-    expect(dueStages(TRACKER, [{ stage: 0, name: 'Renamed', commit: HEAD, via: 'step' }])).toHaveLength(1);
-  });
-});
-
 describe('runStageStep', () => {
   const stage = { stage: 0, name: 'One' };
 
@@ -559,14 +541,6 @@ describe('blockerText', () => {
     expect(text).toContain('src/new.test.ts (2 tests), src/old.test.ts (1 test)');
     expect(text).toContain('Run bun test ./src/new.test.ts ./src/old.test.ts');
     expect(text).not.toContain('\n');
-  });
-});
-
-describe('stageLedgerPathFor', () => {
-  it('sits beside the tracker, named from its stub', () => {
-    expect(stageLedgerPathFor('/p/PLAN_TRACKER-foo.md')).toBe('/p/SUITE_STAGES-foo.json');
-    expect(stageLedgerPathFor('/p/PLAN.md')).toBe('/p/SUITE_STAGES.json');
-    expect(existsSync(stageLedgerPathFor(trackerPath))).toBe(false);
   });
 });
 
