@@ -38,7 +38,8 @@ import { positionAt, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
-import { createIssueListCommand, ISSUE_LIST_FLAGS } from './issue/list.js';
+import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
+import { createIssueListCommand } from './issue/list.js';
 import { createRoadmapCommand, ROADMAP_FLAGS } from './roadmap.js';
 
 /** A temporary directory of this file's own. */

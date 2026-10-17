@@ -37,6 +37,35 @@ spells out, and the shapes the lint config forces.
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
 
+### Declarations, feature indexes and the roots
+
+- **A `declarations.ts` imports types and `@open-tomato/rafa/core/*`
+  values alone.** A value import of a module under `src/` loads it with
+  the roster and undoes the laziness the declaration exists for. A
+  feature's test reads the file's imports off the source (its
+  `declarations.test.ts`, or `index.test.ts` for `board`, which has none)
+  and holds that; a constant a declaration and its command both read lives
+  in the declaration file, and a copy of a value from outside `src/commands/`
+  is held equal to its source by the same test.
+- **A feature's `index.ts` reaches a command module only through
+  `lazyCommand`'s dynamic import.** Each command is one
+  `lazyCommand(DECLARATION, () => import('./x.js'), FEATURE)` line, so
+  importing the index loads the declarations and the core command barrel
+  and no command module. `index.test.ts` reads each call off the source
+  and holds its loader to its declaration's module.
+- **No module under `src/` registers an adapter or a config section on
+  import.** `src/config-registry.ts` and `src/adapter-registry.ts` register
+  nothing as they load, and neither do the declarations, the feature
+  indexes or the command modules. The registration calls sit at the top
+  level of two roots only: `src/index.ts`, the `@open-tomato/rafa` entry,
+  and `src/rafa.ts`, the CLI's. Each calls `registerCoreConfigSections`,
+  then `registerCoreAdapters`, once its imports have loaded.
+  `src/tests/preload.ts` makes the same two calls, and `bunfig.toml`'s
+  `[test] preload` runs it before the first test file. Other callers, such
+  as `src/cli/feature-load-probe.ts`, call them inside a function they run,
+  never on import. A child process a test spawns runs no preload, so its
+  script calls a root itself before it reads either registry.
+
 ### Explicit types on exports
 
 **`base.json` of `packages/typescript-config` sets `isolatedDeclarations`
@@ -97,20 +126,19 @@ and the test files carry hundreds (the spike's probe 8, #804).
 reads.** Its source is `packages/rafa/src/`, and the files of its `core/`
 folder are the connective tissue of the codebase: graph analysis calls such
 files high-betweenness nodes, since many paths between the rest of the tree
-run through them. `CORE_MOVES` of `scripts/survey/core-moves.ts` lists the
-twenty-nine files that changed path, nineteen by #905 and ten more by #1088
-and #1089, `runtime/identity.ts` among them. They sit in eight subject
-folders. `config/` holds the value readers, core's keys of the schema, the
-section contract, core's own section and the loader; `command/` the command
-contract (`RafaCommand`, `RafaContext`, `CommandExit`), the version and the
-confirm prompt; `output/` the active output; `adapters/` the adapter registry;
-`git/` the git runner and the commit helpers; `plan/` the block reader, the
-plan parser and the plan-file readers; `loop/` the loop's session helpers, its
-session readings and the Claude spawner; `runtime/` the reading of which build
-is running. A file keeps its base name when it moves. A moved file keeps a
-re-export at its old path while a non-test file outside core still imports it
-there; `CORE_REEXPORTS` of `scripts/survey/core-moves.ts` lists those paths,
-and it is empty since the move into the package.
+run through them. Twenty-nine files changed path into it, nineteen by #905 and
+ten more by #1088 and #1089, `runtime/identity.ts` among them. They sit in
+eight subject folders. `config/` holds the value readers, core's keys of the
+schema, the section contract, core's own section and the loader; `command/`
+the command contract (`RafaCommand`, `RafaContext`, `CommandExit`), the
+version and the confirm prompt; `output/` the active output; `adapters/` the
+adapter registry; `git/` the git runner and the commit helpers; `plan/` the
+block reader, the plan parser and the plan-file readers; `loop/` the loop's
+session helpers, its session readings and the Claude spawner; `runtime/` the
+reading of which build is running. A file keeps its base name when it moves. A
+moved file keeps no re-export at its old path. The root's build entries are
+the exception: `src/effort/store/index.ts` and `src/ports/index.ts` stand at
+core's folder paths and re-export a package subpath until #808 publishes core.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it moved to
@@ -244,16 +272,19 @@ is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
-`checks`. Core names no section. The twelve are listed in
+`checks`. Core names no section. The thirteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and the eleven `src/config-schema-*.ts` files. Importing
-that module registers the twelve with core once, and `src/rafa.ts` and
-`src/index.ts` import it ahead of anything that loads a config. A file outside
+own (`core-section.ts`) and twelve `src/config-schema-*.ts` files. That
+module registers nothing as it is imported: its `registerCoreConfigSections()`
+registers the thirteen with core and sets core's load hook, and `src/rafa.ts`,
+`src/index.ts` and `src/tests/preload.ts` call it ahead of
+`registerCoreAdapters()`, before anything loads a config. A second call
+registers nothing. A file outside
 `packages/rafa/src/core/` takes the merged `SETTINGS`, `CONFIG_DEFAULTS`,
 `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and `knownKeysAbove` from the
 registry, never from the core barrel, which exports none of them; core reads the
 same through the `active*` functions of `section.ts`. A registration that breaks
-a rule throws at import, naming what it refused: a setting name two sections
+a rule throws from the call, naming what it refused: a setting name two sections
 define, a file key a second section defines under another setting name, which
 names both setting names too, or a `dangerous.*` key a second section defines
 under the same setting name, each naming both packages.
@@ -264,13 +295,18 @@ imports no adapter: the adapters the registry lists sit above core, under
 `src/adapters/` and `src/effort/sync/`, while the two store backends,
 `store/sqlite` and `store/ndjson`, sit in the package under
 `packages/rafa/src/effort/store/`. `src/adapter-registry.ts`, outside
-`packages/rafa/src/core/`, lists them and hands them to `registerAdapters` as
-it is imported. `src/rafa.ts` and `src/index.ts` import it right after
-`src/config-registry.ts`, before anything resolves an adapter, so the two
-composition roots are the two entries' imports. Until the root is imported,
-every member of `CORE_ADAPTER_REGISTRY` refuses, naming it. A test that reads
-core's adapters off the registry imports the root for its effect, as the
-entries do.
+`packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
+as it is imported: its `registerCoreAdapters()` hands them to
+`registerAdapters` and answers the registry that call made. `src/rafa.ts` and
+`src/index.ts` call it before anything resolves an adapter, so the entries
+hold under a manifest declaring `"sideEffects": false`, which the root manifest
+does not declare today because bun 1.3.14's split build breaks under it
+(#1213). A second call registers nothing. Until something calls
+it, every member of `CORE_ADAPTER_REGISTRY` refuses, naming the root.
+`bun test` calls it once per test process from `src/tests/preload.ts`, which
+`bunfig.toml` names under `[test] preload`, so a test reads core's adapters
+registered; a child process a test spawns runs no preload and calls the root
+itself.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's

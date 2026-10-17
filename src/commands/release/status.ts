@@ -98,6 +98,7 @@ import { highestChangeLevel } from '../../release/level.js';
 import { readTags, readUntagged } from '../../release/status-readings.js';
 import { readManifestVersion } from '../../release/version.js';
 
+import { RELEASE_STATUS_DECLARATION, RELEASE_STATUS_PLAN_FLAG } from './declarations.js';
 import { readWaiting, waitingCell, waitingLines, waitingSettingsOf } from './status-fragments.js';
 import { readStaleDocs, readStaleDocsSafely, staleDocsCell, staleDocsProblem } from './status-stale-docs.js';
 
@@ -445,7 +446,7 @@ async function statusConfig(
 
 /** The stub `--plan` names, or null when the line names none. */
 function readPlanFlag(context: RafaContext): string | null {
-  const value = context.flags['plan'];
+  const value = context.flags[RELEASE_STATUS_PLAN_FLAG];
   if (value === undefined) return null;
   const stub = typeof value === 'string'
     ? value.trim()
@@ -504,45 +505,7 @@ export async function readStatus(
 /** The command, reaching git and the store through `seams`; see the module note. */
 export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'release status',
-    subject: 'release',
-    action: 'status',
-    summary: 'show the version, the latest tag, the untagged releases, the pending notes, the waiting fragments'
-      + ' and the open stale-docs lines',
-    description: 'Reads eight things about the release state of the project and writes nothing: the version'
-      + ' `release.versionFile` declares, the latest release tag of the repository by semantic version'
-      + ' precedence, the versions `release.changelog` calls released that carry no tag, the change notes'
-      + ' the current plan\'s sessions have stored for its next release, and the change fragments waiting on'
-      + ' `origin/<pr.base>` as last fetched, with the release `rafa release settle` would fold them into,'
-      + ' and an audit of the changelog\'s released history: a version two headings name, a gap between'
-      + ' versions, dates out of order, and a heading newer than the releases made before settle with no tag,'
-      + ' and how many lines the open stale-docs issues of the tracker the chain lands on hold unticked,'
-      + ' `none` when they hold none. That count is the one reading that can reach the network, and it never'
-      + ' changes the exit code.'
-      + ' The current plan is the one'
-      + ' `--plan=<stub>` names, and otherwise the one the checked-out branch\'s `<type>/<stub>` names,'
-      + ' resolved against the plans in `plan.dir`. A reading that could not be made leaves its cell as `?`'
-      + ' and says why on a line under the block rather than refusing the others. With `--output=json`'
-      + ' the eight readings and the rendered block are the data of the terminal result event.',
-    args: [],
-    flags: [
-      {
-        name: 'plan',
-        description: 'the plan stub the pending change notes are read for, instead of the branch\'s',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release status',
-        note: 'Shows the version, the latest tag, the untagged releases and the notes pending for this branch\'s plan.',
-      },
-      {
-        cmd: 'rafa release status --plan=rafa-21-changelog-and-release',
-        note: 'Reads the pending change notes for that plan rather than the one the branch names.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_STATUS_DECLARATION,
     run: async (context) => {
       const status = await readStatus(context, seams);
       if (context.outputMode === 'json') {

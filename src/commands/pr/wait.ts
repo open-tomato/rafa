@@ -149,11 +149,12 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
-import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
+import { endWithNextStep } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
-import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
+import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 
 import { SEPARATOR } from './current.js';
+import { DEFAULT_WAIT_TIMEOUT_MIN, PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';
 import {
   lineRefusal,
   onProvider,
@@ -165,12 +166,6 @@ import {
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.wait;
-
-/** The flag the deadline is typed with. */
-const TIMEOUT_FLAG = 'timeout';
-
-/** Minutes a line that types no `--timeout` waits: the loop's own CI deadline. */
-export const DEFAULT_WAIT_TIMEOUT_MIN: number = DEFAULT_CI_TIMEOUT_MIN;
 
 /** Milliseconds in a minute, as `--timeout` is turned into a deadline. */
 const MS_PER_MIN = 60_000;
@@ -237,10 +232,10 @@ export interface PrWaitResult extends PrWaitReading {
  * it whatever the flag declares.
  */
 export function readTimeoutMinutes(flags: RafaContext['flags'], usage: string): number {
-  const value = flags[TIMEOUT_FLAG];
+  const value = flags[WAIT_TIMEOUT_FLAG];
   if (value === undefined) return DEFAULT_WAIT_TIMEOUT_MIN;
   const spelled = typeof value === 'boolean'
-    ? `--${TIMEOUT_FLAG} with no value`
+    ? `--${WAIT_TIMEOUT_FLAG} with no value`
     : `"${value}"`;
   const minutes = typeof value === 'string'
     ? Number(value)
@@ -403,53 +398,7 @@ export async function runWait(context: RafaContext, seams: PrWaitSeams): Promise
 /** The command, reaching the provider, the branch, the clock and the wait through `seams`. */
 export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr wait',
-    subject: 'pr',
-    action: 'wait',
-    summary: 'wait for one pull request\'s checks to settle, and answer what they came to',
-    description: 'Polls the checks of one pull request until they settle or the deadline passes, printing a line'
-      + ' per poll, and then prints the verdict with every check under it. Without a number it waits on the open'
-      + ' pull request whose head is the branch checked out at the project root. It writes nothing: no comment,'
-      + ' no label, no merge and no repair session. A pull request with no check at all is polled again while'
-      + ' its head commit is less than two minutes old, since a push\'s checks take some seconds to register,'
-      + ' and is answered at once when the head is older. Green exits 0; a red pull request and one with no'
-      + ' check registered exit 1, and the report says the pull request does not merge cleanly only when it'
-      + ' reads as conflicting; a deadline that passes with checks still running exits 3. The report is'
-      + ' printed once: with `--output=json` a green'
-      + ' wait gives the verdict, the checks, the polls and the rendered text as the data of the terminal'
-      + ' result event, and every other ending carries the report as the message of that event instead.'
-      + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [
-      {
-        name: 'n',
-        description: 'The pull request number. The open pull request of the current branch when it is left out.',
-        type: 'number',
-      },
-    ],
-    flags: [
-      {
-        name: TIMEOUT_FLAG,
-        description: `How many minutes to wait before giving up. ${DEFAULT_WAIT_TIMEOUT_MIN} when it is left out.`,
-        type: 'string',
-      },
-      HINT_FLAG_SPEC,
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr wait',
-        note: 'Waits on the open pull request of the branch checked out at the project root.',
-      },
-      {
-        cmd: 'rafa pr wait 41 --timeout=5',
-        note: 'Waits up to five minutes on pull request 41, then exits 3 if its checks are still running.',
-      },
-      {
-        cmd: 'rafa pr wait 41 --output=json',
-        note: 'Writes a start event, a line per poll, then a result event holding the verdict and the checks'
-          + ' when they are green, and the report as its error message when they are not.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_WAIT_DECLARATION,
     run: async (context) => {
       const waited = await runWait(context, seams);
       // A non-zero ending carries the report itself; see the module note.

@@ -260,10 +260,11 @@ never ends the run it reports on.
 
 A module can provide a logger adapter in its manifest, as it provides a
 tracker (`rafa.provides.logger` with a `kind` and an `entry`). Its kind is
-registered when the module loads. It is not selected yet: the registry a
-module fills reaches no reader today, for any port, and the dispatcher
-resolves through `CORE_ADAPTER_REGISTRY`. `context/cli.md` says the same
-of every port.
+registered when the module loads, and `src/rafa.ts` makes the registry
+it was registered on the active one before it dispatches
+(`activateModuleAdapters`, `src/modules/activate.ts`). The dispatcher's
+resolver reads `CORE_ADAPTER_REGISTRY`, so a `logger.kind` naming the
+module's kind selects it. `context/cli.md` says the same of every port.
 
 ### The contract
 

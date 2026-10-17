@@ -76,10 +76,8 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
 
+import { PRIORITY_FLAG } from './declarations.js';
 import { lineRefusal, readChoiceFlag } from './issue-tracker.js';
-
-/** The flag, by name. */
-export const PRIORITY_FLAG = 'priority';
 
 /** The flags `--priority` is refused beside, in the order a refusal names the first one typed. */
 export const PRIORITY_RIVALS: readonly string[] = Object.freeze(['append-file', 'append', 'replace-file']);

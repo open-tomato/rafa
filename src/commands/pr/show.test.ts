@@ -50,6 +50,7 @@ import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
+import { PR_SHOW_JSON_FIELDS } from './declarations.js';
 import { TRIAGE_MARKER } from './last-triage.js';
 import { PR_USAGE } from './pr-context.js';
 import {
@@ -57,7 +58,6 @@ import {
   KEYWORD_ONLY,
   NOT_IN_BODY,
   OTHER_REPOSITORY,
-  PR_SHOW_JSON_FIELDS,
   renderShow,
 } from './show.js';
 

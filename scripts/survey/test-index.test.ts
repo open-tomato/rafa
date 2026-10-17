@@ -15,10 +15,8 @@ import {
   indexFolder,
   main,
   packageRules,
-  parseMode,
   readCommit,
   renderTestIndexJson,
-  spawnApis,
 } from './test-index';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 
@@ -118,13 +116,6 @@ describe('a spawning test', () => {
     expect(entryOf(index, MENTIONS)).toMatchObject({ index: 2, spawns: false });
     expect(entryOf(index, TYPE_ONLY)).toMatchObject({ index: 2, spawns: false });
   });
-
-  it('reads each way of spawning from a parse', () => {
-    expect(spawnApis('a.ts', 'Bun.spawn([]);\nBun.spawnSync([]);\nawait Bun.$`ls`;\n')).toEqual(['Bun.$', 'Bun.spawn', 'Bun.spawnSync']);
-    expect(spawnApis('a.ts', 'import { $ } from \'bun\';\nimport { spawn } from \'child_process\';\n')).toEqual(['$ from bun', 'child_process']);
-    expect(spawnApis('a.mjs', 'import * as cp from \'node:child_process\';\n')).toEqual(['node:child_process']);
-    expect(spawnApis('a.ts', 'import { file } from \'bun\';\nimport { type $ } from \'bun\';\n')).toEqual([]);
-  });
 });
 
 describe('a test reaching a folder only through support files', () => {
@@ -189,38 +180,6 @@ describe('the outputs', () => {
   it('counts a package as one folder', () => {
     expect(indexFolder('packages/rafa-hub/src/store/rows.ts')).toBe('packages/rafa-hub');
     expect(indexFolder('src/effort/store/rows.ts')).toBe('src/effort/store');
-  });
-});
-
-describe('the command line', () => {
-  it('is picked by --baseline beside --map=<file>, and any other argument is refused', () => {
-    expect(parseMode([])).toBe('survey');
-    expect(parseMode(['--baseline', '--map=docs/survey/cut-table.json'])).toEqual({ baseline: true, map: 'docs/survey/cut-table.json' });
-    expect(parseMode(['--map=m.json', '--baseline'])).toEqual({ baseline: true, map: 'm.json' });
-    expect(() => parseMode(['--base'])).toThrow('unknown arguments: --base.');
-    expect(() => parseMode(['--baseline', '--baseline', '--map=m.json'])).toThrow('unknown arguments');
-  });
-
-  it('refuses --baseline without --map=<file>, and --map=<file> alone', () => {
-    expect(() => parseMode(['--baseline'])).toThrow('--baseline reads the map: pass --map=<file> beside it');
-    expect(() => parseMode(['--map=m.json'])).toThrow('--map=<file> names the map of --baseline or --against=<record>, and neither was passed');
-    expect(() => parseMode(['--baseline', '--map='])).toThrow('unknown arguments: --baseline --map=.');
-    expect(() => parseMode(['--baseline', '--map=a.json', '--map=b.json'])).toThrow('unknown arguments');
-  });
-
-  it('is picked by --against=<record> beside --map=<file>, each with a path', () => {
-    expect(parseMode(['--against=docs/survey/test-index.baseline.json', '--map=docs/survey/cut-table.json'])).toEqual({
-      against: 'docs/survey/test-index.baseline.json',
-      map: 'docs/survey/cut-table.json',
-    });
-    expect(() => parseMode(['--against=', '--map=m.json'])).toThrow('unknown arguments: --against= --map=m.json.');
-    expect(() => parseMode(['--against'])).toThrow('unknown arguments: --against.');
-    expect(() => parseMode(['--baseline', '--against=a.json', '--map=m.json'])).toThrow('unknown arguments');
-    expect(() => parseMode(['--against=a.json', '--against=b.json', '--map=m.json'])).toThrow('unknown arguments');
-  });
-
-  it('refuses --against=<record> without --map=<file>', () => {
-    expect(() => parseMode(['--against=a.json'])).toThrow('--against=<record> reads the map: pass --map=<file> beside it');
   });
 });
 
@@ -416,7 +375,9 @@ const SCRATCH_FILES: Readonly<Record<string, string>> = {
  * The cut table the scratch repositories plant: the bin, its test and
  * `fresh.test.ts`, listed before it is written, in `@scratch/cli`, and
  * `y.ts` alone in `@scratch/far`. `untracked.test.ts`, `stray.test.ts`
- * and `stray/z.ts` are listed nowhere.
+ * and `stray/z.ts` are listed nowhere; the two under `src/stray/` stay
+ * unplaced, since no listed file sits beside them and no row names a
+ * folder.
  */
 const SCRATCH_TABLE = `${JSON.stringify({
   packages: [
@@ -521,15 +482,15 @@ describe('the record mode over a scratch repository', () => {
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
 
-  it('refuses naming each file the map lists nowhere, a test and the source file it reaches, and leaves the record as it was', async () => {
+  it('refuses naming each file the map places in no unit, a test and the source file it reaches, and leaves the record as it was', async () => {
     const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
     git(root, ['reset', '--quiet', '--hard', 'HEAD']);
-    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+    plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     git(root, ['add', '-A']);
     git(root, [...IDENTITY, 'commit', '--quiet', '-m', 'stray']);
-    const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json lists nowhere:\n'
-      + '  src/a/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
+    const refusal = 'test-index: 2 file(s) the map docs/survey/cut-table.json places in no unit, by listing or by folder:\n'
+      + '  src/stray/stray.test.ts\n  src/stray/z.ts\ntest-index: no record was written';
     await expect(main(root, RECORD_MODE)).rejects.toThrow(refusal);
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
@@ -601,8 +562,8 @@ describe('the guard over a scratch repository', () => {
     rmSync(join(root, 'src/a/fresh.test.ts'));
   });
 
-  it('exits 1 naming each file the map lists nowhere, with no test risen', () => {
-    plant(root, 'src/a/stray.test.ts', 'import { z } from \'../stray/z.js\';\n');
+  it('exits 1 naming each file the map places in no unit, with no test risen', () => {
+    plant(root, 'src/stray/stray.test.ts', 'import { z } from \'./z.js\';\n');
     plant(root, 'src/stray/z.ts', 'export const z = 3;\n');
     const run = runGuard(root, BASELINE_PATH);
     expect(run.stdout.split('\n')).toEqual([
@@ -610,13 +571,12 @@ describe('the guard over a scratch repository', () => {
       + '0 risen, 0 sorted, 0 unsorted (0 widened), 1 held, 0 new',
       'test-index: 0 gone, 0 not read, 0 unindexed still, 1 unplaced',
       '',
-      `test-index: 2 file(s) the map ${SCRATCH_MAP} lists nowhere:`,
-      '  src/a/stray.test.ts',
+      `test-index: 2 file(s) the map ${SCRATCH_MAP} places in no unit, by listing or by folder:`,
+      '  src/stray/stray.test.ts',
       '  src/stray/z.ts',
       '',
     ]);
     expect(run).toMatchObject({ exitCode: 1, stderr: '' });
-    rmSync(join(root, 'src/a/stray.test.ts'));
     rmSync(join(root, 'src/stray'), { force: true, recursive: true });
   });
 

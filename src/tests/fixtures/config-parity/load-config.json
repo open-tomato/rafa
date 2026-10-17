@@ -84,6 +84,22 @@
       "value": [],
       "source": "default"
     },
+    "featuresBoard": {
+      "value": true,
+      "source": "default"
+    },
+    "featuresPr": {
+      "value": true,
+      "source": "default"
+    },
+    "featuresRelease": {
+      "value": true,
+      "source": "default"
+    },
+    "featuresRun": {
+      "value": true,
+      "source": "default"
+    },
     "hubTimeout": {
       "value": "3s",
       "source": "default"
@@ -396,7 +412,7 @@
   "path": "<project>/.rafa/config.yaml",
   "userPath": "<home>/.rafa/config.yaml",
   "warnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)"
   ],
   "extras": [
     {
@@ -406,6 +422,6 @@
   ],
   "userExtras": [],
   "printedWarnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)"
   ]
 }

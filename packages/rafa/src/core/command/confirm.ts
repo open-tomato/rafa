@@ -20,6 +20,17 @@
  *
  * Two line prompters over one input both receive every line, so a
  * command handing a question to another closes its own first.
+ *
+ * ## The lazy prompter
+ *
+ * {@link lazyPrompter} wraps the opening of a prompter so a run that
+ * never asks opens nothing: the prompter is opened at the first
+ * question, kept for the next, and closed by `close`, after which the
+ * next question opens a fresh one. Its `ask` answers whether the line
+ * typed means yes: `y` or `yes`, trimmed and in any case, the reading
+ * every `[y/N]` question in rafa makes. Anything else declines, the empty
+ * answer and the null of an input that ended included. `issue ready`,
+ * `next`, `cleanup` and `plan create`'s three offers ask through it.
  */
 import type { Readable } from 'node:stream';
 
@@ -34,6 +45,17 @@ export interface Prompter {
   /** Stops reading the input. */
   readonly close: () => void;
 }
+
+/** A prompter opened at its first question, see the module note. */
+export interface LazyPrompter {
+  /** Opens the prompter if it is not open, asks `question` and answers whether the line typed means yes. */
+  readonly ask: (question: string) => Promise<boolean>;
+  /** Closes the prompter if one is open; the next question opens another. */
+  readonly close: () => void;
+}
+
+/** The answers that mean yes to a question spelled `[y/N]`. */
+const YES_ANSWERS: readonly string[] = Object.freeze(['y', 'yes']);
 
 /** A stream the prompter writes to: `process.stderr`, or a test's own. */
 export interface PromptOutput {
@@ -75,6 +97,26 @@ export function createLinePrompter(input: Readable, output: PromptOutput): Promp
     },
     close: () => {
       lines.close();
+    },
+  };
+}
+
+/**
+ * A {@link LazyPrompter} over `open`, which is called at the first
+ * question and again at the first one after each `close`; see the
+ * module note.
+ */
+export function lazyPrompter(open: () => Prompter): LazyPrompter {
+  let prompter: Prompter | null = null;
+  return {
+    ask: async (question: string): Promise<boolean> => {
+      prompter ??= open();
+      const answer = await prompter.ask(question);
+      return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+    },
+    close: (): void => {
+      prompter?.close();
+      prompter = null;
     },
   };
 }

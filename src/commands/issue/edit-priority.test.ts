@@ -30,10 +30,10 @@ import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
 
+import { PRIORITY_FLAG } from './declarations.js';
 import {
   holdsPriorityAlone,
   planPriorityEdit,
-  PRIORITY_FLAG,
   PRIORITY_RIVALS,
   priorityMessage,
   readPriorityFlag,

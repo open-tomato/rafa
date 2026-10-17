@@ -43,7 +43,7 @@ const CLUSTER_MAP = {
   outside: ['src/ports/index.ts'],
 };
 
-const CORE_MOVES_TEXT = lines(
+const CORE_LOCATION_TEXT = lines(
   'export const CORE_SOURCE = \'packages/rafa/src/\';',
   'export const CORE_FOLDERS: readonly string[] = [\'src/core/\', \'src/effort/store/\', \'src/ports/\'];',
   'export const CORE_NAMED_FILES: readonly string[] = [',
@@ -96,7 +96,7 @@ const TREE: Readonly<Record<string, string>> = {
   'docs/survey/README.md': 'Core was src/core/.\n',
   'docs/survey/cluster-map.json': `${JSON.stringify(CLUSTER_MAP, null, 2)}\n`,
   'packages/hub/src/main.ts': lines('import { rows } from \'@open-tomato/rafa/store\';', '', 'export const hubRows = rows;'),
-  'scripts/survey/core-moves.ts': CORE_MOVES_TEXT,
+  'scripts/survey/core-moves.ts': CORE_LOCATION_TEXT,
   'scripts/survey/cut-table.ts': 'export const CORE_RULE = { folders: [\'src/core/\'] };\n',
   'scripts/uses-core.ts': lines('import { rows } from \'../src/effort/store/rows.js\';', '', 'export const used = rows;'),
   'src/app.ts': APP_TEXT,

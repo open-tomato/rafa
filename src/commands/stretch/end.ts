@@ -106,7 +106,6 @@ import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
-import { baseWarning, openPull, renderOpen } from '../pr/open.js';
 import { DEFAULT_PR_SEAMS, onProvider, openPrContext } from '../pr/pr-context.js';
 
 import { stretchOfBase } from './item.js';
@@ -328,6 +327,8 @@ async function openEnd(context: RafaContext, input: EndInput, body: string, seam
   } catch (error) {
     throw failure(`${path} could not be written: ${messageOf(error)}. No pull request was opened.`);
   }
+  // Imported here, not at the top: `pr open` is the `pr` feature's command module, loaded when it is used.
+  const { baseWarning, openPull, renderOpen } = await import('../pr/open.js');
   const result = await openPull({ ...context, args: [], flags }, seams.pr);
   const warning = baseWarning(result);
   if (warning !== null) context.output.warn(warning);

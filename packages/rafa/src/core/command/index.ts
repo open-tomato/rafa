@@ -1,12 +1,12 @@
 /**
  * The barrel over the command contract: every name `command.ts`,
- * `confirm.ts`, `registry-types.ts`, `running.ts`, `spends.ts`,
- * `types.ts` and `version.ts` export, and nothing else.
+ * `confirm.ts`, `lazy.ts`, `registry-types.ts`, `running.ts`,
+ * `spends.ts`, `types.ts` and `version.ts` export, and nothing else.
  *
- * A file outside `packages/rafa/src/core/` imports this file and never the seven
+ * A file outside `packages/rafa/src/core/` imports this file and never the eight
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `packages/rafa/src/core/` imports the seven directly and never this
+ * file inside `packages/rafa/src/core/` imports the eight directly and never this
  * file.
  *
  * ## What sits behind it
@@ -14,10 +14,15 @@
  *   - `command.ts`: `RafaCommand`, the `RafaContext` it runs with,
  *     `CommandExit`, the routing words and the shape check;
  *   - `confirm.ts`: the `Prompter` every yes-or-no question goes
- *     through, and the line prompter that reads one from a stream;
+ *     through, the line prompter that reads one from a stream, and the
+ *     lazy prompter that opens one only to ask;
+ *   - `lazy.ts`: `CommandDeclaration`, a command less its `run`, and
+ *     `lazyCommand`, the command over a declaration whose `run` imports
+ *     the command's module and delegates to its default export;
  *   - `registry-types.ts`: the contract of the dispatcher's registry,
- *     `CommandRegistry` and the five shapes it names, whose builder
- *     stays in `src/cli/registry.ts`;
+ *     `CommandRegistry` and the five shapes it names, and
+ *     `CommandFeature`, what one feature contributes to it, whose
+ *     builder stays in `src/cli/registry.ts`;
  *   - `running.ts`: the command this process is running with its parsed
  *     flags, recorded by the dispatcher and read by the spend guard;
  *   - `spends.ts`: a command's `spends` declaration, `CommandSpend`, its
@@ -28,16 +33,20 @@
  *   - `version.ts`: the version the running build answers with, and the
  *     line that spells it.
  *
- * The seven hold no name in common, so each name is exported once and
+ * The eight hold no name in common, so each name is exported once and
  * from the file that declares it.
  *
- * ## Why one barrel can hold all seven
+ * ## Why one barrel can hold all eight
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
- * imports the barrel back by value is a runtime cycle. None of the seven
+ * imports the barrel back by value is a runtime cycle. None of the eight
  * imports a file outside `packages/rafa/src/core/` by value. `command.ts` takes
  * `spendsProblem` from `spends.ts` beside it, and both take
  * `describeValue` from `packages/rafa/src/core/config/config-sections.ts`.
+ * `lazy.ts` takes the shape check, `CommandExit` and `commandSpelling`
+ * from `command.ts`, and `messageOf` from the same config file; the
+ * module a lazy command loads is the caller's `load()`, imported when
+ * the command runs, never by `lazy.ts` itself.
  * `confirm.ts` and `running.ts` import `node:` modules alone by value,
  * `running.ts` naming `command.ts` and `types.ts` with `import type`.
  * `version.ts` imports the root `package.json`, and `types.ts` nothing
@@ -84,7 +93,7 @@
  * spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the seven files: every name any of
+ * `index.test.ts` holds the list to the eight files: every name any of
  * them exports is here once, as the same binding, and no other name is
  * here.
  */
@@ -97,9 +106,11 @@ export type {
   RafaContext,
   RafaFlagSpec,
 } from './command.js';
-export type { PromptOutput, Prompter } from './confirm.js';
+export type { LazyPrompter, PromptOutput, Prompter } from './confirm.js';
+export type { CommandDeclaration } from './lazy.js';
 export type {
   CommandAlias,
+  CommandFeature,
   CommandRegistry,
   CommandRegistryInput,
   ModuleMount,
@@ -123,7 +134,8 @@ export {
   isRoutingWord,
   isTopLevel,
 } from './command.js';
-export { createLinePrompter } from './confirm.js';
+export { createLinePrompter, lazyPrompter } from './confirm.js';
+export { lazyCommand } from './lazy.js';
 export {
   restoreRunningCommand,
   runAsRunningCommand,

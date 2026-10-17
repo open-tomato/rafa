@@ -157,6 +157,7 @@ import { LABEL_LIST_LIMIT, listBoardLabels } from '../../board/setup.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 
+import { DEFAULT_HORIZON, EPIC_NEW_DECLARATION } from './declarations.js';
 import { newEpicTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { NATIVE_MODE } from './move-native.js';
 
@@ -165,9 +166,6 @@ const USAGE = 'rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]'
 
 /** The exit code of a slug refused and of a board that cannot be read; see the module note. */
 export const EPIC_NEW_REFUSAL_EXIT = 2;
-
-/** The horizon a new epic takes when the line names none. */
-export const DEFAULT_HORIZON: Horizon = 'later';
 
 /** A kebab word: lowercase letters and digits, in runs joined by single hyphens. */
 export const KEBAB_SLUG: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -514,55 +512,7 @@ export async function runEpicNew(context: RafaContext, seams: EpicNewSeams): Pro
 /** The command, reaching `gh` through `seams`; see the module note. */
 export function createEpicNewCommand(seams: EpicNewSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic new',
-    subject: 'epic',
-    action: 'new',
-    summary: 'create an epic: the issue from the epic template, its line on the current board, and in labels mode its epic:<slug> label',
-    description: 'Creates one epic. The label epic:<slug> is created when the repository does not hold it, then'
-      + ' the epic issue, titled as given, its body the epic template (acceptance criteria, estimate, date,'
-      + ' Owns: and an empty checklist), labelled type:epic, epic:<slug> and horizon:<horizon> in the same'
-      + ' command, and last its `- [ ] #<n> <title>` line on the current board, the one `rafa switch` moved'
-      + ' to, else the default board. The horizon is later unless `--horizon` says now or next, so a new'
-      + ' epic is not picked by the loop unasked. A slug that is not a kebab word (lowercase letters and'
-      + ' digits joined by single hyphens) or that an issue already carries as epic:<slug> is refused with'
-      + ' exit code 2 before anything is created, as is a board that cannot be read. With `--output=json`'
-      + ' the epic, its labels and the board line are the data of the terminal result event. With'
-      + ' board.relationships native an epic is named by its number and title: no slug is needed or read, no'
-      + ' epic:<slug> label is created or checked, and the issue is labelled type:epic and horizon:<horizon> only.',
-    args: [
-      {
-        name: 'title',
-        description: 'The epic\'s title, quoted: one line.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: 'slug',
-        description: 'The epic\'s slug, a kebab word such as sign-in: its members carry epic:<slug>. Required in'
-          + ' labels mode; not used with board.relationships native.',
-        type: 'string',
-        required: true,
-      },
-      {
-        name: 'horizon',
-        description: `The epic's horizon: one of ${HORIZONS.join(', ')}.`,
-        type: 'string',
-        default: DEFAULT_HORIZON,
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic new "Sign-in without passwords" --slug=passwordless',
-        note: 'Creates the label epic:passwordless and the epic, horizon later, and adds its line to the current board.',
-      },
-      {
-        cmd: 'rafa epic new "Billing v2" --slug=billing-v2 --horizon=next',
-        note: 'Creates the epic with horizon:next.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...EPIC_NEW_DECLARATION,
     run: (context) => runEpicNew(context, seams),
   };
   return Object.freeze(command);
