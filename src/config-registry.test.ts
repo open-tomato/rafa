@@ -17,9 +17,11 @@
  * case could meet.
  *
  * A second call of the root registers nothing and leaves the load hook
- * as it found it; over an empty registry, a call registers every
- * setting and sets the hook, the control that the first case could
- * have read a registration.
+ * and the template hook as it found them; over an empty registry, a call
+ * registers every setting and sets both hooks, the control that the
+ * first case could have read a registration. The template hook the
+ * preload's registration set is held to be `templateEntry` from
+ * `src/config/templates.ts`.
  *
  * The probe cases import one module first in a fresh `bun` process,
  * which runs no preload, and print how many settings and defaults
@@ -53,6 +55,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   activeChecks,
   activeConfigLoadHook,
+  activeConfigTemplateHook,
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
@@ -64,9 +67,11 @@ import {
   registerConfigSections,
   restoreConfigSections,
   setConfigLoadHook,
+  setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
+import { templateEntry } from './config/templates.js';
 import {
   CONFIG_DEFAULTS,
   CONFIG_SECTIONS,
@@ -384,22 +389,26 @@ describe('the registration the preload made', () => {
 });
 
 describe('registerCoreConfigSections', () => {
-  it('registers nothing and keeps the load hook when every setting is held already', () => {
+  it('registers nothing and keeps both hooks when every setting is held already', () => {
     const before = activeSettings();
     const hook = setConfigLoadHook(null);
+    const templates = setConfigTemplateHook(null);
     try {
       registerCoreConfigSections();
 
       expect(activeSettings()).toBe(before);
       expect(activeConfigLoadHook()).toBeNull();
+      expect(activeConfigTemplateHook()).toBeNull();
     } finally {
       setConfigLoadHook(hook);
+      setConfigTemplateHook(templates);
     }
   });
 
-  it('registers every setting in schema order and sets the load hook, over an empty registry', () => {
+  it('registers every setting in schema order and sets both hooks, over an empty registry', () => {
     const held = registerConfigSections([]);
     const hook = setConfigLoadHook(null);
+    const templates = setConfigTemplateHook(null);
     restoreConfigSections(EMPTY_CONFIG_REGISTRY);
     try {
       expect(Object.keys(activeSettings())).toEqual([]);
@@ -408,10 +417,20 @@ describe('registerCoreConfigSections', () => {
 
       expect(Object.keys(activeSettings())).toEqual(KEYS.map(([setting]) => setting));
       expect(activeConfigLoadHook()).toBe(handConfigToLogger);
+      expect(activeConfigTemplateHook()).toBe(templateEntry);
     } finally {
       restoreConfigSections(held);
       setConfigLoadHook(hook);
+      setConfigTemplateHook(templates);
     }
+  });
+});
+
+describe('the template hook', () => {
+  it('is set by the registration to templateEntry, answering the escalation entry by name', () => {
+    expect(activeConfigTemplateHook()).toBe(templateEntry);
+    expect(activeConfigTemplateHook()?.('escalation')).toBe(templateEntry('escalation'));
+    expect(activeConfigTemplateHook()?.('no-such-template')).toBeNull();
   });
 });
 

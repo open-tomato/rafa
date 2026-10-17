@@ -7,6 +7,10 @@
  *   `ConfigShape` (`entry.ts`, `shape.ts`).
  * - `defineConfig`, the identity, typed for its parameter.
  * - {@link defaults}, the one entry holding every setting's default.
+ * - `templates`, the config templates by name (`templates.ts`), each a
+ *   frozen `ConfigEntry`, for a project that installs rafa to spread by
+ *   value into its own entries, as `templates.escalation`. A YAML file
+ *   names one with its `templates` key instead.
  *
  * ## The defaults entry
  *
@@ -39,6 +43,7 @@ export type { Config, ConfigEntry } from './entry.js';
 export type { ConfigShape } from './shape.js';
 
 export { defineConfig } from './entry.js';
+export { CONFIG_TEMPLATES as templates } from './templates.js';
 
 /** The settings a file spells as one comma-separated string and core resolves to a list. */
 const COMMA_SEPARATED: ReadonlySet<ConfigSetting> = new Set<ConfigSetting>(['settingSources']);

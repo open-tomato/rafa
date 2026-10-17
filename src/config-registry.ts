@@ -30,7 +30,11 @@
  * The call also sets core's load hook (`setConfigLoadHook` in
  * `packages/rafa/src/core/config/section.ts`) to {@link handConfigToLogger}, so every
  * config `loadConfig` resolves hands the logger its `logger` settings
- * without core importing the logger's section file.
+ * without core importing the logger's section file. It sets core's
+ * template hook too (`setConfigTemplateHook`, same file) to
+ * `templateEntry` from `src/config/templates.ts`, so the loader reads a
+ * template a file names by calling the active hook, and core imports no
+ * template file.
  *
  * ## The order
  *
@@ -91,9 +95,11 @@ import {
   CORE_SECTION,
   registerConfigSections,
   setConfigLoadHook,
+  setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config';
 
 import { setActiveLoggerSettings } from './adapters/logger/settings.js';
+import { templateEntry } from './config/templates.js';
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
@@ -343,20 +349,22 @@ function holdsCoreSections(): boolean {
 
 /**
  * Registers {@link CONFIG_SECTIONS} with core, cut into the runs
- * {@link SETTINGS} holds them in, and sets core's load hook to
- * {@link handConfigToLogger}.
+ * {@link SETTINGS} holds them in, sets core's load hook to
+ * {@link handConfigToLogger}, and sets core's template hook to
+ * `templateEntry` (`src/config/templates.ts`).
  *
  * When core's registry holds every setting already, each as the same
- * spec, it registers nothing and leaves the load hook as it is, so the
+ * spec, it registers nothing and leaves both hooks as they are, so the
  * preload and an entry may both call it in one process. Throws what
  * `registerConfigSections` throws on a section core refuses, such as a
  * setting another package registered first, leaving the registry and
- * the load hook as they were.
+ * both hooks as they were.
  */
 export function registerCoreConfigSections(): void {
   if (holdsCoreSections()) return;
   registerConfigSections(inSettingOrder(CONFIG_SECTIONS, SETTING_NAMES));
   setConfigLoadHook(handConfigToLogger);
+  setConfigTemplateHook(templateEntry);
 }
 
 /** Setting names by the dotted key the file spells them with. */
