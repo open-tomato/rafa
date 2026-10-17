@@ -334,11 +334,15 @@ const ORIGIN_COMMAND = 'remote get-url origin';
 /** What a trust refusal calls the repository, given {@link ORIGIN}. */
 const REPO = 'github.com/open-tomato/rafa';
 
-/** A `git` runner answering no branch and one `origin`, keeping every command it was sent. */
-function plantedGit(): { git: GitRunner; sent: () => readonly string[] } {
+/**
+ * A `git` runner answering one `origin` and `local` to the local branch
+ * read, no branch when left out, keeping every command it was sent.
+ */
+function plantedGit(local = ''): { git: GitRunner; sent: () => readonly string[] } {
   let sent: readonly string[] = [];
   const git: GitRunner = (args) => {
     sent = [...sent, args.join(' ')];
+    if (args[0] === 'for-each-ref') return { ok: true, stdout: local, stderr: '' };
     return args.join(' ') === ORIGIN_COMMAND
       ? { ok: true, stdout: `${ORIGIN}\n`, stderr: '' }
       : { ok: true, stdout: '', stderr: '' };
@@ -373,6 +377,7 @@ interface PlanSpecFields {
   readonly offerAlternative?: AlternativeOffer | null;
   readonly offerRefresh?: RefreshOffer | null;
   readonly passOver?: ReadonlyMap<number, string>;
+  readonly branchTemplate?: string;
   readonly output?: Output;
 }
 
@@ -420,6 +425,9 @@ function ask(
     ...fields.passOver === undefined
       ? {}
       : { passOver: fields.passOver },
+    ...fields.branchTemplate === undefined
+      ? {}
+      : { branchTemplate: fields.branchTemplate },
     gh,
     git,
     output: fields.output ?? OUTPUT,
@@ -583,6 +591,39 @@ describe('the spec the roadmap picks', () => {
 
     if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
     expect(resolved.spec.issue).toBe(33);
+  });
+
+  it('hands the walk naming.branch, so a line whose only branch is under work/{stub} is taken', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: `${ROADMAP_BODY}\n- [ ] #33 the board setup`, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20),
+      issueOf(33),
+    ]);
+
+    const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, plantedGit('refs/remotes/origin/work/rafa-20-x\n').git, {
+      roadmapIssue: ROADMAP,
+      branchTemplate: 'work/{stub}',
+    });
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec.issue).toBe(33);
+  });
+
+  it('picks #20 over the same branch with the template left out, the control for the case above', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: `${ROADMAP_BODY}\n- [ ] #33 the board setup`, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20),
+      issueOf(33),
+    ]);
+
+    const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, plantedGit('refs/remotes/origin/work/rafa-20-x\n').git, {
+      roadmapIssue: ROADMAP,
+    });
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec.issue).toBe(20);
   });
 
   it('lists the board once through gh for a roadmap whose first line is an epic, and plans its first open spec', async () => {
