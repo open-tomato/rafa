@@ -212,10 +212,13 @@ baseline expectations and stage-end failures:
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope, its reason (`declared`, `trigger`,
-`fallback`, `no-module-tests`, or `stage`), the command, exit code, Bun's
-summary line, every failing test (file + full test name pairs), and which
-failures are new against the baseline (not present in `baseline`'s captured
-failures).
+`fallback`, `no-module-tests`, `stage`, `no-check` or `unit`), the command,
+exit code, Bun's summary line, every failing test (file + full test name
+pairs), and which failures are new against the baseline (not present in
+`baseline`'s captured failures). The record also holds a `none` step, for
+a check-point entry that names no check: scope `none`, an empty command,
+exit code 0, no failures, and a `declared` key naming the `tests=` value
+it set aside when the line had one.
 
 **The baseline is the `baseline` step's recorded failures.** A failure is
 identified by its test file path and full test name. When a step reports

@@ -83,14 +83,17 @@ directory, so a changed package file belongs in the scoped
   `tests.alwaysRun` files when the plan has no `Owns:` folder
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
-Each recorded step names its scope (affected, module, full, or a
-file/folder list it ran on) and its reason where it has one (`declared`
+Each recorded step names its scope (affected, module, full, `none`, or
+a file/folder list it ran on) and its reason where it has one (`declared`
 for a task step whose line declares `tests=module` or `tests=full`;
 `trigger` when changed files match `tests.fullSuiteTriggers` and
 escalate the scope; `fallback` for a stage step with no `Owns:` folder
 running `bun test --changed=<since>`; `no-module-tests` when a task
 names `tests=module` but the module has no test files; `stage` for a
-stage step's `Owns:` path list). The baseline and the pre-wrap-up step
+stage step's `Owns:` path list; `no-check` for a `none` step, whose
+check-point entry names no check and which holds an empty command, exit
+code 0, no failures and a `declared` key naming the `tests=` value it
+set aside; `unit` for a run the entry's `unit` check chose). The baseline and the pre-wrap-up step
 carry no reason, as they always run the full suite. Each also records
 the command, exit code, Bun's summary line, every failing test (file +
 full test name pairs), and which failures are new against the baseline
