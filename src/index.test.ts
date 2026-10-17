@@ -1217,7 +1217,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/claim/take.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/config/sections', ['CLAIMS_STALE_DISABLED', 'messageOf']],
+    ['@open-tomato/rafa/core/config/sections', ['CLAIMS_STALE_DISABLED', 'DEFAULT_BRANCH_TEMPLATE', 'messageOf']],
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
     ['../../board/roadmap-claims.js', ['idleText']],

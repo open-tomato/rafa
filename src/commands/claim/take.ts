@@ -11,10 +11,12 @@
  * argument, the issue number (`readIssueArgument`). A line typed
  * `--stale 7` reads `7` as the flag's value and is refused, naming the
  * order to type it in. Then this device's store id, then one fetch of
- * the claim branches (the `naming.branch` template with the stub,
- * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
- * `rafa claim release` reads them (`./release.ts`). No network means no
- * takeover. When a branch of the issue holds a claim, the issue's
+ * the claim branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`): each is the project's
+ * `naming.branch` template with the stub, `feat/rafa-<n>-<slug>` by default
+ * and `work/rafa-<n>-<slug>` under `work/{stub}`. Only the configured
+ * template is read, and the take commit is pushed under it. No network
+ * means no takeover. When a branch of the issue holds a claim, the issue's
  * labels are read once through the `labels` seam, and the clock once
  * through `now`.
  *
@@ -99,7 +101,7 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { CLAIMS_STALE_DISABLED, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
@@ -301,7 +303,8 @@ export async function takeClaim(context: RafaContext, makeSeams: ClaimTakeSeamsF
   const seams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
-  const readings = readIssueBranches(seams.git, issue, refuse);
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const readings = readIssueBranches(seams.git, issue, refuse, template);
   const labels = await readLabels(seams, issue, readings);
   const weights: TakeWeights = {
     issue,
@@ -313,7 +316,7 @@ export async function takeClaim(context: RafaContext, makeSeams: ClaimTakeSeamsF
     stale,
   };
   const { reading, from, was, idleMs } = pickBranch(readings, weights);
-  const sha = pushOnClaimTip(seams.git, reading, { action: 'take', issue, store: storeId }, refuse, TAKING);
+  const sha = pushOnClaimTip(seams.git, reading, { action: 'take', issue, store: storeId }, refuse, TAKING, template);
   return { issue, branch: reading.branch, storeId, from, was, idleMs, sha, labelWarning: labels.warning };
 }
 
@@ -328,7 +331,10 @@ export function renderTake(result: ClaimTakeResult): string {
     + ` take commit ${result.sha} pushed to ${REMOTE}; this device (store ${result.storeId}) now owns the claim.`;
 }
 
-/** The default seams: `loop start`'s claim seams, the issue's labels read through `gh`, and the wall clock. */
+/**
+ * The default seams: `loop start`'s claim seams, the project's `naming.branch`
+ * template, the issue's labels read through `gh`, and the wall clock.
+ */
 const DEFAULT_SEAMS: ClaimTakeSeamsFactory = (root, config) => {
   const base = createStartPreflightClaim(root, config);
   const reader = base.board === null
@@ -337,7 +343,7 @@ const DEFAULT_SEAMS: ClaimTakeSeamsFactory = (root, config) => {
   const labels = reader === null
     ? null
     : async (issue: number): Promise<readonly string[]> => (await reader(issue)).labels;
-  return { ...base, labels, now: () => new Date() };
+  return { ...base, branchTemplate: config.namingBranch, labels, now: () => new Date() };
 };
 
 /** The command, reaching git, the board, the store and the clock through `makeSeams`; see the module note. */
