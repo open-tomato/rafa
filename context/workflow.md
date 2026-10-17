@@ -450,6 +450,29 @@ existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**The claim readers match the `naming.branch` template and no other.** The
+claims, `rafa status`, `rafa next`, the roadmap's claim reading and
+`rafa claim release` each read the configured template, `feat/{stub}` by
+default, and never the default beside it: a branch under another template is
+no claim here. The lightest shape is a line in `.rafa/config.yaml`:
+
+```yaml
+naming:
+  branch: work/{stub}
+```
+
+The suffix shape is `{stub}-wip`, which names the branch for `rafa-49`
+`rafa-49-wip`.
+
+**`lost/<stub>` is fixed whatever the template.** Rafa makes that branch
+itself, and no loop creates it, so no template reaches it.
+
+**A branch made under an earlier template is no claim under the new one.**
+Changing `naming.branch` while claims are held is a move the person makes:
+they rename or re-cut the branches, and the readers carry none over. Reading
+both templates was rejected, because another layout's `feat/rafa-*` would then
+look held here.
+
 **On a detached HEAD, `--create-branch` cuts the branch from the base, and the
 refusal without it names the flag.** Without `--create-branch` the run is
 refused before its first task: the refusal says no branch is checked out,

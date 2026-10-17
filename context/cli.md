@@ -484,7 +484,8 @@ New; it replaces no earlier text. What a row or an action added to
   where `<base>` is `pr.base` when set, else `origin/HEAD`. The branch's
   name is the `naming.branch` template, `feat/{stub}` by default, with the
   plan's stub for `{stub}`; it names the worktree's branch under
-  `--as-worktree` too (`start/branch-decision.ts`). Without the
+  `--as-worktree` too (`start/branch-decision.ts`), and the claim and
+  status readers match the same template. Without the
   flag a terminal asks the same question, and any other run is refused,
   naming the flag. The flag is read from the parsed line and handed into
   `start`, which resolves the plan from `.rafa/plans/` unless `plan.dir`
