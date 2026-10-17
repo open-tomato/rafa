@@ -28,8 +28,6 @@ import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
-import '../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

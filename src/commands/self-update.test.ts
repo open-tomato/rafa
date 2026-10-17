@@ -20,8 +20,6 @@ import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, sep } from 'node:path';

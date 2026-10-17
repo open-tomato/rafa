@@ -17,7 +17,6 @@
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import '../config-registry.js';
-import '../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
