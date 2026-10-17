@@ -5,18 +5,27 @@
  * file, and each `rafa <subject> <action>` inside a `run:` naming an
  * action of the command registry.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_REGISTRY } from '../commands/index.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+
+const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-shape-')));
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
 
 const DIR = fileURLToPath(new URL('./templates/', import.meta.url));
 const FILES = readdirSync(DIR).filter((file) => file.endsWith('.yml'));
 
 interface Step {
+  readonly name?: string;
   readonly run?: string;
 }
 interface Workflow {
@@ -60,6 +69,31 @@ function scriptsOf(workflow: Workflow): readonly string[] {
     : [step.run]));
 }
 
+const CONFIG_STEP = 'Write the CI config';
+const RAFA_CALL = /\brafa(?:\.ts)? [a-z][a-z-]* [a-z][a-z-]*/;
+
+/** The steps of the job holding the config step, and the step itself. */
+function configJob(file: string): { readonly steps: readonly Step[]; readonly step: Step | undefined } {
+  const steps = Object.values(parse(file).jobs)
+    .map((job) => job.steps ?? [])
+    .find((jobSteps) => jobSteps.some((candidate) => candidate.name === CONFIG_STEP)) ?? [];
+  return { steps, step: steps.find((candidate) => candidate.name === CONFIG_STEP) };
+}
+
+/** Runs the config step's script under bash in `dir`, failing on a nonzero exit. */
+function runConfigStep(file: string, dir: string): void {
+  const run = Bun.spawnSync(['bash', '-e', '-o', 'pipefail', '-c', configJob(file).step?.run ?? 'exit 99'], {
+    cwd: dir,
+    env: { TMPDIR: tmpdir(), PATH: process.env['PATH'] ?? '', ...scratchHomeEnv(tempBase) },
+  });
+  expect(run.exitCode).toBe(0);
+}
+
+/** Every file under `dir`, relative, sorted. */
+function listing(dir: string): readonly string[] {
+  return [...new Bun.Glob('**/*').scanSync({ cwd: dir, dot: true, onlyFiles: true })].sort();
+}
+
 describe('the release workflow templates', () => {
   it('ship at least one template', () => {
     expect(FILES.length).toBeGreaterThan(0);
@@ -87,6 +121,41 @@ describe('the release workflow templates', () => {
       for (const call of calls) {
         expect(CORE_REGISTRY.find(call.subject, call.action)).toBeDefined();
       }
+    });
+
+    describe(CONFIG_STEP, () => {
+      it('sits before the first step whose script runs rafa', () => {
+        const { steps } = configJob(file);
+        const at = steps.findIndex((candidate) => candidate.name === CONFIG_STEP);
+        const firstRafa = steps.findIndex((candidate) => RAFA_CALL.test(candidate.run ?? ''));
+
+        expect(at).toBeGreaterThanOrEqual(0);
+        expect(firstRafa).toBeGreaterThan(at);
+      });
+
+      it('writes .rafa/config.yaml enabling the release commands when no config exists', () => {
+        const dir = mkdtempSync(join(tempBase, 'none-'));
+
+        runConfigStep(file, dir);
+
+        expect(listing(dir)).toEqual(['.rafa/config.yaml']);
+        const text = readFileSync(join(dir, '.rafa/config.yaml'), 'utf8');
+        expect(Bun.YAML.parse(text)).toEqual({ release: { enabled: true } });
+        const name = (parse(file) as unknown as { readonly name: string }).name;
+        expect(text.split('\n')[0]).toBe(`# Written by the ${name} workflow: the checkout holds no rafa config.`);
+      });
+
+      it.each(['rafa.config.ts', 'rafa.config.mjs', '.rafa/config.yaml'])('leaves a planted %s byte for byte and writes nothing else', (planted) => {
+        const dir = mkdtempSync(join(tempBase, 'planted-'));
+        const content = 'export default { planted: true }; // \u00e9\n';
+        mkdirSync(join(dir, '.rafa'), { recursive: true });
+        writeFileSync(join(dir, planted), content);
+
+        runConfigStep(file, dir);
+
+        expect(listing(dir)).toEqual([planted]);
+        expect(readFileSync(join(dir, planted), 'utf8')).toBe(content);
+      });
     });
   });
 });
