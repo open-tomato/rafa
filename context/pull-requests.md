@@ -542,10 +542,12 @@ The EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), which
 runs the test a bug's `Rerun` section names. It IGNORES rather than
 refuses: it asks `readBoardTrust` about the bug's author once per login,
 only for a bug whose reference is runnable and on any tracker but `local`,
-which holds no accounts. An untrusted author is a `skipped` row whose
+which has no author to check. An untrusted author is a `skipped` row whose
 reason is "opened by <login>, " and `trustRefusalClause`'s clause; an
-author the tracker does not name is `skipped` with no lookup. Nothing is
-spawned for either, and the exit code stays 0.
+author the tracker does not name is `skipped` with no lookup. No board text
+reaches a prompt or a shell through it: the `Rerun` value is parsed, never
+passed on, and the argv is built here. Nothing is spawned for either, and
+the exit code stays 0.
 
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`
