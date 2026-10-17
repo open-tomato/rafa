@@ -1,7 +1,8 @@
 /**
- * The `triage` section of the config schema: the two settings triage
- * reads when it looks for the nearest open bug a report repeats, each
- * one's field, its default, its spec and its reader.
+ * The `triage` section of the config schema: the five settings triage
+ * reads when it looks for the nearest open bug a report repeats and ranks
+ * the ones a new bug lists, each one's field, its default, its spec and
+ * its reader.
  * {@link TRIAGE_SECTION} hands them to core as one `ConfigSection`,
  * package `triage`, and the `declare module` below adds
  * {@link TriageSettings} to `RafaConfig`.
@@ -19,7 +20,7 @@
  * `config-registry.ts` imports this file; a caller reads the settings off
  * the resolved `RafaConfig`.
  *
- * ## The two keys
+ * ## The five keys
  *
  * Step 3 of a public bug's lookup (`triage/triage.ts`) scores the
  * report against each open bug by Jaccard similarity of their word
@@ -38,9 +39,20 @@
  *     to `3` and accepts a whole number from 1 to 10; the cap keeps that
  *     section short enough to read. It takes no `false`: turning step 3
  *     off is the threshold's to say.
+ *   - `triage.similarity.weights.causeLeaf`, `.causeFamily` and
+ *     `.boundary` are the bonuses `rankedCandidates`
+ *     (`triage/similarity.ts`) adds to an open bug's word score when it
+ *     shares the new bug's cause code, only its cause family, or its
+ *     module and action; the sum is capped at 1 and orders the
+ *     `Possible duplicates` list, never the same-bug decision. They
+ *     default to `0.15`, `0.05` and `0.10` and each accepts a number from
+ *     0 to 1 inclusive: `0` turns its signal off, which is why it is
+ *     accepted here and refused by the threshold, and a bonus above 1
+ *     could only ever hit the cap. `true` and `false` are refused, as the
+ *     threshold refuses `true`: `0` already says off.
  *
  * A quoted number is refused, as every other reader refuses a string
- * spelled like its type. Neither key is a `CommandLineSetting`: the
+ * spelled like its type. No key is a `CommandLineSetting`: the
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
@@ -60,12 +72,23 @@ export interface TriageShape {
     readonly similarity: {
       readonly threshold: SimilarityThreshold;
       readonly candidates: number;
+      readonly weights: {
+        readonly causeLeaf: number;
+        readonly causeFamily: number;
+        readonly boundary: number;
+      };
     };
   };
 }
 
 /** The most `triage.similarity.threshold` accepts. */
 export const SIMILARITY_THRESHOLD_MAX = 1;
+
+/** The least a `triage.similarity.weights.*` bonus accepts; `0` turns its signal off. */
+export const SIMILARITY_WEIGHT_MIN = 0;
+
+/** The most a `triage.similarity.weights.*` bonus accepts. */
+export const SIMILARITY_WEIGHT_MAX = 1;
 
 /** The fewest nearest issues `triage.similarity.candidates` accepts. */
 export const SIMILARITY_CANDIDATES_MIN = 1;
@@ -91,6 +114,21 @@ export interface TriageSettings {
    * section lists. `triage.similarity.candidates`.
    */
   triageSimilarityCandidates: number;
+  /**
+   * The bonus an open bug with the same cause code earns in the
+   * `Possible duplicates` rank. `triage.similarity.weights.causeLeaf`.
+   */
+  triageSimilarityWeightsCauseLeaf: number;
+  /**
+   * The bonus an open bug with the same cause family and another leaf
+   * earns in that rank. `triage.similarity.weights.causeFamily`.
+   */
+  triageSimilarityWeightsCauseFamily: number;
+  /**
+   * The bonus an open bug with the same module and action earns in that
+   * rank. `triage.similarity.weights.boundary`.
+   */
+  triageSimilarityWeightsBoundary: number;
 }
 
 /** True for a finite number above 0 and at most {@link SIMILARITY_THRESHOLD_MAX}. */
@@ -109,6 +147,14 @@ function isCandidateCount(raw: unknown): raw is number {
     && raw <= SIMILARITY_CANDIDATES_MAX;
 }
 
+/** True for a finite number from {@link SIMILARITY_WEIGHT_MIN} to {@link SIMILARITY_WEIGHT_MAX}, both included. */
+function isWeight(raw: unknown): raw is number {
+  return typeof raw === 'number'
+    && Number.isFinite(raw)
+    && raw >= SIMILARITY_WEIGHT_MIN
+    && raw <= SIMILARITY_WEIGHT_MAX;
+}
+
 /**
  * Accepts `false` or a number above 0 and at most 1, each as itself; the
  * module note says why `0`, `true` and a quoted number are refused.
@@ -122,10 +168,21 @@ export const similarityCandidates: Reader<number> = (raw, at) => isCandidateCoun
   ? { value: raw, problems: [], extras: [] }
   : refused(at, raw, `a whole number from ${String(SIMILARITY_CANDIDATES_MIN)} to ${String(SIMILARITY_CANDIDATES_MAX)}`);
 
+/**
+ * Accepts a number from 0 to 1 inclusive as itself; the module note says
+ * why `0` is accepted and `true`, `false` and a quoted number are refused.
+ */
+export const similarityWeight: Reader<number> = (raw, at) => isWeight(raw)
+  ? { value: raw, problems: [], extras: [] }
+  : refused(at, raw, `a number from ${String(SIMILARITY_WEIGHT_MIN)} to ${String(SIMILARITY_WEIGHT_MAX)}`);
+
 /** What every `triage` setting resolves to when no layer names it. */
 export const TRIAGE_DEFAULTS: Readonly<TriageSettings> = Object.freeze({
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  triageSimilarityWeightsCauseLeaf: 0.15,
+  triageSimilarityWeightsCauseFamily: 0.05,
+  triageSimilarityWeightsBoundary: 0.1,
 });
 
 /** The `triage` section's setting specs, in the order problems are reported. */
@@ -142,9 +199,24 @@ export const TRIAGE_SETTINGS: {
     read: similarityCandidates,
     cli: false,
   },
+  triageSimilarityWeightsCauseLeaf: {
+    key: 'triage.similarity.weights.causeLeaf',
+    read: similarityWeight,
+    cli: false,
+  },
+  triageSimilarityWeightsCauseFamily: {
+    key: 'triage.similarity.weights.causeFamily',
+    read: similarityWeight,
+    cli: false,
+  },
+  triageSimilarityWeightsBoundary: {
+    key: 'triage.similarity.weights.boundary',
+    read: similarityWeight,
+    cli: false,
+  },
 };
 
-/** The `triage` section: the two `triage` keys, with their defaults and no check. */
+/** The `triage` section: the five `triage` keys, with their defaults and no check. */
 export const TRIAGE_SECTION: ConfigSection = Object.freeze({
   package: 'triage',
   settings: Object.freeze(TRIAGE_SETTINGS),

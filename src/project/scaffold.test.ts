@@ -244,7 +244,7 @@ describe('the config files', () => {
       .toEqual(['default', 'default', 'default', 'default', 'default']);
   });
 
-  it('carries the triage section, threshold at 0.3 and candidates at 3, which resolve from the file once uncommented', () => {
+  it('carries the triage section, threshold at 0.3, candidates at 3 and the weights at 0.15, 0.05 and 0.1, which resolve from the file once uncommented', () => {
     const triage = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# triage:'),
       CONFIG_SETTINGS_LINES.indexOf('# release:'),
@@ -256,17 +256,36 @@ describe('the config files', () => {
       '#   similarity:',
       '#     threshold: 0.3',
       '#     candidates: 3',
+      '#     weights:',
+      '#       causeLeaf: 0.15',
+      '#       causeFamily: 0.05',
+      '#       boundary: 0.1',
     ]);
     expect([resolved.config.triageSimilarityThreshold, resolved.config.triageSimilarityCandidates]).toEqual([0.3, 3]);
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates]).toEqual(['file', 'file']);
+    expect([
+      resolved.config.triageSimilarityWeightsCauseLeaf,
+      resolved.config.triageSimilarityWeightsCauseFamily,
+      resolved.config.triageSimilarityWeightsBoundary,
+    ]).toEqual([0.15, 0.05, 0.1]);
+    expect([
+      resolved.sources.triageSimilarityWeightsCauseLeaf,
+      resolved.sources.triageSimilarityWeightsCauseFamily,
+      resolved.sources.triageSimilarityWeightsBoundary,
+    ]).toEqual(['file', 'file', 'file']);
   });
 
   it('answers each triage setting from the default once its line is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {5}(?:threshold|candidates):/.test(line));
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {5}(?:threshold|candidates):|^# {7}(?:causeLeaf|causeFamily|boundary):/.test(line));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 2);
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 5);
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates]).toEqual(['default', 'default']);
+    expect([
+      resolved.sources.triageSimilarityWeightsCauseLeaf,
+      resolved.sources.triageSimilarityWeightsCauseFamily,
+      resolved.sources.triageSimilarityWeightsBoundary,
+    ]).toEqual(['default', 'default', 'default']);
   });
 
   it('carries the loop section, worktreeDir at .rafa/worktrees, retries at false, the --continue keys at their defaults and wrapUp.retries at 1, which resolve from the file once uncommented', () => {

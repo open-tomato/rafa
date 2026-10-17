@@ -389,7 +389,7 @@ its place: a security bug is commented on as found without a state read.
 
 ### Configuration: `triage.similarity`
 
-Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
+Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
 - `triage.similarity.threshold`: `false` to turn the step off, or a number
   from 0 to 1 naming the minimum score. Default is `0.3`, which on the
@@ -402,6 +402,14 @@ Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 - `triage.similarity.candidates`: the count of nearest bugs listed in the
   `Possible duplicates` section when the step files a bug with no match at
   the threshold. Default is `3`.
+
+- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`:
+  the bonuses `rankedCandidates` (`src/triage/similarity.ts`) adds to an
+  open bug's word score for the same cause code, the same cause family with
+  another leaf, and the same module and action, capped at 1. Each is a
+  number from 0 to 1, and `0` turns its signal off. Defaults are `0.15`,
+  `0.05` and `0.10`. They order the `Possible duplicates` list only; the
+  same-bug decision stays on the word score and the threshold.
 
 ### Configuration: the record's rules
 
