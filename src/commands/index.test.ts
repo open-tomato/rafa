@@ -318,7 +318,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
-  'bug codes': [[], ['suggest', 'family', 'check']],
+  'bug codes': [[], ['suggest', 'proposals', 'family', 'check']],
   'bug recheck': [['n'], ['all', 'comment']],
   'docs plan': [[], []],
   'self-update': [[], ['force']],

@@ -411,10 +411,11 @@
  *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
  *     names no `stretch/<n>` branch or there is no `report.md`. It
  *     starts no session.
- *   - `bug codes [--suggest=<text>] [--family=<family>] [--check]`: the
+ *   - `bug codes [--suggest=<text> [--no-proposals]] [--family=<family>] [--check]`: the
  *     cause codes a bug can carry, rafa's own and then the project's
  *     `errors.codes`, by family; `--suggest` ranks the closest to a
- *     cause in words, and `--check` exits 1 when two codes of one family
+ *     cause in words, the open bugs' proposed codes beside them unless
+ *     `--no-proposals`, and `--check` exits 1 when two codes of one family
  *     read alike, the two refused together (`./bug/codes.ts`). It
  *     writes nothing and starts no session.
  *   - `bug recheck [<n>…] [--all] [--comment]`: reruns the test each

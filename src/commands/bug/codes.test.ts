@@ -3,9 +3,12 @@
  * `--check` and the json result, each dispatched in-process over a
  * planted project, so the config the command reads is the file a case
  * wrote. Every line and refusal is SPELLED here, never read off the
- * module.
+ * module. Each case runs over a planted tracker listing no open bug,
+ * resolved through the registry seam, so none spawns `gh`.
  */
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { IssueSeams } from '../issue/issue-tracker.js';
+import type { Tracker } from '@open-tomato/rafa/ports';
 
 import '../../adapter-registry.js';
 
@@ -14,6 +17,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
@@ -29,9 +34,39 @@ afterAll(() => {
 /** The subject the command sits under, for the registry a case dispatches over. */
 const SUBJECTS = [{ name: 'bug', summary: 'cause codes for bugs' }];
 
+/** The kind of the planted tracker, which the configs name as `tracker.default`. */
+const EMPTY_KIND = 'empty';
+
+/** The config lines making the planted tracker the chain's default. */
+const TRACKER_CONFIG = `tracker:\n  default: ${EMPTY_KIND}\n`;
+
+/** A tracker listing no open issue, refusing everything else. */
+function emptyTracker(): Tracker {
+  const refuse = (): Promise<never> => Promise.reject(new Error(`${EMPTY_KIND}: not modelled`));
+  return {
+    kind: EMPTY_KIND,
+    capabilities: () => ({ projects: false, customFields: false, issueTypes: false }),
+    preflight: () => Promise.resolve({ ok: true }),
+    find: refuse,
+    get: refuse,
+    create: refuse,
+    comment: refuse,
+    transition: refuse,
+    openIssues: () => Promise.resolve([]),
+  };
+}
+
+/** The seams every case runs over: a registry whose one tracker lists nothing. */
+const SEAMS: IssueSeams = {
+  registry: createAdapterRegistry([
+    { port: 'tracker', kind: EMPTY_KIND, portVersion: PORT_VERSIONS.tracker, create: emptyTracker },
+  ]),
+};
+
 /** A project config adding one code in a family of the project's own. */
 const DEPLOY_CONFIG = [
   projectConfigText(),
+  TRACKER_CONFIG,
   'errors:',
   '  codes:',
   '    - code: deploy:missing-secret',
@@ -45,6 +80,7 @@ const DEPLOY_CONFIG = [
 /** A project config whose one code reads like rafa's `git:no-identity`. */
 const NEAR_DUPLICATE_CONFIG = [
   projectConfigText(),
+  TRACKER_CONFIG,
   'errors:',
   '  codes:',
   '    - code: git:no-author',
@@ -55,14 +91,17 @@ const NEAR_DUPLICATE_CONFIG = [
   '',
 ].join('\n');
 
-/** A fresh project, holding `text` as its config when given. */
-function freshProject(text?: string): PlantedProject {
+/** The scaffold's project config, the planted tracker its chain's default. */
+const BASE_CONFIG = [projectConfigText(), TRACKER_CONFIG].join('\n');
+
+/** A fresh project, holding `text` as its config, {@link BASE_CONFIG} when none is given. */
+function freshProject(text: string = BASE_CONFIG): PlantedProject {
   return plantProject(mkdtempSync(join(tempBase, 'case-')), text);
 }
 
 /** `rafa bug codes <words>` run in `project`. */
 async function ran(words: readonly string[], project: PlantedProject = freshProject()): Promise<CapturedRun> {
-  return dispatchInProject(['bug', 'codes', ...words], SUBJECTS, [createCodesCommand()], project);
+  return dispatchInProject(['bug', 'codes', ...words], SUBJECTS, [createCodesCommand(SEAMS)], project);
 }
 
 describe('rafa bug codes', () => {
