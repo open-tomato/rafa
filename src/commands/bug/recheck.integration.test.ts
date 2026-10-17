@@ -31,6 +31,7 @@ import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/ada
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
+import { rerunOf } from '../../triage/bug-filing.js';
 
 import { recheckBug } from './recheck-run.js';
 import { createRecheckCommand } from './recheck.js';
@@ -74,6 +75,16 @@ const ALTERNATING_SOURCE = [
 
 /** A preload file the strict reference refuses to hand to the runner. */
 const PRELOAD_SOURCE = 'throw new Error("a preload must never run");\n';
+
+const PAREN_FILE = 'src/paren.test.ts';
+const PAREN_CASE = 'a (case)';
+
+/** A test file whose one case is named `a (case)` and either passes or fails. */
+function parenSource(passes: boolean): string {
+  return `import { expect, test } from "bun:test";\ntest("${PAREN_CASE}", () => {\n  expect(1).toBe(${passes
+    ? 1
+    : 2});\n});\n`;
+}
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-bug-recheck-integration-')));
 
@@ -341,6 +352,21 @@ describe('rafa bug recheck, over a real checkout and real bun test runs', () => 
     expect(planted.runnerCalls.map((call) => call.path)).toEqual([PASSING_FILE]);
     expect(readFileSync(join(planted.project.root, COUNTER_FILE), 'utf8')).toBe('0');
     expect([...planted.gh.logins].sort()).toEqual(['alice', 'mallory']);
+  }, CASE_TIMEOUT_MS);
+
+  it.each([
+    ['gone', true, 'gone'],
+    ['reproduces', false, 'reproduces'],
+  ] as const)('judges a case named with parentheses filed through triage %s when the file is %s', async (_name, passes, verdict) => {
+    const rerun = rerunOf({ what: 'red', artifact: `${PAREN_FILE} > ${PAREN_CASE}` });
+    expect(rerun).not.toBeNull();
+    const planted = plantCase({ bugs: { 7: bug('parens', rerun) } });
+    writeFileSync(join(planted.project.root, PAREN_FILE), parenSource(passes));
+
+    const rows = rowsOf(await planted.run(['7', '--output=json']));
+
+    expect(rows[0]).toMatchObject({ issue: 7, verdict, reference: { file: PAREN_FILE, pattern: 'a \\(case\\)' } });
+    expect(planted.runnerCalls.map((call) => [call.path, call.pattern])).toEqual([[PAREN_FILE, 'a \\(case\\)']]);
   }, CASE_TIMEOUT_MS);
 
   it('exits 1 on a chain that fell back to local, before any issue is read', async () => {

@@ -196,6 +196,19 @@ reference, `bun test <file> [-t "<case>"]`, through
 and a bug with no `Rerun` at all. rafa prints the record's `Reproduce`
 text for it and runs nothing.
 
+The `-t` value is read as a POSIX shell reads a double-quoted string: a
+backslash before a backslash, a double quote, `$` or a backtick stands
+for that character, any other backslash is kept with the character
+after it, and the closing quote is the first double quote not escaped
+that way. So the value triage writes for a case holding a regular
+expression's special character runs as the pattern a shell would hand
+bun: `-t "a \\(case\\)"` runs as `a \(case\)` and matches the case
+`a (case)`. A value ending in an odd backslash before its closing quote
+is refused as an unterminated double quote. An unescaped `$` or backtick
+inside the value is `manual`, with the reason "a shell character $
+inside the -t value": a shell would expand it, so the value would not
+mean what it says.
+
 Two gates come before a run. The reference's shape and boundary: its
 file is resolved against the checkout's root, by real path, so a
 symlink out is outside too. Outside is `manual`; a file that is not
