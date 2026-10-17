@@ -1495,6 +1495,76 @@ describe('the release plan\'s six keys, through loadConfig', () => {
   });
 });
 
+const TEMPLATE_GLOBS = {
+  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+  testsIntegration: [
+    '**/*-integration.test.ts',
+    '**/*.integration.test.ts',
+    '**/*-spawned*.test.ts',
+    '**/*-cli.test.ts',
+  ],
+  testsContract: ['**/*.contract.test.ts'],
+};
+
+const EMPTY_GLOBS = {
+  testsFullSuiteTriggers: [],
+  testsIntegration: [],
+  testsContract: [],
+};
+
+const EMPTY_CHECKS = {
+  checksTask: [],
+  checksStage: [],
+  checksLoop: [],
+  checksPullRequest: [],
+  checksStretch: [],
+  checksReleasePullRequest: [],
+  checksPublish: [],
+};
+
+describe('the escalation template over the checks and the three glob keys', () => {
+  it('resolves the template\'s globs and check points, and empties the four unnamed checks', async () => {
+    const resolved = await loadConfig(scopes('templates: [escalation]\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      ...TEMPLATE_GLOBS,
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
+      checksPullRequest: [],
+      checksStretch: [],
+      checksReleasePullRequest: [],
+      checksPublish: [],
+    });
+    expect(resolved.sources).toMatchObject({
+      testsFullSuiteTriggers: 'template',
+      checksTask: 'template',
+      checksStage: 'template',
+      checksLoop: 'template',
+    });
+  });
+
+  it('resolves every checks key and the three glob keys to empty lists with no template', async () => {
+    const resolved = await loadConfig(scopes('version: 1\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({ ...EMPTY_GLOBS, ...EMPTY_CHECKS });
+    expect(resolved.sources).toMatchObject({ checksTask: 'default', testsIntegration: 'default' });
+  });
+
+  it('lets a written checks.stage replace the template\'s entry alone, sourced from the file', async () => {
+    const resolved = await loadConfig(
+      scopes('templates: [escalation]\nchecks:\n  stage: [related]\n', null),
+      {},
+      quiet,
+    );
+
+    expect(resolved.config.checksStage).toEqual(['related']);
+    expect(resolved.sources.checksStage).toBe('file');
+    expect(resolved.config.checksTask).toEqual(['affected']);
+    expect(resolved.sources.checksTask).toBe('template');
+  });
+});
+
 describe('every registered setting, resolved through loadConfig', () => {
   it('names each registered setting in both files and in the defaults', () => {
     expect([...Object.keys(PROJECT_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
