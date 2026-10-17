@@ -47,6 +47,18 @@ describe('the survey readers over the live tree', () => {
     expect(map.unplaced([...STRETCH_10_RELEASE_TESTS, stray])).toEqual([stray]);
   });
 
+  it('places a test in a new subfolder by the walk and a mixed subtree by its own directory', () => {
+    const map = readCutMap(ROOT, 'docs/survey/cut-table.json');
+    const errors = 'src/tests/core-coupled/errors/rafa-codes.test.ts';
+    const commands = 'src/commands/new-file.test.ts';
+    const nowhere = 'src/nowhere/x.test.ts';
+
+    expect(map.unitOf(errors)).toBe('@open-tomato/rafa');
+    expect(map.unitOf(commands)).toBe('@open-tomato/rafa');
+    expect(map.unitOf(nowhere)).toBeUndefined();
+    expect(map.unplaced([errors, commands, nowhere])).toEqual([nowhere]);
+  });
+
   it('classifies the tracked test files, with at least one use-case and one unit test', () => {
     const globs = readTestKindGlobs(ROOT);
     const counts: Record<TestKind, number> = { contract: 0, 'use-case': 0, unit: 0 };
