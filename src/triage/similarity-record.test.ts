@@ -116,7 +116,7 @@ function lookupsOf(
     if (!open.has(filing.cause)) open.set(filing.cause, openIssueOf(filing, valuesOf));
     return {
       reached,
-      duplicates: possibleDuplicatesSection({ threshold: THRESHOLD, nearest: nearest.slice(0, LISTED) }, identity),
+      duplicates: possibleDuplicatesSection({ threshold: THRESHOLD, nearest: nearest.slice(0, LISTED).map(({ issue, score }) => ({ issue, score, words: score, matched: ['words'] as const })) }, identity),
     };
   });
 }

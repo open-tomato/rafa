@@ -313,7 +313,7 @@ describe('no open bug at the threshold', () => {
     expect(result.bugs[0]).toMatchObject({ action: 'filed', problem: null });
     const filed = issueTexts(issuesDir)[1]!;
     expect(filed).toContain('## Possible duplicates');
-    expect(filed).toContain('No open bug shares a word with this one.');
+    expect(filed).toContain('No open bug shares a word, a cause or a module and action with this one.');
   });
 });
 

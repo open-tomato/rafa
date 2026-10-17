@@ -275,7 +275,7 @@ import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
-import type { ComparedText, ScoredIssue } from './similarity.js';
+import type { ComparedText, RankedIssue, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { BugRecord, BugRules } from '../bugs/record.js';
 import type { RefVerifier } from '../refs/verify.js';
@@ -936,7 +936,12 @@ async function answerMiss(run: BugRun): Promise<BugTriage> {
   const [first] = nearest;
   return first !== undefined && first.score >= similarity.threshold
     ? commentOnNearest(run, first, similarity.threshold)
-    : fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: nearest.slice(0, similarity.candidates) } });
+    : fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: nearest.slice(0, similarity.candidates).map(rankedByWords) } });
+}
+
+/** A bug scored on words alone as a line of the ranked list: its score is its rank, `words` its one signal. */
+function rankedByWords({ issue, score }: ScoredIssue): RankedIssue {
+  return { issue, score, words: score, matched: ['words'] };
 }
 
 /** Looks the bug up by its key, then answers what is found, or what step 3 makes of a miss. */
