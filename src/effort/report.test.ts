@@ -114,8 +114,6 @@ import type { SessionUsageTotals } from './session-log.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { SessionEffortRow } from '@open-tomato/rafa/store/types';
 
-import '../adapter-registry.js';
-
 import {
   mkdirSync,
   mkdtempSync,

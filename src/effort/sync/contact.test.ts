@@ -25,7 +25,6 @@ import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '@open-tomato/rafa/ports';
 
 import '../../config-registry.js';
-import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
