@@ -2903,10 +2903,9 @@ refused config list no module action and say nothing of why.
   `registerCoreAdapters` (`src/adapter-registry.ts`), so the entries hold
   under a manifest declaring `"sideEffects": false`, which the root
   manifest does not declare today because bun 1.3.14's split build breaks
-  under it (#1213). The test
-  suite gets the same two calls from `src/tests/preload.ts`, which
-  `bunfig.toml` names under `[test] preload`; a child process a test
-  spawns runs no preload and calls the entries itself.
+  under it (#1213). The test suite gets the same two calls from
+  `src/tests/preload.ts`, which `bunfig.toml` names under `[test] preload`;
+  a child process a test spawns runs no preload and calls the entries itself.
 
 ### One invocation
 
