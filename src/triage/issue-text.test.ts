@@ -4,9 +4,13 @@
  * written, and that the sections above them, `What`, `Artifact` and
  * `Recurrence key` among them, keep their text byte for byte, so
  * `issueTextOf` (`./similarity.ts`) reads a new body as it reads an old one.
+ * Then the `Possible duplicates` section's lines over the ranked list: the
+ * rank, the bonus signals each names, and the sentence for an empty list.
  */
 import type { BugValues } from './issue-text.js';
+import type { MatchedSignal, RankedIssue } from './similarity.js';
 import type { BugRecord } from '../bugs/record.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -16,6 +20,8 @@ import {
   COMMENT_OPENING,
   ISSUE_OPENING,
   issueText,
+  NO_DUPLICATES,
+  possibleDuplicatesSection,
   recordSections,
 } from './issue-text.js';
 import { issueTextOf, sectionValueOf } from './similarity.js';
@@ -240,5 +246,77 @@ describe('a recurrence\'s comment', () => {
     // Assert
     expect(headingsOf(body).filter((heading) => heading === '## Versions')).toHaveLength(1);
     expect(sectionValueOf(body, 'Versions')).toBe(RECORD.versions);
+  });
+});
+
+/** An open bug of the local tracker numbered `id`, with no URL, so a line names it by kind and id. */
+function openIssueOf(id: number): OpenIssue {
+  return { ref: { kind: 'local', externalId: String(id), opt: id, url: null }, title: `bug ${String(id)}`, body: '', createdAt: null };
+}
+
+/** A ranked line for open bug `id`. */
+function rankedOf(id: number, score: number, matched: readonly MatchedSignal[]): RankedIssue {
+  return { issue: openIssueOf(id), score, words: score, matched };
+}
+
+/** The list lines of a `Possible duplicates` section. */
+function listLinesOf(section: string): string[] {
+  return section.split('\n').filter((line) => line.startsWith('- '));
+}
+
+describe('possibleDuplicatesSection', () => {
+  it('names the bonus signals each line matched, joined by commas, after its rank', () => {
+    // Arrange
+    const nearest = [
+      rankedOf(1, 0.31, ['words', 'cause', 'boundary']),
+      rankedOf(2, 0.15, ['cause']),
+      rankedOf(3, 0.08, ['words', 'cause-family']),
+    ];
+
+    // Act
+    const section = possibleDuplicatesSection({ threshold: 0.5, nearest }, asIs);
+
+    // Assert
+    expect(listLinesOf(section)).toEqual([
+      '- local issue 1 (score 0.31; same cause, same module and action)',
+      '- local issue 2 (score 0.15; same cause)',
+      '- local issue 3 (score 0.08; same cause family)',
+    ]);
+  });
+
+  it('writes a line matched on words alone with its rank and no signal', () => {
+    // Act
+    const section = possibleDuplicatesSection({ threshold: 0.5, nearest: [rankedOf(4, 0.2, ['words'])] }, asIs);
+
+    // Assert
+    expect(listLinesOf(section)).toEqual(['- local issue 4 (score 0.20)']);
+  });
+
+  it('opens with the threshold and writes the sentence for an empty list, and no line', () => {
+    // Act
+    const section = possibleDuplicatesSection({ threshold: 0.3, nearest: [] }, asIs);
+
+    // Assert
+    expect(section).toBe('## Possible duplicates\n\n'
+      + 'No open bug scored at or above the similarity threshold of 0.3.\n\n'
+      + 'No open bug shares a word, a cause or a module and action with this one.');
+    expect(NO_DUPLICATES).toBe('No open bug shares a word, a cause or a module and action with this one.');
+    expect(listLinesOf(section)).toEqual([]);
+  });
+
+  it('names an issue with a URL by its URL and redacts the lines', () => {
+    // Arrange
+    const issue: OpenIssue = {
+      ref: { kind: 'github', externalId: '7', opt: 7, url: 'https://example.test/SECRET/7' },
+      title: 'bug 7',
+      body: '',
+      createdAt: null,
+    };
+
+    // Act
+    const section = possibleDuplicatesSection({ threshold: 0.5, nearest: [{ issue, score: 0.4, words: 0.25, matched: ['words', 'cause'] }] }, noSecret);
+
+    // Assert
+    expect(listLinesOf(section)).toEqual(['- https://example.test/[redacted]/7 (score 0.40; same cause)']);
   });
 });

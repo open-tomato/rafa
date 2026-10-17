@@ -909,10 +909,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/bug/codes.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/errors/codes', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
     ['@open-tomato/rafa/errors/rafa-codes', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
-    ['../../errors/match.js', ['nearDuplicates', 'suggestCodes']],
-    ['../issue/issue-tracker.js', ['lineRefusal', 'readNonBlankFlag']],
+    ['../../adapters/logger/active.js', ['activeLogger']],
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../adapters/tracker/resolve.js', ['resolveTracker']],
+    ['../../bugs/record.js', ['parseBugRecord']],
+    ['../../errors/match.js', ['nearDuplicates', 'suggestWithProposals']],
+    ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'lineRefusal', 'readNonBlankFlag']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/bug/recheck.js', [

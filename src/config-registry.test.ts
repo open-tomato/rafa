@@ -150,6 +150,9 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['claimsAhead', 'claims.ahead'],
   ['triageSimilarityThreshold', 'triage.similarity.threshold'],
   ['triageSimilarityCandidates', 'triage.similarity.candidates'],
+  ['triageSimilarityWeightsCauseLeaf', 'triage.similarity.weights.causeLeaf'],
+  ['triageSimilarityWeightsCauseFamily', 'triage.similarity.weights.causeFamily'],
+  ['triageSimilarityWeightsBoundary', 'triage.similarity.weights.boundary'],
   ['releaseEnabled', 'release.enabled'],
   ['releaseVersionFile', 'release.versionFile'],
   ['releaseChangelog', 'release.changelog'],
@@ -553,6 +556,7 @@ describe('SECTIONS', () => {
       'tracking',
       'triage',
       'triage.similarity',
+      'triage.similarity.weights',
     ]);
     expect(SECTIONS.has('modules')).toBe(false);
   });
@@ -614,7 +618,11 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('task.resolver')).toEqual(['task', ['skills', 'lessons']]);
     expect(knownKeysAbove('triage.similarity.thresholds')).toEqual([
       'triage.similarity',
-      ['threshold', 'candidates'],
+      ['threshold', 'candidates', 'weights'],
+    ]);
+    expect(knownKeysAbove('triage.similarity.weights.cause')).toEqual([
+      'triage.similarity.weights',
+      ['causeLeaf', 'causeFamily', 'boundary'],
     ]);
     expect(knownKeysAbove('triage.nearest')).toEqual(['triage', ['similarity']]);
     expect(knownKeysAbove('bugs.recheck.run')).toEqual(['bugs.recheck', ['runs', 'timeoutSeconds']]);

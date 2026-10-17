@@ -1,6 +1,7 @@
 /**
- * Tests for the `triage` section: `triage.similarity.threshold` and
- * `triage.similarity.candidates`.
+ * Tests for the `triage` section: `triage.similarity.threshold`,
+ * `triage.similarity.candidates` and the three
+ * `triage.similarity.weights.*` bonuses.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
  * is proved is the reader the schema wires to the key, not a reader of
@@ -26,6 +27,7 @@ import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
   similarityCandidates,
   similarityThreshold,
+  similarityWeight,
   TRIAGE_DEFAULTS,
   TRIAGE_SECTION,
 } from './config-schema-triage.js';
@@ -38,6 +40,16 @@ const THRESHOLD = 'triage.similarity.threshold';
 
 /** The candidates' file key, spelled. */
 const CANDIDATES = 'triage.similarity.candidates';
+
+/** Each weight's setting and its file key, spelled. */
+const WEIGHTS = [
+  ['triageSimilarityWeightsCauseLeaf', 'triage.similarity.weights.causeLeaf'],
+  ['triageSimilarityWeightsCauseFamily', 'triage.similarity.weights.causeFamily'],
+  ['triageSimilarityWeightsBoundary', 'triage.similarity.weights.boundary'],
+] as const;
+
+/** What a refused weight is expected to be. */
+const EXPECTED_WEIGHT = 'expected a number from 0 to 1';
 
 /** What a refused threshold is expected to be. */
 const EXPECTED_THRESHOLD = 'expected false or a number above 0 and at most 1';
@@ -55,6 +67,12 @@ function readCandidates(raw: unknown) {
   return SETTINGS.triageSimilarityCandidates.read(raw, { label: `F: ${CANDIDATES}`, key: CANDIDATES });
 }
 
+/** Reads `raw` through the spec `SETTINGS` holds for the causeLeaf weight. */
+function readWeight(raw: unknown) {
+  const [setting, key] = WEIGHTS[0];
+  return SETTINGS[setting].read(raw, { label: `F: ${key}`, key });
+}
+
 /** The {@link ConfigError} `run` throws. Fails when it throws none. */
 function refusal(run: () => unknown): ConfigError {
   try {
@@ -66,7 +84,7 @@ function refusal(run: () => unknown): ConfigError {
   throw new Error('expected a ConfigError, and nothing was thrown');
 }
 
-describe('the two keys', () => {
+describe('the five keys', () => {
   it('spells triageSimilarityThreshold as triage.similarity.threshold, file-only, read through similarityThreshold', () => {
     expect(SETTINGS.triageSimilarityThreshold.key).toBe(THRESHOLD);
     expect(SETTINGS.triageSimilarityThreshold.cli).toBe(false);
@@ -79,6 +97,20 @@ describe('the two keys', () => {
     expect(SETTINGS.triageSimilarityCandidates.read).toBe(similarityCandidates);
   });
 
+  it.each(WEIGHTS)('spells %s as %s, file-only, read through similarityWeight', (setting, key) => {
+    expect(SETTINGS[setting].key).toBe(key);
+    expect(SETTINGS[setting].cli).toBe(false);
+    expect(SETTINGS[setting].read).toBe(similarityWeight);
+  });
+
+  it('resolves the weights to 0.15, 0.05 and 0.1 when no layer names them', () => {
+    const resolved = resolveConfig();
+
+    expect(WEIGHTS.map(([setting]) => CONFIG_DEFAULTS[setting])).toEqual([0.15, 0.05, 0.1]);
+    expect(WEIGHTS.map(([setting]) => resolved.config[setting])).toEqual([0.15, 0.05, 0.1]);
+    expect(WEIGHTS.map(([setting]) => resolved.sources[setting])).toEqual(['default', 'default', 'default']);
+  });
+
   it('resolves the threshold to 0.3 and the candidates to 3 when no layer names them', () => {
     const resolved = resolveConfig();
 
@@ -89,7 +121,13 @@ describe('the two keys', () => {
   });
 
   it('keeps the defaults in the section object, frozen', () => {
-    expect(TRIAGE_DEFAULTS).toEqual({ triageSimilarityThreshold: 0.3, triageSimilarityCandidates: 3 });
+    expect(TRIAGE_DEFAULTS).toEqual({
+      triageSimilarityThreshold: 0.3,
+      triageSimilarityCandidates: 3,
+      triageSimilarityWeightsCauseLeaf: 0.15,
+      triageSimilarityWeightsCauseFamily: 0.05,
+      triageSimilarityWeightsBoundary: 0.1,
+    });
     expect(Object.isFrozen(TRIAGE_DEFAULTS)).toBe(true);
   });
 });
@@ -142,6 +180,31 @@ describe('triage.similarity.candidates', () => {
   });
 });
 
+describe('triage.similarity.weights.*', () => {
+  it.each([[0], [0.05], [0.15], [1]])('accepts %p as itself, 0 included to turn a signal off', (raw) => {
+    expect(readWeight(raw)).toEqual({ value: raw, problems: [], extras: [] });
+  });
+
+  it.each([
+    [-0.01, '-0.01'],
+    [-1, '-1'],
+    [1.01, '1.01'],
+    [2, '2'],
+    [Number.NaN, 'NaN'],
+    [Number.POSITIVE_INFINITY, 'Infinity'],
+    [true, 'true'],
+    [false, 'false'],
+    ['0.15', '"0.15"'],
+    [null, 'null'],
+  ])('refuses %p, naming the value and what was expected', (raw, shown) => {
+    expect(readWeight(raw)).toEqual({
+      value: undefined,
+      problems: [`F: ${WEIGHTS[0][1]} is ${shown}, ${EXPECTED_WEIGHT}`],
+      extras: [],
+    });
+  });
+});
+
 describe('through a file', () => {
   it('reads false and 10 from the nested section', () => {
     const layer = parseConfigText('triage:\n  similarity:\n    threshold: false\n    candidates: 10\n', PATH);
@@ -150,6 +213,20 @@ describe('through a file', () => {
     expect([resolved.config.triageSimilarityThreshold, resolved.config.triageSimilarityCandidates]).toEqual([false, 10]);
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates])
       .toEqual(['file', 'file']);
+  });
+
+  it('reads each weight from the nested weights section, 0 included', () => {
+    const text = 'triage:\n  similarity:\n    weights:\n      causeLeaf: 0\n      causeFamily: 1\n      boundary: 0.5\n';
+    const resolved = resolveConfig({ file: parseConfigText(text, PATH) });
+
+    expect(WEIGHTS.map(([setting]) => resolved.config[setting])).toEqual([0, 1, 0.5]);
+    expect(WEIGHTS.map(([setting]) => resolved.sources[setting])).toEqual(['file', 'file', 'file']);
+  });
+
+  it.each([['-1'], ['1.5'], ['true'], ['"0.1"']])('reports a boundary weight of %s with a ConfigError naming the key', (spelled) => {
+    const error = refusal(() => parseConfigText(`triage:\n  similarity:\n    weights:\n      boundary: ${spelled}\n`, PATH));
+
+    expect(error.message).toContain(`triage.similarity.weights.boundary is ${spelled}, ${EXPECTED_WEIGHT}`);
   });
 
   it.each([['0'], ['-1'], ['1.5']])('reports a threshold of %s with a ConfigError naming the key', (spelled) => {
@@ -171,10 +248,16 @@ describe('the section', () => {
     expect(Object.entries(TRIAGE_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
       ['triageSimilarityThreshold', 'triage.similarity.threshold'],
       ['triageSimilarityCandidates', 'triage.similarity.candidates'],
+      ['triageSimilarityWeightsCauseLeaf', 'triage.similarity.weights.causeLeaf'],
+      ['triageSimilarityWeightsCauseFamily', 'triage.similarity.weights.causeFamily'],
+      ['triageSimilarityWeightsBoundary', 'triage.similarity.weights.boundary'],
     ]);
     expect(TRIAGE_SECTION.defaults).toEqual({
       triageSimilarityThreshold: 0.3,
       triageSimilarityCandidates: 3,
+      triageSimilarityWeightsCauseLeaf: 0.15,
+      triageSimilarityWeightsCauseFamily: 0.05,
+      triageSimilarityWeightsBoundary: 0.1,
     });
     expect(TRIAGE_SECTION.checks ?? []).toEqual([]);
   });

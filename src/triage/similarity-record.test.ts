@@ -17,7 +17,7 @@ import { EMPTY_BUG_RECORD } from '../bugs/record.js';
 
 import { bugKeyOf } from './bug-key.js';
 import { ISSUE_OPENING, issueText, possibleDuplicatesSection } from './issue-text.js';
-import { nearestOpenBugs, sectionValueOf } from './similarity.js';
+import { nearestOpenBugs, rankedCandidates, sectionValueOf } from './similarity.js';
 
 /** The default of `triage.similarity.threshold`. */
 const THRESHOLD = 0.3;
@@ -26,6 +26,9 @@ const THRESHOLD = 0.3;
 const LISTED = 3;
 
 const fixture = await Bun.file(new URL('./testdata/scoring.json', import.meta.url)).json() as ScoringFixture;
+
+/** The defaults of `triage.similarity.weights.*`. */
+const DEFAULT_WEIGHTS = { causeLeaf: 0.15, causeFamily: 0.05, boundary: 0.10 } as const;
 
 const identity = (text: string): string => text;
 
@@ -116,7 +119,7 @@ function lookupsOf(
     if (!open.has(filing.cause)) open.set(filing.cause, openIssueOf(filing, valuesOf));
     return {
       reached,
-      duplicates: possibleDuplicatesSection({ threshold: THRESHOLD, nearest: nearest.slice(0, LISTED) }, identity),
+      duplicates: possibleDuplicatesSection({ threshold: THRESHOLD, nearest: nearest.slice(0, LISTED).map(({ issue, score }) => ({ issue, score, words: score, matched: ['words'] as const })) }, identity),
     };
   });
 }
@@ -142,6 +145,60 @@ describe('the bodies with the bug record, over the scoring fixture', () => {
   it('control: the two bodies of a filing are not the same text', () => {
     const [first] = fixture.filings;
     expect(openIssueOf(first!, recordValues).body).not.toBe(openIssueOf(first!, plainValues).body);
+  });
+});
+
+/** What both lookups answered for one filing, the record-bodied issues open. */
+interface Pairing {
+  readonly nearest: ReturnType<typeof nearestOpenBugs>;
+  readonly ranked: ReturnType<typeof rankedCandidates>;
+}
+
+/** Files every filing as `lookupsOf` does, with record bodies, pairing the word lookup with the ranked list. */
+function pairingsOf(filings: readonly Filing[]): Pairing[] {
+  const open = new Map<number, OpenIssue>();
+  return filings.map((filing) => {
+    const issues = [...open.values()];
+    const { record } = recordValues(filing, keyOf(filing));
+    const pairing = {
+      nearest: nearestOpenBugs(filing, issues),
+      ranked: rankedCandidates(filing, record, issues, DEFAULT_WEIGHTS),
+    };
+    if (!open.has(filing.cause)) open.set(filing.cause, openIssueOf(filing, recordValues));
+    return pairing;
+  });
+}
+
+/** The issue the word scores alone put first among `ranked`, as the same-bug decision reads it. */
+function bestByWords(ranked: Pairing['ranked']): number | null {
+  const withWords = ranked.filter(({ words }) => words > 0);
+  const best = [...withWords].sort((a, b) => b.words - a.words)[0];
+  return best !== undefined && best.words >= THRESHOLD
+    ? best.issue.ref.opt
+    : null;
+}
+
+describe('the ranked list with the default weights, over the scoring fixture', () => {
+  const pairings = pairingsOf(fixture.filings);
+
+  it('leaves the same-bug decision of every filing as the word lookup gave it', () => {
+    const decided = pairings.map(({ nearest }) => {
+      const [best] = nearest;
+      return best !== undefined && best.score >= THRESHOLD
+        ? best.issue.ref.opt
+        : null;
+    });
+    expect(pairings.map(({ ranked }) => bestByWords(ranked))).toEqual(decided);
+    expect(decided.some((reached) => reached !== null)).toBe(true);
+  });
+
+  it('gives bodies sharing unknown:new-context and unknown no bonus', () => {
+    const ranked = pairings.flatMap((pairing) => pairing.ranked);
+    expect(ranked.length).toBeGreaterThan(0);
+    for (const entry of ranked) {
+      expect(entry.matched).toEqual(['words']);
+      expect(entry.score).toBe(entry.words);
+    }
   });
 });
 

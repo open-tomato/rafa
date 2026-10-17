@@ -5,25 +5,33 @@
  * {@link issueText}, so a change to the sections it writes that this
  * module stops reading turns these tests red.
  */
+import type { SimilarityWeights } from './similarity.js';
+import type { BugRecord } from '../bugs/record.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
+
+import { EMPTY_BUG_RECORD, parseBugRecord } from '../bugs/record.js';
 
 import { COMMENT_OPENING, ISSUE_OPENING, issueText } from './issue-text.js';
 import {
   issueWordsOf,
   jaccard,
   nearestOpenBugs,
+  rankedCandidates,
   sectionValueOf,
   testFileOf,
   wordSetOf,
 } from './similarity.js';
 
 /** An open bug numbered `id`, its body filed from `what` and `artifact` as triage files one. */
-function openBug(id: number, what: string, artifact: string | null): OpenIssue {
+function openBug(id: number, what: string, artifact: string | null, record?: BugRecord): OpenIssue {
   const body = issueText(ISSUE_OPENING, {
     what,
     artifact,
+    ...(record === undefined
+      ? {}
+      : { record: { ...record, what, artifact } }),
     key: 'some key',
     refs: null,
     planStub: 'other-plan',
@@ -178,5 +186,116 @@ describe('nearestOpenBugs', () => {
   it('answers nothing for a bug with an empty word set', () => {
     const blank: OpenIssue = { ...openBug(1, 'x', null), body: 'written by hand' };
     expect(nearestOpenBugs(report, [blank])).toEqual([]);
+  });
+});
+
+describe('rankedCandidates', () => {
+  /** The defaults of `triage.similarity.weights.*`. */
+  const weights: SimilarityWeights = { causeLeaf: 0.15, causeFamily: 0.05, boundary: 0.1 };
+
+  const report = { what: 'merge test is red', artifact: 'src/effort/merge.test.ts > merge > keeps rows\nboom' };
+
+  /** A record holding `cause`, `module` and `action`. */
+  function recordOf(cause: string | null, module: string | null, action: string | null): BugRecord {
+    return { ...EMPTY_BUG_RECORD, summary: 'a summary', cause, module, action };
+  }
+
+  const record = recordOf('store:row-dropped', 'Effort Store', 'merging rows');
+
+  /** An open bug sharing no word with the report, filed with `filed`. */
+  function wordlessBug(id: number, filed: BugRecord): OpenIssue {
+    return openBug(id, 'push times out', 'timeout after waiting', filed);
+  }
+
+  it('lists a bug sharing the cause leaf and no word, naming the cause', () => {
+    const bug = wordlessBug(1, recordOf('store:row-dropped', null, null));
+    // Control: the body is read back with the cause, and no word is shared.
+    expect(parseBugRecord(bug.body).cause).toBe('store:row-dropped');
+    expect(nearestOpenBugs(report, [bug])).toEqual([]);
+    const [ranked, ...rest] = rankedCandidates(report, record, [bug], weights);
+    expect(rest).toEqual([]);
+    expect(ranked?.issue).toBe(bug);
+    expect(ranked?.words).toBe(0);
+    expect(ranked?.score).toBeCloseTo(0.15, 10);
+    expect(ranked?.matched).toEqual(['cause']);
+  });
+
+  it('leaves the bug out when the cause leaf weighs 0', () => {
+    const bug = wordlessBug(1, recordOf('store:row-dropped', null, null));
+    expect(rankedCandidates(report, record, [bug], { ...weights, causeLeaf: 0 })).toEqual([]);
+    // A bug sharing words stays listed, without the cause it no longer weighs.
+    const worded = openBug(2, 'merge is slow', 'rows pile up', recordOf('store:row-dropped', null, null));
+    const [ranked] = rankedCandidates(report, record, [worded], { ...weights, causeLeaf: 0 });
+    expect(ranked?.matched).toEqual(['words']);
+    expect(ranked?.score).toBe(ranked!.words);
+  });
+
+  it('names the cause family for the same family with another leaf, and the boundary for the same module and action', () => {
+    const family = wordlessBug(1, recordOf('store:key-missing', null, null));
+    const boundary = wordlessBug(2, recordOf(null, 'Effort Store', 'merging rows'));
+    const ranked = rankedCandidates(report, record, [family, boundary], weights);
+    expect(ranked.map(({ matched }) => matched)).toEqual([['boundary'], ['cause-family']]);
+    expect(ranked.map(({ score }) => score)).toEqual([0.1, 0.05]);
+  });
+
+  it('adds the bonuses to the word score in signal order', () => {
+    const bug = openBug(1, 'merge is slow', 'rows pile up', record);
+    const [ranked] = rankedCandidates(report, record, [bug], weights);
+    expect(ranked?.words).toBeGreaterThan(0);
+    expect(ranked?.matched).toEqual(['words', 'cause', 'boundary']);
+    expect(ranked?.score).toBeCloseTo(ranked!.words + 0.25, 10);
+  });
+
+  it('caps a rank at 1', () => {
+    const same = openBug(7, report.what, report.artifact, record);
+    const [ranked] = rankedCandidates(report, record, [same], weights);
+    expect(ranked?.words).toBe(1);
+    expect(ranked?.score).toBe(1);
+    expect(ranked?.matched).toEqual(['words', 'cause', 'boundary']);
+  });
+
+  it('gives no bonus for unknown:new-context, another new-context or an unknown module and action', () => {
+    const open = recordOf('unknown:new-context', 'unknown', 'unknown');
+    const unknownBug = wordlessBug(1, open);
+    // Control: the body is read back with the very values that earn nothing.
+    expect(parseBugRecord(unknownBug.body)).toMatchObject({ cause: 'unknown:new-context', module: 'unknown', action: 'unknown' });
+    expect(rankedCandidates(report, open, [unknownBug], weights)).toEqual([]);
+    const familyNew = recordOf('store:new-context', 'unknown', 'merging rows');
+    expect(rankedCandidates(report, familyNew, [wordlessBug(2, familyNew)], weights)).toEqual([]);
+    expect(rankedCandidates(report, record, [wordlessBug(3, familyNew)], weights)).toEqual([]);
+    // Control: the same record with a coded cause and known boundary earns both.
+    expect(rankedCandidates(report, record, [wordlessBug(4, record)], weights)[0]?.matched)
+      .toEqual(['cause', 'boundary']);
+  });
+
+  it('gives no bonus for a record with null fields, or for a new bug with no record', () => {
+    const empty = recordOf(null, null, null);
+    expect(rankedCandidates(report, empty, [wordlessBug(1, record)], weights)).toEqual([]);
+    expect(rankedCandidates(report, record, [wordlessBug(2, empty)], weights)).toEqual([]);
+    expect(rankedCandidates(report, undefined, [wordlessBug(3, record)], weights)).toEqual([]);
+    const halfBoundary = recordOf(null, 'Effort Store', null);
+    expect(rankedCandidates(report, halfBoundary, [wordlessBug(4, halfBoundary)], weights)).toEqual([]);
+  });
+
+  it('leaves out a bug naming another test file whatever its bonuses', () => {
+    const otherFile = openBug(1, report.what, 'src/effort/split.test.ts > merge > keeps rows\nboom', record);
+    const sameFile = openBug(2, 'merge is red', 'src/effort/merge.test.ts > merge > keeps rows', record);
+    expect(idsOf(rankedCandidates(report, record, [otherFile, sameFile], weights))).toEqual(['2']);
+  });
+
+  it('ranks highest first and keeps the tracker order for equal ranks', () => {
+    const first = wordlessBug(9, record);
+    const second = wordlessBug(4, record);
+    const words = openBug(5, report.what, report.artifact);
+    expect(idsOf(rankedCandidates(report, record, [first, second, words], weights))).toEqual(['5', '9', '4']);
+    expect(idsOf(rankedCandidates(report, record, [second, words, first], weights))).toEqual(['5', '4', '9']);
+  });
+
+  it('ranks on words alone like nearestOpenBugs when no bonus applies', () => {
+    const bugs = [openBug(1, 'merge is slow', 'rows pile up'), openBug(2, report.what, report.artifact)];
+    const ranked = rankedCandidates(report, record, bugs, weights);
+    const nearest = nearestOpenBugs(report, bugs);
+    expect(ranked.map(({ issue, score }) => ({ issue, score }))).toEqual(nearest);
+    expect(ranked.every(({ matched, score, words }) => matched.join() === 'words' && score === words)).toBe(true);
   });
 });

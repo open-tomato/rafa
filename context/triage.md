@@ -348,8 +348,44 @@ a test-file guard so a bug naming one test file is never compared against a
 bug naming another. The nearest at or above the threshold is commented on
 naming its score; its reference is stored under the key. Below the threshold,
 the bug is filed, and its body ends with a `Possible duplicates` section
-listing the nearest bugs it scored, up to `triage.similarity.candidates`.
+listing the open bugs ranked for it, up to `triage.similarity.candidates`.
 When the option is left out or its threshold is `false`, step 3 is off.
+
+The threshold decides alone. `nearestOpenBugs` and its first element stay the
+same-bug decision, on the word score, and no bonus below reaches it: a bonus
+never comments a bug away on its cause. The ranked list is `rankedCandidates`'s.
+A bug's rank is its word score plus each bonus that applies, capped at 1:
+
+- **same cause**: both records carry the same full code, weighed by
+  `triage.similarity.weights.causeLeaf`.
+- **same cause family**: both carry a code of one family with different
+  leaves, weighed by `causeFamily`.
+- **same boundary**: both carry the same module and the same action, neither
+  `unknown`, weighed by `boundary`.
+
+A bonus counts only when both bugs carry the field. A cause whose leaf is
+`new-context` earns no cause bonus, `unknown:new-context` included, so two
+bugs sharing only that code are not ranked together for it. A bonus alone
+lists a bug that shares no word with the report, and a rank of 0 is left out.
+The test-file guard still drops a bug naming another test file.
+
+The edge cases follow from those rules. An old open bug with no fields is
+ranked by its words alone, as before. Two bugs with the same cause leaf and
+few shared words are both filed, and only the later one's list names the
+earlier: a body is written once, when its bug is filed, so the list is one
+way. A bug with no artifact has no key and never reaches step 3, and a
+private bug is never compared with anything, so neither gets a list, as
+before.
+
+A bonus is a second witness. Shared words say two reports sound alike; a
+shared cause code says the same gate triggered, which is not yet "the same
+thing is failing". The witness is heard when the list is ranked, and it does
+not decide the case alone.
+
+Rejected, each with its reason: bonuses inside `nearestOpenBugs`, which would
+comment a bug away on its cause; one weighted sum in place of the word score,
+which would move every score of the 1,013-filing fixture; and a list for the
+bugs that have none today, which would add a tracker read to private bugs.
 
 ### Inherited failures
 
@@ -389,7 +425,7 @@ its place: a security bug is commented on as found without a state read.
 
 ### Configuration: `triage.similarity`
 
-Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
+Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
 - `triage.similarity.threshold`: `false` to turn the step off, or a number
   from 0 to 1 naming the minimum score. Default is `0.3`, which on the
@@ -399,9 +435,40 @@ Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
   least 84% and at most 4%. Lower matches more repeats and puts more new
   causes on the wrong issue.
 
-- `triage.similarity.candidates`: the count of nearest bugs listed in the
-  `Possible duplicates` section when the step files a bug with no match at
-  the threshold. Default is `3`.
+- `triage.similarity.candidates`: the count of open bugs, highest rank first,
+  that the `Possible duplicates` section lists when the step files a bug with
+  no match at the threshold. Default is `3`.
+
+- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`:
+  the bonuses `rankedCandidates` (`src/triage/similarity.ts`) adds to an
+  open bug's word score for the same cause code, the same cause family with
+  another leaf, and the same module and action, capped at 1 (see "Similarity
+  and duplicates"). Each is a number from 0 to 1, and `0` turns its signal
+  off. Defaults are `0.15`, `0.05` and `0.10`. They order the list of
+  `Possible duplicates` only; the same-bug decision stays on the word score
+  and the threshold. A number outside 0 to 1, `true` and `false` are refused.
+
+With an empty config the three weights take their defaults. Setting one to
+`0` turns its signal off and leaves the other two as they are:
+
+```yaml
+triage:
+  similarity:
+    weights:
+      causeFamily: 0
+```
+
+A file that sets the threshold and all three weights:
+
+```yaml
+triage:
+  similarity:
+    threshold: 0.3
+    weights:
+      causeLeaf: 0.2
+      causeFamily: 0.05
+      boundary: 0.15
+```
 
 ### Configuration: the record's rules
 

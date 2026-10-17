@@ -105,7 +105,13 @@ holds them. "no" and "not" are kept: they tell `no-identity` from
   TEXT's words each holds in its code and description, with Jaccard
   breaking ties. A text of three words or more must share two with an
   entry, so a cause the list lacks reads as no match and goes to
-  `<family>:new-context`. It never picks a code: the caller does.
+  `<family>:new-context`. It never picks a code: the caller does. Each
+  row's `issue` is null and its `proposal` false.
+- `suggestWithProposals(text, entries, proposals, limit)` ranks the codes
+  open bugs proposed beside the list's, each read as an entry whose
+  description is the proposing bug's title, through the same floor and
+  tie rules. A proposal already a code of the list is left out, and a code
+  two bugs proposed is ranked once, its `issue` the first of them.
 - `nearDuplicates(entries, threshold)` pairs codes of one family whose
   leaf and description read alike at `NEAR_DUPLICATE_SCORE` (0.5) or above.
   A test keeps rafa's own list free of such pairs.
@@ -127,6 +133,33 @@ one family read alike, which is how a project checks its own additions.
 that finds a pair writes its report as a `bug-codes-alike` event before
 it refuses, because a refusal's terminal event carries no data.
 `context/cli.md` holds the command's row.
+
+**Proposals.** `--suggest` also ranks the codes open bugs proposed. The
+tracker is resolved as the issue commands resolve it, and its open `bug`
+issues are listed. Each body's `Proposed cause` is ranked beside the list's
+codes through `suggestWithProposals` (`src/errors/match.ts`), each proposal
+read as an entry whose description is the proposing bug's title, under the
+same floor and tie rules. A line names the bug that proposed it, as
+`  <code>  <percent>  proposed by <issue name>`. A proposal the list already
+holds is left out, and a code two bugs proposed is ranked once, under the
+first of them. `--family` narrows the proposals to that family.
+`--no-proposals` skips the read, so no tracker is resolved and no `gh` runs.
+A chain that lands nowhere, or a listing that throws, is a `warn` line, and
+the suggestions print without proposals, exit code 0.
+
+A proposal is not yet a cause. The cause rule files a code the list lacks as
+`<family>:new-context`, the code kept as `Proposed cause`
+(`src/bugs/cause-rule.ts`), and that leaf earns no ranking bonus
+(`context/triage.md`). A bug filed with a proposal is therefore shown by
+`--suggest` and not ranked by its cause, until a fix adds the code to the
+list and new bugs file under it.
+
+A filer whose cause no leaf fits runs
+`rafa bug codes --suggest="branch not found"`. If another open bug proposed
+`git:branch-not-found`, the line shows it beside the list's codes and names
+that bug as its proposer, and the filer files with the same proposal.
+Rejected: storing proposals in config, since the tracker already holds each
+one in the bug that made it.
 
 ### Throwing a RafaError
 
