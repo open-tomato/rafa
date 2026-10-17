@@ -448,9 +448,20 @@ export function holdsTree(live: readonly SessionRecord[], checkout: () => string
     || live.some((record) => record.worktree === checkout());
 }
 
-/** Every branch ref this clone and the remote hold, each half that failed noted. */
-export function readRefs(sources: NextSources, remote: string, note: Note): readonly string[] {
-  const scan = scanClaimBranches(sources.git, remote);
+/**
+ * Every branch ref this clone and the remote hold, each half that failed
+ * noted. The scan is taken under {@link NextSources.branchTemplate}, so
+ * its claim reader fetches that template's claim branches (`work/rafa-*`
+ * under `work/{stub}`, `feat/rafa-*` by default). `scanner` stands in for
+ * {@link scanClaimBranches} in a test that watches the scan.
+ */
+export function readRefs(
+  sources: NextSources,
+  remote: string,
+  note: Note,
+  scanner: typeof scanClaimBranches = scanClaimBranches,
+): readonly string[] {
+  const scan = scanner(sources.git, remote, sources.branchTemplate);
   scan.problems.forEach((problem) => note(problem));
   return scan.refs;
 }

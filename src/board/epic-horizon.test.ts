@@ -296,6 +296,35 @@ describe('readHorizonChange on an in-progress epic', () => {
   });
 });
 
+describe('readHorizonChange under the configured branch template', () => {
+  /** Epic 40 with open members 12 and 14, nothing closed, so only a claim makes it in-progress. */
+  const OPEN_ONLY = [epic40(), member(12), member(14)];
+  /** Member 12's only branch, under `work/{stub}`, held here and pushed. */
+  const WORK_BRANCH: GitFixture = { local: ['refs/heads/main', 'refs/heads/work/rafa-12-x'], pushed: ['refs/heads/work/rafa-12-x'] };
+
+  test('reads an epic whose member\'s only branch is work/rafa-12-x as in-progress under work/{stub}, naming the branch', async () => {
+    const { input } = seams({ issues: OPEN_ONLY, git: WORK_BRANCH });
+    const reading = await readHorizonChange({ ...input, branchTemplate: 'work/{stub}' });
+    expect(reading.state).toBe('in-progress');
+    expect(reading.work).toEqual({ branches: ['work/rafa-12-x'], pullRequests: [] });
+  });
+
+  test('reads the same epic as backlog with no work with the template left out (control)', async () => {
+    const { input, gitCalls } = seams({ issues: OPEN_ONLY, git: WORK_BRANCH });
+    const reading = await readHorizonChange(input);
+    // The scan read the same refs, so the backlog reading is the template's doing alone.
+    expect(gitCalls.map((call) => call[0])).toEqual(['for-each-ref', 'ls-remote']);
+    expect(reading.state).toBe('backlog');
+    expect(reading.work).toBeNull();
+  });
+
+  test('reads no claim from a feat/ branch under work/{stub}: only the configured template is read', async () => {
+    const { input } = seams({ issues: OPEN_ONLY, git: { local: ['refs/heads/feat/rafa-12-x'] } });
+    const reading = await readHorizonChange({ ...input, branchTemplate: 'work/{stub}' });
+    expect(reading.state).toBe('backlog');
+  });
+});
+
 describe('readHorizonChange on an epic with no open member', () => {
   const cases: readonly (readonly [string, readonly BoardIssue[], EpicState])[] = [
     ['an empty epic', [epic40()], 'empty'],

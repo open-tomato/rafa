@@ -68,6 +68,8 @@
  * (`claimsOf`) and the rows' `has` column read the same answers. The
  * claims also weigh each branch's claim as the roadmap walk does, so a
  * released claim's branch still shows under `has` but claims nothing.
+ * The scan reads a claim branch under the config's `naming.branch`
+ * alone, `feat/rafa-<n>-<slug>` by default.
  *
  * ## What it writes
  *
@@ -337,6 +339,7 @@ function rowSeams(context: RafaContext, seams: EpicShowSeams, config: RafaConfig
   return onceSeams({
     board,
     git: seams.git ?? createGitRunner(root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(root, config.planDir).path),
     refs,

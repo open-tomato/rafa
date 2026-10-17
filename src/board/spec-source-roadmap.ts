@@ -266,6 +266,13 @@ export interface RoadmapSeams {
   readonly git: GitRunner;
   /** The remote the pushed half of the scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * `naming.branch` as config resolved it, which the branch scan reads
+   * a claim branch under; `DEFAULT_BRANCH_TEMPLATE`, `feat/{stub}`, when
+   * left out. Only this template is read: under `work/{stub}`,
+   * `feat/rafa-20-x` takes no line.
+   */
+  readonly branchTemplate?: string;
   /** Lists the open pull requests the other taken reading is read from. */
   readonly pullRequests: OpenPullRequestLister;
   /**
@@ -559,7 +566,7 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
   const read = await issues(roadmap);
   await seams.inspectRoadmap?.(read);
 
-  const branches = scanClaimBranches(seams.git, seams.remote);
+  const branches = scanClaimBranches(seams.git, seams.remote, seams.branchTemplate);
   branches.problems.forEach((problem) => output.warn(problem));
 
   const readings = passingOver(createRoadmapReadings({

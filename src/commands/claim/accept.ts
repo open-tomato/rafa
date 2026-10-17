@@ -14,11 +14,13 @@
  *
  * The line first: exactly one argument, the issue number
  * (`readIssueArgument`). Then this device's store id with the ids that
- * store replaced (`readClaimDevice`), then one fetch of the
- * claim branches (the `naming.branch` template with the stub,
- * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
- * `rafa claim release` reads them (`./release.ts`). No network means no
- * acceptance.
+ * store replaced (`readClaimDevice`), then one fetch of the claim
+ * branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`): each is the project's
+ * `naming.branch` template with the stub, `feat/rafa-<n>-<slug>` by default
+ * and `work/rafa-<n>-<slug>` under `work/{stub}`. Only the configured
+ * template is read, and the accept commit is pushed under it. No network
+ * means no acceptance.
  *
  * ## Which handover it accepts
  *
@@ -87,6 +89,7 @@ import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { holdsClaim } from '../../claims/device.js';
 import { parseClaimMessage } from '../../claims/record.js';
@@ -225,8 +228,9 @@ export async function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFac
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
-  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse), issue, device);
-  const sha = pushOnClaimTip(seams.git, reading, { action: 'accept', issue, store: storeId }, refuse, ACCEPTING);
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse, template), issue, device);
+  const sha = pushOnClaimTip(seams.git, reading, { action: 'accept', issue, store: storeId }, refuse, ACCEPTING, template);
   return { issue, branch: reading.branch, storeId, from, handSha, sha };
 }
 
@@ -236,8 +240,11 @@ export function renderAccept(result: ClaimAcceptResult): string {
     + ` accept commit ${result.sha} pushed to ${REMOTE}; this device (store ${result.storeId}) now owns the claim.`;
 }
 
-/** The default seams: the ones `loop start`'s claim check reads through. */
-const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => createStartPreflightClaim(root, config);
+/** The default seams: the ones `loop start`'s claim check reads through, with the project's `naming.branch` template. */
+const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
+  ...createStartPreflightClaim(root, config),
+  branchTemplate: config.namingBranch,
+});
 
 /** The command, reaching git and the store through `makeSeams`; see the module note. */
 export function createClaimAcceptCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {

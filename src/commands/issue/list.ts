@@ -78,13 +78,12 @@
  * uncached unless its seams set `boardCache`, so the commands it planted
  * are the commands sent.
  *
- * The Roadmap and the board are GitHub's, so `--roadmap` resolves no
- * tracker, runs no preflight and reads the board whatever
- * `tracker.default` names: the config is read for `roadmap.issue` and
- * for `specs.dir`, where the saved copies are, and for `plan.dir`, the directory the `plan` mark is read in, resolved
- * against the project root as `resolvePlansDir`
- * (`commands/plan/plan-files.ts`) resolves it. The config is read once,
- * through `issueSubjectConfig`, so its warnings are written once.
+ * The Roadmap and the board are GitHub's, so `--roadmap` resolves no tracker, runs no preflight
+ * and reads the board whatever `tracker.default` names: the config is read for `roadmap.issue`,
+ * for `specs.dir`, where the saved copies are, for `plan.dir`, the directory the `plan` mark is
+ * read in, resolved against the project root as `resolvePlansDir` (`commands/plan/plan-files.ts`)
+ * resolves it, and for `naming.branch`, the one template the branch scan reads a claim under. The
+ * config is read once, through `issueSubjectConfig`, so its warnings are written once.
  *
  * The other flags narrow AFTER the Roadmap's selection and keep its
  * order: `--type` and `--module` by the issue's type and module as the
@@ -548,6 +547,7 @@ export async function listRoadmap(
     issues: createGhSpecIssueReader({ gh }),
     board,
     git: seams.git ?? createGitRunner(project.root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames,
     refs,

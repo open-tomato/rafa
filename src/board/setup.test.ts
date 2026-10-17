@@ -1,8 +1,8 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the fifteen labels, the
- * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
- * line written into the project config, and a second run that writes
- * nothing.
+ * Tests for the board setup (`src/board/setup.ts`, its roadmap step in
+ * `src/board/setup-roadmap.ts`): the fifteen labels, the spec issue
+ * template, the pinned Roadmap issue, the `roadmap.issue` line written
+ * into the project config, and a second run that writes nothing.
  *
  * Every case drives {@link fakeBoard}, a `gh` runner holding the labels
  * and the open issues of one imaginary repository in memory and keeping
@@ -42,6 +42,15 @@
  *    what is at the path.
  *
  * The file reads 31 pass either side of both.
+ *
+ * The `naming.branch` cases each sit beside a control with the template
+ * left out, and two more mutations were driven on 2026-10-17 over
+ * `bun test src/board/setup.test.ts`, restored from a scratch copy and
+ * checked with `cmp`: `createRoadmapIssue` building the body without its
+ * template, 37 pass, 2 fail (the `setUpRoadmap` and `setUpBoard` template
+ * cases); `setUpBoard` calling `setUpRoadmap` without `branchTemplate`,
+ * 38 pass, 1 fail (the `setUpBoard` case). The file reads 39 pass on
+ * either side of both.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
@@ -574,6 +583,30 @@ describe('setUpRoadmap', () => {
     expect(step.problems).toEqual([]);
   });
 
+  it('opens the Roadmap issue with a body naming the claim branch under the template it is handed', async () => {
+    const root = freshRoot('roadmap-template');
+    const gh = fakeBoard();
+
+    const step = await setUpRoadmap(gh.run, root, 'work/{stub}');
+
+    expect(step.issue).toBe(1);
+    const body = callsTo(gh.calls(), 'issue create')[0]?.at(-1) ?? '';
+    expect(body).toContain('the branch `work/rafa-<n>-<slug>`');
+    expect(body).not.toContain('feat/');
+  });
+
+  it('opens the Roadmap issue with a body naming feat/rafa-<n>-<slug> when the template is left out', async () => {
+    const root = freshRoot('roadmap-template-control');
+    const gh = fakeBoard();
+
+    const step = await setUpRoadmap(gh.run, root);
+
+    expect(step.issue).toBe(1);
+    const body = callsTo(gh.calls(), 'issue create')[0]?.at(-1) ?? '';
+    expect(body).toContain('the branch `feat/rafa-<n>-<slug>`');
+    expect(body).not.toContain('work/');
+  });
+
   it('passes over an open issue whose title only looks like the roadmap', async () => {
     const root = freshRoot('roadmap-loose');
     const gh = fakeBoard({ issues: [{ number: 3, title: 'Roadmap for 2026' }] });
@@ -716,6 +749,17 @@ describe('setUpBoard', () => {
 
     writeFileSync(config, readFileSync(config, 'utf8'), 'utf8');
     expect(lstatSync(config).mtimeMs).not.toBe(PAST.getTime());
+  });
+
+  it('hands its branchTemplate to the roadmap step, and the default when it carries none', async () => {
+    const configured = fakeBoard();
+    const plain = fakeBoard();
+
+    await setUpBoard({ gh: configured.run, root: freshRoot('board-template'), branchTemplate: 'work/{stub}' });
+    await setUpBoard({ gh: plain.run, root: freshRoot('board-template-control') });
+
+    expect(callsTo(configured.calls(), 'issue create')[0]?.at(-1)).toContain('the branch `work/rafa-<n>-<slug>`');
+    expect(callsTo(plain.calls(), 'issue create')[0]?.at(-1)).toContain('the branch `feat/rafa-<n>-<slug>`');
   });
 
   it('carries on past a part it refuses and reports the rest', async () => {

@@ -292,7 +292,7 @@ async function orEmpty<T>(read: () => Promise<T> | T, fallback: T): Promise<T> {
 }
 
 /** The seams {@link claimsOf} reads through. */
-export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'pullRequests'>;
+export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'branchTemplate' | 'pullRequests'>;
 
 /**
  * The listing as the issue reader the taken reading weighs a claim's
@@ -326,7 +326,7 @@ export async function claimsOf(issues: readonly BoardIssue[], seams: ClaimSeams)
   const names = await orEmpty(seams.planNames, []);
   const readings = createRoadmapReadings({
     issues: listingIssues(issues),
-    branches: scanClaimBranches(seams.git, seams.remote),
+    branches: scanClaimBranches(seams.git, seams.remote, seams.branchTemplate),
     pullRequests: seams.pullRequests,
   });
   const claimed = await Promise.all(issues.map(async ({ number }) => hasPlanFor(names, number)

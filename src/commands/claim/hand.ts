@@ -21,10 +21,12 @@
  * is told so, rather than that it gave no argument. Then this device's
  * store id, and a `--to` naming that very store, or an id it replaced
  * (`holdsClaim`, `src/claims/device.ts`), is refused. Then one fetch of
- * the claim branches (the `naming.branch` template with the stub,
- * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
- * `rafa claim release` reads them (`./release.ts`). No network means no
- * handover.
+ * the claim branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`): each is the project's
+ * `naming.branch` template with the stub, `feat/rafa-<n>-<slug>` by default
+ * and `work/rafa-<n>-<slug>` under `work/{stub}`. Only the configured
+ * template is read, and the hand or withdraw commit is pushed under it.
+ * No network means no handover.
  *
  * ## What it pushes
  *
@@ -76,6 +78,7 @@ import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { holdsClaim } from '../../claims/device.js';
 import { REMOTE } from '../../start/branch-decision.js';
@@ -198,9 +201,10 @@ export async function handClaim(context: RafaContext, makeSeams: ClaimSeamsFacto
   if (request.action === 'hand' && holdsClaim(device, request.to)) {
     throw refuse(`--${CLAIM_HAND_TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
   }
-  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, HANDING);
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse, template), { issue, device }, refuse, HANDING);
   const { record, to, replaced } = recordFor(reading, request, issue, storeId);
-  const sha = pushOnClaimTip(seams.git, reading, record, refuse, HANDING);
+  const sha = pushOnClaimTip(seams.git, reading, record, refuse, HANDING, template);
   return { issue, branch: reading.branch, action: request.action, storeId, to, replaced, sha };
 }
 
@@ -219,8 +223,11 @@ export function renderHand(result: ClaimHandResult): string {
     + ` runs rafa claim accept ${issue}.${replaced}`;
 }
 
-/** The default seams: the ones `loop start`'s claim check reads through. */
-const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => createStartPreflightClaim(root, config);
+/** The default seams: the ones `loop start`'s claim check reads through, with the project's `naming.branch` template. */
+const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
+  ...createStartPreflightClaim(root, config),
+  branchTemplate: config.namingBranch,
+});
 
 /** The command, reaching git and the store through `makeSeams`; see the module note. */
 export function createClaimHandCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {

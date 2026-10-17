@@ -22,7 +22,8 @@
  * no listing of its own. The epic's computed state is `readEpics`'
  * (`./epics.ts`), over the claims the roadmap's `has` column reads: a
  * plan file ({@link hasPlanFor}), a branch ({@link scanClaimBranches},
- * {@link branchClaims} under the scan's own template) and an open pull request
+ * {@link branchClaims} under {@link HorizonChangeInput.branchTemplate}, the
+ * project's `naming.branch`) and an open pull request
  * ({@link closedIssuesIn}). Each of those three is read at most once,
  * and none of them is read when the epic has no open member, since such
  * an epic cannot be `in-progress` and has no open work to name.
@@ -115,6 +116,12 @@ export interface HorizonChangeInput {
   readonly git: GitRunner;
   /** The remote the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * The branch template a branch claims an issue under, the project's
+   * `naming.branch`; `DEFAULT_BRANCH_TEMPLATE` when left out. Only this
+   * template is read: a branch under another one is no claim.
+   */
+  readonly branchTemplate?: string;
   /** Every open pull request. */
   readonly pullRequests: OpenPullRequestLister;
   /** The file names in the plan dir. */
@@ -211,7 +218,7 @@ interface ClaimReadings {
 
 /** The three claim readings; a failure is a problem sentence, never a throw. */
 async function readClaims(input: HorizonChangeInput): Promise<ClaimReadings> {
-  const scan = scanClaimBranches(input.git, input.remote);
+  const scan = scanClaimBranches(input.git, input.remote, input.branchTemplate);
   const problems = [...scan.problems];
   let pulls: readonly RoadmapPullRequest[] = [];
   try {

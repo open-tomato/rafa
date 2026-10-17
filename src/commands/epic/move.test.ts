@@ -121,6 +121,8 @@ const MOVE_12: MembershipChange = { kind: 'move', issue: 12, from: 40, to: 50 };
 
 /** How the planted `gh` answers. */
 interface Planted {
+  /** The listing `gh issue list` answers; {@link LISTING} when left out. */
+  readonly listing?: readonly object[];
   readonly failListing?: boolean;
   readonly failSwap?: boolean;
   readonly failComment?: boolean;
@@ -152,7 +154,7 @@ function plantedGh(planted: Planted = {}): PlantedGh {
     if (noun === 'issue' && verb === 'list' && words.includes('--state all')) {
       return planted.failListing === true
         ? failed('error connecting to api.github.com')
-        : ok(JSON.stringify(LISTING));
+        : ok(JSON.stringify(planted.listing ?? LISTING));
     }
     if (noun === 'pr' && verb === 'list' && words.includes('--state open')) return ok(JSON.stringify(PULLS));
     if (noun === 'issue' && verb === 'edit') {
@@ -182,16 +184,26 @@ function plantedGh(planted: Planted = {}): PlantedGh {
   return { gh, calls, bodies };
 }
 
-/** A `git` holding the branches the module note names, recording every call. */
-function plantedGit(): { git: GitRunner; calls: string[][] } {
+/** The refs a planted `git` holds: in this checkout, and on the remote. */
+interface PlantedRefs {
+  readonly local: readonly string[];
+  readonly pushed: readonly string[];
+}
+
+/** The branches the module note names. */
+const REFS: PlantedRefs = {
+  local: ['refs/heads/feat/rafa-12-login', 'refs/remotes/origin/feat/rafa-12-login', 'refs/heads/feat/rafa-14-session', 'refs/heads/main'],
+  pushed: ['refs/heads/feat/rafa-12-login'],
+};
+
+/** A `git` holding `refs`, the branches the module note names by default, recording every call. */
+function plantedGit(refs: PlantedRefs = REFS): { git: GitRunner; calls: string[][] } {
   const calls: string[][] = [];
   const ok = (lines: readonly string[]): GitResult => ({ ok: true, stdout: lines.join('\n'), stderr: '' });
   const git: GitRunner = (args) => {
     calls.push([...args]);
-    if (args[0] === 'for-each-ref') {
-      return ok(['refs/heads/feat/rafa-12-login', 'refs/remotes/origin/feat/rafa-12-login', 'refs/heads/feat/rafa-14-session', 'refs/heads/main']);
-    }
-    if (args[0] === 'ls-remote') return ok(['abc123\trefs/heads/feat/rafa-12-login']);
+    if (args[0] === 'for-each-ref') return ok(refs.local);
+    if (args[0] === 'ls-remote') return ok(refs.pushed.map((head) => `abc123\t${head}`));
     return { ok: false, stdout: '', stderr: `unplanted: git ${args.join(' ')}` };
   };
   return { git, calls };
@@ -220,6 +232,8 @@ function scriptedPrompter(answers: readonly (string | null)[]): { open: () => Pr
 /** What one case runs with. */
 interface CaseSetup {
   readonly planted?: Planted;
+  /** The refs the planted `git` holds; {@link REFS} when left out. */
+  readonly refs?: PlantedRefs;
   /** The answers typed, or null for no terminal. */
   readonly answers?: readonly (string | null)[] | null;
   /** Wraps the relationships made over the planted `gh`, handed in as a seam; the config's when left out. */
@@ -241,7 +255,7 @@ function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
 /** Dispatches `rafa epic move <words>` over a planted `gh`, `git` and terminal. */
 async function run(words: readonly string[], setup: CaseSetup = {}) {
   const planted = plantedGh(setup.planted);
-  const git = plantedGit();
+  const git = plantedGit(setup.refs);
   const answers = setup.answers ?? null;
   const prompter = scriptedPrompter(answers ?? []);
   const seams: EpicMoveSeams = {
@@ -714,5 +728,47 @@ describe('rafa epic move, and the project', () => {
 
     expect([swap.exitCode, unasked.exitCode]).toEqual([1, 0]);
     expect(recorded.calls()).toEqual([]);
+  });
+});
+
+describe('rafa epic move under the configured branch template', () => {
+  /** #12 in epic #50, `epic:billing`, so it can move to epic #40. */
+  const IN_BILLING: readonly object[] = [
+    raw(40, ['type:epic', 'epic:auth', 'horizon:now'], { body: BODY_40 }),
+    raw(50, ['type:epic', 'epic:billing', 'horizon:next'], { body: BODY_50 }),
+    raw(12, ['epic:billing']),
+  ];
+  /** #12's only branch, under `work/{stub}`, held here and pushed. */
+  const WORK_REFS: PlantedRefs = { local: ['refs/heads/main', 'refs/heads/work/rafa-12-x'], pushed: ['refs/heads/work/rafa-12-x'] };
+
+  /** Moves #12 to epic #40 under `config`, answering the json result's data and the git calls. */
+  async function moveOverWorkBranch(config: string): Promise<{ exitCode: number | null; data: unknown; gitCalls: readonly string[][] }> {
+    const result = await run(['12', '--to=40', '--reason=x', '--output=json'], { planted: { listing: IN_BILLING }, refs: WORK_REFS, config });
+    const event = eventsOf(result.stdout).find((each) => each.type === 'result');
+    return { exitCode: result.exitCode, data: (event as { data?: unknown } | undefined)?.data, gitCalls: result.gitCalls };
+  }
+
+  it('names work/rafa-12-x as #12\'s open work under naming.branch: work/{stub}', async () => {
+    const outcome = await moveOverWorkBranch(`${LOCAL_CONFIG}naming:\n  branch: work/{stub}\n`);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.data).toMatchObject({ status: 'moved', from: 50, to: 40, work: { branches: ['work/rafa-12-x'], pullRequests: [7] } });
+  });
+
+  it('names no branch with naming.branch left out, the control for the case above', async () => {
+    const outcome = await moveOverWorkBranch(LOCAL_CONFIG);
+
+    expect(outcome.exitCode).toBe(0);
+    // The scan read the same refs and #7 still closes #12, so the empty branch list is the template's doing alone.
+    expect(outcome.gitCalls.map((call) => call[0])).toEqual(['for-each-ref', 'ls-remote']);
+    expect(outcome.data).toMatchObject({ status: 'moved', from: 50, to: 40, work: { branches: [], pullRequests: [7] } });
+  });
+
+  it('reads the branch through readEpicMove\'s own branchTemplate, and not with it left out', async () => {
+    const issues = parseBoardListing(JSON.stringify(IN_BILLING), 'the planted listing');
+    const input = { issues, issue: 12, to: 40, git: plantedGit(WORK_REFS).git, pullRequests: () => Promise.resolve([]) };
+
+    expect((await readEpicMove({ ...input, branchTemplate: 'work/{stub}' })).work?.branches).toEqual(['work/rafa-12-x']);
+    expect((await readEpicMove(input)).work?.branches).toEqual([]);
   });
 });

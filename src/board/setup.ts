@@ -75,56 +75,15 @@
  * no run is stopped, so the limit is a line an operator may have to read
  * past rather than a failure mode.
  *
- * ## The roadmap issue, and why the config is read before the search
+ * ## The roadmap step lives in `./setup-roadmap.ts`
  *
- * The order is: `roadmap.issue` in the project config, then the open
- * issue titled {@link ROADMAP_TITLE}, then a new issue. The config is
- * read FIRST on purpose. `gh issue list --search` goes through GitHub's
- * search index, which is not updated the moment an issue is created, so
- * a second run minutes after the first can be answered "no issue titled
- * Roadmap" for an issue that exists — and creating a second Roadmap
- * issue is the one failure here that cannot be undone by running the
- * command again. Once `roadmap.issue` names the issue, no later run
- * searches at all, so idempotency rests on a file in the checkout rather
- * than on an index nobody controls.
- *
- * Two open issues titled Roadmap are REFUSED, with `./roadmap.ts`'s own
- * sentence, for the reason it gives: which one holds the order is not
- * this command to guess.
- *
- * ## The roadmap carries {@link ROADMAP_LABEL}
- *
- * A board is an open issue labelled `type:roadmap`, so the Roadmap issue
- * this command opens is opened with `--label type:roadmap`; the labels
- * are made before the issue, so the label is there to be added. An
- * existing issue the title search ADOPTS is read with its labels, and
- * one that lacks the label gets it through
- * `gh issue edit <n> --add-label type:roadmap`. That write is what makes
- * its `issue` part `created` rather than `present`: the issue was not
- * opened by this run, but it was written to, and {@link boardChanged}
- * has to say so. An edit that fails leaves the part `present` and comes
- * back as a {@link BoardSetupReport.problems} sentence, the way a failed
- * pin does: `roadmap.issue` still names the issue, which is what every
- * reader ranks first.
- *
- * An issue `roadmap.issue` already names is not read at all, as before,
- * so it is not labelled either: that path sends nothing to GitHub.
- *
- * The pin is `gh issue pin <n>` (measured present in `gh` 2.100.0 on
- * 2026-09-19). A pin that fails does not make the part refused: the
- * issue exists and `roadmap.issue` names it, which is everything
- * `plan create --next` reads, and pinnedness is what a person sees on
- * the issues page. It comes back as a {@link BoardSetupReport.problems}
- * sentence instead, the shape `./roadmap.ts` uses for the half of a
- * branch scan that failed.
- *
- * ## Writing one setting into a file of comments
- *
- * `roadmap.issue` is written INTO the config `rafa init` wrote rather
- * than over it, so the commented template an operator reads stays in the
- * file. The edit, the shape it refuses and the parse-back that guards it
- * are `./setup-config.ts`'s; {@link writeRoadmapSetting} is the part
- * that reports what came of them.
+ * The Roadmap issue, its label, its body and `roadmap.issue` are
+ * `./setup-roadmap.ts`'s, which carries the note on why the config is
+ * read before the search. This module re-exports all of it and runs it
+ * last, under the `naming.branch` template {@link BoardSetupOptions}
+ * carries, so the issue's naming paragraph names the claim branch the
+ * project configured. The parts and the `gh` readers both steps share
+ * are `./setup-parts.ts`'s.
  *
  * ## Seams
  *
@@ -136,22 +95,15 @@
  * a recorded fake: none reaches GitHub, spawns `gh`, or touches the real
  * home.
  */
-import type { SettingReading } from './setup-config.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BoardPart } from './setup-parts.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Stats } from 'node:fs';
 
 import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { configFilePath } from '@open-tomato/rafa/core/config';
-import {
-  branchFromTemplate,
-  DEFAULT_BRANCH_TEMPLATE,
-  describeValue,
-  isMapping,
-  messageOf,
-} from '@open-tomato/rafa/core/config/sections';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
@@ -159,13 +111,19 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';
 import { SPEC_LABEL } from './issue.js';
-import { ID_PREFIX } from './naming.js';
 import { SPEC_READY_LABEL } from './readiness.js';
-import { ROADMAP_SETTING, ROADMAP_TITLE, severalRoadmapsMessage } from './roadmap.js';
-import { readRoadmapSetting, roadmapIssueIn, withRoadmapIssue } from './setup-config.js';
+import { detailOf, holdsLabel, parseRows, partOf, PREFIX, rowText } from './setup-parts.js';
+import { ROADMAP_LABEL, setUpRoadmap } from './setup-roadmap.js';
 
-/** What every refusal this module writes opens with. */
-const PREFIX = 'board setup';
+export type { BoardOutcome, BoardPart, BoardPartKind } from './setup-parts.js';
+export {
+  CREATED_ISSUE_URL,
+  ROADMAP_LABEL,
+  roadmapIssueBody,
+  setUpRoadmap,
+  writeRoadmapSetting,
+} from './setup-roadmap.js';
+export type { RoadmapStep } from './setup-roadmap.js';
 
 /** This module's own directory: where the shipped issue template is looked for. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
@@ -177,9 +135,6 @@ export interface BoardLabel {
   /** The one-line description sent with `gh label create`. */
   readonly description: string;
 }
-
-/** The label that marks an open issue as a board; see the module note. */
-export const ROADMAP_LABEL: string = `${GITHUB_LABELS.typePrefix}roadmap`;
 
 /**
  * The fifteen labels the workflow files under, in the order they are made.
@@ -265,24 +220,6 @@ export const TEMPLATES_DIRNAME = 'templates';
 /** The name the shipped spec template carries in that directory. */
 export const SPEC_TEMPLATE_FILE = 'spec.md';
 
-/** What one part of the board came to. */
-export type BoardOutcome = 'created' | 'present' | 'refused';
-
-/** Which part of the board a {@link BoardPart} is about. */
-export type BoardPartKind = 'label' | 'template' | 'issue' | 'setting';
-
-/** One part of the board, and what this run made of it. */
-export interface BoardPart {
-  /** Which part it is; a caller groups its rows by this. */
-  readonly kind: BoardPartKind;
-  /** What it is called: a label name, a path, `Roadmap issue`, `roadmap.issue`. */
-  readonly name: string;
-  /** Created by this run, already present, or not made. */
-  readonly outcome: BoardOutcome;
-  /** One sentence: what was made, or why it was not. */
-  readonly detail: string;
-}
-
 /** What a whole run of {@link setUpBoard} came to. */
 export interface BoardSetupReport {
   /** Every part, labels first, then the template, the issue and the setting. */
@@ -303,55 +240,6 @@ export function boardRefusals(report: BoardSetupReport): readonly BoardPart[] {
   return report.parts.filter((part) => part.outcome === 'refused');
 }
 
-/** One part, as the parts are built. */
-function partOf(kind: BoardPartKind, name: string, outcome: BoardOutcome, detail: string): BoardPart {
-  return { kind, name, outcome, detail };
-}
-
-/** What a failed command wrote, for a message. Never empty. */
-function detailOf(result: GhResult, command: string): string {
-  const written = result.stderr.trim() || result.stdout.trim();
-  return written === ''
-    ? `${command} failed and wrote nothing`
-    : `${command} failed: ${written}`;
-}
-
-/** What `command` wrote, parsed as a list. Throws, naming it, when it is not one. */
-function parseRows(stdout: string, command: string): readonly unknown[] {
-  let payload: unknown;
-  try {
-    payload = JSON.parse(stdout) as unknown;
-  } catch (error) {
-    throw new Error(`${PREFIX}: ${command} wrote output that is not JSON: ${messageOf(error)}`, { cause: error });
-  }
-  if (!Array.isArray(payload)) {
-    throw new Error(`${PREFIX}: ${command} answered ${describeValue(payload)}, expected a list`);
-  }
-  return payload as readonly unknown[];
-}
-
-/** The string a row carries at `key`, checked. */
-function rowText(row: unknown, key: string, command: string, where: string): string {
-  const value = isMapping(row)
-    ? row[key]
-    : null;
-  if (typeof value !== 'string') {
-    throw new Error(`${PREFIX}: ${command} answered ${where}.${key} as ${describeValue(value)}, expected a string`);
-  }
-  return value;
-}
-
-/** The positive whole number a row carries at `key`, checked. */
-function rowNumber(row: unknown, key: string, command: string, where: string): number {
-  const value = isMapping(row)
-    ? row[key]
-    : null;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
-    throw new Error(`${PREFIX}: ${command} answered ${where}.${key} as ${describeValue(value)}, expected a positive whole number`);
-  }
-  return value;
-}
-
 /**
  * Every label name the repository holds, read with one
  * `gh label list --limit <n> --json name`.
@@ -368,12 +256,6 @@ export async function listBoardLabels(gh: GhRunner): Promise<readonly string[]> 
   if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
   return Object.freeze(parseRows(result.stdout, command)
     .map((row, index) => rowText(row, 'name', command, `label ${String(index)}`)));
-}
-
-/** True when `held` carries `name`, however either spells its case. */
-function holdsLabel(held: readonly string[], name: string): boolean {
-  const wanted = name.trim().toLowerCase();
-  return held.some((label) => label.trim().toLowerCase() === wanted);
 }
 
 /**
@@ -519,246 +401,6 @@ export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR):
   });
 }
 
-/**
- * The body a new Roadmap issue is opened with: the empty list and the
- * naming paragraph, whose branch is the `naming.branch` `template` over
- * the stub, `feat/rafa-<n>-<slug>` under `DEFAULT_BRANCH_TEMPLATE`, the
- * template when left out.
- */
-export function roadmapIssueBody(template: string = DEFAULT_BRANCH_TEMPLATE): string {
-  const spec = `${ID_PREFIX}-<n>-<slug>`;
-  const branch = branchFromTemplate(template, spec);
-  return [
-    '## Next, in order',
-    '',
-    '<!-- One issue per line, the one to take next at the top:',
-    '`- [ ] #<n> why it is next`. rafa plan create --next walks this list',
-    'from the top and takes the first line nobody has finished and nobody',
-    'has started, so the order written here is the order the work happens',
-    'in. A ticked line is done: rafa pr merge ticks one when the pull',
-    'request that closes its issue is merged. -->',
-    '',
-    '## Naming',
-    '',
-    'Every piece of work has one issue, and the number of that issue is its',
-    `id everywhere else: the spec \`${spec}.md\`, the plan stub \`${spec}\`,`,
-    `the branch \`${branch}\` and the pull request title`,
-    `\`${ID_PREFIX}-<n>: <what you get>\`.`,
-    '',
-  ].join('\n');
-}
-
-/**
- * The URL `gh issue create` prints, capturing the issue number.
- *
- * `src/adapters/tracker/github.ts` keeps its own copy of this pattern,
- * private, for the same line off the same command. Reading a URL is not
- * the concern either module is about, and the shared alternative is
- * exporting a regular expression from the tracker adapter, which is a
- * copied shape open-tomato owns: a second reader of it would be one more
- * thing a change there has to look at. This copy is the board's own, so
- * it is exported for `./issue-board.ts`, whose `createIssue` reads the
- * same line.
- */
-export const CREATED_ISSUE_URL: RegExp = /^https:\/\/[^\s/]+\/[\w.-]+\/[\w.-]+\/issues\/([1-9]\d*)$/u;
-
-/** What a roadmap issue step came to: the parts it made and the issue, when there is one. */
-export interface RoadmapStep {
-  readonly parts: readonly BoardPart[];
-  readonly issue: number | null;
-  readonly problems: readonly string[];
-}
-
-/** The `Roadmap issue` part, under the name every caller groups it by. */
-const ISSUE_PART_NAME = `${ROADMAP_TITLE} issue`;
-
-/**
- * Writes `roadmap.issue: <issue>` into the project config under `root`,
- * having read the text back as that issue first. Answers the `setting`
- * part.
- */
-export function writeRoadmapSetting(root: string, issue: number, reading: SettingReading): BoardPart {
-  const path = configFilePath(root);
-  const name = ROADMAP_SETTING;
-  const written = withRoadmapIssue(reading.text, issue);
-  if (written === null) {
-    const why = `it spells roadmap in a shape this command does not edit, so set ${name} by hand`;
-    return partOf('setting', name, 'refused', `${path} was left as it was: ${why}`);
-  }
-
-  let read: number | null;
-  try {
-    read = roadmapIssueIn(written, path);
-  } catch (error) {
-    const why = `the file this run would have written does not parse: ${messageOf(error)}`;
-    return partOf('setting', name, 'refused', `${path} was left as it was: ${why}`);
-  }
-  if (read !== issue) {
-    const why = `the file this run would have written reads ${name} as ${describeValue(read)}`;
-    return partOf('setting', name, 'refused', `${path} was left as it was: ${why}`);
-  }
-
-  try {
-    writeFileSync(path, written, 'utf8');
-  } catch (error) {
-    return partOf('setting', name, 'refused', `${path} could not be written: ${messageOf(error)}`);
-  }
-  return partOf('setting', name, 'created', `${path} now names issue #${String(issue)}`);
-}
-
-/** Both parts refused for the same reason, when neither can be reached. */
-function roadmapRefused(why: string): RoadmapStep {
-  return {
-    parts: [
-      partOf('issue', ISSUE_PART_NAME, 'refused', why),
-      partOf('setting', ROADMAP_SETTING, 'refused', why),
-    ],
-    issue: null,
-    problems: [],
-  };
-}
-
-/** One open issue titled {@link ROADMAP_TITLE}, and whether it already carries {@link ROADMAP_LABEL}. */
-interface TitledRoadmap {
-  readonly number: number;
-  readonly labelled: boolean;
-}
-
-/** The label names a row carries at `labels`, checked. */
-function rowLabels(row: unknown, command: string, where: string): readonly string[] {
-  const value = isMapping(row)
-    ? row['labels']
-    : null;
-  if (!Array.isArray(value)) {
-    throw new Error(`${PREFIX}: ${command} answered ${where}.labels as ${describeValue(value)}, expected a list`);
-  }
-  return (value as readonly unknown[])
-    .map((label, index) => rowText(label, 'name', command, `${where}.labels ${String(index)}`));
-}
-
-/** Every open issue titled {@link ROADMAP_TITLE}, by an exact fold of the title. */
-async function searchRoadmapIssues(gh: GhRunner): Promise<readonly TitledRoadmap[]> {
-  const search = `${ROADMAP_TITLE} in:title`;
-  const args = ['issue', 'list', '--state', 'open', '--search', search, '--json', 'number,title,labels'];
-  const command = `gh issue list --state open --search "${search}" --json number,title,labels`;
-
-  const result = await gh(args);
-  if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-  const wanted = ROADMAP_TITLE.toLowerCase();
-  return Object.freeze(parseRows(result.stdout, command)
-    .map((row, index) => ({
-      number: rowNumber(row, 'number', command, `issue ${String(index)}`),
-      title: rowText(row, 'title', command, `issue ${String(index)}`),
-      labels: rowLabels(row, command, `issue ${String(index)}`),
-    }))
-    .filter((row) => row.title.trim().toLowerCase() === wanted)
-    .map((row) => ({ number: row.number, labelled: holdsLabel(row.labels, ROADMAP_LABEL) })));
-}
-
-/** Opens the Roadmap issue and answers its number, or throws naming the command. */
-async function createRoadmapIssue(gh: GhRunner): Promise<number> {
-  const command = `gh issue create --title ${ROADMAP_TITLE} --label ${ROADMAP_LABEL}`;
-  const result = await gh(['issue', 'create', '--title', ROADMAP_TITLE, '--label', ROADMAP_LABEL, '--body', roadmapIssueBody()]);
-  if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-
-  const url = result.stdout.trim().split('\n')
-    .at(-1) ?? '';
-  const number = CREATED_ISSUE_URL.exec(url)?.[1];
-  if (number === undefined) {
-    throw new Error(`${PREFIX}: ${command} exited 0 and printed no issue URL, so the issue may exist`
-      + ` unrecorded; it wrote ${describeValue(result.stdout)}`);
-  }
-  return Number.parseInt(number, 10);
-}
-
-/** Pins `issue`; a failure is a sentence the caller carries, never a refusal. */
-async function pinRoadmapIssue(gh: GhRunner, issue: number): Promise<string | null> {
-  const command = `gh issue pin ${String(issue)}`;
-  const result = await gh(['issue', 'pin', String(issue)]);
-  return result.ok
-    ? null
-    : `issue #${String(issue)} was opened but not pinned, so it does not show at the top of the issues page: ${detailOf(result, command)}`;
-}
-
-/**
- * The `issue` part of an adopted Roadmap issue: `present` when it
- * already carries {@link ROADMAP_LABEL}, else `created` once the label
- * was added, with a problem sentence and `present` when it could not be.
- */
-async function adoptRoadmapIssue(gh: GhRunner, found: TitledRoadmap): Promise<{ part: BoardPart; problem: string | null }> {
-  const issue = String(found.number);
-  const titled = `issue #${issue} is open and titled ${ROADMAP_TITLE}`;
-  if (found.labelled) return { part: partOf('issue', ISSUE_PART_NAME, 'present', titled), problem: null };
-
-  const command = `gh issue edit ${issue} --add-label ${ROADMAP_LABEL}`;
-  const result = await gh(['issue', 'edit', issue, '--add-label', ROADMAP_LABEL]);
-  return result.ok
-    ? { part: partOf('issue', ISSUE_PART_NAME, 'created', `${titled}, and now carries ${ROADMAP_LABEL}`), problem: null }
-    : {
-      part: partOf('issue', ISSUE_PART_NAME, 'present', titled),
-      problem: `issue #${issue} was adopted but not labelled ${ROADMAP_LABEL}: ${detailOf(result, command)}`,
-    };
-}
-
-/**
- * The roadmap issue and the setting that names it: `roadmap.issue` when
- * the project config names one, else the open issue titled
- * {@link ROADMAP_TITLE}, else a new one. See the module note on why the
- * config is read before the search.
- */
-export async function setUpRoadmap(gh: GhRunner, root: string): Promise<RoadmapStep> {
-  const reading = readRoadmapSetting(root);
-  if (reading.problem !== null) return roadmapRefused(reading.problem);
-  if (reading.issue !== null) {
-    return {
-      parts: [
-        partOf('issue', ISSUE_PART_NAME, 'present', `${ROADMAP_SETTING} names issue #${String(reading.issue)}`),
-        partOf('setting', ROADMAP_SETTING, 'present', `it already names issue #${String(reading.issue)}`),
-      ],
-      issue: reading.issue,
-      problems: [],
-    };
-  }
-
-  let found: readonly TitledRoadmap[];
-  try {
-    found = await searchRoadmapIssues(gh);
-  } catch (error) {
-    return roadmapRefused(messageOf(error));
-  }
-  if (found.length > 1) return roadmapRefused(severalRoadmapsMessage(found.map((row) => row.number)));
-
-  const existing = found[0] ?? null;
-  if (existing !== null) {
-    const adopted = await adoptRoadmapIssue(gh, existing);
-    return {
-      parts: [adopted.part, writeRoadmapSetting(root, existing.number, reading)],
-      issue: existing.number,
-      problems: adopted.problem === null
-        ? []
-        : [adopted.problem],
-    };
-  }
-
-  let opened: number;
-  try {
-    opened = await createRoadmapIssue(gh);
-  } catch (error) {
-    return roadmapRefused(messageOf(error));
-  }
-  const pin = await pinRoadmapIssue(gh, opened);
-  return {
-    parts: [
-      partOf('issue', ISSUE_PART_NAME, 'created', `issue #${String(opened)} opened with ${ROADMAP_LABEL} and pinned`),
-      writeRoadmapSetting(root, opened, reading),
-    ],
-    issue: opened,
-    problems: pin === null
-      ? []
-      : [pin],
-  };
-}
-
 /** What {@link setUpBoard} is made with. */
 export interface BoardSetupOptions {
   /** Runs every `gh` command, in the repository the board is made on. */
@@ -767,6 +409,11 @@ export interface BoardSetupOptions {
   readonly root: string;
   /** Where the shipped template is looked for; this module's directory unless given. */
   readonly moduleDir?: string | undefined;
+  /**
+   * The `naming.branch` template the Roadmap issue's naming paragraph
+   * builds the claim branch from; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string | undefined;
 }
 
 /**
@@ -780,10 +427,10 @@ export interface BoardSetupOptions {
  * back as refused parts.
  */
 export async function setUpBoard(options: BoardSetupOptions): Promise<BoardSetupReport> {
-  const { gh, root, moduleDir } = options;
+  const { gh, root, moduleDir, branchTemplate } = options;
   const labels = await setUpLabels(gh);
   const template = writeSpecTemplate(root, moduleDir ?? MODULE_DIR);
-  const roadmap = await setUpRoadmap(gh, root);
+  const roadmap = await setUpRoadmap(gh, root, branchTemplate);
 
   return Object.freeze({
     parts: Object.freeze([...labels, template, ...roadmap.parts]),

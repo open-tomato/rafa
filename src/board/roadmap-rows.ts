@@ -329,6 +329,13 @@ export interface RoadmapRowsOptions {
   readonly git: GitRunner;
   /** The remote the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * `naming.branch` as config resolved it, which the branch scan reads
+   * a claim branch under; `DEFAULT_BRANCH_TEMPLATE`, `feat/{stub}`, when
+   * left out. Only this template is read: under `work/{stub}`,
+   * `feat/rafa-20-x` names no `branch` in the `has` column.
+   */
+  readonly branchTemplate?: string;
   /** The open pull requests, asked once and only when the board answered. */
   readonly pullRequests: OpenPullRequestLister;
   /** The plan dir's file names. */
@@ -642,7 +649,7 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
 export async function readLineRows(lines: readonly RoadmapLine[], options: LineRowsOptions): Promise<LineRows> {
   const selected = lines.filter((line) => options.all === true || !line.ticked);
   const listed = await listBoard(options.board);
-  const scan = scanClaimBranches(options.git, options.remote);
+  const scan = scanClaimBranches(options.git, options.remote, options.branchTemplate);
   const pulls = listed.issues === null
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');

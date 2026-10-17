@@ -93,6 +93,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
+import { scanClaimBranches } from '../board/roadmap.js';
 import { formatClaimMessage } from '../claims/record.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
@@ -420,6 +421,40 @@ describe('the branch refs of this clone and its remote', () => {
     expect(readRefs(sourcesOf({ git: git.git }), 'origin', kept.note)).toEqual(['refs/heads/main']);
     expect(kept.held()).toHaveLength(1);
     expect(kept.held()[0]).toContain('could not be read');
+  });
+
+  it('scans under work/{stub} asking the work/rafa-* glob, and feat/rafa-* with the template left out', () => {
+    const answers = {
+      'for-each-ref --format=%(refname) refs/heads refs/remotes': said('refs/remotes/origin/work/rafa-20-x\n'),
+      'ls-remote --heads origin': said('ab2\trefs/heads/work/rafa-20-x\nab3\trefs/heads/feat/rafa-21-y\n'),
+    };
+    const fetched = (template: string | undefined): { refs: readonly string[]; fetches: readonly string[] } => {
+      const git = gitOf(answers);
+      const over = template === undefined
+        ? {}
+        : { branchTemplate: template };
+      const refs = readRefs(
+        sourcesOf({ git: git.git, ...over }),
+        'origin',
+        notes().note,
+        (runner, remote, scanTemplate) => {
+          const scan = scanClaimBranches(runner, remote, scanTemplate);
+          scan.claimOf?.('work/rafa-20-x');
+          scan.claimOf?.('feat/rafa-21-y');
+          return scan;
+        },
+      );
+      return { refs, fetches: git.ran().filter((call) => call.startsWith('fetch')) };
+    };
+
+    const templated = fetched('work/{stub}');
+    expect(templated.refs).toContain('refs/remotes/origin/work/rafa-20-x');
+    expect(templated.fetches.join('\n')).toContain('+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+    expect(templated.fetches.join('\n')).not.toContain('feat/rafa-*');
+
+    const control = fetched(undefined);
+    expect(control.fetches.join('\n')).not.toContain('work/rafa-*');
+    expect(control.fetches.join('\n')).toContain('feat/rafa-*');
   });
 });
 

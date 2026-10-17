@@ -451,8 +451,10 @@ existing print-only behavior when the flag is absent. Use it alongside
 `.rafa/plans/` unless the config `plan.dir` names another.
 
 **The claim readers match the `naming.branch` template and no other.** The
-claims, `rafa status`, `rafa next`, the roadmap's claim reading and
-`rafa claim release` each read the configured template, `feat/{stub}` by
+claim commands (`rafa claim take`, `hand` and `accept` beside `release`),
+`rafa status`, `rafa next`, `rafa plan create --next`, the roadmap tables and
+the epic commands' claim readings, the drift report's line and the Roadmap
+issue `rafa init` opens each read the configured template, `feat/{stub}` by
 default, and never the default beside it: a branch under another template is
 no claim here. The lightest shape is a line in `.rafa/config.yaml`:
 

@@ -26,12 +26,15 @@
  *
  * {@link configuredMoveRelations} makes the relationships the project's
  * config names, through `selectBoardRelations`
- * (`src/board/relations/select.ts`). The config is loaded through
- * `../issue/issue-tracker.ts`'s `issueSubjectConfig`, so a config
- * `loadConfig` refuses is refused with exit code 1, and its warnings are
- * DROPPED, as `rafa issue unblock` drops them (`../issue/unblock-native.ts`):
- * this command loaded no config before the native mode existed, and in
- * `labels` mode, the default, it prints what it printed then.
+ * (`src/board/relations/select.ts`). It reads no config of its own: it
+ * takes the `RafaConfig` `./move.ts` loaded once, through
+ * `../issue/issue-tracker.ts`'s `issueSubjectConfig`, for both the mode
+ * and the branch template the open work is read under. A config
+ * `loadConfig` refuses is refused there with exit code 1, and its
+ * warnings are DROPPED, as `rafa issue unblock` drops them
+ * (`../issue/unblock-native.ts`): this command loaded no config before the
+ * native mode existed, and in `labels` mode, the default, it prints what
+ * it printed then.
  *
  * The `native` adapter tells a parent on the board's own repository
  * from one on another, so it is made with the board's `owner/name`,
@@ -50,10 +53,9 @@
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardRelations, EpicOfReading } from '../../board/relations/port.js';
-import type { ProjectFound } from '../../project/scope.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { selectBoardRelations } from '../../board/relations/select.js';
-import { issueSubjectConfig } from '../issue/issue-tracker.js';
 
 /** What every native-mode sentence of the move opens with. */
 export const NATIVE_MODE = 'board.relationships is native';
@@ -94,16 +96,15 @@ export function nativeParentLine(to: number): string {
 }
 
 /**
- * The relationships `project`'s config names, made over `gh`; see the
- * module note. `readRepository` reads the board's repository, and is
- * called in `native` mode only.
+ * The relationships `config` names, made over `gh`; see the module note.
+ * `readRepository` reads the board's repository, and is called in
+ * `native` mode only.
  */
 export async function configuredMoveRelations(
-  project: ProjectFound,
+  config: RafaConfig,
   gh: GhRunner,
   readRepository: () => Promise<string>,
 ): Promise<BoardRelations> {
-  const config = await issueSubjectConfig(project, () => undefined);
   const repository = config.boardRelationships === 'native'
     ? await readRepository()
     : '';
