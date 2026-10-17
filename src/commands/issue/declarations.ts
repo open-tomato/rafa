@@ -29,7 +29,7 @@
  * `UNBLOCK_YES_FLAG` (`unblock.ts`).
  *
  * The values a declaration spells from outside `src/commands/`, which
- * no file here may import, are copies, and `declarations.test.ts` holds
+ * no file here may import, are copies, and `declarations-integration.test.ts` holds
  * each equal to its source: `ISSUE_STATE_WORDS`, `ISSUE_TYPE_WORDS` and
  * `ISSUE_PRIORITY_WORDS` are `ISSUE_STATES`, `ISSUE_TYPES` and
  * `ISSUE_PRIORITIES` (`src/adapters/tracker/issue-values.ts`);
