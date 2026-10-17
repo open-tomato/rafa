@@ -116,12 +116,15 @@ its change reaches:
   graph check over the live tree, beside the turbo-config sweep
   (`src/tests/turbo-config.sweep.test.ts`), which holds `turbo.json`'s
   `agentGuidance` key and its three tasks
-- `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
-  `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
-  named in `[test] preload` of `bunfig.toml`)
-- `tests.integration` (glob list, defaults to `**/*-integration.test.ts`,
-  `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
-- `tests.contract` (glob list, defaults to `**/*.contract.test.ts`) — the
+- `tests.fullSuiteTriggers` (glob list, defaults to empty; the
+  `escalation` template names `bunfig.toml`, `tsconfig*.json`,
+  `package.json`, `bun.lock` and `bun.lockb`, and the files named in
+  `[test] preload` of `bunfig.toml` are added either way)
+- `tests.integration` (glob list, defaults to empty; the `escalation`
+  template names `**/*-integration.test.ts`, `**/*.integration.test.ts`,
+  `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
+- `tests.contract` (glob list, defaults to empty; the `escalation`
+  template names `**/*.contract.test.ts`) — the
   contract tests, each checking the promise a package makes to others with
   a fixture; no step reads this key yet
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,

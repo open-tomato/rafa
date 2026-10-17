@@ -366,28 +366,15 @@
       "source": "default"
     },
     "testsContract": {
-      "value": [
-        "**/*.contract.test.ts"
-      ],
+      "value": [],
       "source": "default"
     },
     "testsFullSuiteTriggers": {
-      "value": [
-        "bunfig.toml",
-        "tsconfig*.json",
-        "package.json",
-        "bun.lock",
-        "bun.lockb"
-      ],
+      "value": [],
       "source": "default"
     },
     "testsIntegration": {
-      "value": [
-        "**/*-integration.test.ts",
-        "**/*.integration.test.ts",
-        "**/*-spawned*.test.ts",
-        "**/*-cli.test.ts"
-      ],
+      "value": [],
       "source": "default"
     },
     "testsRetakeRedAlone": {

@@ -29,30 +29,31 @@
  *
  *   - `tests.fullSuiteTriggers` names the files a task's diff runs the
  *     full suite for, however the task line scoped its tests. Its
- *     default is the five files whose change can move a test no import
- *     graph reaches: `bunfig.toml`, `tsconfig*.json`, `package.json`,
- *     `bun.lock` and `bun.lockb`. The plan adds the preload files
- *     `bunfig.toml`'s `[test] preload` names, and those are NOT in this
- *     default: a default is a value this module can spell, and which
- *     files a project preloads is a question about its disk, answered
- *     at run time by the reader of the scope. A project that sets this
- *     key replaces the five, and the preload files are added to its own
- *     list all the same.
+ *     default is empty. The `escalation` template
+ *     (`src/config/templates.ts`) names the five files whose change can
+ *     move a test no import graph reaches: `bunfig.toml`,
+ *     `tsconfig*.json`, `package.json`, `bun.lock` and `bun.lockb`. The
+ *     runner adds the preload files `bunfig.toml`'s `[test] preload`
+ *     names to whatever list resolves, empty included, and those are in
+ *     no list here: which files a project preloads is a question about
+ *     its disk, answered at run time by the reader of the scope.
  *   - `tests.integration` names the test files a stage step runs beside
  *     the tests under the folders the stage touched, because they drive
- *     the whole CLI rather than one folder's modules. Its default is the
- *     four spellings this repository gives such a file, in any folder:
- *     a name ending `-integration.test.ts` or `.integration.test.ts`,
- *     one holding `-spawned` and ending `.test.ts`, and one ending
- *     `-cli.test.ts`. Each default pattern opens with the any-folder
- *     prefix, two stars and a slash, which this note cannot spell
- *     because it would close the comment.
+ *     the whole CLI rather than one folder's modules. Its default is
+ *     empty. The `escalation` template names the four spellings this
+ *     repository gives such a file, in any folder: a name ending
+ *     `-integration.test.ts` or `.integration.test.ts`, one holding
+ *     `-spawned` and ending `.test.ts`, and one ending `-cli.test.ts`.
+ *     Each of its patterns opens with the any-folder prefix, two stars
+ *     and a slash, which this note cannot spell because it would close
+ *     the comment.
  *   - `tests.contract` names the contract tests. A contract test checks
  *     the promise a package makes to others, with a fixture, and runs in
  *     that package's own `test` task in ring 1 of CI, where a use-case
  *     test matching `tests.integration` runs in ring 0's full run. Its
- *     default is one pattern: a name ending `.contract.test.ts`, in any
- *     folder, under the same any-folder prefix. No step reads the key
+ *     default is empty. The `escalation` template names one pattern: a
+ *     name ending `.contract.test.ts`, in any folder, under the same
+ *     any-folder prefix. No step reads the key
  *     yet; its readers come with the CI rings that run each kind.
  *   - `tests.alwaysRun` names the test files a task's scoped run takes
  *     beside the ones `bun test --changed=<base>` selects. A content
@@ -69,9 +70,12 @@
  *
  * An empty list is a value every glob key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage
- * runs no integration tier, no file is a contract test, or a task runs no sweep beside its scoped
- * tests. It is not read as "the default", since a list written `[]`
- * has been said.
+ * runs no integration file, no file is a contract test, or a task runs
+ * no sweep beside its scoped tests. The first three default to it, so a
+ * project that names no template runs no trigger, no integration file
+ * and no contract file; one that writes `templates: [escalation]` takes
+ * the template's lists under its own keys. A list written `[]` has been
+ * said, and outranks the template's.
  *
  * ## The reader
  *
@@ -181,20 +185,9 @@ export const globList: Reader<readonly string[]> = listOf(repoGlob, 'glob patter
 
 /** What every `tests` setting resolves to when no layer names it. */
 export const TESTS_DEFAULTS: Readonly<TestsSettings> = Object.freeze({
-  testsFullSuiteTriggers: Object.freeze([
-    'bunfig.toml',
-    'tsconfig*.json',
-    'package.json',
-    'bun.lock',
-    'bun.lockb',
-  ]),
-  testsIntegration: Object.freeze([
-    '**/*-integration.test.ts',
-    '**/*.integration.test.ts',
-    '**/*-spawned*.test.ts',
-    '**/*-cli.test.ts',
-  ]),
-  testsContract: Object.freeze(['**/*.contract.test.ts']),
+  testsFullSuiteTriggers: Object.freeze([]),
+  testsIntegration: Object.freeze([]),
+  testsContract: Object.freeze([]),
   testsAlwaysRun: Object.freeze(['src/**/*.sweep.test.ts']),
   testsRetakeRedAlone: true,
 });

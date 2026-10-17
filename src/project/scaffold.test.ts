@@ -228,18 +228,19 @@ describe('the config files', () => {
     ]);
   });
 
-  it('carries the tests section before checks, its globs quoted, which resolve from the file once uncommented', () => {
+  it('carries the tests section before checks, three lists empty naming the template, its globs quoted, which resolve from the file once uncommented', () => {
     const tests = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# tests:'), CONFIG_SETTINGS_LINES.indexOf('# checks:'));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...tests].join('\n')), 'c.yaml') });
 
     expect(tests.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
       '# tests:',
-      '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
-      '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
-      '#   contract: ["**/*.contract.test.ts"]',
+      '#   fullSuiteTriggers: []',
+      '#   integration: []',
+      '#   contract: []',
       '#   alwaysRun: ["src/**/*.sweep.test.ts"]',
       '#   retakeRedAlone: true',
     ]);
+    expect(tests.slice(1, 4).map((line) => line.includes('the escalation template names'))).toEqual([true, true, true]);
     expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsContract, resolved.config.testsAlwaysRun])
       .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsContract, CONFIG_DEFAULTS.testsAlwaysRun]);
     expect(resolved.config.testsRetakeRedAlone).toBe(true);

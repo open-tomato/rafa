@@ -11,8 +11,9 @@
  *      import graph reaches from it (`lib/greeting.test.ts`), never the
  *      unrelated `lib/other.test.ts` that sits beside it.
  *   2. A line with no `tests=` whose diff touches `bunfig.toml` alone runs
- *      the FULL suite: `bunfig.toml` is one of `tests.fullSuiteTriggers`'
- *      own defaults (`../config-schema-tests.ts`), a file no import graph
+ *      the FULL suite: `bunfig.toml` is one of the `tests.fullSuiteTriggers`
+ *      the `escalation` template names (`../config/templates.ts`), which
+ *      the planted config adopts, a file no import graph
  *      reaches a test through, so `--changed` could miss what it changes.
  *   3. A line declaring `{tests=full}` runs the full suite regardless of
  *      what its own diff touches (here, a new `NOTES.md` nothing imports
@@ -168,8 +169,12 @@ const BUNFIG_SOURCE = [
 /** The flags every `loop start` in this file runs with. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push costs no `gh`. */
-const CONFIG = 'pr:\n  provider: none\n';
+/**
+ * The project config: `pr.provider: none`, so the wrap-up's push costs no
+ * `gh`, and the `escalation` template, which names `bunfig.toml` among
+ * `tests.fullSuiteTriggers`.
+ */
+const CONFIG = 'templates: [escalation]\npr:\n  provider: none\n';
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {
@@ -413,7 +418,7 @@ describe('the four answers taskStepScope ranks, over one real bun test --changed
     expect(task1Step.summary).toContain('across 1 file');
 
     // 2. No tests=, a diff touching bunfig.toml alone: the full suite,
-    // since that file is one of tests.fullSuiteTriggers' own defaults and
+    // since that file is one of the escalation template's triggers and
     // no import graph reaches a test through it.
     expect(task2Step.scope).toBe('full');
     expect(hasNoChangedFlag(task2Step.command)).toBe(true);

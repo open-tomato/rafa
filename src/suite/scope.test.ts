@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { TESTS_DEFAULTS } from '../config-schema-tests.js';
+import { templateEntry } from '../config/templates.js';
 
 import {
   integrationFiles,
@@ -26,8 +26,14 @@ import {
   triggeredPaths,
 } from './scope.js';
 
+/**
+ * The `escalation` template's `tests` lists, which a project adopting it
+ * reads; the section's own defaults for the two below are empty.
+ */
+const ESCALATION_TESTS = templateEntry('escalation')?.tests;
+
 const TRIGGERS: FullSuiteTriggers = {
-  globs: TESTS_DEFAULTS.testsFullSuiteTriggers,
+  globs: ESCALATION_TESTS?.fullSuiteTriggers ?? [],
   preload: ['test/setup.ts'],
 };
 
@@ -59,7 +65,7 @@ function stage(overrides: Partial<StageScopeInput>): StageScopeInput {
   return {
     diff: ['src/a/one.ts'],
     owns: ['src/a', 'src/b'],
-    integration: TESTS_DEFAULTS.testsIntegration,
+    integration: ESCALATION_TESTS?.integration ?? [],
     testFiles: TEST_FILES,
     ...overrides,
   };
@@ -83,7 +89,7 @@ function plant(path: string, text = ''): void {
 }
 
 describe('triggeredPaths', () => {
-  it('matches the default globs at the root and not below it', () => {
+  it('matches the template\'s globs at the root and not below it', () => {
     const diff = ['tsconfig.base.json', 'sub/tsconfig.json', 'bun.lock', 'src/package.json', 'package.json'];
     expect(triggeredPaths(diff, TRIGGERS)).toEqual(['bun.lock', 'package.json', 'tsconfig.base.json']);
   });
@@ -187,9 +193,9 @@ describe('touchedFolders', () => {
 });
 
 describe('integrationFiles', () => {
-  it('matches each default spelling in any folder and at the root', () => {
+  it('matches each spelling of the template in any folder and at the root', () => {
     const files = [...TEST_FILES, 'root.integration.test.ts', 'src/plain.test.ts'];
-    expect(integrationFiles(TESTS_DEFAULTS.testsIntegration, files)).toEqual([
+    expect(integrationFiles(ESCALATION_TESTS?.integration ?? [], files)).toEqual([
       'root.integration.test.ts',
       'src/board/run-cli.test.ts',
       'src/tests/flow-integration.test.ts',

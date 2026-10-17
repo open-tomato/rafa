@@ -257,15 +257,19 @@ automatically, and which tests always run:**
   content sweeps that always run alongside scoped tests in every task's
   gates, since they read files at run time and `bun test --changed=<base>`
   follows only the import graph
-- `tests.fullSuiteTriggers` (glob list; defaults include `bunfig.toml`,
-  `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
-  named in `[test] preload` of `bunfig.toml`) — when a task touches any
-  file matching these globs, the task scope escalates to `tests=full`
-- `tests.integration` (glob list; defaults to `**/*-integration.test.ts`,
-  `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
-  — the test files a stage step with `Owns:` folders runs beside the
-  folders it changed; a task step does not read this key
-- `tests.contract` (glob list; defaults to `**/*.contract.test.ts`) — the
+- `tests.fullSuiteTriggers` (glob list; defaults to empty, the
+  `escalation` template names `bunfig.toml`, `tsconfig*.json`,
+  `package.json`, `bun.lock` and `bun.lockb`; the files named in
+  `[test] preload` of `bunfig.toml` are added either way) — when a task
+  touches any file matching these globs, the task scope escalates to
+  `tests=full`
+- `tests.integration` (glob list; defaults to empty, the `escalation`
+  template names `**/*-integration.test.ts`, `**/*.integration.test.ts`,
+  `**/*-spawned*.test.ts`, `**/*-cli.test.ts`) — the test files a stage
+  step with `Owns:` folders runs beside the folders it changed; a task
+  step does not read this key
+- `tests.contract` (glob list; defaults to empty, the `escalation`
+  template names `**/*.contract.test.ts`) — the
   contract tests: a contract test checks the promise a package makes to
   others, with a fixture, and runs in that package's own `test` task in
   ring 1 of CI, where a use-case test matching `tests.integration` runs in

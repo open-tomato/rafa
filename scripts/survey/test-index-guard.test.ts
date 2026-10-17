@@ -4,14 +4,17 @@ import type { RecordInput, TestIndexRecord, TestRecord } from './test-index-reco
 
 import { describe, expect, it } from 'bun:test';
 
-import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
+import { templateEntry } from '../../src/config/templates';
 
 import { parseCutMap } from './cut-map';
 import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
 
-/** The defaults, as a project with no `tests` key reads them. */
-const GLOBS = { contract: TESTS_DEFAULTS.testsContract, integration: TESTS_DEFAULTS.testsIntegration };
+/** The `escalation` template's two lists, as a project naming it reads them. */
+const GLOBS = {
+  contract: templateEntry('escalation')?.tests?.contract ?? [],
+  integration: templateEntry('escalation')?.tests?.integration ?? [],
+};
 
 const CORE = '@open-tomato/rafa-core';
 const CORE_STORE = 'packages/rafa/src/effort/store/index.ts';

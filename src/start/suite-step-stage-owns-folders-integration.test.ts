@@ -34,8 +34,9 @@
  * `alpha`, never `beta`, which the diff never touches — plus every test
  * file a `tests.integration` glob matches by name alone, regardless of
  * which folder holds it: `shared/flow-integration.test.ts`, whose name
- * ends `-integration.test.ts`, one of `tests.integration`'s own defaults
- * (`../config-schema-tests.ts`), sitting under neither `Owns:` folder.
+ * ends `-integration.test.ts`, one of the `tests.integration` globs the
+ * `escalation` template names (`../config/templates.ts`), which the
+ * planted config adopts, sitting under neither `Owns:` folder.
  *
  * The one assertion that matters reads the `stage` step back off the run
  * record's `steps` (`../core/loop/sessions.ts`): its `scope`, the raw path
@@ -133,7 +134,7 @@ const ALPHA_TEST_FILE = 'alpha/mod.test.ts';
 /** The `Owns:` folder the diff never touches; its test file must never run. */
 const BETA_TEST_FILE = 'beta/mod.test.ts';
 
-/** A test file outside both `Owns:` folders, matched by `tests.integration`'s own default glob. */
+/** A test file outside both `Owns:` folders, matched by a `tests.integration` glob of the template. */
 const INTEGRATION_TEST_FILE = 'shared/flow-integration.test.ts';
 
 /** {@link ALPHA_SOURCE_FILE}'s seed source. */
@@ -187,8 +188,12 @@ const INTEGRATION_TEST_SOURCE = [
 /** The flags every `loop start` in this file runs with. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push costs no extra `gh` call. */
-const CONFIG = 'pr:\n  provider: none\n';
+/**
+ * The project config: `pr.provider: none`, so the wrap-up's push costs no
+ * extra `gh` call, and the `escalation` template, which holds the
+ * `tests.integration` globs.
+ */
+const CONFIG = 'templates: [escalation]\npr:\n  provider: none\n';
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {

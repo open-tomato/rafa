@@ -52,6 +52,9 @@
  * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and all three
  * `tests` lists from `CONFIG_DEFAULTS` too, each pattern double-quoted:
  * a flow-list entry opening with `*` would parse as a YAML alias. The
+ * `fullSuiteTriggers`, `integration` and `contract` lines show their
+ * empty default and name the `escalation` template, which holds the
+ * values a project adopting it takes. The
  * seven `checks` lists are written from `CONFIG_DEFAULTS` as flow lists of
  * bare names, empty by default, and the first names the six check names
  * a list may hold.
@@ -233,9 +236,9 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   skills: ${CONFIG_DEFAULTS.taskSkills}                # planner | tag | none, the resolver that picks a task's skills`,
   `#   lessons: ${CONFIG_DEFAULTS.taskLessons}                    # on | off, whether blessed lessons join a task's prompt`,
   '# tests:',
-  `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
-  `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
-  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others`,
+  `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite; empty, the escalation template names five`,
+  `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs; empty, the escalation template names four`,
+  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others; empty, the escalation template names one`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
   `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
   '# checks:',
