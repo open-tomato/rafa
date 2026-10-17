@@ -86,6 +86,9 @@ const MATCH_SCORE = '0.71';
 const DEFAULTS: NonNullable<TriageOptions['similarity']> = {
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  triageSimilarityWeightsCauseLeaf: 0.15,
+  triageSimilarityWeightsCauseFamily: 0.05,
+  triageSimilarityWeightsBoundary: 0.1,
 };
 
 /** The method names a recorded tracker was asked, in order. */
@@ -297,7 +300,7 @@ describe('no open bug at the threshold', () => {
     await session(FIRST);
     await session(UNRELATED);
 
-    await session(REWORDED, { triageSimilarityThreshold: 0.9, triageSimilarityCandidates: 1 });
+    await session(REWORDED, { ...DEFAULTS, triageSimilarityThreshold: 0.9, triageSimilarityCandidates: 1 });
 
     const filed = issueTexts(issuesDir)[2]!;
     const listed = listedDuplicates(filed);

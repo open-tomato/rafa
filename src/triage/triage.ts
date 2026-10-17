@@ -78,11 +78,18 @@
  *      holds open issues only, and its reference is stored under the key,
  *      so a later recurrence is answered by step 1. Its `foundBy` is
  *      `similarity` and its `score` the score. A listing that fails answers
- *      `failed`, as a failed `find` does.
+ *      `failed`, as a failed `find` does. When none is at the threshold,
+ *      the same listing is ranked for step 4's list by `rankedCandidates`
+ *      (`./similarity.ts`): the word score plus a bonus for the same
+ *      cause, the same cause family and the same module and action, read
+ *      from the bug's record and each open bug's body and weighed by the
+ *      `triage.similarity.weights` settings the option names. The bonuses
+ *      reach that list alone: the same-bug decision is on words only, so
+ *      a rank at or above the threshold never makes a recurrence.
  *   4. None of those: the bug is filed with `tracker.create`, and the
  *      reference it answers is stored under the key. When step 3 ran and
  *      found nothing at its threshold, the body ends with a `Possible
- *      duplicates` section listing the nearest open bugs it scored, up to
+ *      duplicates` section listing the open bugs step 3 ranked, up to
  *      the configured count.
  *
  * Step 3 is off when the option is left out or its threshold is `false`,
@@ -275,7 +282,7 @@ import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
-import type { ComparedText, RankedIssue, ScoredIssue } from './similarity.js';
+import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { BugRecord, BugRules } from '../bugs/record.js';
 import type { RefVerifier } from '../refs/verify.js';
@@ -315,7 +322,7 @@ import {
 import { routeByKind } from './kind-route.js';
 import { localPathRedactor } from './local-paths.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
-import { nearestOpenBugs } from './similarity.js';
+import { nearestOpenBugs, rankedCandidates } from './similarity.js';
 import { triageStaleDocs } from './stale-docs.js';
 
 /** Where security bugs are filed, under a repository root. */
@@ -476,7 +483,14 @@ export interface TriageOptions {
    * step; see the module note. Left out, or with a threshold of `false`,
    * that step is off.
    */
-  readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
+  readonly similarity?: Pick<
+    RafaConfig,
+    | 'triageSimilarityThreshold'
+    | 'triageSimilarityCandidates'
+    | 'triageSimilarityWeightsCauseLeaf'
+    | 'triageSimilarityWeightsCauseFamily'
+    | 'triageSimilarityWeightsBoundary'
+  >;
   /** The kind check's readings and the repair cap; left out, no entry is routed by its kind. */
   readonly kinds?: KindRouteOptions;
   /**
@@ -756,14 +770,22 @@ interface Route {
 interface SimilarityStep {
   readonly threshold: number;
   readonly candidates: number;
+  /** What each bonus adds to a rank of the `Possible duplicates` list. */
+  readonly weights: SimilarityWeights;
 }
 
 /** The similarity step `options` turn on, or null when they leave it off. */
 function similarityStepOf(options: TriageOptions): SimilarityStep | null {
-  const threshold = options.similarity?.triageSimilarityThreshold;
-  const candidates = options.similarity?.triageSimilarityCandidates;
-  return typeof threshold === 'number' && typeof candidates === 'number'
-    ? { threshold, candidates }
+  const { similarity } = options;
+  if (similarity === undefined) return null;
+  const threshold = similarity.triageSimilarityThreshold;
+  const weights: SimilarityWeights = {
+    causeLeaf: similarity.triageSimilarityWeightsCauseLeaf,
+    causeFamily: similarity.triageSimilarityWeightsCauseFamily,
+    boundary: similarity.triageSimilarityWeightsBoundary,
+  };
+  return typeof threshold === 'number'
+    ? { threshold, candidates: similarity.triageSimilarityCandidates, weights }
     : null;
 }
 
@@ -922,8 +944,8 @@ async function commentOnNearest(run: BugRun, nearest: ScoredIssue, threshold: nu
 
 /**
  * Step 3, after a `find` miss: comments on the nearest open bug at or above
- * the threshold, or files the bug listing the nearest below it; files it
- * plainly where the step does not run. See the module note.
+ * the threshold, or files the bug listing the open bugs ranked by words and
+ * record; files it plainly where the step does not run. See the module note.
  */
 async function answerMiss(run: BugRun): Promise<BugTriage> {
   const { tracker, similarity } = run.route;
@@ -932,16 +954,12 @@ async function answerMiss(run: BugRun): Promise<BugTriage> {
 
   const listed = await step(run, `the ${run.route.channel} tracker openIssues`, () => list.call(tracker, 'bug'));
   if (!listed.ok) return resultOf(run, 'failed', { problem: listed.problem });
-  const nearest = nearestOpenBugs(run.filing.compared, listed.value);
-  const [first] = nearest;
-  return first !== undefined && first.score >= similarity.threshold
-    ? commentOnNearest(run, first, similarity.threshold)
-    : fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: nearest.slice(0, similarity.candidates).map(rankedByWords) } });
-}
-
-/** A bug scored on words alone as a line of the ranked list: its score is its rank, `words` its one signal. */
-function rankedByWords({ issue, score }: ScoredIssue): RankedIssue {
-  return { issue, score, words: score, matched: ['words'] };
+  const [first] = nearestOpenBugs(run.filing.compared, listed.value);
+  if (first !== undefined && first.score >= similarity.threshold) {
+    return commentOnNearest(run, first, similarity.threshold);
+  }
+  const ranked = rankedCandidates(run.filing.compared, run.filing.values.record, listed.value, similarity.weights);
+  return fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: ranked.slice(0, similarity.candidates) } });
 }
 
 /** Looks the bug up by its key, then answers what is found, or what step 3 makes of a miss. */

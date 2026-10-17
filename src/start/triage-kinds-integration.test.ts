@@ -100,6 +100,9 @@ const CONFIG: StartTriageOptions['config'] = {
   prerequisitesOptional: [],
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 3,
+  triageSimilarityWeightsCauseLeaf: 0.15,
+  triageSimilarityWeightsCauseFamily: 0.05,
+  triageSimilarityWeightsBoundary: 0.1,
   ...ISSUES_DEFAULTS,
   errorsCodes: [],
 };
