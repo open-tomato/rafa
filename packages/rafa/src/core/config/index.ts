@@ -155,6 +155,7 @@ export type {
   ConfigOverrides,
   ConfigSource,
   ResolvedConfig,
+  TemplateLayer,
 } from './config.js';
 export type { DangerousPhrases } from './dangerous.js';
 export type { ProjectFound, Scope } from './scope.js';
@@ -192,6 +193,7 @@ export {
 export {
   ConfigError,
   configFilePath,
+  layTemplatesUnder,
   parseConfigDocument,
   parseConfigText,
   readConfigDocument,

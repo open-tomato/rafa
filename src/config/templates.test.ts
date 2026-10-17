@@ -87,4 +87,9 @@ describe('templateEntry', () => {
     expect(templateEntry('__proto__')).toBeNull();
     expect(templateEntry('toString')).toBeNull();
   });
+
+  test('carries TEMPLATE_NAMES as the names it knows, frozen with it', () => {
+    expect(templateEntry.names).toBe(TEMPLATE_NAMES);
+    expect(Object.isFrozen(templateEntry)).toBe(true);
+  });
 });

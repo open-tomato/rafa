@@ -27,6 +27,9 @@
  * `@open-tomato/rafa/config` and spread an entry into its own
  * `rafa.config.ts`.
  *
+ * {@link templateEntry} carries {@link TEMPLATE_NAMES} as its `names`, so
+ * the loader can list them when a file names a template none holds.
+ *
  * Every mapping and list is frozen, and a name is looked up with
  * `Object.hasOwn`, so `constructor` or `__proto__` answers null rather
  * than something off `Object.prototype`.
@@ -77,16 +80,30 @@ export const TEMPLATE_NAMES: readonly TemplateName[] = Object.freeze(
   Object.keys(CONFIG_TEMPLATES) as TemplateName[],
 );
 
+/** The lookup {@link templateEntry} is: a template's entry by name, and every name it knows. */
+export interface TemplateLookup {
+  /**
+   * The entry a template's name stands for, or null for a name
+   * {@link CONFIG_TEMPLATES} does not hold.
+   *
+   * @param name - The name a file's `templates` key gives.
+   * @returns The template's frozen entry, or null.
+   */
+  (name: string): ConfigEntry | null;
+  /** {@link TEMPLATE_NAMES}, which the loader lists when it refuses a name. */
+  readonly names: readonly TemplateName[];
+}
+
 /**
  * The entry a template's name stands for, or null for a name
- * {@link CONFIG_TEMPLATES} does not hold. Set as core's template hook by
- * `registerCoreConfigSections`.
- *
- * @param name - The name a file's `templates` key gives.
- * @returns The template's frozen entry, or null.
+ * {@link CONFIG_TEMPLATES} does not hold, carrying {@link TEMPLATE_NAMES}
+ * as its `names`. Set as core's template hook by
+ * `registerCoreConfigSections`, so a file naming a template no entry
+ * holds is refused with the names this lookup knows.
  */
-export function templateEntry(name: string): ConfigEntry | null {
-  return Object.hasOwn(CONFIG_TEMPLATES, name)
+export const templateEntry: TemplateLookup = Object.freeze(Object.assign(
+  (name: string): ConfigEntry | null => Object.hasOwn(CONFIG_TEMPLATES, name)
     ? CONFIG_TEMPLATES[name as TemplateName]
-    : null;
-}
+    : null,
+  { names: TEMPLATE_NAMES },
+));

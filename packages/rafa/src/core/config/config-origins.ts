@@ -17,6 +17,12 @@
  * none. A map setting merged across both files names the project's,
  * the file its source names.
  *
+ * A setting a template answered (`template`) names the file whose
+ * `templates` key named it, the project's where the project's template
+ * answered and the user's otherwise, with the entry of that file that
+ * last set `templates`, and carries the template's name as `template`.
+ * An origin a file's own key gave carries no `template`.
+ *
  * ## A shadowed file
  *
  * A scope is read from one file, the first of `rafa.config.ts`,
@@ -34,8 +40,13 @@ export type ConfigScopeName = 'user' | 'project';
 export interface SettingOrigin {
   /** The file, as its layer names it. */
   readonly file: string;
-  /** The zero-based entry of that file that last set the setting. */
+  /**
+   * The zero-based entry of that file that last set the setting, or for
+   * a template's setting the entry that last set the file's `templates`.
+   */
   readonly entry: number;
+  /** The template that answered the setting, by name; absent for a file's own key. */
+  readonly template?: string;
 }
 
 /** A YAML file left unread because a module file holds its scope. */
@@ -46,6 +57,15 @@ export interface ShadowedFile {
   readonly path: string;
   /** The module file read in its place. */
   readonly by: string;
+}
+
+/** The file whose template answered `setting`: the project's where its template did, else the user's. */
+function templateLayerOf(setting: ConfigSetting, file: ConfigFile | null, user: ConfigFile | null): ConfigFile | null {
+  return file?.templates?.has(setting) === true
+    ? file
+    : user?.templates?.has(setting) === true
+      ? user
+      : null;
 }
 
 /**
@@ -68,7 +88,13 @@ export function originOf(
     ? file
     : source === 'user'
       ? user
-      : null;
+      : source === 'template'
+        ? templateLayerOf(setting, file, user)
+        : null;
   if (layer === null) return null;
-  return Object.freeze({ file: layer.path, entry: layer.entries?.get(setting) ?? 0 });
+  const template = source === 'template'
+    ? layer.templates?.get(setting)
+    : undefined;
+  if (template === undefined) return Object.freeze({ file: layer.path, entry: layer.entries?.get(setting) ?? 0 });
+  return Object.freeze({ file: layer.path, entry: layer.entries?.get('templates') ?? 0, template });
 }

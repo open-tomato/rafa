@@ -112,7 +112,8 @@
  * stands for, a mapping nested as a file nests its keys (the shape of a
  * `ConfigEntry`, `src/config/entry.ts`, typed here as a plain
  * {@link Mapping} since core imports nothing from `src/config/`), or null
- * for a name it does not know. Like the load hook it is a module-level
+ * for a name it does not know, and may carry the `names` it knows, which
+ * the loader lists when it refuses a name. Like the load hook it is a module-level
  * value of its own, beside the registry: restoring a registry leaves it
  * as it was, and a case that sets one puts the previous hook back in a
  * `finally`.
@@ -487,7 +488,15 @@ export function activeConfigLoadHook(): ConfigLoadHook | null {
  * file nests its keys, or null for a name the hook does not know. See
  * "The template hook" in the module note.
  */
-export type ConfigTemplateHook = (name: string) => Mapping | null;
+export interface ConfigTemplateHook {
+  /** The entry `name` stands for, or null for a name the hook does not know. */
+  (name: string): Mapping | null;
+  /**
+   * Every name the hook knows, which `loadConfig` lists when it refuses
+   * one a file gives. Absent from a hook that cannot list its names.
+   */
+  readonly names?: readonly string[];
+}
 
 /** The module-level hook {@link activeConfigTemplateHook} answers. */
 let templateHook: ConfigTemplateHook | null = null;
