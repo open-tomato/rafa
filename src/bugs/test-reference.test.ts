@@ -27,21 +27,52 @@ describe('reading a Rerun value', () => {
       .toEqual({ kind: 'runnable', file: 'src/a.test.ts', pattern: 'outer the case' });
   });
 
-  it('reads the value triage writes for a case with parentheses, its pattern taken literally', () => {
+  it('reads the value triage writes for a case with parentheses as the single-backslash pattern', () => {
     // Arrange
     const rerun = rerunOf({ what: 'red', artifact: 'src/c.test.ts > outer > a (case) [1]' });
 
     // Act
     const reference = readTestReference(rerun);
 
-    // Assert: the control proves triage wrote backslashes the reading keeps
+    // Assert: the control proves triage wrote the doubled backslashes the reading undoes
     expect(rerun).toBe('bun test src/c.test.ts -t "outer a \\\\(case\\\\) \\\\[1\\\\]"');
-    expect(reference).toEqual({ kind: 'runnable', file: 'src/c.test.ts', pattern: 'outer a \\\\(case\\\\) \\\\[1\\\\]' });
+    expect(reference).toEqual({ kind: 'runnable', file: 'src/c.test.ts', pattern: 'outer a \\(case\\) \\[1\\]' });
+  });
+
+  it('reads an escaped backslash before a parenthesis and a bracket as one backslash', () => {
+    expect(readTestReference('bun test a.test.ts -t "a \\\\(b\\\\) \\\\[1\\\\]"'))
+      .toEqual({ kind: 'runnable', file: 'a.test.ts', pattern: 'a \\(b\\) \\[1\\]' });
+  });
+
+  it('reads an escaped double quote and an escaped dollar as the character', () => {
+    expect(readTestReference('bun test a.test.ts -t "a \\"q\\" b"'))
+      .toEqual({ kind: 'runnable', file: 'a.test.ts', pattern: 'a "q" b' });
+    expect(readTestReference('bun test a.test.ts -t "\\$x"'))
+      .toEqual({ kind: 'runnable', file: 'a.test.ts', pattern: '$x' });
+  });
+
+  it('keeps a backslash before any other character with that character', () => {
+    expect(readTestReference('bun test a.test.ts -t "a\\.b \\(c\\)"'))
+      .toEqual({ kind: 'runnable', file: 'a.test.ts', pattern: 'a\\.b \\(c\\)' });
   });
 
   it('keeps shell characters inside the quoted -t value as one word', () => {
-    expect(readTestReference('bun test a.spec.tsx -t "a; b | (c) $x"'))
+    expect(readTestReference('bun test a.spec.tsx -t "a; b | (c) \\$x"'))
       .toEqual({ kind: 'runnable', file: 'a.spec.tsx', pattern: 'a; b | (c) $x' });
+  });
+
+  it('refuses an unescaped dollar or backtick inside the -t value, naming the character', () => {
+    expect(reasonOf('bun test a.test.ts -t "a $x"')).toBe('a shell character $ inside the -t value');
+    expect(reasonOf('bun test a.test.ts -t "a `x`"')).toBe('a shell character ` inside the -t value');
+    expect(reasonOf('bun test a.test.ts -t "\\\\$x"')).toBe('a shell character $ inside the -t value');
+  });
+
+  it('refuses an odd backslash before the closing quote as an unterminated double quote', () => {
+    expect(reasonOf('bun test a.test.ts -t "case\\"')).toBe('an unterminated double quote');
+    expect(reasonOf('bun test a.test.ts -t "case\\\\\\"')).toBe('an unterminated double quote');
+    // Control: an even run of backslashes closes the value
+    expect(readTestReference('bun test a.test.ts -t "case\\\\"'))
+      .toEqual({ kind: 'runnable', file: 'a.test.ts', pattern: 'case\\' });
   });
 
   it('refuses a null or blank value as having no Rerun section', () => {
@@ -77,7 +108,7 @@ describe('reading a Rerun value', () => {
     expect(reasonOf('bun test a.test.ts -t case')).toBe('an unquoted -t value: case');
     expect(reasonOf('bun test a.test.ts -t')).toBe('a missing -t value');
     expect(reasonOf('bun test a.test.ts -t ""')).toBe('an empty -t value');
-    expect(reasonOf('bun test a.test.ts -t "a \\"q\\" b"')).toBe('a double quote inside the -t value');
+    expect(reasonOf('bun test a.test.ts -t "a "q" b"')).toBe('a double quote inside the -t value');
     expect(reasonOf('bun test a.test.ts -t "open')).toBe('an unterminated double quote');
   });
 
@@ -93,6 +124,28 @@ describe('reading a Rerun value', () => {
     expect(reasonOf('bun test src/a.ts')).toBe('not a test file: src/a.ts');
     expect(reasonOf('bun test "a.test.ts"')).toBe('a quoted file "a.test.ts"');
   });
+});
+
+describe('the value triage writes and the pattern recheck runs', () => {
+  const CASES: readonly (readonly [string, string])[] = [
+    ['a (case)', 'a \\(case\\)'],
+    ['a [1]', 'a \\[1\\]'],
+    ['a.b', 'a\\.b'],
+    ['a*b', 'a\\*b'],
+    ['a "q"', 'a "q"'],
+    ['$x', '\\$x'],
+  ];
+
+  for (const [name, spelled] of CASES) {
+    it(`reads the case ${name} back as its escaped pattern, which matches it`, () => {
+      // Act
+      const reference = readTestReference(rerunOf({ what: 'red', artifact: `src/c.test.ts > ${name}` }));
+
+      // Assert
+      expect(reference).toEqual({ kind: 'runnable', file: 'src/c.test.ts', pattern: spelled });
+      expect(new RegExp(spelled).test(name)).toBe(true);
+    });
+  }
 });
 
 describe('resolving a test reference against a checkout', () => {

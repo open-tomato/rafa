@@ -16,7 +16,9 @@
  *     parenthesis or a backslash) or a quote in a word outside the `-t`
  *     value;
  *   - a flag other than `-t`, a second `-t`, a `-t` with no value or an
- *     unquoted one, an empty value or a double quote inside it;
+ *     unquoted one, an empty value, an unescaped `$` or backtick inside
+ *     it, or a character straight after its closing quote;
+ *   - a double quote with no closing quote;
  *   - an absolute path or one with a `..` segment, a file word that is not
  *     a test file, or a word after the file.
  *
@@ -24,13 +26,21 @@
  * and a JavaScript or TypeScript extension, as `src/triage/test-failure.ts`
  * defines one.
  *
- * The `-t` value is taken literally, as one argv word: it never reaches a
- * shell, so a backslash or a parenthesis inside it is kept as written. So
- * the value triage's `rerunOf` writes for a case holding a regular
- * expression's special character, shell-escaped for a double-quoted
- * string, reads with its backslashes doubled. Measured on bun 1.3.14:
- * `-t 'a \\(case\\)'` matched 0 tests where `-t 'a \(case\)'` matched the
- * case `a (case)`.
+ * The `-t` value is read as a POSIX shell reads a double-quoted string:
+ * a backslash before `\`, `"`, `$` or a backtick stands for that
+ * character, any other backslash is kept with the character after it,
+ * and the closing quote is the first `"` not escaped that way. A value
+ * ending in an odd backslash before its quote is therefore unterminated.
+ * An unescaped `$` or backtick is refused, since a shell would expand it
+ * and the value would not mean what it says. The reading still reaches
+ * no shell: it is handed to bun as one argv word.
+ *
+ * So the value triage's `rerunOf` writes, a case name escaped as a
+ * regular expression and then for a double-quoted string, and the
+ * pattern recheck runs are inverses: `-t "a \\(case\\)"` reads as the
+ * pattern `a \(case\)`, which matches the case `a (case)`. Measured on
+ * bun 1.3.14: `-t 'a \\(case\\)'` matched 0 tests where `-t 'a \(case\)'`
+ * matched the case `a (case)`.
  *
  * ## Resolving a reference
  *
@@ -51,7 +61,7 @@ export interface RunnableReference {
   readonly kind: 'runnable';
   /** The test file, relative to the checkout, as written. */
   readonly file: string;
-  /** The `-t` value as one argv word, or null when the value has no `-t`. */
+  /** The `-t` value as a shell reads it, one argv word, or null when the value has no `-t`. */
   readonly pattern: string | null;
 }
 
@@ -75,9 +85,26 @@ export const NO_RERUN_REASON = 'no Rerun section';
 
 /** A word of the value: its text, and whether it was double-quoted. */
 interface Word {
+  /** The word as written, between its quotes when it was quoted. */
   readonly text: string;
   readonly quoted: boolean;
+  /** The word as a POSIX shell reads it; `text` for an unquoted word. */
+  readonly reading: string;
+  /** The first unescaped `$` or backtick of a quoted word, or null. */
+  readonly expansion: string | null;
 }
+
+/** A quoted word, and the index after its closing quote. */
+interface QuotedWord {
+  readonly word: Word;
+  readonly next: number;
+}
+
+/** The characters a backslash escapes inside double quotes, as POSIX reads them. */
+const DOUBLE_QUOTE_ESCAPES = new Set(['\\', '"', '$', '`']);
+
+/** The characters a shell expands inside double quotes. */
+const DOUBLE_QUOTE_EXPANSIONS = new Set(['$', '`']);
 
 /** The characters a word outside the `-t` value may not hold. */
 const SHELL_CHARACTER = /[;&|<>$`()\\'"]/;
@@ -96,6 +123,36 @@ function manual(reason: string): ManualReference {
   return { kind: 'manual', reason };
 }
 
+/**
+ * The double-quoted word opening at `open`, read as a POSIX shell reads
+ * it (see the module note), or the reason it is unterminated.
+ */
+function quotedWordAt(line: string, open: number): QuotedWord | ManualReference {
+  let reading = '';
+  let expansion: string | null = null;
+  let at = open + 1;
+  while (at < line.length) {
+    const char = line[at] ?? '';
+    if (char === '"') {
+      const word = { text: line.slice(open + 1, at), quoted: true, reading, expansion };
+      return { word, next: at + 1 };
+    }
+    if (char === '\\') {
+      const escaped = line[at + 1];
+      if (escaped === undefined) break;
+      reading += DOUBLE_QUOTE_ESCAPES.has(escaped)
+        ? escaped
+        : char + escaped;
+      at += 2;
+      continue;
+    }
+    if (expansion === null && DOUBLE_QUOTE_EXPANSIONS.has(char)) expansion = char;
+    reading += char;
+    at += 1;
+  }
+  return manual('an unterminated double quote');
+}
+
 /** The words of a one-line value, or the reason they cannot be read. */
 function wordsOf(line: string): readonly Word[] | ManualReference {
   const words: Word[] = [];
@@ -106,19 +163,20 @@ function wordsOf(line: string): readonly Word[] | ManualReference {
       continue;
     }
     if (line[at] === '"') {
-      const close = line.indexOf('"', at + 1);
-      if (close === -1) return manual('an unterminated double quote');
-      const after = line[close + 1];
+      const quoted = quotedWordAt(line, at);
+      if ('kind' in quoted) return quoted;
+      const after = line[quoted.next];
       if (after !== undefined && !/\s/.test(after)) return manual('a double quote inside the -t value');
-      words.push({ text: line.slice(at + 1, close), quoted: true });
-      at = close + 1;
+      words.push(quoted.word);
+      at = quoted.next;
       continue;
     }
     const end = line.slice(at).search(/\s/);
     const stop = end === -1
       ? line.length
       : at + end;
-    words.push({ text: line.slice(at, stop), quoted: false });
+    const text = line.slice(at, stop);
+    words.push({ text, quoted: false, reading: text, expansion: null });
     at = stop;
   }
   return words;
@@ -145,9 +203,10 @@ function patternOf(rest: readonly Word[]): string | null | ManualReference {
   if (flag.text !== NAME_FLAG) return manual(`a flag other than -t: ${flag.text}`);
   if (value === undefined) return manual('a missing -t value');
   if (!value.quoted) return manual(`an unquoted -t value: ${value.text}`);
-  if (value.text.trim() === '') return manual('an empty -t value');
+  if (value.reading.trim() === '') return manual('an empty -t value');
+  if (value.expansion !== null) return manual(`a shell character ${value.expansion} inside the -t value`);
   const next = after[0];
-  if (next === undefined) return value.text;
+  if (next === undefined) return value.reading;
   if (!next.quoted && next.text === NAME_FLAG) return manual('a second -t');
   return manual(`a word after the -t value: ${next.text}`);
 }
