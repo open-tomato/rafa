@@ -424,7 +424,7 @@ describe('the drift report', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe([
-      'warn: claim drift: #7 is labelled rafa:claimed (open) but no claim branch names it',
+      'warn: claim drift: #7 is labelled rafa:claimed (open) but no feat/rafa-7-* claim branch names it',
       'board #40 · epic #80 Epic delta (now) · 1/2 done',
       '',
     ].join('\n'));
