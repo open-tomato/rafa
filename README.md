@@ -283,7 +283,7 @@ on its own (0) to a release on every merge (4):
 what the level still needs. The row never refuses a setting. The release order
 across packages is parked until two publishable packages depend on each other.
 
-To move to level 2, where a pushed tag publishes, take three steps:
+To move to level 2, where a pushed tag publishes, take four steps:
 
 1. Set the key in `.rafa/config.yaml`:
 
@@ -298,9 +298,17 @@ To move to level 2, where a pushed tag publishes, take three steps:
 3. On npmjs.com, add a trusted publisher for the package that names this
    repository and `release-publish.yml`. Trusted publishing needs npm 11.5.1 or
    newer.
+4. In the repository's GitHub settings, open Settings > Secrets and variables >
+   Actions > Variables, and add the repository variable `RAFA_RELEASE_PUBLISH`
+   with the value `ci`. From a shell, the same is:
 
-Then `rafa release tag --push` tags the release and pushes the tag, and the
-publish workflow runs the gates and publishes it with provenance.
+   ```bash
+   gh variable set RAFA_RELEASE_PUBLISH --body ci
+   ```
+
+Until the variable is `ci`, the publish job is skipped, and a skipped job is not
+a failed run. Then `rafa release tag --push` tags the release and pushes the
+tag, and the publish workflow runs the gates and publishes it with provenance.
 
 The release commands beyond settle and tag:
 
