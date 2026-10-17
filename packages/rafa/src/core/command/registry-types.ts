@@ -1,7 +1,8 @@
 /**
  * The registry's contract: the {@link CommandRegistry} the dispatcher
- * routes through, what it is built from, and the subjects, aliases and
- * mounts it answers.
+ * routes through, what it is built from, the subjects, aliases and
+ * mounts it answers, and the {@link CommandFeature} one feature hands
+ * the registry its subjects and commands in.
  *
  * The registry itself, `createCommandRegistry` and the refusals it
  * throws, stays the CLI's, in `src/cli/registry.ts`, which imports
@@ -51,6 +52,21 @@ export interface CommandRegistryInput {
   /** The subjects, in roster order. */
   readonly subjects: readonly SubjectSpec[];
   /** The core commands, in roster order. */
+  readonly commands: readonly RafaCommand[];
+}
+
+/**
+ * What one feature contributes to a registry: its name, the subjects it
+ * declares and the commands under them, each list in roster order. The
+ * same two lists as a {@link CommandRegistryInput}, under the name that
+ * says which feature they came from.
+ */
+export interface CommandFeature {
+  /** The feature's name, which a load failure of one of its commands names. */
+  readonly name: string;
+  /** The subjects the feature declares, in roster order. */
+  readonly subjects: readonly SubjectSpec[];
+  /** The feature's commands, in roster order. */
   readonly commands: readonly RafaCommand[];
 }
 

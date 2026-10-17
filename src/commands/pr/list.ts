@@ -79,6 +79,7 @@ import { createGitRunner } from '../../pr/index.js';
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 
 import { SEPARATOR } from './current.js';
+import { PR_LIST_DECLARATION } from './declarations.js';
 import { createBaseReader, forecastCell, forecastLine, listForecast } from './list-forecast.js';
 import {
   DEFAULT_PR_SEAMS,
@@ -311,33 +312,7 @@ export async function readList(context: RafaContext, seams: PrListSeams, now: nu
 /** The command, reaching the provider through `seams`; see the module note. */
 export function createPrListCommand(seams: PrListSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr list',
-    subject: 'pr',
-    action: 'list',
-    summary: 'list the open pull requests with their checks, mergeability and release forecast',
-    description: 'Lists every open pull request of the repository at the project root, one row each carrying its'
-      + ' number, its title, the branch it is from, how long ago it last moved, the verdict over its checks and'
-      + ' whether it merges. The checks and the mergeability are read per pull request, so the command sends one'
-      + ' GitHub CLI command for the list and two more for each row; a read that failed leaves its cell as `?` and'
-      + ' says what the CLI reported on a line under the table rather than refusing the whole list. A pull request'
-      + ' GitHub ran nothing for reads `checks none`. Where the release is on, a last column shows the release forecast'
-      + ' the pull request body carries, marked `(base moved)` when the base branch, as last fetched, holds another'
-      + ' version or other waiting fragments than the forecast was computed against, with a line under the table'
-      + ' naming both; it fetches nothing and sends no further command. With `--output=json` every row and the rendered table are the'
-      + ' data of the terminal result event. Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa pr list',
-        note: 'Lists the open pull requests of the repository at the project root.',
-      },
-      {
-        cmd: 'rafa pr list --output=json',
-        note: 'Writes a start event, then a result event holding every row and the rendered table.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_LIST_DECLARATION,
     run: async (context) => {
       const listed = await readList(context, seams, Date.now());
       if (context.outputMode === 'json') {

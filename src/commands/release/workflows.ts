@@ -57,6 +57,8 @@ import { readReleaseTemplate, writeReleaseWorkflow } from '../../release/templat
 import { readLadderFiles } from '../doctor-ladder.js';
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { RELEASE_WORKFLOWS_DECLARATION, RELEASE_WORKFLOWS_WRITE_FLAG } from './declarations.js';
+
 /** The command's name, as its refusals spell it. */
 const COMMAND_NAME = 'rafa release workflows';
 
@@ -64,7 +66,7 @@ const COMMAND_NAME = 'rafa release workflows';
 export const RELEASE_WORKFLOWS_USAGE = 'rafa release workflows [--write]';
 
 /** The flag that writes each needed missing workflow. */
-export const WRITE_FLAG = 'write';
+export const WRITE_FLAG: string = RELEASE_WORKFLOWS_WRITE_FLAG;
 
 /** What a workflow file reads as against its template. */
 export type WorkflowState = 'present' | 'missing' | 'differs';
@@ -263,37 +265,7 @@ export async function runWorkflows(context: RafaContext, seams: WorkflowsSeams =
 /** The command, reading the templates through `seams`; see the module note. */
 export function createReleaseWorkflowsCommand(seams: WorkflowsSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'release workflows',
-    subject: 'release',
-    action: 'workflows',
-    summary: 'list the release ladder\'s workflow files and whether the configured level needs each; write the missing ones',
-    description: 'Writes one row per workflow file of the release ladder under `.github/workflows/`: its path,'
-      + ' the levels it serves, whether the level `release.settle`, `release.tag` and `release.publish`'
-      + ' read as needs it, and `present` when it holds the shipped template\'s bytes, `differs` when it'
-      + ' holds others, or `missing`, a path holding no regular file counting as missing. With `--write`'
-      + ' each needed missing workflow is written from the shipped template, a present or differing file'
-      + ' is left as it is and named, and a directory at the path is refused and named; a workflow the'
-      + ' level does not need is never written. The command exits 0 in every case. With `--output=json`'
-      + ' the level, the rows and the writes are the data of the terminal result event.',
-    args: [],
-    flags: [
-      {
-        name: WRITE_FLAG,
-        description: 'Write each workflow the level needs and the project lacks, from the shipped template.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release workflows',
-        note: 'Lists the ladder\'s workflow files, which the configured level needs, and their state.',
-      },
-      {
-        cmd: 'rafa release workflows --write',
-        note: 'Writes each needed workflow that is missing, and leaves every existing file as it is.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_WORKFLOWS_DECLARATION,
     run: async (context) => {
       const result = await runWorkflows(context, seams);
       if (context.outputMode === 'json') {

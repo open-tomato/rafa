@@ -21,7 +21,7 @@
  * {@link Prompter} `rafa init`, `pr merge` and `issue unblock` read an
  * answer with, so a json-mode stdout stays NDJSON. An answer that is
  * not `y` or `yes` declines, the empty answer and an input that ended
- * included ({@link answeredYes}): the question is spelled `[y/N]`.
+ * included ({@link lazyPrompter}): the question is spelled `[y/N]`.
  *
  * Without a terminal and without `--yes` nothing is asked and nothing
  * is written. The two readings are printed anyway and the run reports
@@ -164,7 +164,7 @@ import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
@@ -182,19 +182,13 @@ import {
   SPEC_READY_LABEL,
 } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
-import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
-import { answeredYes } from '../../start/branch-decision.js';
+import { endWithNextStep } from '../../next/ending.js';
 
+import { ISSUE_READY_DECLARATION, READY_DRY_RUN_FLAG, READY_YES_FLAG } from './declarations.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
 /** The usage line a refusal names. */
 export const READY_USAGE = 'rafa issue ready <n> [--yes | --dry-run]';
-
-/** The flag that marks the issue with no question once every check passes. */
-const YES_FLAG = 'yes';
-
-/** The flag that makes every check and prints it, asking nothing and writing nothing. */
-const DRY_RUN_FLAG = 'dry-run';
 
 /** The exit code a label swap `gh` refused ends with. */
 export const READY_WRITE_EXIT = 1;
@@ -390,7 +384,7 @@ export async function runIssueReady(options: ReadyOptions): Promise<ReadyReport>
   if (options.dryRun === true) {
     return readyReport(issue, 'checked', reading, {
       ...lines,
-      message: `#${String(issue)} is ready to mark; --${DRY_RUN_FLAG} wrote nothing.`,
+      message: `#${String(issue)} is ready to mark; --${READY_DRY_RUN_FLAG} wrote nothing.`,
     });
   }
   if (options.yes !== true) {
@@ -461,7 +455,7 @@ function readReadySwitch(context: RafaContext, name: string): boolean {
  * the usage for a value given to it. Read before anything is opened.
  */
 export function readReadyYes(context: RafaContext): boolean {
-  return readReadySwitch(context, YES_FLAG);
+  return readReadySwitch(context, READY_YES_FLAG);
 }
 
 /**
@@ -470,7 +464,7 @@ export function readReadyYes(context: RafaContext): boolean {
  * opened.
  */
 export function readReadyDryRun(context: RafaContext): boolean {
-  return readReadySwitch(context, DRY_RUN_FLAG);
+  return readReadySwitch(context, READY_DRY_RUN_FLAG);
 }
 
 /** How the board, the terminal and the question are reached; each left out is the system's own. */
@@ -491,30 +485,6 @@ export interface ReadySeams {
 export const DEFAULT_READY_SEAMS: ReadySeams = Object.freeze({});
 
 /**
- * The prompter the one question goes through, opened to ask it and
- * closed by `close`. Nothing is opened by a run that never asks.
- *
- * Exported for `../plan/ready-offer.ts`, which puts this command's
- * question inside a `plan create` run, for `../next.ts`, which puts
- * one question per step of its chain, and for `../cleanup.ts`, which
- * asks after its checklist: each must open and close the terminal the
- * same way rather than spelling the pair again.
- */
-export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () => void } {
-  let prompter: Prompter | null = null;
-  return {
-    ask: async (question: string): Promise<boolean> => {
-      prompter ??= open();
-      return answeredYes(await prompter.ask(question));
-    },
-    close: (): void => {
-      prompter?.close();
-      prompter = null;
-    },
-  };
-}
-
-/**
  * Runs the marking a line asks for: the line, the project's
  * `board.trustedAuthors`, the repository label off `origin`, and the
  * question through the prompter when there is a terminal and the line
@@ -529,7 +499,7 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
   const dryRun = readReadyDryRun(context);
   if (yes && dryRun) {
     throw lineRefusal(
-      `--${YES_FLAG} and --${DRY_RUN_FLAG} cannot be used together: one asks for the write and the other for none`,
+      `--${READY_YES_FLAG} and --${READY_DRY_RUN_FLAG} cannot be used together: one asks for the write and the other for none`,
       READY_USAGE,
     );
   }
@@ -579,59 +549,7 @@ function writeReport(context: RafaContext, report: ReadyReport): void {
 /** The command, reading the board with `seams`; see the module note. */
 export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue ready',
-    subject: 'issue',
-    action: 'ready',
-    summary: `mark an issue ${SPEC_READY_LABEL} once its author and its body check out`,
-    description: 'Reads the issue on the GitHub board, refuses one opened by an account without write access to'
-      + ' the repository, refuses a body that does not fill the spec template, refuses an issue carrying two'
-      + ' `epic:` labels (with board.relationships set to labels, the default), and then asks whether to mark it'
-      + ` ${SPEC_READY_LABEL}. On a yes it swaps the labels in one write, adding ${SPEC_READY_LABEL} and`
-      + ` removing ${SPEC_NEEDS_WORK_LABEL}. \`--yes\` makes the swap with no question once every check passes,`
-      + ' with or without a terminal, and refuses everything the checks refuse without it; without a terminal and'
-      + ' without `--yes` it prints both readings and adds no label. A run that marks the issue, or finds'
-      + ' it marked already, ends by naming the one step that follows, which `--no-hint` turns off.'
-      + ' `--dry-run` makes every check and prints both readings, asking nothing and writing nothing whatever'
-      + ' the terminal, exits 2 on a check that refuses, and is refused beside `--yes`. With'
-      + ' `--output=json` the report is the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number on the GitHub board.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: YES_FLAG,
-        description: `Marks the issue ${SPEC_READY_LABEL} without asking, once its author and its body check out;`
-          + ' a check that refuses still refuses. Needed where standard input is no terminal.',
-        type: 'boolean',
-      },
-      {
-        name: DRY_RUN_FLAG,
-        description: 'Prints both readings and writes nothing, asking no question whatever the terminal;'
-          + ' a check that refuses still exits 2. Not with --yes.',
-        type: 'boolean',
-      },
-      HINT_FLAG_SPEC,
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue ready 57',
-        note: `Checks #57 and asks whether to mark it ${SPEC_READY_LABEL}.`,
-      },
-      {
-        cmd: 'rafa issue ready 57 --yes',
-        note: `Checks #57 and marks it ${SPEC_READY_LABEL} with no question, from a script or an agent.`,
-      },
-      {
-        cmd: 'rafa issue ready 57 --dry-run',
-        note: 'Checks #57 and reads its status in one line, from a script, an agent or CI, marking nothing.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_READY_DECLARATION,
     run: async (context) => {
       const made = await markIssueReady(context, seams);
       if (context.outputMode === 'json') context.output.result(made);

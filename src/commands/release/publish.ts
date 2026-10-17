@@ -92,6 +92,7 @@ import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { parseReleaseTag } from '../../release/version-tag.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
+import { RELEASE_PUBLISH_DECLARATION, RELEASE_PUBLISH_DRY_RUN_FLAG, RELEASE_PUBLISH_TAG_FLAG } from './declarations.js';
 import { readPublishTarget } from './tag-follow-ups.js';
 import { readTagPackages, readVersion } from './tag-units.js';
 
@@ -99,10 +100,10 @@ import { readTagPackages, readVersion } from './tag-units.js';
 export const RELEASE_PUBLISH_USAGE = 'rafa release publish [--tag=<tag>] [--dry-run]';
 
 /** The flag naming the one tag to publish. */
-export const TAG_FLAG = 'tag';
+export const TAG_FLAG: string = RELEASE_PUBLISH_TAG_FLAG;
 
 /** The flag that prints each unit's line and runs nothing. */
-export const DRY_RUN_FLAG = 'dry-run';
+export const DRY_RUN_FLAG: string = RELEASE_PUBLISH_DRY_RUN_FLAG;
 
 /** The code npm writes for a package the registry does not know. */
 const NOT_FOUND_CODE = 'E404';
@@ -518,51 +519,7 @@ export async function runPublish(context: RafaContext, seams: PublishSeams = {})
 /** The command, reaching git and the processes through `seams`; see the module note. */
 export function createReleasePublishCommand(seams: PublishSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'release publish',
-    subject: 'release',
-    action: 'publish',
-    summary: 'publish each release unit whose tag points at HEAD, skipping a version the registry holds',
-    description: 'Runs `release.publishCommand` (`npm publish` by default) through the shell for each release'
-      + ' tag pointing at HEAD — `v<version>` for the root, published from the project root, and'
-      + ' `<name>@<version>` for a publishable workspace package, published from its folder — or for the'
-      + ' one tag `--tag` names, which is refused when it is no release tag or does not point at HEAD.'
-      + ' Every unit is read before anything runs, and the run refuses with exit 1 when no release tag'
-      + ' points at HEAD, when a tag names no publishable package, or when the manifest declares a version'
-      + ' other than the tag\'s. Before each publish it asks `npm view <name>@<version> version'
-      + ' --registry=<registry>`, the registry being `publishConfig.registry` or npm\'s, and skips the unit'
-      + ' with one line when the registry holds that version already, so a retry publishes only what is'
-      + ' missing; a private manifest is skipped too. The publish runs with the terminal\'s streams, and'
-      + ' the first that fails stops the run with its exit code, naming the tags published before it.'
-      + ' `--dry-run` prints each unit\'s line and runs nothing. With `--output=json` the units, the'
-      + ' skipped, the published and the exit are the data of the terminal result event.',
-    args: [],
-    flags: [
-      {
-        name: TAG_FLAG,
-        description: 'The one release tag to publish, which has to point at HEAD.',
-        type: 'string',
-      },
-      {
-        name: DRY_RUN_FLAG,
-        description: 'Print the line of each unit and run nothing, not even the registry check.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa release publish',
-        note: 'Publishes every release unit tagged at HEAD that the registry does not hold yet.',
-      },
-      {
-        cmd: 'rafa release publish --tag=@scope/plugin@0.2.0',
-        note: 'Publishes that one package, when its tag points at HEAD.',
-      },
-      {
-        cmd: 'rafa release publish --dry-run',
-        note: 'Prints what each unit would run, and runs nothing.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...RELEASE_PUBLISH_DECLARATION,
     run: async (context) => {
       const result = await runPublish(context, seams);
       if (context.outputMode === 'json') context.output.result(result);

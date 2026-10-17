@@ -80,13 +80,11 @@ import { RefVerifyError } from '../../refs/verify.js';
 import { readSwitch } from '../plan/plan-files.js';
 import { createPlanRefsVerifier, registryRoster } from '../plan/refs-check.js';
 
+import { ISSUE_CHECK_DECLARATION, STAMP_FLAG } from './declarations.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
 /** The usage line a refusal names. */
 export const CHECK_USAGE = 'rafa issue check <n> [--stamp]';
-
-/** The flag that re-stamps every reference. */
-export const STAMP_FLAG = 'stamp';
 
 /** A whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -296,47 +294,7 @@ export async function checkIssue(context: RafaContext, seams: IssueCheckSeams = 
 /** The command, reading the targets with `seams`; see the module note. */
 export function createIssueCheckCommand(seams: IssueCheckSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue check',
-    subject: 'issue',
-    action: 'check',
-    summary: 'read the references a spec\'s saved copy names, each with its state',
-    description: 'Reads the saved copy of issue <n> under `specs.dir` and prints every reference it names — an'
-      + ' issue, a file, a declared symbol, a command, a flag, a config key — with its state against the'
-      + ' stamp the copy keeps: ok, new, dangling, suspect, resolved or unknown. A reference the copy keeps no'
-      + ' stamp for is stamped on this read. Exits 0 whatever the states are, and plans nothing. A missing'
-      + ' saved copy is refused, naming the `rafa plan create --issue=<n>` that writes one. With'
-      + ' `--output=json` every reference, with its kind, line, state and fingerprint, is the data of the'
-      + ' terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number on the GitHub board whose saved copy is read.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: STAMP_FLAG,
-        description: 'Re-stamp every reference with what its target holds now, so the next check reads each one ok.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue check 151',
-        note: 'Prints each reference the saved copy of #151 names with its state, and a count per state.',
-      },
-      {
-        cmd: 'rafa issue check 151 --stamp',
-        note: 'Prints the same reading, then re-stamps every reference as reviewed without planning.',
-      },
-      {
-        cmd: 'rafa issue check 151 --output=json',
-        note: 'Writes a start event, then a result event whose data lists every reference with its kind, line, state and fingerprint.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_CHECK_DECLARATION,
     run: async (context) => {
       const result = await checkIssue(context, seams);
       if (context.outputMode === 'json') {

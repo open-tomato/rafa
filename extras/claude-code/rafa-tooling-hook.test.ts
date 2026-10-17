@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import { describeRegistry } from '../../src/cli/describe';
 import { CORE_REGISTRY } from '../../src/commands/index';
-import { PR_SHOW_JSON_FIELDS } from '../../src/commands/pr/show';
+import { PR_SHOW_JSON_FIELDS } from '../../src/commands/pr/declarations';
 
 import {
   commandsOf,

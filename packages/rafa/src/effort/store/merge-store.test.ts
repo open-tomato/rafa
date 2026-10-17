@@ -14,6 +14,9 @@
  * not its bytes, so it is compared by every table's rows and its
  * `user_version` (`storeRows`), `store_meta` among them.
  *
+ * The migration case reads the temp root it hands the merge, since the
+ * shared `tmpdir()` holds other processes' scratch folders under turbo.
+ *
  * Each refusal snapshots both directories before and after and finds
  * them byte-identical. Each has a control beside it, the same planting
  * less the one fault, which merges, and the merge case finds this
@@ -288,7 +291,8 @@ describe('mergeStore', () => {
     expect(readRows(testCase.path, 'SELECT rows_in_conflict FROM merges')).toEqual([{ rows_in_conflict: 1 }]);
   });
 
-  it('brings a copy of an other store that lacks migrations forward, never the file itself', () => {
+  /** A case whose other store lacks the last migrations, with one old finding. */
+  function oldOtherCase(): Case {
     const testCase = freshCase();
     withStore(testCase.path, (db) => plantFinding(db, HERE, 'a1'));
     mkdirSync(dirname(testCase.otherPath), { recursive: true });
@@ -300,9 +304,15 @@ describe('mergeStore', () => {
     } finally {
       old.close();
     }
+    return testCase;
+  }
+
+  it('brings a copy of an other store that lacks migrations forward, never the file itself', () => {
+    const testCase = oldOtherCase();
+    const tempDir = realpathSync(mkdtempSync(join(scope, 'temp-')));
     const [, thereBefore] = snapshotBoth(testCase);
 
-    const result = mergeStore(mergeOptions(testCase));
+    const result = mergeStore(mergeOptions(testCase, { tempDir }));
 
     expect(result.otherBroughtForward).toEqual(['schema_migrations', ...SQLITE_MIGRATIONS.slice(12).map(({ id }) => id)]);
     expect(result).toMatchObject({ rowsAdded: 1, otherStore: null });
@@ -311,7 +321,34 @@ describe('mergeStore', () => {
     ]);
     const [, thereAfter] = snapshotBoth(testCase);
     expect(thereBefore !== undefined && thereAfter !== undefined && sameFiles(thereBefore, thereAfter)).toBe(true);
-    expect(readdirSync(tmpdir()).filter((name) => name.startsWith('rafa-merge-other-'))).toEqual([]);
+    expect(readdirSync(tempDir).filter((name) => name.startsWith('rafa-merge-other-'))).toEqual([]);
+  });
+
+  it('merges beside a stray scratch folder in the shared temp directory, leaving it alone', () => {
+    const testCase = oldOtherCase();
+    const tempDir = realpathSync(mkdtempSync(join(scope, 'temp-')));
+    const stray = mkdtempSync(join(tmpdir(), 'rafa-merge-other-'));
+    try {
+      const result = mergeStore(mergeOptions(testCase, { tempDir }));
+
+      expect(result.status).toBe('merged');
+      expect(readdirSync(tempDir).filter((name) => name.startsWith('rafa-merge-other-'))).toEqual([]);
+      expect(readdirSync(tmpdir())).toContain(stray.slice(tmpdir().length + 1));
+    } finally {
+      rmSync(stray, { recursive: true, force: true });
+    }
+  });
+
+  it('throws naming a tempDir that does not exist, leaving both files byte-identical', () => {
+    const testCase = oldOtherCase();
+    const tempDir = join(scope, 'never-made');
+    const [hereBefore, thereBefore] = snapshotBoth(testCase);
+
+    expect(() => mergeStore(mergeOptions(testCase, { tempDir }))).toThrow(tempDir);
+
+    const [hereAfter, thereAfter] = snapshotBoth(testCase);
+    expect(hereBefore !== undefined && hereAfter !== undefined && sameFiles(hereBefore, hereAfter)).toBe(true);
+    expect(thereBefore !== undefined && thereAfter !== undefined && sameFiles(thereBefore, thereAfter)).toBe(true);
   });
 });
 

@@ -111,6 +111,8 @@ import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { expectOneArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { CLAIM_RELEASE_DECLARATION } from './declarations.js';
+
 /** The usage line a refusal names. */
 const USAGE = 'rafa claim release <n>';
 
@@ -330,36 +332,7 @@ const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
 /** The command, reaching git, the board and the store through `makeSeams`; see the module note. */
 export function createClaimReleaseCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'claim release',
-    subject: 'claim',
-    action: 'release',
-    summary: 'give up this device\'s claim on an issue, and take its stage label off',
-    description: 'Pushes one release commit to the issue\'s claim branch on origin, leased on the tip it'
-      + ' read, so no other device\'s push is overwritten, then takes `rafa:claimed` or'
-      + ' `rafa:in-development` off the issue; a label that cannot be written is a warning beside a'
-      + ' release that stands. Refused when this device does not own the claim, when the branch moved'
-      + ' meanwhile, and when origin cannot be reached. No local branch moves. With `--output=json`'
-      + ' the issue, the branch, the store and the release commit are the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number whose claim this device gives up.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa claim release 324',
-        note: 'Releases this device\'s claim on #324 and takes its stage label off.',
-      },
-      {
-        cmd: 'rafa claim release 324 --output=json',
-        note: 'Writes a start event, then a result event whose data holds the branch and the release commit.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...CLAIM_RELEASE_DECLARATION,
     run: async (context) => {
       const result = await releaseClaim(context, makeSeams);
       if (context.outputMode === 'json') {

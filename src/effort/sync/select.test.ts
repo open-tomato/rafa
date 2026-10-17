@@ -21,7 +21,8 @@
  * read in a child `bun` per import order, since this file has already
  * imported both by the time a case runs. The registry's side is entered
  * through its barrel, `packages/rafa/src/core/adapters/index.ts`, as this module
- * enters it, and each child imports the root after both.
+ * enters it, and each child imports the root after both and calls its
+ * `registerCoreAdapters`, since importing the root registers nothing.
  *
  * Three mutations were driven on 2026-09-29 over this file,
  * `packages/rafa/src/core/adapters/registry.test.ts`,
@@ -317,7 +318,7 @@ describe('the load order with the adapter registry', () => {
     const script = [
       `const first = await import(${JSON.stringify(first)});`,
       `const second = await import(${JSON.stringify(second)});`,
-      `await import(${JSON.stringify(ROOT_ENTRY)});`,
+      `(await import(${JSON.stringify(ROOT_ENTRY)})).registerCoreAdapters();`,
       'const { selectSync } = first.selectSync ? first : second;',
       'const { CORE_ADAPTER_REGISTRY } = first.CORE_ADAPTER_REGISTRY ? first : second;',
       'const sync = selectSync("/nonexistent", { effortSync: "local" });',

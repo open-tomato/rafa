@@ -1,7 +1,20 @@
 /**
  * Tests for the composition root `src/adapter-registry.ts`: the adapters
- * core registers, read off `CORE_ADAPTER_REGISTRY` once this file has
- * imported the root, as every caller reads them.
+ * core registers, read off `CORE_ADAPTER_REGISTRY` once
+ * `registerCoreAdapters` has been called, as every caller reads them.
+ * The call is the preload's (`src/tests/preload.ts`), made once for the
+ * test process before this file loads; importing the root registers
+ * nothing.
+ *
+ * The `registerCoreAdapters` cases read the call itself: a fresh child
+ * that imports the root and reads the registry is refused until it
+ * calls it, the call answers the active registry it made, holding each
+ * of `CORE_ADAPTERS` under its kind, a second call registers nothing
+ * and answers the same registry, beside `registerAdapters` handed the
+ * same list refusing it, and a kind of core's held by another adapter
+ * is refused with the active registry left as it was. Each in-process
+ * case starts from an empty registry and puts back the one it found in
+ * a `finally`.
  *
  * `packages/rafa/src/core/adapters/registry.test.ts` holds the registry's mechanics
  * over fixture adapters it builds itself, and imports no adapter. The
@@ -29,7 +42,8 @@
  * a child `bun` with a scratch `HOME`, because bun's `homedir()` keeps
  * the `HOME` a process started with (measured on bun 1.3.14: setting
  * `process.env.HOME` in the process left `homedir()` unchanged); that
- * child imports the root before it reads the registry. The `github`
+ * child, which runs no preload, calls the root's `registerCoreAdapters`
+ * before it reads the registry. The `github`
  * tracker cases hand that adapter the recorded fake as its `gh` runner
  * and read what it filed off the fake. No case runs the runner the
  * adapter makes when its context names none, which spawns the real
@@ -39,9 +53,9 @@
  * default spawns the real `claude`; the refusals throw before one is
  * made.
  *
- * No case changes the active registry. An add-on is registered through
- * `register`, which answers a new registry, and a case holds core's
- * kinds unchanged afterwards.
+ * No case outside the `registerCoreAdapters` ones changes the active
+ * registry. An add-on is registered through `register`, which answers a
+ * new registry, and a case holds core's kinds unchanged afterwards.
  *
  * The mutations recorded in `registry.test.ts` before the move were
  * driven against these cases there, with the entries in `registry.ts`:
@@ -65,7 +79,6 @@ import type { InstinctRecord, Sync } from '@open-tomato/rafa/ports';
 import type { SessionEffortRow } from '@open-tomato/rafa/store';
 
 import './config-registry.js';
-import './adapter-registry.js';
 
 import {
   existsSync,
@@ -82,13 +95,20 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import {
+  activeAdapterRegistry,
+  CORE_ADAPTER_REGISTRY,
+  createAdapterRegistry,
+  registerAdapters,
+  restoreAdapters,
+} from '@open-tomato/rafa/core/adapters';
 import {
   EMPTY_CONFIG_REGISTRY,
   registerConfigSections,
   restoreConfigSections,
 } from '@open-tomato/rafa/core/config';
 
+import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { draftFixture } from './adapters/tracker/contract.js';
 import { createFakeGh } from './adapters/tracker/github-fake.js';
 import { parseLocalIssue } from './adapters/tracker/local.js';
@@ -104,6 +124,39 @@ const ROOT_ENTRY = fileURLToPath(new URL('./adapter-registry.ts', import.meta.ur
 
 /** The adapters barrel, as a child process imports it. */
 const BARREL_ENTRY = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/adapters'));
+
+/** Each of {@link CORE_ADAPTERS} as `port/kind`, in the order the root lists them. */
+const CORE_ADAPTER_KEYS: readonly string[] = [
+  'store/sqlite',
+  'store/ndjson',
+  'output/text',
+  'output/json',
+  'output/events',
+  'logger/console',
+  'tracker/local',
+  'tracker/github',
+  'learning/local',
+  'planner/claude',
+  'sync/local',
+  'sync/file',
+];
+
+/** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
+const UNREGISTERED = 'adapter registry: no adapter is registered:';
+
+/**
+ * Runs `body` over an empty active registry, putting back the one it
+ * found afterwards, whatever `body` does.
+ */
+function overEmpty(body: () => void): void {
+  const held = activeAdapterRegistry();
+  try {
+    restoreAdapters(createAdapterRegistry());
+    body();
+  } finally {
+    restoreAdapters(held);
+  }
+}
 
 /** What the planner case's session writes to stdout: a review judging the spec ready. */
 const PLANNER_SESSION_STDOUT = [
@@ -208,6 +261,63 @@ beforeAll(() => {
 
 afterAll(() => {
   if (tempDir !== '') rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe('registerCoreAdapters', () => {
+  it('lists core\'s adapters in the order kinds answers them', () => {
+    expect(CORE_ADAPTERS.map((adapter) => `${adapter.port}/${adapter.kind}`)).toEqual([...CORE_ADAPTER_KEYS]);
+  });
+
+  it('leaves the registry refusing in a fresh process that imports the root, until the root is called', () => {
+    const script = [
+      `const root = await import(${JSON.stringify(ROOT_ENTRY)});`,
+      `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(BARREL_ENTRY)});`,
+      'let refused = "";',
+      'try { CORE_ADAPTER_REGISTRY.kinds("store"); } catch (error) { refused = error.message; }',
+      'root.registerCoreAdapters();',
+      'console.log(JSON.stringify([refused, CORE_ADAPTER_REGISTRY.kinds("store")]));',
+    ].join('\n');
+    const child = Bun.spawnSync([process.execPath, '-e', script]);
+    const [refused, kinds] = JSON.parse(child.stdout.toString()) as [string, string[]];
+
+    expect(child.exitCode).toBe(0);
+    expect(refused).toStartWith(UNREGISTERED);
+    // Control: the call registers, in the same process that was refused.
+    expect(kinds).toEqual(['sqlite', 'ndjson']);
+  });
+
+  it('answers the active registry it made, holding each of CORE_ADAPTERS under its kind', () => {
+    overEmpty(() => {
+      const empty = activeAdapterRegistry();
+      const made = registerCoreAdapters();
+
+      expect(made).toBe(activeAdapterRegistry());
+      expect(made).not.toBe(empty);
+      expect(CORE_ADAPTERS.filter((adapter) => made.find(adapter.port, adapter.kind)?.create !== adapter.create))
+        .toEqual([]);
+    });
+  });
+
+  it('registers nothing on a second call, answering the active registry as it is', () => {
+    overEmpty(() => {
+      const first = registerCoreAdapters();
+
+      expect(registerCoreAdapters()).toBe(first);
+      expect(activeAdapterRegistry()).toBe(first);
+      // Control: the same list registered again, without the root, is refused.
+      expect(() => registerAdapters(CORE_ADAPTERS)).toThrow('adapter registry: store/sqlite is already registered');
+    });
+  });
+
+  it('refuses when another adapter holds a kind of core\'s, leaving the active registry as it was', () => {
+    overEmpty(() => {
+      registerAdapters([addOn({ port: 'store', kind: 'sqlite' })]);
+      const before = activeAdapterRegistry();
+
+      expect(() => registerCoreAdapters()).toThrow('adapter registry: store/sqlite is already registered');
+      expect(activeAdapterRegistry()).toBe(before);
+    });
+  });
 });
 
 describe('every core port kind', () => {
@@ -461,7 +571,7 @@ describe('the core adapter registry', () => {
 
       expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered') })).toThrow(
         'adapter registry: learning.bless.minConfidence has no registered default:'
-          + ' import src/config-registry.ts before making the local learning adapter without one',
+          + ' call registerCoreConfigSections from src/config-registry.ts before making the local learning adapter without one',
       );
       // Control: a floor the context names needs no registered default.
       expect(() => adapter.create({ repoRoot: freshRoot('learning-unregistered'), learningBlessMinConfidence: 0.5 }))
@@ -482,8 +592,8 @@ describe('the core adapter registry', () => {
     });
     // bun's homedir() keeps the HOME the process started with, so each reading is a child of its own.
     const script = [
-      `await import(${JSON.stringify(CONFIG_REGISTRY_ENTRY)});`,
-      `await import(${JSON.stringify(ROOT_ENTRY)});`,
+      `(await import(${JSON.stringify(CONFIG_REGISTRY_ENTRY)})).registerCoreConfigSections();`,
+      `(await import(${JSON.stringify(ROOT_ENTRY)})).registerCoreAdapters();`,
       `const { CORE_ADAPTER_REGISTRY } = await import(${JSON.stringify(BARREL_ENTRY)});`,
       `const learning = CORE_ADAPTER_REGISTRY.resolve('learning', 'local').create({ repoRoot: ${JSON.stringify(root)} });`,
       'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',

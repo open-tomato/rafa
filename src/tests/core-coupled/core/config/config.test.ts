@@ -111,7 +111,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -209,6 +209,10 @@ const SETTINGS: readonly ConfigSetting[] = [
   'testsContract',
   'testsAlwaysRun',
   'testsRetakeRedAlone',
+  'featuresBoard',
+  'featuresPr',
+  'featuresRun',
+  'featuresRelease',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -318,6 +322,10 @@ const DEFAULTS: RafaConfig = {
   testsContract: ['**/*.contract.test.ts'],
   testsAlwaysRun: ['src/**/*.sweep.test.ts'],
   testsRetakeRedAlone: true,
+  featuresBoard: true,
+  featuresPr: true,
+  featuresRun: true,
+  featuresRelease: true,
 };
 
 /**
@@ -470,6 +478,11 @@ const FULL = [
   '  contract: [packages/*/src/*.contract.test.ts]',
   '  alwaysRun: [src/sweeps/*.test.ts]',
   '  retakeRedAlone: false',
+  'features:',
+  '  board: false',
+  '  pr: false',
+  '  run: false',
+  '  release: false',
   '',
 ].join('\n');
 
@@ -586,6 +599,10 @@ const FULL_VALUES: RafaConfig = {
   testsContract: ['packages/*/src/*.contract.test.ts'],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
   testsRetakeRedAlone: false,
+  featuresBoard: false,
+  featuresPr: false,
+  featuresRun: false,
+  featuresRelease: false,
 };
 
 /**
@@ -1289,6 +1306,26 @@ describe('parseConfigText', () => {
         'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: off',
         'tests.retakeRedAlone is "off", expected true or false',
         'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+      ],
+      [
+        'features.board', 'features:\n  board: "false"',
+        'features.board is "false", expected true or false',
+        'features:\n  board: false', 'featuresBoard', false,
+      ],
+      [
+        'features.pr', 'features:\n  pr: "false"',
+        'features.pr is "false", expected true or false',
+        'features:\n  pr: false', 'featuresPr', false,
+      ],
+      [
+        'features.run', 'features:\n  run: "false"',
+        'features.run is "false", expected true or false',
+        'features:\n  run: false', 'featuresRun', false,
+      ],
+      [
+        'features.release', 'features:\n  release: "false"',
+        'features.release is "false", expected true or false',
+        'features:\n  release: false', 'featuresRelease', false,
       ],
     ];
 

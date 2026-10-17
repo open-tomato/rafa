@@ -168,8 +168,9 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
+import { EPIC_MOVE_DECLARATION, TO_FLAG } from './declarations.js';
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';
-import { TO_FLAG, workPhrase } from './horizon-change.js';
+import { workPhrase } from './horizon-change.js';
 import {
   configuredMoveRelations,
   NATIVE_MODE,
@@ -740,47 +741,7 @@ export async function runEpicMove(context: RafaContext, seams: EpicMoveSeams): P
 /** The command, reaching `gh`, `git` and the terminal through `seams`; see the module note. */
 export function createEpicMoveCommand(seams: EpicMoveSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic move',
-    subject: 'epic',
-    action: 'move',
-    summary: 'move an issue to another epic, its label, its checklist line and a comment with the reason',
-    description: 'Swaps the issue\'s epic: label for the target epic\'s in one edit, moves its checklist line from'
-      + ' the old epic\'s body to the new one\'s keeping every other byte, and comments "Moved from epic #A to #B:'
-      + ' <reason>" on the issue, naming its open branches and pull requests, which stay as they are. The issue is'
-      + ' never recreated or closed. The reason is --reason, or asked once where there is a terminal; with neither,'
-      + ' nothing changes and the question is printed. An issue with no epic: label, a target that is not an open'
-      + ' epic and a move to its own epic are refused with exit code 2 before anything is written. With'
-      + ' `--output=json` the move and what each write did are the data of the terminal result event. With'
-      + ' board.relationships set to native it sets the issue\'s parent to the target epic in one edit instead,'
-      + ' and no label or checklist line is read or written; the comment is the same.',
-    args: [
-      {
-        name: 'issue',
-        description: 'The number of the issue that moves.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: TO_FLAG,
-        description: 'The number of the open epic it moves to. Required.',
-        type: 'string',
-        required: true,
-      },
-      {
-        name: REASON_FLAG,
-        description: 'Why it moves, commented on the issue. Asked once when left out.',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic move 12 --to=40 --reason="belongs with sign-in"',
-        note: 'Swaps #12\'s epic: label for #40\'s, moves its line into #40\'s checklist and comments the move on #12.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...EPIC_MOVE_DECLARATION,
     run: (context) => runEpicMove(context, seams),
   };
   return Object.freeze(command);

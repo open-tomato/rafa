@@ -18,10 +18,12 @@
  * Core's adapters stay under `src/adapters/`, the two store backends
  * under `packages/rafa/src/effort/store/` and the two sync strategies under
  * `src/effort/sync/`, and the composition root `src/adapter-registry.ts`
- * imports each by value and registers them through this barrel when it
- * is imported. `src/rafa.ts` and `src/index.ts` import that root; a
- * caller of this barrel that imports neither imports the root itself,
- * or every member of `CORE_ADAPTER_REGISTRY` refuses, naming it.
+ * imports each by value and registers them through this barrel when its
+ * `registerCoreAdapters` is called; importing the root registers
+ * nothing. `src/rafa.ts` and `src/index.ts` call it, and `bun test`
+ * calls it from `src/tests/preload.ts`; a process that loads none of
+ * them calls the root itself, or every member of
+ * `CORE_ADAPTER_REGISTRY` refuses, naming it.
  *
  * ## No cycle runs through it
  *
@@ -32,7 +34,8 @@
  * root imports `select.ts` now and `registry.ts` imports nothing above
  * core, so the cycle is gone. `index.test.ts` imports each of this file,
  * `registry.ts` and `select.ts` first in a fresh `bun`, the root after
- * it, and resolves `sync/local` in each order.
+ * it with `registerCoreAdapters` called, and resolves `sync/local` in
+ * each order.
  *
  * ## What it exports
  *

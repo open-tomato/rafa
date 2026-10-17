@@ -28,6 +28,7 @@ cli.js
 config-registry.d.ts
 config-schema-board-project.d.ts
 config-schema-errors.d.ts
+config-schema-features.d.ts
 config-schema-hub.d.ts
 config-schema-issues.d.ts
 config-schema-logger.d.ts
@@ -46,6 +47,7 @@ continue-decision-prompt.md
 core/command/command.d.ts
 core/command/confirm.d.ts
 core/command/index.d.ts
+core/command/lazy.d.ts
 core/command/registry-types.d.ts
 core/command/running.d.ts
 core/command/spends.d.ts
@@ -127,6 +129,9 @@ index-<hash>.js
 index-<hash>.js
 index-<hash>.js
 index-<hash>.js
+index-<hash>.js
+index-<hash>.js
+index-<hash>.js
 index.js
 learning/index.js
 plan-prompt.md
@@ -142,6 +147,7 @@ ports/log-level.d.ts
 ports/spec-review.d.ts
 pr/checks.d.ts
 pr/types.d.ts
+ready-<hash>.js
 release-templates/release-bot-fragment.yml
 release-templates/release-publish.yml
 release-templates/release-settle.yml

@@ -92,7 +92,7 @@ describe('the dispatcher\'s start', () => {
     restoreAdapters(createAdapterRegistry());
 
     expect(() => CORE_ADAPTER_REGISTRY.resolve('logger', 'console')).toThrow(
-      /adapter registry: no adapter is registered: import src\/adapter-registry\.ts/,
+      /adapter registry: no adapter is registered: call registerCoreAdapters\(\) from src\/adapter-registry\.ts/,
     );
   });
 });
