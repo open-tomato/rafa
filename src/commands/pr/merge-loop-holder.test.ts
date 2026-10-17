@@ -26,8 +26,6 @@
 import type { MergeSeams } from './merge.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
