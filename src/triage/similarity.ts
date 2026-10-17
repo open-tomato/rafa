@@ -45,11 +45,39 @@
  * scoring the same keep the order the tracker listed them in. The caller
  * takes the first for a match at its threshold and the first few for a
  * `Possible duplicates` section.
+ *
+ * ## The ranked list
+ *
+ * {@link rankedCandidates} ranks the open bugs for the `Possible
+ * duplicates` list a reader sees; the same-bug decision stays with
+ * {@link nearestOpenBugs}. A bug's rank is its word score plus each bonus
+ * that applies, capped at 1, each bonus weighed by its
+ * {@link SimilarityWeights} entry, where `0` turns the signal off:
+ *
+ * - `cause`: both causes are the same full code.
+ * - `cause-family`: the two causes are of the same family
+ *   (`familyOf`) with different leaves.
+ * - `boundary`: both modules are equal and both actions are equal, with
+ *   none of the four `unknown` (`UNKNOWN_VALUE`).
+ *
+ * A bonus counts only when both records carry the field: a null field, or
+ * no record for the new bug at all, earns none, and a cause whose leaf is
+ * `new-context` (`NEW_CONTEXT_LEAF`), `unknown:new-context` included,
+ * earns neither cause bonus. The open bug's record is its body read by
+ * `parseBugRecord`. The test-file guard drops a bug as it does for the
+ * nearest bugs, a rank of 0 is left out, and equal ranks keep the order
+ * the tracker listed the bugs in.
  */
+import type { BugRecord } from '../bugs/record.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename } from 'node:path';
+
+import { familyOf, NEW_CONTEXT_LEAF } from '@open-tomato/rafa/errors/codes';
+
+import { parseBugRecord } from '../bugs/record.js';
+import { UNKNOWN_VALUE } from '../bugs/title.js';
 
 import { strippedText } from './bug-key.js';
 import { testFailureOf, testFilesIn } from './test-failure.js';
@@ -72,6 +100,33 @@ export interface ScoredIssue {
   /** Its Jaccard score against the report, above 0 and at most 1. */
   readonly score: number;
 }
+
+/** How much each bonus adds to a rank, each from 0 to 1; `0` turns its signal off. */
+export interface SimilarityWeights {
+  /** Both causes are the same full code. */
+  readonly causeLeaf: number;
+  /** Both causes are of the same family, with different leaves. */
+  readonly causeFamily: number;
+  /** Both modules and both actions are equal, none `unknown`. */
+  readonly boundary: number;
+}
+
+/** A signal that contributed to a rank. */
+export type MatchedSignal = 'words' | 'cause' | 'cause-family' | 'boundary';
+
+/** One open bug of the ranked list; see the module note. */
+export interface RankedIssue {
+  readonly issue: OpenIssue;
+  /** Its rank: the word score plus each bonus that applies, above 0 and capped at 1. */
+  readonly score: number;
+  /** Its Jaccard word score alone, from 0 to 1. */
+  readonly words: number;
+  /** The signals that contributed to the rank, in {@link MatchedSignal} order. */
+  readonly matched: readonly MatchedSignal[];
+}
+
+/** The fields of a record the bonuses read. */
+type RankedFields = Pick<BugRecord, 'cause' | 'module' | 'action'>;
 
 /** The word set of `text`; see the module note. */
 export function wordSetOf(text: string): ReadonlySet<string> {
@@ -167,4 +222,87 @@ export function nearestOpenBugs(report: ComparedText, openBugs: readonly OpenIss
   });
   // Array.prototype.sort is stable, so equal scores keep the tracker's order.
   return [...scored].sort((a, b) => b.score - a.score);
+}
+
+/** The cause a cause bonus reads, or null for none or a `new-context` leaf. */
+function codedCause(cause: string | null): string | null {
+  return cause === null || cause.endsWith(`:${NEW_CONTEXT_LEAF}`)
+    ? null
+    : cause;
+}
+
+/** The cause signal two records share, or null when neither cause bonus applies. */
+function causeSignalOf(a: RankedFields, b: RankedFields): 'cause' | 'cause-family' | null {
+  const first = codedCause(a.cause);
+  const second = codedCause(b.cause);
+  if (first === null || second === null) return null;
+  if (first === second) return 'cause';
+  const bothCoded = first.includes(':') && second.includes(':');
+  return bothCoded && familyOf(first) === familyOf(second)
+    ? 'cause-family'
+    : null;
+}
+
+/** True for a module or action a boundary bonus reads: present and not `unknown`. */
+function isKnownBoundary(value: string | null): value is string {
+  return value !== null && value !== UNKNOWN_VALUE;
+}
+
+/** True when both records name the same known module and the same known action. */
+function sharesBoundary(a: RankedFields, b: RankedFields): boolean {
+  const known = [a.module, a.action, b.module, b.action].every(isKnownBoundary);
+  return known && a.module === b.module && a.action === b.action;
+}
+
+/** The bonus signals two records share, each with its weight above 0, in {@link MatchedSignal} order. */
+function bonusesOf(
+  record: RankedFields | undefined,
+  other: RankedFields,
+  weights: SimilarityWeights,
+): { readonly signal: MatchedSignal; readonly weight: number }[] {
+  if (record === undefined) return [];
+  const cause = causeSignalOf(record, other);
+  const causeWeight = cause === 'cause'
+    ? weights.causeLeaf
+    : weights.causeFamily;
+  const causeBonus = cause === null
+    ? []
+    : [{ signal: cause, weight: causeWeight }];
+  const boundaryBonus = sharesBoundary(record, other)
+    ? [{ signal: 'boundary' as const, weight: weights.boundary }]
+    : [];
+  return [...causeBonus, ...boundaryBonus].filter(({ weight }) => weight > 0);
+}
+
+/**
+ * The open bugs ranked for the `Possible duplicates` list, highest rank
+ * first, ties in the order `openBugs` lists them, skipping each the
+ * test-file guard refuses and each ranked 0. `record` is the new bug's,
+ * or undefined when it was filed without one; see the module note.
+ */
+export function rankedCandidates(
+  report: ComparedText,
+  record: BugRecord | undefined,
+  openBugs: readonly OpenIssue[],
+  weights: SimilarityWeights,
+): RankedIssue[] {
+  const reportWords = reportWordsOf(report);
+  const reportFile = testFileOf(report);
+  const ranked = openBugs.flatMap((issue): RankedIssue[] => {
+    const text = issueTextOf(issue.body);
+    if (namesOtherTestFile(reportFile, testFileOf(text))) return [];
+    const words = jaccard(reportWords, reportWordsOf(text));
+    const bonuses = bonusesOf(record, parseBugRecord(issue.body), weights);
+    const sum = bonuses.reduce((total, { weight }) => total + weight, words);
+    const score = Math.min(1, sum);
+    const wordSignal: MatchedSignal[] = words > 0
+      ? ['words']
+      : [];
+    const matched = [...wordSignal, ...bonuses.map(({ signal }) => signal)];
+    return score > 0
+      ? [{ issue, score, words, matched }]
+      : [];
+  });
+  // Array.prototype.sort is stable, so equal ranks keep the tracker's order.
+  return [...ranked].sort((a, b) => b.score - a.score);
 }
