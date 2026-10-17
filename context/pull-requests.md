@@ -496,7 +496,7 @@ rejected.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. SEVEN routes ask the question. Two are
+someone allowed to change the repo. EIGHT routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
 the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
@@ -537,6 +537,15 @@ which amends the issue body in place. It gates on two ownership checks
 through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
 answers) and whose issue (the issue's author). A lookup that fails refuses
 as `ownership-unknown`, exit 2, before the issue is written.
+
+The EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), which
+runs the test a bug's `Rerun` section names. It IGNORES rather than
+refuses: it asks `readBoardTrust` about the bug's author once per login,
+only for a bug whose reference is runnable and on any tracker but `local`,
+which holds no accounts. An untrusted author is a `skipped` row whose
+reason is "opened by <login>, " and `trustRefusalClause`'s clause; an
+author the tracker does not name is `skipped` with no lookup. Nothing is
+spawned for either, and the exit code stays 0.
 
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`
