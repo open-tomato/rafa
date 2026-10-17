@@ -22,8 +22,6 @@ import type { ReleaseWorkflowsResult, WorkflowRow } from './workflows.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
