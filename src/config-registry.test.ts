@@ -95,6 +95,7 @@ const PACKAGES = [
   'board-project',
   'triage',
   'errors',
+  'bugs',
   'logger',
   'issues',
   'tests',
@@ -155,6 +156,9 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['claimsAhead', 'claims.ahead'],
   ['triageSimilarityThreshold', 'triage.similarity.threshold'],
   ['triageSimilarityCandidates', 'triage.similarity.candidates'],
+  ['triageSimilarityWeightsCauseLeaf', 'triage.similarity.weights.causeLeaf'],
+  ['triageSimilarityWeightsCauseFamily', 'triage.similarity.weights.causeFamily'],
+  ['triageSimilarityWeightsBoundary', 'triage.similarity.weights.boundary'],
   ['releaseEnabled', 'release.enabled'],
   ['releaseVersionFile', 'release.versionFile'],
   ['releaseChangelog', 'release.changelog'],
@@ -164,8 +168,11 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['releasePublish', 'release.publish'],
   ['releaseMoveLock', 'release.moveLock'],
   ['errorsCodes', 'errors.codes'],
+  ['bugsRecheckRuns', 'bugs.recheck.runs'],
+  ['bugsRecheckTimeoutSeconds', 'bugs.recheck.timeoutSeconds'],
   ['loggerKind', 'logger.kind'],
   ['loggerLevel', 'logger.level'],
   ['loggerTheme', 'logger.theme'],
@@ -234,6 +241,7 @@ const TOP = [
   'triage',
   'release',
   'errors',
+  'bugs',
   'logger',
   'issues',
   'cleanup',
@@ -348,6 +356,7 @@ describe('the registration the preload made', () => {
         'triage',
         'release',
         'errors',
+        'bugs',
         'logger',
         'issues',
         'core',
@@ -541,6 +550,8 @@ describe('SECTIONS', () => {
     expect([...SECTIONS].sort()).toEqual([
       'board',
       'board.project',
+      'bugs',
+      'bugs.recheck',
       'checks',
       'claims',
       'cleanup',
@@ -577,6 +588,7 @@ describe('SECTIONS', () => {
       'tracking',
       'triage',
       'triage.similarity',
+      'triage.similarity.weights',
     ]);
     expect(SECTIONS.has('modules')).toBe(false);
   });
@@ -611,6 +623,7 @@ describe('knownKeysAbove', () => {
         'settle',
         'tag',
         'publishCommand',
+        'publish',
         'moveLock',
       ],
     ]);
@@ -637,9 +650,15 @@ describe('knownKeysAbove', () => {
     expect(knownKeysAbove('task.resolver')).toEqual(['task', ['skills', 'lessons']]);
     expect(knownKeysAbove('triage.similarity.thresholds')).toEqual([
       'triage.similarity',
-      ['threshold', 'candidates'],
+      ['threshold', 'candidates', 'weights'],
+    ]);
+    expect(knownKeysAbove('triage.similarity.weights.cause')).toEqual([
+      'triage.similarity.weights',
+      ['causeLeaf', 'causeFamily', 'boundary'],
     ]);
     expect(knownKeysAbove('triage.nearest')).toEqual(['triage', ['similarity']]);
+    expect(knownKeysAbove('bugs.recheck.run')).toEqual(['bugs.recheck', ['runs', 'timeoutSeconds']]);
+    expect(knownKeysAbove('bugs.rerun')).toEqual(['bugs', ['recheck']]);
   });
 
   it('answers the tiers section for a map name spelled flat, which no setting reads', () => {

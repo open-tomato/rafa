@@ -22,8 +22,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createGitRunner } from '../pr/index.js';
 
 import {
+  CLAIM_BRANCH_GLOB,
   CLAIM_REFSPEC,
+  claimBranchGlob,
   claimBranchIssue,
+  claimRefspec,
   fetchClaimBranches,
   makeOwnershipCommit,
   pushNewClaimBranch,
@@ -35,6 +38,10 @@ import { formatClaimMessage, parseClaimMessage } from './record.js';
 
 /** The claim branch most cases race for. */
 const BRANCH = 'feat/rafa-7-claim-race';
+
+/** A `naming.branch` template other than the default, and a claim branch only it names. */
+const WORK_TEMPLATE = 'work/{stub}';
+const WORK_BRANCH = 'work/rafa-7-x';
 
 /** The store ids the two devices claim under. */
 const STORE_A = 'store-a';
@@ -166,6 +173,100 @@ describe('claimBranchIssue', () => {
     for (const branch of ['main', 'feat/other', 'feat/rafa-', 'feat/rafa-0-x', 'feat/rafa-x-1', 'lost/rafa-7-x', 'feat/rafa-7-']) {
       expect(claimBranchIssue(branch)).toBeNull();
     }
+  });
+});
+
+describe('the claim glob and refspec', () => {
+  it('keeps the default template\'s values, spelled out', () => {
+    expect(CLAIM_BRANCH_GLOB).toBe('feat/rafa-*');
+    expect(CLAIM_REFSPEC).toBe('+refs/heads/feat/rafa-*:refs/remotes/origin/feat/rafa-*');
+  });
+
+  it('reads another template\'s glob and refspec off the template', () => {
+    expect(claimBranchGlob(WORK_TEMPLATE)).toBe('work/rafa-*');
+    expect(claimRefspec(WORK_TEMPLATE)).toBe('+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+  });
+});
+
+describe('claimBranchIssue under a template', () => {
+  it('reads the issue off a branch the template names, and only that template', () => {
+    expect(claimBranchIssue(WORK_BRANCH, WORK_TEMPLATE)).toBe(7);
+    expect(claimBranchIssue('work/rafa-9', WORK_TEMPLATE)).toBe(9);
+    expect(claimBranchIssue('feat/rafa-7-x', WORK_TEMPLATE)).toBeNull();
+    // The control: the same branch with the template left out is no claim branch.
+    expect(claimBranchIssue(WORK_BRANCH)).toBeNull();
+  });
+
+  it('answers null for a stub the template frames but that names no issue', () => {
+    for (const branch of ['work/rafa-', 'work/rafa-0-x', 'work/rafa-x-1', 'work/rafa-7-', 'work/other']) {
+      expect(claimBranchIssue(branch, WORK_TEMPLATE)).toBeNull();
+    }
+  });
+});
+
+describe('the claim operations under a template', () => {
+  it('fetches and reads a claim branch only the template names, with the template\'s refspec', () => {
+    const trio = plantTrio('template-read');
+    const claim = claimOn(trio.b, STORE_B);
+    must(trio.b, ['push', '--quiet', 'origin', `${claim}:refs/heads/${WORK_BRANCH}`]);
+    const calls: string[][] = [];
+    const git = recording(trio.a, calls);
+
+    expect(fetchClaimBranches(git, WORK_TEMPLATE)).toEqual({ ok: true });
+    const reading = foundOf(readClaimBranch(git, WORK_BRANCH, WORK_TEMPLATE));
+
+    expect(reading.tip).toBe(claim);
+    expect(reading.ownership).toEqual({ state: 'held', owner: STORE_B, pending: null, ignored: [] });
+    expect(calls.filter((call) => call[0] === 'fetch')).toEqual([
+      ['fetch', '--quiet', '--prune', '--no-tags', 'origin', '+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*'],
+    ]);
+  });
+
+  it('does not read the same branch with the template left out: the fetch skips it and the read refuses it', () => {
+    const trio = plantTrio('template-control');
+    must(trio.b, ['push', '--quiet', 'origin', `${claimOn(trio.b, STORE_B)}:refs/heads/${WORK_BRANCH}`]);
+
+    expect(fetchClaimBranches(trio.a)).toEqual({ ok: true });
+
+    expect(trio.a(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${WORK_BRANCH}`]).ok).toBe(false);
+    expect(() => readClaimBranch(trio.a, WORK_BRANCH)).toThrow('is not a feat/rafa-* branch');
+    // The fetch under the template does write the ref the default left unwritten.
+    fetchClaimBranches(trio.a, WORK_TEMPLATE);
+    expect(trio.a(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${WORK_BRANCH}`]).ok).toBe(true);
+  });
+
+  it('reads a local claim branch under the template, and refuses it without', () => {
+    const trio = plantTrio('template-local');
+    const claim = claimOn(trio.a, STORE_A);
+    must(trio.a, ['update-ref', `refs/heads/${WORK_BRANCH}`, claim]);
+
+    expect(foundOf(readLocalClaimBranch(trio.a, WORK_BRANCH, WORK_TEMPLATE)).tip).toBe(claim);
+    expect(() => readLocalClaimBranch(trio.a, WORK_BRANCH)).toThrow('is not a feat/rafa-* branch');
+  });
+
+  it('pushes a claim and an ownership commit under the template, and names the holder of a lost race', () => {
+    const trio = plantTrio('template-push');
+    const winner = claimOn(trio.a, STORE_A);
+    const loser = claimOn(trio.b, STORE_B);
+
+    expect(pushNewClaimBranch(trio.a, winner, WORK_BRANCH, WORK_TEMPLATE)).toEqual({ outcome: 'pushed' });
+    const lost = pushNewClaimBranch(trio.b, loser, WORK_BRANCH, WORK_TEMPLATE);
+    expect(foundOf(holderOf(lost)).ownership).toEqual({ state: 'held', owner: STORE_A, pending: null, ignored: [] });
+    const release = makeOwnershipCommit(trio.a, winner, { action: 'release', issue: 7, store: STORE_A });
+    if (!release.ok) throw new Error(release.reason);
+    expect(pushOwnershipCommit(trio.a, release.sha, WORK_BRANCH, winner, WORK_TEMPLATE)).toEqual({ outcome: 'pushed' });
+    expect(remoteTip(trio, WORK_BRANCH)).toBe(release.sha);
+  });
+
+  it('refuses both pushes on the template\'s branch with the template left out, before running git', () => {
+    const calls: string[][] = [];
+    const git = answering({ ok: true, stdout: '', stderr: '' }, calls);
+    const sha = 'd'.repeat(40);
+
+    expect(() => pushNewClaimBranch(git, sha, WORK_BRANCH)).toThrow('is not a feat/rafa-* branch');
+    expect(() => pushOwnershipCommit(git, sha, WORK_BRANCH, sha)).toThrow('is not a feat/rafa-* branch');
+    expect(() => pushNewClaimBranch(git, sha, BRANCH, WORK_TEMPLATE)).toThrow('is not a work/rafa-* branch');
+    expect(calls).toEqual([]);
   });
 });
 

@@ -23,8 +23,10 @@
  */
 import type { SettlePlace } from './settle-step.js';
 import type { NextActionId } from './state.js';
+import type { SettleWaiting } from '../pr/settle-waiting.js';
 import type { Fragment } from '../release/fragment.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { ReleaseMove } from '../release/release-move.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,6 +37,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../pr/index.js';
 import { serializeFragment } from '../release/fragment.js';
+import { moveSpelling } from '../release/release-move.js';
 
 import { actionInvocation, NEXT_COMMAND_ACTIONS } from './actions.js';
 import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from './ceiling.js';
@@ -48,6 +51,14 @@ import {
   settleReaderFor,
   settleState,
 } from './settle-step.js';
+
+const MOVES: readonly ReleaseMove[] = [
+  { package: null, dir: '.', from: '0.4.0', to: '0.5.0' },
+  { package: '@scope/plugin', dir: 'packages/plugin', from: '0.1.0', to: '0.2.0' },
+];
+
+/** The two moves spelled as `settleWaitingOn` spells them: the root's bare, the package's `<name>@<version>`. */
+const TWO_MOVES: SettleWaiting = { base: 'main', fragments: 2, version: MOVES.map(moveSpelling).join(', ') };
 
 /** Every action id a state can carry, spelled out. */
 const EVERY_ACTION: readonly NextActionId[] = [
@@ -100,6 +111,14 @@ describe('the state the settle step answers', () => {
   it('says several fragments in the plural', () => {
     expect(settleState({ base: 'trunk', fragments: 3, version: '2.0.0' }).reading)
       .toBe('3 fragments wait on `trunk` and fold into 2.0.0');
+  });
+
+  it('names a root move and a package move in the reading and the proposal', () => {
+    const state = settleState(TWO_MOVES);
+
+    expect(TWO_MOVES.version).toBe('0.5.0, @scope/plugin@0.2.0');
+    expect(state.reading).toBe('2 fragments wait on `main` and fold into 0.5.0, @scope/plugin@0.2.0');
+    expect(state.proposal).toBe('settle the fragments on `main` into 0.5.0, @scope/plugin@0.2.0');
   });
 
   it('is proposed as rafa release settle with no words, and asked over its proposal', () => {
@@ -189,7 +208,7 @@ describe('settleReaderFor, over a planted base', () => {
     mkdirSync(join(root, '.changes'), { recursive: true });
     levels.forEach((level, index) => {
       const plan = `rafa-${String(index + 1)}`;
-      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], notes: ['- loop: a change'] };
+      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], package: null, notes: ['- loop: a change'] };
       writeFileSync(join(root, '.changes', `${plan}.md`), serializeFragment(fragment));
     });
     runGit(root, 'init', '--quiet', '--initial-branch=main');

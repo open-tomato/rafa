@@ -336,7 +336,7 @@ function fragmentFor(
     : stampedNotes;
   const taken = commits.flatMap((commit) => fragmentNamesAt(git, commit, settings.releaseFragments));
   const fragmentPath = posix.join(directoryPrefix(settings.releaseFragments), allocateFragmentName(plan, taken));
-  return { plan, fragmentPath, fragmentText: serializeFragment({ plan, title, level, notes }) };
+  return { plan, fragmentPath, fragmentText: serializeFragment({ plan, title, level, package: null, notes }) };
 }
 
 /**

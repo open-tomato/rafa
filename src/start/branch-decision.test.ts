@@ -40,7 +40,6 @@ import {
   anyBranchStandsAside,
   branchNameFor,
   branchSteps,
-  BRANCH_PREFIX,
   detachedHeadRefusal,
   hasDiverged,
   localRef,
@@ -129,8 +128,12 @@ const FF_FATAL = 'hint: Diverging branches can\'t be fast-forwarded, you need to
   + 'fatal: Not possible to fast-forward, aborting.';
 
 describe('the branch a plan runs on', () => {
-  it('is feat/ and the stub, and the refs it is read at', () => {
-    expect(BRANCH_PREFIX).toBe('feat/');
+  it('is feat/ and the stub, and the refs it is read at', async () => {
+    // No fixed prefix is exported: every reader takes the naming.branch template.
+    const decision = await import('./branch-decision.js');
+    expect('BRANCH_PREFIX' in decision).toBe(false);
+    // The control: the same reading finds a name the module does export.
+    expect('REMOTE' in decision).toBe(true);
     expect(branchNameFor('rafa-49')).toBe('feat/rafa-49');
     expect(localRef('feat/rafa-49')).toBe('refs/heads/feat/rafa-49');
     expect(remoteTrackingRef('feat/rafa-49')).toBe('refs/remotes/origin/feat/rafa-49');
@@ -141,7 +144,7 @@ describe('the branch a plan runs on', () => {
     expect(branchNameFor('rafa-49', 'work/{stub}')).toBe('work/rafa-49');
     expect(branchNameFor('rafa-49', '{stub}-wip')).toBe('rafa-49-wip');
     // The control: the default template is the prefix and the stub.
-    expect(branchNameFor('rafa-49', 'feat/{stub}')).toBe(`${BRANCH_PREFIX}rafa-49`);
+    expect(branchNameFor('rafa-49', 'feat/{stub}')).toBe('feat/rafa-49');
   });
 });
 

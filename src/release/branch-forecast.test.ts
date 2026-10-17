@@ -4,7 +4,10 @@
  *
  * The git runner is scripted and records its argv, so a case pins that
  * the base version is read at the COMMIT step 1 read the waiting
- * fragments at, not at the ref, which could have moved. The fold is the
+ * fragments at, not at the ref, which could have moved. A second,
+ * path-answering runner plants a workspace at that commit, so a package
+ * slot is pinned to fold from its member's manifest while the root slot
+ * on the same tree folds from `release.versionFile`. The fold is the
  * real `semver-by-level` strategy, so a forecast here is the answer
  * settle would give over the same tree.
  */
@@ -13,9 +16,18 @@ import type { TreeFragment } from './fragment-tree.js';
 import type { Fragment } from './fragment.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { ReleaseVerified } from './verify.js';
-import type { GitResult } from '@open-tomato/rafa/core/git';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import { describe, expect, it } from 'bun:test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
+import { afterAll, describe, expect, it } from 'bun:test';
+
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   bodyWithRelease,
@@ -25,7 +37,9 @@ import {
   releaseBodyBlock,
   releaseBodyLines,
 } from './branch-forecast.js';
+import { readFragmentTree } from './fragment-tree.js';
 import { parseFragment, serializeFragment } from './fragment.js';
+import { readGuard } from './guard.js';
 
 const COMMIT = 'c'.repeat(40);
 const SETTINGS = {
@@ -35,7 +49,7 @@ const SETTINGS = {
 } as const;
 
 /** The branch's fragment, as step 3 verified it. */
-const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', notes: ['- loop: a fix'] };
+const OURS: Fragment = { plan: 'rafa-21', title: 'the branch', level: 'patch', package: null, notes: ['- loop: a fix'] };
 
 /** A fragment waiting on the base, parsed as the tree reader parses one. */
 function waiting(id: string, fragment: Fragment, addedOn = '2026-09-18'): TreeFragment {
@@ -91,6 +105,31 @@ function gitAnswering(answer: GitResult): { readonly run: (args: readonly string
 const MANIFEST: GitResult = { ok: true, stdout: '{"name":"x","version":"0.25.0"}\n', stderr: '' };
 const NOW = new Date('2026-09-20T23:30:00Z');
 
+/** A planted base: a root manifest at 0.25.0 with one member, `@scope/plugin`, at 3.1.0. */
+const PLANTED: Readonly<Record<string, string>> = {
+  'package.json': '{"name":"x","version":"0.25.0","workspaces":["packages/*"]}\n',
+  'packages/plugin/package.json': '{"name":"@scope/plugin","version":"3.1.0"}\n',
+};
+
+/** A runner answering `git show` and `git ls-tree` over `files` at {@link COMMIT}, recording the argv. */
+function gitOver(files: Readonly<Record<string, string>>): { readonly run: GitRunner; readonly argv: string[] } {
+  const argv: string[] = [];
+  const run: GitRunner = (args) => {
+    argv.push(args.join(' '));
+    if (args[0] === 'show') {
+      const text = files[(args[1] ?? '').slice(`${COMMIT}:`.length)];
+      return text === undefined || !(args[1] ?? '').startsWith(`${COMMIT}:`)
+        ? { ok: false, stdout: '', stderr: `fatal: invalid object name '${args[1] ?? ''}'.` }
+        : { ok: true, stdout: text, stderr: '' };
+    }
+    if (args[0] === 'ls-tree' && args.at(-1) === COMMIT) {
+      return { ok: true, stdout: `${Object.keys(files).join('\0')}\0`, stderr: '' };
+    }
+    return { ok: false, stdout: '', stderr: `fatal: unscripted git ${args.join(' ')}` };
+  };
+  return { run, argv };
+}
+
 describe('readBranchForecast', () => {
   it('reads the base version at step 1 commit, without a leading ./', () => {
     const git = gitAnswering(MANIFEST);
@@ -102,7 +141,7 @@ describe('readBranchForecast', () => {
 
   it('folds the waiting fragments then the branch, and ships the batch level', () => {
     const git = gitAnswering(MANIFEST);
-    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', notes: ['- cli: new'] })];
+    const queue = [waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] })];
 
     const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(), now: NOW });
 
@@ -122,6 +161,77 @@ describe('readBranchForecast', () => {
     const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(), now: NOW });
 
     expect(read.ok && read.forecast.kind === 'ships' && read.forecast.version).toBe('0.25.1');
+  });
+
+  it('holds a waiting package fragment out of the root forecast, and folds a waiting root fragment', () => {
+    const git = gitAnswering(MANIFEST);
+    const queue = [
+      waiting('rafa-18', { plan: 'rafa-18', title: 'plugin major', level: 'major', package: '@scope/plugin', notes: ['- plugin: break'] }),
+      waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] }),
+    ];
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.waiting).toEqual(['rafa-19']);
+    expect(read.forecast.version).toBe('0.26.0');
+    expect(read.forecast.section).toContain('<!-- rafa:fragments rafa-19 rafa-21 -->');
+    expect(read.problems).toEqual([]);
+  });
+
+  it('folds the waiting fragments of the branch fragment\'s own package, the control beside the root case', () => {
+    const git = gitOver(PLANTED);
+    const ours: Fragment = { ...OURS, package: '@scope/plugin' };
+    const queue = [
+      waiting('rafa-18', { plan: 'rafa-18', title: 'plugin major', level: 'major', package: '@scope/plugin', notes: ['- plugin: break'] }),
+      waiting('rafa-19', { plan: 'rafa-19', title: 'waiting minor', level: 'minor', package: null, notes: ['- cli: new'] }),
+    ];
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver(queue), verified: verified(ours), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.waiting).toEqual(['rafa-18']);
+    expect(read.forecast.version).toBe('4.0.0');
+  });
+
+  it('folds a package slot from the member manifest version at step 1 commit', () => {
+    const git = gitOver(PLANTED);
+    const ours: Fragment = { ...OURS, package: '@scope/plugin' };
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(ours), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.baseVersion).toBe('3.1.0');
+    expect(read.forecast.version).toBe('3.1.1');
+    expect(git.argv).toContain(`show ${COMMIT}:packages/plugin/package.json`);
+  });
+
+  it('folds a root slot on the same planted base from release.versionFile (control)', () => {
+    const git = gitOver(PLANTED);
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(), now: NOW });
+
+    if (!read.ok || read.forecast.kind !== 'ships') throw new Error(`expected a shipping forecast, got ${JSON.stringify(read)}`);
+    expect(read.baseVersion).toBe('0.25.0');
+    expect(read.forecast.version).toBe('0.25.1');
+    expect(git.argv).toEqual([`show ${COMMIT}:package.json`]);
+  });
+
+  it('answers no forecast with the guard\'s sentence for a package absent from the base', () => {
+    const git = gitOver(PLANTED);
+    const ours: Fragment = { ...OURS, package: '@scope/absent' };
+
+    const read = readBranchForecast({ git: git.run, settings: SETTINGS, prepared: preparedOver([]), verified: verified(ours), now: NOW });
+
+    expect(read).toEqual({
+      ok: false,
+      ref: 'origin/main',
+      problem: 'origin/main\'s workspace holds no package @scope/absent, so no forecast was folded',
+      problems: [],
+    });
+    expect(forecastLine(read)).toBe(
+      'Release forecast: none computed, because origin/main\'s workspace holds no package @scope/absent, so no forecast was folded',
+    );
   });
 
   it('leaves a waiting fragment that does not parse out of the fold and names it', () => {
@@ -178,6 +288,88 @@ describe('readBranchForecast', () => {
     });
 
     expect(read.ok && read.forecast.kind === 'ships' && read.forecast.section).toContain('<!-- rafa:fragments rafa-21-2 -->');
+  });
+});
+
+/** A temporary directory of this file's own, for the one real repository. */
+const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-branch-forecast-')));
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
+
+describe('the body and the guard over one real repository', () => {
+  it('forecast 0.3.0 from the plugin\'s own 0.2.0, not the root\'s 0.24.0, in the same sentence', () => {
+    const home = join(tempBase, 'home');
+    const repo = join(tempBase, 'repo');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(repo, { recursive: true });
+    const git = (args: readonly string[]): string => execFileSync('git', [...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        HOME: home,
+        GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+        GIT_CONFIG_NOSYSTEM: '1',
+        ...gitIdentityEnv(),
+        GIT_AUTHOR_DATE: '2026-09-01T12:00:00Z',
+        GIT_COMMITTER_DATE: '2026-09-01T12:00:00Z',
+        LC_ALL: 'C',
+      },
+    }).trim();
+    const commit = (files: Readonly<Record<string, string>>, message: string): string => {
+      for (const [path, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(repo, path)), { recursive: true });
+        writeFileSync(join(repo, path), text, 'utf8');
+      }
+      git(['add', '-A']);
+      git(['commit', '-q', '--no-verify', '-m', message]);
+      return git(['rev-parse', 'HEAD']);
+    };
+    git(['init', '-q', '--initial-branch=main', '.']);
+    const baseCommit = commit({
+      'package.json': '{"name":"demo","version":"0.24.0","workspaces":["packages/*"]}\n',
+      'packages/plugin/package.json': '{"name":"@scope/plugin","version":"0.2.0"}\n',
+      '.changes/.gitkeep': '',
+    }, 'base');
+    git(['switch', '-q', '-c', 'feat/1192']);
+    const fragment: Fragment = { plan: 'rafa-1192', title: 'plugin feature', level: 'minor', package: '@scope/plugin', notes: ['- plugin: new'] };
+    commit({ '.changes/rafa-1192.md': serializeFragment(fragment) }, 'feat: plugin fragment');
+    const runner = createGitRunner(repo);
+    const settings = {
+      releaseVersionFile: 'package.json',
+      releaseChangelog: 'CHANGELOG.md',
+      releaseFragments: '.changes',
+      releaseStrategy: 'semver-by-level',
+      releaseHeading: '## {version} — {date}, {title}',
+      releaseMoveLock: false,
+    } as const;
+    const now = new Date('2026-09-29T12:00:00Z');
+
+    const guard = readGuard({ git: runner, settings, base: 'main', branch: { ref: 'feat/1192', name: 'feat/1192', pullRequest: null }, now });
+    const tree = readFragmentTree(runner, baseCommit, '.changes');
+    if (!tree.ok) throw new Error(`tree not read: ${tree.problem}`);
+    const body = readBranchForecast({
+      git: runner,
+      settings,
+      prepared: { ...preparedOver(tree.fragments), base: { ref: 'main', commit: baseCommit, waiting: tree.fragments } },
+      verified: verified(fragment, '.changes/rafa-1192.md'),
+      now,
+    });
+
+    if (!guard.ok) throw new Error(`guard not read: ${guard.problem}`);
+    const guardForecast = guard.forecast;
+    if (guardForecast === null || !guardForecast.ok || guardForecast.forecast.kind !== 'ships') {
+      throw new Error(`expected a shipping guard forecast, got ${JSON.stringify(guardForecast)}`);
+    }
+    if (!body.ok || body.forecast.kind !== 'ships') throw new Error(`expected a shipping body forecast, got ${JSON.stringify(body)}`);
+    expect(guardForecast.baseVersion).toBe('0.2.0');
+    expect(body.baseVersion).toBe('0.2.0');
+    expect(guardForecast.forecast.version).toBe('0.3.0');
+    expect(body.forecast.version).toBe('0.3.0');
+    expect(body.forecast.sentence).toBe(guardForecast.forecast.sentence);
+    expect(body.forecast.sentence).toContain('0.3.0');
   });
 });
 

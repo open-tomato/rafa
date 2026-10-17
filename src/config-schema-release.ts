@@ -115,16 +115,25 @@
  *     one write of the tag, and `settle` has settle put it on the
  *     commit it pushes.
  *
- * One more `release` setting is text rafa prints and never runs:
+ * One more `release` setting is text `rafa release tag` prints and
+ * `rafa release publish` runs:
  *
  *   - `release.publishCommand` defaults to `npm publish`, the command
- *     `rafa release tag` names for the publish after the tag. It is free
+ *     `rafa release tag` names for the publish after the tag and
+ *     `rafa release publish` runs in each tagged unit's folder. It is free
  *     text, so a project that publishes with another tool, or with a
  *     flag such as `--tag next`, says so here. It was read off the
  *     manifest's `packageManager` field until 2026-09-30, which named
  *     `bun publish` for this repository while its releases are
  *     published with `npm publish`: the tool a project installs with is
  *     not the tool it publishes with.
+ *
+ * One more `release` setting says who publishes a tagged version:
+ *
+ *   - `release.publish` defaults to `manual`: a person runs the publish
+ *     after the tag. `ci` says the pushed tag publishes through the
+ *     project's CI workflow instead. It is the third key the release
+ *     ladder is read off, beside `release.settle` and `release.tag`.
  *
  * One more `release` setting is for the repository that releases rafa:
  *
@@ -152,6 +161,7 @@ import type {
   PrProvider,
   Reader,
   ReleaseEnabled,
+  ReleasePublishMode,
   ReleaseSettleMode,
   ReleaseStrategy,
   ReleaseTagMode,
@@ -166,6 +176,7 @@ import {
   RELEASE_AUTO,
   releaseEnabled,
   releaseFile,
+  releasePublishMode,
   releaseSettleMode,
   releaseStrategy,
   releaseTagMode,
@@ -203,6 +214,7 @@ export interface ReleaseShape {
     readonly settle: ReleaseSettleMode;
     readonly tag: ReleaseTagMode;
     readonly publishCommand: string;
+    readonly publish: ReleasePublishMode;
     readonly moveLock: boolean;
   };
 }
@@ -272,8 +284,10 @@ export interface ReleaseSettings {
   releaseSettle: ReleaseSettleMode;
   /** Who tags a settled version. `release.tag`. */
   releaseTag: ReleaseTagMode;
-  /** The command `rafa release tag` prints for the publish, which it never runs. `release.publishCommand`. */
+  /** The command `rafa release tag` prints for the publish and `rafa release publish` runs. `release.publishCommand`. */
   releasePublishCommand: string;
+  /** Who publishes a tagged version: a person, or CI on the pushed tag. `release.publish`. */
+  releasePublish: ReleasePublishMode;
   /**
    * Whether settle also writes `rafa.lock` to the version it settles,
    * in the same release commit. `release.moveLock`.
@@ -310,6 +324,7 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  releasePublish: 'manual',
   releaseMoveLock: false,
 });
 
@@ -378,6 +393,7 @@ export const RELEASE_SETTINGS: {
     read: text('a publish command'),
     cli: false,
   },
+  releasePublish: { key: 'release.publish', read: releasePublishMode, cli: false },
   releaseMoveLock: { key: 'release.moveLock', read: flag, cli: false },
 };
 

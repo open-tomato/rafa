@@ -528,6 +528,7 @@ describe('resolveScope fallback rules', () => {
     const { message, cause } = refusal as ScopeError;
     expect(message).toBe(`rafa scope: cannot read the main checkout of /b/wt (${failure.message})`);
     expect(cause).toBe(failure);
+    expect(refusal).toMatchObject({ code: 'git:new-context', module: 'project', hint: null });
   });
 
   it('lets any other error of the seam through unwrapped', () => {

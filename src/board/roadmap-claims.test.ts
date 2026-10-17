@@ -94,15 +94,41 @@ describe('claimBranchOfRef', () => {
       'refs/heads/feat/rafa-20-pr-commands',
       'refs/remotes/origin/feat/rafa-20-pr-commands',
       'origin/feat/rafa-20',
-    ].map(claimBranchOfRef);
+    ].map((ref) => claimBranchOfRef(ref));
 
     expect(named).toEqual(['feat/rafa-20-pr-commands', 'feat/rafa-20-pr-commands', 'feat/rafa-20-pr-commands', 'feat/rafa-20']);
   });
 
   it('names nothing for a ref that is no claim branch', () => {
-    const named = ['refs/heads/main', 'feat/rafa-20x', 'feat/rafa-0-x', 'myfeat/rafa-2-x', 'fix/rafa-2-x'].map(claimBranchOfRef);
+    const named = ['refs/heads/main', 'feat/rafa-20x', 'feat/rafa-0-x', 'myfeat/rafa-2-x', 'fix/rafa-2-x'].map((ref) => claimBranchOfRef(ref));
 
     expect(named).toEqual([null, null, null, null, null]);
+  });
+
+  it('names the claim branch under work/{stub}, and the default template names none of it', () => {
+    const refs = ['origin/work/rafa-20-x', 'refs/remotes/origin/work/rafa-20-x', 'work/rafa-20'];
+
+    const named = refs.map((ref) => claimBranchOfRef(ref, 'work/{stub}'));
+    const control = refs.map((ref) => claimBranchOfRef(ref));
+
+    expect(named).toEqual(['work/rafa-20-x', 'work/rafa-20-x', 'work/rafa-20']);
+    expect(control).toEqual([null, null, null]);
+  });
+
+  it('names nothing under work/{stub} for a branch under the default template', () => {
+    const named = ['origin/feat/rafa-20-x', 'refs/heads/feat/rafa-20-x'].map((ref) => claimBranchOfRef(ref, 'work/{stub}'));
+
+    expect(named).toEqual([null, null]);
+  });
+
+  it('reads a template with a part after the stub, and none that does not hold the stub once', () => {
+    const named = [
+      claimBranchOfRef('refs/remotes/origin/team/rafa-20-x/wip', 'team/{stub}/wip'),
+      claimBranchOfRef('refs/remotes/origin/team/rafa-20-x', 'team/{stub}/wip'),
+      claimBranchOfRef('origin/feat/rafa-20-x', 'feat/rafa'),
+    ];
+
+    expect(named).toEqual(['team/rafa-20-x/wip', null, null]);
   });
 });
 
@@ -154,6 +180,26 @@ describe('createRemoteClaimReader', () => {
     expect(readings.map((reading) => reading?.state)).toEqual(['unreadable', 'unreadable']);
     expect(readings[0]?.state === 'unreadable' && readings[0].reason).toContain('fatal: unable to access origin');
     expect(git.calls().map((call) => call[0])).toEqual(['fetch']);
+  });
+
+  it('under work/{stub}, fetches the work/rafa-* branches and reads the claim as held', () => {
+    const git = scriptedGit({ messages: [claim] });
+    const read = createRemoteClaimReader(git.run, 'origin', ['refs/heads/main', 'refs/heads/work/rafa-33-board-setup'], 'work/{stub}');
+
+    const reading = read('work/rafa-33-board-setup');
+    const [fetch, ...reads] = git.calls();
+
+    expect(reading?.state === 'found' && reading.ownership).toEqual({ state: 'held', owner: 'store-a', pending: null, ignored: [] });
+    expect(fetch).toEqual(['fetch', '--quiet', '--prune', '--no-tags', 'origin', '+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*']);
+    expect(reads.map((call) => call[0])).toEqual(['rev-parse', 'log', 'log']);
+  });
+
+  it('with the template left out, answers null for the same work/ branch and fetches nothing', () => {
+    const git = scriptedGit({ messages: [claim] });
+    const read = createRemoteClaimReader(git.run, 'origin', ['refs/heads/main', 'refs/heads/work/rafa-33-board-setup']);
+
+    expect(read('work/rafa-33-board-setup')).toBeNull();
+    expect(git.calls()).toEqual([]);
   });
 });
 

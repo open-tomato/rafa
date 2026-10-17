@@ -26,9 +26,11 @@ function row(number: number, labels: readonly string[], body = '', state: BoardI
   return { number, title: `Issue ${String(number)}`, body, state, stateReason, labels, type: typeOfLabels(labels), module: 'unassigned' };
 }
 
-/** A branch scan that read `refs` whole. */
-function scanOf(refs: readonly string[], problems: readonly string[] = []): () => DriftBranches {
-  return () => ({ refs, problems });
+/** A branch scan that read `refs` whole, under `branchTemplate` when given and the default template when left out. */
+function scanOf(refs: readonly string[], problems: readonly string[] = [], branchTemplate?: string): () => DriftBranches {
+  return branchTemplate === undefined
+    ? () => ({ refs, problems })
+    : () => ({ refs, problems, branchTemplate });
 }
 
 /** Every claim branch the cases below name, so no stage label is branchless unless a case says so. */
@@ -144,8 +146,8 @@ describe('findDrift: stage labels with no claim branch', () => {
     const report = findDrift({ issues, checklists: [], branches: ALL_BRANCHES });
 
     expect(report.findings).toEqual([
-      { kind: 'label-without-branch', issue: 30, state: 'OPEN', labels: [CLAIMED_LABEL] },
-      { kind: 'label-without-branch', issue: 40, state: 'CLOSED', labels: [CLAIMED_LABEL] },
+      { kind: 'label-without-branch', issue: 30, state: 'OPEN', labels: [CLAIMED_LABEL], branch: 'feat/rafa-30-*' },
+      { kind: 'label-without-branch', issue: 40, state: 'CLOSED', labels: [CLAIMED_LABEL], branch: 'feat/rafa-40-*' },
     ]);
   });
 
@@ -163,6 +165,39 @@ describe('findDrift: stage labels with no claim branch', () => {
     const report = findDrift({ issues, checklists: [], branches: scanOf(['refs/heads/feat/rafa-120-x', 'refs/heads/fix/rafa-12-x']) });
 
     expect(report.findings.map((finding) => finding.issue)).toEqual([12]);
+  });
+
+  it('reads the claim branches under the scan\'s own template, and the default template reads none of them', () => {
+    const issues = [row(20, [IN_DEVELOPMENT_LABEL])];
+    const refs = ['refs/remotes/origin/work/rafa-20-x'];
+
+    const templated = findDrift({ issues, checklists: [], branches: () => ({ refs, problems: [], branchTemplate: 'work/{stub}' }) });
+    const untemplated = findDrift({ issues, checklists: [], branches: scanOf(refs) });
+    const featUnderWork = findDrift({
+      issues,
+      checklists: [],
+      branches: () => ({ refs: ['refs/remotes/origin/feat/rafa-20-x'], problems: [], branchTemplate: 'work/{stub}' }),
+    });
+
+    expect(templated.findings).toEqual([]);
+    expect(untemplated.findings.map((finding) => [finding.kind, finding.issue])).toEqual([['label-without-branch', 20]]);
+    expect(featUnderWork.findings.map((finding) => [finding.kind, finding.issue])).toEqual([['label-without-branch', 20]]);
+  });
+
+  it('reports no issue whose only branch is work/rafa-12-a under work/{stub}, where the default template reports it', () => {
+    const issues = [row(12, [CLAIMED_LABEL]), row(30, [CLAIMED_LABEL])];
+    const refs = ['refs/remotes/origin/work/rafa-12-a'];
+
+    const templated = findDrift({ issues, checklists: [], branches: scanOf(refs, [], 'work/{stub}') });
+    const untemplated = findDrift({ issues, checklists: [], branches: scanOf(refs) });
+
+    expect(templated.findings).toEqual([
+      { kind: 'label-without-branch', issue: 30, state: 'OPEN', labels: [CLAIMED_LABEL], branch: 'work/rafa-30-*' },
+    ]);
+    expect(untemplated.findings).toEqual([
+      { kind: 'label-without-branch', issue: 12, state: 'OPEN', labels: [CLAIMED_LABEL], branch: 'feat/rafa-12-*' },
+      { kind: 'label-without-branch', issue: 30, state: 'OPEN', labels: [CLAIMED_LABEL], branch: 'feat/rafa-30-*' },
+    ]);
   });
 
   it('never asks for the branches when no issue carries a stage label, and asks once when one does', () => {
@@ -240,6 +275,22 @@ describe('driftLines', () => {
       'claim drift: #12 is ticked on #1 (line 1) but still labelled rafa:in-development (closed)',
       'claim drift: #30 is labelled rafa:claimed (open) but no feat/rafa-30-* claim branch names it',
       'claim drift: #77, ticked on #1, is not in the board listing, so it was not compared',
+    ]);
+  });
+
+  it('names the work/rafa-30-* shape under a work/{stub} scan, and feat/rafa-30-* with the template left out', () => {
+    const issues = [row(12, [CLAIMED_LABEL]), row(30, [CLAIMED_LABEL])];
+    const refs = ['refs/remotes/origin/work/rafa-12-a'];
+
+    const templated = driftLines(findDrift({ issues, checklists: [], branches: scanOf(refs, [], 'work/{stub}') }));
+    const untemplated = driftLines(findDrift({ issues, checklists: [], branches: scanOf(refs) }));
+
+    expect(templated).toEqual([
+      'claim drift: #30 is labelled rafa:claimed (open) but no work/rafa-30-* claim branch names it',
+    ]);
+    expect(untemplated).toEqual([
+      'claim drift: #12 is labelled rafa:claimed (open) but no feat/rafa-12-* claim branch names it',
+      'claim drift: #30 is labelled rafa:claimed (open) but no feat/rafa-30-* claim branch names it',
     ]);
   });
 

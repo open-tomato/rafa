@@ -46,6 +46,7 @@
  * Every type is `import type`, so this module loads nothing.
  */
 import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
+import type { BugsShape } from '../config-schema-bugs.js';
 import type { ChecksShape } from '../config-schema-checks.js';
 import type { ErrorsShape } from '../config-schema-errors.js';
 import type { FeaturesShape } from '../config-schema-features.js';
@@ -152,6 +153,7 @@ export interface DangerousShape extends ReleaseDangerousShape {
 
 /** The nested file shape: core's keys, and each section's; see the module note. */
 export interface ConfigShape extends
+  BugsShape,
   ChecksShape,
   ErrorsShape,
   FeaturesShape,

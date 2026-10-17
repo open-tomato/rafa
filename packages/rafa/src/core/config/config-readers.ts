@@ -22,7 +22,8 @@
  *
  * The closed lists and readers of the release plan's keys —
  * `release.strategy`, `release.settle`, `release.tag`,
- * `pr.versionCollision` and `release.fragments` — are value rules and
+ * `release.publish`, `pr.versionCollision` and `release.fragments` —
+ * are value rules and
  * sit here all the same: `config-sections.ts` stood at 781 lines,
  * measured with `wc -l`, when they joined, and takes no new code under
  * the 800-line cap of `context/source.md`. Each closed list is read
@@ -183,6 +184,15 @@ export const RELEASE_TAG_MODES = ['manual', 'settle'] as const;
 export type ReleaseTagMode = (typeof RELEASE_TAG_MODES)[number];
 
 /**
+ * Who publishes a tagged version: a person running the publish command
+ * `rafa release tag` names, or the CI workflow a pushed tag starts.
+ */
+export const RELEASE_PUBLISH_MODES = ['manual', 'ci'] as const;
+
+/** One of {@link RELEASE_PUBLISH_MODES}. */
+export type ReleasePublishMode = (typeof RELEASE_PUBLISH_MODES)[number];
+
+/**
  * How `rafa pr merge` reacts to a branch the release guard reads as
  * `missing` or `stale`: stay silent, report it, ask, or refuse it.
  */
@@ -199,6 +209,9 @@ export const releaseSettleMode: Reader<ReleaseSettleMode> = oneOf(RELEASE_SETTLE
 
 /** The reader of `release.tag`. */
 export const releaseTagMode: Reader<ReleaseTagMode> = oneOf(RELEASE_TAG_MODES);
+
+/** The reader of `release.publish`. */
+export const releasePublishMode: Reader<ReleasePublishMode> = oneOf(RELEASE_PUBLISH_MODES);
 
 /** The reader of `pr.versionCollision`. */
 export const versionCollisionMode: Reader<VersionCollisionMode> = oneOf(VERSION_COLLISION_MODES);

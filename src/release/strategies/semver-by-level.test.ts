@@ -38,7 +38,7 @@ function piece(
   title: string = `title of ${id}`,
   notes: readonly string[] = [`- Area ${id}: note of ${id}`],
 ): FoldFragment {
-  return { id, addedOn, fragment: { plan: id, title, level, notes } };
+  return { id, addedOn, fragment: { plan: id, title, level, package: null, notes } };
 }
 
 /** Every ordering of `items`. */

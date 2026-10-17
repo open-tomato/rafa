@@ -66,6 +66,15 @@
  * say whether a loop session could push and merge. It gates nothing; it
  * comes here so which permissions are write access is spelled once.
  *
+ * An EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), and
+ * it is the second caller that IGNORES rather than refuses, like the
+ * spec-review comment: it runs {@link readBoardTrust} over the bug's
+ * author once per login, only for a runnable reference and off the
+ * `local` tracker, which has no author. An untrusted author is a
+ * `skipped` row carrying {@link trustRefusalClause}'s reason, so a
+ * sweep over every open bug still runs the rest. No board text reaches
+ * a prompt or a shell through it.
+ *
  * `context/pull-requests.md` carries the roster.
  *
  * ## What a planted spec-review comment can take

@@ -74,7 +74,8 @@
  *      cheapest check rather than after the tiers a repository added.
  *   7. **Checks the claim** on the issue the plan's stub names, through
  *      `start/preflight-claim.ts`, before any probe: a claim `plan create`
- *      left unpushed on the local `feat/<stub>` is pushed, and a run of an
+ *      left unpushed on the local claim branch (the `naming.branch`
+ *      template with the stub, `feat/rafa-<n>-<slug>` by default) is pushed, and a run of an
  *      issue another device owns, or no device holds, is refused naming
  *      the owner. A plan whose stub names no issue, or a branch carrying
  *      no claim commit, runs as it always did.

@@ -46,6 +46,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `effort/store/stale-docs.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/store-sources.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
 | `effort/store/tracker-refs.test.ts` | `src/utils/progress.ts` |
+| `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `src/schema/failure-strings.ts`, `src/schema/skill.ts` |
 | `ports/index.test.ts` | `src/plan/index.ts` |
 | `report/parse.test.ts` | `src/schema/instinct.ts` |
 | `schema/project-id.test.ts` | `src/tests/git-identity.ts` |

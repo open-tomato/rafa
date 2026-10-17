@@ -295,6 +295,9 @@ export interface StartTriageOptions {
     | 'prerequisitesOptional'
     | 'triageSimilarityThreshold'
     | 'triageSimilarityCandidates'
+    | 'triageSimilarityWeightsCauseLeaf'
+    | 'triageSimilarityWeightsCauseFamily'
+    | 'triageSimilarityWeightsBoundary'
     | keyof IssuesConfigSettings
     | 'errorsCodes'
     | keyof RefreshConfig

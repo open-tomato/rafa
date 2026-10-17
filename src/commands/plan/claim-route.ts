@@ -238,11 +238,12 @@ export async function resolveAndClaim(seams: ClaimRouteSeams): Promise<ClaimedRo
  * writes refreshing the issue on the project
  * (`../../board/project/issue-board-refresh.ts`), this
  * device's store id read under `config.store`, `claims.staleAfter`,
- * `claims.ahead`, and the clock at the call.
+ * `claims.ahead`, the `naming.branch` template the claim branches are
+ * named and read under, and the clock at the call.
  */
 export function createPlanClaimContext(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead'> & RefreshConfig,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead' | 'namingBranch'> & RefreshConfig,
 ): PlanClaimContext {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
@@ -254,5 +255,6 @@ export function createPlanClaimContext(
     staleAfter: config.claimsStaleAfter,
     claimsAhead: config.claimsAhead,
     now: new Date(),
+    branchTemplate: config.namingBranch,
   };
 }

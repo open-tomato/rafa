@@ -36,12 +36,17 @@
  * When `./triage.ts`'s nearest-open-bug step ran and found no open bug at
  * or above its threshold, the issue filed ends, after `Feedback`, with a
  * `Possible duplicates` section ({@link possibleDuplicatesSection}): the
- * threshold, then the nearest open bugs it listed, each named as
- * `Supersedes` names its issue and followed by its score to two decimals,
- * or a sentence saying no open bug shares a word with this one. Names and
- * scores are the tracker's and this module's, not a session's, so they are
- * redacted but not fenced. An issue filed with the step off or skipped has
- * no such section.
+ * threshold, then the open bugs it ranked (`RankedIssue`,
+ * `./similarity.ts`), one line each, as
+ * `- <issue name> (score 0.31; same cause, same module and action)`: the
+ * issue named as `Supersedes` names it, its rank to two decimals
+ * ({@link scoreText}), then the bonus signals that matched, in
+ * `MatchedSignal` order and joined by `, `, as `same cause`, `same cause
+ * family` and `same module and action`. A line matched on words alone
+ * reads `- <issue name> (score 0.31)`. An empty list is the sentence
+ * {@link NO_DUPLICATES}. Names, ranks and signals are the tracker's and
+ * this module's, not a session's, so they are redacted but not fenced. An
+ * issue filed with the step off or skipped has no such section.
  *
  * A recurrence that step matched is commented on under its own opening
  * ({@link similarCommentOpening}), naming the score and the threshold it
@@ -76,7 +81,7 @@
  *
  * Every value goes through the caller's `redact` before it is shown.
  */
-import type { ScoredIssue } from './similarity.js';
+import type { MatchedSignal, RankedIssue } from './similarity.js';
 import type { BugRecord } from '../bugs/record.js';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 
@@ -185,8 +190,29 @@ function afterFeedback(values: BugValues, redact: (text: string) => string): str
 export interface PossibleDuplicates {
   /** The threshold none of {@link nearest} met. */
   readonly threshold: number;
-  /** The nearest open bugs, highest score first, already cut to the configured count. */
-  readonly nearest: readonly ScoredIssue[];
+  /** The ranked open bugs, highest rank first, already cut to the configured count. */
+  readonly nearest: readonly RankedIssue[];
+}
+
+/** The sentence a `Possible duplicates` section shows for an empty list. */
+export const NO_DUPLICATES = 'No open bug shares a word, a cause or a module and action with this one.';
+
+/** How a line names each bonus signal; `words` is the score itself and is not named. */
+const SIGNAL_TEXT: Readonly<Record<Exclude<MatchedSignal, 'words'>, string>> = {
+  'cause': 'same cause',
+  'cause-family': 'same cause family',
+  'boundary': 'same module and action',
+};
+
+/** One line of the `Possible duplicates` list, before redaction; see the module note. */
+export function duplicateLine({ issue, score, matched }: RankedIssue): string {
+  const signals = matched.flatMap((signal) => signal === 'words'
+    ? []
+    : [SIGNAL_TEXT[signal]]);
+  const named = signals.length === 0
+    ? ''
+    : `; ${signals.join(', ')}`;
+  return `- ${issueNameOf(issue.ref)} (score ${scoreText(score)}${named})`;
 }
 
 /** A similarity score as a filed text shows it: two decimals. */
@@ -205,10 +231,8 @@ export function similarCommentOpening(score: number, threshold: number): string 
 export function possibleDuplicatesSection(duplicates: PossibleDuplicates, redact: (text: string) => string): string {
   const intro = `No open bug scored at or above the similarity threshold of ${String(duplicates.threshold)}.`;
   const listed = duplicates.nearest.length === 0
-    ? 'No open bug shares a word with this one.'
-    : duplicates.nearest
-      .map(({ issue, score }) => `- ${issueNameOf(issue.ref)} (score ${scoreText(score)})`)
-      .join('\n');
+    ? NO_DUPLICATES
+    : duplicates.nearest.map(duplicateLine).join('\n');
   return `## Possible duplicates\n\n${redact(`${intro}\n\n${listed}`)}`;
 }
 

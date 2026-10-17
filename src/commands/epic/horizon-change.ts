@@ -364,6 +364,7 @@ export async function changeEpicHorizon(context: RafaContext, action: HorizonAct
     epic: line.epic,
     to: line.to,
     git: seams.git ?? createGitRunner(project.root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(project.root, config.planDir).path),
   });

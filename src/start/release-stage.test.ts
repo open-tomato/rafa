@@ -670,6 +670,24 @@ describe('finishRelease on the run\'s head branch', () => {
   });
 });
 
+describe('prepareReleaseStage over a real checkout', () => {
+  it('writes a fragment with no package line', () => {
+    setActiveOutput(sinkOutput({}));
+    const dir = checkoutOnBase();
+    writeFileSync(join(dir, 'package.json'), '{"version":"1.0.0"}\n');
+    writeFileSync(join(dir, 'CHANGELOG.md'), '# Changelog\n');
+    gitIn(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+
+    const result = prepareReleaseStage({ ...STAGE_INPUT, repoRoot: dir });
+
+    expect(result?.kind).toBe('prepared');
+    const written = textAt(join(dir, '.changes', `${PLAN_ID}.md`));
+    expect(written).not.toBeNull();
+    expect(written).toContain('level: ');
+    expect(written).not.toContain('package');
+  });
+});
+
 describe('planTitleIn', () => {
   const ASSUMED = assumptionsHeading([{ heading: 'Design', what: 'the store backend is not named', blocking: false, assumption: 'the SQLite backend' }]);
 

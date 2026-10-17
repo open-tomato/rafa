@@ -30,7 +30,8 @@
     "./schema/project-id": "./src/schema/project-id.ts",
     "./core/config/config-schema": "./src/core/config/config-schema.ts",
     "./store/*": "./src/effort/store/*.ts",
-    "./ports/*": "./src/ports/*.ts"
+    "./ports/*": "./src/ports/*.ts",
+    "./errors/*": "./src/errors/*.ts"
   },
   "scripts": {
     "lint": "eslint .",

@@ -460,3 +460,46 @@ describe('rafa epics, with an epic closed as not planned', () => {
     expect(result?.data.warnings).toEqual([NOTICE]);
   });
 });
+
+/** The config {@link plantCase} writes, with `naming.branch` set to `work/{stub}`. */
+const WORK_CONFIG = `tracker:\n  default: local\nroadmap:\n  issue: ${String(ROADMAP)}\nnaming:\n  branch: work/{stub}\n`;
+
+/**
+ * Dispatches `rafa epics 60` from a fresh project holding `config`, over
+ * a `git` whose remote holds #61's branch only as `work/rafa-61-x` and
+ * which answers every other command with nothing; answers the outcome
+ * and each git command sent.
+ */
+async function runOverWorkBranch(config: string): Promise<{ stdout: string; exitCode: number | null; sent: readonly string[] }> {
+  let sent: readonly string[] = [];
+  const git: GitRunner = (args) => {
+    sent = [...sent, args.join(' ')];
+    return args[0] === 'ls-remote'
+      ? { ok: true, stdout: `${'f'.repeat(40)}\trefs/heads/work/rafa-61-x\n`, stderr: '' }
+      : { ok: true, stdout: '', stderr: '' };
+  };
+  const seams = { gh: plantedGh([], {}), git, planNames: () => () => [], terminalWidth: () => undefined };
+  const project = plantProject(mkdtempSync(join(tempBase, 'case-')), config);
+  const outcome = await dispatchInProject(['epics', '60'], [EPIC_SUBJECT], [createEpicShowCommand(seams)], project);
+  return { stdout: outcome.stdout, exitCode: outcome.exitCode, sent };
+}
+
+describe('rafa epics under the configured branch template', () => {
+  it('asks its git for the work/rafa-* glob under naming.branch: work/{stub}, and reads #61\'s branch as a claim', async () => {
+    const outcome = await runOverWorkBranch(WORK_CONFIG);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.sent).toContain('fetch --quiet --prune --no-tags origin +refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+    expect(outcome.stdout.split('\n')[0]).toBe('Epic #60 · Epic beta · in-progress, 0/2 done');
+  });
+
+  it('asks no work/rafa-* glob and reads #60 as backlog with naming.branch left out, the control for the case above', async () => {
+    const outcome = await runOverWorkBranch(`tracker:\n  default: local\nroadmap:\n  issue: ${String(ROADMAP)}\n`);
+
+    expect(outcome.exitCode).toBe(0);
+    // The scan read the same remote, so what follows is the template's doing alone.
+    expect(outcome.sent).toContain('ls-remote --heads origin');
+    expect(outcome.sent.filter((sent) => sent.includes('work/rafa-*'))).toEqual([]);
+    expect(outcome.stdout.split('\n')[0]).toBe('Epic #60 · Epic beta · backlog, 0/2 done');
+  });
+});

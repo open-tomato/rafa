@@ -134,6 +134,26 @@ describe('the messages', () => {
     expect(message).toContain('--while-in-development');
   });
 
+  test('a refusal in development names the branch under the template the input carries', () => {
+    const work = inputOf('append', { labels: [IN_DEVELOPMENT_LABEL], branchTemplate: 'work/{stub}' });
+    const control = inputOf('append', { labels: [IN_DEVELOPMENT_LABEL] });
+
+    const reading = readEditState(work);
+    expect(reading).toEqual({ pass: false, refusal: 'in-development', branch: 'work/rafa-12-sync-design-devices' });
+    expect(editStateRefusalMessage(work, reading)).toContain('on work/rafa-12-sync-design-devices');
+    expect(editStateRefusalMessage(control, readEditState(control))).toContain('on feat/rafa-12-sync-design-devices');
+    expect(editStateRefusalMessage(control, readEditState(control))).not.toContain('work/');
+  });
+
+  test('a refusal message spells the branch from the template when the reading carries none', () => {
+    const work = inputOf('replace', { labels: [CLAIMED_LABEL], branchTemplate: 'work/{stub}' });
+    const control = inputOf('replace', { labels: [CLAIMED_LABEL] });
+    const bare = { pass: false, refusal: 'in-development', branch: null } as const;
+
+    expect(editStateRefusalMessage(work, bare)).toContain('on work/rafa-12-sync-design-devices,');
+    expect(editStateRefusalMessage(control, bare)).toContain('on feat/rafa-12-sync-design-devices,');
+  });
+
   test('a replace refused in development points at an append under the flag', () => {
     const input = inputOf('replace', { labels: [CLAIMED_LABEL] });
     expect(editStateRefusalMessage(input, readEditState(input))).toContain(

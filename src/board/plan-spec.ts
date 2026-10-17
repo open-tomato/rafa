@@ -481,6 +481,12 @@ export interface PlanSpecOptions {
    * claim was refused; `./spec-source-roadmap.ts`'s own seam, handed on.
    */
   readonly passOver?: ReadonlyMap<number, string>;
+  /**
+   * `naming.branch` as config resolved it, which a `--next` walk reads a
+   * claim branch under; `./spec-source-roadmap.ts`'s own seam, handed on.
+   * The default, `feat/{stub}`, when left out.
+   */
+  readonly branchTemplate?: string;
   /** Runs `gh`; one made for the project root when left out. */
   readonly gh?: GhRunner;
   /** Runs `git`; one made for the project root when left out. */
@@ -598,6 +604,9 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
       ...options.passOver === undefined
         ? {}
         : { passOver: options.passOver },
+      ...options.branchTemplate === undefined
+        ? {}
+        : { branchTemplate: options.branchTemplate },
     },
     output,
   });

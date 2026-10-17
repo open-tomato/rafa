@@ -14,8 +14,8 @@
  *
  * `packages/rafa/src/core/config/` has three barrels, all listed under `CORE_BARRELS`
  * in `scripts/survey/core-moves.ts`. `sections.ts` holds the leaf pair,
- * `config-sections.ts` and `config-readers.ts`, and argues why the pair
- * has a barrel of its own. `load.ts` holds `config-load.ts` alone, and
+ * `config-sections.ts` and `config-readers.ts`, with `branch-template.ts`
+ * beside it, and argues why the pair has a barrel of its own. `load.ts` holds `config-load.ts` alone, and
  * argues the same for it. This one holds the four files that read a
  * key or rank a layer, and `section.ts`, the contract a section file
  * outside `packages/rafa/src/core/` is typed by, the registry it is handed to and the

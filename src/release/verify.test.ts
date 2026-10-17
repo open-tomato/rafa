@@ -224,6 +224,7 @@ describe('verifyRelease over a session that did as it was told', () => {
         plan: PLAN,
         title: 'releases settle on the base branch',
         level: 'minor',
+        package: null,
         notes: ['- loop: the loop writes a fragment itself and reports what a diff is worth'],
       },
       text,

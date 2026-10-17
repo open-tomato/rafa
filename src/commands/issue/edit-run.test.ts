@@ -214,6 +214,7 @@ interface RunOver {
   readonly gh?: StandInGh;
   readonly trustedAuthors?: readonly string[];
   readonly root?: string;
+  readonly branchTemplate?: string;
 }
 
 /** Runs `request` over `fake`, with the trust and the editor read over the stand-in `gh`. */
@@ -224,6 +225,7 @@ function run(fake: FakeTracker, request: EditRequest, over: RunOver = {}) {
     tracker: requireEditingTracker(fake.tracker),
     root: over.root ?? freshRoot(),
     specsDir: SPECS_DIR,
+    branchTemplate: over.branchTemplate,
     trust: () => ghBoardTrust({ gh, trustedAuthors: over.trustedAuthors ?? [], repo: REPO }),
     editor: createGhEditorLogin({ gh }),
     now: () => NOW,
@@ -655,6 +657,21 @@ describe('runIssueEdit, the gates in order, nothing written on a refusal', () =>
     expect(refusal.exitCode).toBe(2);
     expect(refusal.message).toContain(branchName(ISSUE, TITLE));
     expect(refusal.message).toContain('--while-in-development');
+    expect(fake.edits).toEqual([]);
+  });
+
+  it('names the loop branch under the naming.branch template it is handed, the default naming feat/', async () => {
+    const fake = fakeTracker({ labels: [SPEC_LABEL, IN_DEVELOPMENT_LABEL] });
+
+    const work = await refusalOf(run(fake, appendRequest(), { branchTemplate: 'work/{stub}' }));
+    const control = await refusalOf(run(fake, appendRequest()));
+
+    expect(work.refusal).toBe('in-development');
+    expect(work.message).toContain(`on ${branchName(ISSUE, TITLE, 'work/{stub}')}`);
+    expect(work.message).toContain('on work/rafa-');
+    expect(work.message).not.toContain('feat/');
+    expect(control.message).toContain(`on ${branchName(ISSUE, TITLE)}`);
+    expect(control.message).not.toContain('work/');
     expect(fake.edits).toEqual([]);
   });
 

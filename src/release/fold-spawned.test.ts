@@ -60,7 +60,7 @@ const GIT_RUNNER_MODULE = fileURLToPath(new URL('../pr/index.js', import.meta.ur
 
 /** The fragment text of plan `plan`, at `level`, with one note. */
 function fragmentText(plan: string, level: Fragment['level'], note: string): string {
-  const fragment: Fragment = { plan, title: `title of ${plan}`, level, notes: [`- ${note}`] };
+  const fragment: Fragment = { plan, title: `title of ${plan}`, level, package: null, notes: [`- ${note}`] };
   return serializeFragment(fragment);
 }
 

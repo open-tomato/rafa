@@ -77,11 +77,11 @@ function plantTrio(name: string): Trio {
   return { a: cloneInto(originPath, aDir, 'device-a'), b: cloneInto(originPath, join(root, 'b'), 'device-b'), aDir };
 }
 
-/** `git` pushes a new claim branch holding `record`'s commit on `main`. */
-function claim(git: GitRunner, branch: string, record: ClaimRecord): void {
+/** `git` pushes a new claim branch holding `record`'s commit on `main`, named under `template` when given. */
+function claim(git: GitRunner, branch: string, record: ClaimRecord, template?: string): void {
   const made = makeOwnershipCommit(git, 'main', record);
   if (!made.ok) throw new Error(made.reason);
-  const pushed = pushNewClaimBranch(git, made.sha, branch);
+  const pushed = pushNewClaimBranch(git, made.sha, branch, template);
   if (pushed.outcome !== 'pushed') throw new Error(`claim push: ${pushed.outcome}`);
 }
 
@@ -158,6 +158,20 @@ describe('readClaimBranches', () => {
     const trio = plantTrio('empty');
 
     expect(readClaimBranches(trio.a)).toEqual({ found: [], notes: [] });
+  });
+
+  it('reads work/rafa-7-x under work/{stub}, where the default template reads no claim on origin', () => {
+    const trio = plantTrio('template');
+    claim(trio.b, 'work/rafa-7-x', { action: 'claim', issue: 7, store: 'store-b' }, 'work/{stub}');
+    must(trio.a, ['fetch', '--quiet', 'origin']);
+
+    const templated = readClaimBranches(trio.a, 'work/{stub}');
+    const defaulted = readClaimBranches(trio.a);
+
+    expect(must(trio.a, ['for-each-ref', '--format=%(refname:lstrip=3)', 'refs/remotes/origin/work/'])).toBe('work/rafa-7-x');
+    expect(templated.found.map((found) => [found.branch, found.issue, found.ownership.state])).toEqual([['work/rafa-7-x', 7, 'held']]);
+    expect(templated.notes).toEqual([]);
+    expect(defaulted).toEqual({ found: [], notes: [] });
   });
 
   it('throws what git said when the origin branches cannot be listed', () => {
@@ -245,6 +259,8 @@ describe('the claims section of readStatusSections', () => {
     cleanupKeep: [],
     cleanupStaleDays: 30,
     cleanupWorktreeIdleDays: 7,
+    loopWorktreeDir: '.rafa/worktrees',
+    namingBranch: 'feat/{stub}',
   };
 
   /** A board with no line left, so the board section asks for nothing more. */
@@ -284,6 +300,22 @@ describe('the claims section of readStatusSections', () => {
     expect(none.claims.read && none.claims.notes).toEqual([
       'the stage labels were not read: pr.provider is none, as origin is no GitHub remote, and rafa status reads the stage labels through gh alone',
     ]);
+  });
+
+  it('lists the claim on work/rafa-7-x under naming.branch work/{stub}, and nothing under the default', async () => {
+    const trio = plantTrio('wired-template');
+    claim(trio.b, 'work/rafa-7-x', { action: 'claim', issue: 7, store: 'store-b' }, 'work/{stub}');
+    must(trio.a, ['fetch', '--quiet', 'origin']);
+    const now = new Date(tipOf(readClaimBranches(trio.a, 'work/{stub}')).getTime() + HOUR_MS);
+    const seams = seamsFor(null, [], now);
+
+    const templated = await readStatusSections({ root: trio.aDir, home: scope, config: { ...CONFIG, namingBranch: 'work/{stub}' } }, seams);
+    const defaulted = await readStatusSections({ root: trio.aDir, home: scope, config: CONFIG }, seams);
+
+    expect(templated.claims.read && templated.claims.claims.map((row) => [row.branch, row.issue, row.owner, row.state])).toEqual([
+      ['work/rafa-7-x', 7, 'store-b', 'held'],
+    ]);
+    expect(defaulted.claims.read && defaulted.claims.claims).toEqual([]);
   });
 
   it('is not read when git cannot list the origin branches, and the loops section is read all the same', async () => {

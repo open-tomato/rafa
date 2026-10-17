@@ -81,7 +81,8 @@
  * nothing.
  *
  * {@link refusedPushReaderIn} makes that reading over a checkout and a
- * store id reader. `start()` hands it the checkout and this device's
+ * store id reader. `start()` hands it the checkout, the run's
+ * `naming.branch` template and this device's
  * id read from the PROJECT root under the run's `store`
  * (`claims/device.ts`); {@link prLifecycleSeamsIn}'s own default reads
  * the SQLite store under the directory it was made for, which is the
@@ -126,7 +127,7 @@ import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runClaude, spawnClaude } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
@@ -226,7 +227,9 @@ export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClau
 /**
  * The reading {@link PrLifecycleSeams.readRefusedPush} makes: git run in
  * `dir`, the checkout whose push was refused, and this device's store id
- * and the ids it replaced from `readStoreId`. A store that names no id
+ * and the ids it replaced from `readStoreId`, the branch read as a claim
+ * branch under `template`, the run's `naming.branch`
+ * (`DEFAULT_BRANCH_TEMPLATE` when left out). A store that names no id
  * is read as no claimant (`claims/lost.ts`); a store whose read THROWS
  * answers `unknown` rather than guess at one, so no claim of this
  * device's is read as lost. A branch that is no claim branch reads no
@@ -235,10 +238,13 @@ export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClau
 export function refusedPushReaderIn(
   dir: string,
   readStoreId: () => DeviceStoreId,
+  template: string = DEFAULT_BRANCH_TEMPLATE,
 ): (branch: string) => RefusedPushReading {
   return (branch) => {
-    const issue = claimBranchIssue(branch);
-    if (issue === null) return readRefusedPush(createGitRunner(dir), { branch, storeId: null, replacedIds: [] });
+    const issue = claimBranchIssue(branch, template);
+    if (issue === null) {
+      return readRefusedPush(createGitRunner(dir), { branch, branchTemplate: template, storeId: null, replacedIds: [] });
+    }
     let device: DeviceStoreId;
     try {
       device = readStoreId();
@@ -248,7 +254,7 @@ export function refusedPushReaderIn(
     const claimant = device.ok
       ? { storeId: device.storeId, replacedIds: device.replacedIds }
       : { storeId: null, replacedIds: [] };
-    return readRefusedPush(createGitRunner(dir), { branch, ...claimant });
+    return readRefusedPush(createGitRunner(dir), { branch, branchTemplate: template, ...claimant });
   };
 }
 

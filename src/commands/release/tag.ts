@@ -1,10 +1,12 @@
 /**
  * `rafa release tag`: the TAG write of the `release` subject, whose
- * other write, the release commit, is `./settle.ts`'s. It puts
- * `v<version>` on the commit of the release branch that SET that
- * version, which is HEAD unless merges landed after it, when every
- * reading agrees that version is the one to tag, and then prints the
- * publish line rather than publishing.
+ * other write, the release commit, is `./settle.ts`'s. It puts one tag
+ * per unit — `v<version>` for the root package, `<name>@<version>` for
+ * each publishable workspace package (`./tag-units.ts`) — on the commit
+ * of the release branch that SET that unit's version, which is HEAD
+ * unless merges landed after it, when every reading agrees that version
+ * is the one to tag, and then prints the publish lines rather than
+ * publishing.
  *
  * The loop writes a change fragment with every pull request and stops
  * there (`src/start/release-stage.ts`): the merge commit is not its to
@@ -16,10 +18,25 @@
  * settle does not write itself is this action's
  * (`src/release/settle-tag.ts`).
  *
- * One git command here writes — `git tag <tag> <commit>` — and it is
- * the last thing the run does, save the push `--push` asks for after it. Everything before it is a read, and every
- * refusal happens before it, so a refused run leaves the repository
- * exactly as it found it.
+ * One git command here writes — `git tag <tag> <commit>`, once per
+ * ready unit, in unit order — and it is the last thing the run does,
+ * save the pushes `--push` asks for after it. Everything before it is a
+ * read, and every unit is decided before the first tag is written, so a
+ * refused run leaves the repository exactly as it found it.
+ *
+ * ## Units, and the one skip
+ *
+ * The root is read off `release.versionFile` and `release.changelog`;
+ * a package off `<dir>/package.json` and `<dir>/CHANGELOG.md`
+ * (`./tag-units.ts`). The branch is read and checked once for the run,
+ * before any package is read; then {@link decideTag} decides each unit
+ * over its own readings, in unit order: the root first, then the
+ * packages by manifest path. A unit whose version a tag already names is
+ * `skipped`, not refused, so a run after a hand-tagged root still tags
+ * the package; the run refuses `tagged` only when every unit is
+ * skipped, which is the one refusal a one-package project had before.
+ * Any other refusal of any unit stops the run with exit 1 before the
+ * first write, one line per refused unit.
  *
  * ## The three refusals, and the two readings that must not pass
  *
@@ -101,13 +118,22 @@
  * prints the publish line for the configured registry and does not run
  * it" (the spec, step 4). The configured registry is the version
  * file's own `publishConfig.registry`, and the default when it names
- * none is npm's, {@link DEFAULT_REGISTRY}. The command is
+ * none is npm's, `DEFAULT_REGISTRY` in `./tag-follow-ups.ts`. The command is
  * `release.publishCommand`, `npm publish` by default, printed as the
  * config spells it. Nothing here adds a flag: `publishConfig` carries
  * the access and the registry, and npm reads that block itself, so a
  * `--registry` this module spelled would be a second place for the
  * same fact to be wrong. A project that wants a flag, or another tool,
- * spells it in the setting.
+ * spells it in the setting. A package publishes from its own folder, so
+ * its line is `(cd <dir> && <publishCommand>)` (`./tag-follow-ups.ts`),
+ * one publish line per unit, under the push line of that unit's tag.
+ *
+ * Under `release.publish: ci` the pushed tag starts
+ * `.github/workflows/release-publish.yml`, which publishes the unit, so
+ * the publish line gives way to one sentence saying so, and naming the
+ * repository variable `RAFA_RELEASE_PUBLISH` the publish job waits on
+ * (`ciPublishSentence` in `./tag-follow-ups.ts`), and json carries
+ * `publish: "ci"` on each unit that sentence was written for.
  *
  * The command is a setting rather than a reading of the manifest. Until
  * 2026-09-30 it was `<manager> publish`, the manager read off the
@@ -135,17 +161,19 @@
  *
  * ## `--push`
  *
- * With `--push` (#736) the run pushes the tag itself once it is written,
- * through `../../release/tag-push.ts`, to the remote the release branch
- * tracks, `origin` when it tracks none. A push that went drops the push
- * line from the follow-ups and adds a `Pushed` line under the `Tagged`
- * one; json mode carries the push as the result's `pushed`, a key a run
- * without the flag leaves out, so that run reads exactly as before. A
- * push that failed exits 1 with git's words and the push to run again,
- * and keeps the local tag: it names the right commit whether or not the
- * remote has it, and a second run would refuse on it as `tagged`. The
- * push is the one network call, and it runs only after the write, so
- * every refusal above still leaves the repository as it found it.
+ * With `--push` (#736) the run pushes each tag itself once every tag is
+ * written, in unit order, through `../../release/tag-push.ts`, to the
+ * remote the release branch tracks, `origin` when it tracks none. A push
+ * that went drops that tag's push line from the follow-ups and adds a
+ * `Pushed` line under its `Tagged` one; json mode carries the push as
+ * the unit's `pushed`, and the root's as the result's `pushed`, keys a
+ * run without the flag leaves out, so that run reads exactly as before.
+ * A push that failed exits 1 with git's words and the push to run again,
+ * naming the tags pushed before it and the ones left unpushed after it,
+ * and keeps every local tag: each names the right commit whether or not
+ * the remote has it, and a second run skips it as tagged. The pushes are
+ * the one network call, and they run only after the writes, so every
+ * refusal above still leaves the repository as it found it.
  *
  * ## What is shared with `release status`
  *
@@ -158,26 +186,27 @@
  *
  * ## Two borrowings from other subjects
  *
- * `versionTag` comes from `src/release/version-tag.ts`, which settle's
- * tag step (`src/release/settle-tag.ts`) builds its tag from too. That
- * write and this one have to be the same string or one version gets two
- * tags, and one function is what holds them together; two copies of
- * `` `v${version}` `` would drift with nothing to notice.
+ * `versionTag` and `packageTag` come from `src/release/version-tag.ts`,
+ * which settle's tag step (`src/release/settle-tag.ts`) builds its tags
+ * from too. That write and this one have to be the same string or one
+ * version gets two tags, and one function per spelling is what holds
+ * them together; two copies of `` `v${version}` `` would drift with
+ * nothing to notice.
  *
  * `expectNoArgument` comes from `../plan/plan-files.ts`, the refusal
  * eight other commands reading no argument already share.
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
+import type { ReleaseFollowUp } from './tag-follow-ups.js';
+import type { ChangelogReading, UnitDecision, UnitReadings, VersionReading } from './tag-units.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
-
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
@@ -185,24 +214,28 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
-import { changelogVersions, readTags } from '../../release/status-readings.js';
+import { readTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
-import { versionTag } from '../../release/version-tag.js';
-import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
+import { packageTag, versionTag } from '../../release/version-tag.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { RELEASE_TAG_DECLARATION, RELEASE_TAG_PUSH_FLAG } from './declarations.js';
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
+import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
+import {
+  readNewestRelease,
+  readTagPackages,
+  readUnitInputs,
+  readVersion,
+  unitDecisionOf,
+} from './tag-units.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
-
-/** The registry a publish reaches when the manifest names none. */
-export const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
 
 /** What every line under a heading is indented by, as `pr merge` indents its follow-ups. */
 const INDENT = '  ';
@@ -218,53 +251,13 @@ export interface BranchReading {
   readonly problem: string | null;
 }
 
-/** What the version file declared, and the text it declared it in. */
-export interface VersionReading {
-  /** The path as `release.versionFile` spells it. */
-  readonly path: string;
-  /** The file's text, kept for the publish line, or null when it could not be read. */
-  readonly text: string | null;
-  /** The version it declares, or null when none could be read. */
-  readonly version: string | null;
-  /** Why there is none, or null when there is one. */
-  readonly problem: string | null;
-}
-
-/** What the changelog's newest section names. */
-export interface ChangelogReading {
-  /** The path as `release.changelog` spells it. */
-  readonly path: string;
-  /** The version its newest section names, or null when no section names one. */
-  readonly version: string | null;
-  /** Why the file could not be read, or null when it was. */
-  readonly problem: string | null;
-}
-
-/** Where a publish would go, read off the version file; see the module note. */
-export interface PublishTarget {
-  /** `publishConfig.registry`, or {@link DEFAULT_REGISTRY}. */
-  readonly registry: string;
-  /** The package name, or null when the file names none. */
-  readonly name: string | null;
-  /** True when the manifest declares `"private": true`. */
-  readonly isPrivate: boolean;
-}
-
-/** One command the run names for the operator to type next. */
-export interface ReleaseFollowUp {
-  /** The whole command, as the operator types it. */
-  readonly command: string;
-  /** Why it applies, in a phrase, lower case and with no full stop. */
-  readonly why: string;
-}
-
 /** Why a run refused; see the module note for the five, and the receipt. */
 export type TagRefusalReason =
   /** The release branch is not the one checked out, or none is. */
   | 'branch'
   /** The version file could not be read, or declares no version. */
   | 'version'
-  /** A tag already names that version. */
+  /** A tag of the unit already names that version; another unit's tag of the same version does not count. */
   | 'tagged'
   /** The changelog's newest section names another version, or none. */
   | 'changelog'
@@ -306,11 +299,13 @@ export interface TagInputs {
   readonly releaseBranch: string;
   /** What is checked out. */
   readonly branch: BranchReading;
+  /** The workspace package the readings are of, or null for the root; it picks the tags and their spelling. */
+  readonly package: string | null;
   /** What the version file declares. */
   readonly version: VersionReading;
   /** What the changelog's newest section names. */
   readonly changelog: ChangelogReading;
-  /** The repository's release tags, as `release status` reads them. */
+  /** The repository's release tags, as `release status` reads them; {@link decideTag} reads the unit's. */
   readonly tags: TagReading;
   /** The commit that set the version, or null when there was no version to look for. */
   readonly release: ReleaseCommitReading | null;
@@ -318,20 +313,44 @@ export interface TagInputs {
   readonly receipt: ReceiptVerdict | null;
 }
 
+/** One unit of a run that tagged: what it read, what was decided, and what the operator does next. */
+export interface ReleaseTagUnit {
+  /** The workspace package, or null for the root. */
+  readonly package: string | null;
+  /** The package's folder relative to the root, or null for the root. */
+  readonly dir: string | null;
+  /** The readings its decision was made from. */
+  readonly inputs: TagInputs;
+  /** Its tag, written, or the skip that left it alone; a refusal never reaches a result. */
+  readonly decision: UnitDecision;
+  /** Its push and publish lines; none for a skipped unit. */
+  readonly followUps: readonly ReleaseFollowUp[];
+  /** The push `--push` made of its tag; left out of a run without the flag and of a skipped unit. */
+  readonly pushed?: TagPushed;
+  /**
+   * `ci` when `release.publish: ci` hands its publish to the publish
+   * workflow; left out where the unit has a publish line or nothing to publish.
+   */
+  readonly publish?: 'ci';
+}
+
 /**
  * What json mode gives as the terminal result's `data`. A refusal
  * never reaches it: every one of them is thrown as a
- * {@link CommandExit}, so a result exists only for a run that wrote a
- * tag.
+ * {@link CommandExit}, so a result exists only for a run that wrote at
+ * least one tag. `inputs`, `written` and `pushed` are the root's, as
+ * they were before units, for json readers that read those keys.
  */
 export interface ReleaseTagResult {
-  /** The readings the decision was made from. */
+  /** The root's readings. */
   readonly inputs: TagInputs;
-  /** The tag written, and the version it names. */
-  readonly written: TagReady;
-  /** What the operator does next. */
+  /** The root's tag, written, or null when the root was skipped. */
+  readonly written: TagReady | null;
+  /** Every unit's follow-ups, in unit order. */
   readonly followUps: readonly ReleaseFollowUp[];
-  /** The push `--push` made; left out of a run without the flag. */
+  /** Every unit, the root first, then the publishable packages by manifest path. */
+  readonly units: readonly ReleaseTagUnit[];
+  /** The push `--push` made of the root's tag; left out of a run without the flag. */
   readonly pushed?: TagPushed;
 }
 
@@ -346,132 +365,6 @@ export function readBranch(git: GitRunner): BranchReading {
     return { branch: null, problem: 'no branch is checked out, so this is a detached HEAD' };
   }
   return { branch, problem: null };
-}
-
-/** `path`'s text, or null when it could not be read. */
-function textOf(path: string): string | null {
-  try {
-    return readFileSync(path, 'utf8');
-  } catch {
-    return null;
-  }
-}
-
-/** What the version file at `configured` under `root` declares, text included. */
-export function readVersion(root: string, configured: string): VersionReading {
-  const resolved = join(root, configured);
-  const text = textOf(resolved);
-  if (text === null) {
-    return {
-      path: configured,
-      text: null,
-      version: null,
-      problem: `the version file could not be read at ${resolved}`,
-    };
-  }
-  const version = readManifestVersion(text);
-  return version === null
-    ? { path: configured, text, version: null, problem: `${resolved} declares no version this can read` }
-    : { path: configured, text, version, problem: null };
-}
-
-/** What the newest section of the changelog at `configured` under `root` names. */
-export function readNewestRelease(root: string, configured: string): ChangelogReading {
-  const resolved = join(root, configured);
-  const text = textOf(resolved);
-  if (text === null) {
-    return { path: configured, version: null, problem: `the changelog could not be read at ${resolved}` };
-  }
-  return { path: configured, version: changelogVersions(text)[0] ?? null, problem: null };
-}
-
-/** A string with something in it, trimmed, or null. */
-function trimmedOrNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed === ''
-    ? null
-    : trimmed;
-}
-
-/** `value` as a JSON object's fields, or null when it is anything else. */
-function fieldsOf(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-/** What a version file that is no manifest at all reads as: nothing to publish. */
-const NO_PACKAGE: PublishTarget = Object.freeze({
-  registry: DEFAULT_REGISTRY,
-  name: null,
-  isPrivate: false,
-});
-
-/**
- * Where a publish of `text` would go. A text that is no JSON object
- * reads as {@link NO_PACKAGE}, which names no package and so gets no
- * publish line; see the module note.
- */
-export function readPublishTarget(text: string | null): PublishTarget {
-  if (text === null) return NO_PACKAGE;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return NO_PACKAGE;
-  }
-  const fields = fieldsOf(parsed);
-  if (fields === null) return NO_PACKAGE;
-
-  const publishConfig = fieldsOf(fields['publishConfig']);
-  return {
-    registry: trimmedOrNull(publishConfig?.['registry']) ?? DEFAULT_REGISTRY,
-    name: trimmedOrNull(fields['name']),
-    isPrivate: fields['private'] === true,
-  };
-}
-
-/** Where the tag went relative to the checkout: how far HEAD is past it, on which branch. */
-export interface TagPlace {
-  /** First-parent commits HEAD is past the tagged commit. */
-  readonly ahead: number;
-  /** The branch checked out, which the publish line switches back to. */
-  readonly branch: string;
-}
-
-/** The place of a tag written on HEAD itself. */
-const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRANCH });
-
-/**
- * What the operator does next once `tag` is written: push it to
- * `pushTo`, unless `pushTo` is `null` because the run pushed it
- * already, and publish `version` with
- * `publish`, `release.publishCommand`, when there is something to
- * publish — from the tag when HEAD is past it; see the module note.
- * Pure and total.
- */
-export function followUpsFor(
-  tag: string,
-  version: string,
-  target: PublishTarget,
-  publish: string,
-  place: TagPlace = ON_HEAD,
-  pushTo: string | null = RELEASE_REMOTE,
-): readonly ReleaseFollowUp[] {
-  const push: readonly ReleaseFollowUp[] = pushTo === null
-    ? []
-    : [{ command: `git push ${pushTo} ${tag}`, why: `the tag is local until ${pushTo} has it` }];
-  if (target.name === null || target.isPrivate) return push;
-  const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
-  if (place.ahead === 0) return [...push, { command: publish, why: publishes }];
-  return [
-    ...push,
-    {
-      command: `git switch --detach ${tag} && ${publish} && git switch ${place.branch}`,
-      why: `${publishes} from the tagged commit, not HEAD; skip it if ${target.registry} has that version already`,
-    },
-  ];
 }
 
 /** A refusal, spelled once so every branch below reads the same. */
@@ -504,11 +397,19 @@ function changelogRefusal(inputs: TagInputs, version: string): TagRefused | null
       + ` says ${newest}`);
 }
 
+/** The tag naming `version` of the unit `inputs` reads: `v<version>` for the root, `<name>@<version>` for a package. */
+function unitTag(inputs: TagInputs, version: string): string {
+  return inputs.package === null
+    ? versionTag(version)
+    : packageTag(inputs.package, version);
+}
+
 /**
- * What one run does: the tag to write, or the one refusal that stopped
- * it. Pure and total, so every combination of the five readings is
+ * What one unit does: the tag to write, or the one refusal that stopped
+ * it. Pure and total, so every combination of the readings is
  * measurable from literals; the order the checks run in is the module
- * note's.
+ * note's. Only the unit's own tags count for `tagged`: a package's tag
+ * of the root's version does not hold the root's, nor the other way.
  */
 export function decideTag(inputs: TagInputs): TagDecision {
   const onBranch = branchRefusal(inputs);
@@ -520,7 +421,8 @@ export function decideTag(inputs: TagInputs): TagDecision {
   }
 
   if (inputs.tags.problem !== null) return refuse('git', inputs.tags.problem);
-  const held = inputs.tags.tags.find((candidate) => candidate.version === version);
+  const held = inputs.tags.tags.find((candidate) => candidate.package === inputs.package
+    && candidate.version === version);
   if (held !== undefined) {
     return refuse('tagged', `${held.tag} already names ${version}, so there is nothing to tag`);
   }
@@ -539,16 +441,15 @@ export function decideTag(inputs: TagInputs): TagDecision {
   if (release.problem !== null) return refuse(release.problem.reason, release.problem.message);
   if (release.commit === null) return refuse('git', `no commit could be named for ${version}`);
 
-  return { kind: 'ready', version, tag: versionTag(version), commit: release.commit, ahead: release.ahead };
+  return { kind: 'ready', version, tag: unitTag(inputs, version), commit: release.commit, ahead: release.ahead };
 }
-
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
 function projectOf(context: RafaContext): ProjectFound {
   if (context.project === null) throw new Error('rafa release runs inside a project, and was handed none');
   return context.project;
 }
 
-/** The four settings one run reads out of the config. */
+/** The five settings one run reads out of the config. */
 export interface TagSettings {
   /** `release.versionFile`, relative to the repository root. */
   readonly versionFile: string;
@@ -558,9 +459,11 @@ export interface TagSettings {
   readonly releaseBranch: string;
   /** `release.publishCommand`, the publish line's command; see the module note. */
   readonly publishCommand: string;
+  /** `release.publish`: `ci` replaces the publish line; see the module note. */
+  readonly publishMode: ReleasePublishMode;
 }
 
-/** The four settings this action reads, refusing a config `loadConfig` refuses. */
+/** The five settings this action reads, refusing a config `loadConfig` refuses. */
 async function tagConfig(project: ProjectFound, warn: (message: string) => void): Promise<TagSettings> {
   try {
     const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
@@ -569,6 +472,7 @@ async function tagConfig(project: ProjectFound, warn: (message: string) => void)
       changelog: config.releaseChangelog,
       releaseBranch: config.prBase ?? DEFAULT_RELEASE_BRANCH,
       publishCommand: config.releasePublishCommand,
+      publishMode: config.releasePublish,
     };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
@@ -592,6 +496,7 @@ export function readTagInputs(root: string, git: GitRunner, config: TagSettings)
   return {
     releaseBranch: config.releaseBranch,
     branch,
+    package: null,
     version,
     changelog: readNewestRelease(root, config.changelog),
     tags: readTags(git),
@@ -604,11 +509,134 @@ export function readTagInputs(root: string, git: GitRunner, config: TagSettings)
   };
 }
 
-/** The one write: `v<version>` on the commit that set it. */
-function writeTag(git: GitRunner, tag: string, commit: string): void {
-  const result = git(['tag', tag, commit]);
-  if (result.ok) return;
-  throw new CommandExit(1, `❌ ${tag} could not be written: ${gitSaid(result)}`);
+/** One unit read and decided, before anything is written. */
+type DecidedUnit = Omit<ReleaseTagUnit, 'followUps' | 'pushed'>;
+
+/** A unit whose decision is a tag to write. */
+type ReadyUnit = DecidedUnit & { readonly decision: TagReady };
+
+/** True for a unit whose decision is a tag to write. */
+function isReady(unit: DecidedUnit): unit is ReadyUnit {
+  return unit.decision.kind === 'ready';
+}
+
+/** The exit a run refused with: one `❌` line per sentence, without repeats, then the usage. */
+function refusal(messages: readonly string[]): CommandExit {
+  const lines = [...new Set(messages)].map((message) => `❌ ${message}`);
+  return new CommandExit(1, `${lines.join('\n')}\nUsage: ${RELEASE_TAG_USAGE}`);
+}
+
+/**
+ * Every unit, read and decided: the root from `root`'s decision, then
+ * each publishable package over the run's branch reading. Called only
+ * once the branch check passed; see the module note.
+ */
+function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): readonly DecidedUnit[] {
+  const packages = readTagPackages(projectRoot);
+  if (!packages.ok) throw refusal([packages.problem]);
+  const run = { releaseBranch: root.releaseBranch, branch: root.branch };
+  const members = packages.packages.map((member): DecidedUnit => {
+    const readings: UnitReadings = readUnitInputs(projectRoot, git, member);
+    const inputs: TagInputs = { ...run, ...readings };
+    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs)) };
+  });
+  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root)) }, ...members];
+}
+
+/**
+ * The units to write, once every unit is decided: any refusal stops the
+ * run, and a run whose every unit is skipped refuses `tagged`.
+ */
+function readyUnits(units: readonly DecidedUnit[]): readonly ReadyUnit[] {
+  const refused = messagesOf(units, 'refused');
+  if (refused.length > 0) throw refusal(refused);
+  const ready = units.filter(isReady);
+  if (ready.length === 0) throw refusal(messagesOf(units, 'skipped'));
+  return ready;
+}
+
+/** The sentences of the units decided `kind`, in unit order. */
+function messagesOf(units: readonly DecidedUnit[], kind: 'refused' | 'skipped'): readonly string[] {
+  return units.flatMap(({ decision }) => decision.kind !== 'ready' && decision.kind === kind
+    ? [decision.message]
+    : []);
+}
+
+/** `tags` named in a clause: `a`, or `a, b`, with the verb that agrees. */
+function named(tags: readonly string[], one: string, many: string): string {
+  return `${tags.join(', ')} ${tags.length === 1
+    ? one
+    : many}`;
+}
+
+/** The writes: each ready unit's tag, in unit order; a write that failed names the ones written before it. */
+function writeTags(git: GitRunner, ready: readonly ReadyUnit[]): void {
+  const written: string[] = [];
+  for (const unit of ready) {
+    const { tag, commit } = unit.decision;
+    const result = git(['tag', tag, commit]);
+    if (!result.ok) {
+      const before = written.length === 0
+        ? ''
+        : `; ${named(written, 'is', 'are')} written already`;
+      throw new CommandExit(1, `❌ ${tag} could not be written: ${gitSaid(result)}${before}`);
+    }
+    written.push(tag);
+  }
+}
+
+/** The pushes `--push` asks for, in unit order, stopping at the first that failed; see the module note. */
+function pushTags(git: GitRunner, ready: readonly ReadyUnit[], branch: string): ReadonlyMap<string, TagPushed> {
+  const pushed = new Map<string, TagPushed>();
+  for (const [index, unit] of ready.entries()) {
+    const outcome = pushTag(git, unit.decision.tag, branch);
+    if (outcome.outcome === 'failed') {
+      const before = pushed.size === 0
+        ? ''
+        : `; ${named([...pushed.keys()], 'is', 'are')} pushed already`;
+      const left = ready.slice(index + 1).map((each) => each.decision.tag);
+      const after = left.length === 0
+        ? ''
+        : `; ${named(left, 'is', 'are')} written and not pushed`;
+      throw new CommandExit(outcome.exitCode, `❌ ${outcome.sentence}${before}${after}`);
+    }
+    pushed.set(unit.decision.tag, outcome);
+  }
+  return pushed;
+}
+
+/** `unit` as the result carries it, with its follow-ups and the push it got. */
+function unitResult(
+  unit: DecidedUnit,
+  config: TagSettings,
+  pushed: ReadonlyMap<string, TagPushed> | null,
+  pushTo: string | null,
+): ReleaseTagUnit {
+  const base = { package: unit.package, dir: unit.dir, inputs: unit.inputs, decision: unit.decision };
+  if (unit.decision.kind !== 'ready') return { ...base, followUps: [] };
+  const { tag, version, ahead } = unit.decision;
+  const target = readPublishTarget(unit.inputs.version.text);
+  const place = { ahead, branch: config.releaseBranch, dir: unit.dir };
+  const mode = config.publishMode;
+  const followUps = followUpsFor(tag, version, target, config.publishCommand, place, pushTo, mode);
+  const ci = mode === 'ci' && ciPublishSentence(tag, version, target) !== null
+    ? { publish: 'ci' as const }
+    : {};
+  const push = pushed?.get(tag);
+  return push === undefined
+    ? { ...base, followUps, ...ci }
+    : { ...base, followUps, pushed: push, ...ci };
+}
+
+/** The `Next:` lines of one unit: its follow-ups, then the CI publish sentence when it has one. */
+function nextLines(unit: ReleaseTagUnit): readonly string[] {
+  const lines = unit.followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`);
+  if (unit.publish !== 'ci' || unit.decision.kind !== 'ready') return lines;
+  const { tag, version } = unit.decision;
+  const sentence = ciPublishSentence(tag, version, readPublishTarget(unit.inputs.version.text));
+  return sentence === null
+    ? lines
+    : [...lines, `${INDENT}${sentence}`];
 }
 
 /** The warning a run prints when HEAD is past the tagged commit, or null when HEAD is the tagged commit. */
@@ -621,33 +649,42 @@ export function pastReleaseWarning(written: TagReady, branch: string): string | 
     + ` was set; they are not in ${written.tag}.`;
 }
 
-/**
- * The lines text mode writes for a run that tagged the commit of
- * `branch` that set the version: the `Pushed` line when `pushed` is
- * given, and the `Next:` heading only over follow-ups there are.
- */
-export function renderTagged(
-  written: TagReady,
-  branch: string,
-  followUps: readonly ReleaseFollowUp[],
-  pushed?: TagPushed,
-): readonly string[] {
-  const where = written.ahead === 0
+/** The lines of one unit: its `Tagged` and `Pushed` lines, or its `Skipped` line. */
+function unitLines(unit: ReleaseTagUnit, branch: string): readonly string[] {
+  const decision = unit.decision;
+  if (decision.kind === 'skipped') return [`Skipped: ${decision.message}.`];
+  if (decision.kind === 'refused') return [];
+  const where = decision.ahead === 0
     ? `the HEAD of ${branch}`
-    : `${written.commit.slice(0, SHORT_COMMIT)}, the commit of ${branch} that set ${written.version}`;
-  const next = followUps.length === 0
-    ? []
-    : ['Next:', ...followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`)];
+    : `${decision.commit.slice(0, SHORT_COMMIT)}, the commit of ${branch} that set ${decision.version}`;
   return [
-    `✅ Tagged ${written.tag} at ${where}.`,
-    ...(pushed === undefined
+    `✅ Tagged ${decision.tag} at ${where}.`,
+    ...(unit.pushed === undefined
       ? []
-      : [`✅ Pushed ${pushed.tag} to ${pushed.remote}.`]),
-    ...next,
+      : [`✅ Pushed ${unit.pushed.tag} to ${unit.pushed.remote}.`]),
   ];
 }
 
-/** One whole run: the readings, the decision, the write it may make, and the lines. */
+/**
+ * The lines text mode writes for a run that tagged on `branch`: one
+ * `Tagged` line per tag in unit order, each with its `Pushed` line when
+ * the tag was pushed, a `Skipped` line per skipped unit, and the
+ * `Next:` heading only over follow-ups there are, every unit's in unit
+ * order, a unit under `release.publish: ci` giving its CI publish
+ * sentence where its publish line would stand.
+ */
+export function renderTagged(units: readonly ReleaseTagUnit[], branch: string): readonly string[] {
+  const lines = units.flatMap(nextLines);
+  const next = lines.length === 0
+    ? []
+    : ['Next:', ...lines];
+  return [...units.flatMap((unit) => unitLines(unit, branch)), ...next];
+}
+
+/**
+ * One whole run: the branch check, every unit's readings and decision,
+ * the writes, the pushes `--push` asks for, and the result.
+ */
 export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): Promise<ReleaseTagResult> {
   expectNoArgument(context.args, RELEASE_TAG_USAGE);
   const push = readSwitch(RELEASE_TAG_PUSH_FLAG, context.flags[RELEASE_TAG_PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
@@ -658,25 +695,27 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
   const git = (seams.git ?? createGitRunner)(project.root);
 
   const inputs = readTagInputs(project.root, git, config);
-  const decision = decideTag(inputs);
-  if (decision.kind === 'refused') {
-    throw new CommandExit(1, `❌ ${decision.message}\nUsage: ${RELEASE_TAG_USAGE}`);
-  }
+  const onBranch = branchRefusal(inputs);
+  if (onBranch !== null) throw refusal([onBranch.message]);
+  const decided = decideUnits(project.root, git, inputs);
+  const ready = readyUnits(decided);
 
-  writeTag(git, decision.tag, decision.commit);
+  writeTags(git, ready);
   const pushed = push
-    ? pushTag(git, decision.tag, config.releaseBranch)
+    ? pushTags(git, ready, config.releaseBranch)
     : null;
-  if (pushed?.outcome === 'failed') throw new CommandExit(pushed.exitCode, `❌ ${pushed.sentence}`);
-  const place: TagPlace = { ahead: decision.ahead, branch: config.releaseBranch };
-  const target = readPublishTarget(inputs.version.text);
   const pushTo = pushed === null
     ? trackedRemote(git, config.releaseBranch)
     : null;
-  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place, pushTo);
-  return pushed === null
-    ? { inputs, written: decision, followUps }
-    : { inputs, written: decision, followUps, pushed };
+  const units = decided.map((unit) => unitResult(unit, config, pushed, pushTo));
+  const root = units[0];
+  const written = root?.decision.kind === 'ready'
+    ? root.decision
+    : null;
+  const followUps = units.flatMap((unit) => unit.followUps);
+  return root?.pushed === undefined
+    ? { inputs, written, followUps, units }
+    : { inputs, written, followUps, units, pushed: root.pushed };
 }
 
 /** The command, reaching git through `seams`; see the module note. */
@@ -685,15 +724,17 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
     ...RELEASE_TAG_DECLARATION,
     run: async (context) => {
       const result = await runTag(context, seams);
-      const past = pastReleaseWarning(result.written, result.inputs.releaseBranch);
-      if (past !== null) context.output.warn(past);
+      for (const unit of result.units) {
+        if (unit.decision.kind !== 'ready') continue;
+        const past = pastReleaseWarning(unit.decision, result.inputs.releaseBranch);
+        if (past !== null) context.output.warn(past);
+      }
       if (context.outputMode === 'json') {
         context.output.result(result);
         return;
       }
       // The release branch IS the branch checked out: a run that got here passed the branch check.
-      const lines = renderTagged(result.written, result.inputs.releaseBranch, result.followUps, result.pushed);
-      for (const line of lines) context.output.info(line);
+      for (const line of renderTagged(result.units, result.inputs.releaseBranch)) context.output.info(line);
     },
   };
   return Object.freeze(command);

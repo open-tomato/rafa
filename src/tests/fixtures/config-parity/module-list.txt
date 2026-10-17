@@ -1,5 +1,5 @@
 exit 0
 --- stdout
-warn: rafa config: unknown key "unknownParityKey" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)
+warn: rafa config: unknown key "unknownParityKey" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)
 No modules configured.
 --- stderr

@@ -1,5 +1,5 @@
 /**
- * `RELEASE_FEATURE` source: the `release` subject and its three lazy
+ * `RELEASE_FEATURE` source: the `release` subject and its seven lazy
  * commands, read off `index.ts` as text through the TypeScript parser.
  *
  * The static imports of `index.ts` are read off its source, so a command
@@ -24,6 +24,10 @@ const LOADED_AS: readonly (readonly [string, string])[] = [
   ['./status.js', 'RELEASE_STATUS_DECLARATION'],
   ['./settle.js', 'RELEASE_SETTLE_DECLARATION'],
   ['./tag.js', 'RELEASE_TAG_DECLARATION'],
+  ['./publish.js', 'RELEASE_PUBLISH_DECLARATION'],
+  ['./workflows.js', 'RELEASE_WORKFLOWS_DECLARATION'],
+  ['./fragment.js', 'RELEASE_FRAGMENT_DECLARATION'],
+  ['./list.js', 'RELEASE_LIST_DECLARATION'],
 ];
 
 /**

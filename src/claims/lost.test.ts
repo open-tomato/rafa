@@ -31,6 +31,11 @@ const BRANCH = 'feat/rafa-7-claim-lost';
 /** The branch its commits are kept on. */
 const LOST = 'lost/rafa-7-claim-lost';
 
+/** A `naming.branch` template other than the default, the claim branch under it, and its lost branch. */
+const WORK_TEMPLATE = 'work/{stub}';
+const WORK_BRANCH = 'work/rafa-7-x';
+const WORK_LOST = 'lost/rafa-7-x';
+
 /** The store ids the two devices claim under. */
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
@@ -167,6 +172,73 @@ describe('lostBranchFor', () => {
   it('throws on a branch that is no claim branch', () => {
     expect(() => lostBranchFor('feat/other')).toThrow('is not a feat/rafa-<n> branch');
     expect(() => lostBranchFor('main')).toThrow('is not a feat/rafa-<n> branch');
+  });
+});
+
+describe('lostBranchFor under a template', () => {
+  it('answers lost/<stub> for a claim branch under the template', () => {
+    expect(lostBranchFor(WORK_BRANCH, WORK_TEMPLATE)).toBe(WORK_LOST);
+  });
+
+  it('leaves the default template\'s answer unchanged when no template is given', () => {
+    expect(lostBranchFor('feat/rafa-7-x')).toBe('lost/rafa-7-x');
+    // Control: the template branch is no claim branch under the default.
+    expect(() => lostBranchFor(WORK_BRANCH)).toThrow('is not a feat/rafa-<n> branch');
+  });
+
+  it('throws on a default-template branch under another template, naming that template', () => {
+    expect(() => lostBranchFor('feat/rafa-7-x', WORK_TEMPLATE)).toThrow('is not a work/rafa-<n> branch');
+  });
+});
+
+describe('readRefusedPush under the work/{stub} template', () => {
+  /** `a` claims #7 on `work/rafa-7-x`, commits work on it, and `b` takes the claim; answers the work and the new tip. */
+  function plantTakenWorkClaim(name: string): { readonly trio: Trio; readonly work: string; readonly newTip: string } {
+    const trio = plantTrio(name);
+    const made = makeOwnershipCommit(trio.a, 'main', { action: 'claim', issue: 7, store: STORE_A });
+    if (!made.ok) throw new Error(made.reason);
+    if (pushNewClaimBranch(trio.a, made.sha, WORK_BRANCH, WORK_TEMPLATE).outcome !== 'pushed') throw new Error('claim push');
+    const work = workOn(trio.a, made.sha, 'feat: work of device a');
+    must(trio.a, ['update-ref', `refs/heads/${WORK_BRANCH}`, work]);
+    if (!fetchClaimBranches(trio.b, WORK_TEMPLATE).ok) throw new Error('b could not fetch');
+    const lease = must(trio.b, ['rev-parse', `refs/remotes/origin/${WORK_BRANCH}`]);
+    const take = makeOwnershipCommit(trio.b, lease, { action: 'take', issue: 7, store: STORE_B });
+    if (!take.ok) throw new Error(take.reason);
+    if (pushOwnershipCommit(trio.b, take.sha, WORK_BRANCH, lease, WORK_TEMPLATE).outcome !== 'pushed') throw new Error('take push');
+    const pushed = trio.a(['push', 'origin', WORK_BRANCH]);
+    expect(pushed.ok).toBe(false);
+    expect(pushed.stderr).toContain('[rejected]');
+    return { trio, work, newTip: take.sha };
+  }
+
+  it('keeps lost/<stub> for a refused push on work/rafa-7-x, fetching the template\'s branches', () => {
+    const { trio, work, newTip } = plantTakenWorkClaim('work-taken');
+    const calls: string[][] = [];
+
+    const lost = asLost(readRefusedPush(recording(trio.a, calls), {
+      branch: WORK_BRANCH,
+      branchTemplate: WORK_TEMPLATE,
+      storeId: STORE_A,
+      replacedIds: [],
+    }));
+
+    expect(lost).toMatchObject({ issue: 7, branch: WORK_BRANCH, owner: STORE_B, remoteTip: newTip });
+    expect(lost.kept).toEqual({ state: 'created', name: WORK_LOST, sha: work });
+    expect(tipOf(trio.a, `refs/heads/${WORK_LOST}`)).toBe(work);
+    expect(tipOf(trio.origin, `refs/heads/${WORK_BRANCH}`)).toBe(newTip);
+    expect(calls.find((argv) => argv[0] === 'fetch')).toContain('+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+    expect(calls.some((argv) => argv[0] === 'push')).toBe(false);
+  });
+
+  it('reads the same refused push with the template left out as no claim branch, keeping nothing', () => {
+    const { trio } = plantTakenWorkClaim('work-control');
+    const calls: string[][] = [];
+
+    const reading = readRefusedPush(recording(trio.a, calls), { branch: WORK_BRANCH, storeId: STORE_A, replacedIds: [] });
+
+    expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'not-a-claim-branch', branch: WORK_BRANCH });
+    expect(calls).toEqual([]);
+    expect(tipOf(trio.a, `refs/heads/${WORK_LOST}`)).toBeNull();
   });
 });
 

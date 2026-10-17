@@ -10,10 +10,14 @@
  * The line first: exactly one argument, a positive whole number with no
  * leading zero. Then this device's store id (`src/claims/device.ts`),
  * since a claim names a store and a device with no id holds none. Then
- * one fetch of the `feat/rafa-*` branches (`src/claims/git.ts`) and
- * every remote branch of the issue, `feat/rafa-<n>` or
- * `feat/rafa-<n>-<slug>`, read as that fetch left it. No network means
- * no release: the remote is the authority on who holds a claim, and a
+ * one fetch of the claim branches the `naming.branch` template names
+ * (`src/claims/git.ts`), `feat/rafa-*` by default, and every remote
+ * branch of the issue, the template with the stub `rafa-<n>` or
+ * `rafa-<n>-<slug>` (`feat/rafa-<n>-<slug>` by default), read as that
+ * fetch left it. Only the configured template is read: under
+ * `work/{stub}` the issue's branch is `work/rafa-<n>-<slug>`, and a
+ * `feat/rafa-<n>-<slug>` beside it is no claim. No network means no
+ * release: the remote is the authority on who holds a claim, and a
  * release that could not be pushed would release nothing.
  *
  * ## What it pushes
@@ -39,7 +43,7 @@
  *
  * No local ref, index or working tree moves. The push itself writes
  * `refs/remotes/origin/<branch>` (measured in `src/claims/plan-claim.ts`),
- * and a local `feat/<stub>` is left where it was: its work commits are
+ * and a local branch of that name is left where it was: its work commits are
  * the owner's to keep, and a later `loop start` reads the remote,
  * finds the claim released, and refuses the run.
  *
@@ -76,7 +80,10 @@
  * branches the same way and pushes its commit the same way.
  * {@link readClaimDevice} answers the store's id with the ids it
  * replaced, for a caller that compares a holder; {@link readClaimStoreId}
- * answers the id alone.
+ * answers the id alone. {@link readIssueBranches} and
+ * {@link pushOnClaimTip} take the template as a trailing argument, the
+ * default `feat/{stub}` when left out; a release passes its seams'
+ * `branchTemplate`.
  */
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
@@ -87,10 +94,11 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { holdsClaim } from '../../claims/device.js';
 import {
+  claimBranchGlob,
   claimBranchIssue,
   fetchClaimBranches,
   makeOwnershipCommit,
@@ -99,7 +107,7 @@ import {
 } from '../../claims/git.js';
 import { unlabelReleased } from '../../claims/labels.js';
 import { gitSaid } from '../../pr/index.js';
-import { BRANCH_PREFIX, REMOTE } from '../../start/branch-decision.js';
+import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { expectOneArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
@@ -122,6 +130,11 @@ export interface ClaimCommandSeams {
   readonly board: IssueBoard | null;
   /** This device's store id; `readDeviceStoreId` over the project. */
   readonly readStoreId: () => DeviceStoreId;
+  /**
+   * The `naming.branch` template the claim branches are named under,
+   * `config.namingBranch`; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** Makes the seams for the project at `root` under `config`. */
@@ -194,22 +207,30 @@ export function readClaimStoreId(seams: ClaimCommandSeams, refuseWith: (message:
 }
 
 /**
- * Every branch of `issue` on the remote, read after one fetch; a refusal
- * for a fetch or a listing that fails, and for an issue with none.
+ * Every branch of `issue` on the remote under `template`, read after one
+ * fetch of the claim branches it names; a refusal for a fetch or a
+ * listing that fails, and for an issue with none, naming the branch the
+ * template gives the issue: `feat/rafa-<n>-<slug>` by default.
  */
-export function readIssueBranches(git: GitRunner, issue: number, refuseWith: (message: string) => CommandExit): readonly ClaimBranchReading[] {
-  const fetched = fetchClaimBranches(git);
+export function readIssueBranches(
+  git: GitRunner,
+  issue: number,
+  refuseWith: (message: string) => CommandExit,
+  template: string = DEFAULT_BRANCH_TEMPLATE,
+): readonly ClaimBranchReading[] {
+  const fetched = fetchClaimBranches(git, template);
   if (!fetched.ok) throw refuseWith(fetched.reason);
-  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${BRANCH_PREFIX}`]);
+  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${claimBranchGlob(template)}`]);
   if (!listed.ok) throw refuseWith(`the ${REMOTE} branches could not be listed: ${gitSaid(listed)}`);
   const branches = listed.stdout
     .split('\n')
     .map((line) => line.trim())
-    .filter((name) => name !== '' && claimBranchIssue(name) === issue);
+    .filter((name) => name !== '' && claimBranchIssue(name, template) === issue);
   if (branches.length === 0) {
-    throw refuseWith(`${REMOTE} has no ${BRANCH_PREFIX}rafa-${String(issue)}-<slug> branch, so #${String(issue)} carries no claim`);
+    const shape = branchFromTemplate(template, `rafa-${String(issue)}-<slug>`);
+    throw refuseWith(`${REMOTE} has no ${shape} branch, so #${String(issue)} carries no claim`);
   }
-  return branches.map((branch) => readClaimBranch(git, branch));
+  return branches.map((branch) => readClaimBranch(git, branch, template));
 }
 
 /** Why `reading` is not a claim this store may release. */
@@ -253,6 +274,7 @@ export function findOwnedBranch(
 /**
  * Pushes the ownership commit `record` makes on `reading`'s tip, leased
  * on it; answers the commit's sha, or a refusal made by `refuseWith`.
+ * `template` is the one {@link readIssueBranches} read `reading` under.
  */
 export function pushOnClaimTip(
   git: GitRunner,
@@ -260,11 +282,12 @@ export function pushOnClaimTip(
   record: ClaimRecord,
   refuseWith: (message: string) => CommandExit,
   doing: ClaimDoing,
+  template: string = DEFAULT_BRANCH_TEMPLATE,
 ): string {
   const { branch, tip } = reading;
   const made = makeOwnershipCommit(git, tip, record);
   if (!made.ok) throw refuseWith(made.reason);
-  const pushed = pushOwnershipCommit(git, made.sha, branch, tip);
+  const pushed = pushOwnershipCommit(git, made.sha, branch, tip, template);
   if (pushed.outcome === 'moved') {
     throw refuseWith(`${branch} moved on ${REMOTE} while the claim on #${String(record.issue)} ${doing.during}; ${doing.nothing}. Run it again to read the branch afresh`);
   }
@@ -280,8 +303,10 @@ export async function releaseClaim(context: RafaContext, makeSeams: ClaimSeamsFa
   const seams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
-  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, RELEASING);
-  const sha = pushOnClaimTip(seams.git, reading, { action: 'release', issue, store: storeId }, refuse, RELEASING);
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse, template), { issue, device }, refuse, RELEASING);
+  const record: ClaimRecord = { action: 'release', issue, store: storeId };
+  const sha = pushOnClaimTip(seams.git, reading, record, refuse, RELEASING, template);
   const label = await unlabelReleased(seams.board, issue);
   const labelWarning = label.outcome === 'warning'
     ? label.warning
@@ -295,8 +320,14 @@ export function renderRelease(result: ClaimReleaseResult): string {
     + ` release commit ${result.sha} pushed to ${REMOTE}.`;
 }
 
-/** The default seams: the ones `loop start`'s claim check reads through. */
-const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => createStartPreflightClaim(root, config);
+/**
+ * The default seams: the ones `loop start`'s claim check reads through,
+ * with the claim branches named under `config.namingBranch`.
+ */
+const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
+  ...createStartPreflightClaim(root, config),
+  branchTemplate: config.namingBranch,
+});
 
 /** The command, reaching git, the board and the store through `makeSeams`; see the module note. */
 export function createClaimReleaseCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {

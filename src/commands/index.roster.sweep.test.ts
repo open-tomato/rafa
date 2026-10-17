@@ -5,7 +5,12 @@
  * `BUNDLED_FEATURES` and `ROSTER_SUBJECTS` hold, and `rafa describe`
  * lists the subjects of `ROSTER_SUBJECTS` in its order and the command
  * names it listed at `origin/stretch/102`, with `docs plan` registered
- * since after `bug codes` and `config show` since after `config set`.
+ * since after `bug codes`, `config show` since after `config set`,
+ * `release list` since after `release tag`, `release publish` since
+ * between those two, `release workflows` since between `release
+ * publish` and `release list` and `release fragment` since between
+ * `release workflows` and `release list`, and `bug recheck` since after
+ * `bug codes`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -25,7 +30,7 @@ const REPO_ROOT = resolve(HERE, '..', '..');
 const DEFAULT_IMPORT = /^import (\w+) from '(\.\/[^']+)\.js';$/gm;
 const NAMED_IMPORT = /^import \{ (\w+) \} from '(\.\/[^']+\/(?:declarations|index))\.js';$/gm;
 
-/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan` and `config show` added: `<subject> <action>`, then top-level names. */
+/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list`, `release publish`, `release workflows`, `release fragment` and `bug recheck` added: `<subject> <action>`, then top-level names. */
 const BASE_NAMES: readonly string[] = [
   'plan create',
   'plan list',
@@ -89,6 +94,10 @@ const BASE_NAMES: readonly string[] = [
   'release status',
   'release settle',
   'release tag',
+  'release publish',
+  'release workflows',
+  'release fragment',
+  'release list',
   'board list',
   'board sync',
   'epic show',
@@ -115,6 +124,7 @@ const BASE_NAMES: readonly string[] = [
   'stretch item',
   'stretch end',
   'bug codes',
+  'bug recheck',
   'docs plan',
   'status',
   'next',
@@ -174,7 +184,7 @@ describe('the commands roster', () => {
     });
   });
 
-  it('lists through `rafa describe` the same command names as at origin/stretch/102, docs plan and config show added', () => {
+  it('lists through `rafa describe` the same command names as at origin/stretch/102, docs plan, config show, release list, release publish, release workflows, release fragment and bug recheck added', () => {
     // Arrange
     const spawned = Bun.spawnSync(['bun', 'src/rafa.ts', 'describe'], { cwd: REPO_ROOT, stderr: 'pipe' });
 

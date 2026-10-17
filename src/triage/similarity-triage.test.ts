@@ -79,6 +79,35 @@ const DISJOINT: ReportBug = {
   extras: [],
 };
 
+/** The cause both bugs of the cause cases carry. */
+const SHARED_CAUSE = 'git:no-identity';
+
+/** A bug with {@link SHARED_CAUSE}: 6 distinct words, two of which {@link CAUSE_SECOND} shares. */
+const CAUSE_FIRST: ReportBug = {
+  what: 'Quokka wombat zebra',
+  artifact: 'marmot ferret dingo',
+  security: false,
+  kind: 'bug',
+  module: null,
+  action: null,
+  reproduce: null,
+  cause: SHARED_CAUSE,
+  extras: [],
+};
+
+/** Shares `ferret` and `dingo` with {@link CAUSE_FIRST}: 2 of 10 words, a score of 0.2. */
+const CAUSE_SECOND: ReportBug = {
+  what: 'Lemur ibex okapi',
+  artifact: 'ferret dingo tapir',
+  security: false,
+  kind: 'bug',
+  module: null,
+  action: null,
+  reproduce: null,
+  cause: SHARED_CAUSE,
+  extras: [],
+};
+
 /** What {@link REWORDED} scores against {@link FIRST}, as a filed text shows it. */
 const MATCH_SCORE = '0.71';
 
@@ -86,6 +115,9 @@ const MATCH_SCORE = '0.71';
 const DEFAULTS: NonNullable<TriageOptions['similarity']> = {
   triageSimilarityThreshold: 0.3,
   triageSimilarityCandidates: 3,
+  triageSimilarityWeightsCauseLeaf: 0.15,
+  triageSimilarityWeightsCauseFamily: 0.05,
+  triageSimilarityWeightsBoundary: 0.1,
 };
 
 /** The method names a recorded tracker was asked, in order. */
@@ -297,7 +329,7 @@ describe('no open bug at the threshold', () => {
     await session(FIRST);
     await session(UNRELATED);
 
-    await session(REWORDED, { triageSimilarityThreshold: 0.9, triageSimilarityCandidates: 1 });
+    await session(REWORDED, { ...DEFAULTS, triageSimilarityThreshold: 0.9, triageSimilarityCandidates: 1 });
 
     const filed = issueTexts(issuesDir)[2]!;
     const listed = listedDuplicates(filed);
@@ -313,7 +345,7 @@ describe('no open bug at the threshold', () => {
     expect(result.bugs[0]).toMatchObject({ action: 'filed', problem: null });
     const filed = issueTexts(issuesDir)[1]!;
     expect(filed).toContain('## Possible duplicates');
-    expect(filed).toContain('No open bug shares a word with this one.');
+    expect(filed).toContain('No open bug shares a word, a cause or a module and action with this one.');
   });
 });
 
@@ -395,5 +427,52 @@ describe('a listing that fails', () => {
     expect(result.bugs[0]?.problem).toBe('the public tracker openIssues failed: gh issue list refused');
     expect(callsSince(calls, mark)).toEqual(['find', 'openIssues']);
     expect(issueTexts(issuesDir)).toHaveLength(1);
+  });
+});
+
+describe('an open bug sharing a cause leaf with a new bug at a word score of 0.2', () => {
+  it('is listed under Possible duplicates naming the cause, the new bug filed', async () => {
+    const { issuesDir, session } = freshCase();
+    await session(CAUSE_FIRST);
+
+    const result = await session(CAUSE_SECOND, DEFAULTS);
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null, problem: null });
+    expect(issueTexts(issuesDir)).toHaveLength(2);
+    expect(listedDuplicates(issueTexts(issuesDir)[1]!)).toEqual(['- local issue 1 (score 0.35; same cause)']);
+  });
+
+  it('is not listed with the causeLeaf weight at 0', async () => {
+    const { issuesDir, session } = freshCase();
+    await session(CAUSE_FIRST);
+
+    const result = await session(CAUSE_SECOND, { ...DEFAULTS, triageSimilarityWeightsCauseLeaf: 0 });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null, problem: null });
+    const filed = issueTexts(issuesDir)[1]!;
+    expect(listedDuplicates(filed)).toEqual(['- local issue 1 (score 0.20)']);
+    expect(filed).not.toContain('same cause');
+  });
+
+  it('still comments on a match at the threshold on words alone, the bonus not counted', async () => {
+    const { calls, session } = freshCase();
+    await session(CAUSE_FIRST);
+    const mark = calls.length;
+
+    const result = await session(CAUSE_SECOND, { ...DEFAULTS, triageSimilarityThreshold: 0.2 });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'similarity' });
+    expect(result.bugs[0]?.score).toBeCloseTo(0.2, 10);
+    expect(callsSince(calls, mark)).toEqual(['find', 'openIssues', 'comment']);
+  });
+
+  it('files new at a threshold just above the words, though the bonus would lift the rank over it', async () => {
+    const { issuesDir, session } = freshCase();
+    await session(CAUSE_FIRST);
+
+    const result = await session(CAUSE_SECOND, { ...DEFAULTS, triageSimilarityThreshold: 0.3 });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null });
+    expect(listedDuplicates(issueTexts(issuesDir)[1]!)).toEqual(['- local issue 1 (score 0.35; same cause)']);
   });
 });

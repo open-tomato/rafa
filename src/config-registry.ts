@@ -105,6 +105,7 @@ import {
   BOARD_PROJECT_LIMIT_SETTINGS,
   BOARD_PROJECT_SECTION,
 } from './config-schema-board-project.js';
+import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from './config-schema-bugs.js';
 import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from './config-schema-checks.js';
 import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
 import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from './config-schema-features.js';
@@ -150,6 +151,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   BOARD_PROJECT_SECTION,
   TRIAGE_SECTION,
   ERRORS_SECTION,
+  BUGS_SECTION,
   LOGGER_SECTION,
   ISSUES_SECTION,
   TESTS_SECTION,
@@ -259,6 +261,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...TRIAGE_DEFAULTS,
   ...RELEASE_DEFAULTS,
   ...ERRORS_DEFAULTS,
+  ...BUGS_DEFAULTS,
   ...LOGGER_DEFAULTS,
   ...ISSUES_DEFAULTS,
   ...run(CORE_VALUES, CORE_CLEANUP),
@@ -289,6 +292,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = Objec
   ...TRIAGE_SETTINGS,
   ...RELEASE_SETTINGS,
   ...ERRORS_SETTINGS,
+  ...BUGS_SETTINGS,
   ...LOGGER_SETTINGS,
   ...ISSUES_SETTINGS,
   ...run(CORE_SPECS, CORE_CLEANUP),

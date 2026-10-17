@@ -336,8 +336,9 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
         ...prLifecycleSeamsIn(checkout),
         readProvider,
         // A refused push reads this device's store id from the
-        // project root, where the store lives, not the checkout.
-        readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),
+        // project root, where the store lives, not the checkout, and
+        // the claim branch under the run's own `naming.branch`.
+        readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings), settings.namingBranch),
       },
       session,
     );

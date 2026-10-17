@@ -1,11 +1,12 @@
 /**
  * The barrel over the config's value readers: every name
- * `config-sections.ts` and `config-readers.ts` export, and nothing else.
+ * `config-sections.ts`, `config-readers.ts` and `branch-template.ts`
+ * export, and nothing else.
  *
- * A file outside `packages/rafa/src/core/` imports this file and never the two behind
+ * A file outside `packages/rafa/src/core/` imports this file and never the three behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `packages/rafa/src/core/` imports the two directly and never this file.
+ * file inside `packages/rafa/src/core/` imports the three directly and never this file.
  *
  * ## Why the pair has a barrel of its own
  *
@@ -23,16 +24,22 @@
  * longer what keeps the two barrels apart; they stay as the move left
  * them, a name with one barrel to be learned from.
  *
+ * `branch-template.ts` joined the pair with the readers of a branch name
+ * through the `naming.branch` template, `branchGlob` and `stubOfBranch`.
+ * It imports `config-readers.ts` alone, so it is a leaf as the pair is,
+ * and it sits beside `branchFromTemplate`, the writer it reads back.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the entries
  * `src/index.ts` and `src/plan/index.ts` spell theirs.
  *
- * `sections.test.ts` holds the list to the two files: every name either
- * exports is here once, as the same binding, and no name is here that
- * neither exports.
+ * `sections.test.ts` holds the list to the three files: every name any
+ * of them exports is here once, as the same binding, and no name is here
+ * that none of them exports.
  */
 export type {
+  ReleasePublishMode,
   ReleaseSettleMode,
   ReleaseStrategy,
   ReleaseTagMode,
@@ -63,6 +70,7 @@ export type {
   ValueAt,
 } from './config-sections.js';
 
+export { branchGlob, stubOfBranch } from './branch-template.js';
 export {
   BRANCH_STUB,
   branchFromTemplate,
@@ -72,10 +80,12 @@ export {
   fragmentsDirectory,
   isBranchTemplate,
   mapOf,
+  RELEASE_PUBLISH_MODES,
   RELEASE_SETTLE_MODES,
   RELEASE_STRATEGIES,
   RELEASE_TAG_MODES,
   releaseFile,
+  releasePublishMode,
   releaseSettleMode,
   releaseStrategy,
   releaseTagMode,

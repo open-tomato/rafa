@@ -220,10 +220,19 @@ merged now. The fragment is stored under `release.fragments` (default
 waiting and suggests running settle. `rafa pr list` marks forecasts as
 `(base moved)` if the base branch changed since the forecast was written.
 
+A workspace package under `packages/` that is not `private: true` can release
+on its own. A fragment names it with a fourth front-matter line,
+`package: <name>` (the package's manifest `name`); a fragment without the line
+is the root's. Settle then moves that package's version, changelog and tag
+beside the root's, and `rafa release list` prints one row per unit that
+releases: the root, then each publishable package, with its version, waiting
+fragments and newest tag. `context/release.md` has the rules.
+
 Every project starts with fragments settling to the base branch and tagging
 by hand. You can configure settle to open a pending release pull request
 instead (for protected base branches), and have settle tag the commit
-automatically (for CI ownership of releases). Four keys, all optional:
+automatically (for CI ownership of releases). Every key is optional; the
+examples below set `release.settle`, `release.tag` and `pr.versionCollision`:
 
 ```yaml
 # Empty config: fragments in .changes/, semver-by-level, settle pushes, tags by hand
@@ -244,15 +253,74 @@ pr:
   versionCollision: refuse
 ```
 
-The keys are: `release.fragments` (path, default `.changes/`), `release.strategy`
-(fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
-default `push`), `release.tag` (`manual` or `settle`, default `manual`),
-`release.publishCommand` (the publish line `rafa release tag` prints and never
-runs, default `npm publish`), and `release.moveLock` (`true` has settle write
-`rafa.lock` in its release commit, default `false`). `pr.versionCollision`
-controls what happens when a merge would collide (default `report`). Read `context/release.md` for the full design,
-`docs/ci-release-settle.md` for automating settle in CI, and
-`rafa release settle --help` for the settle command.
+The keys are: `release.fragments` (path, default `.changes/`),
+`release.strategy` (fold strategy, default `semver-by-level`),
+`release.settle` (`push` or `pr`, default `push`), `release.tag` (`manual` or
+`settle`, default `manual`), `release.publish` (`manual` or `ci`, who publishes
+a tagged version, default `manual`), `release.publishCommand` (the publish line
+`rafa release tag` prints and `rafa release publish` runs in each tagged unit's
+folder, default `npm publish`), `release.moveLock` (`true` has settle write
+`rafa.lock` in its release commit, default `false`), and `pr.versionCollision`
+(what happens when a merge would collide, default `report`). Read
+`context/release.md` for the full design, `docs/ci-release-settle.md` for
+automating settle in CI, and `rafa release settle --help` for the settle
+command.
+
+### The release ladder
+
+The release keys step a project up a ladder, one level at a time, from nothing
+on its own (0) to a release on every merge (4):
+
+| Level | `release.settle` | `release.tag` | `release.publish` | Runs on its own |
+|---|---|---|---|---|
+| 0 Manual | any | `manual` | `manual` | nothing |
+| 1 Settle tags | `push` | `settle` | `manual` | version, changelog and tag in one settle |
+| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and publishes with provenance |
+| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags and publishes |
+| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags |
+
+`rafa doctor` prints the reading of the keys as its `Release ladder:` row, with
+what the level still needs. The row never refuses a setting. The release order
+across packages is parked until two publishable packages depend on each other.
+
+To move to level 2, where a pushed tag publishes, take four steps:
+
+1. Set the key in `.rafa/config.yaml`:
+
+   ```yaml
+   release:
+     publish: ci
+   ```
+
+2. Run `rafa release workflows --write`. It writes
+   `.github/workflows/release-publish.yml` from the shipped template. A file
+   already at that path is left as it is.
+3. On npmjs.com, add a trusted publisher for the package that names this
+   repository and `release-publish.yml`. Trusted publishing needs npm 11.5.1 or
+   newer.
+4. In the repository's GitHub settings, open Settings > Secrets and variables >
+   Actions > Variables, and add the repository variable `RAFA_RELEASE_PUBLISH`
+   with the value `ci`. From a shell, the same is:
+
+   ```bash
+   gh variable set RAFA_RELEASE_PUBLISH --body ci
+   ```
+
+Until the variable is `ci`, the publish job is skipped, and a skipped job is not
+a failed run. Then `rafa release tag --push` tags the release and pushes the
+tag, and the publish workflow runs the gates and publishes it with provenance.
+
+The release commands beyond settle and tag:
+
+```bash
+rafa release publish [--tag=<tag>] [--dry-run]   # publishCommand in each unit tagged at HEAD
+rafa release workflows [--write]                  # the ladder's workflow files
+rafa release fragment --plan=<id> --level=<level> --title=<text>   # a branch with no wrap-up
+```
+
+`rafa release publish` skips a version the registry already holds, so a rerun
+after a publish that stopped halfway publishes only the units the registry
+lacks.
 
 ### Tracking effort and learning from skills
 

@@ -1080,6 +1080,23 @@ describe('refusedPushReaderIn, over a bare remote and two clones', () => {
     expect(reading.outcome === 'not-lost' && reading.cause).toBe('not-a-claim-branch');
     expect(asked).toBe(0);
   });
+
+  it('reads a branch under the template it is given as a claim branch, and the same branch without it as none', () => {
+    let asked = 0;
+    const readStoreId = (): DeviceStoreId => {
+      asked += 1;
+      return STORE_A;
+    };
+
+    // `scope` is no repository, so the fetch fails: reaching it at all
+    // shows the branch was read as claim branch #7 under the template.
+    const underTemplate = refusedPushReaderIn(scope, readStoreId, 'work/{stub}')('work/rafa-7-x');
+    const withoutTemplate = refusedPushReaderIn(scope, readStoreId)('work/rafa-7-x');
+
+    expect(underTemplate).toMatchObject({ outcome: 'unknown', issue: 7, branch: 'work/rafa-7-x' });
+    expect(withoutTemplate).toMatchObject({ outcome: 'not-lost', cause: 'not-a-claim-branch' });
+    expect(asked).toBe(1);
+  });
 });
 
 describe('PR_LIFECYCLE_SEAMS', () => {
@@ -1200,7 +1217,7 @@ describe('the gate as start() calls it, through runWrapUp', () => {
   it('reads a refused push in the checkout, and the store id at the project root under the run\'s store', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
 
-    expect(gateCall(wrapUpRun())).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),');
+    expect(gateCall(wrapUpRun())).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings), settings.namingBranch),');
     // The `settings` read there is the run's own config, as `start()` hands it over.
     expect(start).toContain('settings: runConfig.config,');
   });

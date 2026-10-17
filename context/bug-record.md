@@ -185,6 +185,86 @@ module, action and summary, the last three read back from each title
 `-`, so a bug filed before the template lists whole under summary. Json
 mode is unchanged.
 
+### Recheck
+
+`rafa bug recheck [<n>…] [--all] [--comment]` reruns the test a bug's
+`Rerun` section names and judges whether the bug still reproduces
+(`src/commands/bug/recheck.ts`). It reads `Rerun` strictly as a test
+reference, `bun test <file> [-t "<case>"]`, through
+`readTestReference` (`src/bugs/test-reference.ts`). Any other text is
+`manual`: a `rafa` line, a shell line, a command an issue body writes,
+and a bug with no `Rerun` at all. rafa prints the record's `Reproduce`
+text for it and runs nothing.
+
+The `-t` value is read as a POSIX shell reads a double-quoted string: a
+backslash before a backslash, a double quote, `$` or a backtick stands
+for that character, any other backslash is kept with the character
+after it, and the closing quote is the first double quote not escaped
+that way. So the value triage writes for a case holding a regular
+expression's special character runs as the pattern a shell would hand
+bun: `-t "a \\(case\\)"` runs as `a \(case\)` and matches the case
+`a (case)`. A value ending in an odd backslash before its closing quote
+is refused as an unterminated double quote. An unescaped `$` or backtick
+inside the value is `manual`, with the reason "a shell character $
+inside the -t value": a shell would expand it, so the value would not
+mean what it says.
+
+Two gates come before a run. The reference's shape and boundary: its
+file is resolved against the checkout's root, by real path, so a
+symlink out is outside too. Outside is `manual`; a file that is not
+there is `stale`. The author's trust: read for a runnable bug only,
+and never on the `local` tracker, which holds no accounts. The author
+is `editable(ref)`'s, weighed once per login by `readBoardTrust`. An
+untrusted author is `skipped`, with "opened by <login>, " and the
+reason from `trustRefusalClause`; nothing runs for it, and the rest of
+a sweep still runs.
+
+The argv is built by rafa and given to `runSuite` with no shell: the
+file as `./<path>`, the case as its own word after `-t`. The child's
+environment is `suiteEnv(process.env)` with every variable
+`namedSecrets` names removed, and the report lists the names it left
+out. A run passing its deadline is a failed run, and the report says
+it timed out.
+
+A run is judged by its JUnit cases of the file. A failed case, or a
+timed-out run, is `reproduces` when it is the first run. A first run
+that passes, then `runs` further runs, gives `gone` when every one of
+them passes and `flaky` when one fails: `flaky` is a judgement of its
+own, never "probably fixed". `stale` is a run that left no report, ran
+no test of the file, or named a case the file does not hold. The six
+verdicts are `reproduces`, `gone`, `flaky`, `stale`, `manual` and
+`skipped`.
+
+Runs go in the directory rafa runs in, so a machine-dependent test can
+read `gone` here and fail elsewhere. The report names where it ran, and
+`--comment` names the rafa version and the short commit, with
+`-dirty` when the checkout has changes.
+
+`--comment` writes only on `gone` and `flaky`, one line through the
+record's redaction, and never closes a bug. A `gone` comment reads
+"gone at rafa <version>, `<commit>`: `<reference>` passed <n> runs";
+a `flaky` one reads "flaky at rafa ..." with the failed count. A
+degraded issue chain (`resolveIssueTracker`) exits 1 before any issue
+is read.
+
+Exit code 0 with one row per bug as the terminal result's data,
+whatever the verdicts. Exit code 1 for a refused line, a config the
+reader refuses, a degraded chain and a listing that failed. The
+command starts no Claude session.
+
+With no `bugs` section, the defaults hold: 5 further runs after a pass,
+300 seconds a run. A set section looks like this:
+
+```yaml
+bugs:
+  recheck:
+    runs: 10              # 1..20, default 5: further runs after a pass
+    timeoutSeconds: 600   # 1..3600, default 300: one run's deadline
+```
+
+Both keys refuse `0`, a fraction, a quoted number and a boolean, and
+neither has an "off" spelling. The reader is `src/config-schema-bugs.ts`.
+
 ### `--dry-run`
 
 `rafa issue create --dry-run`, for any type, makes the draft, prints its

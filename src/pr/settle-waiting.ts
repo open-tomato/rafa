@@ -28,7 +28,8 @@ import type { MergeGuardSettings } from '../release/guard-merge.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { resolveReleaseEnabled } from '../release/enabled.js';
-import { readSettle } from '../release/settle.js';
+import { moveSpelling } from '../release/release-move.js';
+import { readSettle, settleMoves } from '../release/settle.js';
 
 /**
  * The remote whose `<base>` the dry run reads. `merge-cleanup.ts` has
@@ -54,9 +55,13 @@ export interface SettleWaitingPlace {
 export interface SettleWaiting {
   /** The base branch the fragments wait on, e.g. `main`. */
   readonly base: string;
-  /** How many fragments the fold took, `level: none` ones included. */
+  /** How many fragments the folded units took, `level: none` ones included. */
   readonly fragments: number;
-  /** The version settle would write. */
+  /**
+   * The versions settle would write, one per unit in unit order: the
+   * root's bare, a package's as `<name>@<version>` (`moveSpelling`),
+   * joined by `, `.
+   */
   readonly version: string;
 }
 
@@ -65,5 +70,8 @@ export function settleWaitingOn(place: SettleWaitingPlace, git: GitRunner): Sett
   if (!resolveReleaseEnabled(place.release, place.root).enabled) return null;
   const reading = readSettle(git, `${SETTLE_REMOTE}/${place.base}`, place.release);
   if (reading.outcome !== 'folded') return null;
-  return { base: place.base, fragments: reading.fragments.length, version: reading.version };
+  const fragments = reading.units.reduce((total, unit) => total + unit.fragments.length, 0);
+  const version = settleMoves(reading).map(moveSpelling)
+    .join(', ');
+  return { base: place.base, fragments, version };
 }

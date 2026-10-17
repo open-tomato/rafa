@@ -221,17 +221,27 @@ describe('createStartPreflightDrift', () => {
   it('counts the project\'s run records and names roadmap.issue as a board', () => {
     const root = rootWith('a1.json', 'b2.json');
 
-    const seams = createStartPreflightDrift(root, { prProvider: 'none', roadmapIssue: 31 });
+    const seams = createStartPreflightDrift(root, { namingBranch: 'feat/{stub}', prProvider: 'none', roadmapIssue: 31 });
 
     expect(seams.runCount()).toBe(2);
     expect(seams.boards).toEqual([31]);
-    expect(createStartPreflightDrift(root, { prProvider: 'none', roadmapIssue: null }).boards).toEqual([]);
+    expect(createStartPreflightDrift(root, { namingBranch: 'feat/{stub}', prProvider: 'none', roadmapIssue: null }).boards).toEqual([]);
   });
 
   it('answers no listing under pr.provider: none, and a listing under gh', () => {
     const root = rootWith();
 
-    expect(createStartPreflightDrift(root, { prProvider: 'none', roadmapIssue: null }).listing()).toBeNull();
-    expect(typeof createStartPreflightDrift(root, { prProvider: 'gh', roadmapIssue: null }).listing()).toBe('function');
+    expect(createStartPreflightDrift(root, { namingBranch: 'feat/{stub}', prProvider: 'none', roadmapIssue: null }).listing()).toBeNull();
+    expect(typeof createStartPreflightDrift(root, { namingBranch: 'feat/{stub}', prProvider: 'gh', roadmapIssue: null }).listing()).toBe('function');
+  });
+
+  it('scans the branches under naming.branch', () => {
+    const root = rootWith();
+
+    const templated = createStartPreflightDrift(root, { namingBranch: 'work/{stub}', prProvider: 'none', roadmapIssue: null });
+    const defaulted = createStartPreflightDrift(root, { namingBranch: 'feat/{stub}', prProvider: 'none', roadmapIssue: null });
+
+    expect(templated.branches().branchTemplate).toBe('work/{stub}');
+    expect(defaulted.branches().branchTemplate).toBe('feat/{stub}');
   });
 });

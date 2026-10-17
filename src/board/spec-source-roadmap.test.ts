@@ -1597,6 +1597,61 @@ describe('pickRoadmapIssue passing over issues whose claim was refused', () => {
   });
 });
 
+/** The one branch the template cases plant: issue 20's, under `work/{stub}`, held only as a remote-tracking ref. */
+const WORK_BRANCH = 'refs/remotes/origin/work/rafa-20-x';
+
+/** A git runner answering {@link WORK_BRANCH} to the local read and nothing else, keeping every command it was sent. */
+function workBranchGit(): { git: GitRunner; sent: () => readonly string[] } {
+  let sent: readonly string[] = [];
+  return {
+    git: (args) => {
+      sent = [...sent, args.join(' ')];
+      return args[0] === 'for-each-ref'
+        ? { ok: true, stdout: `${WORK_BRANCH}\n`, stderr: '' }
+        : { ok: true, stdout: '', stderr: '' };
+    },
+    sent: () => sent,
+  };
+}
+
+describe('pickRoadmapIssue under the configured branch template', () => {
+  it('skips a line whose only branch is under work/{stub} as branch, and picks the line after it', async () => {
+    const { lines, output } = capture();
+    const planted = workBranchGit();
+
+    const resolution = await nextRun({
+      output,
+      seams: { git: planted.git, branchTemplate: 'work/{stub}' },
+    });
+
+    expect(specOf(resolution).issue).toBe(33);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      skipLine({ line: { issue: 17, ticked: true, why: 'the pull request port, merged', lineNumber: 3 }, reason: 'ticked', detail: '' }),
+      skipLine({
+        line: { issue: 20, ticked: false, why: 'pull request commands', lineNumber: 4 },
+        reason: 'branch',
+        detail: WORK_BRANCH,
+      }),
+      pickLine({ issue: 33, ticked: false, why: 'the board setup', lineNumber: 5 }),
+    ]);
+    expect(lines.warn).toEqual([]);
+    expect(planted.sent()).toContain('ls-remote --heads origin');
+  });
+
+  it('picks the same line with the template left out, the control for the case above', async () => {
+    const { lines, output } = capture();
+    const planted = workBranchGit();
+
+    const resolution = await nextRun({ output, seams: { git: planted.git } });
+
+    // The scan read the same ref, so the pick is the template's doing alone.
+    expect(planted.sent()).toContain('for-each-ref --format=%(refname) refs/heads refs/remotes');
+    expect(specOf(resolution).issue).toBe(20);
+    expect(lines.info).toContain(pickLine({ issue: 20, ticked: false, why: 'pull request commands', lineNumber: 4 }));
+  });
+});
+
 /** The line-ahead reading a `--next` resolution answered, or the failure of one that answered none. */
 function aheadOf(resolution: SpecSourceResolution): NonNullable<ResolvedSpec['ahead']> {
   if (resolution.outcome !== 'spec' || resolution.spec.ahead === undefined) {

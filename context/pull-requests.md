@@ -496,7 +496,7 @@ rejected.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. SEVEN routes ask the question. Two are
+someone allowed to change the repo. EIGHT routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
 the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
@@ -537,6 +537,17 @@ which amends the issue body in place. It gates on two ownership checks
 through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
 answers) and whose issue (the issue's author). A lookup that fails refuses
 as `ownership-unknown`, exit 2, before the issue is written.
+
+The EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), which
+runs the test a bug's `Rerun` section names. It IGNORES rather than
+refuses: it asks `readBoardTrust` about the bug's author once per login,
+only for a bug whose reference is runnable and on any tracker but `local`,
+which has no author to check. An untrusted author is a `skipped` row whose
+reason is "opened by <login>, " and `trustRefusalClause`'s clause; an
+author the tracker does not name is `skipped` with no lookup. No board text
+reaches a prompt or a shell through it: the `Rerun` value is parsed, never
+passed on, and the argv is built here. Nothing is spawned for either, and
+the exit code stays 0.
 
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`
@@ -821,7 +832,7 @@ session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it
-lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
+lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup-roadmap.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
@@ -1132,8 +1143,8 @@ and number together; the repository comes from its `url`.
 ### Claims
 
 A claim reserves an issue for one device to work alone. The claim lives in
-git as the ownership record on the branch `feat/<stub>` (formatted
-`feat/rafa-<n>-<slug>` where the branch already runs). Its first commit is
+git as the ownership record on the plan's branch, the `naming.branch`
+template with the stub (`feat/rafa-<n>-<slug>` by default). Its first commit is
 an empty CLAIM commit naming the claiming store's id (`store_meta.store_id`
 from the effort store) in the trailer `Rafa-Claim-Store:`. Every later
 ownership change (release, handover, acceptance, takeover) is one empty
