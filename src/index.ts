@@ -71,7 +71,7 @@
  *
  * Neither `config-registry.ts` nor `adapter-registry.ts` registers
  * anything as it is imported. Once its imports have loaded, the entry
- * calls {@link registerCoreConfigSections}, which hands the thirteen
+ * calls {@link registerCoreConfigSections}, which hands the fourteen
  * sections of the config schema to core, so every setting is
  * registered before a caller of this entry loads or reads a config,
  * then {@link registerCoreAdapters}, which hands core's adapters to the

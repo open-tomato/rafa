@@ -1,5 +1,5 @@
 /**
- * Tests for the registry: the thirteen sections it lists, the
+ * Tests for the registry: the fourteen sections it lists, the
  * registration its root, `registerCoreConfigSections`, makes, and the
  * merged schema it exports.
  *
@@ -12,7 +12,7 @@
  * section and every package name is SPELLED here, never read off the
  * module, so a section dropped, renamed or reordered fails rather than
  * agreeing with itself. The list merged into `EMPTY_CONFIG_REGISTRY`
- * is held to meet no refusal, so no two of the thirteen define one file
+ * is held to meet no refusal, so no two of the fourteen define one file
  * key under two setting names; `section.test.ts` holds the refusal that
  * case could meet.
  *
@@ -79,7 +79,7 @@ import {
   SETTINGS,
 } from './config-registry.js';
 
-/** The thirteen packages, in the order the registry lists their sections. */
+/** The fourteen packages, in the order the registry lists their sections. */
 const PACKAGES = [
   'core',
   'hub',
@@ -90,6 +90,7 @@ const PACKAGES = [
   'board-project',
   'triage',
   'errors',
+  'bugs',
   'logger',
   'issues',
   'tests',
@@ -161,6 +162,8 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releasePublish', 'release.publish'],
   ['releaseMoveLock', 'release.moveLock'],
   ['errorsCodes', 'errors.codes'],
+  ['bugsRecheckRuns', 'bugs.recheck.runs'],
+  ['bugsRecheckTimeoutSeconds', 'bugs.recheck.timeoutSeconds'],
   ['loggerKind', 'logger.kind'],
   ['loggerLevel', 'logger.level'],
   ['loggerTheme', 'logger.theme'],
@@ -221,6 +224,7 @@ const TOP = [
   'triage',
   'release',
   'errors',
+  'bugs',
   'logger',
   'issues',
   'cleanup',
@@ -275,7 +279,7 @@ function probeRegistered(module: string, call = false): { settings: number; defa
 }
 
 describe('CONFIG_SECTIONS', () => {
-  it('lists the thirteen sections, core\'s first', () => {
+  it('lists the fourteen sections, core\'s first', () => {
     expect(CONFIG_SECTIONS.map((section) => section.package)).toEqual(PACKAGES);
   });
 
@@ -333,6 +337,7 @@ describe('the registration the preload made', () => {
         'triage',
         'release',
         'errors',
+        'bugs',
         'logger',
         'issues',
         'core',
@@ -511,6 +516,8 @@ describe('SECTIONS', () => {
     expect([...SECTIONS].sort()).toEqual([
       'board',
       'board.project',
+      'bugs',
+      'bugs.recheck',
       'claims',
       'cleanup',
       'dangerous',
@@ -610,6 +617,8 @@ describe('knownKeysAbove', () => {
       ['threshold', 'candidates'],
     ]);
     expect(knownKeysAbove('triage.nearest')).toEqual(['triage', ['similarity']]);
+    expect(knownKeysAbove('bugs.recheck.run')).toEqual(['bugs.recheck', ['runs', 'timeoutSeconds']]);
+    expect(knownKeysAbove('bugs.rerun')).toEqual(['bugs', ['recheck']]);
   });
 
   it('answers the tiers section for a map name spelled flat, which no setting reads', () => {

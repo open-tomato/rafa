@@ -280,11 +280,11 @@ is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
-`checks`. Core names no section. The thirteen are listed in
+`checks`. Core names no section. The fourteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and twelve `src/config-schema-*.ts` files. That
+own (`core-section.ts`) and thirteen `src/config-schema-*.ts` files. That
 module registers nothing as it is imported: its `registerCoreConfigSections()`
-registers the thirteen with core and sets core's load hook, and `src/rafa.ts`,
+registers the fourteen with core and sets core's load hook, and `src/rafa.ts`,
 `src/index.ts` and `src/tests/preload.ts` call it ahead of
 `registerCoreAdapters()`, before anything loads a config. A second call
 registers nothing. A file outside
