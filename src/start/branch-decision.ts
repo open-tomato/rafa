@@ -167,14 +167,6 @@ import { gitSaid } from '../pr/index.js';
 /** The remote a plan's branch is created from and tracked on. */
 export const REMOTE = 'origin';
 
-/**
- * What a plan branch is called under the default `naming.branch`,
- * `feat/{stub}`: this, and the plan's stub. `loop start` names the
- * branch it creates from the template ({@link branchNameFor}); the
- * readers of claim and plan branches still match this prefix.
- */
-export const BRANCH_PREFIX = 'feat/';
-
 /** The indent a refusal's listed lines carry, as `src/pr/merge.ts` indents its own. */
 const INDENT = '   ';
 

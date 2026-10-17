@@ -204,7 +204,7 @@ function pullRequestNamingBullets(branch: string, provider: PrProvider): readonl
   if (provider === 'none') return [];
   return [
     '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
-    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
+    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is the \`naming.branch\` template with the plan's stub, \`feat/rafa-<n>-<slug>\` by default.`,
     '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
   ];

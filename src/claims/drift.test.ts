@@ -255,7 +255,7 @@ describe('driftLines', () => {
 
     expect(lines).toEqual([
       'claim drift: #12 is ticked on #1 (line 1) but still labelled rafa:in-development (closed)',
-      'claim drift: #30 is labelled rafa:claimed (open) but no feat/rafa-30-* claim branch names it',
+      'claim drift: #30 is labelled rafa:claimed (open) but no claim branch names it',
       'claim drift: #77, ticked on #1, is not in the board listing, so it was not compared',
     ]);
   });

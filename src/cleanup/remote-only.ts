@@ -28,8 +28,8 @@
  *   4. `origin/<base>` does not reach its tip. A branch the base reaches
  *      is merged, and is not listed here at all.
  *   5. It is not the head of an open pull request.
- *   6. It is not a claim branch (`feat/rafa-<n>`, `../claims/git.ts`)
- *      whose claim another store holds.
+ *   6. It is not a claim branch (the `naming.branch` template with the
+ *      stub, `feat/rafa-<n>-<slug>` by default, `../claims/git.ts`) whose claim another store holds.
  *
  * Every row starts UNticked: {@link RemoteOnlyRow.ticked} is the
  * literal `false`. Nothing here says a row's work is merged, so nothing

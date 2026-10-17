@@ -64,7 +64,8 @@
  * the same call under `work/{stub}`, and `branchGlob` over the default
  * pinned as `feat/` with the id prefix, which the default's branch
  * matches and the `work/` branch does not. They replaced one case and
- * added two, so this file now holds 27.
+ * added two. The last added is that no fixed `BRANCH_PREFIX` is
+ * exported beside the template, so this file now holds 28.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -189,6 +190,14 @@ describe('the four spellings', () => {
     expect(branchGlob(DEFAULT_BRANCH_TEMPLATE)).toBe(`feat/${ID_PREFIX}-*`);
     expect(new Bun.Glob(branchGlob(DEFAULT_BRANCH_TEMPLATE)).match(branchName(ISSUE, TITLE))).toBe(true);
     expect(new Bun.Glob(branchGlob(DEFAULT_BRANCH_TEMPLATE)).match(branchName(ISSUE, TITLE, 'work/{stub}'))).toBe(false);
+  });
+
+  it('exports no fixed BRANCH_PREFIX: the branch comes from the template alone', async () => {
+    const naming = await import('./naming.js');
+    expect('BRANCH_PREFIX' in naming).toBe(false);
+    // The control: the same reading finds a name the module does export.
+    expect('ID_PREFIX' in naming).toBe(true);
+    expect(branchName(ISSUE, TITLE)).toBe('feat/rafa-20-pull-request-commands');
   });
 
   it('spells the pull-request title as the id and the whole title', () => {

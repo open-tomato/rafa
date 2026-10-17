@@ -11,7 +11,8 @@
  * argument, the issue number (`readIssueArgument`). A line typed
  * `--stale 7` reads `7` as the flag's value and is refused, naming the
  * order to type it in. Then this device's store id, then one fetch of
- * the `feat/rafa-*` branches and every remote branch of the issue, as
+ * the claim branches (the `naming.branch` template with the stub,
+ * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
  * `rafa claim release` reads them (`./release.ts`). No network means no
  * takeover. When a branch of the issue holds a claim, the issue's
  * labels are read once through the `labels` seam, and the clock once

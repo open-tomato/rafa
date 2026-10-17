@@ -173,11 +173,15 @@ function sha256(text: string): string {
     .digest('hex');
 }
 
-/** The `gh` prompt with no pull request open, hashed at `08415e9`, before the provider argument. */
-const GH_CREATE_PROMPT_SHA = 'bbfa6cf0eaa94eb76f4669fb0aa6aab04a43fd90b0ea01d4123efbacdf1e04a7';
+/**
+ * The `gh` prompt with no pull request open, first hashed at `08415e9`,
+ * before the provider argument, and hashed again once the issue-number
+ * bullet named the branch as the `naming.branch` template with the stub.
+ */
+const GH_CREATE_PROMPT_SHA = '994e6b0d9a0ac9a4825cf699f34f3013ec2771d32c89d006304f02ac427ad1c7';
 
-/** The `gh` prompt with pull request 601 open, hashed at the same commit. */
-const GH_EDIT_PROMPT_SHA = '7f21587e6848e85d202c67a0a747feb166569529758e5e5dc01d9d6f7e21a36b';
+/** The `gh` prompt with pull request 601 open, hashed at the same two points. */
+const GH_EDIT_PROMPT_SHA = 'cdfcb9de51386e2a2dae48cffe6a6a6bdfcc650a4e55fe3d0d035132194bafc1';
 
 /** A phrase of each bullet that only serves a pull request, left out under `none`. */
 const PULL_REQUEST_ONLY: readonly string[] = [

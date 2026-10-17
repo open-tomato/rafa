@@ -21,7 +21,8 @@
  * is told so, rather than that it gave no argument. Then this device's
  * store id, and a `--to` naming that very store, or an id it replaced
  * (`holdsClaim`, `src/claims/device.ts`), is refused. Then one fetch of
- * the `feat/rafa-*` branches and every remote branch of the issue, as
+ * the claim branches (the `naming.branch` template with the stub,
+ * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
  * `rafa claim release` reads them (`./release.ts`). No network means no
  * handover.
  *

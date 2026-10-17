@@ -256,7 +256,7 @@ export function driftSentence(finding: DriftFinding): string {
   const state = finding.state.toLowerCase();
   return finding.kind === 'ticked-labelled'
     ? `${issue} is ticked on #${String(finding.checklist)} (line ${String(finding.lineNumber)}) but still labelled ${labels} (${state})`
-    : `${issue} is labelled ${labels} (${state}) but no feat/rafa-${String(finding.issue)}-* claim branch names it`;
+    : `${issue} is labelled ${labels} (${state}) but no claim branch names it`;
 }
 
 /** The report as lines to print: each finding, then each notice, every one prefixed. Empty when there is nothing to say. */
