@@ -298,9 +298,10 @@ imports no adapter: the adapters the registry lists sit above core, under
 `packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
 as it is imported: its `registerCoreAdapters()` hands them to
 `registerAdapters` and answers the registry that call made. `src/rafa.ts` and
-`src/index.ts` call it before anything resolves an adapter, since `bun build`
-drops an import kept for its effect alone from a package declaring
-`"sideEffects": false`. A second call registers nothing. Until something calls
+`src/index.ts` call it before anything resolves an adapter, so the entries
+hold under a manifest declaring `"sideEffects": false`, which the root manifest
+does not declare today because bun 1.3.14's split build breaks under it
+(#1213). A second call registers nothing. Until something calls
 it, every member of `CORE_ADAPTER_REGISTRY` refuses, naming the root.
 `bun test` calls it once per test process from `src/tests/preload.ts`, which
 `bunfig.toml` names under `[test] preload`, so a test reads core's adapters

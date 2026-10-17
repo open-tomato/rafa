@@ -14,10 +14,12 @@
  * core refuses throws from the call, naming what it refused. The root
  * is called, never imported for its effect: under `"sideEffects":
  * false` in a manifest, `bun build` drops an import kept for its effect
- * alone. `src/rafa.ts` and `src/index.ts` call it as they load, after
- * their imports and before anything that resolves an adapter; core
- * never imports this module. Until something calls it, every member of
- * `CORE_ADAPTER_REGISTRY` refuses.
+ * alone. The root manifest declares no such field today, since bun
+ * 1.3.14's split build breaks under it (#1213). `src/rafa.ts` and
+ * `src/index.ts` call it as they load, after their imports and before
+ * anything that resolves an adapter; core never imports this module.
+ * Until something calls it, every member of `CORE_ADAPTER_REGISTRY`
+ * refuses.
  *
  * `bun test` calls it once for the test process, from
  * `src/tests/preload.ts`, which `bunfig.toml` names under

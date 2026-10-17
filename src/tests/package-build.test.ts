@@ -15,6 +15,13 @@
  * the script as the manifest holds it, so nothing is written into the
  * repository's own `dist/`.
  *
+ * The manifest declares no `sideEffects` field, and every build this file
+ * reads was taken without one: under `"sideEffects": false` bun 1.3.14's
+ * `--splitting` build wrote library entries that failed to parse, so the
+ * field went and #1213 keeps the goal of declaring it again. The entries
+ * call their composition roots, `registerCoreConfigSections` and
+ * `registerCoreAdapters`, either way, so they hold under the field too.
+ *
  * ## What each clause of the build script is for
  *
  * Each clause answers a reading taken on bun 1.3.14:
@@ -320,6 +327,15 @@
  * `--version` copy sits beside the package, not under it, so no
  * `node_modules` is at or above it still.
  *
+ * The four packages, and the `tsc` the two type-check cases run, are
+ * linked as bun resolves them from the checkout (`Bun.resolveSync` of the
+ * package's `package.json` from `REPO_ROOT`), not as
+ * `REPO_ROOT/node_modules/<name>`. A linked worktree with no
+ * `node_modules` of its own (a loop's, under `.rafa/worktrees/`) finds the
+ * main checkout's that way. Measured on 2026-10-16 on bun 1.3.14, the
+ * fixed path made `beforeAll` fail with ENOENT in such a worktree, the
+ * failure of #1124's three reports.
+ *
  * ## The config subpath's declarations
  *
  * `./config` is the exports entry carrying both conditions: `types` at
@@ -466,7 +482,7 @@ import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js'
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
-import { expectExit, plantProjectConfig } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
@@ -507,7 +523,11 @@ const EXPORTS = {
 /** The prefix of a specifier that names one of the package's own subpaths. */
 const OWN_SUBPATH = '@open-tomato/rafa/';
 
-/** The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line. */
+/**
+ * The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line.
+ * It follows the build since: six lines from `7306b06` (`config-schema-features.d.ts`,
+ * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`).
+ */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
 /** A chunk the `--splitting` build names by its content hash, directly in `dist/`. */
@@ -539,9 +559,6 @@ const PUBLISH_CONFIG = {
 
 /** The engine the build targets, and the only one the manifest names. */
 const ENGINES = { bun: '>=1.3.14' };
-
-/** The manifest's `sideEffects`: false lets the bundler drop an unused import, so the entries call their roots. */
-const SIDE_EFFECTS = false;
 
 /** The manifest's `module`: the root of the exports map, which the build writes. */
 const MODULE = './dist/index.js';
@@ -785,11 +802,20 @@ function defineConfigLoads(text: string): string[] {
   return DEFINE_CONFIG_LOADS.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
 }
 
+/** The directory the repository installed the package `name` in, found as bun resolves it from {@link REPO_ROOT}. */
+function installedDir(name: string): string {
+  return realpathSync(dirname(Bun.resolveSync(`${name}/package.json`, REPO_ROOT)));
+}
+
+/** The `tsc` binary of the `typescript` the repository installed. */
+function installedTsc(): string {
+  return join(installedDir('typescript'), 'bin', 'tsc');
+}
+
 /** Links the package `name` as the repository installed it into `dir`'s `node_modules`. */
 function linkInstalled(dir: string, name: string): void {
   mkdirSync(dirname(join(dir, 'node_modules', name)), { recursive: true });
-  const installed = realpathSync(join(REPO_ROOT, 'node_modules', name));
-  symlinkSync(installed, join(dir, 'node_modules', name), 'dir');
+  symlinkSync(installedDir(name), join(dir, 'node_modules', name), 'dir');
 }
 
 /** Links {@link DEFINE_CONFIG} as the repository installed it into `dir`'s `node_modules`. */
@@ -1093,8 +1119,8 @@ describe('the package manifest', () => {
     expect(readManifest()['engines']).toEqual(ENGINES);
   });
 
-  it('declares no side effects, so the entries must call the composition roots', () => {
-    expect(readManifest()['sideEffects']).toBe(SIDE_EFFECTS);
+  it('declares no sideEffects field, which bun 1.3.14\'s split build cannot take (#1213); the entries call the composition roots regardless', () => {
+    expect('sideEffects' in readManifest()).toBe(false);
   });
 
   it('points module at the built root export, not at a source placeholder', () => {
@@ -1180,7 +1206,7 @@ describe('the build script, run in a copy of the package', () => {
     expect(missing).toEqual([]);
   });
 
-  it('writes the files a build before core moved into its package wrote, chunk hashes set aside', () => {
+  it('writes the files the build at c920603 wrote and has since, chunk hashes set aside', () => {
     const before = readFileSync(join(import.meta.dir, DIST_FILES_BEFORE_MOVE), 'utf8')
       .split('\n')
       .filter((line) => line !== '')
@@ -1191,7 +1217,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(149);
+    expect(before).toHaveLength(155);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1252,7 +1278,12 @@ describe('the built CLI', () => {
     const fromBuild = run([process.execPath, join(DIST, 'cli.js'), 'describe', '--output=json'], tempRoot, env);
 
     expectExit(fromBuild, 0, { cwd: tempRoot });
-    const document = JSON.parse(fromBuild.stdout) as {
+    const last = eventsOf(fromBuild.stdout).at(-1);
+    expect(last?.type).toBe('result');
+    expect(last?.type === 'result' && last.ok).toBe(true);
+    const document = (last?.type === 'result'
+      ? last.data
+      : undefined) as {
       subjects: { name: string; actions: { name: string }[] }[];
     };
     const pr = document.subjects.find((subject) => subject.name === 'pr');
@@ -1536,7 +1567,7 @@ describe('the config subpath, installed from the packed tarball', () => {
     }), 'utf8');
     const env = withBunOnPath();
 
-    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, env);
+    const check = run([process.execPath, installedTsc(), '--noEmit', '--pretty', 'false'], project, env);
     const load = run([
       process.execPath,
       '-e',
@@ -1561,7 +1592,7 @@ describe('the config subpath, installed from the packed tarball', () => {
       files: ['bad.config.ts'],
     }), 'utf8');
 
-    const check = run([process.execPath, join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
+    const check = run([process.execPath, installedTsc(), '--noEmit', '--pretty', 'false'], project, withBunOnPath());
 
     expect(check.exitCode).not.toBe(0);
     expect(check.stdout).toContain('bad.config.ts');

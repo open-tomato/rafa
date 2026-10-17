@@ -17,6 +17,8 @@
  * refuses throws from the call, naming what it refused. The root is
  * called, never imported for its effect: under `"sideEffects": false`
  * in a manifest, `bun build` drops an import kept for its effect alone.
+ * The root manifest declares no such field today, since bun 1.3.14's
+ * split build breaks under it (#1213).
  * `src/rafa.ts` and `src/index.ts` call it as they load, after their
  * imports, ahead of `registerCoreAdapters` and before anything that
  * loads a config; core never imports this module. Until something calls
