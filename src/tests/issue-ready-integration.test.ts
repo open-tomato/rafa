@@ -37,8 +37,6 @@ import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

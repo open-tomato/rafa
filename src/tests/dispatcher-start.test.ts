@@ -1,7 +1,7 @@
 /**
  * The dispatcher's start: what a process that loads `src/index.ts` holds
- * in core's adapter registry, what a dispatch resolves once only the
- * composition root `src/adapter-registry.ts` is imported, and the
+ * in core's adapter registry, what a dispatch resolves off the registry
+ * the preload's `registerCoreAdapters()` call filled, and the
  * refusal a resolve makes when nothing is registered.
  *
  * The first case reads the registry in a fresh `bun` process, since
@@ -16,7 +16,6 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import '../adapter-registry.js';
 import {
   activeAdapterRegistry,
   CORE_ADAPTER_REGISTRY,
@@ -65,7 +64,7 @@ describe('the dispatcher\'s start', () => {
     expect(JSON.parse(stdout)).toEqual(CORE_KINDS);
   });
 
-  it('dispatches a command with only the root imported, resolving logger/console', async () => {
+  it('dispatches a command over the preload\'s registry, resolving logger/console', async () => {
     const seen: string[] = [];
     const command: RafaCommand = {
       name: 'probe start',
