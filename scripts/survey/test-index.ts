@@ -34,8 +34,9 @@
  * row whose `files` list it, or the `folder` of the `unassigned[]` entry
  * whose `files` list it (`src/ci/`). A file listed nowhere takes its
  * folder's unit through `cut-map.ts` (the one unit of its directory's
- * listed files, else the one row naming its longest folder), and is
- * unplaced only when that places it nowhere.
+ * listed files, or of the nearest folder above it holding any, else the
+ * one row naming its longest folder), and is unplaced only when that
+ * places it nowhere.
  *
  * The rule per kind, which the record and the guard apply: a test's kind
  * is read from its name through `tests.contract` and `tests.integration`

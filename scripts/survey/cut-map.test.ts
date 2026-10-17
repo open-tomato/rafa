@@ -97,8 +97,17 @@ describe('parseCutMap', () => {
   });
 
   it('answers the unplaced files of a set sorted and once each', () => {
-    const files = ['src/z.ts', 'src/a/one.ts', 'src/split/new.ts', 'src/z.ts', 'src/ci/runs.ts', 'src/a/new.test.ts'];
-    expect(map.unplaced(files)).toEqual(['src/split/new.ts', 'src/z.ts']);
+    const files = [
+      'src/z.ts',
+      'src/a/one.ts',
+      'src/split/new.ts',
+      'src/z.ts',
+      'src/ci/runs.ts',
+      'src/a/new.test.ts',
+      'src/a/sub/new.test.ts',
+      'src/split/deep/new.ts',
+    ];
+    expect(map.unplaced(files)).toEqual(['src/split/deep/new.ts', 'src/split/new.ts', 'src/z.ts']);
     expect(map.unplaced(new Set(['src/a/one.ts']))).toEqual([]);
   });
 
@@ -143,6 +152,44 @@ describe('parseCutMap fallback for a file listed nowhere', () => {
     expect(map.unitOf('src/cia/x.ts')).toBeUndefined();
   });
 
+  it('places a file in a new subfolder of a one-unit folder by the walk', () => {
+    expect(map.unitOf('src/a/sub/new.test.ts')).toBe('rafa-three');
+    expect(map.unitOf('src/a/sub/deeper/new.test.ts')).toBe('rafa-three');
+  });
+
+  it('answers by the walk before any folder, and with no folder named', () => {
+    const unnamed = parseCutMap(tableWith((table) => {
+      delete (table.packages as Record<string, unknown>[])[0]!.folders;
+    }), 'x');
+    expect(unnamed.unitOf('src/a/sub/new.test.ts')).toBe('rafa-three');
+    const nestedUnderA = parseCutMap(tableWith((table) => {
+      (table.packages as Record<string, unknown>[])[1]!.folders = ['src/a/sub/'];
+    }), 'x');
+    expect(nestedUnderA.unitOf('src/a/sub/x.ts')).toBe('rafa-three');
+  });
+
+  it('leaves a new subfolder of a mixed folder to the folder step', () => {
+    expect(splitOnce.unitOf('src/split/deep/new.ts')).toBe('rafa-three');
+    expect(map.unitOf('src/split/deep/new.ts')).toBeUndefined();
+  });
+
+  it('reads the own directory by its direct files and the folders above by every file below', () => {
+    const foreign = parseCutMap(tableWith((table) => {
+      (table.packages as { files: string[] }[])[1]!.files.push('src/a/sub/foreign.ts');
+    }), 'x');
+    expect(foreign.unitOf('src/a/new.ts')).toBe('rafa-three');
+    expect(foreign.unitOf('src/a/sub/x.ts')).toBe('rafa-other');
+    expect(foreign.unitOf('src/a/other/x.ts')).toBe('rafa-three');
+  });
+
+  it('walks up to the root and answers nothing there', () => {
+    expect(map.unitOf('packages/other/x.ts')).toBeUndefined();
+    expect(map.unitOf('root.ts')).toBeUndefined();
+    expect(map.unitOf('src/zzz/file.ts')).toBeUndefined();
+    expect(map.unitOf('src/cia/x.ts')).toBeUndefined();
+    expect(map.unitOf('src/ci/')).toBeUndefined();
+  });
+
   it('places a file under an unassigned folder or an empty row by the folder', () => {
     expect(map.unitOf('src/ci/runs2.ts')).toBe('src/ci/');
     expect(map.unitOf('src/ci/deep/new.ts')).toBe('src/ci/');
@@ -151,10 +198,10 @@ describe('parseCutMap fallback for a file listed nowhere', () => {
 
   it('places a file by the longest folder that holds it', () => {
     const nested = parseCutMap(tableWith((table) => {
-      (table.packages as Record<string, unknown>[])[1]!.folders = ['src/a/sub/'];
+      (table.packages as Record<string, unknown>[])[1]!.folders = ['src/split/sub/'];
     }), 'x');
-    expect(nested.unitOf('src/a/sub/x.ts')).toBe('rafa-other');
-    expect(nested.unitOf('src/a/other/x.ts')).toBe('rafa-three');
+    expect(nested.unitOf('src/split/sub/x.ts')).toBe('rafa-other');
+    expect(nested.unitOf('src/split/other/x.ts')).toBe('rafa-three');
   });
 
   it('places nothing by a shorter folder when two rows name the longest', () => {
