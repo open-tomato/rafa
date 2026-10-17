@@ -50,6 +50,7 @@ core/command/index.d.ts
 core/command/lazy.d.ts
 core/command/registry-types.d.ts
 core/command/running.d.ts
+core/command/shared-flags.d.ts
 core/command/spends.d.ts
 core/command/types.d.ts
 core/command/version.d.ts

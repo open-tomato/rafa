@@ -1,7 +1,8 @@
 /**
  * The `issue` declarations: `declarations.ts` imports no module under
  * `src/`, only the core entries; the values it copies from outside
- * `src/commands/` stay equal to their sources; and each of the nine
+ * `src/commands/` stay equal to their sources; `issue ready` declares
+ * core's `HINT_FLAG_SPEC` itself, not a copy; and each of the nine
  * modules exports a command that is its declaration plus a `run`.
  *
  * The import reading takes every module specifier `ts.preProcessFile`
@@ -19,11 +20,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { HINT_FLAG_SPEC } from '../../next/ending.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 
 import issueCheck from './check.js';
@@ -35,7 +37,6 @@ import {
   ISSUE_COMMENT_DECLARATION,
   ISSUE_CREATE_DECLARATION,
   ISSUE_EDIT_DECLARATION,
-  ISSUE_HINT_FLAG_SPEC,
   ISSUE_LIST_DECLARATION,
   ISSUE_MOVE_DECLARATION,
   ISSUE_NEEDS_WORK_LABEL,
@@ -141,9 +142,9 @@ describe('the values declarations.ts copies', () => {
     expect(ISSUE_BLOCKED_LABEL).toBe(SPEC_BLOCKED_LABEL);
   });
 
-  it('declares the hint flag HINT_FLAG_SPEC declares, on issue ready', () => {
-    expect(ISSUE_HINT_FLAG_SPEC).toEqual(HINT_FLAG_SPEC);
-    expect(ISSUE_READY_DECLARATION.flags).toContain(ISSUE_HINT_FLAG_SPEC);
+  it('declares HINT_FLAG_SPEC itself on issue ready, and an equal copy would not pass', () => {
+    expect(ISSUE_READY_DECLARATION.flags.includes(HINT_FLAG_SPEC)).toBe(true);
+    expect(ISSUE_READY_DECLARATION.flags.includes(Object.freeze({ ...HINT_FLAG_SPEC }))).toBe(false);
   });
 });
 

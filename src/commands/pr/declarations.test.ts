@@ -1,7 +1,8 @@
 /**
  * The `pr` declarations: `declarations.ts` imports no module under
- * `src/`, only the core entries, and the two values it copies from
- * outside `src/commands/` stay equal to their sources.
+ * `src/`, only the core entries; the value it copies from outside
+ * `src/commands/` stays equal to its source; and `pr wait`, `pr merge`
+ * and `pr triage` declare core's `HINT_FLAG_SPEC` itself, not a copy.
  *
  * The import reading takes every module specifier `ts.preProcessFile`
  * finds, `import type`, `export … from` and dynamic `import()` among
@@ -16,13 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { HINT_FLAG_SPEC } from '../../next/ending.js';
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+
 import { DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 
 import {
   DEFAULT_WAIT_TIMEOUT_MIN,
   MERGE_DANGEROUS_PHRASES,
-  PR_HINT_FLAG_SPEC,
   PR_MERGE_DECLARATION,
   PR_SUBJECT,
   PR_TRIAGE_DECLARATION,
@@ -83,22 +84,20 @@ describe('what declarations.ts imports', () => {
     const planted = [
       'import type { RafaCommand } from \'@open-tomato/rafa/core/command\';',
       'import type { PrSeams } from \'./pr-context.js\';',
-      'import { HINT_FLAG_SPEC } from \'../../next/ending.js\';',
+      'import { endingWith } from \'../../next/ending.js\';',
     ].join('\n');
 
     expect(underSrc(readImports(planted, HERE))).toEqual(['./pr-context.js', '../../next/ending.js']);
   });
 });
 
-describe('the values declarations.ts copies', () => {
-  it('declares the hint flag HINT_FLAG_SPEC declares', () => {
-    expect(PR_HINT_FLAG_SPEC).toEqual(HINT_FLAG_SPEC);
-  });
+describe('the values declarations.ts declares and copies', () => {
+  it('declares HINT_FLAG_SPEC itself on pr wait, pr merge and pr triage, and an equal copy would not pass', () => {
+    const declarations = [PR_WAIT_DECLARATION, PR_MERGE_DECLARATION, PR_TRIAGE_DECLARATION];
+    const copy = Object.freeze({ ...HINT_FLAG_SPEC });
 
-  it('declares it on pr wait, pr merge and pr triage', () => {
-    for (const declaration of [PR_WAIT_DECLARATION, PR_MERGE_DECLARATION, PR_TRIAGE_DECLARATION]) {
-      expect(declaration.flags).toContain(PR_HINT_FLAG_SPEC);
-    }
+    expect(declarations.map((declaration) => declaration.flags.includes(HINT_FLAG_SPEC))).toEqual([true, true, true]);
+    expect(declarations.map((declaration) => declaration.flags.includes(copy))).toEqual([false, false, false]);
   });
 
   it('defaults pr wait to the loop\'s own CI deadline', () => {

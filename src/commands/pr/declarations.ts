@@ -16,11 +16,11 @@
  *
  * ## What this file imports
  *
- * Types alone, from `@open-tomato/rafa/core/command` and
- * `@open-tomato/rafa/core/config`, and no module under `src/`: a value
- * import of a command's helper would load it with the roster and undo
- * the laziness. `declarations.test.ts` reads this file's imports and
- * holds that.
+ * Types from `@open-tomato/rafa/core/command` and
+ * `@open-tomato/rafa/core/config`, the one value `HINT_FLAG_SPEC` from
+ * the command barrel, and no module under `src/`: a value import of a
+ * command's helper would load it with the roster and undo the laziness.
+ * `declarations.test.ts` reads this file's imports and holds that.
  *
  * So a constant a declaration spells and a module also reads lives here,
  * and the module imports it from here: `PR_SHOW_JSON_FIELDS` (`show.ts`),
@@ -29,33 +29,24 @@
  * `DEFAULT_MAX_ATTEMPTS` (`triage.ts`) and `MERGE_DANGEROUS_PHRASES`,
  * the `dangerous` field of `pr merge`, read by `merge-guard.ts`'s note.
  *
- * Two values are copies of a value outside `src/commands/`, which no
- * file here may import, and `declarations.test.ts` holds each equal to
- * its source: `PR_HINT_FLAG_SPEC` is `HINT_FLAG_SPEC`
- * (`src/next/ending.ts`), the `--no-hint` flag `pr wait`, `pr merge`
- * and `pr triage` declare, and `DEFAULT_WAIT_TIMEOUT_MIN` is the loop's
- * own CI deadline, `DEFAULT_CI_TIMEOUT_MIN` (`src/start/pr-lifecycle.ts`).
+ * The `--no-hint` flag `pr wait`, `pr merge` and `pr triage` declare is
+ * `HINT_FLAG_SPEC` itself, core's one spelling of it, which the other
+ * three commands that end with a hint declare too.
+ *
+ * One value is a copy of a value outside `src/commands/`, which no file
+ * here may import, and `declarations.test.ts` holds it equal to its
+ * source: `DEFAULT_WAIT_TIMEOUT_MIN` is the loop's own CI deadline,
+ * `DEFAULT_CI_TIMEOUT_MIN` (`src/start/pr-lifecycle.ts`).
  */
-import type { CommandDeclaration, RafaFlagSpec, SubjectSpec } from '@open-tomato/rafa/core/command';
+import type { CommandDeclaration, SubjectSpec } from '@open-tomato/rafa/core/command';
 import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
+
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
 /** The `pr` subject: its routing word and its roster line. */
 export const PR_SUBJECT: SubjectSpec = Object.freeze({
   name: 'pr',
   summary: 'the pull request of a branch: one line, in full or in the browser; open, list, wait on, merge and triage them',
-});
-
-/**
- * The `--hint` flag `pr wait`, `pr merge` and `pr triage` declare, so
- * `--no-hint` suppresses the ending: a copy of `HINT_FLAG_SPEC`
- * (`src/next/ending.ts`); see the module note.
- */
-export const PR_HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
-  name: 'hint',
-  description: 'Ends by naming the one step that follows, asking it where there is a terminal to answer on;'
-    + ' `--no-hint` reads nothing and prints nothing.',
-  type: 'boolean',
-  default: true,
 });
 
 /**
@@ -388,7 +379,7 @@ export const PR_WAIT_DECLARATION: CommandDeclaration = Object.freeze<CommandDecl
       description: `How many minutes to wait before giving up. ${DEFAULT_WAIT_TIMEOUT_MIN} when it is left out.`,
       type: 'string',
     },
-    PR_HINT_FLAG_SPEC,
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {
@@ -470,7 +461,7 @@ export const PR_MERGE_DECLARATION: CommandDeclaration = Object.freeze<CommandDec
       description: 'How to merge: squash, merge or rebase. `pr.mergeMethod` when it is left out.',
       type: 'string',
     },
-    PR_HINT_FLAG_SPEC,
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {
@@ -560,7 +551,7 @@ export const PR_TRIAGE_DECLARATION: CommandDeclaration = Object.freeze<CommandDe
       type: 'number',
       default: DEFAULT_MAX_ATTEMPTS,
     },
-    PR_HINT_FLAG_SPEC,
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {
