@@ -13,6 +13,12 @@
 # package, naming this repository and this workflow file. npm attaches
 # provenance on a trusted publish, so no token and no flag are set here.
 #
+# The publish job runs only when the repository variable
+# `RAFA_RELEASE_PUBLISH` is `ci`: with it unset or holding anything else,
+# GitHub skips the job, and a skipped job does not fail the run. Set it
+# under Settings, Secrets and variables, Actions, Variables, or with
+# `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+#
 # A tag pushed with a workflow's GITHUB_TOKEN starts no other workflow
 # run, so a workflow that tags calls this one through `workflow_call`
 # instead of waiting for the `push` trigger.
@@ -44,6 +50,7 @@ permissions:
 
 jobs:
   publish:
+    if: vars.RAFA_RELEASE_PUBLISH == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
