@@ -6,8 +6,8 @@
  *
  * ```text
  * Release ladder: level 0, Manual.
- * Release ladder: level 2, CI publishes; release.settle is pr where the level reads push.
- * Release ladder: level 3, Release PR, 2 missing: .github/workflows/release-tag.yml is absent (run rafa release workflows --write); package.json is private (remove "private": true to publish it).
+ * Release ladder: level 2, CI publishes; release.settle is pr where the level reads push. Publishing waits for the repository variable RAFA_RELEASE_PUBLISH set to ci, which doctor cannot read.
+ * Release ladder: level 3, Release PR, 2 missing: .github/workflows/release-tag.yml is absent (run rafa release workflows --write); package.json is private (remove "private": true to publish it). Publishing waits for the repository variable RAFA_RELEASE_PUBLISH set to ci, which doctor cannot read.
  * ```
  *
  * ## What is read, and what decides
@@ -28,7 +28,12 @@
  * `warn` line naming each missing item with the file or command that
  * supplies it (`rafa release workflows --write` for a workflow file).
  * A key that does not fit the level's table row is named on the row in
- * both cases and does not by itself warn. In json mode the row goes
+ * both cases and does not by itself warn. From level 2 up the row ends
+ * on {@link PUBLISH_SWITCH_REMINDER}, after the missing list when there
+ * is one: the publish job waits for the repository variable
+ * `PUBLISH_SWITCH_VARIABLE` names, which doctor cannot read from the
+ * checkout, so the reminder is never a missing item, never turns the
+ * row to `warn` and never changes the count. In json mode the row goes
  * out at the same level as a `log` event. Doctor never refuses for it:
  * the exit code is what the other rows give, and nothing is written.
  */
@@ -48,6 +53,7 @@ import { join } from 'node:path';
 import {
   DEPENDABOT_CONFIG,
   LADDER_WORKFLOWS,
+  PUBLISH_SWITCH_VARIABLE,
   PUBLISH_WORKFLOW,
   ladderLevel,
   ladderPreconditions,
@@ -55,6 +61,15 @@ import {
 
 /** The command that writes a missing ladder workflow. */
 export const WORKFLOWS_COMMAND = 'rafa release workflows --write';
+
+/** The lowest level that publishes from CI, from which the row carries the reminder. */
+const FIRST_PUBLISHING_LEVEL = 2;
+
+/**
+ * The sentence ending the row from level 2 up: what publishing waits
+ * for that doctor cannot read. It never holds the word "missing".
+ */
+export const PUBLISH_SWITCH_REMINDER: string = `Publishing waits for the repository variable ${PUBLISH_SWITCH_VARIABLE} set to ci, which doctor cannot read.`;
 
 /** The settings the row reads, named as the resolved config names them. */
 export type DoctorLadderConfig = Pick<
@@ -164,16 +179,22 @@ export function missingPhrase(missing: LadderMissing): string {
   }
 }
 
-/** The row: the level, the key that does not fit, and each missing item. */
+/**
+ * The row: the level, the key that does not fit, each missing item,
+ * and from level 2 up the publish switch reminder last.
+ */
 export function ladderRow(reading: DoctorLadderReading): string {
   const { level, misfit } = reading.level;
   const head = `Release ladder: level ${String(level)}, ${reading.level.name}`;
   const fit = misfit === null
     ? ''
     : `; ${misfit.key} is ${misfit.value} where the level reads ${misfit.expected}`;
-  if (reading.missing.length === 0) return `${head}${fit}.`;
+  const reminder = level >= FIRST_PUBLISHING_LEVEL
+    ? ` ${PUBLISH_SWITCH_REMINDER}`
+    : '';
+  if (reading.missing.length === 0) return `${head}${fit}.${reminder}`;
   const items = reading.missing.map(missingPhrase).join('; ');
-  return `${head}${fit}, ${String(reading.missing.length)} missing: ${items}.`;
+  return `${head}${fit}, ${String(reading.missing.length)} missing: ${items}.${reminder}`;
 }
 
 /**

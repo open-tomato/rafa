@@ -44,7 +44,11 @@ adds `release-settle.yml`, each missing when absent or not a file. Levels 3 and
 4 also need `release-bot-fragment.yml` while `.github/dependabot.yml` exists.
 Doctor
 cannot read the trusted publisher on npmjs.com, so that stays a step the project
-takes by hand.
+takes by hand. Nor can it read the repository variable `RAFA_RELEASE_PUBLISH`,
+so from level 2 up the row ends on a reminder, after the missing list when
+there is one: `Release ladder: level 2, CI publishes. Publishing waits for the
+repository variable RAFA_RELEASE_PUBLISH set to ci, which doctor cannot read.`
+The reminder is never a missing item, so it neither warns nor counts.
 
 The release order across packages (a topological layer, rules by id) is parked
 by the spec's 2026-10-16 update until two publishable packages depend on each
@@ -503,8 +507,10 @@ needs and a `warn` line listing each missing precondition (a needed workflow
 under `.github/workflows/` absent or not a file, with `rafa release workflows
 --write` to write it; the publish workflow without `id-token: write`; the
 version file's manifest private or without a `name`; the bot fragment workflow
-while `.github/dependabot.yml` exists) otherwise. It never changes the exit
-code.
+while `.github/dependabot.yml` exists) otherwise. From level 2 up the row
+ends on the reminder that publishing waits for the repository variable
+`RAFA_RELEASE_PUBLISH` set to `ci`, which doctor cannot read. It never changes
+the exit code.
 
 ### Config keys
 
