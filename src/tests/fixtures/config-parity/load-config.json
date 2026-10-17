@@ -40,6 +40,34 @@
       "value": [],
       "source": "default"
     },
+    "checksLoop": {
+      "value": [],
+      "source": "default"
+    },
+    "checksPublish": {
+      "value": [],
+      "source": "default"
+    },
+    "checksPullRequest": {
+      "value": [],
+      "source": "default"
+    },
+    "checksReleasePullRequest": {
+      "value": [],
+      "source": "default"
+    },
+    "checksStage": {
+      "value": [],
+      "source": "default"
+    },
+    "checksStretch": {
+      "value": [],
+      "source": "default"
+    },
+    "checksTask": {
+      "value": [],
+      "source": "default"
+    },
     "claimsAhead": {
       "value": "off",
       "source": "default"
@@ -412,7 +440,7 @@
   "path": "<project>/.rafa/config.yaml",
   "userPath": "<home>/.rafa/config.yaml",
   "warnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, checks, features)"
   ],
   "extras": [
     {
@@ -422,6 +450,6 @@
   ],
   "userExtras": [],
   "printedWarnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, checks, features)"
   ]
 }

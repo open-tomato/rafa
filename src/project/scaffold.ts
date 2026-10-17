@@ -44,14 +44,17 @@
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
- * The `tiers`, `routing`, `task` and `tests` sections close the
- * template. `tiers.skills` and `tiers.agents` are written as `{}`, their
+ * The `tiers`, `routing`, `task`, `tests` and `checks` sections close
+ * the template. `tiers.skills` and `tiers.agents` are written as `{}`, their
  * empty default, and `routing` as one line per row of
  * `tiers/routing.ts`'s `DEFAULT_ROUTES`, so the template cannot drift
  * from the defaults the schema answers. `task.skills` and `task.lessons`
  * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and all three
  * `tests` lists from `CONFIG_DEFAULTS` too, each pattern double-quoted:
- * a flow-list entry opening with `*` would parse as a YAML alias.
+ * a flow-list entry opening with `*` would parse as a YAML alias. The
+ * seven `checks` lists are written from `CONFIG_DEFAULTS` as flow lists of
+ * bare names, empty by default, and the first names the six check names
+ * a list may hold.
  *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
@@ -73,6 +76,7 @@ import { configFilePath } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { CHECK_NAMES } from '../config-schema-checks.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
@@ -91,6 +95,11 @@ export const USER_TREE: readonly ['instincts'] = Object.freeze(['instincts'] as 
 /** `patterns` as a YAML flow list, each double-quoted. See the module note. */
 function globsLine(patterns: readonly string[]): string {
   return `[${patterns.map((pattern) => JSON.stringify(pattern)).join(', ')}]`;
+}
+
+/** `names` as a YAML flow list of bare check names. */
+function checksLine(names: readonly string[]): string {
+  return `[${names.join(', ')}]`;
 }
 
 /**
@@ -228,6 +237,14 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
   `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
+  '# checks:',
+  `#   task: ${checksLine(CONFIG_DEFAULTS.checksTask)}                     # the checks a task step runs, each one of: ${CHECK_NAMES.join(', ')}`,
+  `#   stage: ${checksLine(CONFIG_DEFAULTS.checksStage)}                    # the checks a stage step runs`,
+  `#   loop: ${checksLine(CONFIG_DEFAULTS.checksLoop)}                     # the checks the loop runs before its wrap-up`,
+  `#   pullRequest: ${checksLine(CONFIG_DEFAULTS.checksPullRequest)}              # the checks a pull request's CI runs`,
+  `#   stretch: ${checksLine(CONFIG_DEFAULTS.checksStretch)}                  # the checks a stretch of work runs`,
+  `#   releasePullRequest: ${checksLine(CONFIG_DEFAULTS.checksReleasePullRequest)}       # the checks a release pull request's CI runs`,
+  `#   publish: ${checksLine(CONFIG_DEFAULTS.checksPublish)}                  # the checks a publish runs`,
 ]);
 
 /** The line every file opens its settings with. */
