@@ -1,6 +1,6 @@
 /**
- * `RUN_FEATURE` source: the `claim` subject and its four lazy commands, read off `index.ts` as text through the
- * TypeScript parser.
+ * `RUN_FEATURE` source: the `claim` subject and its four lazy commands, read
+ * off `index.ts` as text through the TypeScript parser.
  *
  * The static imports of `index.ts` are read off its source, so a command
  * module imported by value, which would load with the roster, goes red;

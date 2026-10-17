@@ -1,14 +1,14 @@
 /**
- * `RELEASE_FEATURE` source: the `release` subject and its three lazy commands, read off `index.ts` as text through the
- * TypeScript parser.
+ * `RELEASE_FEATURE` source: the `release` subject and its three lazy
+ * commands, read off `index.ts` as text through the TypeScript parser.
  *
  * The static imports of `index.ts` are read off its source, so a command
  * module imported by value, which would load with the roster, goes red;
  * and each `lazyCommand` call is read off it too, so a loader importing
  * another command's module goes red, with a planted call as the control.
  *
- * The cases over `RELEASE_FEATURE` and the loading of each command module are in
- * `index-integration.test.ts` beside this file.
+ * The cases over `RELEASE_FEATURE` and the loading of each command module
+ * are in `index-integration.test.ts` beside this file.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

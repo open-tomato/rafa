@@ -1,7 +1,7 @@
 /**
- * `RELEASE_FEATURE`: the `release` subject and its three lazy commands, each spelled
- * as its declaration, in roster order, over a module whose command is
- * that declaration under a `run`.
+ * `RELEASE_FEATURE`: the `release` subject and its three lazy commands, each
+ * spelled as its declaration, in roster order, over a module whose command
+ * is that declaration under a `run`.
  *
  * These cases import `index.ts` and the declarations, and so reach core's
  * command types; the cases that read the source of `index.ts` stay in
