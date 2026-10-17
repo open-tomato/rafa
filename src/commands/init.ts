@@ -578,6 +578,7 @@ async function boardStep(
     openGh: () => seams.gh(root),
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,
+    branchTemplate: scopes.config.namingBranch,
   });
 }
 

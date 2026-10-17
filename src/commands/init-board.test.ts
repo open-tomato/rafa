@@ -493,6 +493,30 @@ describe('whether the step runs', () => {
     expect(result.report?.roadmapIssue).toBe(7);
   });
 
+  it('hands branchTemplate to the Roadmap issue body, and names feat/ when the key is left out', async () => {
+    const templated = fakeGh();
+    const control = fakeGh();
+    const options = (gh: ReturnType<typeof fakeGh>, label: string) => ({
+      wanted: true,
+      provider: 'gh',
+      root: freshRoot(label),
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    }) as const;
+
+    await runBoardStep({ ...options(templated, 'template-work'), branchTemplate: 'work/{stub}' });
+    await runBoardStep(options(control, 'template-default'));
+
+    const bodyOf = (gh: ReturnType<typeof fakeGh>) => gh.calls()
+      .find((args) => args[0] === 'issue' && args[1] === 'create')
+      ?.at(-1) ?? '';
+    expect(bodyOf(templated)).toContain('the branch `work/rafa-<n>-<slug>`');
+    expect(bodyOf(templated)).not.toContain('feat/');
+    expect(bodyOf(control)).toContain('the branch `feat/rafa-<n>-<slug>`');
+    expect(bodyOf(control)).not.toContain('work/');
+  });
+
   it('adds type:roadmap to an existing titled Roadmap it adopts, and sends no edit to one already carrying it', async () => {
     const bare = fakeGh({ issues: [{ number: 4, title: 'Roadmap', labels: [] }] });
     const labelled = fakeGh({ issues: [{ number: 4, title: 'Roadmap', labels: [ROADMAP_LABEL] }] });
