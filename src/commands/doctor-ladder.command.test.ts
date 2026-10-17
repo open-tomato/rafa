@@ -14,7 +14,9 @@
  *   - the exit code of every run is compared with a run of the same
  *     project with the ladder keys at level 0, so "stays what the other
  *     rows gave" is measured and not assumed to be 0;
- *   - the json run carries the same row as a `log` event.
+ *   - the json run carries the same row as a `log` event;
+ *   - the publish switch reminder naming `RAFA_RELEASE_PUBLISH` is on the
+ *     row at levels 2 to 4 only, as the last thing on it.
  */
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
@@ -28,7 +30,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { LADDER_WORKFLOWS } from '../release/ladder.js';
+import { LADDER_WORKFLOWS, PUBLISH_SWITCH_VARIABLE } from '../release/ladder.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
@@ -207,5 +209,40 @@ describe('rafa doctor, the ladder row: each level', () => {
     const needed = LADDER_WORKFLOWS.map((entry) => entry.path.split('/').pop() as string);
 
     expect(needed.filter((file) => file !== 'release-bot-fragment.yml').every((file) => planted.has(file))).toBe(true);
+  });
+});
+
+describe('rafa doctor, the ladder row: the publish switch reminder', () => {
+  it('names the variable the constant holds', () => {
+    expect(PUBLISH_SWITCH_VARIABLE).toBe('RAFA_RELEASE_PUBLISH');
+  });
+
+  for (const level of [0, 1, 2, 3, 4]) {
+    const carries = level >= 2;
+    it(`${carries
+      ? 'carries'
+      : 'omits'} the reminder at level ${String(level)}, text and json, keeping the exit code`, async () => {
+      const row = await doctorRow(plant(complete(level)));
+
+      expect(row.line).toContain(`Release ladder: level ${String(level)}, `);
+      expect(row.jsonLine).not.toBeNull();
+      expect(row.line.includes('RAFA_RELEASE_PUBLISH')).toBe(carries);
+      expect((row.jsonLine as string).includes('RAFA_RELEASE_PUBLISH')).toBe(carries);
+      if (carries) {
+        expect(row.line.trimEnd().endsWith('which doctor cannot read.')).toBe(true);
+        expect(row.line).toContain('set to ci');
+        expect(row.line).not.toContain('missing');
+        expect(row.jsonLine).toContain('"log"');
+      }
+      expect(row.exitCode).toBe(await baselineExit());
+    });
+  }
+
+  it('ends a row with items missing on the reminder, after the list', async () => {
+    const row = await doctorRow(plant({ ...complete(3), manifest: PRIVATE_MANIFEST }));
+
+    expect(row.line.indexOf('package.json is private')).toBeLessThan(row.line.indexOf('RAFA_RELEASE_PUBLISH'));
+    expect(row.line.trimEnd().endsWith('which doctor cannot read.')).toBe(true);
+    expect(row.exitCode).toBe(await baselineExit());
   });
 });
