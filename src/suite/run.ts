@@ -11,9 +11,9 @@
  *
  * ## What is spawned
  *
- * `bun test [--changed=<commit>] <paths...> --reporter=junit
- * --reporter-outfile=<junitFile>` in `cwd`, with `bun` looked up on the
- * environment's `PATH`. The
+ * `bun test [--changed=<commit>] <paths...> [-t <pattern>]
+ * --reporter=junit --reporter-outfile=<junitFile>` in `cwd`, with `bun`
+ * looked up on the environment's `PATH`. The
  * environment is the one handed in (`process.env` when left out) with
  * `CLAUDECODE` removed: with it set, Bun prints no per-test line, only
  * the counts. `FORCE_COLOR` is removed too ({@link suiteEnv}). Measured
@@ -58,6 +58,16 @@
  *     files, but no test files are affected`, `Ran 0 tests across 0
  *     files.`, exited 0 and wrote NO JUnit file, so such a run reads
  *     `junit: 'missing'` with exit code 0: green, with nothing run.
+ *   - **`-t <pattern>` is a regular expression over the full name with
+ *     its parts joined by a space**, not by ` > `; measured on bun 1.3.14.
+ *     `-t 'grp one \(x\) two'` ran `grp > one (x) two` and the JUnit file
+ *     held the file's other case as `skipped`; `-t 'grp one (x) two'`, the
+ *     parenthesis a group, and `-t 'grp > one \(x\) two'` each matched
+ *     none, printing `regex "..." matched 0 tests` with every case
+ *     `skipped` in the JUnit file (the first exited 1). The pattern is
+ *     handed as written, as its own argv word after `-t`, never through a
+ *     shell; escaping it is the caller's concern
+ *     ({@link SuiteRunOptions.testNamePattern}).
  *   - **The report, counts and summary go to stderr**; a test's own
  *     `console.log` goes to stdout. Reading stderr alone keeps a test
  *     printing ` 5 errors` from changing the counts read here.
@@ -164,6 +174,14 @@
  * field is a list of lists, one per `bun test` process: one for a run,
  * two for a run folded with a second (`start/task-always-run.ts`). A run
  * that wrote no JUnit file holds one empty list.
+ *
+ * ## Every case of the run
+ *
+ * {@link SuiteResult.cases} holds every testcase the JUnit file names,
+ * passed, failed or skipped, each file and name pair once, as
+ * {@link parseJunitCases} reads them; none when the file was not read
+ * (`missing` or `unreadable`). A case `-t` left out is in it as
+ * `skipped`, so a caller tells a case that ran from one that did not.
  */
 import type { UnhandledError } from './unhandled.js';
 import type { SuiteFailure , SpawnEnv } from '@open-tomato/rafa/core/loop';
@@ -232,6 +250,12 @@ export interface SuiteResult {
    */
   readonly fileOrder?: readonly (readonly string[])[];
   /**
+   * Every testcase the JUnit file names, with its outcome; none when the
+   * file was not read, and absent from a result no run made. See the
+   * module note, "Every case of the run".
+   */
+  readonly cases?: readonly JunitCase[];
+  /**
    * Whether the spawner killed the run at its deadline, as
    * {@link SuiteSpawnResult.timedOut} answered it; absent when the
    * spawner keeps no deadline, as {@link spawnSuite} does.
@@ -277,6 +301,14 @@ export interface SuiteRunOptions {
    * selection is made.
    */
   readonly changedSince?: string;
+  /**
+   * A test name pattern: only the cases whose full name it matches run,
+   * as `-t <pattern>`, two argv words after the paths; the others read
+   * `skipped`. Bun reads it as a regular expression over the name's parts
+   * joined by a space (see the module note); it is handed on as written
+   * and never through a shell. Left out, every case runs.
+   */
+  readonly testNamePattern?: string;
   /**
    * Where Bun writes its JUnit report; its directory is created, and the
    * capped stderr text is written beside it ({@link outputFileFor}).
@@ -329,16 +361,21 @@ export function suitePathArgument(path: string): string {
 
 /**
  * The argv of one run over `paths`, or over the whole project when left
- * out, narrowed to what changed since `changedSince` when it is handed.
+ * out, narrowed to what changed since `changedSince` when it is handed,
+ * and to the cases `testNamePattern` matches as `-t` and the pattern, two
+ * words after the paths and before the reporter flags.
  */
-export function suiteCommand(junitFile: string, paths?: readonly string[], changedSince?: string): readonly string[] {
+export function suiteCommand(junitFile: string, paths?: readonly string[], changedSince?: string, testNamePattern?: string): readonly string[] {
   const pathArgs = paths === undefined
     ? []
     : paths.map(suitePathArgument);
   const changedArgs = changedSince === undefined
     ? []
     : [`--changed=${changedSince}`];
-  return ['bun', 'test', ...changedArgs, ...pathArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
+  const patternArgs = testNamePattern === undefined
+    ? []
+    : ['-t', testNamePattern];
+  return ['bun', 'test', ...changedArgs, ...pathArgs, ...patternArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
 }
 
 /** The suffix a JUnit file name ends in, which {@link outputFileFor} replaces. */
@@ -564,26 +601,27 @@ function walkJunit(xml: string): JunitWalk | null {
   return walk;
 }
 
-/** What {@link readJunit} answers: how the file read, its failures and its test files in order. */
+/** What {@link readJunit} answers: how the file read, its failures, its test files in order and its cases. */
 interface JunitRead {
   readonly junit: JunitReading;
   readonly failures: readonly SuiteFailure[];
   readonly files: readonly string[];
+  readonly cases: readonly JunitCase[];
 }
 
 /** The JUnit file at `path`, read and parsed. */
 function readJunit(path: string): JunitRead {
-  if (!existsSync(path)) return { junit: 'missing', failures: [], files: [] };
+  if (!existsSync(path)) return { junit: 'missing', failures: [], files: [], cases: [] };
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
   } catch {
-    return { junit: 'unreadable', failures: [], files: [] };
+    return { junit: 'unreadable', failures: [], files: [], cases: [] };
   }
   const walk = walkJunit(text);
   return walk === null
-    ? { junit: 'unreadable', failures: [], files: [] }
-    : { junit: 'read', failures: walk.failures, files: walk.files };
+    ? { junit: 'unreadable', failures: [], files: [], cases: [] }
+    : { junit: 'read', failures: walk.failures, files: walk.files, cases: walk.cases };
 }
 
 /**
@@ -604,15 +642,15 @@ export async function spawnSuite(argv: readonly string[], options: SuiteSpawnOpt
 
 /**
  * Runs `bun test` over `options.paths`, or the whole project when they
- * are left out, narrowed by `options.changedSince` when it is handed,
- * and answers what it found. Throws a `RangeError` for an
+ * are left out, narrowed by `options.changedSince` and
+ * `options.testNamePattern` when they are handed, and answers what it found. Throws a `RangeError` for an
  * empty path list; a failing suite is an answer, never a throw.
  */
 export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   if (options.paths?.length === 0) {
     throw new RangeError('runSuite: an empty path list would run the whole project; leave paths out for that');
   }
-  const command = suiteCommand(options.junitFile, options.paths, options.changedSince);
+  const command = suiteCommand(options.junitFile, options.paths, options.changedSince, options.testNamePattern);
   const outputFile = outputFileFor(options.junitFile);
   mkdirSync(dirname(options.junitFile), { recursive: true });
   rmSync(options.junitFile, { force: true });
@@ -620,17 +658,17 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
   const { exitCode, stderr, timedOut } = await spawn(command, { cwd: options.cwd, env });
-  const { junit, failures: named, files } = readJunit(options.junitFile);
-  const cases = parseFailedCases(stderr, failingFilesOf(named));
-  writeFileSync(outputFile, suiteOutputText(stderr, cases));
+  const { junit, failures: named, files, cases } = readJunit(options.junitFile);
+  const failedCases = parseFailedCases(stderr, failingFilesOf(named));
+  writeFileSync(outputFile, suiteOutputText(stderr, failedCases));
   const { summary, errors } = readSummary(stderr);
-  const failures = withErrorLines(named, cases);
+  const failures = withErrorLines(named, failedCases);
   const unhandled = parseUnhandled(stderr);
   const outputTail = readOutputTail(stderr);
   const deadline = timedOut === undefined
     ? {}
     : { timedOut };
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files], ...deadline };
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files], cases, ...deadline };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

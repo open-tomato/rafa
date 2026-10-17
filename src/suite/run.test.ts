@@ -414,6 +414,22 @@ describe('suiteCommand', () => {
     // Control: the same call without the commit carries no --changed.
     expect(suiteCommand('/r/j.xml').some((part) => part.startsWith('--changed'))).toBe(false);
   });
+
+  it('writes a pattern holding a space and a parenthesis as one word after -t, past the paths and before the reporter', () => {
+    const pattern = 'grp one \\(x\\) two';
+    expect(suiteCommand('/r/j.xml', ['a.test.ts'], 'abc123', pattern)).toEqual([
+      'bun',
+      'test',
+      '--changed=abc123',
+      './a.test.ts',
+      '-t',
+      'grp one \\(x\\) two',
+      '--reporter=junit',
+      '--reporter-outfile=/r/j.xml',
+    ]);
+    // Control: without a pattern no -t is written, so the two words above are the pattern's.
+    expect(suiteCommand('/r/j.xml', ['a.test.ts'])).not.toContain('-t');
+  });
 });
 
 describe('suiteEnv', () => {
@@ -460,6 +476,7 @@ describe('runSuite', () => {
       unhandled: [{ file: 'c.test.ts', firstLine: 'error: Cannot find module \'./nope.js\' from \'/tmp/scratch/c.test.ts\'' }],
       outputTail: nonBlank.slice(-OUTPUT_TAIL_LINES),
       fileOrder: [['a.test.ts', 'sub/b.test.ts']],
+      cases: parseJunitCases(fixture('mixed.junit.xml')) ?? [],
     });
     // Control: the recorded stderr holds more non-blank lines than the cap, so the tail opens partway down it.
     expect(result.outputTail).toHaveLength(OUTPUT_TAIL_LINES);
@@ -569,6 +586,47 @@ describe('runSuite', () => {
     const result = await runSuite({ cwd: dir, junitFile, changedSince: 'base1', spawn: recordedSpawner('clean', 0, seen) });
     expect(result.command).toEqual(['bun', 'test', '--changed=base1', '--reporter=junit', `--reporter-outfile=${junitFile}`]);
     expect(seen[0]?.argv).toEqual(result.command);
+  });
+
+  it('spawns -t and the pattern when testNamePattern is handed', async () => {
+    const seen: SeenSpawn[] = [];
+    const junitFile = join(dir, 'j.xml');
+    const result = await runSuite({ cwd: dir, junitFile, paths: ['a.test.ts'], testNamePattern: 'grp one \\(x\\)', spawn: recordedSpawner('clean', 0, seen) });
+    expect(seen[0]?.argv).toEqual(['bun', 'test', './a.test.ts', '-t', 'grp one \\(x\\)', '--reporter=junit', `--reporter-outfile=${junitFile}`]);
+    expect(result.command).toEqual(seen[0]?.argv ?? []);
+  });
+
+  it('answers every case of the JUnit file, passed, failed and skipped, in the order it names them', async () => {
+    const result = await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('mixed', 1, []) });
+    expect(result.cases).toEqual([
+      { file: 'a.test.ts', name: 'passes', outcome: 'passed' },
+      { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>', outcome: 'failed' },
+      { file: 'a.test.ts', name: 'skipped', outcome: 'skipped' },
+      { file: 'a.test.ts', name: 'todo one', outcome: 'skipped' },
+      { file: 'sub/b.test.ts', name: 'b fails', outcome: 'failed' },
+      { file: 'sub/b.test.ts', name: 'b ok', outcome: 'passed' },
+    ]);
+  });
+
+  it('answers the cases of a second fixture, each failure among them as failed', async () => {
+    const result = await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('failed-cases', 1, []) });
+    const failed = result.cases?.filter((testCase) => testCase.outcome === 'failed')
+      .map(({ file, name }) => ({ file, name }));
+    expect(failed).toEqual(result.failures.map(({ file, name }) => ({ file, name })));
+    // Control: the fixture holds passing cases too, so the filter above had something to leave out.
+    expect(result.cases?.some((testCase) => testCase.outcome === 'passed')).toBe(true);
+  });
+
+  it('answers no case when the JUnit file was missing or unreadable', async () => {
+    const missing = await runSuite({ cwd: dir, paths: ['nope'], junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('no-match', 1, []) });
+    expect(missing).toMatchObject({ junit: 'missing', cases: [] });
+    const junitFile = join(dir, 'k.xml');
+    const torn: SuiteSpawner = async () => {
+      writeFileSync(junitFile, '<testsuites><testsuite name="a.test.ts"><testcase name="t" file="a.test.ts"/>');
+      return { exitCode: 1, stderr: '' };
+    };
+    // Control: the torn text does name a testcase, so its absence below is the unreadable reading.
+    expect(await runSuite({ cwd: dir, junitFile, spawn: torn })).toMatchObject({ junit: 'unreadable', cases: [] });
   });
 
   it('refuses an empty path list rather than running the whole project', async () => {
