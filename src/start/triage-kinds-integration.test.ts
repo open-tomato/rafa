@@ -57,6 +57,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createBaseRunCache, runNamedTestAt } from '../triage/base-run.js';
@@ -104,6 +105,14 @@ const CONFIG: StartTriageOptions['config'] = {
   triageSimilarityWeightsCauseFamily: 0.05,
   triageSimilarityWeightsBoundary: 0.1,
   ...ISSUES_DEFAULTS,
+  boardRelationships: CONFIG_DEFAULTS.boardRelationships,
+  boardProjectNumber: CONFIG_DEFAULTS.boardProjectNumber,
+  roadmapIssue: CONFIG_DEFAULTS.roadmapIssue,
+  boardProjectRetries: CONFIG_DEFAULTS.boardProjectRetries,
+  boardProjectRetryWaitSeconds: CONFIG_DEFAULTS.boardProjectRetryWaitSeconds,
+  boardProjectWriteBatchSize: CONFIG_DEFAULTS.boardProjectWriteBatchSize,
+  boardProjectWritePauseMs: CONFIG_DEFAULTS.boardProjectWritePauseMs,
+  releaseFragments: CONFIG_DEFAULTS.releaseFragments,
   errorsCodes: [],
 };
 
