@@ -17,6 +17,12 @@
 # run, so a workflow that tags calls this one through `workflow_call`
 # instead of waiting for the `push` trigger.
 #
+# rafa needs a config with `release.enabled: true`, and the checkout may
+# hold none: when none of `rafa.config.ts`, `rafa.config.mjs` and
+# `.rafa/config.yaml` is there, the workflow writes `.rafa/config.yaml`
+# with that key. A committed config is left as it is, so a project that
+# needs other release keys in CI commits them.
+#
 # rafa runs from the checkout when the project is rafa itself (its
 # manifest names `@open-tomato/rafa` and git tracks `src/rafa.ts`), and
 # from a global install otherwise, so one file serves both.
@@ -75,6 +81,14 @@ jobs:
       - name: Types
         if: ${{ !cancelled() }}
         run: bun run check-types
+
+      - name: Write the CI config
+        shell: bash
+        run: |
+          if [ ! -f rafa.config.ts ] && [ ! -f rafa.config.mjs ] && [ ! -f .rafa/config.yaml ]; then
+            mkdir -p .rafa
+            printf '%s\n' '# Written by the Release publish workflow: the checkout holds no rafa config.' 'release:' '  enabled: true' > .rafa/config.yaml
+          fi
 
       - name: Publish
         shell: bash

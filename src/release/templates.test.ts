@@ -116,6 +116,17 @@ describe('the shipped publish workflow', () => {
     expect(stepNamed(steps, 'Publish')?.['if']).toBeUndefined();
   });
 
+  it('writes the CI config under bash after the gate steps, as the step straight before Publish', () => {
+    const steps = publishSteps();
+    const names = steps.map((step) => step['name']);
+    const written = names.indexOf('Write the CI config');
+
+    expect(at(stepNamed(steps, 'Write the CI config'), ['shell'])).toBe('bash');
+    expect(stepNamed(steps, 'Write the CI config')?.['if']).toBeUndefined();
+    expect(GATE_STEPS.every((name) => names.indexOf(name) !== -1 && names.indexOf(name) < written)).toBe(true);
+    expect(names.indexOf('Publish')).toBe(written + 1);
+  });
+
   it('refuses, naming both places, a directory the build dropped the workflow from', () => {
     const empty = mkdtempSync(join(tempBase, 'no-build-'));
 
