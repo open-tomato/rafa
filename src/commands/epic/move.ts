@@ -421,9 +421,9 @@ function movedLineOf(from: BoardIssue, issue: BoardIssue): MovedLine {
   return Object.freeze({ why, ticked: old?.ticked ?? issue.state === 'CLOSED' });
 }
 
-/** True when `pull` is `issue`'s: its body closes it or its head branch claims it. */
-function pullIsFor(pull: RoadmapPullRequest, issue: number): boolean {
-  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue);
+/** True when `pull` is `issue`'s: its body closes it or its head branch claims it under `template`. */
+function pullIsFor(pull: RoadmapPullRequest, issue: number, template: string | undefined): boolean {
+  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue, template);
 }
 
 /** The open work of `issue`, with a sentence per reading that failed. */
@@ -436,8 +436,8 @@ async function openWorkOf(input: EpicMoveInput): Promise<{ work: OpenWork; probl
   } catch (error) {
     problems.push(`the open pull requests could not be read, so none is named: ${messageOf(error)}`);
   }
-  const branches = scan.refs.filter((scanned) => branchClaims(scanned, input.issue)).map(branchNameOf);
-  const numbers = pulls.filter((pull) => pullIsFor(pull, input.issue)).map((pull) => pull.number);
+  const branches = scan.refs.filter((scanned) => branchClaims(scanned, input.issue, scan.branchTemplate)).map(branchNameOf);
+  const numbers = pulls.filter((pull) => pullIsFor(pull, input.issue, scan.branchTemplate)).map((pull) => pull.number);
   return {
     work: Object.freeze({
       branches: Object.freeze([...new Set(branches)]),

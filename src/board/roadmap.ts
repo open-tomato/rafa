@@ -58,7 +58,7 @@
  * ## Done, and taken
  *
  * A line is DONE when it is ticked or its issue is closed, and TAKEN
- * when a branch `feat/rafa-<n>-*` exists locally or on the remote whose
+ * when a claim branch for `<n>` exists locally or on the remote whose
  * claim, if it carries one, was not released (see "Claims on the
  * branch"), or an open pull request closes it. The four readings are
  * asked cheapest first — the tick costs nothing, the issue state one
@@ -68,8 +68,15 @@
  * ticked line at the top of a long roadmap spends no call at all.
  *
  * The scan of branches is taken ONCE for a whole walk
- * ({@link scanClaimBranches}) and so is the list of open pull requests,
+ * ({@link scanClaimBranches}, `./branch-scan.ts`, re-exported here) and so is the list of open pull requests,
  * because both answer every line and neither changes mid-walk.
+ *
+ * A claim branch is the `naming.branch` template with the stub in it,
+ * `feat/rafa-<n>-<slug>` under the default, `feat/{stub}`. The scan
+ * records the template it was taken under
+ * ({@link BranchScan.branchTemplate}), and every reading over the scan
+ * matches its refs under that template alone: under `work/{stub}`,
+ * `feat/rafa-20-x` names no issue.
  *
  * ## Claims on the branch
  *
@@ -130,21 +137,20 @@
  * `Fixes #20` has claimed the issue just as plainly.
  *
  * The pull request's HEAD BRANCH is not read here, although the spec's
- * branch is `feat/rafa-<n>-<slug>`: an open pull request's head branch
+ * branch is the template with its stub: an open pull request's head branch
  * exists on the remote by definition, so {@link scanClaimBranches}
  * answers it one reading earlier and the two would only ever report the
  * same claim twice, with the branch sentence — the one that names where
  * the work is — losing to the pull request's.
  */
+import type { BranchScan } from './branch-scan.js';
 import type { SpecIssueReader } from './issue.js';
-import type { BranchClaim, RemoteClaimReader } from './roadmap-claims.js';
+import type { BranchClaim } from './roadmap-claims.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
-import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import {
-  branchFromTemplate,
   DEFAULT_BRANCH_TEMPLATE,
   describeValue,
   isMapping,
@@ -153,14 +159,16 @@ import {
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
-import { boardId } from './naming.js';
+import { branchClaims } from './branch-scan.js';
 import {
   claimBranchOfRef,
-  createRemoteClaimReader,
   idleText,
   keepsTaken,
   weighBranchClaim,
 } from './roadmap-claims.js';
+
+export type { BranchScan } from './branch-scan.js';
+export { branchClaims, DEFAULT_REMOTE, scanClaimBranches } from './branch-scan.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board roadmap';
@@ -173,9 +181,6 @@ export const ROADMAP_SETTING = 'roadmap.issue';
 
 /** The exit code a refused roadmap ends the command with; the board's own. */
 export const ROADMAP_REFUSAL_EXIT = 2;
-
-/** The remote the branch scan asks when the caller names none. */
-export const DEFAULT_REMOTE = 'origin';
 
 /** How many open pull requests one `gh pr list` reads; see the module note. */
 export const OPEN_PULL_REQUEST_LIMIT = 100;
@@ -417,80 +422,6 @@ export function closedIssuesIn(body: string): readonly number[] {
     .filter((issue) => Number.isSafeInteger(issue) && issue > 0));
 }
 
-/**
- * True when `ref` names the branch `feat/rafa-<issue>` or one spelled
- * under that id, wherever the ref's own prefix puts it:
- * `feat/rafa-20-x`, `origin/feat/rafa-20-x` and
- * `refs/heads/feat/rafa-20-x` all claim issue 20, and `feat/rafa-2-x`
- * claims issue 2 and not issue 20.
- */
-export function branchClaims(ref: string, issue: number): boolean {
-  const claim = branchFromTemplate(DEFAULT_BRANCH_TEMPLATE, boardId(issue));
-  return new RegExp(`(?:^|/)${claim}(?:-|$)`, 'u').test(ref);
-}
-
-/** Every branch ref a walk has in hand, with what could not be read. */
-export interface BranchScan {
-  /** The refs read, as git spelled them. */
-  readonly refs: readonly string[];
-  /** A sentence per reading that failed; the module note holds the policy. */
-  readonly problems: readonly string[];
-  /**
-   * Reads the claim on a branch the remote holds (`./roadmap-claims.ts`).
-   * Left out, as a scan planted by hand leaves it, no claim is read and
-   * every branch is taken as it always was.
-   */
-  readonly claimOf?: RemoteClaimReader;
-}
-
-/** The lines of a git command's output, blank ones dropped. */
-function outputLines(stdout: string): readonly string[] {
-  return stdout.split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-}
-
-/**
- * Every branch this clone and `remote` hold, read once for a whole walk.
- *
- * `git for-each-ref` over `refs/heads` and `refs/remotes` answers what
- * the clone knows; `git ls-remote --heads <remote>` answers what the
- * remote holds now. Either failing is reported through
- * {@link BranchScan.problems} and leaves the other's refs in place, so a
- * scan is never silently half-read.
- *
- * The scan carries {@link BranchScan.claimOf}, the claim reader over the
- * claim branches the remote answered; it reads nothing until a line
- * asks, and then fetches once (`./roadmap-claims.ts`).
- */
-export function scanClaimBranches(git: GitRunner, remote: string = DEFAULT_REMOTE): BranchScan {
-  const local = git(['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']);
-  const pushed = git(['ls-remote', '--heads', remote]);
-
-  const localRefs = local.ok
-    ? outputLines(local.stdout)
-    : [];
-  const pushedRefs = pushed.ok
-    ? outputLines(pushed.stdout).map((line) => line.split('\t').at(-1) ?? '')
-    : [];
-  const claimOf = createRemoteClaimReader(git, remote, pushedRefs);
-
-  const problems = [
-    local.ok
-      ? ''
-      : `the branches of this checkout could not be read, so a branch held only here was not seen: ${detailOf(local, 'git for-each-ref')}`,
-    pushed.ok
-      ? ''
-      : `the branches on ${remote} could not be read, so a branch pushed but not fetched was not seen: ${detailOf(pushed, `git ls-remote --heads ${remote}`)}`,
-  ].filter((problem) => problem !== '');
-
-  return Object.freeze({
-    refs: Object.freeze([...localRefs, ...pushedRefs].filter((ref) => ref !== '')),
-    problems: Object.freeze(problems),
-    claimOf,
-  });
-}
-
 /** A branch naming an issue, and what the claim on it says. */
 export interface BranchClaimReading {
   /** The branch ref, as the scan spelled it. */
@@ -523,7 +454,7 @@ export interface RoadmapReadings {
 export interface RoadmapReadingsOptions {
   /** Reads one issue by number; `./issue.ts`'s own seam. */
   readonly issues: SpecIssueReader;
-  /** The branches, scanned once by {@link scanClaimBranches}. */
+  /** The branches, scanned once by {@link scanClaimBranches}; matched under its {@link BranchScan.branchTemplate}. */
   readonly branches: BranchScan;
   /** The open pull requests, read once on the first line that asks. */
   readonly pullRequests: OpenPullRequestLister;
@@ -552,6 +483,7 @@ function decidingBranch(read: readonly BranchClaimReading[]): BranchClaimReading
  */
 export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapReadings {
   const { issues, branches, pullRequests } = options;
+  const template = branches.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
   const staleAfter = options.staleAfter ?? CONFIG_DEFAULTS.claimsStaleAfter;
   const now = options.now ?? ((): Date => new Date());
   let open: Promise<readonly RoadmapPullRequest[]> | null = null;
@@ -560,13 +492,13 @@ export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapR
     isClosed: async (issue: number): Promise<boolean> => (await issues(issue)).state === 'CLOSED',
 
     branchFor: (issue: number): string | null => branches.refs
-      .find((ref) => branchClaims(ref, issue)) ?? null,
+      .find((ref) => branchClaims(ref, issue, template)) ?? null,
 
     branchClaimFor: async (issue: number): Promise<BranchClaimReading | null> => {
-      const refs = branches.refs.filter((ref) => branchClaims(ref, issue));
+      const refs = branches.refs.filter((ref) => branchClaims(ref, issue, template));
       const { claimOf } = branches;
       const found = refs.map((ref) => {
-        const name = claimBranchOfRef(ref);
+        const name = claimBranchOfRef(ref, template);
         return { ref, reading: claimOf === undefined || name === null
           ? null
           : claimOf(name) };

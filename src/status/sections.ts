@@ -691,8 +691,8 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
     ? { gh: runner, mode: 'native' }
     : { gh: runner })))(gh));
   const board = (seams.board ?? ghNextBoard)(native
-    ? { gh, git, configured: config.roadmapIssue, listing, relations }
-    : { gh, git, configured: config.roadmapIssue, listing });
+    ? { gh, git, configured: config.roadmapIssue, branchTemplate: config.namingBranch, listing, relations }
+    : { gh, git, configured: config.roadmapIssue, branchTemplate: config.namingBranch, listing });
   const openGate = seams.ownerGate ?? nextOwnerGate;
   const place: PlaceSources = {
     root,

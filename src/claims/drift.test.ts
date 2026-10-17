@@ -165,6 +165,23 @@ describe('findDrift: stage labels with no claim branch', () => {
     expect(report.findings.map((finding) => finding.issue)).toEqual([12]);
   });
 
+  it('reads the claim branches under the scan\'s own template, and the default template reads none of them', () => {
+    const issues = [row(20, [IN_DEVELOPMENT_LABEL])];
+    const refs = ['refs/remotes/origin/work/rafa-20-x'];
+
+    const templated = findDrift({ issues, checklists: [], branches: () => ({ refs, problems: [], branchTemplate: 'work/{stub}' }) });
+    const untemplated = findDrift({ issues, checklists: [], branches: scanOf(refs) });
+    const featUnderWork = findDrift({
+      issues,
+      checklists: [],
+      branches: () => ({ refs: ['refs/remotes/origin/feat/rafa-20-x'], problems: [], branchTemplate: 'work/{stub}' }),
+    });
+
+    expect(templated.findings).toEqual([]);
+    expect(untemplated.findings.map((finding) => [finding.kind, finding.issue])).toEqual([['label-without-branch', 20]]);
+    expect(featUnderWork.findings.map((finding) => [finding.kind, finding.issue])).toEqual([['label-without-branch', 20]]);
+  });
+
   it('never asks for the branches when no issue carries a stage label, and asks once when one does', () => {
     let asked = 0;
     const branches = (): DriftBranches => {

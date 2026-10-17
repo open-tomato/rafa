@@ -22,7 +22,7 @@
  * no listing of its own. The epic's computed state is `readEpics`'
  * (`./epics.ts`), over the claims the roadmap's `has` column reads: a
  * plan file ({@link hasPlanFor}), a branch ({@link scanClaimBranches},
- * {@link branchClaims}) and an open pull request
+ * {@link branchClaims} under the scan's own template) and an open pull request
  * ({@link closedIssuesIn}). Each of those three is read at most once,
  * and none of them is read when the epic has no open member, since such
  * an epic cannot be `in-progress` and has no open work to name.
@@ -202,6 +202,8 @@ export function branchNameOf(ref: string): string {
 /** Every claim reading one epic needs, each taken once, with what failed. */
 interface ClaimReadings {
   readonly refs: readonly string[];
+  /** The template the branch scan was taken under, which a branch claims an issue by. */
+  readonly branchTemplate: string | undefined;
   readonly pulls: readonly RoadmapPullRequest[];
   readonly planNames: readonly string[];
   readonly problems: readonly string[];
@@ -223,12 +225,12 @@ async function readClaims(input: HorizonChangeInput): Promise<ClaimReadings> {
   } catch (error) {
     problems.push(`the plan dir could not be read, so no plan counts as started work: ${messageOf(error)}`);
   }
-  return { refs: scan.refs, pulls, planNames, problems };
+  return { refs: scan.refs, branchTemplate: scan.branchTemplate, pulls, planNames, problems };
 }
 
-/** True when `pull` is `issue`'s: its body closes it or its head branch claims it. */
-function pullIsFor(pull: RoadmapPullRequest, issue: number): boolean {
-  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue);
+/** True when `pull` is `issue`'s: its body closes it or its head branch claims it under `template`. */
+function pullIsFor(pull: RoadmapPullRequest, issue: number, template: string | undefined): boolean {
+  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue, template);
 }
 
 /** Every issue on `issues` one of `readings` claims. */
@@ -237,16 +239,16 @@ function claimsOf(issues: readonly BoardIssue[], readings: ClaimReadings): Reado
     .map((issue) => issue.number)
     .filter((number) => hasPlanFor(readings.planNames, number)
       || readings.pulls.some((pull) => closedIssuesIn(pull.body).includes(number))
-      || readings.refs.some((scanned) => branchClaims(scanned, number))));
+      || readings.refs.some((scanned) => branchClaims(scanned, number, readings.branchTemplate))));
 }
 
 /** The open work of `open` members; see the module note. */
 function openWorkOf(open: readonly number[], readings: ClaimReadings): EpicOpenWork {
   const branches = readings.refs
-    .filter((scanned) => open.some((issue) => branchClaims(scanned, issue)))
+    .filter((scanned) => open.some((issue) => branchClaims(scanned, issue, readings.branchTemplate)))
     .map(branchNameOf);
   const pulls = readings.pulls
-    .filter((pull) => open.some((issue) => pullIsFor(pull, issue)))
+    .filter((pull) => open.some((issue) => pullIsFor(pull, issue, readings.branchTemplate)))
     .map((pull) => pull.number);
   return Object.freeze({
     branches: Object.freeze([...new Set(branches)]),
