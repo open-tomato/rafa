@@ -13,8 +13,6 @@ import type { OpenStaleDocLine } from '../../docs/open-lines.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
