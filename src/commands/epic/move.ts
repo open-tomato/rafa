@@ -47,12 +47,13 @@
  *   out of, and with two it cannot tell which. The owner may be closed:
  *   an issue can leave a finished epic.
  *
- * A closed issue moves too. Only an OPEN issue has its work read: every
- * scanned branch ref `branchClaims` reads as the issue's, named as a
- * person types it (`branchNameOf`, `src/board/epic-horizon.ts`), and every
- * open pull request whose body closes it or whose head branch claims it,
- * in ascending number. A reading that fails is a problem sentence, never
- * a throw, and the command warns that the work named may be short.
+ * A closed issue moves too. Only an OPEN issue has its work read
+ * (`./move-work.ts`): every scanned branch ref `branchClaims` reads as the
+ * issue's under the template `naming.branch` names, named as a person
+ * types it (`branchNameOf`, `src/board/epic-horizon.ts`), and every open
+ * pull request whose body closes it or whose head branch claims it, in
+ * ascending number. A reading that fails is a problem sentence, never a
+ * throw, and the command warns that the work named may be short.
  *
  * ## The line that moves
  *
@@ -144,7 +145,7 @@ import type { EpicRelations } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { BoardRelations, RelationWrite } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
+import type { OpenPullRequestLister } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
@@ -153,7 +154,6 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { branchNameOf } from '../../board/epic-horizon.js';
 import {
   blankReasonMessage,
   REASON_FLAG,
@@ -165,8 +165,8 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
-import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
+import { createGhOpenPullRequests, parseRoadmapBody } from '../../board/roadmap.js';
+import { issueProject, issueSubjectConfig, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { TO_FLAG, workPhrase } from './horizon-change.js';
@@ -178,6 +178,7 @@ import {
   nativeEpicLeft,
   nativeParentLine,
 } from './move-native.js';
+import { openWorkOf } from './move-work.js';
 
 /** The exit code every refusal of a move ends the command with. */
 export const EPIC_MOVE_REFUSAL_EXIT = 2;
@@ -208,6 +209,8 @@ export interface EpicMoveInput {
   readonly git: GitRunner;
   /** The remote the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /** The branch template a branch claims the issue under, the project's `naming.branch`; `DEFAULT_BRANCH_TEMPLATE` when left out. */
+  readonly branchTemplate?: string;
   /** Every open pull request. */
   readonly pullRequests: OpenPullRequestLister;
   /** The board's relationships, which read the epic a native issue leaves; `labels` mode when left out. See the module note. */
@@ -421,32 +424,6 @@ function movedLineOf(from: BoardIssue, issue: BoardIssue): MovedLine {
   return Object.freeze({ why, ticked: old?.ticked ?? issue.state === 'CLOSED' });
 }
 
-/** True when `pull` is `issue`'s: its body closes it or its head branch claims it under `template`. */
-function pullIsFor(pull: RoadmapPullRequest, issue: number, template: string | undefined): boolean {
-  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue, template);
-}
-
-/** The open work of `issue`, with a sentence per reading that failed. */
-async function openWorkOf(input: EpicMoveInput): Promise<{ work: OpenWork; problems: readonly string[] }> {
-  const scan = scanClaimBranches(input.git, input.remote);
-  const problems = [...scan.problems];
-  let pulls: readonly RoadmapPullRequest[] = [];
-  try {
-    pulls = await input.pullRequests();
-  } catch (error) {
-    problems.push(`the open pull requests could not be read, so none is named: ${messageOf(error)}`);
-  }
-  const branches = scan.refs.filter((scanned) => branchClaims(scanned, input.issue, scan.branchTemplate)).map(branchNameOf);
-  const numbers = pulls.filter((pull) => pullIsFor(pull, input.issue, scan.branchTemplate)).map((pull) => pull.number);
-  return {
-    work: Object.freeze({
-      branches: Object.freeze([...new Set(branches)]),
-      pullRequests: Object.freeze([...new Set(numbers)].sort((left, right) => left - right)),
-    }),
-    problems: Object.freeze(problems),
-  };
-}
-
 /** The move `input` asks for, read in `native` mode through `relations`; see the module note. */
 async function readNativeMove(input: EpicMoveInput, relations: EpicRelations): Promise<NativeMoveReading> {
   const issue = memberRow(input.issues, input.issue);
@@ -610,15 +587,17 @@ async function askReason(reading: EpicMoveReading, flag: string | null, seams: E
 export async function moveEpicIssue(context: RafaContext, seams: EpicMoveSeams): Promise<EpicMoveResult> {
   const line = readMoveLine(context);
   const project = issueProject(context);
+  const config = await issueSubjectConfig(project, () => undefined);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const relations = seams.relations
-    ?? await configuredMoveRelations(project, gh, () => readOrRefuse('the board\'s repository', () => readBoardRepository(gh)));
+    ?? await configuredMoveRelations(config, gh, () => readOrRefuse('the board\'s repository', () => readBoardRepository(gh)));
   const listing = await readOrRefuse('the board', () => createGhBoardListing({ gh, mode: relations.mode })());
   const reading = await readEpicMove({
     issues: listing,
     issue: line.issue,
     to: line.to,
     git: seams.git ?? createGitRunner(project.root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     relations,
   });

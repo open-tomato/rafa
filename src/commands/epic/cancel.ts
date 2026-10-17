@@ -9,14 +9,16 @@
  *
  * The line is one epic number, a whole number from 1, and `--reason`,
  * optional text for the epic's comment; anything else is refused with
- * exit code 1. The board listing is read once (`createGhBoardListing`);
- * one that cannot be read is refused with {@link EPIC_CANCEL_REFUSAL_EXIT}.
- * Off it, {@link readEpicToCancel} refuses with the same exit code an
- * issue not on the listing, one that is not `type:epic`, and an epic
- * closed as completed, since a finished epic is not cancelled. An epic
- * already closed as NOT PLANNED — by hand on GitHub, or by an earlier
- * cancel whose writes did not all land — is not refused: the close is
- * skipped and the questions are asked.
+ * exit code 1. The config is loaded once (`issueSubjectConfig`), for
+ * `naming.branch` alone; a config it refuses is refused with exit code 1.
+ * The board listing is read once (`createGhBoardListing`); one that cannot
+ * be read is refused with {@link EPIC_CANCEL_REFUSAL_EXIT}. Off it,
+ * {@link readEpicToCancel} refuses with the same exit code an issue not
+ * on the listing, one that is not `type:epic`, and an epic closed as
+ * completed, since a finished epic is not cancelled. An epic already
+ * closed as NOT PLANNED — by hand on GitHub, or by an earlier cancel whose
+ * writes did not all land — is not refused: the close is skipped and the
+ * questions are asked.
  *
  * The dependents are `readEpicDependents`'s (`src/board/epic-dependents.ts`):
  * every open issue outside the epic whose `Blocked by:` line names one of
@@ -54,9 +56,9 @@
  * stderr, {@link dependentQuestion}: `m` or `move`, `u` or `unblock`, `c`
  * or `cancel`, any case. Any other answer is told the three and asked
  * again. A move asks {@link targetQuestion} for the epic, and reads the
- * move with `readEpicMove` (`./move.ts`), so a target `epic move` would
- * refuse — not an open epic, its own epic — and the epic being cancelled
- * are said and the question is asked again. Every answer is taken BEFORE
+ * move with `readEpicMove` (`./move.ts`) under that branch template, so
+ * a target `epic move` would refuse — not an open epic, its own epic —
+ * and the epic being cancelled are said and the question is asked again. Every answer is taken BEFORE
  * any write, so an input that ends early changes nothing.
  *
  * With no terminal and at least one dependent, nothing changes: the list
@@ -144,7 +146,7 @@ import { createLabelsRelations, LABELS_READS } from '../../board/relations/label
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
+import { issueProject, issueSubjectConfig, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';
 import { cancelTarget, refreshProjectAfterEpic } from './epic-project.js';
@@ -368,6 +370,8 @@ export interface AskDependentsInput {
   readonly dependents: readonly EpicDependent[];
   readonly prompter: Prompter;
   readonly git: GitRunner;
+  /** The branch template a move answer's open work is read under, the project's `naming.branch`; `DEFAULT_BRANCH_TEMPLATE` when left out. */
+  readonly branchTemplate?: string;
   readonly pullRequests: OpenPullRequestLister;
 }
 
@@ -383,7 +387,8 @@ async function moveTo(input: AskDependentsInput, issue: number, answer: string):
   const to = Number(found[1]);
   if (to === input.epic) return `Epic ${ref(to)} is the epic being cancelled; name another.`;
   try {
-    return await readEpicMove({ issues: input.issues, issue, to, git: input.git, pullRequests: input.pullRequests });
+    const { issues, git, branchTemplate, pullRequests } = input;
+    return await readEpicMove({ issues, issue, to, git, branchTemplate, pullRequests });
   } catch (error) {
     return `Cannot move ${ref(issue)} to epic ${ref(to)}: ${plainMessage(error)}`;
   }
@@ -685,6 +690,7 @@ async function askAll(input: Omit<AskDependentsInput, 'prompter'>, seams: EpicCa
 export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): Promise<EpicCancelResult> {
   const line = readCancelLine(context);
   const project = issueProject(context);
+  const config = await issueSubjectConfig(project, (message) => print(context, warn(message)));
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const relations = seams.relations ?? LABELS_READS;
   const issues = await readListing(gh, relations);
@@ -701,7 +707,8 @@ export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): 
       return unchanged('unasked', target);
     }
     const git = seams.git ?? createGitRunner(project.root);
-    const answered = await askAll({ epic, issues, dependents: target.dependents, git, pullRequests: createGhOpenPullRequests({ gh }) }, seams);
+    const pullRequests = createGhOpenPullRequests({ gh });
+    const answered = await askAll({ epic, issues, dependents: target.dependents, git, branchTemplate: config.namingBranch, pullRequests }, seams);
     if (answered === null) {
       print(context, warn(endedCancelMessage(epic)));
       return unchanged('ended', target);
