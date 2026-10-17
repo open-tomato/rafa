@@ -231,6 +231,12 @@ export interface SuiteResult {
    * note.
    */
   readonly fileOrder?: readonly (readonly string[])[];
+  /**
+   * Whether the spawner killed the run at its deadline, as
+   * {@link SuiteSpawnResult.timedOut} answered it; absent when the
+   * spawner keeps no deadline, as {@link spawnSuite} does.
+   */
+  readonly timedOut?: boolean;
 }
 
 /** What one spawn of `bun test` answered. */
@@ -238,6 +244,12 @@ export interface SuiteSpawnResult {
   readonly exitCode: number;
   /** Everything the process wrote to stderr. */
   readonly stderr: string;
+  /**
+   * True when the spawner killed the process at its deadline
+   * (`createDeadlineSpawner`, `./deadline-spawn.ts`), false when it
+   * exited first; absent from a spawner with no deadline.
+   */
+  readonly timedOut?: boolean;
 }
 
 /** Where, and with what environment, `bun test` is spawned. */
@@ -607,7 +619,7 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   rmSync(outputFile, { force: true });
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
-  const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
+  const { exitCode, stderr, timedOut } = await spawn(command, { cwd: options.cwd, env });
   const { junit, failures: named, files } = readJunit(options.junitFile);
   const cases = parseFailedCases(stderr, failingFilesOf(named));
   writeFileSync(outputFile, suiteOutputText(stderr, cases));
@@ -615,7 +627,10 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const failures = withErrorLines(named, cases);
   const unhandled = parseUnhandled(stderr);
   const outputTail = readOutputTail(stderr);
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files] };
+  const deadline = timedOut === undefined
+    ? {}
+    : { timedOut };
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files], ...deadline };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

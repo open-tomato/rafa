@@ -510,6 +510,17 @@ describe('runSuite', () => {
     expect(result.failures.every((failure) => !('errorLines' in failure))).toBe(true);
   });
 
+  it('carries the spawner\'s timedOut into the result, and leaves it out when the spawner answers none', async () => {
+    const junitFile = join(dir, 'j.xml');
+    const killed: SuiteSpawner = async () => ({ exitCode: 137, stderr: '', timedOut: true });
+    const finished: SuiteSpawner = async () => ({ exitCode: 0, stderr: '', timedOut: false });
+    expect((await runSuite({ cwd: dir, junitFile, spawn: killed })).timedOut).toBe(true);
+    expect((await runSuite({ cwd: dir, junitFile, spawn: finished })).timedOut).toBe(false);
+    // Control: a spawner with no deadline adds no key.
+    const plain = await runSuite({ cwd: dir, junitFile, spawn: recordedSpawner('clean', 0, []) });
+    expect('timedOut' in plain).toBe(false);
+  });
+
   it('creates the JUnit file\'s directory before the spawn', async () => {
     const junitFile = join(dir, 'deep', 'er', 'j.xml');
     // Control: the directory is not there before the run.
