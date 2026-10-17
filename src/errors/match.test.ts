@@ -1,13 +1,16 @@
 /**
  * Tests for the word matching over cause codes: what `suggestCodes`
  * ranks and leaves out, filler words and the shared-word floor
- * included, and which leaves `nearDuplicates` pairs.
+ * included, what `suggestWithProposals` ranks beside the list's codes,
+ * and which leaves `nearDuplicates` pairs.
  */
+import type { IssueRef } from '@open-tomato/rafa/ports';
+
 import { describe, expect, it } from 'bun:test';
 
 import { defineErrorCodes } from '@open-tomato/rafa/errors/codes';
 
-import { nearDuplicates, suggestCodes } from './match.js';
+import { nearDuplicates, suggestCodes, suggestWithProposals } from './match.js';
 
 const LIST = defineErrorCodes([
   { code: 'git:no-identity', description: 'a git commit runs with no author identity set', hint: 'set user.name and user.email', level: 'error', since: '#949' },
@@ -40,6 +43,60 @@ describe('suggestCodes', () => {
 
   it('answers at most the limit', () => {
     expect(suggestCodes('git', LIST, 1)).toHaveLength(1);
+  });
+
+  it('answers issue null and proposal false on every row', () => {
+    const ranked = suggestCodes('git', LIST);
+    expect(ranked.length).toBeGreaterThan(1);
+    expect(ranked.map((row) => [row.issue, row.proposal])).toEqual(ranked.map(() => [null, false]));
+  });
+});
+
+/** A GitHub issue reference numbered `id`. */
+function refOf(id: number): IssueRef {
+  return { opt: id, kind: 'github', externalId: String(id), url: null };
+}
+
+describe('suggestWithProposals', () => {
+  it('ranks a proposal on its leaf words, naming the bug that proposed it', () => {
+    const proposals = [{ code: 'git:branch-not-found', title: 'the loop stops early', issue: refOf(7) }];
+    const ranked = suggestWithProposals('branch not found', LIST, proposals);
+    expect(ranked).toEqual([{ code: 'git:branch-not-found', score: 1, proposal: true, issue: refOf(7) }]);
+  });
+
+  it('ranks the list codes beside a proposal, each with issue null', () => {
+    const proposals = [{ code: 'git:branch-not-found', title: 'checkout fails', issue: refOf(7) }];
+    const ranked = suggestWithProposals('git', LIST, proposals);
+    expect(ranked.map((row) => [row.code, row.issue])).toEqual([
+      ['git:branch-not-found', refOf(7)],
+      ['git:no-identity', null],
+      ['git:filesystem-boundary', null],
+    ]);
+  });
+
+  it('leaves out a proposal that is already a code of the list', () => {
+    const proposals = [{ code: 'git:no-identity', title: 'git commit has no author identity', issue: refOf(7) }];
+    const ranked = suggestWithProposals('git commit has no author identity', LIST, proposals);
+    expect(ranked.map((row) => [row.code, row.proposal, row.issue])).toEqual([['git:no-identity', false, null]]);
+  });
+
+  it('lists a code two bugs proposed once, naming the first', () => {
+    const proposals = [
+      { code: 'git:branch-not-found', title: 'checkout fails', issue: refOf(7) },
+      { code: 'git:branch-not-found', title: 'branch not found on push', issue: refOf(9) },
+    ];
+    const ranked = suggestWithProposals('branch not found', LIST, proposals);
+    expect(ranked).toEqual([{ code: 'git:branch-not-found', score: 1, proposal: true, issue: refOf(7) }]);
+  });
+
+  it('applies the shared-word floor to a proposal', () => {
+    const proposals = [{ code: 'docker:out-of-memory', title: 'the build stops', issue: refOf(7) }];
+    expect(suggestWithProposals('docker image pull fails', LIST, proposals)).toEqual([]);
+  });
+
+  it('cuts the ranked list at the limit', () => {
+    const proposals = [{ code: 'git:branch-not-found', title: 'checkout fails', issue: refOf(7) }];
+    expect(suggestWithProposals('git', LIST, proposals, 2)).toHaveLength(2);
   });
 });
 

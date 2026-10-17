@@ -14,9 +14,14 @@
  * out of a sentence is a coincidence, and a cause the list lacks should
  * read as no match, which sends it to `<family>:new-context`. It never
  * picks: the caller (an agent) does.
+ *
+ * `suggestWithProposals` ranks the leaves open bugs proposed beside the
+ * list's codes: a proposal reads as an entry whose description is the
+ * proposing bug's title, through the same floor and tie rules.
  */
 
 import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
+import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { familyOf } from '@open-tomato/rafa/errors/codes';
 
@@ -61,8 +66,19 @@ export interface CodeSuggestion {
   readonly code: string;
   /** The share of the text's words the entry holds, above 0 and at most 1. */
   readonly score: number;
-  /** True for an open bug's proposed leaf; always false until the bug record lands. */
+  /** True for an open bug's proposed leaf, false for a code of the list. */
   readonly proposal: boolean;
+  /** The open bug that proposed the code; null for a code of the list. */
+  readonly issue: IssueRef | null;
+}
+
+/** A code an open bug's record proposed, with the bug it came from. */
+export interface CodeProposal {
+  /** The proposed code, `<family>:<leaf>`. */
+  readonly code: string;
+  /** The proposing bug's title, ranked as the proposal's description. */
+  readonly title: string;
+  readonly issue: IssueRef;
 }
 
 /** Two codes of one family that read alike. */
@@ -77,11 +93,6 @@ function contentWords(text: string): ReadonlySet<string> {
   return new Set([...wordSetOf(text)].filter((word) => !FILLER_WORDS.has(word)));
 }
 
-/** An entry's words: its code and its description. */
-function entryWords(entry: ErrorCodeEntry): ReadonlySet<string> {
-  return contentWords(`${entry.code} ${entry.description}`);
-}
-
 /** How many words of `query` the set `words` holds. */
 function sharedCount(query: ReadonlySet<string>, words: ReadonlySet<string>): number {
   return [...query].filter((word) => words.has(word)).length;
@@ -94,24 +105,81 @@ function sharedFloor(query: ReadonlySet<string>): number {
     : 1;
 }
 
+/** One candidate to rank: a list entry, or a proposal read as one. */
+interface Candidate {
+  readonly code: string;
+  readonly description: string;
+  readonly issue: IssueRef | null;
+}
+
+/** A candidate's words: its code and its description. */
+function candidateWords(candidate: Candidate): ReadonlySet<string> {
+  return contentWords(`${candidate.code} ${candidate.description}`);
+}
+
+/** The candidates closest to `text`, best first, at most `limit`. */
+function rankCandidates(
+  text: string,
+  candidates: readonly Candidate[],
+  limit: number,
+): readonly CodeSuggestion[] {
+  const query = contentWords(text);
+  const floor = sharedFloor(query);
+  const scored = candidates.map((candidate) => {
+    const words = candidateWords(candidate);
+    return { candidate, shared: sharedCount(query, words), tie: jaccard(query, words) };
+  });
+  return scored
+    .filter((row) => row.shared >= floor)
+    .map((row) => ({ ...row, score: row.shared / query.size }))
+    .sort((a, b) => b.score - a.score || b.tie - a.tie || a.candidate.code.localeCompare(b.candidate.code))
+    .slice(0, limit)
+    .map((row) => Object.freeze({
+      code: row.candidate.code,
+      score: row.score,
+      proposal: row.candidate.issue !== null,
+      issue: row.candidate.issue,
+    }));
+}
+
 /** The entries closest to `text`, best first, at most `limit`. */
 export function suggestCodes(
   text: string,
   entries: readonly ErrorCodeEntry[],
   limit: number = SUGGESTION_LIMIT,
 ): readonly CodeSuggestion[] {
-  const query = contentWords(text);
-  const floor = sharedFloor(query);
-  const scored = entries.map((entry) => {
-    const words = entryWords(entry);
-    return { code: entry.code, shared: sharedCount(query, words), tie: jaccard(query, words) };
-  });
-  return scored
-    .filter((row) => row.shared >= floor)
-    .map((row) => ({ ...row, score: row.shared / query.size }))
-    .sort((a, b) => b.score - a.score || b.tie - a.tie || a.code.localeCompare(b.code))
-    .slice(0, limit)
-    .map((row) => Object.freeze({ code: row.code, score: row.score, proposal: false }));
+  return rankCandidates(text, entries.map((entry): Candidate => ({ ...entry, issue: null })), limit);
+}
+
+/**
+ * The proposals worth ranking: none already a code of `entries`, since
+ * the list has it, and each code once, kept with the first bug naming it.
+ */
+function distinctProposals(
+  entries: readonly ErrorCodeEntry[],
+  proposals: readonly CodeProposal[],
+): readonly Candidate[] {
+  const listed = new Set(entries.map((entry) => entry.code));
+  return proposals
+    .filter((proposal) => !listed.has(proposal.code))
+    .filter((proposal, index, all) => all.findIndex((other) => other.code === proposal.code) === index)
+    .map((proposal) => ({ code: proposal.code, description: proposal.title, issue: proposal.issue }));
+}
+
+/**
+ * The entries and the open bugs' proposals closest to `text`, best first,
+ * at most `limit`. A proposal ranks as an entry whose description is its
+ * bug's title; one already a code of the list is left out, and a code two
+ * bugs proposed is listed once, naming the first of `proposals`.
+ */
+export function suggestWithProposals(
+  text: string,
+  entries: readonly ErrorCodeEntry[],
+  proposals: readonly CodeProposal[],
+  limit: number = SUGGESTION_LIMIT,
+): readonly CodeSuggestion[] {
+  const listed = entries.map((entry): Candidate => ({ ...entry, issue: null }));
+  return rankCandidates(text, [...listed, ...distinctProposals(entries, proposals)], limit);
 }
 
 /** An entry's leaf words and description words, for comparing within a family. */

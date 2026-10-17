@@ -105,7 +105,13 @@ holds them. "no" and "not" are kept: they tell `no-identity` from
   TEXT's words each holds in its code and description, with Jaccard
   breaking ties. A text of three words or more must share two with an
   entry, so a cause the list lacks reads as no match and goes to
-  `<family>:new-context`. It never picks a code: the caller does.
+  `<family>:new-context`. It never picks a code: the caller does. Each
+  row's `issue` is null and its `proposal` false.
+- `suggestWithProposals(text, entries, proposals, limit)` ranks the codes
+  open bugs proposed beside the list's, each read as an entry whose
+  description is the proposing bug's title, through the same floor and
+  tie rules. A proposal already a code of the list is left out, and a code
+  two bugs proposed is ranked once, its `issue` the first of them.
 - `nearDuplicates(entries, threshold)` pairs codes of one family whose
   leaf and description read alike at `NEAR_DUPLICATE_SCORE` (0.5) or above.
   A test keeps rafa's own list free of such pairs.
