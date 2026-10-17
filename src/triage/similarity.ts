@@ -126,7 +126,7 @@ export interface RankedIssue {
 }
 
 /** The fields of a record the bonuses read. */
-type RankedFields = Pick<BugRecord, 'cause' | 'module' | 'action'>;
+export type RankedFields = Pick<BugRecord, 'cause' | 'module' | 'action'>;
 
 /** The word set of `text`; see the module note. */
 export function wordSetOf(text: string): ReadonlySet<string> {
@@ -232,7 +232,7 @@ function codedCause(cause: string | null): string | null {
 }
 
 /** The cause signal two records share, or null when neither cause bonus applies. */
-function causeSignalOf(a: RankedFields, b: RankedFields): 'cause' | 'cause-family' | null {
+export function causeSignalOf(a: RankedFields, b: RankedFields): 'cause' | 'cause-family' | null {
   const first = codedCause(a.cause);
   const second = codedCause(b.cause);
   if (first === null || second === null) return null;
@@ -249,7 +249,7 @@ function isKnownBoundary(value: string | null): value is string {
 }
 
 /** True when both records name the same known module and the same known action. */
-function sharesBoundary(a: RankedFields, b: RankedFields): boolean {
+export function sharesBoundary(a: RankedFields, b: RankedFields): boolean {
   const known = [a.module, a.action, b.module, b.action].every(isKnownBoundary);
   return known && a.module === b.module && a.action === b.action;
 }
