@@ -9,10 +9,14 @@
  * and releases it, and `readRunClaim` over a plan stubbed `rafa-7-x`
  * reads it as owned.
  *
+ * `rafa claim hand`, `accept` and `take` run in turn from clones of
+ * the same shape, each reaching the template through `loadConfig` and its
+ * own real `DEFAULT_SEAMS`, and push their commits onto `work/rafa-7-x`.
+ *
  * The control is a second clone of the same remote whose config leaves
  * the template out, so it reads the default `feat/{stub}`: the same
  * three find no claim, and the release refuses with no branch found,
- * pushing nothing.
+ * pushing nothing; so are the three claim commands.
  */
 import type { GitRunner } from '../pr/index.js';
 import type { StatusSeams } from '../status/sections.js';
@@ -27,9 +31,14 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { makeOwnershipCommit, pushNewClaimBranch } from '../claims/git.js';
+import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
+import { parseClaimMessage } from '../claims/record.js';
+import { createClaimAcceptCommand } from '../commands/claim/accept.js';
+import { createClaimHandCommand } from '../commands/claim/hand.js';
 import { createClaimReleaseCommand } from '../commands/claim/release.js';
+import { createClaimTakeCommand } from '../commands/claim/take.js';
 import { createGitRunner } from '../pr/index.js';
 import { readRunClaim } from '../start/preflight-claim.js';
 import { readStatusSections } from '../status/sections.js';
@@ -47,6 +56,7 @@ const BRANCH = 'work/rafa-7-x';
 const STORE = 'store-a';
 const ISSUE = 7;
 const PLAN = '/project/.rafa/plans/PLAN-rafa-7-x.md';
+const OTHER_STORE = 'store-b';
 const SUBJECTS = [{ name: 'claim', summary: 'claims' }];
 
 /** The project config a clone carries: the template when given, the default otherwise. */
@@ -66,6 +76,10 @@ interface Project {
 
 /** The remote's runner and the two projects, one per template. */
 interface World {
+  readonly root: string;
+  readonly originPath: string;
+  /** The clone that planted the remote, which pushes the records no device under test makes. */
+  readonly seed: GitRunner;
   readonly origin: GitRunner;
   readonly templated: Project;
   readonly defaulted: Project;
@@ -118,6 +132,9 @@ function plantWorld(name: string): World {
   const pushed = pushNewClaimBranch(seed, made.sha, BRANCH, TEMPLATE);
   if (pushed.outcome !== 'pushed') throw new Error(`claim push: ${pushed.outcome}`);
   return {
+    root,
+    originPath,
+    seed,
     origin: createGitRunner(originPath),
     templated: projectOver(originPath, root, TEMPLATE),
     defaulted: projectOver(originPath, root, undefined),
@@ -239,5 +256,100 @@ describe('the same claim under the default template', () => {
     expect(run.exitCode).toBe(1);
     expect(`${run.stdout}${run.stderr}`).toContain('origin has no feat/rafa-7-<slug> branch, so #7 carries no claim');
     expect(remoteTip(world, BRANCH)).toBe(claimTip);
+  });
+});
+
+/** Mints the effort store at `repo` under `storeId`, so the real seams read it as this device's. */
+function mintDeviceStore(repo: string, storeId: string): void {
+  withSqliteStore(sqliteStorePath(repo), 'write', true, () => undefined, {
+    newStoreId: () => storeId,
+    now: () => new Date('2026-09-30T12:00:00.000Z'),
+  });
+}
+
+/** A device of the world: a clone under `template` whose store carries `storeId`. */
+function deviceOf(world: World, template: string | undefined, storeId: string): Project {
+  const label = `${template === undefined
+    ? 'defaulted'
+    : 'templated'}-${storeId}`;
+  const dir = join(world.root, label);
+  const git = cloneInto(world.originPath, dir, storeId);
+  plantProjectConfig(dir, configText(template));
+  const home = join(world.root, `${label}-home`);
+  mkdirSync(home);
+  mintDeviceStore(dir, storeId);
+  return { root: dir, home, git };
+}
+
+/** Pushes one more ownership commit on the remote tip of `BRANCH` from the seed clone. */
+function pushRecordAsSeed(world: World, record: Parameters<typeof makeOwnershipCommit>[2]): void {
+  must(world.seed, ['fetch', '--quiet', 'origin', `+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}`]);
+  const tip = remoteTip(world, BRANCH);
+  if (tip === null) throw new Error(`no ${BRANCH} on the remote`);
+  const made = makeOwnershipCommit(world.seed, tip, record);
+  if (!made.ok) throw new Error(made.reason);
+  const pushed = pushOwnershipCommit(world.seed, made.sha, BRANCH, tip, TEMPLATE);
+  if (pushed.outcome !== 'pushed') throw new Error(`record push: ${pushed.outcome}`);
+}
+
+/** The record of the commit at the remote's `BRANCH` tip. */
+function tipRecord(world: World): ReturnType<typeof parseClaimMessage> {
+  return parseClaimMessage(must(world.origin, ['log', '-1', '--format=%B', `refs/heads/${BRANCH}`]));
+}
+
+/** Dispatches one claim command with its real default seams in `project`. */
+async function runReal(word: 'hand' | 'accept' | 'take', extra: readonly string[], project: Project): ReturnType<typeof dispatchInProject> {
+  const command = word === 'hand'
+    ? createClaimHandCommand()
+    : word === 'accept'
+      ? createClaimAcceptCommand()
+      : createClaimTakeCommand();
+  return dispatchInProject(['claim', word, String(ISSUE), ...extra], SUBJECTS, [command], project);
+}
+
+const NO_BRANCH = 'origin has no feat/rafa-7-<slug> branch, so #7 carries no claim';
+
+describe('rafa claim hand, accept and take under work/{stub}, with the real default seams', () => {
+  it('land their commits on work/rafa-7-x in turn', async () => {
+    const world = plantWorld('claim-trio');
+    const deviceA = deviceOf(world, TEMPLATE, STORE);
+    const deviceB = deviceOf(world, TEMPLATE, OTHER_STORE);
+
+    const handed = await runReal('hand', [`--to=${OTHER_STORE}`], deviceA);
+    expect(handed.exitCode).toBe(0);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'hand', issue: ISSUE, store: STORE, to: OTHER_STORE } });
+
+    const accepted = await runReal('accept', [], deviceB);
+    expect(accepted.exitCode).toBe(0);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'accept', issue: ISSUE, store: OTHER_STORE } });
+
+    pushRecordAsSeed(world, { action: 'release', issue: ISSUE, store: OTHER_STORE });
+    const taken = await runReal('take', [], deviceA);
+    expect(taken.exitCode).toBe(0);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'take', issue: ISSUE, store: STORE } });
+    expect(remoteTip(world, 'feat/rafa-7-x')).toBeNull();
+  });
+
+  it('are each refused with no branch found by a clone with no template, which pushes nothing', async () => {
+    const handWorld = plantWorld('claim-hand-control');
+    const acceptWorld = plantWorld('claim-accept-control');
+    pushRecordAsSeed(acceptWorld, { action: 'hand', issue: ISSUE, store: STORE, to: OTHER_STORE });
+    const takeWorld = plantWorld('claim-take-control');
+    pushRecordAsSeed(takeWorld, { action: 'release', issue: ISSUE, store: STORE });
+    const cases = [
+      { world: handWorld, word: 'hand', extra: [`--to=${OTHER_STORE}`], store: STORE },
+      { world: acceptWorld, word: 'accept', extra: [], store: OTHER_STORE },
+      { world: takeWorld, word: 'take', extra: [], store: OTHER_STORE },
+    ] as const;
+
+    for (const { world, word, extra, store } of cases) {
+      const tipBefore = remoteTip(world, BRANCH);
+      const run = await runReal(word, extra, deviceOf(world, undefined, store));
+
+      expect(run.exitCode).toBe(1);
+      expect(`${run.stdout}${run.stderr}`).toContain(NO_BRANCH);
+      expect(remoteTip(world, BRANCH)).toBe(tipBefore);
+      expect(remoteTip(world, 'feat/rafa-7-x')).toBeNull();
+    }
   });
 });
