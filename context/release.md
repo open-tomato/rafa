@@ -16,9 +16,9 @@ on its own (0) to a release on every merge (4):
 |---|---|---|---|---|
 | 0 Manual | any | `manual` | `manual` | nothing |
 | 1 Settle tags | `push` | `settle` | `manual` | version, changelog and tag in one settle |
-| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and publishes with provenance |
-| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags and publishes |
-| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags |
+| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and, once `RAFA_RELEASE_PUBLISH` is `ci`, publishes with provenance |
+| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags, and publishes once `RAFA_RELEASE_PUBLISH` is `ci` |
+| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags once `RAFA_RELEASE_PUBLISH` is `ci` |
 
 A level is read off the keys that choose it: levels 3 and 4 by all three,
 level 1 by `release.settle: push` with `release.tag: settle`, and level 2 by
@@ -31,6 +31,18 @@ since level 2 spells `push`. `release.settle: pr` with `release.tag: settle` and
 `release.publish: manual` reads as level 0 with `release.tag` named, since a
 `pr` delivery never tags.
 
+From level 2 up, the publish job of `release-publish.yml` runs only when the
+repository variable `RAFA_RELEASE_PUBLISH` reads `ci`, through its job condition
+`if: vars.RAFA_RELEASE_PUBLISH == 'ci'`. With the variable unset, the tag is
+still pushed, the publish job is skipped, and nothing goes red, since a skipped
+job is not a failed run. With the variable at `ci`, the pushed tag publishes.
+Set it under Settings, Secrets and variables, Actions, Variables, or with
+`gh variable set RAFA_RELEASE_PUBLISH --body ci`. Two other homes were weighed
+and rejected. An environment with required reviewers would add a second setting
+beside the trusted publisher and a manual approval on every release. A committed
+config key would hold the switch in a file, but the switch belongs to the
+repository's GitHub settings, next to the trusted publisher it depends on.
+
 `rafa doctor` prints the reading as its `Release ladder:` row, right under the
 `Release:` row, and lists what the level still needs. The row is `info` when
 nothing is missing and `warn` otherwise. It never refuses the setting or
@@ -42,13 +54,14 @@ that grant), and the version file's manifest when it is `private` or has no
 `name`, since the level publishes it. Level 3 adds `release-tag.yml` and level 4
 adds `release-settle.yml`, each missing when absent or not a file. Levels 3 and
 4 also need `release-bot-fragment.yml` while `.github/dependabot.yml` exists.
-Doctor
-cannot read the trusted publisher on npmjs.com, so that stays a step the project
-takes by hand. Nor can it read the repository variable `RAFA_RELEASE_PUBLISH`,
-so from level 2 up the row ends on a reminder, after the missing list when
-there is one: `Release ladder: level 2, CI publishes. Publishing waits for the
-repository variable RAFA_RELEASE_PUBLISH set to ci, which doctor cannot read.`
-The reminder is never a missing item, so it neither warns nor counts.
+Doctor cannot read the trusted publisher on npmjs.com, so that stays a step the
+project takes by hand. Nor can it read the repository variable
+`RAFA_RELEASE_PUBLISH`, so from level 2 up the row ends on a reminder, after the
+missing list when there is one: `Release ladder: level 2, CI publishes.
+Publishing waits for the repository variable RAFA_RELEASE_PUBLISH set to ci,
+which doctor cannot read.` The reminder stays on the row once the variable is
+`ci`, since doctor cannot see it set. It is never a missing item, so it neither
+warns nor counts.
 
 The release order across packages (a topological layer, rules by id) is parked
 by the spec's 2026-10-16 update until two publishable packages depend on each
@@ -73,6 +86,10 @@ The four templates:
   the type check, upgrades npm (trusted publishing needs npm 11.5.1 or newer)
   and runs `rafa release publish`. It grants `id-token: write` and sets no token
   and no provenance flag, since npm attaches provenance on a trusted publish.
+  Its publish job carries `if: vars.RAFA_RELEASE_PUBLISH == 'ci'`, so with the
+  repository variable unset or holding anything else, GitHub skips the job and
+  the run stays green (see "The ladder"). The tagging jobs carry no such
+  condition, so the tag is pushed either way.
 - `release-tag.yml` (level 3): when a pull request from `rafa/release` merges,
   checks the base branch out at the merge commit, runs
   `rafa release tag --push`, then calls the publish workflow with the merge
@@ -362,7 +379,9 @@ publishes <name>@<version> to <registry> through
 RAFA_RELEASE_PUBLISH is ci (release.publish: ci).`, for the units
 that would have had a publish line (a unit with no name, or a private one,
 gets neither), and json mode carries `publish: "ci"` on that unit
-(`src/commands/release/tag-follow-ups.ts`). Without `--push` it
+(`src/commands/release/tag-follow-ups.ts`). The sentence names the switch: with
+the variable unset the tag still goes out, and the publish job it names is
+skipped, not failed. Without `--push` it
 reaches no network and each push is a line to copy, naming the remote `--push`
 would reach (#857).
 
@@ -555,7 +574,8 @@ read for it: that field names the tool a project installs with, and tagging
 
 **`release.publish`** — Who publishes a tagged version: `manual` (default, a
 person runs the publish command `rafa release tag` prints) or `ci` (the pushed
-tag publishes through the project's CI workflow). Any other value is refused.
+tag publishes through the project's CI workflow, once the repository variable
+`RAFA_RELEASE_PUBLISH` is `ci`). Any other value is refused.
 It is the third key the release ladder is read off, beside `release.settle`
 and `release.tag`. Its readers are `rafa release tag`, which prints the CI
 sentence in place of a publish line under `ci`, and the ladder reading in
