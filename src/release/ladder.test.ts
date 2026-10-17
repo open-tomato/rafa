@@ -21,6 +21,7 @@ import {
   ladderLevel,
   ladderPreconditions,
   ladderWorkflowNeeded,
+  PUBLISH_SWITCH_VARIABLE,
   PUBLISH_WORKFLOW,
   TAG_WORKFLOW,
 } from './ladder.js';
@@ -79,6 +80,21 @@ describe('LADDER_WORKFLOWS', () => {
     expect(ladderWorkflowNeeded(BOT_FRAGMENT_WORKFLOW, 2, true)).toBe(false);
     expect(ladderWorkflowNeeded(PUBLISH_WORKFLOW, 2, false)).toBe(true);
     expect(ladderWorkflowNeeded(PUBLISH_WORKFLOW, 1, true)).toBe(false);
+  });
+});
+
+describe('PUBLISH_SWITCH_VARIABLE', () => {
+  it('names the variable the job condition of the publish template reads', async () => {
+    const template = await Bun.file(`${import.meta.dir}/templates/${PUBLISH_WORKFLOW.file}`).text();
+
+    expect(PUBLISH_SWITCH_VARIABLE).toBe('RAFA_RELEASE_PUBLISH');
+    expect(template).toContain(`if: vars.${PUBLISH_SWITCH_VARIABLE} == 'ci'`);
+  });
+
+  it('is never a missing item: complete readings at level 2 and up miss nothing', () => {
+    const levels: LadderLevel[] = [2, 3, 4];
+
+    expect(levels.map(level => ladderPreconditions(level, complete()))).toEqual([[], [], []]);
   });
 });
 

@@ -52,6 +52,14 @@
  * must grant `id-token: write`, without which npm trusted publishing
  * gets no token. A workflow path holding a directory, or anything else
  * that is not a regular file, is as missing as an absent one.
+ *
+ * The publish job of each workflow that publishes runs only while the
+ * repository variable {@link PUBLISH_SWITCH_VARIABLE} reads `ci`; unset,
+ * or holding anything else, GitHub skips the job and the run still
+ * passes. Doctor cannot read a repository variable from the checkout,
+ * so the variable is never one of {@link ladderPreconditions}' missing
+ * items: it is named, alongside {@link PUBLISH_WORKFLOW}, by the readers
+ * that tell the operator what publishing waits for.
  */
 import type {
   ReleasePublishMode,
@@ -232,6 +240,12 @@ export const PUBLISH_WORKFLOW: LadderWorkflow = workflow(
   'the publish on a pushed tag or a workflow_call',
   [2, 3, 4],
 );
+
+/**
+ * The repository variable whose value `ci` lets a publish job run, read
+ * by each publish job's `if:` condition, `vars.RAFA_RELEASE_PUBLISH == 'ci'`.
+ */
+export const PUBLISH_SWITCH_VARIABLE = 'RAFA_RELEASE_PUBLISH';
 
 /** The bot fragment workflow, needed while `.github/dependabot.yml` exists. */
 export const BOT_FRAGMENT_WORKFLOW: LadderWorkflow = workflow(

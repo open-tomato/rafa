@@ -124,7 +124,8 @@ describe('a unit published from its own folder', () => {
 describe('a publish that CI runs, under release.publish: ci', () => {
   const onHead = { ahead: 0, branch: 'main' };
   const sentence = `Once pushed, ${TAG} publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`
-    + ' through .github/workflows/release-publish.yml (release.publish: ci).';
+    + ' through .github/workflows/release-publish.yml when the repository variable'
+    + ' RAFA_RELEASE_PUBLISH is ci (release.publish: ci).';
 
   it('names the push alone under ci, where the same call under manual adds the publish line', () => {
     expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, RELEASE_REMOTE, 'ci')

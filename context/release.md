@@ -354,7 +354,8 @@ in unit order, then what to run next: per tag, its push and its publish line, a
 package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
 publish line is replaced by one sentence in the form `Once pushed, <tag>
 publishes <name>@<version> to <registry> through
-.github/workflows/release-publish.yml (release.publish: ci).`, for the units
+.github/workflows/release-publish.yml when the repository variable
+RAFA_RELEASE_PUBLISH is ci (release.publish: ci).`, for the units
 that would have had a publish line (a unit with no name, or a private one,
 gets neither), and json mode carries `publish: "ci"` on that unit
 (`src/commands/release/tag-follow-ups.ts`). Without `--push` it

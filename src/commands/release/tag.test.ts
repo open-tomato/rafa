@@ -785,7 +785,8 @@ describe('the dispatched action', () => {
 
 describe('a run under release.publish: ci', () => {
   const sentence = `Once pushed, ${TAG} publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`
-    + ' through .github/workflows/release-publish.yml (release.publish: ci).';
+    + ' through .github/workflows/release-publish.yml when the repository variable'
+    + ' RAFA_RELEASE_PUBLISH is ci (release.publish: ci).';
 
   /** A release project whose config sets `release.publish` to `mode`. */
   function publishProject(mode: string, manifest = MANIFEST): PlantedProject {
