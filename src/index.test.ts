@@ -1200,6 +1200,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/claim/hand.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config/sections', ['DEFAULT_BRANCH_TEMPLATE']],
     ['../../claims/device.js', ['holdsClaim']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
@@ -1208,6 +1209,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/claim/accept.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config/sections', ['DEFAULT_BRANCH_TEMPLATE']],
     ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/record.js', ['parseClaimMessage']],
     ['../../start/branch-decision.js', ['REMOTE']],
