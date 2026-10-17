@@ -111,7 +111,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, checks, features)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -203,6 +203,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'taskLessons',
   'mergeDuplicates',
   'namingBranch',
+  'templates',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsContract',
@@ -317,6 +318,7 @@ const DEFAULTS: RafaConfig = {
   taskLessons: 'on',
   mergeDuplicates: 'warn',
   namingBranch: 'feat/{stub}',
+  templates: [],
   testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
   testsIntegration: [
     '**/*-integration.test.ts',
@@ -483,6 +485,7 @@ const FULL = [
   '  duplicates: allow',
   'naming:',
   '  branch: "work/{stub}"',
+  'templates: [escalation]',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
@@ -612,6 +615,7 @@ const FULL_VALUES: RafaConfig = {
   taskLessons: 'off',
   mergeDuplicates: 'allow',
   namingBranch: 'work/{stub}',
+  templates: ['escalation'],
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
   testsContract: ['packages/*/src/*.contract.test.ts'],
@@ -696,7 +700,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(23);
+    expect(lists).toHaveLength(24);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1301,6 +1305,11 @@ describe('parseConfigText', () => {
         'naming.branch', 'naming:\n  branch: feat/{stub}-{stub}',
         'naming.branch is "feat/{stub}-{stub}", expected a branch name template holding {stub} exactly once',
         'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
+      ],
+      [
+        'templates', 'templates: escalation',
+        'templates is "escalation", expected a list of template names',
+        'templates: [escalation]', 'templates', ['escalation'],
       ],
       [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',

@@ -420,6 +420,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'REQUIRED_ITEM_KEYS',
   'activeChecks',
   'activeConfigLoadHook',
+  'activeConfigTemplateHook',
   'activeDefaults',
   'activeKnownKeysAbove',
   'activeSectionPaths',
@@ -440,6 +441,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'restoreDangerousPhrases',
   'runWithDangerousPhrases',
   'setConfigLoadHook',
+  'setConfigTemplateHook',
   'setDangerousPhrases',
   'writeDangerousPassLines',
 ];

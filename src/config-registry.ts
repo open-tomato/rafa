@@ -48,7 +48,7 @@
  * in (`inSettingOrder`), each cut under its section's package and a
  * section's checks on its first cut, and core's registry holds every
  * setting in this order. Registering the list whole would put core's
- * forty-two first, and the warning recorded in
+ * forty-five first, and the warning recorded in
  * `src/tests/fixtures/config-parity/` would list `hub` after `task`.
  * `config-registry.test.ts` holds that the registry holds the same
  * settings, in the same order, as the same specs, and the same defaults,
@@ -206,7 +206,7 @@ const CORE_CLEANUP = [
   'dangerousAcceptStaleRefs',
 ] as const;
 
-/** Core's settings from the second consent to `task.lessons`, before `tests`. */
+/** Core's settings from the second consent to `templates`, before `tests`. */
 const CORE_TAIL = [
   'dangerousSelfUpdateDuringLoop',
   'statusNotice',
@@ -218,6 +218,7 @@ const CORE_TAIL = [
   'taskLessons',
   'mergeDuplicates',
   'namingBranch',
+  'templates',
 ] as const;
 
 /**

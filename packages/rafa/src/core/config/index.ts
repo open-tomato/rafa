@@ -116,7 +116,7 @@
  * section, the routing defaults, the item readers, `config.ts`'s two
  * document readers the loader reads a scope through, and the section
  * registry with its key indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
- * `activeSettingByKey` and twenty-eight more), which `src/index.test.ts`
+ * `activeSettingByKey` and thirty more), which `src/index.test.ts`
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
@@ -145,6 +145,7 @@ export type {
   ConfigLoadHook,
   ConfigSection,
   ConfigSectionRegistry,
+  ConfigTemplateHook,
   SettingsRecord,
 } from './section.js';
 export type {
@@ -173,6 +174,7 @@ export { CONFIG_FILE, CORE_SECTION, SCOPE_DIR } from './core-section.js';
 export {
   activeChecks,
   activeConfigLoadHook,
+  activeConfigTemplateHook,
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
@@ -185,6 +187,7 @@ export {
   registerConfigSections,
   restoreConfigSections,
   setConfigLoadHook,
+  setConfigTemplateHook,
 } from './section.js';
 export {
   ConfigError,

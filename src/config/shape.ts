@@ -262,4 +262,6 @@ export interface ConfigShape extends
     /** `naming.branch`: the template the branch `loop start` creates is named from, holding `{stub}` once. */
     readonly branch: string;
   };
+  /** `templates`: the config templates this file adopts, by name. */
+  readonly templates: readonly string[];
 }

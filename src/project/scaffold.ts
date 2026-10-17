@@ -107,6 +107,7 @@ function checksLine(names: readonly string[]): string {
  * default, in the order of the spec's block. See the module note.
  */
 export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
+  `# templates: [${CONFIG_DEFAULTS.templates.join(', ')}]                # the config templates this file adopts, by name`,
   `# store: ${CONFIG_DEFAULTS.store}                  # sqlite | ndjson`,
   '# effort:',
   `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,
