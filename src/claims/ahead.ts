@@ -40,8 +40,13 @@
  * the remote's refusal is the compare-and-set, and a take commit with
  * `--force-with-lease` on the tip it was made on. When either ref is
  * refused, git refuses the other with it and the remote keeps neither.
- * C's branch is named as `plan create --issue=<C>` would later name it
- * (`feat/` and `planStub`), so that run finds the claim already held.
+ * C's branch is named as `plan create --issue=<C>` would later name it,
+ * the `naming.branch` template with `planStub` in it
+ * (`feat/rafa-<n>-<slug>` by default), so that run finds the claim
+ * already held. Both {@link resolveAheadTarget} and
+ * {@link pushClaimsAtomic} take the template as an optional trailing
+ * argument, `DEFAULT_BRANCH_TEMPLATE` when left out, and the push takes
+ * as a claim branch only a branch the template names.
  *
  * | Porcelain line of the refused ref | Answer |
  * |---|---|
@@ -67,11 +72,13 @@ import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { GitRunner } from '../pr/index.js';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
 
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+
 import { planStub } from '../board/naming.js';
 import { gitSaid } from '../pr/index.js';
 import { branchNameFor, REMOTE } from '../start/branch-decision.js';
 
-import { CLAIMED_REASONS, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from './git.js';
+import { CLAIMED_REASONS, claimBranchGlob, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from './git.js';
 
 /** The line ahead of the home issue, as the walk read it. */
 export interface AheadCandidate {
@@ -192,11 +199,12 @@ function otherBoardReason(candidate: AheadCandidate, homeBoard: number | null, h
 }
 
 /**
- * The line ahead to claim for home issue `home`, or the report of why
- * none is: no line ahead, the home issue itself, or a line on another
- * board. See the module note's "Only on H's board".
+ * The line ahead to claim for home issue `home`, its branch named under
+ * `template`, or the report of why none is: no line ahead, the home
+ * issue itself, or a line on another board. See the module note's
+ * "Only on H's board".
  */
-export function resolveAheadTarget(request: AheadRequest, home: number): AheadTarget {
+export function resolveAheadTarget(request: AheadRequest, home: number, template: string = DEFAULT_BRANCH_TEMPLATE): AheadTarget {
   const { candidate, homeBoard } = request;
   if (candidate === null || candidate.issue === home) {
     const reason = `no undone line follows ${numbered(home)} on its board, so there is nothing to claim ahead`;
@@ -205,16 +213,16 @@ export function resolveAheadTarget(request: AheadRequest, home: number): AheadTa
   if (homeBoard === null || candidate.board !== homeBoard) {
     return { ok: false, report: aheadNotClaimed(candidate.issue, 'other-board', otherBoardReason(candidate, homeBoard, home)) };
   }
-  const branch = branchNameFor(planStub(candidate.issue, candidate.title));
+  const branch = branchNameFor(planStub(candidate.issue, candidate.title), template);
   return { ok: true, issue: candidate.issue, branch, labels: candidate.labels };
 }
 
-/** Why `refs` cannot be pushed as given, or null when they can; a ref here is the caller's to get right. */
-function refProblem(refs: readonly AtomicClaimRef[]): string | null {
+/** Why `refs` cannot be pushed as given under `template`, or null when they can; a ref here is the caller's to get right. */
+function refProblem(refs: readonly AtomicClaimRef[], template: string): string | null {
   if (refs.length === 0) return 'no ref to push';
   if (new Set(refs.map((ref) => ref.branch)).size !== refs.length) return 'one branch named twice';
   for (const { branch, sha, lease } of refs) {
-    if (claimBranchIssue(branch) === null) return `${JSON.stringify(branch)} is not a claim branch`;
+    if (claimBranchIssue(branch, template) === null) return `${JSON.stringify(branch)} is not a ${claimBranchGlob(template)} claim branch`;
     if (!FULL_SHA.test(sha) || (lease !== null && !FULL_SHA.test(lease))) return `a sha for ${branch} is not a full sha`;
   }
   return null;
@@ -245,12 +253,17 @@ function refusedRef(stdout: string, refs: readonly AtomicClaimRef[]): AtomicClai
  * Pushes every ref of `refs` in ONE `git push --atomic`: each without
  * force when its lease is null, else with `--force-with-lease` on it.
  * Answers `pushed` only when every ref landed; see the module note.
- * Refuses without pushing when a ref names no claim branch, a sha is
- * not a full sha, a branch is named twice, or a pushed commit does not
- * descend from its lease, since work commits never leave a branch.
+ * Refuses without pushing when a ref names no claim branch under
+ * `template`, a sha is not a full sha, a branch is named twice, or a
+ * pushed commit does not descend from its lease, since work commits
+ * never leave a branch.
  */
-export function pushClaimsAtomic(git: GitRunner, refs: readonly AtomicClaimRef[]): AtomicClaimPush {
-  const problem = refProblem(refs) ?? droppedWork(git, refs);
+export function pushClaimsAtomic(
+  git: GitRunner,
+  refs: readonly AtomicClaimRef[],
+  template: string = DEFAULT_BRANCH_TEMPLATE,
+): AtomicClaimPush {
+  const problem = refProblem(refs, template) ?? droppedWork(git, refs);
   if (problem !== null) return { outcome: 'failed', reason: problem };
 
   const leases = refs.flatMap(({ branch, lease }) => lease === null

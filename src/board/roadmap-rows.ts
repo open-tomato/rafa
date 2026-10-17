@@ -17,8 +17,9 @@
  *    asked for; in `native` mode the relationships port's `blockersOf`
  *    (`./relations/port.ts`), each state off its `blockedBy` node;
  *  - `has`: {@link stubOfPlanFile} over the plan dir's file names, the
- *    branch scan {@link scanClaimBranches} with {@link branchClaims}, and
- *    the open pull request list with {@link closedIssuesIn};
+ *    branch scan {@link scanClaimBranches} with {@link branchClaims} under
+ *    the scan's own template, and the open pull request list with
+ *    {@link closedIssuesIn};
  *  - `refs`: whatever {@link RoadmapRefs} answers, asked once for every
  *    selected line; `issue list --roadmap` hands in the reading `rafa
  *    doctor`'s references row makes (`src/commands/doctor-refs.ts`).
@@ -524,6 +525,8 @@ export function hasPlanFor(names: readonly string[], issue: number): boolean {
 interface HasSources {
   readonly planNames: readonly string[];
   readonly refs: readonly string[];
+  /** The template the branch scan was taken under, which a ref claims an issue by. */
+  readonly branchTemplate?: string;
   readonly pulls: readonly RoadmapPullRequest[];
 }
 
@@ -532,7 +535,7 @@ function readHasColumn(issue: number, sources: HasSources): readonly HasMark[] {
   const plan: readonly HasMark[] = hasPlanFor(sources.planNames, issue)
     ? [{ kind: 'plan' }]
     : [];
-  const ref = sources.refs.find((candidate) => branchClaims(candidate, issue));
+  const ref = sources.refs.find((candidate) => branchClaims(candidate, issue, sources.branchTemplate));
   const branch: readonly HasMark[] = ref === undefined
     ? []
     : [{ kind: 'branch', ref }];
@@ -655,7 +658,7 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
       'the saved copies could not be read, so the refs column is empty',
     );
 
-  const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
+  const sources: HasSources = { planNames: plans.value, refs: scan.refs, branchTemplate: scan.branchTemplate, pulls: pulls.value };
   const rows = selected.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 
   const warnings = [

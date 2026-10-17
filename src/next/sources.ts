@@ -322,6 +322,11 @@ export interface NextBoardOptions {
   readonly configured: number | null;
   /** The remote the pushed half of the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * `naming.branch`, the template the branch scan matches a claim branch
+   * by; the default, `feat/{stub}`, when left out.
+   */
+  readonly branchTemplate?: string;
   /** The board listing the walk reads, for a caller that reads it too; `createGhBoardListing` over `gh` when left out. */
   readonly listing?: BoardListing;
   /** The project root whose position file names the current place; left out, the walk starts from the default board. */
@@ -347,7 +352,7 @@ export interface NextBoardOptions {
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
+type NextConfig = Pick<RafaConfig, 'namingBranch' | 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -384,7 +389,7 @@ async function cancelledNotices(listing: BoardListing): Promise<readonly string[
  * for the problems it carries.
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
-  const { gh, git, configured, remote, root, relations } = options;
+  const { gh, git, configured, remote, root, relations, branchTemplate } = options;
   const listed = options.listing ?? createGhBoardListing(relations === undefined
     ? { gh }
     : { gh, mode: relations.mode });
@@ -412,7 +417,7 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         : await readCurrentPlace(root, listing, fallback);
       const roadmap = current?.place?.board ?? fallback;
       const epic = current?.place?.epic ?? null;
-      const branches = scanClaimBranches(git, remote);
+      const branches = scanClaimBranches(git, remote, branchTemplate);
       const readings = createRoadmapReadings({
         issues,
         branches,
@@ -564,6 +569,7 @@ export async function openNextSources(
     gh,
     git,
     configured: config.roadmapIssue,
+    branchTemplate: config.namingBranch,
     root: project.root,
     noticeCancelled: true,
     ...roadmap
@@ -580,6 +586,7 @@ export async function openNextSources(
     runs: (): readonly SessionRecord[] => readRecords(project.root, loop),
     git,
     pulls,
+    branchTemplate: config.namingBranch,
     ...roadmap
       ? { roadmap: Object.freeze({ ownerApproval: nextOwnerGate({ gh, root: project.root, pulls, configured: config.roadmapIssue }) }) }
       : {},

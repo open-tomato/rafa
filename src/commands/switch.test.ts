@@ -424,7 +424,7 @@ describe('the drift report', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe([
-      'warn: claim drift: #7 is labelled rafa:claimed (open) but no feat/rafa-7-* claim branch names it',
+      'warn: claim drift: #7 is labelled rafa:claimed (open) but no claim branch names it',
       'board #40 · epic #80 Epic delta (now) · 1/2 done',
       '',
     ].join('\n'));
@@ -442,6 +442,17 @@ describe('the drift report', () => {
     expect(drifted.stdout).toContain('warn: claim drift: #51 is ticked on #31 (line 2) but still labelled rafa:in-development (open)\n');
     expect(branched.stdout).not.toContain('claim drift');
     expect(branched.exitCode).toBe(0);
+  });
+
+  it('reads the claim branches under naming.branch, and the default template reads none of them', async () => {
+    const work = ['refs/heads/work/rafa-7-x'];
+
+    const templated = await run(['40'], plantCase('tracker:\n  default: local\nnaming:\n  branch: work/{stub}\n'), { listing: DRIFTED }, work);
+    const untemplated = await run(['40'], plantCase(), { listing: DRIFTED }, work);
+
+    expect(templated.exitCode).toBe(0);
+    expect(templated.stdout).not.toContain('claim drift: #7');
+    expect(untemplated.stdout).toContain('claim drift: #7 is labelled rafa:claimed (open)');
   });
 
   it('reads no branch when no issue carries a stage label, where a labelled board reads them', async () => {

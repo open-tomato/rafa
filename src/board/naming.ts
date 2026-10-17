@@ -12,7 +12,7 @@
  * spec                <specs.dir>/rafa-20-pr-commands.md
  * local notes         <specs.dir>/rafa-20-notes.md
  * plan stub           rafa-20-pr-commands
- * branch              feat/rafa-20-pr-commands
+ * branch              feat/rafa-20-pr-commands   (the naming.branch template, feat/{stub} by default)
  * pull-request title  rafa-20: Pull request commands
  * ```
  *
@@ -28,12 +28,17 @@
  * is a caller that can disagree with the others. The disagreement is not
  * cosmetic: `src/effort/attribution.ts` matches a branch back to its
  * plan by name, and `plan create --next` calls a roadmap line TAKEN when
- * a branch `feat/rafa-<n>-*` exists, so a branch spelled a second way is
+ * a branch the `naming.branch` template names over `rafa-<n>-*` exists
+ * (`feat/rafa-<n>-*` by default), so a branch spelled a second way is
  * work that looks unclaimed and effort that attributes to nothing.
  *
  * Nothing here touches the filesystem, the board or the configuration.
  * These are pure string functions over a number and a title, so the
- * cases in `./naming.test.ts` need no seams at all.
+ * cases in `./naming.test.ts` need no seams at all. The branch is the
+ * one spelling a project configures: {@link branchName} takes the
+ * `naming.branch` template as an argument, and a caller holding a
+ * `RafaConfig` hands it `config.namingBranch`; left out, it is
+ * `DEFAULT_BRANCH_TEMPLATE`, `feat/{stub}`.
  *
  * ## The slug
  *
@@ -77,11 +82,10 @@
  */
 import path from 'path';
 
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+
 /** The prefix every board id carries: `rafa-20`. */
 export const ID_PREFIX = 'rafa';
-
-/** The prefix every branch carries, over the id: `feat/rafa-20-...`. */
-export const BRANCH_PREFIX = 'feat';
 
 /** The extension a spec snapshot is written under. */
 export const SPEC_EXTENSION = '.md';
@@ -207,9 +211,18 @@ export function notesPath(specsDir: string, issue: number): string {
   return path.join(specsDir, notesFileName(issue));
 }
 
-/** The branch an issue is worked on: `feat/rafa-20-pr-commands`. */
-export function branchName(issue: number, title: string): string {
-  return `${BRANCH_PREFIX}/${planStub(issue, title)}`;
+/**
+ * The branch an issue is worked on: the plan stub put into the
+ * `naming.branch` template, `feat/rafa-20-pr-commands` under the default.
+ *
+ * @param issue - The issue's number.
+ * @param title - The issue's title, which the stub's slug is read from.
+ * @param template - The `naming.branch` template, `config.namingBranch`;
+ *   `DEFAULT_BRANCH_TEMPLATE` (`feat/{stub}`) when left out.
+ * @returns The branch name, `work/rafa-20-pr-commands` under `work/{stub}`.
+ */
+export function branchName(issue: number, title: string, template: string = DEFAULT_BRANCH_TEMPLATE): string {
+  return branchFromTemplate(template, planStub(issue, title));
 }
 
 /**

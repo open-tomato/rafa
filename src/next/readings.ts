@@ -67,8 +67,10 @@
  * ## A plan branch holding claim commits alone is not started
  *
  * `plan create` claims the issue it plans (`src/claims/`): one empty
- * commit, subject `claim(rafa-<n>): claim`, on the base, pushed as
- * `feat/<stub>`. So a plan nobody has run on has a branch all the same,
+ * commit, subject `claim(rafa-<n>): claim`, on the base, pushed as the
+ * `naming.branch` template with the stub ({@link NextSources.branchTemplate},
+ * `feat/rafa-<n>-<slug>` by default). Only that template is read: a
+ * branch under another one names no plan here. So a plan nobody has run on has a branch all the same,
  * and {@link NextWorld.unstartedPlan} reads past it: a plan is started
  * by a run or by a branch tip, here or remote-tracking, holding any
  * commit past its fork from the base that is no well-formed ownership
@@ -107,7 +109,7 @@ import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sectio
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
 
@@ -115,7 +117,7 @@ import { scanClaimBranches } from '../board/roadmap.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { listPlans } from '../plan/list.js';
 import { gitSaid, parseWorkingTree } from '../pr/index.js';
-import { BRANCH_PREFIX, parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
+import { parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */
 const DETACHED = 'HEAD';
@@ -244,6 +246,11 @@ export interface NextSources {
   /** The remote the base is fetched from and the branches are scanned on; `origin` when left out. */
   readonly remote?: string;
   /**
+   * The `naming.branch` template a plan branch is named under,
+   * `config.namingBranch`; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
+  /**
    * What `rafa next --roadmap` reads beside the rest. Set, the table reads
    * its hop rows as well (`./hop-rows.ts`); left out, it reads the
    * thirteen rows alone, and nothing it names is asked.
@@ -308,7 +315,7 @@ export interface NextWorld {
   readonly branchPlan: () => PlanListing | null;
   /**
    * The first plan with no run and no branch holding work, or null when
-   * every plan has one. A `feat/<stub>` holding claim commits alone past
+   * every plan has one. A plan branch holding claim commits alone past
    * its fork from the base is no work: see {@link hasStartedBranch}.
    */
   readonly unstartedPlan: () => PlanListing | null;
@@ -478,12 +485,18 @@ export async function readOpenPull(sources: NextSources, branch: string, note: N
   return { summary, mergeable: detail?.mergeable ?? 'unknown', verdict: checks.verdict };
 }
 
-/** The plan `branch` is named after, or null when the branch names none. */
-export function readBranchPlan(branch: string, plans: readonly PlanListing[]): PlanListing | null {
-  if (!branch.startsWith(BRANCH_PREFIX)) return null;
-
-  const stub = branch.slice(BRANCH_PREFIX.length);
-  return plans.find((plan) => plan.stub === stub) ?? null;
+/**
+ * The plan `branch` is named after under the `naming.branch` template,
+ * or null when the branch names none: the plan whose stub the template
+ * names `branch` with. A branch under another template names none: under
+ * `work/{stub}`, `feat/rafa-7-x` is no plan branch.
+ */
+export function readBranchPlan(
+  branch: string,
+  plans: readonly PlanListing[],
+  template: string = DEFAULT_BRANCH_TEMPLATE,
+): PlanListing | null {
+  return plans.find((plan) => branchFromTemplate(template, plan.stub) === branch) ?? null;
 }
 
 /** True when a session record names the plan `stub`, whichever state the record reads. */
@@ -494,20 +507,25 @@ export function hasRun(records: readonly SessionRecord[], stub: string): boolean
     || record.plan.endsWith(`/${file}`));
 }
 
-/** True when `refs` holds `feat/<stub>`, here or on the remote. */
-export function hasBranch(refs: readonly string[], stub: string): boolean {
-  const branch = `${BRANCH_PREFIX}${stub}`;
+/**
+ * True when `refs` holds the plan branch of `stub`, the `naming.branch`
+ * template with the stub (`feat/<stub>` by default), here or on the remote.
+ */
+export function hasBranch(refs: readonly string[], stub: string, template: string = DEFAULT_BRANCH_TEMPLATE): boolean {
+  const branch = branchFromTemplate(template, stub);
   return refs.some((ref) => ref === branch || ref.endsWith(`/${branch}`));
 }
 
 /**
- * The tips of `feat/<stub>` this clone holds, its own branch and its
- * remote-tracking one, as full refs that resolve here; or null with a
+ * The tips of the plan branch of `stub` this clone holds, named from
+ * {@link NextSources.branchTemplate} (`feat/<stub>` by default): its
+ * own branch and its remote-tracking one, as full refs that resolve
+ * here; or null with a
  * problem noted when git could not say. A ref git answers nothing for
  * is absent, the way `src/claims/git.ts` reads one.
  */
 export function readBranchTips(sources: NextSources, remote: string, stub: string, note: Note): readonly string[] | null {
-  const branch = `${BRANCH_PREFIX}${stub}`;
+  const branch = planBranchOf(sources, stub);
   const tips: string[] = [];
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/${remote}/${branch}`]) {
     const resolved = sources.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
@@ -520,6 +538,11 @@ export function readBranchTips(sources: NextSources, remote: string, stub: strin
     }
   }
   return tips;
+}
+
+/** The plan branch of `stub` under {@link NextSources.branchTemplate}. */
+function planBranchOf(sources: NextSources, stub: string): string {
+  return branchFromTemplate(sources.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE, stub);
 }
 
 /**
@@ -562,12 +585,12 @@ export function claimsOnly(messages: readonly string[]): boolean {
  * no tip of, that last one with a problem noted too.
  */
 export function hasStartedBranch(sources: NextSources, remote: string, refs: readonly string[], stub: string, note: Note): boolean {
-  if (!hasBranch(refs, stub)) return false;
+  if (!hasBranch(refs, stub, sources.branchTemplate)) return false;
 
   const tips = readBranchTips(sources, remote, stub, note);
   if (tips === null) return true;
   if (tips.length === 0) {
-    note(`\`${BRANCH_PREFIX}${stub}\` is on ${remote} but not fetched here, so its commits were not read and its plan reads as started`);
+    note(`\`${planBranchOf(sources, stub)}\` is on ${remote} but not fetched here, so its commits were not read and its plan reads as started`);
     return true;
   }
 
@@ -605,7 +628,7 @@ export function openWorld(sources: NextSources): NextWorld {
     standing: once(() => readStanding(sources, remote, note)),
     tracked: once(() => readTracked(sources, note)),
     checkout,
-    branchPlan: once(() => readBranchPlan(branch(), plans())),
+    branchPlan: once(() => readBranchPlan(branch(), plans(), sources.branchTemplate)),
     unstartedPlan: once(() => plans()
       .find((plan) => !hasRun(runs(), plan.stub) && !hasStartedBranch(sources, remote, refs(), plan.stub, note)) ?? null),
     openPull: once(() => readOpenPull(sources, branch(), note)),

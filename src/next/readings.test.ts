@@ -822,6 +822,63 @@ describe('a plan branch that holds claim commits alone', () => {
   });
 });
 
+/** A `naming.branch` template other than the default. */
+const WORK_TEMPLATE = 'work/{stub}';
+
+/** A plan stub whose branch exists only under {@link WORK_TEMPLATE}. */
+const WORK_STUB = 'rafa-7-x';
+
+/** The plan branch of {@link WORK_STUB} under {@link WORK_TEMPLATE}. */
+const WORK_BRANCH = 'work/rafa-7-x';
+
+describe('a plan branch under the naming.branch template', () => {
+  const plans = [
+    { stub: WORK_STUB, plan: '/p/PLAN-x.md', tracker: null, tasks: { total: 1, done: 0, blocked: 0, open: 1 }, issues: 0 },
+  ];
+
+  it('finds the plan a branch names under the template, and none with the template left out', () => {
+    expect(readBranchPlan(WORK_BRANCH, plans, WORK_TEMPLATE)?.stub).toBe(WORK_STUB);
+    expect(readBranchPlan(WORK_BRANCH, plans)).toBeNull();
+  });
+
+  it('reads no plan from a default-template branch under another template', () => {
+    expect(readBranchPlan(`feat/${WORK_STUB}`, plans, WORK_TEMPLATE)).toBeNull();
+  });
+
+  it('sees the remote branch under the template, and nothing with the template left out', () => {
+    const refs = [`refs/remotes/origin/${WORK_BRANCH}`];
+
+    expect(hasBranch(refs, WORK_STUB, WORK_TEMPLATE)).toBe(true);
+    expect(hasBranch(refs, WORK_STUB)).toBe(false);
+  });
+
+  it('resolves the tips of the branch the sources template names', () => {
+    const tracking = `refs/remotes/origin/${WORK_BRANCH}`;
+    const git = gitOf({ [resolveArgv(tracking)]: said('abc1234\n'), [resolveArgv(`refs/heads/${WORK_BRANCH}`)]: refused('') });
+
+    expect(readBranchTips(sourcesOf({ git: git.git, branchTemplate: WORK_TEMPLATE }), 'origin', WORK_STUB, notes().note)).toEqual([tracking]);
+    expect(readBranchTips(sourcesOf({ git: git.git }), 'origin', WORK_STUB, notes().note)).toEqual([]);
+  });
+
+  it('names the unfetched branch from the template in its note', () => {
+    const git = gitOf();
+    const noted = notes();
+    const sources = sourcesOf({ git: git.git, branchTemplate: WORK_TEMPLATE });
+
+    expect(hasStartedBranch(sources, 'origin', [`refs/remotes/origin/${WORK_BRANCH}`], WORK_STUB, noted.note)).toBe(true);
+    expect(noted.held()).toEqual([`\`${WORK_BRANCH}\` is on origin but not fetched here, so its commits were not read and its plan reads as started`]);
+  });
+
+  it('reads the branch plan of the world through the sources template', () => {
+    const git = gitOf({ 'rev-parse --abbrev-ref HEAD': said(`${WORK_BRANCH}\n`) });
+    const root = plantPlans('work-template', { [WORK_STUB]: PLAN });
+    const plansDir = plansDirAt(root, '.rafa/plans');
+
+    expect(openWorld(sourcesOf({ git: git.git, plans: plansDir, branchTemplate: WORK_TEMPLATE })).branchPlan()?.stub).toBe(WORK_STUB);
+    expect(openWorld(sourcesOf({ git: git.git, plans: plansDir })).branchPlan()).toBeNull();
+  });
+});
+
 describe('the world one answer is read over', () => {
   it('reads each source at most once, however many rows ask', () => {
     let runs = 0;

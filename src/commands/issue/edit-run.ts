@@ -437,6 +437,11 @@ export interface EditRunOptions {
   readonly root: string;
   /** `specs.dir`, where a saved copy is looked for. */
   readonly specsDir: string;
+  /**
+   * `naming.branch`, the template the loop's branch is named under in
+   * gate 4; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
   /** Makes the trust gates 1 and 2 weigh over; never called on the `local` tracker. */
   readonly trust: () => BoardTrust;
   /** Reads the login running the edit; never called on the `local` tracker. */
@@ -581,6 +586,7 @@ function weighState(options: EditRunOptions, found: EditableIssue, gates: Gates)
     savedCopies: findSavedCopies(options.root, options.specsDir, request.issue),
     kind: request.kind,
     whileInDevelopment: request.whileInDevelopment,
+    branchTemplate: options.branchTemplate,
   };
   const reading = readEditState(input);
   if (!reading.pass) gates.refuse(reading.refusal, editStateRefusalMessage(input, reading));
@@ -768,8 +774,9 @@ export interface IssueEditResult extends EditReport {
 
 /**
  * Runs the edit a line asks for: the line and its text read first, then
- * the tracker through the chain, the project's `specs.dir` and
- * `board.trustedAuthors`, and {@link runIssueEdit} over them, the trust
+ * the tracker through the chain, the project's `specs.dir`,
+ * `naming.branch` and `board.trustedAuthors`, and {@link runIssueEdit}
+ * over them, the trust
  * read over `seams.gh` (the tracker's own runner) and the repository
  * label over `seams.openGit`.
  */
@@ -779,7 +786,7 @@ export async function editIssue(context: RafaContext, seams: EditSeams): Promise
   const project = issueProject(context);
   const { tracker, data } = await resolveIssueTracker(context, seams);
   const editing = requireEditingTracker(tracker);
-  // The chain read the config and wrote its warnings once; this read is for two keys and stays quiet.
+  // The chain read the config and wrote its warnings once; this read is for three keys and stays quiet.
   const config = await issueSubjectConfig(project, () => undefined);
   const gh: GhRunner = seams.gh ?? createGhRunner({ cwd: project.root });
   const openGit = seams.openGit ?? createGitRunner;
@@ -789,6 +796,7 @@ export async function editIssue(context: RafaContext, seams: EditSeams): Promise
     tracker: editing,
     root: project.root,
     specsDir: config.specsDir,
+    branchTemplate: config.namingBranch,
     trust: () => ghBoardTrust({
       gh,
       trustedAuthors: config.boardTrustedAuthors,

@@ -145,7 +145,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { configFilePath } from '@open-tomato/rafa/core/config';
-import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import {
+  branchFromTemplate,
+  DEFAULT_BRANCH_TEMPLATE,
+  describeValue,
+  isMapping,
+  messageOf,
+} from '@open-tomato/rafa/core/config/sections';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
@@ -153,7 +159,7 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';
 import { SPEC_LABEL } from './issue.js';
-import { BRANCH_PREFIX, ID_PREFIX } from './naming.js';
+import { ID_PREFIX } from './naming.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE, severalRoadmapsMessage } from './roadmap.js';
 import { readRoadmapSetting, roadmapIssueIn, withRoadmapIssue } from './setup-config.js';
@@ -513,10 +519,15 @@ export function writeSpecTemplate(root: string, moduleDir: string = MODULE_DIR):
   });
 }
 
-/** The body a new Roadmap issue is opened with: the empty list and the naming paragraph. */
-export function roadmapIssueBody(): string {
+/**
+ * The body a new Roadmap issue is opened with: the empty list and the
+ * naming paragraph, whose branch is the `naming.branch` `template` over
+ * the stub, `feat/rafa-<n>-<slug>` under `DEFAULT_BRANCH_TEMPLATE`, the
+ * template when left out.
+ */
+export function roadmapIssueBody(template: string = DEFAULT_BRANCH_TEMPLATE): string {
   const spec = `${ID_PREFIX}-<n>-<slug>`;
-  const branch = `${BRANCH_PREFIX}/${spec}`;
+  const branch = branchFromTemplate(template, spec);
   return [
     '## Next, in order',
     '',

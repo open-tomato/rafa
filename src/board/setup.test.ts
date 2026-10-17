@@ -464,6 +464,14 @@ describe('roadmapIssueBody', () => {
     expect(body).toContain('## Naming');
     expect(body).toContain('`feat/rafa-<n>-<slug>`');
   });
+
+  it('names the branch under the naming.branch template it is handed', () => {
+    const body = roadmapIssueBody('work/{stub}');
+
+    expect(body).toContain('the branch `work/rafa-<n>-<slug>`');
+    expect(body).not.toContain('feat/');
+    expect(roadmapIssueBody()).toContain('the branch `feat/rafa-<n>-<slug>`');
+  });
 });
 
 describe('setUpRoadmap', () => {

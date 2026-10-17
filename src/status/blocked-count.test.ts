@@ -383,7 +383,7 @@ describe('the board section in labels mode, the control', () => {
       expect(board.blockedIssues).toBe(LABELS_COUNT);
       expect(blockedAsked()).toBe(1);
       expect(Object.keys(board)).toEqual(['roadmap', 'next', 'passed', 'blockedIssues', 'notes', 'read']);
-      expect(boards.map((options) => Object.keys(options))).toEqual([['gh', 'git', 'configured', 'listing']]);
+      expect(boards.map((options) => Object.keys(options))).toEqual([['gh', 'git', 'configured', 'branchTemplate', 'listing']]);
       expect(gh).toEqual([]);
       expect(boardLine(read)).toBe(`Board: roadmap #31 has no line left; ${String(LABELS_COUNT)} issues labelled spec:blocked`);
     }

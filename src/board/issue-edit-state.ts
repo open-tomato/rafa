@@ -49,7 +49,9 @@
  *
  * The claimed row names the loop's branch, {@link branchName} over the
  * issue's number and its title as read BEFORE the edit, since a loop
- * that is already running took its branch from that title.
+ * that is already running took its branch from that title, put into the
+ * `naming.branch` template {@link EditStateInput.branchTemplate} carries
+ * (`feat/rafa-<n>-<slug>` under the default).
  */
 import { readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -81,6 +83,11 @@ export interface EditStateInput {
   readonly kind: EditKind;
   /** True under `--while-in-development`, which opens an append on a claimed issue. */
   readonly whileInDevelopment: boolean;
+  /**
+   * The `naming.branch` template the loop's branch is spelled under,
+   * `config.namingBranch`; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** What gate 4 answered. */
@@ -115,7 +122,7 @@ export function readEditState(input: EditStateInput): EditStateReading {
   if (!input.open) return refused('closed');
 
   if (isClaimed(input.labels)) {
-    const branch = branchName(input.issue, input.title);
+    const branch = branchName(input.issue, input.title, input.branchTemplate);
     return input.kind === 'append' && input.whileInDevelopment
       ? { pass: true, staleCopy: true, branch }
       : refused('in-development', branch);
@@ -172,7 +179,7 @@ export function editStateRefusalMessage(input: EditStateInput, reading: EditStat
     case 'closed':
       return `${what} is refused: the issue is closed, and rafa edits open issues only.`;
     case 'in-development': {
-      const where = `a loop holds it on ${reading.branch ?? branchName(input.issue, input.title)}`;
+      const where = `a loop holds it on ${reading.branch ?? branchName(input.issue, input.title, input.branchTemplate)}`;
       return input.kind === 'append'
         ? `${what} is refused: ${where}; add --while-in-development for an amendment the loop must not miss.`
         : `${what} is refused: ${where}, and a spec under way changes by append: ${appendLine(input.issue, ' --while-in-development')}`;

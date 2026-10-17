@@ -15,7 +15,8 @@
  * The line first: exactly one argument, the issue number
  * (`readIssueArgument`). Then this device's store id with the ids that
  * store replaced (`readClaimDevice`), then one fetch of the
- * `feat/rafa-*` branches and every remote branch of the issue, as
+ * claim branches (the `naming.branch` template with the stub,
+ * `feat/rafa-<n>-<slug>` by default) and every remote branch of the issue, as
  * `rafa claim release` reads them (`./release.ts`). No network means no
  * acceptance.
  *

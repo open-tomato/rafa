@@ -7,9 +7,23 @@
  * Git is reached through a `GitRunner` (`packages/rafa/src/core/git/git.ts`), never a
  * shell string, and every operation answers rather than throws when git
  * refuses or cannot run. The one throw is a caller's mistake: a branch
- * that is not `feat/rafa-<n>` or `feat/rafa-<n>-<slug>`, a pushed commit
- * or a lease that is not a full sha, or a record `formatClaimMessage`
+ * that is not a claim branch under the template, a pushed commit or a
+ * lease that is not a full sha, or a record `formatClaimMessage`
  * refuses.
+ *
+ * ## The claim branch, through the template
+ *
+ * A claim branch is the `naming.branch` template with the stub in it:
+ * `feat/rafa-<n>` or `feat/rafa-<n>-<slug>` under the default,
+ * `feat/{stub}`. Every operation that names, fetches or reads one takes
+ * an optional trailing `template`, defaulting to `DEFAULT_BRANCH_TEMPLATE`,
+ * so a caller with no config in hand reads as before and one holding a
+ * `RafaConfig` passes `config.namingBranch`. The issue of a branch is the
+ * number after `rafa-` in the stub `stubOfBranch` reads off it
+ * ({@link claimBranchIssue}); the fetch's refspec is the template's glob
+ * ({@link claimRefspec}). Only the template given is read: under
+ * `work/{stub}`, `feat/rafa-7-x` is no claim branch, and under the
+ * default `work/rafa-7-x` is none either.
  *
  * ## The operations
  *
@@ -28,8 +42,8 @@
  * repository's configured identity, as any commit's.
  *
  * **One fetch, then any number of reads.** {@link fetchClaimBranches}
- * fetches `+refs/heads/feat/rafa-*` into `refs/remotes/origin/feat/rafa-*`
- * with `--prune`, so a claim branch deleted on the remote leaves no
+ * fetches the template's glob, `+refs/heads/feat/rafa-*` into
+ * `refs/remotes/origin/feat/rafa-*` under the default, with `--prune`, so a claim branch deleted on the remote leaves no
  * stale remote-tracking ref behind; the prune reaches only the refs the
  * refspec names, never `origin/main`. {@link readClaimBranch} then reads
  * the remote-tracking ref and nothing else, so walking several issues
@@ -104,19 +118,38 @@
 import type { BranchCommit, ClaimRecord, Ownership } from './record.js';
 import type { GitRunner } from '../pr/index.js';
 
+import { branchGlob, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, localRef, REMOTE, remoteTrackingRef } from '../start/branch-decision.js';
+import { localRef, REMOTE, remoteTrackingRef } from '../start/branch-decision.js';
 
 import { formatClaimMessage, parseClaimMessage, readOwnership } from './record.js';
 
-/** The branches a claim can live on, as a glob under `refs/heads/`. */
-export const CLAIM_BRANCH_GLOB: string = `${BRANCH_PREFIX}rafa-*`;
+/**
+ * The branches a claim can live on under `template`, as a glob under
+ * `refs/heads/`: `feat/rafa-*` for the default template.
+ */
+export function claimBranchGlob(template: string): string {
+  return branchGlob(template);
+}
 
-/** The one refspec {@link fetchClaimBranches} fetches. */
-export const CLAIM_REFSPEC: string = `+refs/heads/${CLAIM_BRANCH_GLOB}:refs/remotes/${REMOTE}/${CLAIM_BRANCH_GLOB}`;
+/**
+ * The one refspec {@link fetchClaimBranches} fetches under `template`:
+ * the claim branches into their remote-tracking refs, forced.
+ */
+export function claimRefspec(template: string): string {
+  const glob = claimBranchGlob(template);
+  return `+refs/heads/${glob}:refs/remotes/${REMOTE}/${glob}`;
+}
 
-/** A claim branch: `feat/rafa-<n>`, or `feat/rafa-<n>-<slug>`. */
-const CLAIM_BRANCH = /^feat\/rafa-([1-9]\d*)(?:-\S+)?$/;
+/** {@link claimBranchGlob} of the default template, `feat/rafa-*`. */
+export const CLAIM_BRANCH_GLOB: string = claimBranchGlob(DEFAULT_BRANCH_TEMPLATE);
+
+/** {@link claimRefspec} of the default template. */
+export const CLAIM_REFSPEC: string = claimRefspec(DEFAULT_BRANCH_TEMPLATE);
+
+/** A claim branch's stub: `rafa-<n>`, or `rafa-<n>-<slug>`. */
+const CLAIM_STUB = /^rafa-([1-9]\d*)(?:-\S+)?$/;
 
 /** A full object name, SHA-1 or SHA-256. */
 const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
@@ -179,9 +212,16 @@ export type OwnershipPush =
   /** Anything else git refused or could not do, or the push was not tried. */
   | { readonly outcome: 'failed'; readonly reason: string };
 
-/** The issue number of a claim branch, or null when `branch` is not one. */
-export function claimBranchIssue(branch: string): number | null {
-  const match = CLAIM_BRANCH.exec(branch);
+/**
+ * The issue number of a claim branch under `template`, or null when
+ * `branch` is not one: `work/rafa-7-x` is 7 under `work/{stub}` and null
+ * under the default, `feat/{stub}`.
+ */
+export function claimBranchIssue(branch: string, template: string = DEFAULT_BRANCH_TEMPLATE): number | null {
+  const stub = stubOfBranch(template, branch);
+  const match = stub === null
+    ? null
+    : CLAIM_STUB.exec(stub);
   return match === null
     ? null
     : Number(match[1]);
@@ -202,10 +242,10 @@ function assertSha(value: string, what: string): void {
 }
 
 /** The issue of `branch`, or a throw naming it: a branch here is the caller's to get right. */
-function issueOf(branch: string): number {
-  const issue = claimBranchIssue(branch);
+function issueOf(branch: string, template: string): number {
+  const issue = claimBranchIssue(branch, template);
   if (issue === null) {
-    throw new Error(`claim git: ${JSON.stringify(branch)} is not a ${CLAIM_BRANCH_GLOB} branch`);
+    throw new Error(`claim git: ${JSON.stringify(branch)} is not a ${claimBranchGlob(template)} branch`);
   }
   return issue;
 }
@@ -233,38 +273,41 @@ export function makeOwnershipCommit(git: GitRunner, parent: string, record: Clai
 }
 
 /**
- * Fetches every `feat/rafa-*` branch of the remote into its
- * remote-tracking refs, pruning the ones the remote no longer has. The
- * one network call {@link readClaimBranch} reads after.
+ * Fetches every claim branch of the remote under `template`, `feat/rafa-*`
+ * for the default, into its remote-tracking refs, pruning the ones the
+ * remote no longer has. The one network call {@link readClaimBranch}
+ * reads after.
  */
-export function fetchClaimBranches(git: GitRunner): ClaimFetch {
-  const fetched = git(['fetch', '--quiet', '--prune', '--no-tags', REMOTE, CLAIM_REFSPEC]);
+export function fetchClaimBranches(git: GitRunner, template: string = DEFAULT_BRANCH_TEMPLATE): ClaimFetch {
+  const fetched = git(['fetch', '--quiet', '--prune', '--no-tags', REMOTE, claimRefspec(template)]);
   return fetched.ok
     ? { ok: true }
-    : { ok: false, reason: `could not fetch the ${CLAIM_BRANCH_GLOB} branches from ${REMOTE}: ${gitSaid(fetched)}` };
+    : { ok: false, reason: `could not fetch the ${claimBranchGlob(template)} branches from ${REMOTE}: ${gitSaid(fetched)}` };
 }
 
 /**
  * Reads `branch` as the last {@link fetchClaimBranches} left it: its
  * tip, the tip's committer date and its ownership commits, with no
- * network call. Throws on a branch that is not a claim branch.
+ * network call. Throws on a branch that is not a claim branch under
+ * `template`.
  */
-export function readClaimBranch(git: GitRunner, branch: string): ClaimBranchReading {
-  return readClaimRef(git, branch, remoteTrackingRef(branch));
+export function readClaimBranch(git: GitRunner, branch: string, template: string = DEFAULT_BRANCH_TEMPLATE): ClaimBranchReading {
+  return readClaimRef(git, branch, remoteTrackingRef(branch), template);
 }
 
 /**
  * Reads the LOCAL `branch`, `refs/heads/<branch>`, as {@link readClaimBranch}
  * reads its remote-tracking ref, with no network call: `absent` when this
- * checkout has no such branch. Throws on a branch that is not a claim branch.
+ * checkout has no such branch. Throws on a branch that is not a claim
+ * branch under `template`.
  */
-export function readLocalClaimBranch(git: GitRunner, branch: string): ClaimBranchReading {
-  return readClaimRef(git, branch, localRef(branch));
+export function readLocalClaimBranch(git: GitRunner, branch: string, template: string = DEFAULT_BRANCH_TEMPLATE): ClaimBranchReading {
+  return readClaimRef(git, branch, localRef(branch), template);
 }
 
 /** The claim reading of `branch` at `ref`, its remote-tracking ref or its local one. */
-function readClaimRef(git: GitRunner, branch: string, ref: string): ClaimBranchReading {
-  const issue = issueOf(branch);
+function readClaimRef(git: GitRunner, branch: string, ref: string, template: string): ClaimBranchReading {
+  const issue = issueOf(branch, template);
   const resolved = git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
   const tip = resolved.stdout.trim();
   if (!resolved.ok || tip === '') {
@@ -328,10 +371,11 @@ export function porcelainFor(stdout: string, ref: string): { readonly flag: stri
  * Pushes `sha` to `branch` on the remote WITHOUT force. A refusal
  * because the branch holds another commit answers `claimed`, with the
  * branch as read after one fetch; see the module note. Throws on a
- * `sha` that is not a full sha or a branch that is not a claim branch.
+ * `sha` that is not a full sha or a branch that is not a claim branch
+ * under `template`, which the fetch after a refusal also reads under.
  */
-export function pushNewClaimBranch(git: GitRunner, sha: string, branch: string): ClaimPush {
-  issueOf(branch);
+export function pushNewClaimBranch(git: GitRunner, sha: string, branch: string, template: string = DEFAULT_BRANCH_TEMPLATE): ClaimPush {
+  issueOf(branch, template);
   assertSha(sha, 'the pushed commit');
   const ref = `refs/heads/${branch}`;
   const pushed = git(['push', '--porcelain', REMOTE, `${sha}:${ref}`]);
@@ -342,9 +386,9 @@ export function pushNewClaimBranch(git: GitRunner, sha: string, branch: string):
   if (line?.flag !== '!' || !CLAIMED_REASONS.includes(line.summary)) {
     return { outcome: 'failed', reason: `could not push ${branch} to ${REMOTE}: ${gitSaid(pushed)}` };
   }
-  const fetched = fetchClaimBranches(git);
+  const fetched = fetchClaimBranches(git, template);
   const holder: ClaimBranchReading = fetched.ok
-    ? readClaimBranch(git, branch)
+    ? readClaimBranch(git, branch, template)
     : { state: 'unreadable', branch, reason: fetched.reason };
   return { outcome: 'claimed', holder };
 }
@@ -354,10 +398,16 @@ export function pushNewClaimBranch(git: GitRunner, sha: string, branch: string):
  * `--force-with-lease` on `lease`, the tip last seen. A stale lease
  * answers `moved`. Refuses without pushing when `lease` is not an
  * ancestor of `sha`. Throws on a `sha` or a lease that is not a full
- * sha, or a branch that is not a claim branch.
+ * sha, or a branch that is not a claim branch under `template`.
  */
-export function pushOwnershipCommit(git: GitRunner, sha: string, branch: string, lease: string): OwnershipPush {
-  issueOf(branch);
+export function pushOwnershipCommit(
+  git: GitRunner,
+  sha: string,
+  branch: string,
+  lease: string,
+  template: string = DEFAULT_BRANCH_TEMPLATE,
+): OwnershipPush {
+  issueOf(branch, template);
   assertSha(sha, 'the pushed commit');
   assertSha(lease, 'the lease');
   const ancestry = git(['merge-base', '--is-ancestor', lease, sha]);

@@ -1132,8 +1132,8 @@ and number together; the repository comes from its `url`.
 ### Claims
 
 A claim reserves an issue for one device to work alone. The claim lives in
-git as the ownership record on the branch `feat/<stub>` (formatted
-`feat/rafa-<n>-<slug>` where the branch already runs). Its first commit is
+git as the ownership record on the plan's branch, the `naming.branch`
+template with the stub (`feat/rafa-<n>-<slug>` by default). Its first commit is
 an empty CLAIM commit naming the claiming store's id (`store_meta.store_id`
 from the effort store) in the trailer `Rafa-Claim-Store:`. Every later
 ownership change (release, handover, acceptance, takeover) is one empty

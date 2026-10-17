@@ -52,6 +52,14 @@
  * a duration (1), the claim dated by the tip in place of its latest
  * ownership commit (5), and the sentence added whenever the claim's
  * date could be read (6).
+ *
+ * The cases of a claim branch under `naming.branch: work/{stub}` push to
+ * `work/rafa-7-x` alone, each beside the control that the same seams
+ * with no `branchTemplate` read none. Two mutations were driven against
+ * this file alone on 2026-10-16, each restored sha256-identical, and
+ * each reddened at least one case: the branch named under the default
+ * template (3), and the re-sign's leased push run under the default
+ * template (1).
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -897,6 +905,77 @@ describe('a claim waiting unpushed on the local branch', () => {
   });
 });
 
+describe('a claim branch under the naming.branch template', () => {
+  const TEMPLATE = 'work/{stub}';
+  const TEMPLATED_STUB = 'rafa-7-x';
+  const TEMPLATED_BRANCH = `work/${TEMPLATED_STUB}`;
+  const TEMPLATED_PLAN = `/project/.rafa/plans/PLAN-${TEMPLATED_STUB}.md`;
+
+  /** The seams of `seamsOf`, reading the claim branch under `template` when one is given. */
+  function templatedSeams(git: GitRunner, template: string | undefined, replacedIds: readonly string[] = []): StartPreflightClaim {
+    const seams = seamsOf(git, STORE_A, [], replacedIds);
+    return template === undefined
+      ? seams
+      : { ...seams, branchTemplate: template };
+  }
+
+  /** The remote's `work/rafa-7-x`, read off the bare repository. */
+  function templatedTip(trio: Trio): string | null {
+    return tipAt(trio.origin, `refs/heads/${TEMPLATED_BRANCH}`);
+  }
+
+  /** A claim commit by `store` pushed to the remote's `work/rafa-7-x` alone. */
+  function pushTemplatedClaim(trio: Trio, store: string): string {
+    const sha = ownershipOn(trio.a, 'main', 'claim', store);
+    must(trio.a, ['push', '--quiet', 'origin', `${sha}:refs/heads/${TEMPLATED_BRANCH}`]);
+    return sha;
+  }
+
+  it('owns a claim the remote holds on work/rafa-7-x under work/{stub}; the template left out reads none', () => {
+    const trio = plantTrio('template-held');
+    const sha = pushTemplatedClaim(trio, STORE_A);
+
+    const claim = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, TEMPLATE));
+    const control = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, undefined));
+
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: TEMPLATED_BRANCH, storeId: STORE_A, via: 'held', note: '', replacedId: null });
+    expect(control).toEqual({ outcome: 'none' });
+    expect(templatedTip(trio)).toBe(sha);
+    expect(tipAt(trio.origin, `refs/heads/feat/${TEMPLATED_STUB}`)).toBeNull();
+  });
+
+  it('pushes a claim waiting on the local work/rafa-7-x under work/{stub}; the template left out pushes nothing', () => {
+    const trio = plantTrio('template-retry');
+    const sha = ownershipOn(trio.a, 'main', 'claim', STORE_A);
+    must(trio.a, ['update-ref', `refs/heads/${TEMPLATED_BRANCH}`, sha]);
+
+    const control = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, undefined));
+    const remoteAfterControl = templatedTip(trio);
+    const claim = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, TEMPLATE));
+
+    expect(control).toEqual({ outcome: 'none' });
+    expect(remoteAfterControl).toBeNull();
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: TEMPLATED_BRANCH, storeId: STORE_A, via: 'pushed', note: '', replacedId: null });
+    expect(templatedTip(trio)).toBe(sha);
+  });
+
+  it('re-signs a claim on work/rafa-7-x under an id this store replaced under work/{stub}; the template left out reads none and pushes nothing', () => {
+    const trio = plantTrio('template-re-sign');
+    const sha = pushTemplatedClaim(trio, STORE_A_REPLACED);
+
+    const control = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, undefined, [STORE_A_REPLACED]));
+    const remoteAfterControl = templatedTip(trio);
+    const claim = readRunClaim(TEMPLATED_PLAN, templatedSeams(trio.a, TEMPLATE, [STORE_A_REPLACED]));
+    const resigned = templatedTip(trio);
+
+    expect(control).toEqual({ outcome: 'none' });
+    expect(remoteAfterControl).toBe(sha);
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: TEMPLATED_BRANCH, storeId: STORE_A, via: 're-signed', note: '', replacedId: STORE_A_REPLACED });
+    expect(resigned).not.toBe(sha);
+    expect(must(trio.origin, ['rev-parse', '--verify', `${String(resigned)}^1`])).toBe(sha);
+  });
+});
+
 describe('refuseUnownedClaim', () => {
   it('throws exit 1 naming the owner under one opening line, printing nothing', async () => {
     const trio = plantTrio('refuse');
@@ -997,17 +1076,18 @@ describe('refuseUnownedClaim', () => {
 });
 
 describe('createStartPreflightClaim', () => {
-  it('holds no board under pr.provider: none and reads the store id under the configured store; gh holds one', () => {
+  it('holds no board under pr.provider: none and reads the store id under the configured store and the branch template from naming.branch; gh holds one', () => {
     const root = realpathSync(mkdtempSync(join(scope, 'factory-')));
 
-    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: '36h', ...NO_PROJECT });
-    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson', claimsStaleAfter: 'disabled', ...NO_PROJECT });
+    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: '36h', namingBranch: 'work/{stub}', ...NO_PROJECT });
+    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson', claimsStaleAfter: 'disabled', namingBranch: 'feat/{stub}', ...NO_PROJECT });
     const storeId = none.readStoreId();
 
     expect(none.board).toBeNull();
     expect(gh.board).not.toBeNull();
     expect(storeId).toMatchObject({ ok: false, cause: 'ndjson' });
     expect([none.staleAfter, gh.staleAfter]).toEqual(['36h', 'disabled']);
+    expect([none.branchTemplate, gh.branchTemplate]).toEqual(['work/{stub}', 'feat/{stub}']);
     expect(none.git(['rev-parse', '--is-inside-work-tree']).ok).toBe(false);
   });
 });
