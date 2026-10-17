@@ -62,8 +62,6 @@ import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { Logger } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

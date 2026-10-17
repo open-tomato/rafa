@@ -89,8 +89,6 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
-import '../adapter-registry.js';
-
 import {
   existsSync,
   mkdirSync,
