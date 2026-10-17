@@ -48,10 +48,10 @@ import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
 import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
 
 import { listOf, refused } from '@open-tomato/rafa/core/config/sections';
+import { listedCodes } from '@open-tomato/rafa/errors/rafa-codes';
 
 import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';
 import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from './bugs/title.js';
-import { listedCodes } from './errors/rafa-codes.js';
 
 declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `issues` section's fields, added to core's. */

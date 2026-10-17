@@ -64,6 +64,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
 
 import {
   DISK_FILE_SYSTEM,
@@ -546,6 +547,31 @@ describe('resolveScope refusals', () => {
     expect(hintOf(resolveScope('/work', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe(initHint('/work'));
   });
 
+  it('codes a relative start or home input:invalid-value, of the project module, with the code\'s hint', () => {
+    const fs = memoryFs(tree);
+    const refusals = [
+      { start: 'work', home: '/home/op' },
+      { start: '/work', home: 'home/op' },
+    ].map(({ start, home }) => {
+      try {
+        resolveScope(start, { home, fs, mainCheckout: noRepository });
+      } catch (error) {
+        return error;
+      }
+      return null;
+    });
+
+    for (const refusal of refusals) {
+      expect(refusal).toBeInstanceOf(RafaError);
+      expect(refusal).toMatchObject({
+        name: 'ScopeError',
+        code: 'input:invalid-value',
+        module: 'project',
+        hint: 'pass one of the values the message lists',
+      });
+    }
+  });
+
   it('refuses a relative home before probing, and resolves with the absolute one', () => {
     const fs = memoryFs(tree);
 
@@ -581,6 +607,7 @@ describe('resolveScope refusals', () => {
     expect(name).toBe('ScopeError');
     expect(message).toStartWith(`rafa scope: start directory ${missing} does not resolve (`);
     expect(cause).toBeInstanceOf(Error);
+    expect(refusal).toMatchObject({ code: 'fs:not-found', module: 'project' });
 
     makeDir(missing);
     expect(rootOf(resolveScope(missing, { home }))).toBe(realpathSync(project));

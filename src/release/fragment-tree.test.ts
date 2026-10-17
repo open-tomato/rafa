@@ -46,7 +46,7 @@ const DEFAULT_DATE = '2026-09-01T12:00:00Z';
 
 /** The fragment text of plan `plan`, level `patch`, one note. */
 function fragmentText(plan: string, note = 'Loop: a change'): string {
-  const fragment: Fragment = { plan, title: `title of ${plan}`, level: 'patch', notes: [`- ${note}`] };
+  const fragment: Fragment = { plan, title: `title of ${plan}`, level: 'patch', package: null, notes: [`- ${note}`] };
   return serializeFragment(fragment);
 }
 

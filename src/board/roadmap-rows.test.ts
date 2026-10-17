@@ -633,6 +633,24 @@ describe('the has column', () => {
   });
 });
 
+describe('the has column under the configured branch template', () => {
+  const line = { issue: 20, ticked: false, why: 'a blocker of #16', lineNumber: 3 };
+  const git = plantedGit(['refs/heads/main', 'refs/heads/work/rafa-20-x']);
+
+  it('shows branch for refs/heads/work/rafa-20-x under work/{stub}', async () => {
+    const read = await readLineRows([line], planted({ git, branchTemplate: 'work/{stub}' }).options);
+
+    expect(rowFor(read.rows, 20).has).toEqual([{ kind: 'branch', ref: 'refs/heads/work/rafa-20-x' }]);
+    expect(hasText(rowFor(read.rows, 20).has)).toBe('branch');
+  });
+
+  it('shows nothing for the same branch with the template left out, the control for the case above', async () => {
+    const read = await readLineRows([line], planted({ git }).options);
+
+    expect(hasText(rowFor(read.rows, 20).has)).toBe('');
+  });
+});
+
 describe('the plan dir names', () => {
   const roots: string[] = [];
   afterAll(() => {

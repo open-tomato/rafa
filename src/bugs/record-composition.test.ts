@@ -2,7 +2,7 @@ import type { BugRecord } from './record.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { RAFA_CODES } from '../errors/rafa-codes.js';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
 import { causeOf } from './cause-rule.js';
 import { boundaryValueOf, summaryOf } from './filed-values.js';

@@ -9,17 +9,23 @@
  *
  * ## Which issue, and which branch
  *
- * The claim lives on `feat/<stub>`, the branch the loop runs on, so the
- * issue is the one the plan's stub names: `PLAN-rafa-7-x.md` is #7 on
- * `feat/rafa-7-x`. A plan whose stub opens no `rafa-<n>` (or a bare
- * `PLAN.md`) has no claim to check, and the run goes on as it always
- * did, touching neither git nor the store.
+ * The claim lives on the branch the loop runs on, the `naming.branch`
+ * template with the plan's stub in it (`branchNameFor`), so the issue is
+ * the one the stub names: `PLAN-rafa-7-x.md` is #7 on `feat/rafa-7-x`
+ * under the default template, and on `work/rafa-7-x` under
+ * `work/{stub}`. The seams' `branchTemplate` is that template
+ * (`config.namingBranch`, `DEFAULT_BRANCH_TEMPLATE` when left out), and
+ * every claim read, fetch and push below runs under it, so a branch
+ * under another template is no claim. A plan whose stub opens no
+ * `rafa-<n>` (or a bare `PLAN.md`) has no claim to check, and the run
+ * goes on as it always did, touching neither git nor the store.
  *
  * ## What is read
  *
- * The local `feat/<stub>` (`readLocalClaimBranch`), where `plan create`
+ * The local claim branch (`readLocalClaimBranch`), where `plan create`
  * leaves a claim commit it could not push, then one fetch of the
- * `feat/rafa-*` branches and the remote's `feat/<stub>` as it left it
+ * template's claim branches (`feat/rafa-*` by default) and the remote's
+ * claim branch as it left it
  * (`claims/git.ts`). A branch that carries no claim commit on either
  * side is a run as today: nothing more is read and nothing is printed.
  * Otherwise this device's store id is read (`claims/device.ts`), with
@@ -95,7 +101,7 @@
  * is not read a third time: the answer is `owned` via `not-re-signed`
  * on that second reading, with a warning.
  *
- * A local `feat/<stub>` does not hold the take commit, since no local
+ * A local claim branch does not hold the take commit, since no local
  * ref moves. Measured on git 2.50.1 under macOS with `LC_ALL=C`, in a
  * clone of a bare remote (2026-10-11): once a take commit sat on the
  * remote tip, `git push --set-upstream origin <branch>`, the push a run
@@ -180,7 +186,7 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { claimDurationHours, CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPath } from '@open-tomato/rafa/core/plan';
@@ -213,6 +219,12 @@ export interface StartPreflightClaim {
   readonly readStoreId: () => DeviceStoreId;
   /** `claims.staleAfter`, which dates the stale claim a refusal names. */
   readonly staleAfter: ClaimsStaleAfter;
+  /**
+   * The `naming.branch` template the claim branch is named and read
+   * under; `config.namingBranch` from {@link createStartPreflightClaim},
+   * `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /**
@@ -221,13 +233,14 @@ export interface StartPreflightClaim {
  * resolves to `pr.provider: gh` and none otherwise, its label writes
  * refreshing the issue on the project (`../board/project/issue-board-refresh.ts`),
  * this device's
- * store id read under `config.store`, and `claims.staleAfter`. Resolving the provider reads
+ * store id read under `config.store`, `claims.staleAfter`, and the
+ * `naming.branch` template (`config.namingBranch`). Resolving the provider reads
  * `origin` unless `pr.provider` is configured; nothing else is read
  * until the check runs.
  */
 export function createStartPreflightClaim(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter'> & RefreshConfig,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'namingBranch'> & RefreshConfig,
 ): StartPreflightClaim {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
@@ -237,6 +250,7 @@ export function createStartPreflightClaim(
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
     staleAfter: config.claimsStaleAfter,
+    branchTemplate: config.namingBranch,
   };
 }
 
@@ -288,10 +302,12 @@ const REREADS_AFTER_A_MOVED_TIP = 1;
 /** A reading of a branch that exists. */
 type FoundReading = Extract<ClaimBranchReading, { state: 'found' }>;
 
-/** What one check read: the issue, its branch, both readings and the fetch. */
+/** What one check read: the issue, its branch and the template naming it, both readings and the fetch. */
 interface Readings {
   readonly issue: number;
   readonly branch: string;
+  /** The `naming.branch` template `branch` was named and read under. */
+  readonly template: string;
   readonly local: ClaimBranchReading;
   readonly remote: ClaimBranchReading;
   /** What the failed fetch said, or null when it worked. */
@@ -440,25 +456,26 @@ function mintedAfterClaim(readings: Readings, claimant: Claimant, seams: Decisio
  * Throws `CommandExit` only for a store whose id cannot be read.
  */
 export function readRunClaim(planPath: string, seams: StartPreflightClaim): RunClaim {
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
   const stub = planStubFromPath(planPath);
   const branch = stub === null
     ? null
-    : branchNameFor(stub);
+    : branchNameFor(stub, template);
   const issue = branch === null
     ? null
-    : claimBranchIssue(branch);
+    : claimBranchIssue(branch, template);
   if (branch === null || issue === null) return NONE;
 
   const { git } = seams;
-  const local = readLocalClaimBranch(git, branch);
-  const fetched = fetchClaimBranches(git);
-  const remote = readClaimBranch(git, branch);
+  const local = readLocalClaimBranch(git, branch, template);
+  const fetched = fetchClaimBranches(git, template);
+  const remote = readClaimBranch(git, branch, template);
   const offline = fetched.ok
     ? null
     : fetched.reason;
   if (!carriesClaim(local) && !carriesClaim(remote)) return NONE;
 
-  return decide({ issue, branch, local, remote, offline }, claimantOf(seams, issue), seams, REREADS_AFTER_A_MOVED_TIP);
+  return decide({ issue, branch, template, local, remote, offline }, claimantOf(seams, issue), seams, REREADS_AFTER_A_MOVED_TIP);
 }
 
 /**
@@ -517,7 +534,7 @@ function resign(
   seams: DecisionSeams,
   rereads: number,
 ): RunClaim {
-  const { issue, branch, remote } = readings;
+  const { issue, branch, template, remote } = readings;
   const { git } = seams;
   const { storeId } = claimant;
   const owned = (via: OwnedVia, note: string): RunClaim => ({ outcome: 'owned', issue, branch, storeId, via, note, replacedId });
@@ -525,21 +542,21 @@ function resign(
 
   const made = makeOwnershipCommit(git, remote.tip, { action: 'take', issue, store: storeId });
   if (!made.ok) return owned('not-re-signed', made.reason);
-  const pushed = pushOwnershipCommit(git, made.sha, branch, remote.tip);
+  const pushed = pushOwnershipCommit(git, made.sha, branch, remote.tip, template);
   if (pushed.outcome === 'pushed') return owned('re-signed', '');
   if (pushed.outcome === 'failed') return owned('not-re-signed', pushed.reason);
   if (rereads <= 0) return owned('not-re-signed', `${branch} moved on ${REMOTE} a second time while its take commit was being pushed`);
 
-  const fetched = fetchClaimBranches(git);
+  const fetched = fetchClaimBranches(git, template);
   const offline = fetched.ok
     ? null
     : fetched.reason;
-  return decide({ ...readings, remote: readClaimBranch(git, branch), offline }, claimant, seams, rereads - 1);
+  return decide({ ...readings, remote: readClaimBranch(git, branch, template), offline }, claimant, seams, rereads - 1);
 }
 
 /** Pushes this store's claim waiting on the local branch, without force, answering as `storeId`, the store's own id; see the module note. */
 function pushWaiting(readings: Readings, storeId: string, git: GitRunner): RunClaim {
-  const { issue, branch, local } = readings;
+  const { issue, branch, template, local } = readings;
   const refused = (owner: string | null, reason: string): RunClaim => ({ outcome: 'refused', issue, branch, owner, reason });
   const tag = `#${String(issue)}`;
   const waiting = `the claim on ${tag} waits unpushed on the local ${branch}`;
@@ -549,7 +566,7 @@ function pushWaiting(readings: Readings, storeId: string, git: GitRunner): RunCl
   const sha = latestOwnershipSha(local);
   if (sha === null) return refused(null, `${waiting}, but its claim commit could not be found`);
 
-  const pushed = pushNewClaimBranch(git, sha, branch);
+  const pushed = pushNewClaimBranch(git, sha, branch, template);
   if (pushed.outcome === 'pushed') return { outcome: 'owned', issue, branch, storeId, via: 'pushed', note: '', replacedId: null };
   if (pushed.outcome === 'failed') return refused(null, `${waiting} and could not be pushed: ${pushed.reason}`);
   const holder = holderOf(pushed.holder);

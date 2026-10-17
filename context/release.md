@@ -6,17 +6,147 @@ A branch no longer stamps a version: instead, its wrap-up commits a small file
 under `release.fragments` (default `.changes/`), and the pull request shows a
 forecast of what version the branch would get if merged now.
 
+### The ladder
+
+Three keys decide how much of a release runs on its own: `release.settle`,
+`release.tag` and `release.publish`. A project sits on one rung, from nothing
+on its own (0) to a release on every merge (4):
+
+| Level | `release.settle` | `release.tag` | `release.publish` | Runs on its own |
+|---|---|---|---|---|
+| 0 Manual | any | `manual` | `manual` | nothing |
+| 1 Settle tags | `push` | `settle` | `manual` | version, changelog and tag in one settle |
+| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and, once `RAFA_RELEASE_PUBLISH` is `ci`, publishes with provenance |
+| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags, and publishes once `RAFA_RELEASE_PUBLISH` is `ci` |
+| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags once `RAFA_RELEASE_PUBLISH` is `ci` |
+
+A level is read off the keys that choose it: levels 3 and 4 by all three,
+level 1 by `release.settle: push` with `release.tag: settle`, and level 2 by
+`release.publish: ci` alone. Level 0 is the floor every combination stands on.
+The highest level whose choosing keys all hold is the reading, and each key is
+then compared with that level's row. A key that differs is the misfit, and
+doctor names it on the ladder row. `release.settle: pr` with `release.tag:
+manual` and `release.publish: ci` reads as level 2 with `release.settle` named,
+since level 2 spells `push`. `release.settle: pr` with `release.tag: settle` and
+`release.publish: manual` reads as level 0 with `release.tag` named, since a
+`pr` delivery never tags.
+
+From level 2 up, the publish job of `release-publish.yml` runs only when the
+repository variable `RAFA_RELEASE_PUBLISH` reads `ci`, through its job condition
+`if: vars.RAFA_RELEASE_PUBLISH == 'ci'`. With the variable unset, the tag is
+still pushed, the publish job is skipped, and nothing goes red, since a skipped
+job is not a failed run. With the variable at `ci`, the pushed tag publishes.
+Set it under Settings, Secrets and variables, Actions, Variables, or with
+`gh variable set RAFA_RELEASE_PUBLISH --body ci`. Two other homes were weighed
+and rejected. An environment with required reviewers would add a second setting
+beside the trusted publisher and a manual approval on every release. A committed
+config key would hold the switch in a file, but the switch belongs to the
+repository's GitHub settings, next to the trusted publisher it depends on.
+
+`rafa doctor` prints the reading as its `Release ladder:` row, right under the
+`Release:` row, and lists what the level still needs. The row is `info` when
+nothing is missing and `warn` otherwise. It never refuses the setting or
+changes the exit code, so a level turned on before CI can carry it is listed on
+every run until its preconditions hold. From level 2 up, the missing items are
+the publish workflow, `.github/workflows/release-publish.yml`, when it is
+absent, not a file, or lacks `id-token: write` (npm trusted publishing needs
+that grant), and the version file's manifest when it is `private` or has no
+`name`, since the level publishes it. Level 3 adds `release-tag.yml` and level 4
+adds `release-settle.yml`, each missing when absent or not a file. Levels 3 and
+4 also need `release-bot-fragment.yml` while `.github/dependabot.yml` exists.
+Doctor cannot read the trusted publisher on npmjs.com, so that stays a step the
+project takes by hand. Nor can it read the repository variable
+`RAFA_RELEASE_PUBLISH`, so from level 2 up the row ends on a reminder, after the
+missing list when there is one: `Release ladder: level 2, CI publishes.
+Publishing waits for the repository variable RAFA_RELEASE_PUBLISH set to ci,
+which doctor cannot read.` The reminder stays on the row once the variable is
+`ci`, since doctor cannot see it set. It is never a missing item, so it neither
+warns nor counts.
+
+The release order across packages (a topological layer, rules by id) is parked
+by the spec's 2026-10-16 update until two publishable packages depend on each
+other.
+
+### Workflows and the GITHUB_TOKEN rule
+
+`rafa release workflows` prints one row per ladder workflow: its path under
+`.github/workflows/`, the levels it serves, whether the level the keys read as
+needs it, and its state. `present` is a regular file holding the template's
+bytes, `differs` a regular file with other bytes (a project's own edit, not
+wrong by itself) and `missing` nothing at the path, or something that is not a
+file. `--write` writes each needed workflow that is missing from its template
+under `src/release/templates/`. A file already at the path is left byte for
+byte, and a directory there is refused with its reason. The command exits 0 in
+every case, since the doctor row is what warns.
+
+The four templates:
+
+- `release-publish.yml` (level 2 and up): on a pushed tag, or through
+  `workflow_call` with a `ref`, checks the ref out, runs the tests, the lint and
+  the type check, upgrades npm (trusted publishing needs npm 11.5.1 or newer)
+  and runs `rafa release publish`. It grants `id-token: write` and sets no token
+  and no provenance flag, since npm attaches provenance on a trusted publish.
+  Its publish job carries `if: vars.RAFA_RELEASE_PUBLISH == 'ci'`, so with the
+  repository variable unset or holding anything else, GitHub skips the job and
+  the run stays green (see "The ladder"). The tagging jobs carry no such
+  condition, so the tag is pushed either way.
+- `release-tag.yml` (level 3): when a pull request from `rafa/release` merges,
+  checks the base branch out at the merge commit, runs
+  `rafa release tag --push`, then calls the publish workflow with the merge
+  commit as `ref`.
+- `release-settle.yml` (level 4): on each push to the default branch, runs
+  `rafa release settle`, and when that pushed a release commit and tagged it,
+  calls the publish workflow with that commit as `ref`.
+- `release-bot-fragment.yml` (levels 3 and 4, while `.github/dependabot.yml`
+  exists): see "Fragments" below.
+
+Each template runs one rafa line in the runner's checkout, and that checkout may
+hold no rafa config: `.rafa/config.yaml` is gitignored in this repository, and
+no `rafa.config.*` is committed, so rafa refuses with exit 1 (#1203). Each
+template therefore has a step named `Write the CI config`, placed straight
+before the step that runs rafa, in the directory rafa runs in: the root for the
+three workflows that run from it, and `base/` for the bot fragment workflow.
+When none of `rafa.config.ts`, `rafa.config.mjs` and `.rafa/config.yaml` is
+there, the step writes `.rafa/config.yaml` holding the lightest config that
+turns the release on, with a header naming the workflow:
+
+```yaml
+# Written by the Release tag workflow: the checkout holds no rafa config.
+release:
+  enabled: true
+```
+
+A config already there under any of the three names is left byte for byte, so
+a project that needs other release keys in CI commits its config, and the
+template's header comment says so. The written file lives only in the runner's
+checkout, and nothing commits it.
+
+The two tagging workflows publish in their own run because of GitHub's
+recursion guard: a tag or commit pushed with the workflow's `GITHUB_TOKEN`
+starts no other workflow run, so the `push: tags` trigger of the publish
+workflow never fires for a tag they push. Each calls the publish workflow
+through `workflow_call` instead. The trigger stays, for a tag a person pushes by
+hand.
+
 ### Fragments: the branch carries intent
 
 A fragment is one file per plan, named `<plan id>.md` (or `-2`, `-3` if a
 fragment of that name already waits on `origin/<pr.base>`). Each fragment holds
-a front-matter block with three lines and notes below:
+a front-matter block with three lines, an optional fourth, and notes below:
 
 ```yaml
 plan: rafa-247
 title: One line, the plan title
 level: patch | minor | major | none
 ```
+
+A fourth line, `package: <name>` after `level`, names the workspace package
+the fragment releases; a fragment without it is the root package's, read as
+`package: null`, and the serialiser writes the line only when it is set.
+The name is the workspace member's manifest `name`, matched exactly.
+`parseFragment` refuses an empty name or one holding whitespace; settle refuses
+a name the workspace lacks or a private member's (see "Settle and its
+deliveries").
 
 Below the front matter, the notes are one line per area (`- area: summary`),
 the same as the wrapped changelog lines the session writes today. Level `none`
@@ -32,6 +162,37 @@ the version file or the changelog. `src/release/fragment.ts` holds the format,
 parser, and the name allocation logic (`src/release/fragment-tree.ts` reads
 the base branch's fragments after a `git fetch` to pick the right name).
 
+`rafa release fragment --plan=<id> --level=<level> --title=<text>
+[--note=<area>: <summary>]... [--package=<name>]` writes one fragment for a
+branch with no wrap-up to write it, such as a bot's pull request, and prints
+its path as the last line. `--plan` must match the plan id pattern, `--level`
+is one of `patch`, `minor`, `major` and `none`, and `--package` must name a
+public member of the checkout's workspace. A shipping level given no `--note`
+takes the title as its one note, with a warning. The name is `<plan>.md`, or
+`-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
+already at the path, in the working tree or in `HEAD`, is refused, so a second
+run never duplicates the first.
+
+The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
+a Dependabot pull request. It runs on `pull_request_target` for
+`dependabot[bot]` pulls from the repository itself, so its token is writable
+and no code from the pull request runs: rafa runs from the base branch's
+checkout, under `base/`, and the branch is checked out only to receive one
+file. Its `Write the CI config` step runs in `base/` before the fragment is
+written, and writes `.rafa/config.yaml` there when the base holds no rafa
+config (see "Workflows and the GITHUB_TOKEN rule"), since rafa reads its config
+from the directory it runs in. A branch that already adds a fragment named for
+the pull request (`dependabot-<number>.md`, or `-2`, `-3` and on) is left as it
+is, and the config step is skipped with the rest. Otherwise the fragment is
+written at `patch` when `dependabot/fetch-metadata` reads the update as
+`direct:production`, and at `none` otherwise, committed as
+`chore: release fragment dependabot-<number>` and pushed to the pull request's
+branch. The commit stages the fragment alone, so the config written in `base/`
+is never committed. That push uses `GITHUB_TOKEN`, so it starts no other run.
+Dependabot stops rebasing a branch someone else has pushed to, so a rebase it
+asks for drops that commit, and the `synchronize` run that follows writes it
+again.
+
 ### The fold: one strategy, pure function
 
 The fold is a single function shape, `fold(currentVersion, fragments) →
@@ -41,6 +202,20 @@ version and one changelog section. It's called in three places: the forecast
 branch). All three get the same answer because the fold's inputs are committed
 data only: the base branch's current version and the ordered fragments. It reads
 no network, label, or clock.
+
+The fold runs once per unit that releases, not once per branch. The root's
+batch folds from `release.versionFile` over the fragments with no `package`
+line; each workspace package a fragment names folds from the `version` of its
+own `<dir>/package.json` over that package's fragments. Every batch keeps the
+same first-parent order. A package no fragment names is never folded, and it
+keeps its version through a release. The pull request body's forecast
+(`src/release/branch-forecast.ts`) applies the same split: it folds only the
+waiting fragments whose `package` equals the branch fragment's (null with null),
+so a package fragment waiting on the base does not move the root's forecast.
+A package slot folds from the member's own manifest version at the base commit,
+as the guard does, read through `packageBaseVersionAt`; a package the base cannot
+fold answers one problem line in the guard's words, ending `so no forecast was
+folded`.
 
 Fragment order is first-parent commit order: the commit that ADDED each fragment
 to the base branch, read from git. First add wins if a fragment name appears
@@ -61,13 +236,26 @@ calendar-based versioning) while keeping the default simple.
 
 `rafa release settle [--dry-run]` builds its commit in a scratch worktree of
 `origin/<pr.base>`, reading the fragments from that tree, ordering them by
-first-parent commit, folding them to a version and section, then delivering by
-one of two methods:
+first-parent commit, splitting them into one batch per unit, folding each batch
+to a version and section, then delivering by one of two methods:
 
-**Push delivery** (default): Settle writes the version and section on the base
-branch, deletes the fragments it folded, commits `chore: release <version>` and
-pushes. If the push is refused, settle fetches again. If the fragments it folded
-are gone (another machine settled them), it stops with exit 0. If new fragments
+**Refusals**: a fragment that does not parse, or that names a package the
+workspace at the base lacks or a private one, refuses the whole batch. Settle
+prints one sentence per refused fragment, naming its path and the reason
+(`<path> names package <name>, which the workspace at <hash> does not hold`, or
+`<path> names package <name>, which is private and never publishes`), and exits
+1 with nothing written. The rest of the batch is not folded either, since a
+fragment left out would release later than the order the base received it. A
+dry run reads the same and gives the same refusal.
+
+**Push delivery** (default): Settle writes each unit's version and section on
+the base branch (the root's, and each workspace package a fragment names),
+deletes the fragments it folded, commits them all at once as
+`chore: release <version>`, `chore: release <version>, <name>@<version>` or
+`chore: release <name>@<version>` (`releaseCommitSubject`,
+`src/release/release-move.ts`) and pushes. If the push is refused, settle
+fetches again. If the fragments it folded are gone (another machine settled
+them), it stops with exit 0. If new fragments
 arrived, it recomputes and retries once, then stops with exit 1 if that retry
 is refused.
 
@@ -82,7 +270,9 @@ scope's own config file (`rafa.config.ts` in a project that holds one). No refus
 drops that line from what it quotes (#765).
 
 **PR delivery** (`release.settle: pr`): Settle pushes the commit to the `rafa/release`
-branch and opens or updates one pending release pull request. Closing that PR
+branch and opens or updates one pending release pull request, titled with the
+commit's subject. Its body lists each unit's move and ends with one changelog
+section per unit, each under a line naming the unit. Closing that PR
 undoes the release before it lands. This is the delivery method for a protected
 base branch that requires review.
 
@@ -163,7 +353,7 @@ needing retrofitted fragments and makes every pre-settle section acceptable.
 
 `src/release/receipt.ts` computes the boundary by reading the changelog;
 `src/release/audit.ts` in `rafa release status` audits the changelog and names
-any heading with no tag above the adoption boundary.
+any heading with no root tag above the adoption boundary.
 
 The `{title}` in `release.heading` renders the batch's plan titles in fold order
 joined by `; `, and `{date}` is the UTC date of the newest folded fragment's add
@@ -172,27 +362,79 @@ settle deterministic across machines and retries.
 
 ### Tag and its push
 
-`rafa release tag [--push]` writes `v<version>` on the commit of the release
-branch that set the version, then prints what to run next: the push of the tag
-and the publish line. Without `--push` it reaches no network and the push is a
-line to copy, naming the remote `--push` would reach (#857).
+`rafa release tag [--push]` writes one tag per unit on the commit of the release
+branch that set that unit's version: `v<version>` for the root, read off
+`release.versionFile` and `release.changelog`, and `<name>@<version>` for each
+publishable workspace package, read off `<dir>/package.json` and
+`<dir>/CHANGELOG.md` (`src/commands/release/tag-units.ts`). The branch is
+checked once for the run, and every unit is decided before the first tag is
+written: a unit whose version a tag already names is skipped, the run refuses
+`tagged` only when every unit is skipped, and any other refusal of any unit
+exits 1 with nothing written. It prints one `✅ Tagged <tag> at …` line per tag
+in unit order, then what to run next: per tag, its push and its publish line, a
+package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
+publish line is replaced by one sentence in the form `Once pushed, <tag>
+publishes <name>@<version> to <registry> through
+.github/workflows/release-publish.yml when the repository variable
+RAFA_RELEASE_PUBLISH is ci (release.publish: ci).`, for the units
+that would have had a publish line (a unit with no name, or a private one,
+gets neither), and json mode carries `publish: "ci"` on that unit
+(`src/commands/release/tag-follow-ups.ts`). The sentence names the switch: with
+the variable unset the tag still goes out, and the publish job it names is
+skipped, not failed. Without `--push` it
+reaches no network and each push is a line to copy, naming the remote `--push`
+would reach (#857).
 
-With `--push` (#736) it pushes `refs/tags/v<version>` itself once the tag is
-written (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote the
-release branch tracks (`branch.<pr.base>.remote`), or `origin` when the branch
-tracks none or tracks a local branch. A push that went prints
-`✅ Pushed v<version> to <remote>.` and drops the push line from the follow-ups;
-json mode carries it as the result's `pushed`, a key a run without the flag
-leaves out. A push that fails, a hook or rule refusing it included, exits 1 with
-git's words and the push to run again, and keeps the local tag, since it names
-the right commit whether or not the remote has it.
+With `--push` (#736) it pushes each tag itself once every tag is written, in
+unit order (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote
+the release branch tracks (`branch.<pr.base>.remote`), or `origin` when the
+branch tracks none or tracks a local branch. A push that went prints
+`✅ Pushed <tag> to <remote>.` under its `Tagged` line and drops that push line
+from the follow-ups; json mode carries it as the unit's `pushed` and the root's
+as the result's `pushed`, keys a run without the flag leaves out. A push that
+fails, a hook or rule refusing it included, exits 1 with git's words and the
+push to run again, naming the tags pushed before it and those written and not
+pushed after it, and keeps every local tag, since each names the right commit
+whether or not the remote has it.
+
+**`rafa release publish [--tag=<tag>] [--dry-run]`** runs the publish line's
+command for the release tags on HEAD (`git tag --points-at HEAD`), in the order
+git lists them with the root's first. The root publishes from the project root
+and a package from its own folder, through `release.publishCommand`. `--tag`
+names one of those tags and is refused when HEAD does not carry it, and a HEAD
+with no release tag is refused with exit 1, so a publish never ships a tree its
+tag does not name. Every unit is read before anything runs, and a version other
+than the tag's is refused. The publish workflow calls it, and a person may run
+it by hand.
+
+The retry rule: before each unit publishes, `npm view <name>@<version> version`
+asks the registry the manifest names (`publishConfig.registry`, or
+`https://registry.npmjs.org`). A version the registry holds is skipped with a
+`Skipped` line, and a version it lacks is published. An `E404` reads as lacking,
+since npm answers it both for a missing version and for a package it does not
+know, and a query that exits 0 without the version reads as lacking too. Any
+other failure to read the registry stops the run with exit 1, since a publish
+on a guess could ship a version twice or not at all. So a rerun after a publish
+that stopped halfway publishes only the units the registry lacks. A manifest
+that names no package or is `private` is skipped without a query. The first
+publish command that fails stops the run, and the units after it are not tried.
+`--dry-run` prints each unit's command, directory and registry, and runs
+nothing, not even the query.
 
 ### Guards: the preflight check
 
 A preflight item in `rafa pr merge` (read also by `rafa pr triage`) runs the fold
-as a dry run over the base branch's current version and the fragments waiting
-there (the state at the time the branch was last pulled). It answers one of four
-classes:
+as a dry run for one unit: the package of the branch fragment that takes the
+forecast's last place, or the root when it names none. It folds from that
+unit's version on the base branch (the root's from `release.versionFile`, a
+package's from its own manifest, read through `readWorkspacePackagesAt`) and
+folds only the fragments that name the same package, or none for the root:
+those waiting on the base (the state at the time the branch was last pulled),
+as the pull request body's forecast does, and the branch's own others. A package
+fragment, waiting or on the branch, does not move the root's forecast, nor a
+root fragment a package's. A package the base's workspace lacks, a private one
+or one declaring no version gives no forecast and one note saying why. It
+answers one of four classes:
 
 - **`clean`**: A fragment is present and the branch changes neither the version
   file nor the changelog.
@@ -227,12 +469,23 @@ ordinary branch stamping a version still reads `stale`.
 last fetched) and prints:
 
 - The version `release.versionFile` declares now
-- The latest release tag by semantic version precedence
+- The latest root release tag (`v<version>`, or a bare `<version>`) by
+  semantic version precedence. A package's `<name>@<version>` tag is read
+  (`releaseTagsOf`, with `package` set) but neither counted nor taken as latest
+  here, and `rafa release tag` counts only a unit's own tags for its skip
 - Untagged versions marked in `release.changelog` (a changelog section with no
-  matching `v<version>` tag)
+  matching `v<version>` tag; a package's tag of that version does not count)
 - The fragments waiting on the base branch, one line each in fold order with
-  level, add date and title, and the release that settle would produce from
-  them (or an error if a fragment does not parse)
+  level, add date and title, then `for <name>` when the fragment names a
+  package, and the release that settle would produce from them: the root's,
+  then `; <name> <base> → <next>` for each package a fragment names, each
+  forecast over its own base version (or an error if a fragment does not
+  parse, or names a package the workspace lacks or a private one)
+- The `packages` row: `none` for a workspace with no publishable member,
+  `<n> publishable` otherwise, with one line per package under it, its
+  name, the version its manifest declares, how many waiting fragments name
+  it and its newest tag (`latestTagOf`) or `untagged`; read in
+  `src/commands/release/status-packages.ts` (`readPackages`)
 - An audit of released history: versions two headings name, gaps (a version not
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary
@@ -245,8 +498,18 @@ last fetched) and prints:
 
 Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
 readers other folders import (`compareVersions`, `changelogVersions`,
-`readTags`, `readUntagged`) are its library half,
+`readTags`, `readUntagged`, `rootTags`) are its library half,
 `src/release/status-readings.ts`.
+
+**`rafa release list`** prints one row per unit that releases on its own,
+the root first (`@open-tomato/rafa  0.45.0  2 waiting  v0.45.0`), then each
+publishable workspace package in the columns of the `packages` row: name,
+version, waiting fragments and newest tag, or `untagged`. The root's name is
+the version file's manifest `name`, for display only; its version comes from
+`release.versionFile`, its waiting count from the base's fragments with no
+`package` line, its tag from the latest root tag. A column it could not read
+is `?`, with the reason under the rows, and it still exits 0. Never writes.
+Implemented in `src/commands/release/list.ts`, over `status`'s readers.
 
 **`rafa pr list`** shows each open pull request's forecast (the version and
 section that settle would produce if the branch merged now), marked as forecast,
@@ -256,10 +519,21 @@ fragment IDs since the forecast in the PR body was written.
 **`rafa doctor`** prints one row for the release status: the base version, the
 latest tag, the top heading in the changelog, and the waiting fragments on the
 base branch. It warns when fragments wait and names `rafa release settle`.
+Right under it, a `Release ladder: level <n>, <name>` row names the level
+`release.settle`, `release.tag` and `release.publish` read as, and a key that
+does not fit the level's row. It is an `info` line when the level has all it
+needs and a `warn` line listing each missing precondition (a needed workflow
+under `.github/workflows/` absent or not a file, with `rafa release workflows
+--write` to write it; the publish workflow without `id-token: write`; the
+version file's manifest private or without a `name`; the bot fragment workflow
+while `.github/dependabot.yml` exists) otherwise. From level 2 up the row
+ends on the reminder that publishing waits for the repository variable
+`RAFA_RELEASE_PUBLISH` set to `ci`, which doctor cannot read. It never changes
+the exit code.
 
 ### Config keys
 
-Eight keys control the release flow, all under the `release` section except two:
+Nine keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -272,21 +546,41 @@ effect the next settle.
 
 **`release.settle`** — Delivery method: `push` (default, push to the base
 branch) or `pr` (open or update one pending release pull request on
-`rafa/release`). Read by `rafa release settle` and `rafa next`.
+`rafa/release`). Read by `rafa release settle` and `rafa next`, and by the
+ladder reading in `rafa doctor` and `rafa release workflows`.
 
 **`release.tag`** — Who tags the version: `manual` (default, tag by hand with
-`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags the commit it pushed). Read by
-`rafa release settle` and `rafa release tag`. Under `release.settle: pr`, the
-tag waits for `rafa release tag` after that pull request merges.
+`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags
+the commit it pushed, one tag per unit it moves: `v<version>` for the root,
+`<name>@<version>` for a package, in unit order, stopping at the first that
+fails). Read by `rafa release settle` and `rafa release tag`, and by the
+ladder reading in `rafa doctor` and `rafa release workflows`. Under
+`release.settle: pr`, settle never tags: the tag waits for `rafa release tag`
+after that pull request merges, run by hand under `tag: manual`, and by the
+`release-tag.yml` workflow under `tag: settle`, which the release pull
+request's body then names as tagging and publishing on the merge.
 
 **`release.publishCommand`** — The command `rafa release tag` prints for the
-publish, default `npm publish`. Free text, printed as written and never run, so
-a project that publishes with another tool or a flag (`pnpm publish --tag
-next`) spells it here. When HEAD is past the tagged commit the line becomes
+publish, default `npm publish`. Free text: `rafa release tag` prints it as
+written and never runs it, and `rafa release publish` runs it through the shell
+in each unit's folder for the release tags on HEAD, skipping a version the
+registry holds (`src/commands/release/publish.ts`). So a project that publishes
+with another tool or a flag (`pnpm publish --tag next`) spells it here. When HEAD is past the tagged commit the line becomes
 `git switch --detach <tag> && <publishCommand> && git switch <branch>`, so the
-tagged tree is the one published. The manifest's `packageManager` field is not
+tagged tree is the one published. A workspace package's line runs it in the
+package's folder: `(cd <dir> && <publishCommand>)`. The manifest's `packageManager` field is not
 read for it: that field names the tool a project installs with, and tagging
 0.24.1 printed `bun publish` from it while rafa is published with `npm publish`.
+
+**`release.publish`** — Who publishes a tagged version: `manual` (default, a
+person runs the publish command `rafa release tag` prints) or `ci` (the pushed
+tag publishes through the project's CI workflow, once the repository variable
+`RAFA_RELEASE_PUBLISH` is `ci`). Any other value is refused.
+It is the third key the release ladder is read off, beside `release.settle`
+and `release.tag`. Its readers are `rafa release tag`, which prints the CI
+sentence in place of a publish line under `ci`, and the ladder reading in
+`rafa doctor` and `rafa release workflows`. `rafa release publish` does not
+read it: it runs `release.publishCommand`.
 
 **`release.moveLock`** — Boolean (default `false`, read through `flag`, so
 `"true"`, `yes` and `1` are refused). `true` has settle also write `rafa.lock`
@@ -308,6 +602,7 @@ another.
 All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
 `release.settle` defaults to `push`, an absent `release.tag` defaults to
-`manual`, an absent `release.publishCommand` defaults to `npm publish`, and an
-absent `release.moveLock` defaults to `false`. They're set by `rafa init` and
+`manual`, an absent `release.publishCommand` defaults to `npm publish`, an
+absent `release.publish` defaults to `manual`, and an absent `release.moveLock`
+defaults to `false`. They're set by `rafa init` and
 read by `loadConfig`.

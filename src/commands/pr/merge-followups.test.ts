@@ -18,9 +18,11 @@
  */
 import type { FollowUpReading } from './merge-followups.js';
 import type { SettleWaiting } from '../../pr/settle-waiting.js';
+import type { ReleaseMove } from '../../release/release-move.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { moveSpelling } from '../../release/release-move.js';
 import { versionTag } from '../../release/version-tag.js';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { createReleaseSettleCommand } from '../release/settle.js';
@@ -29,6 +31,14 @@ import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMA
 
 /** Two fragments waiting on main that fold into 0.5.0. */
 const WAITING: SettleWaiting = { base: 'main', fragments: 2, version: '0.5.0' };
+
+const MOVES: readonly ReleaseMove[] = [
+  { package: null, dir: '.', from: '0.4.0', to: '0.5.0' },
+  { package: '@scope/plugin', dir: 'packages/plugin', from: '0.1.0', to: '0.2.0' },
+];
+
+/** The two moves spelled as `settleWaitingOn` spells them: the root's bare, the package's `<name>@<version>`. */
+const TWO_MOVES: SettleWaiting = { base: 'main', fragments: 2, version: MOVES.map(moveSpelling).join(', ') };
 
 /** A reading of a rafa checkout on a version nothing has installed, with fragments waiting, filled from `over`. */
 function reading(over: Partial<FollowUpReading> = {}): FollowUpReading {
@@ -60,6 +70,13 @@ describe('which follow-ups apply', () => {
     expect(followUps.map((followUp) => followUp.command)).toEqual(['rafa self-update', 'rafa release settle']);
     expect(followUps[0]?.why).toBe('0.4.0 is not installed as this machine\'s rafa runtime');
     expect(followUps[1]?.why).toBe('2 fragments wait on main and fold into 0.5.0');
+  });
+
+  it('names a root move and a package move in the settle why, joined by a comma', () => {
+    const followUps = readFollowUps(reading({ settle: TWO_MOVES }));
+
+    expect(TWO_MOVES.version).toBe('0.5.0, @scope/plugin@0.2.0');
+    expect(followUps.at(-1)?.why).toBe('2 fragments wait on main and fold into 0.5.0, @scope/plugin@0.2.0');
   });
 
   it('keeps settle last in every combination that names it', () => {

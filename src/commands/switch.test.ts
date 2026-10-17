@@ -444,6 +444,17 @@ describe('the drift report', () => {
     expect(branched.exitCode).toBe(0);
   });
 
+  it('reads the claim branches under naming.branch, and the default template reads none of them', async () => {
+    const work = ['refs/heads/work/rafa-7-x'];
+
+    const templated = await run(['40'], plantCase('tracker:\n  default: local\nnaming:\n  branch: work/{stub}\n'), { listing: DRIFTED }, work);
+    const untemplated = await run(['40'], plantCase(), { listing: DRIFTED }, work);
+
+    expect(templated.exitCode).toBe(0);
+    expect(templated.stdout).not.toContain('claim drift: #7');
+    expect(untemplated.stdout).toContain('claim drift: #7 is labelled rafa:claimed (open)');
+  });
+
   it('reads no branch when no issue carries a stage label, where a labelled board reads them', async () => {
     const clean = await run(['40']);
     const labelled = await run(['40'], plantCase(), { listing: DRIFTED });

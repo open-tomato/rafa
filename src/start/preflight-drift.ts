@@ -22,8 +22,9 @@
  * written through `gh` alone (`claims/labels.ts`): the board through
  * `createCachedBoardListing` (`board/board-cache.ts`), so a due run
  * spends one small incremental read once the cache is kept, and the
- * branches through `scanClaimBranches` (`board/roadmap.ts`), which the
- * check asks only when some issue carries a stage label. `roadmap.issue`
+ * branches through `scanClaimBranches` (`board/roadmap.ts`) under
+ * `naming.branch`, which the check asks only when some issue carries a
+ * stage label. `roadmap.issue`
  * is compared as a board beside the listing's `type:roadmap` rows. A run
  * that is not due resolves no provider and reads neither.
  *
@@ -98,7 +99,7 @@ export function isDriftRun(count: number): boolean {
  */
 export function createStartPreflightDrift(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'roadmapIssue'>,
+  config: Pick<RafaConfig, 'namingBranch' | 'prProvider' | 'roadmapIssue'>,
 ): StartPreflightDrift {
   return {
     runCount: () => countRunRecords(repoRoot),
@@ -108,7 +109,7 @@ export function createStartPreflightDrift(
     boards: config.roadmapIssue === null
       ? []
       : [config.roadmapIssue],
-    branches: () => scanClaimBranches(createGitRunner(repoRoot)),
+    branches: () => scanClaimBranches(createGitRunner(repoRoot), undefined, config.namingBranch),
   };
 }
 

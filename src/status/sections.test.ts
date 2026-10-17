@@ -911,3 +911,26 @@ describe('the loop worktrees the housekeeping section counts', () => {
     expect(await idleUnder('.rafa/worktrees')).toBe(5);
   });
 });
+
+describe('the board section under naming.branch', () => {
+  /** The template `readStatusSections` hands the board under `namingBranch`. */
+  async function handedTemplate(namingBranch: string): Promise<readonly (string | undefined)[]> {
+    const handed: (string | undefined)[] = [];
+    const base = world();
+    const seams: StatusSeams = {
+      ...base.seams,
+      board: (options) => {
+        handed.push(options.branchTemplate);
+        return scriptedBoard(() => Promise.resolve(NO_LINE), true, null, []);
+      },
+    };
+
+    await sections(projectWith(), seams, { ...CONFIG, namingBranch });
+    return handed;
+  }
+
+  it('hands the board work/{stub} when the config names it, and the default when it names the default', async () => {
+    expect(await handedTemplate('work/{stub}')).toEqual(['work/{stub}']);
+    expect(await handedTemplate('feat/{stub}')).toEqual(['feat/{stub}']);
+  });
+});

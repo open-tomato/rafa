@@ -12,7 +12,7 @@
  * the two item shapes the `prerequisites` and `modules` lists read.
  * `config-readers.ts` holds `mapOf` and the named readers the settings
  * below are read through: `directory`, `trackerKind`, `tierPins` and
- * `routeTable`. The twelve section files `src/config-schema-*.ts` hold
+ * `routeTable`. The thirteen section files `src/config-schema-*.ts` hold
  * the other packages' settings; core names none of them here.
  *
  * ## The schema

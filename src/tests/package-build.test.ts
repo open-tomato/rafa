@@ -8,7 +8,8 @@
  * first three and phase 1's publishing stage the rest, so a target
  * renamed in the manifest fails a case instead of agreeing with
  * itself. Every other case reads a build: the suite copies the package
- * (its manifest and lockfile, its tsconfig files, the README, `src/`,
+ * (its manifest and lockfile, its tsconfig files, the README, the bundle
+ * script `scripts/build/bundle.ts`, `src/`,
  * core's workspace package `packages/rafa/` and the tsconfig base's
  * `packages/typescript-config/`) into a scratch directory and runs
  * `bun run build` there,
@@ -33,6 +34,10 @@
  *     both. An unused export appended to a module changed no chunk at
  *     all, which is why that reading was taken on a change the bundle
  *     keeps.
+ *   - `bun scripts/build/bundle.ts` runs the next two builds, each with
+ *     every publishable workspace package as `--external`, and fails
+ *     when a bundle holds a file of one (see that script's module note).
+ *     It is copied into the scratch package beside the manifest.
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
@@ -122,10 +127,10 @@
  *
  * ## The asset-tree clause
  *
- * The two templates above are named files; the pinned resolve plans
- * and the board templates are DIRECTORIES, so the build script ends with
- * a loop over a table of `<source under src>:<name under dist>` pairs.
- * Three readings shape it:
+ * The two templates above are named files; the pinned resolve plans,
+ * the board templates and the release workflow templates are
+ * DIRECTORIES, so the build script ends with a loop over a table of
+ * `<source under src>:<name under dist>` pairs. Three readings shape it:
  *
  *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
  *     holds `load.ts` and `load.test.ts` beside the four plans, and
@@ -133,12 +138,16 @@
  *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
- *     `src/board/templates/epic-guard.yml`, and a case resolves it
- *     through `readEpicGuard` pointed at `dist/`. Unlike `*.md`, a tree
- *     holding no YAML is not a failure: the `[ -e ]` guard skips the
- *     unmatched pattern, since `src/pr/plans/` carries none.
- *   - A tree lands DIRECTLY under `dist/`, as `dist/plans` and
- *     `dist/templates`, not at its source path. A bundle reading
+ *     `src/board/templates/epic-guard.yml` and the release ladder's
+ *     `src/release/templates/*.yml`, and a case resolves each through
+ *     `readEpicGuard` and `readReleaseTemplate` pointed at `dist/`.
+ *     Each pattern is copied file by file behind an `[ -e ]` guard, so
+ *     a tree holding no YAML (`src/pr/plans/`) or no markdown
+ *     (`src/release/templates/`) is not a failure.
+ *   - A tree lands DIRECTLY under `dist/`, as `dist/plans`,
+ *     `dist/templates` and `dist/release-templates`, not at its source
+ *     path; the release tree takes its own name because `templates` is
+ *     the board's. A bundle reading
  *     `import.meta.url` answers its own directory, which is `dist/` for
  *     `cli.js`, so `src/pr/plans/load.ts`'s first candidate is
  *     `<moduleDir>/plans/<name>.md`; `PINNED_PLANS_DIRNAME` is that
@@ -146,7 +155,8 @@
  *     `readPinnedPlan` pointed at `dist/` rather than only comparing
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
- *     with no markdown in it fails the build, whatever YAML it holds. `src/board/templates/`
+ *     with neither markdown nor YAML in it fails the build: the loop
+ *     counts what it copied and exits 1 on none. `src/board/templates/`
  *     now carries `spec.md`, the spec issue template, and carried no
  *     tracked file when the clause was written: `cp
  *     src/board/templates/*.md` against an absent directory would have
@@ -156,7 +166,13 @@
  *     with the directory absent, the `[ -d ]` guard skipped it and the
  *     run exited 0; with it present and holding no markdown, the `cp`
  *     matched nothing and the run exited 1. So the skip cannot hide a
- *     tree that is there and ships nothing.
+ *     tree that is there and ships nothing. When the release tree
+ *     joined the table on 2026-10-16, the clause as it stood (`cp
+ *     "$src"/*.md`) exited 1 on a probe tree holding only a `.yml`, so
+ *     the copy became one guarded loop over both patterns with a count;
+ *     in the same probe that loop copied a markdown-only and a
+ *     YAML-only tree, skipped an absent one, and exited 1 on a tree
+ *     holding only a `.ts` file and on an empty one.
  *
  * That last reading is why the board tree's case reads a PLANTED file:
  * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
@@ -480,6 +496,7 @@ import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
+import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '../release/templates.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
@@ -515,6 +532,8 @@ const EXPORTS = {
   './core/config': { types: './dist/core/config/index.d.ts' },
   './core/config/config-schema': { types: './dist/core/config/config-schema.d.ts' },
   './core/config/sections': { types: './dist/core/config/sections.d.ts' },
+  './errors/codes': { types: './dist/errors/codes.d.ts' },
+  './errors/rafa-codes': { types: './dist/errors/rafa-codes.d.ts' },
   './ports/log-level': { types: './dist/ports/log-level.d.ts' },
   './report/parse': { types: './dist/report/parse.d.ts' },
   './store/check-rows': { types: './dist/effort/store/check-rows.d.ts' },
@@ -526,7 +545,8 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
 /**
  * The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line.
  * It follows the build since: six lines from `7306b06` (`config-schema-features.d.ts`,
- * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`).
+ * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`), and
+ * `config-schema-bugs.d.ts` from the `bugs` section (#953).
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -620,6 +640,8 @@ const PACKAGE_FILES = [
   'tsconfig.packages.json',
   'tsconfig.config-types.json',
   'README.md',
+  // The `build` script's first segment after `rm -rf dist`: both `bun build` runs and their guard.
+  'scripts/build/bundle.ts',
 ];
 
 /** Core's workspace package, which the build reads core's source and first declarations pass from. */
@@ -705,6 +727,7 @@ const TEMPLATES: [string, string][] = [
 const ASSET_TREES: [string, string][] = [
   ['src/pr/plans', 'plans'],
   ['src/board/templates', 'templates'],
+  ['src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
 
 /**
@@ -1202,7 +1225,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(14);
+    expect(targets).toHaveLength(16);
     expect(missing).toEqual([]);
   });
 
@@ -1217,7 +1240,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(155);
+    expect(before).toHaveLength(161);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1477,14 +1500,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the twelve section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the thirteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
+      'board-project', 'bugs', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
       'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(12);
+    expect(sections).toHaveLength(13);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);
@@ -1846,5 +1869,11 @@ describe('the asset trees in the build', () => {
     const source = readFileSync(join(PACKAGE_DIR, 'src/board/templates', EPIC_GUARD_FILE), 'utf8');
 
     expect(readEpicGuard(DIST)).toBe(source);
+  });
+
+  it('lands the release publish workflow where readReleaseTemplate looks for it from a bundle in dist', () => {
+    const source = readFileSync(join(PACKAGE_DIR, 'src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
+
+    expect(readReleaseTemplate(RELEASE_PUBLISH_FILE, DIST)).toBe(source);
   });
 });

@@ -23,6 +23,12 @@ spells out, and the shapes the lint config forces.
   refusal is the real smell, as `release status`'s hand-rolled
   `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
+  `src/commands/release/workflows.ts` takes `readLadderFiles` from
+  `src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
+  takes too, and `LADDER_WORKFLOWS` from `src/release/ladder.ts` and
+  `readReleaseTemplate` and `writeReleaseWorkflow` from
+  `src/release/templates.ts`, so the command and the doctor row read one
+  set of files.
 - **Every `import type` line forms one `import/order` group**
   (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its order: neither plain
   name order, "every sibling before every parent", nor path depth first,
@@ -145,8 +151,10 @@ pull-request code, but release code imports the git runner too, so it moved to
 `packages/rafa/src/core/git/`. `packages/rafa/src/report/parse.ts` reads like
 the run's report code, but the effort store reads it, so it is core. Core is
 also `packages/rafa/src/ports/`, the effort store under
-`packages/rafa/src/effort/store/` and `packages/rafa/src/report/record.ts`: core
-by assignment, kept where they are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
+`packages/rafa/src/effort/store/`, `packages/rafa/src/report/record.ts` and
+the cause codes of `packages/rafa/src/errors/codes.ts` and
+`packages/rafa/src/errors/rafa-codes.ts`: core by assignment, kept where they
+are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
 `scripts/survey/core-moves.ts` list core's folders and named files, and
 `isCoreFile` reads them: the one place a sweep, a survey script or a spawned
 loader takes core's location from.
@@ -272,11 +280,11 @@ is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
-`checks`. Core names no section. The thirteen are listed in
+`checks`. Core names no section. The fourteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and twelve `src/config-schema-*.ts` files. That
+own (`core-section.ts`) and thirteen `src/config-schema-*.ts` files. That
 module registers nothing as it is imported: its `registerCoreConfigSections()`
-registers the thirteen with core and sets core's load hook, and `src/rafa.ts`,
+registers the fourteen with core and sets core's load hook, and `src/rafa.ts`,
 `src/index.ts` and `src/tests/preload.ts` call it ahead of
 `registerCoreAdapters()`, before anything loads a config. A second call
 registers nothing. A file outside
@@ -414,8 +422,31 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   (`@open-tomato/rafa-sync-service`), and the two config packages,
   `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`) and
   `packages/eslint-config/` (`@open-tomato/rafa-eslint-config`). Publishing
-  them is an operator's decision, and the root `files` ships none of them.
+  one is the manifest rule below, and the root `files` ships none of them.
   The root publishes `@open-tomato/rafa` with core bundled.
+- **What publishes is what the manifests say.** A workspace member publishes
+  when its `package.json` holds no `"private": true`, and no config key names
+  the packages that publish. The build (`publishableOf` in
+  `src/release/workspace-packages.ts`) and the release read that one field;
+  the graph check reads it through `isPublishable` in
+  `scripts/workspace/publish-rules.ts`. Every member is `private` today, so the
+  build passes no external and no fragment can name a package for settle.
+- **The root `build` script keeps every publishable member out of the CLI.**
+  The script runs `bun scripts/build/bundle.ts` after `rm -rf dist`. That
+  script builds `src/rafa.ts` alone to `dist/cli.js`, then the six library
+  entries together, with `--splitting --root=src`, into `dist/`. Each build
+  passes `--external <name>` for every publishable member's name. bun applies
+  an external to the name and to every `<name>/<subpath>` before it resolves
+  the import, so the bundle keeps the bare specifier; a private member such as
+  `@open-tomato/rafa-core` is bundled, as before. The bundle guard then reads
+  each build's metafile and fails the build, exit 1, when a file under a
+  publishable member's folder is in a bundle, one line per file:
+  `dist/cli.js bundles <file> of <name>, imported by <importers>`. The
+  externals only name bare imports, so the guard is what catches a relative
+  import that reaches into a publishable member's folder. A clean build prints
+  one line per bundle, `<label> built with externals: <names>`, or `none`.
+  `--no-externals`, which the tests alone pass, builds with no `--external`,
+  so the guard's failure has a planted-tree control.
 - **The config packages are the shared configs every member extends.**
   `packages/typescript-config/base.json` is the strict tsconfig base, reached
   as `@open-tomato/rafa-typescript-config/base`; the root declares it with
@@ -441,6 +472,32 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `@open-tomato/rafa@workspace:* failed to resolve`, since the root is not a
   member of its own workspace. The members depend on
   `@open-tomato/rafa-core` instead.
+- **A publishable member names rafa as a peer, never as a dev dependency.** A
+  member that publishes and imports `@open-tomato/rafa`, or a subpath of it,
+  declares that package under `peerDependencies` and in no other field, so the
+  rafa its consumer installed is the one it shares. Its manifest has no
+  `devDependencies` line for the root: bun 1.3.14 refuses `workspace:*` and
+  `link:../..` there (`@x/root@workspace:* failed to resolve`), and
+  `file:../..` installs a copy of the root instead. The in-repo import still
+  resolves through the `paths` of `tsconfig.packages.json`, which bun reads at
+  run time. The publish rules hold the shape: a file the member ships that
+  imports the root while `peerDependencies` does not name it is refused. Their
+  import rules read only the shipped files: with a `files` list, each file an
+  entry names, directly, by a folder holding it or as a `Bun.Glob`; with none,
+  every code file but a test file (a name holding `.test.`, or a `__tests__`,
+  `test` or `tests` folder) and a tool config at the member's root
+  (`*.config.{js,mjs,cjs,ts,mts,cts}`). The targets of `main` and `bin` are
+  not read, and the undeclared-import rule of the graph check below still
+  reads every code file. A plugin's manifest reads:
+
+  ```json
+  { "name": "@open-tomato/rafa-plugin-example", "version": "0.1.0",
+    "peerDependencies": { "@open-tomato/rafa": ">=0.46.0" } }
+  ```
+
+  No member here has the shape yet: this plan ships no plugin, so the publish
+  rules and this example are what hold it.
+- **A package imports core through the entries the import rule allows.** A
 - **A package imports core through the entries the import rule allows.** A
   file outside core takes the barrels, the store and ports entries and the
   named files by the subpaths of "Core and its barrels" above, and nothing
@@ -498,18 +555,29 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
   umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
   reads core's source through `paths` as before.
-- **The graph check refuses four things.** `scripts/workspace/graph-check.ts`
-  reads each member under `packages/*` and refuses it on four counts, one line
-  per reason: it has no script for a task in the root `turbo.json` (`lint`,
-  `check-types` and `test` today), with `check-types` asked only of a member
-  that holds a `tsconfig.json`; its `tsconfig.json` is not `composite`, or the
+- **The graph check refuses four things, and three more of a publishable
+  member.** `scripts/workspace/graph-check.ts` reads each member under
+  `packages/*` and refuses it on four counts, one line per reason: it has no
+  script for a task in the root `turbo.json` (`lint`, `check-types` and `test`
+  today), with `check-types` asked only of a member that holds a
+  `tsconfig.json`; its `tsconfig.json` is not `composite`, or the
   solution file does not reference it; its `tsconfig.json` `references` omit a
   workspace dependency whose own `tsconfig.json` is composite; or a `.ts`,
   `.mjs` or `.js` file under it imports an `@open-tomato/*` package that its
   `dependencies`, `devDependencies` or `peerDependencies` do not declare, a
-  `paths` alias counting as the member it resolves into. It exits 0 with one
-  `ok` line per member and exits 1 with a line per reason; a root it cannot
-  read is a refusal too. Ring 1 runs it, and
+  `paths` alias counting as the member it resolves into. A member with no
+  `private: true`, which publishes, is refused on three more counts, kept in
+  `scripts/workspace/publish-rules.ts`: its `dependencies`,
+  `peerDependencies` or `optionalDependencies` name a private member; a file
+  imports `@open-tomato/rafa` or a subpath of it while `peerDependencies` does
+  not name `@open-tomato/rafa`; or a file imports a subpath the root
+  manifest's `exports` lack, or a private member by name. The last two read
+  only the files the member ships, as the bullet on a publishable member's
+  peer above sets out. For such a member `@open-tomato/rafa/<subpath>` names
+  the root package, not the member the `paths` alias resolves it into, so the
+  fourth refusal leaves it to these.
+  It exits 0 with one `ok` line per member and exits 1 with a line per
+  reason; a root it cannot read is a refusal too. Ring 1 runs it, and
   `src/tests/workspace-graph.sweep.test.ts` runs it over the live tree in every
   task's gates. Each refusal has a planted-tree control in
   `scripts/workspace/graph-check.test.ts`.
@@ -527,18 +595,22 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   itself by name through its own `exports`. After a manifest edit, `bun
   install` refreshes `bun.lock` and the links.
 - **The build reads core from its source and names it through two shims.** The
-  root `build` script bun-builds `src/effort/store/index.ts` and
-  `src/ports/index.ts`, two of its entries, which are one-line `export *`
+  root `build` script runs `scripts/build/bundle.ts`, which bun-builds
+  `src/rafa.ts` and six library entries with every publishable member as
+  `--external` (core is private, so it stays bundled) and fails when a
+  bundle holds a publishable member's file. Two of those entries,
+  `src/effort/store/index.ts` and `src/ports/index.ts`, are one-line `export *`
   shims of `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the
   `dist/` files the root `exports` name exist until #808 bundles core into
   the root. Its declarations come in two passes:
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps six `types`-only entries for core's
+  them. The root `exports` also keeps eight `types`-only entries for core's
   files (`./core/config`, `./core/config/config-schema`,
-  `./core/config/sections`, `./ports/log-level`, `./report/parse` and
-  `./store/check-rows`), which #808 retires.
+  `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
+  `./ports/log-level`, `./report/parse` and `./store/check-rows`), which
+  #808 retires.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a

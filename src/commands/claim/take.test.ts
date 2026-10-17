@@ -114,23 +114,29 @@ function remoteTip(world: World, branch: string = BRANCH): string | null {
     : null;
 }
 
-/** Pushes `store`'s claim on `branch` from `git`, answering the claim commit. */
-function claimBranch(git: GitRunner, store: string, branch: string = BRANCH): string {
+/** Pushes `store`'s claim on `branch`, a branch of `template`, from `git`, answering the claim commit. */
+function claimBranch(git: GitRunner, store: string, branch: string = BRANCH, template?: string): string {
   const made = makeOwnershipCommit(git, 'main', { action: 'claim', issue: ISSUE, store });
   if (!made.ok) throw new Error(made.reason);
-  const pushed = pushNewClaimBranch(git, made.sha, branch);
+  const pushed = pushNewClaimBranch(git, made.sha, branch, template);
   if (pushed.outcome !== 'pushed') throw new Error(`claim push: ${pushed.outcome}`);
   return made.sha;
 }
 
-/** Pushes one more ownership commit on the remote tip of `branch` from `git`. */
-function pushRecord(world: World, git: GitRunner, record: Parameters<typeof makeOwnershipCommit>[2], branch: string = BRANCH): string {
+/** Pushes one more ownership commit on the remote tip of `branch`, a branch of `template`, from `git`. */
+function pushRecord(
+  world: World,
+  git: GitRunner,
+  record: Parameters<typeof makeOwnershipCommit>[2],
+  branch: string = BRANCH,
+  template?: string,
+): string {
   must(git, ['fetch', '--quiet', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`]);
   const tip = remoteTip(world, branch);
   if (tip === null) throw new Error(`no ${branch} on the remote`);
   const made = makeOwnershipCommit(git, tip, record);
   if (!made.ok) throw new Error(made.reason);
-  const pushed = pushOwnershipCommit(git, made.sha, branch, tip);
+  const pushed = pushOwnershipCommit(git, made.sha, branch, tip, template);
   if (pushed.outcome !== 'pushed') throw new Error(`record push: ${pushed.outcome}`);
   return made.sha;
 }
@@ -488,6 +494,43 @@ describe('rafa claim take refuses', () => {
       expect(remoteTip(world)).toBe(claimed);
     }
     expect(storeReads).toBe(0);
+  });
+});
+
+describe('rafa claim take, under the naming.branch template', () => {
+  const TEMPLATE = 'work/{stub}';
+  const WORK_BRANCH = 'work/rafa-7-x';
+
+  /** A world whose remote holds a claim on `work/rafa-7-x` that store A released. */
+  function releasedWorld(name: string): { readonly world: World; readonly released: string } {
+    const world = plantWorld(name);
+    claimBranch(world.a, STORE_A, WORK_BRANCH, TEMPLATE);
+    const released = pushRecord(world, world.a, { action: 'release', issue: ISSUE, store: STORE_A }, WORK_BRANCH, TEMPLATE);
+    return { world, released };
+  }
+
+  it('takes over a released claim on work/rafa-7-x under work/{stub}, pushing the take commit there', async () => {
+    const { world, released } = releasedWorld('template');
+
+    const run = await take(world, ['7'], seamsOfB(world, { branchTemplate: TEMPLATE }));
+
+    expect(run.exitCode).toBe(0);
+    const tip = remoteTip(world, WORK_BRANCH);
+    expect(tip).not.toBe(released);
+    expect(must(world.origin, ['rev-parse', `${tip ?? ''}^`])).toBe(released);
+    expect(tipRecord(world, WORK_BRANCH)).toEqual({ kind: 'ownership', record: { action: 'take', issue: ISSUE, store: STORE_B } });
+    expect(remoteTip(world)).toBeNull();
+    expect(run.stdout).toContain(`Took over the claim on #7 on ${WORK_BRANCH} (released by store ${STORE_A}): take commit ${tip ?? ''} pushed to origin`);
+  });
+
+  it('control: with the template left out the same remote is refused with no branch found', async () => {
+    const { world, released } = releasedWorld('template-control');
+
+    const run = await take(world, ['7'], seamsOfB(world));
+
+    expect(run.exitCode).toBe(1);
+    expect(`${run.stdout}${run.stderr}`).toContain('origin has no feat/rafa-7-<slug> branch, so #7 carries no claim');
+    expect(remoteTip(world, WORK_BRANCH)).toBe(released);
   });
 });
 

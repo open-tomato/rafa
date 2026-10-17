@@ -1,5 +1,5 @@
 /**
- * The `release` feature: the `release` subject and its three commands,
+ * The `release` feature: the `release` subject and its seven commands,
  * each made by `lazyCommand` over its declaration in `declarations.ts`
  * and a dynamic import of its module.
  *
@@ -20,16 +20,20 @@ import type { CommandFeature } from '@open-tomato/rafa/core/command';
 import { lazyCommand } from '@open-tomato/rafa/core/command';
 
 import {
+  RELEASE_FRAGMENT_DECLARATION,
+  RELEASE_LIST_DECLARATION,
+  RELEASE_PUBLISH_DECLARATION,
   RELEASE_SETTLE_DECLARATION,
   RELEASE_STATUS_DECLARATION,
   RELEASE_SUBJECT,
   RELEASE_TAG_DECLARATION,
+  RELEASE_WORKFLOWS_DECLARATION,
 } from './declarations.js';
 
 /** The feature's name, which a load failure of one of its commands names. */
 const FEATURE_NAME = 'release';
 
-/** The `release` feature: the `release` subject and its three lazy commands, in roster order. */
+/** The `release` feature: the `release` subject and its seven lazy commands, in roster order. */
 export const RELEASE_FEATURE: CommandFeature = Object.freeze({
   name: FEATURE_NAME,
   subjects: Object.freeze([RELEASE_SUBJECT]),
@@ -37,5 +41,9 @@ export const RELEASE_FEATURE: CommandFeature = Object.freeze({
     lazyCommand(RELEASE_STATUS_DECLARATION, () => import('./status.js'), FEATURE_NAME),
     lazyCommand(RELEASE_SETTLE_DECLARATION, () => import('./settle.js'), FEATURE_NAME),
     lazyCommand(RELEASE_TAG_DECLARATION, () => import('./tag.js'), FEATURE_NAME),
+    lazyCommand(RELEASE_PUBLISH_DECLARATION, () => import('./publish.js'), FEATURE_NAME),
+    lazyCommand(RELEASE_WORKFLOWS_DECLARATION, () => import('./workflows.js'), FEATURE_NAME),
+    lazyCommand(RELEASE_FRAGMENT_DECLARATION, () => import('./fragment.js'), FEATURE_NAME),
+    lazyCommand(RELEASE_LIST_DECLARATION, () => import('./list.js'), FEATURE_NAME),
   ]),
 });

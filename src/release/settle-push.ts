@@ -119,7 +119,8 @@ import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
-import { buildSettle, releaseCommitSubject } from './settle.js';
+import { releaseCommitSubject } from './release-move.js';
+import { buildSettle, settleMoves } from './settle.js';
 
 /** How a settle ends for the shell: 0 settled or nothing to do, 1 not. */
 export type SettleExitCode = 0 | 1;
@@ -318,7 +319,7 @@ function superseded(
   base: string,
   attempts: SettlePushAttempts,
 ): SettleSuperseded {
-  const first = build.deleted[0];
+  const first = build.deleted.flatMap((unit) => unit.paths)[0];
   const winner = first === undefined
     ? null
     : deletedBy(worktree.git, base, first);
@@ -355,7 +356,7 @@ function finalPush(
   attempts: SettlePushAttempts,
   pushed: PushReading,
 ): SettlePushOutcome {
-  const subject = releaseCommitSubject(build.version);
+  const subject = releaseCommitSubject(settleMoves(build));
   const target = `${worktree.remote} ${worktree.branch}`;
   if (pushed.kind === 'pushed') return { outcome: 'pushed', exitCode: 0, attempts, build };
   if (pushed.kind === 'rule') return failed('rule', build, attempts, ruleSentence(target, subject, pushed.rule, configFile));
@@ -402,7 +403,7 @@ export function settleByPush(worktree: SettleWorktree, settings: SettleSettings,
 
   const refetched = refetchBase(worktree);
   if ('problem' in refetched) return failed('unpushed', build, 1, refetched.problem);
-  const present = stillPresent(worktree.git, refetched.base, build.deleted);
+  const present = stillPresent(worktree.git, refetched.base, build.deleted.flatMap((unit) => unit.paths));
   if ('problem' in present) return failed('unpushed', build, 1, present.problem);
   if (present.present.length === 0) return superseded(worktree, build, refetched.base, 1);
 

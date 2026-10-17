@@ -10,7 +10,7 @@
  * | Finding | When |
  * |---|---|
  * | `ticked-labelled` | a checklist line is ticked while its issue still carries `rafa:in-development` or `rafa:claimed` |
- * | `label-without-branch` | an issue carries a stage label and no `feat/rafa-<n>-*` branch names it |
+ * | `label-without-branch` | an issue carries a stage label and no claim branch names it; it names the shape it looked for, `rafa-<n>-*` under the configured template (`feat/rafa-30-*` by default) |
  *
  * A ticked line is done (`./labels.ts` takes both stage labels off when
  * the pull request merges through `rafa pr merge`), so a stage label left
@@ -38,7 +38,9 @@
  * Every ref the branch scan answered (`scanClaimBranches`,
  * `src/board/roadmap.ts`): this checkout's branches and remote-tracking
  * refs, and the remote's heads. A ref counts when `claimBranchOfRef`
- * (`src/board/roadmap-claims.ts`) reads a claim branch in it, so a branch
+ * (`src/board/roadmap-claims.ts`) reads a claim branch in it under the
+ * scan's own template (`BranchScan.branchTemplate`): the `naming.branch`
+ * template with the stub, `feat/rafa-<n>-<slug>` by default. So a branch
  * held only by this checkout — a plan written with no network, its claim
  * commit waiting to be pushed — is a branch, and no finding. No claim
  * commit is read: a branch whose claim was released is still a branch.
@@ -60,7 +62,7 @@
 import type { BoardIssue, BoardIssueState, BoardListing } from '../board/roadmap-board.js';
 import type { BranchScan } from '../board/roadmap.js';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_BRANCH_TEMPLATE, branchFromTemplate, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { isEpicIssue } from '../board/epic-walk.js';
 import { claimBranchOfRef } from '../board/roadmap-claims.js';
@@ -94,6 +96,12 @@ export interface LabelWithoutBranchDrift {
   readonly state: BoardIssueState;
   /** The stage labels the issue carries, in {@link STAGE_LABELS} order. */
   readonly labels: readonly string[];
+  /**
+   * The shape of the claim branch the issue would have under the scan's
+   * template, `rafa-<n>-*` in place of the stub: `feat/rafa-30-*` by
+   * default, `work/rafa-30-*` under `work/{stub}`.
+   */
+  readonly branch: string;
 }
 
 /** One disagreement the check found; see the module note. */
@@ -106,8 +114,8 @@ export interface DriftReport {
   readonly notices: readonly string[];
 }
 
-/** The branch refs the check reads, and what the scan could not read. */
-export type DriftBranches = Pick<BranchScan, 'refs' | 'problems'>;
+/** The branch refs the check reads, the template they were scanned under, and what the scan could not read. */
+export type DriftBranches = Pick<BranchScan, 'refs' | 'problems' | 'branchTemplate'>;
 
 /** What {@link findDrift} compares. */
 export interface DriftInput {
@@ -178,13 +186,13 @@ function tickedDrift(
   return { findings, notices };
 }
 
-/** The issues `refs` name a claim branch for. */
-function branchIssues(refs: readonly string[]): ReadonlySet<number> {
+/** The issues `refs` name a claim branch for under `template`, the default when left out. */
+function branchIssues(refs: readonly string[], template: string = DEFAULT_BRANCH_TEMPLATE): ReadonlySet<number> {
   const issues = refs
-    .map(claimBranchOfRef)
+    .map((ref) => claimBranchOfRef(ref, template))
     .map((branch) => branch === null
       ? null
-      : claimBranchIssue(branch))
+      : claimBranchIssue(branch, template))
     .filter((issue) => issue !== null);
   return new Set(issues);
 }
@@ -206,7 +214,8 @@ function branchlessDrift(
     const skipped = 'so no stage label was reported as having no claim branch';
     return { findings: [], notices: scan.problems.map((problem) => `${problem}; ${skipped}`) };
   }
-  const named = branchIssues(scan.refs);
+  const template = scan.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const named = branchIssues(scan.refs, template);
   const findings = labelled
     .filter((issue) => !named.has(issue.number))
     .sort((left, right) => left.number - right.number)
@@ -215,6 +224,7 @@ function branchlessDrift(
       issue: issue.number,
       state: issue.state,
       labels: Object.freeze(stageLabelsOf(issue.labels)),
+      branch: branchFromTemplate(template, `rafa-${String(issue.number)}-*`),
     }));
   return { findings, notices: [] };
 }
@@ -254,7 +264,7 @@ export function driftSentence(finding: DriftFinding): string {
   const state = finding.state.toLowerCase();
   return finding.kind === 'ticked-labelled'
     ? `${issue} is ticked on #${String(finding.checklist)} (line ${String(finding.lineNumber)}) but still labelled ${labels} (${state})`
-    : `${issue} is labelled ${labels} (${state}) but no feat/rafa-${String(finding.issue)}-* claim branch names it`;
+    : `${issue} is labelled ${labels} (${state}) but no ${finding.branch} claim branch names it`;
 }
 
 /** The report as lines to print: each finding, then each notice, every one prefixed. Empty when there is nothing to say. */

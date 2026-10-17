@@ -160,6 +160,8 @@ export interface SpecRouteOptions {
   readonly relationships?: BoardRelationshipMode;
   /** Issues a `--next` walk passes over, each with the branch whose claim was refused (`./claim-route.ts`). */
   readonly passOver?: ReadonlyMap<number, string>;
+  /** `naming.branch` as config resolved it, which a `--next` walk reads a claim branch under; the default, `feat/{stub}`, when left out. */
+  readonly branchTemplate?: string;
   /** The keys the project refresh reads, so the gate's and the offer's label swaps refresh the issue; none sent when left out. */
   readonly projectConfig?: RefreshConfig;
 }
@@ -225,6 +227,9 @@ export async function resolveCreateSpec(
     ...options.passOver === undefined
       ? {}
       : { passOver: options.passOver },
+    ...options.branchTemplate === undefined
+      ? {}
+      : { branchTemplate: options.branchTemplate },
     ...options.projectConfig === undefined
       ? {}
       : { projectConfig: options.projectConfig },

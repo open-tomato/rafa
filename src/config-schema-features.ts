@@ -6,7 +6,7 @@
  * below adds {@link FeaturesSettings} to `RafaConfig`.
  * {@link FeaturesShape} holds the keys a file writes, which
  * `src/config/shape.ts` composes into `ConfigShape`, the nested file
- * shape. `config-registry.ts` registers the section thirteenth in
+ * shape. `config-registry.ts` registers the section fourteenth in
  * `CONFIG_SECTIONS`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the
  * objects below last, after the `tests` section.
  *

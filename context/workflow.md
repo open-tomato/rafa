@@ -450,6 +450,31 @@ existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**The claim readers match the `naming.branch` template and no other.** The
+claim commands (`rafa claim take`, `hand` and `accept` beside `release`),
+`rafa status`, `rafa next`, `rafa plan create --next`, the roadmap tables and
+the epic commands' claim readings, the drift report's line and the Roadmap
+issue `rafa init` opens each read the configured template, `feat/{stub}` by
+default, and never the default beside it: a branch under another template is
+no claim here. The lightest shape is a line in `.rafa/config.yaml`:
+
+```yaml
+naming:
+  branch: work/{stub}
+```
+
+The suffix shape is `{stub}-wip`, which names the branch for `rafa-49`
+`rafa-49-wip`.
+
+**`lost/<stub>` is fixed whatever the template.** Rafa makes that branch
+itself, and no loop creates it, so no template reaches it.
+
+**A branch made under an earlier template is no claim under the new one.**
+Changing `naming.branch` while claims are held is a move the person makes:
+they rename or re-cut the branches, and the readers carry none over. Reading
+both templates was rejected, because another layout's `feat/rafa-*` would then
+look held here.
+
 **On a detached HEAD, `--create-branch` cuts the branch from the base, and the
 refusal without it names the flag.** Without `--create-branch` the run is
 refused before its first task: the refusal says no branch is checked out,
@@ -488,9 +513,10 @@ when it names none), not scratch/notes`. A run started on the base prints
 nothing, and a run started on a detached HEAD says `not a detached HEAD`.
 
 **An existing branch under `--as-worktree` catches up with its base when it
-holds only claims.** `rafa plan create` claims a plan by pushing `feat/<stub>`
-at the base's tip, so a run started later finds a branch cut from a base that
-has moved since. When `--as-worktree` takes a branch that already exists
+holds only claims.** `rafa plan create` claims a plan by pushing its branch,
+the `naming.branch` template with the stub (`feat/<stub>` by default), at the
+base's tip, so a run started later finds a branch cut from a base that has
+moved since. When `--as-worktree` takes a branch that already exists
 (local, remote-only, or held by the worktree an earlier start left), it
 fetches `origin/<base>` (the base, read as above, never the branch) and reads
 the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding

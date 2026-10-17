@@ -132,6 +132,8 @@ const ISSUES = parseBoardListing(JSON.stringify(LISTING), 'the planted listing')
 
 /** How the planted `gh` answers. */
 interface Planted {
+  /** The listing `gh issue list` answers, and the bodies it holds; {@link LISTING} when left out. */
+  readonly listing?: readonly object[];
   readonly failListing?: boolean;
   /** Issues whose close fails. */
   readonly failClose?: readonly number[];
@@ -153,7 +155,8 @@ function issueOfPath(path: string): number {
 function plantedGh(planted: Planted = {}): PlantedGh {
   const ok = (stdout: string): GhResult => ({ ok: true, stdout, stderr: '' });
   const failed = (stderr: string): GhResult => ({ ok: false, stdout: '', stderr });
-  const bodies = new Map<number, string>(ISSUES.map((issue) => [issue.number, issue.body]));
+  const listing = planted.listing ?? LISTING;
+  const bodies = new Map<number, string>(parseBoardListing(JSON.stringify(listing), 'the planted listing').map((issue) => [issue.number, issue.body]));
   const calls: (readonly string[])[] = [];
   const answer = (args: readonly string[]): GhResult => {
     const [noun, verb = '', third = ''] = args;
@@ -161,7 +164,7 @@ function plantedGh(planted: Planted = {}): PlantedGh {
     if (noun === 'issue' && verb === 'list' && words.includes('--state all')) {
       return planted.failListing === true
         ? failed('error connecting to api.github.com')
-        : ok(JSON.stringify(LISTING));
+        : ok(JSON.stringify(listing));
     }
     if (noun === 'pr' && verb === 'list' && words.includes('--state open')) return ok('[]');
     if (noun === 'issue' && verb === 'edit') return ok('');
@@ -187,12 +190,12 @@ function plantedGh(planted: Planted = {}): PlantedGh {
   return { gh, calls, bodies };
 }
 
-/** A `git` holding no branch of any dependent, recording every call. */
-function plantedGit(): { git: GitRunner; calls: string[][] } {
+/** A `git` holding `local` refs and no pushed one, by default no branch of any dependent, recording every call. */
+function plantedGit(local: readonly string[] = ['refs/heads/main']): { git: GitRunner; calls: string[][] } {
   const calls: string[][] = [];
   const git: GitRunner = (args) => {
     calls.push([...args]);
-    if (args[0] === 'for-each-ref') return { ok: true, stdout: 'refs/heads/main', stderr: '' };
+    if (args[0] === 'for-each-ref') return { ok: true, stdout: local.join('\n'), stderr: '' };
     if (args[0] === 'ls-remote') return { ok: true, stdout: '', stderr: '' };
     return { ok: false, stdout: '', stderr: `unplanted: git ${args.join(' ')}` } satisfies GitResult;
   };
@@ -222,6 +225,8 @@ function scriptedPrompter(answers: readonly (string | null)[]): { open: () => Pr
 /** What one case runs with. */
 interface CaseSetup {
   readonly planted?: Planted;
+  /** The refs the planted `git` holds in this checkout; `refs/heads/main` alone when left out. */
+  readonly refs?: readonly string[];
   /** The answers typed, or null for no terminal. */
   readonly answers?: readonly (string | null)[] | null;
   /** The project's config; {@link LOCAL_CONFIG} when left out. */
@@ -241,7 +246,7 @@ function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
 /** Dispatches `rafa epic cancel <words>` over a planted `gh`, `git`, clock and terminal. */
 async function run(words: readonly string[], setup: CaseSetup = {}) {
   const planted = plantedGh(setup.planted);
-  const git = plantedGit();
+  const git = plantedGit(setup.refs);
   const answers = setup.answers ?? null;
   const prompter = scriptedPrompter(answers ?? []);
   const seams: EpicCancelSeams = {
@@ -633,5 +638,46 @@ describe('rafa epic cancel, and the project', () => {
     expect([unasked.exitCode, ended.exitCode]).toEqual([0, 0]);
     expect(writesOf([...unasked.calls, ...ended.calls])).toEqual([]);
     expect(recorded.calls()).toEqual([]);
+  });
+});
+
+describe('rafa epic cancel under the configured branch template', () => {
+  /** Epic #30 with open member #31, which #12 of epic #50 waits on; #12 moves to epic #40. */
+  const WAITING_12: readonly object[] = [
+    raw(30, ['type:epic', 'epic:core', 'horizon:now']),
+    raw(31, ['epic:core']),
+    raw(40, ['type:epic', 'epic:auth', 'horizon:now'], { body: '## Specs\n\n' }),
+    raw(50, ['type:epic', 'epic:billing', 'horizon:next'], { body: '## Specs\n\n- [ ] #12 login\n' }),
+    raw(12, ['epic:billing'], { body: 'Blocked by: #31\n' }),
+  ];
+  /** The move the answers make. */
+  const MOVE_12: MembershipChange = { kind: 'move', issue: 12, from: 50, to: 40 };
+
+  /** Cancels epic #30 under `config`, moving #12 to epic #40, its only branch `work/rafa-12-x`. */
+  async function cancelOverWorkBranch(config: string) {
+    return run(['30'], {
+      planted: { listing: WAITING_12 },
+      refs: ['refs/heads/main', 'refs/heads/work/rafa-12-x'],
+      answers: ['m', '40'],
+      config,
+    });
+  }
+
+  it('names work/rafa-12-x in the move comment on #12 under naming.branch: work/{stub}', async () => {
+    const result = await cancelOverWorkBranch(`${LOCAL_CONFIG}naming:\n  branch: work/{stub}\n`);
+    const work = { branches: ['work/rafa-12-x'], pullRequests: [] };
+
+    expect(result.exitCode).toBe(0);
+    expect(writesOf(result.calls)).toContainEqual(commentCall(12, renderMoveComment(MOVE_12, cancelMoveReason(30), work)));
+  });
+
+  it('names no branch in the same comment with naming.branch left out, the control for the case above', async () => {
+    const result = await cancelOverWorkBranch(LOCAL_CONFIG);
+    const work = { branches: [], pullRequests: [] };
+
+    expect(result.exitCode).toBe(0);
+    // The scan read the same refs, so the empty branch list is the template's doing alone.
+    expect(result.gitCalls.map((call) => call[0])).toEqual(['for-each-ref', 'ls-remote']);
+    expect(writesOf(result.calls)).toContainEqual(commentCall(12, renderMoveComment(MOVE_12, cancelMoveReason(30), work)));
   });
 });

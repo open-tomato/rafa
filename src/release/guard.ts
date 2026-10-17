@@ -83,6 +83,28 @@
  * edits is the branch's, folded once in the branch's place, as the
  * merge would leave one file at that path.
  *
+ * The fold is one unit's, as settle folds each unit apart: the unit of
+ * the branch fragment in the forecast's last place (its `package`; null,
+ * the root, when that is null or the branch carries none). Only the
+ * waiting fragments and the branch's other fragments whose `package`
+ * equals that unit's are folded, as `./branch-forecast.ts` does for the
+ * waiting ones: a package's fragment, waiting on the base or carried by
+ * the branch beside a root one, does not move the root's forecast, nor a
+ * root fragment a package's, and one left out this way is not a problem
+ * line.
+ *
+ * The base version is the unit's at the base commit: the root's from
+ * `release.versionFile`, asking nothing of the workspace, and a
+ * package's from its own manifest, the member
+ * `readWorkspacePackagesAt` (`./workspace-packages.ts`) answers by that
+ * name, as settle reads it. When the version cannot be read there is no
+ * forecast and one problem line saying why, ending `so no forecast was
+ * folded`: the root's version file declares none; the workspace could
+ * not be read; it holds no package by the name; the member is private;
+ * or its manifest declares no version. `BranchForecast.baseVersion` is
+ * the version the unit folded from, so the forecast line names the
+ * package's for a package slot.
+ *
  * ## Both sides, and the fix
  *
  * A `stale` or `collision` answer names the branch with its pull
@@ -134,6 +156,7 @@ import { forecastLine } from './branch-forecast.js';
 import { forecastRelease } from './forecast.js';
 import { directoryPrefix, readFragmentTree } from './fragment-tree.js';
 import { highestChangeLevel, RELEASE_LEVEL_RANK } from './level.js';
+import { packageBaseVersionAt } from './package-base-version.js';
 import { readReceipt } from './receipt.js';
 import { changelogVersions, compareVersions } from './status-readings.js';
 import { releaseStrategyFor } from './strategy.js';
@@ -487,39 +510,68 @@ function nameVerdict(git: GitRunner, base: string, settings: SettleSettings, jud
   return { ...judgement, base: { ...judgement.base, commit } };
 }
 
-/** The fold run dry over the base and the branch's fragments; see the module note. */
-function dryFold(
-  git: GitRunner,
-  input: GuardInput,
-  base: { readonly ref: string; readonly commit: string; readonly version: string | null },
-  branch: readonly FoldFragment[],
-): { readonly forecast: BranchForecast | null; readonly problems: readonly string[] } {
-  if (base.version === null) {
-    return { forecast: null, problems: [`${base.ref} declares no version in ${input.settings.releaseVersionFile}, so no forecast was folded`] };
-  }
-  const listed = readFragmentTree(git, base.commit, input.settings.releaseFragments);
-  if (!listed.ok) return { forecast: { ok: false, ref: base.ref, problem: listed.problem, problems: [] }, problems: [] };
-  const problems: string[] = [];
-  const waiting: FoldFragment[] = [];
-  const own = new Set(branch.map((each) => each.id));
-  for (const each of listed.fragments) {
-    if (own.has(each.id)) continue;
-    if (each.reading.ok) waiting.push({ id: each.id, fragment: each.reading.fragment, addedOn: each.addedOn });
-    else problems.push(`${base.ref}'s ${each.path} was left out of the forecast: ${each.reading.sentence}`);
-  }
-
+/** The branch fragment in the forecast's last place, and the others; see the module note. */
+function slotOf(branch: readonly FoldFragment[]): { readonly slot: FoldFragment | null; readonly others: readonly FoldFragment[] } {
   const shipping = branch
     .map((each, index) => (each.fragment.level === 'none'
       ? -1
       : index))
     .filter((index) => index !== -1);
   const last = shipping.at(-1) ?? branch.length - 1;
-  const slot = branch[last] ?? null;
-  const before = branch.filter((_, index) => index !== last);
+  return { slot: branch[last] ?? null, others: branch.filter((_, index) => index !== last) };
+}
+
+/**
+ * The version the slot's unit declares at the base: `release.versionFile`'s
+ * for the root (`rootVersion`, already read), the member manifest's for a
+ * package, read through {@link packageBaseVersionAt}; or the problem
+ * line saying why no forecast was folded.
+ */
+function slotBaseVersion(
+  git: GitRunner,
+  input: GuardInput,
+  base: { readonly ref: string; readonly commit: string; readonly rootVersion: string | null },
+  pkg: string | null,
+): { readonly version: string } | { readonly problem: string } {
+  const unfolded = 'so no forecast was folded';
+  if (pkg === null) {
+    return base.rootVersion === null
+      ? { problem: `${base.ref} declares no version in ${input.settings.releaseVersionFile}, ${unfolded}` }
+      : { version: base.rootVersion };
+  }
+  return packageBaseVersionAt({ git, base, package: pkg });
+}
+
+/** The fold run dry over the base and the branch's fragments; see the module note. */
+function dryFold(
+  git: GitRunner,
+  input: GuardInput,
+  base: { readonly ref: string; readonly commit: string; readonly rootVersion: string | null },
+  branch: readonly FoldFragment[],
+): { readonly forecast: BranchForecast | null; readonly problems: readonly string[] } {
+  const { slot, others } = slotOf(branch);
+  const pkg = slot?.fragment.package ?? null;
+  const baseVersion = slotBaseVersion(git, input, base, pkg);
+  if ('problem' in baseVersion) return { forecast: null, problems: [baseVersion.problem] };
+  const listed = readFragmentTree(git, base.commit, input.settings.releaseFragments);
+  if (!listed.ok) return { forecast: { ok: false, ref: base.ref, problem: listed.problem, problems: [] }, problems: [] };
+  const before = others.filter((each) => each.fragment.package === pkg);
+
+  const problems: string[] = [];
+  const waiting: FoldFragment[] = [];
+  const own = new Set(branch.map((each) => each.id));
+  for (const each of listed.fragments) {
+    if (own.has(each.id)) continue;
+    if (!each.reading.ok) {
+      problems.push(`${base.ref}'s ${each.path} was left out of the forecast: ${each.reading.sentence}`);
+    } else if (each.reading.fragment.package === pkg) {
+      waiting.push({ id: each.id, fragment: each.reading.fragment, addedOn: each.addedOn });
+    }
+  }
   const strategy = releaseStrategyFor(input.settings.releaseStrategy, { heading: input.settings.releaseHeading });
-  const forecast = forecastRelease({ strategy, baseVersion: base.version, waiting: [...waiting, ...before], branch: slot });
+  const forecast = forecastRelease({ strategy, baseVersion: baseVersion.version, waiting: [...waiting, ...before], branch: slot });
   return {
-    forecast: { ok: true, ref: base.ref, baseVersion: base.version, waiting: waiting.map((each) => each.id), forecast, problems },
+    forecast: { ok: true, ref: base.ref, baseVersion: baseVersion.version, waiting: waiting.map((each) => each.id), forecast, problems },
     problems,
   };
 }
@@ -593,7 +645,7 @@ export function readGuard(input: GuardInput): GuardReading {
   };
   const verdict = nameVerdict(git, baseCommit, settings, judgeGuard(facts));
   const base = { ref: input.base, commit: baseCommit };
-  const dry = dryFold(git, input, { ...base, version: baseSide.version }, own.folded);
+  const dry = dryFold(git, input, { ...base, rootVersion: baseSide.version }, own.folded);
   const level = localLevelReport(own.folded, input.readNotes);
   return {
     ok: true,

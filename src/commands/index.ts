@@ -32,9 +32,9 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred registered so far wrap a
- * phase 0 command (`wrap.ts`), which keeps its own parser and its own
- * writes. `describe` wraps none: it builds its document from the registry
+ * of each is its command. Four of the hundred and five registered so far
+ * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
+ * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, which read plan files
  * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
@@ -76,11 +76,20 @@
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the ten `pr` actions, which read, open, retarget, close, wait on,
  * merge and triage one repository's pull requests through the
- * PullRequests port and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
+ * `release publish`, which runs `release.publishCommand` in each tagged
+ * unit's directory through `./release/tag-units.ts`,
+ * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * `release workflows`, which reads the ladder's files through
+ * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `src/release/templates.ts`, nor
+ * `release fragment`, which writes one change fragment through
+ * `src/release/fragment.ts` and reads the waiting ones through
+ * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
@@ -113,7 +122,9 @@
  * pull request through `pr open`'s `openPull` and puts `pr.base` back
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
  * codes of `src/errors/` beside the project's `errors.codes`, nor
- * `docs plan`, which writes a plan from the open lines of the
+ * `bug recheck`, which reads each bug's `Rerun` through
+ * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
+ * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
  * stale-docs issues through `src/docs/open-lines.ts`.
  *
  * ## What is registered
@@ -254,11 +265,28 @@
  *     a scratch worktree, commits `chore: release <version>` and
  *     delivers it by `release.settle`, printing the fragments in fold
  *     order, the strategy and the version and exiting 0 or 1 by the
- *     settle's outcome, `--dry-run` writing nothing; and `release tag`,
+ *     settle's outcome, `--dry-run` writing nothing; `release tag`,
  *     which puts `v<version>` on the release branch's HEAD and prints
  *     the push and publish lines rather than running them, refusing on
  *     another branch, on a tag already there, and where the two release
- *     files disagree.
+ *     files disagree; `release publish [--tag=<tag>] [--dry-run]`,
+ *     which runs `release.publishCommand` in the directory of each
+ *     release unit whose tag points at HEAD, skipping a version the
+ *     registry holds and stopping at the first publish that fails;
+ *     `release workflows [--write]`, one row per workflow file of the
+ *     release ladder with the levels it serves, whether the configured
+ *     level needs it and whether it is present, missing or differs from
+ *     the shipped template, `--write` writing each needed missing one
+ *     and exiting 0 in every case; `release fragment --plan=<id>
+ *     --level=<level> --title=<text> [--note=<area>: <summary>]...
+ *     [--package=<name>]`, which writes one change fragment under
+ *     `release.fragments` for a branch with no wrap-up, named free of
+ *     the fragments waiting on `origin/<pr.base>` after a fetch, and
+ *     prints the path written; and
+ *     `release list`, one row per unit that
+ *     releases on its own, the root first and then each publishable
+ *     workspace package, with its version, the fragments waiting for it
+ *     and its newest tag, writing nothing.
  *   - `board list`, every open `type:roadmap` board, and the default
  *     board when it lacks the label, one line each: its number and
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
@@ -383,12 +411,21 @@
  *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
  *     names no `stretch/<n>` branch or there is no `report.md`. It
  *     starts no session.
- *   - `bug codes [--suggest=<text>] [--family=<family>] [--check]`: the
+ *   - `bug codes [--suggest=<text> [--no-proposals]] [--family=<family>] [--check]`: the
  *     cause codes a bug can carry, rafa's own and then the project's
  *     `errors.codes`, by family; `--suggest` ranks the closest to a
- *     cause in words, and `--check` exits 1 when two codes of one family
+ *     cause in words, the open bugs' proposed codes beside them unless
+ *     `--no-proposals`, and `--check` exits 1 when two codes of one family
  *     read alike, the two refused together (`./bug/codes.ts`). It
  *     writes nothing and starts no session.
+ *   - `bug recheck [<n>…] [--all] [--comment]`: reruns the test each
+ *     bug's `Rerun` section names, read strictly as
+ *     `bun test <file> [-t "<case>"]` and run with no shell, and judges
+ *     each bug `reproduces`, `gone`, `flaky`, `stale`, `manual` or
+ *     `skipped`; only a trusted author's bug runs, off the `local`
+ *     tracker, and `--comment` posts the verdict on `gone` and `flaky`
+ *     bugs, redacted, closing none (`./bug/recheck.ts`). Exits 0 whatever
+ *     the verdicts, and starts no session.
  *   - `docs plan`: `<plan.dir>/PLAN-rafa-<n>-doc-update.md`, titled
  *     `chore(doc-update)`, written from every open line of the open
  *     stale-docs issues, one `{agent=doc-updater}` task each, every line
@@ -439,6 +476,7 @@ import agentVendor from './agent/vendor.js';
 import { BOARD_SUBJECT } from './board/declarations.js';
 import { BOARD_FEATURE } from './board/index.js';
 import bugCodes from './bug/codes.js';
+import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
 import { CLAIM_SUBJECT } from './claim/declarations.js';
 import { RUN_FEATURE } from './claim/index.js';
@@ -519,7 +557,7 @@ const UPDATE_SUBJECT: SubjectSpec = { name: 'update', summary: 'bring this proje
 const CONFIG_SUBJECT: SubjectSpec = { name: 'config', summary: 'show every setting and where it came from; set one key in the project\'s config, keeping every comment' };
 const CI_SUBJECT: SubjectSpec = { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' };
 const STRETCH_SUBJECT: SubjectSpec = { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' };
-const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' };
+const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, check for codes that read alike, and recheck whether a bug still reproduces' };
 const DOCS_SUBJECT: SubjectSpec = { name: 'docs', summary: 'write a plan repairing the open lines of the stale-docs issues' };
 
 /** Core's own subjects, in roster order: those no bundled feature declares. */
@@ -619,6 +657,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   stretchItem,
   stretchEnd,
   bugCodes,
+  bugRecheck,
   docsPlan,
   status,
   next,

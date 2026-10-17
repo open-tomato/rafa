@@ -77,6 +77,7 @@ const FRAGMENT_TEXT = serializeFragment({
   plan: PLAN_ID,
   title: 'One command, the next step',
   level: 'minor',
+  package: null,
   notes: ['- next: a change worth a minor bump'],
 });
 

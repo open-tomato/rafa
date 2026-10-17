@@ -27,10 +27,15 @@ person's approval.
 ## Read the board
 
 ```bash
+rafa bug recheck --all
 rafa roadmap --full
 rafa issue list --type=bug --limit=200
 rafa effort report --trend
 ```
+
+`rafa bug recheck --all` reruns each open bug's test and prints one
+verdict per bug. A `gone` bug is closed by the sweep as fixed; a `flaky`
+one is grouped as a bug of its own, never read as fixed.
 
 Read the roadmap's "now" epics first: their members are where the
 project already said the work is.

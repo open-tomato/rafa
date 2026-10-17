@@ -205,6 +205,11 @@ export interface BoardStepOptions {
   readonly openPrompter: () => Prompter;
   /** Where the shipped spec template is looked for; `src/board/setup.ts`'s own when left out. */
   readonly moduleDir?: string | undefined;
+  /**
+   * The `naming.branch` template the Roadmap issue's naming paragraph
+   * builds the claim branch from; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string | undefined;
 }
 
 /** A step that did not run, carrying `warnings`. */
@@ -301,7 +306,7 @@ async function answered(
  * write: {@link setUpBoard} reports those as refused parts.
  */
 export async function runBoardStep(options: BoardStepOptions): Promise<BoardStepResult> {
-  const { wanted, provider, root, openGh, isTerminal, openPrompter, moduleDir } = options;
+  const { wanted, provider, root, openGh, isTerminal, openPrompter, moduleDir, branchTemplate } = options;
   if (wanted === false) return noRun('declined');
   if (provider !== 'gh') {
     return noRun('not-github', wanted === true
@@ -322,7 +327,7 @@ export async function runBoardStep(options: BoardStepOptions): Promise<BoardStep
     }
   }
 
-  const report = await setUpBoard({ gh, root, moduleDir });
+  const report = await setUpBoard({ gh, root, moduleDir, branchTemplate });
   return {
     status: 'ran',
     asked,

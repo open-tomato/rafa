@@ -10,8 +10,8 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `docs plan` and the ten `pr` actions
+ * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
+ * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -188,6 +188,10 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release status': ['text', 'json'],
   'release settle': ['text', 'json'],
   'release tag': ['text', 'json'],
+  'release publish': ['text', 'json'],
+  'release workflows': ['text', 'json'],
+  'release fragment': ['text', 'json'],
+  'release list': ['text', 'json'],
   'board list': ['text', 'json'],
   'board sync': ['text', 'json'],
   'claim release': ['text', 'json'],
@@ -209,6 +213,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'stretch item': ['text'],
   'stretch end': ['text'],
   'bug codes': ['text', 'json'],
+  'bug recheck': ['text', 'json'],
   'docs plan': ['text', 'json'],
 };
 
@@ -267,6 +272,10 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release status': [[], ['plan']],
   'release settle': [[], ['dry-run']],
   'release tag': [[], ['push']],
+  'release publish': [[], ['tag', 'dry-run']],
+  'release workflows': [[], ['write']],
+  'release fragment': [[], ['plan', 'level', 'title', 'note', 'package']],
+  'release list': [[], []],
   'board list': [[], []],
   'board sync': [[], ['dry-run']],
   'status': [[], []],
@@ -309,7 +318,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
-  'bug codes': [[], ['suggest', 'family', 'check']],
+  'bug codes': [[], ['suggest', 'proposals', 'family', 'check']],
+  'bug recheck': [['n'], ['all', 'comment']],
   'docs plan': [[], []],
   'self-update': [[], ['force']],
   'describe': [[], []],
@@ -428,6 +438,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
   ['stretch end --dry-run', 'stretch end', ['--dry-run'], ''],
   ['bug codes --family=git', 'bug codes', ['--family=git'], ''],
+  ['bug recheck 412 415 --comment', 'bug recheck', ['412', '415', '--comment'], ''],
   ['docs plan', 'docs plan', [], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
@@ -532,9 +543,9 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
 };
 
-/** The value a spelled English number names, a hyphenated tens word and ones word added together. */
+/** The value a spelled English number names, its words joined by a hyphen or `and` added together. */
 function numberWord(word: string): number {
-  return word.split('-').reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
+  return word.split(/-| and /).reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
 }
 
 /** The module note of `src/commands/index.ts`, read fresh so it stays honest as the roster grows. */
@@ -604,6 +615,7 @@ describe('the core roster', () => {
       'stretch item',
       'stretch end',
       'bug codes',
+      'bug recheck',
       'docs plan',
       'status',
       'next',
@@ -649,6 +661,10 @@ describe('the core roster', () => {
       'release status',
       'release settle',
       'release tag',
+      'release publish',
+      'release workflows',
+      'release fragment',
+      'release list',
     ]);
     expect(ROSTER_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
     expect(CORE_REGISTRY.commands()).toHaveLength(ROSTER_COMMANDS.length - 2);
@@ -692,7 +708,7 @@ describe('the core roster', () => {
 
 describe('the module note\'s count word', () => {
   it('names the roster at exactly the count of the commands CORE_REGISTRY holds', () => {
-    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:-[a-z]+)?) registered so far/);
+    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:(?:-| and )[a-z]+)?) registered so far/);
 
     expect(match).not.toBeNull();
     expect(numberWord(match?.[1] ?? '')).toBe(ROSTER_COMMANDS.length);
@@ -700,8 +716,8 @@ describe('the module note\'s count word', () => {
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
     expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
-    expect(numberWord('sixty-five')).toBe(CORE_COMMANDS.length);
-    expect(numberWord('sixty-five')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-six')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-six')).not.toBe(ROSTER_COMMANDS.length);
   });
 });
 
@@ -717,13 +733,13 @@ describe('createRosterRegistry', () => {
       .toEqual([0, 1, 2, 3]);
   });
 
-  it('holds the 100 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+  it('holds the 105 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
     const registry = createRosterRegistry();
 
-    expect(registry.commands({ includeHidden: true })).toHaveLength(100);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(105);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
     expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
-    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(100);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(105);
   });
 
   it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
@@ -732,7 +748,7 @@ describe('createRosterRegistry', () => {
 
     expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
     expect(PR_FEATURE.commands).toHaveLength(10);
-    expect(registry.commands({ includeHidden: true })).toHaveLength(90);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(95);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
     expect(registry.subjects().map((subject) => subject.name))
       .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));
@@ -752,6 +768,11 @@ describe('createRosterRegistry', () => {
     expect(() => createRosterRegistry({ off: ['pr', 'prs'] }))
       .toThrow('rafa: cannot build the roster: no bundled feature is named "prs"; the features are board, pr, run, release');
     expect(() => createRosterRegistry({ off: ['claim'] })).toThrow('no bundled feature is named "claim"');
+  });
+
+  it('reads a count spelled with and as its words added together', () => {
+    expect(numberWord('hundred and one')).toBe(101);
+    expect(numberWord('hundred and')).toBeNaN();
   });
 });
 

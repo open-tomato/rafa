@@ -615,6 +615,7 @@ export default async function plan(
     roadmapIssue,
     boardTrustedAuthors,
     boardRelationships,
+    namingBranch,
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
@@ -630,6 +631,7 @@ export default async function plan(
       trustedAuthors: boardTrustedAuthors,
       relationships: boardRelationships,
       passOver,
+      branchTemplate: namingBranch,
       projectConfig: config,
     }),
     prepare: async (spec) => {

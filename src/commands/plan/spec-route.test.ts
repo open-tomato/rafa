@@ -278,6 +278,24 @@ describe('the issues a --next walk passes over', () => {
   });
 });
 
+describe('the branch template a --next walk reads claims under', () => {
+  it('hands naming.branch to the resolution as given', async () => {
+    const route = recording();
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [], branchTemplate: 'work/{stub}' }, route.seams);
+
+    expect(route.asked().branchTemplate).toBe('work/{stub}');
+  });
+
+  it('leaves the key out for a run given no template, the control for the case above', async () => {
+    const route = recording();
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [] }, route.seams);
+
+    expect(Object.keys(route.asked())).not.toContain('branchTemplate');
+  });
+});
+
 describe('the --spec route through the resolution the command uses', () => {
   it('answers the spec found under the specs directory, with no issue to publish on', async () => {
     const repoRoot = plant(join(SPECS_DIR, 'my-feature.md'));

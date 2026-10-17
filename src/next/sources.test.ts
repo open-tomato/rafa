@@ -93,7 +93,7 @@
  *  - the walked-into epic never carried as dry: 25 pass and 1 fail, the
  *    dry epic on the roadmap walk.
  */
-import type { NextSources } from './readings.js';
+import type { NextRoadmapReading, NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import type { Place } from '../project/position.js';
@@ -449,6 +449,25 @@ describe('the board the roadmap rows are read through', () => {
       'for-each-ref --format=%(refname) refs/heads refs/remotes',
       'ls-remote --heads origin',
     ]);
+  });
+
+  it('reads the line\'s branch under naming.branch, and the default template reads none of it', async () => {
+    const workRef = `refs/remotes/origin/work/rafa-${String(ISSUE)}-x`;
+    const git: GitRunner = (args) => said(args[0] === 'for-each-ref'
+      ? `${workRef}\n`
+      : '');
+    const read = (branchTemplate?: string): Promise<NextRoadmapReading> => {
+      const gh = fakeGh({ issues: { [ROADMAP]: { body: ROADMAP_BODY }, [ISSUE]: {} } });
+      return (branchTemplate === undefined
+        ? ghNextBoard({ gh: gh.gh, git, configured: ROADMAP })
+        : ghNextBoard({ gh: gh.gh, git, configured: ROADMAP, branchTemplate })).next();
+    };
+
+    const templated = await read('work/{stub}');
+    const untemplated = await read();
+
+    expect([templated.line?.issue ?? null, templated.passed]).toEqual([null, 2]);
+    expect([untemplated.line?.issue ?? null, untemplated.passed]).toEqual([ISSUE, 1]);
   });
 
   it('sends no search where roadmap.issue names the issue', async () => {

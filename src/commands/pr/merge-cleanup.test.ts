@@ -245,7 +245,7 @@ describe('followUpsFor and reportFollowUps', () => {
     mkdirSync(join(at.root, '.changes'), { recursive: true });
     levels.forEach((level, index) => {
       const plan = `rafa-${String(index + 1)}`;
-      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], notes: ['- loop: a change'] };
+      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], package: null, notes: ['- loop: a change'] };
       writeFileSync(join(at.root, '.changes', `${plan}.md`), serializeFragment(fragment));
     });
     runGit(at.root, 'init', '--quiet', '--initial-branch=main');

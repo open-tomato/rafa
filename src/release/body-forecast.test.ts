@@ -27,7 +27,7 @@ function fragmentOf(id: string, level: PlanReleaseLevel): FoldFragment {
   const notes = level === 'none'
     ? []
     : [`- Area ${id}: change`];
-  return { id, addedOn: '2026-09-29', fragment: { plan: id, title: `title ${id}`, level, notes } };
+  return { id, addedOn: '2026-09-29', fragment: { plan: id, title: `title ${id}`, level, package: null, notes } };
 }
 
 /** The body the wrap-up writes for `branch` over `waiting` at `baseVersion`, under a description. */

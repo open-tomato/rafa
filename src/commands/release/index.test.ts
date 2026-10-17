@@ -20,10 +20,14 @@ import ts from 'typescript';
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
 
 import {
+  RELEASE_FRAGMENT_DECLARATION,
+  RELEASE_LIST_DECLARATION,
+  RELEASE_PUBLISH_DECLARATION,
   RELEASE_SETTLE_DECLARATION,
   RELEASE_STATUS_DECLARATION,
   RELEASE_SUBJECT,
   RELEASE_TAG_DECLARATION,
+  RELEASE_WORKFLOWS_DECLARATION,
 } from './declarations.js';
 
 import { RELEASE_FEATURE } from './index.js';
@@ -35,6 +39,10 @@ const DECLARED: readonly (readonly [string, CommandDeclaration])[] = [
   ['./status.js', RELEASE_STATUS_DECLARATION],
   ['./settle.js', RELEASE_SETTLE_DECLARATION],
   ['./tag.js', RELEASE_TAG_DECLARATION],
+  ['./publish.js', RELEASE_PUBLISH_DECLARATION],
+  ['./workflows.js', RELEASE_WORKFLOWS_DECLARATION],
+  ['./fragment.js', RELEASE_FRAGMENT_DECLARATION],
+  ['./list.js', RELEASE_LIST_DECLARATION],
 ];
 
 /** The same pairs as `index.ts` must spell them: each module beside the name of its declaration. */
@@ -42,6 +50,10 @@ const LOADED_AS: readonly (readonly [string, string])[] = [
   ['./status.js', 'RELEASE_STATUS_DECLARATION'],
   ['./settle.js', 'RELEASE_SETTLE_DECLARATION'],
   ['./tag.js', 'RELEASE_TAG_DECLARATION'],
+  ['./publish.js', 'RELEASE_PUBLISH_DECLARATION'],
+  ['./workflows.js', 'RELEASE_WORKFLOWS_DECLARATION'],
+  ['./fragment.js', 'RELEASE_FRAGMENT_DECLARATION'],
+  ['./list.js', 'RELEASE_LIST_DECLARATION'],
 ];
 
 /**
@@ -108,6 +120,10 @@ describe('RELEASE_FEATURE', () => {
       'release status',
       'release settle',
       'release tag',
+      'release publish',
+      'release workflows',
+      'release fragment',
+      'release list',
     ]);
   });
 
