@@ -6,10 +6,12 @@
  * in full, since the help of six commands prints it and
  * `src/cli/help.test.ts` freezes that help; its freeze; and that its
  * name is the {@link HINT_FLAG} the hint reads (`src/next/hint.ts`).
+ * The CI default is held at 20, the minutes the help of `loop start`
+ * and `pr wait` prints.
  */
 import { describe, expect, it } from 'bun:test';
 
-import { HINT_FLAG, HINT_FLAG_SPEC } from './shared-flags.js';
+import { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG, HINT_FLAG_SPEC } from './shared-flags.js';
 
 describe('the hint flag', () => {
   it('is named hint', () => {
@@ -32,5 +34,11 @@ describe('the hint flag', () => {
 
   it('carries the name the hint reads', () => {
     expect(HINT_FLAG_SPEC.name).toBe(HINT_FLAG);
+  });
+});
+
+describe('the CI default', () => {
+  it('is twenty minutes', () => {
+    expect(DEFAULT_CI_TIMEOUT_MIN).toBe(20);
   });
 });

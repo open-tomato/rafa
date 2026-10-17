@@ -192,7 +192,7 @@ import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 import type { SettleSettings } from '../../release/settle.js';
 import type { Output } from '@open-tomato/rafa/ports';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { waitForChecks } from '../../pr/index.js';
@@ -209,7 +209,7 @@ import {
   resolveWorktreePath,
   worktreeAt,
 } from '../../pr/worktree.js';
-import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
+import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
 import { requireTrustedConfig } from './triage-config-trust.js';

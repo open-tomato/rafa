@@ -28,7 +28,9 @@
  *     flags, recorded by the dispatcher and read by the spend guard;
  *   - `shared-flags.ts`: the flags commands of several features
  *     declare, spelled once: `HINT_FLAG` and `HINT_FLAG_SPEC`, the
- *     `--no-hint` flag of the six commands that end with a hint;
+ *     `--no-hint` flag of the six commands that end with a hint, and
+ *     `DEFAULT_CI_TIMEOUT_MIN`, the default of the loop's
+ *     `--ci-timeout` and of `pr wait`'s `--timeout`;
  *   - `spends.ts`: a command's `spends` declaration, `CommandSpend`, its
  *     shape check and the mark help ends a spender's roster line with;
  *   - `types.ts`: the contracts copied from open-tomato's `cli-core`,
@@ -157,7 +159,7 @@ export {
   runningCommand,
   setRunningCommand,
 } from './running.js';
-export { HINT_FLAG, HINT_FLAG_SPEC } from './shared-flags.js';
+export { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG, HINT_FLAG_SPEC } from './shared-flags.js';
 export {
   SPENDS_GLYPH,
   SPENDS_WHEN,

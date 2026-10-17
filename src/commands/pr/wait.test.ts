@@ -74,13 +74,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
+
 import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
-import { DEFAULT_WAIT_TIMEOUT_MIN } from './declarations.js';
 import { PR_USAGE } from './pr-context.js';
 import {
   createPrWaitCommand,
@@ -412,8 +413,8 @@ describe('the exit code each verdict carries', () => {
 
 describe('the deadline the line asks for', () => {
   it('waits the loop own CI deadline when no timeout is typed', () => {
-    expect(readTimeoutMinutes({}, USAGE)).toBe(DEFAULT_WAIT_TIMEOUT_MIN);
-    expect(DEFAULT_WAIT_TIMEOUT_MIN).toBe(20);
+    expect(readTimeoutMinutes({}, USAGE)).toBe(DEFAULT_CI_TIMEOUT_MIN);
+    expect(DEFAULT_CI_TIMEOUT_MIN).toBe(20);
   });
 
   it('reads the minutes a value names', () => {
@@ -618,7 +619,7 @@ describe('the poll, over an injected clock', () => {
       rows: [{ name: 'gates', state: 'SUCCESS', outcome: 'pass' }],
       elapsedMs: 0,
       polls: 1,
-      timeoutMs: DEFAULT_WAIT_TIMEOUT_MIN * 60_000,
+      timeoutMs: DEFAULT_CI_TIMEOUT_MIN * 60_000,
       conflicting: false,
       exitCode: 0,
     });

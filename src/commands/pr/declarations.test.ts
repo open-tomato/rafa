@@ -1,8 +1,8 @@
 /**
  * The `pr` declarations: `declarations.ts` imports no module under
- * `src/`, only the core entries; the value it copies from outside
- * `src/commands/` stays equal to its source; and `pr wait`, `pr merge`
- * and `pr triage` declare core's `HINT_FLAG_SPEC` itself, not a copy.
+ * `src/`, only the core entries; `pr wait`'s `--timeout` description
+ * spells core's `DEFAULT_CI_TIMEOUT_MIN`; and `pr wait`, `pr merge` and
+ * `pr triage` declare core's `HINT_FLAG_SPEC` itself, not a copy.
  *
  * The import reading takes every module specifier `ts.preProcessFile`
  * finds, `import type`, `export … from` and dynamic `import()` among
@@ -17,17 +17,15 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
-
-import { DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
+import { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
 import {
-  DEFAULT_WAIT_TIMEOUT_MIN,
   MERGE_DANGEROUS_PHRASES,
   PR_MERGE_DECLARATION,
   PR_SUBJECT,
   PR_TRIAGE_DECLARATION,
   PR_WAIT_DECLARATION,
+  WAIT_TIMEOUT_FLAG,
 } from './declarations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -100,8 +98,13 @@ describe('the values declarations.ts declares and copies', () => {
     expect(declarations.map((declaration) => declaration.flags.includes(copy))).toEqual([false, false, false]);
   });
 
-  it('defaults pr wait to the loop\'s own CI deadline', () => {
-    expect(DEFAULT_WAIT_TIMEOUT_MIN).toBe(DEFAULT_CI_TIMEOUT_MIN);
+  it('spells the loop\'s own CI deadline in pr wait\'s --timeout description', () => {
+    const timeout = PR_WAIT_DECLARATION.flags.find((flag) => flag.name === WAIT_TIMEOUT_FLAG);
+
+    expect(timeout?.description).toBe(
+      `How many minutes to wait before giving up. ${DEFAULT_CI_TIMEOUT_MIN} when it is left out.`,
+    );
+    expect(timeout?.description).not.toContain(`${DEFAULT_CI_TIMEOUT_MIN + 1} when`);
   });
 });
 

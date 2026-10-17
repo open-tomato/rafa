@@ -549,9 +549,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./spec-route.js', ['resolveCreateSpec']],
   ]],
   ['./commands/loop/start.js', [
-    ['@open-tomato/rafa/core/command', ['HINT_FLAG_SPEC']],
+    ['@open-tomato/rafa/core/command', ['DEFAULT_CI_TIMEOUT_MIN', 'HINT_FLAG_SPEC']],
     ['../../next/ending.js', ['endingWith']],
-    ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
+    ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS']],
     ['../../start/runtime.js', ['refuseMisplacedRuntime']],
     ['../../start.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],

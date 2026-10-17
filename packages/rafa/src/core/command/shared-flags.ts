@@ -11,6 +11,12 @@
  * one of the six can reach it, and each declares this value itself
  * rather than a copy its tests would have to hold equal.
  *
+ * {@link DEFAULT_CI_TIMEOUT_MIN} is here for the same reason: the
+ * loop's `--ci-timeout` (`src/commands/loop/start.ts`,
+ * `src/start/run-setup.ts`) and `pr wait`'s `--timeout`
+ * (`src/commands/pr/declarations.ts`, `src/commands/pr/wait.ts`) both
+ * default to it, and the second is spelled in a declarations file.
+ *
  * The file imports nothing by value: it names `command.ts` with
  * `import type` for {@link RafaFlagSpec}, which is erased before
  * anything loads.
@@ -32,3 +38,12 @@ export const HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
   type: 'boolean',
   default: true,
 });
+
+/**
+ * How many minutes a pull request's checks are polled before the wait
+ * gives up on them. The loop's `--ci-timeout` and `pr wait`'s
+ * `--timeout` both default to it, so one wait typed by hand and the
+ * loop's own CI gate hold a pull request to the same deadline;
+ * `pr triage --resolve` waits this long too.
+ */
+export const DEFAULT_CI_TIMEOUT_MIN: number = 20;
