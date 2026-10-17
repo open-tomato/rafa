@@ -51,6 +51,7 @@ core/command/running.d.ts
 core/command/spends.d.ts
 core/command/types.d.ts
 core/command/version.d.ts
+core/config/branch-template.d.ts
 core/config/config-items.d.ts
 core/config/config-load.d.ts
 core/config/config-origins.d.ts
