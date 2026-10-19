@@ -43,8 +43,6 @@
 import type { CapturedRun } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';

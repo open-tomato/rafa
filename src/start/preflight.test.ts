@@ -112,8 +112,6 @@ import type { TaskInfo } from '../utils/tracker.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config/sections';
 
-import '../adapter-registry.js';
-
 import {
   existsSync,
   mkdirSync,

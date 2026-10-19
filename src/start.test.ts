@@ -870,7 +870,8 @@ function plant(script: (calls: string) => string = standInScript): Scratch {
 
   mkdirSync(join(repo, '.plans'));
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
-  plantProjectConfig(repo);
+  // `checks.task` names `affected`, so the task step runs `bun test --changed`.
+  plantProjectConfig(repo, 'version: 1\nchecks:\n  task: [affected]\n');
 
   return { repo, home, calls, path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter) };
 }

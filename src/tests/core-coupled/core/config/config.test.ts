@@ -111,7 +111,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)';
+  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -209,11 +209,19 @@ const SETTINGS: readonly ConfigSetting[] = [
   'taskLessons',
   'mergeDuplicates',
   'namingBranch',
+  'templates',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsContract',
   'testsAlwaysRun',
   'testsRetakeRedAlone',
+  'checksTask',
+  'checksStage',
+  'checksLoop',
+  'checksPullRequest',
+  'checksStretch',
+  'checksReleasePullRequest',
+  'checksPublish',
   'featuresBoard',
   'featuresPr',
   'featuresRun',
@@ -322,16 +330,19 @@ const DEFAULTS: RafaConfig = {
   taskLessons: 'on',
   mergeDuplicates: 'warn',
   namingBranch: 'feat/{stub}',
-  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
-  testsIntegration: [
-    '**/*-integration.test.ts',
-    '**/*.integration.test.ts',
-    '**/*-spawned*.test.ts',
-    '**/*-cli.test.ts',
-  ],
-  testsContract: ['**/*.contract.test.ts'],
+  templates: [],
+  testsFullSuiteTriggers: [],
+  testsIntegration: [],
+  testsContract: [],
   testsAlwaysRun: ['src/**/*.sweep.test.ts'],
   testsRetakeRedAlone: true,
+  checksTask: [],
+  checksStage: [],
+  checksLoop: [],
+  checksPullRequest: [],
+  checksStretch: [],
+  checksReleasePullRequest: [],
+  checksPublish: [],
   featuresBoard: true,
   featuresPr: true,
   featuresRun: true,
@@ -490,12 +501,21 @@ const FULL = [
   '  duplicates: allow',
   'naming:',
   '  branch: "work/{stub}"',
+  'templates: [escalation]',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
-  '  integration: []',
+  '  integration: [e2e/*.flow.test.ts]',
   '  contract: [packages/*/src/*.contract.test.ts]',
   '  alwaysRun: [src/sweeps/*.test.ts]',
   '  retakeRedAlone: false',
+  'checks:',
+  '  task: [affected]',
+  '  stage: [related, integration]',
+  '  loop: [full]',
+  '  pullRequest: [unit, contract, integration]',
+  '  stretch: [related, contract, integration]',
+  '  releasePullRequest: [integration]',
+  '  publish: [full]',
   'features:',
   '  board: false',
   '  pr: false',
@@ -617,11 +637,19 @@ const FULL_VALUES: RafaConfig = {
   taskLessons: 'off',
   mergeDuplicates: 'allow',
   namingBranch: 'work/{stub}',
+  templates: ['escalation'],
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
-  testsIntegration: [],
+  testsIntegration: ['e2e/*.flow.test.ts'],
   testsContract: ['packages/*/src/*.contract.test.ts'],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
   testsRetakeRedAlone: false,
+  checksTask: ['affected'],
+  checksStage: ['related', 'integration'],
+  checksLoop: ['full'],
+  checksPullRequest: ['unit', 'contract', 'integration'],
+  checksStretch: ['related', 'contract', 'integration'],
+  checksReleasePullRequest: ['integration'],
+  checksPublish: ['full'],
   featuresBoard: false,
   featuresPr: false,
   featuresRun: false,
@@ -694,7 +722,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(16);
+    expect(lists).toHaveLength(24);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1331,6 +1359,11 @@ describe('parseConfigText', () => {
         'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
       ],
       [
+        'templates', 'templates: escalation',
+        'templates is "escalation", expected a list of template names',
+        'templates: [escalation]', 'templates', ['escalation'],
+      ],
+      [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
         'tests.fullSuiteTriggers is "package.json", expected a list of glob patterns',
         'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1354,6 +1387,41 @@ describe('parseConfigText', () => {
         'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: off',
         'tests.retakeRedAlone is "off", expected true or false',
         'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+      ],
+      [
+        'checks.task', 'checks:\n  task: [unit, unit]',
+        'checks.task is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "unit" is written twice',
+        'checks:\n  task: [affected]', 'checksTask', ['affected'],
+      ],
+      [
+        'checks.stage', 'checks:\n  stage: [lint]',
+        'checks.stage[0] is "lint", expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  stage: [related]', 'checksStage', ['related'],
+      ],
+      [
+        'checks.loop', 'checks:\n  loop: full',
+        'checks.loop is "full", expected a list of check names from: affected, related, unit, contract, integration, full',
+        'checks:\n  loop: [full]', 'checksLoop', ['full'],
+      ],
+      [
+        'checks.pullRequest', 'checks:\n  pullRequest: [7]',
+        'checks.pullRequest[0] is 7, expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  pullRequest: [unit]', 'checksPullRequest', ['unit'],
+      ],
+      [
+        'checks.stretch', 'checks:\n  stretch: { related: true }',
+        'checks.stretch is a mapping, expected a list of check names from: affected, related, unit, contract, integration, full',
+        'checks:\n  stretch: [related, contract]', 'checksStretch', ['related', 'contract'],
+      ],
+      [
+        'checks.releasePullRequest', 'checks:\n  releasePullRequest: [full, integration, full]',
+        'checks.releasePullRequest is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "full" is written twice',
+        'checks:\n  releasePullRequest: [integration]', 'checksReleasePullRequest', ['integration'],
+      ],
+      [
+        'checks.publish', 'checks:\n  publish: ["bun test"]',
+        'checks.publish[0] is "bun test", expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  publish: [full]', 'checksPublish', ['full'],
       ],
       [
         'features.board', 'features:\n  board: "false"',

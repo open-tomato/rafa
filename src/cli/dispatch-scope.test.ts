@@ -57,8 +57,6 @@ import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/c
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {

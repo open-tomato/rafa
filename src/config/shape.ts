@@ -47,6 +47,7 @@
  */
 import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
 import type { BugsShape } from '../config-schema-bugs.js';
+import type { ChecksShape } from '../config-schema-checks.js';
 import type { ErrorsShape } from '../config-schema-errors.js';
 import type { FeaturesShape } from '../config-schema-features.js';
 import type { HubShape } from '../config-schema-hub.js';
@@ -153,6 +154,7 @@ export interface DangerousShape extends ReleaseDangerousShape {
 /** The nested file shape: core's keys, and each section's; see the module note. */
 export interface ConfigShape extends
   BugsShape,
+  ChecksShape,
   ErrorsShape,
   FeaturesShape,
   HubShape,
@@ -262,4 +264,6 @@ export interface ConfigShape extends
     /** `naming.branch`: the template the branch `loop start` creates is named from, holding `{stub}` once. */
     readonly branch: string;
   };
+  /** `templates`: the config templates this file adopts, by name. */
+  readonly templates: readonly string[];
 }

@@ -1,5 +1,5 @@
 /**
- * `runTaskStep` (`./suite-step.ts`) driven over a real scratch git
+ * `runTaskStep` (`./suite-task-step.ts`) driven over a real scratch git
  * repository, proving the type step (`./type-step.ts`) end to end through
  * the runner's own task step: real git for the diff and the base
  * worktree, the real `tsc` of this repository (the scratch's
@@ -203,6 +203,10 @@ function runStep(scratch: Scratch): ReturnType<typeof runTaskStep> {
       testsIntegration: ['**/*-integration.test.ts'],
       testsAlwaysRun: [],
       testsRetakeRedAlone: false,
+      testsContract: [],
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
     },
     owns: () => Promise.resolve(null),
     seams: { appendStep: (step) => steps.push(step) },

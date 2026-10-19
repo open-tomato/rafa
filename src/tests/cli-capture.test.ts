@@ -27,8 +27,6 @@
 import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

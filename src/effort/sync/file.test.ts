@@ -24,8 +24,6 @@ import type { Device } from '../../tests/merged-stores.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

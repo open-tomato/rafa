@@ -1,6 +1,6 @@
 /**
  * `rafa loop start` spawned end to end, over a real `bun test`, proving
- * `taskStepScope`'s ranking (`../suite/scope.ts`'s module note) through
+ * `resolveChecks`' ranking (`../suite/checks.ts`'s module note) through
  * the four recorded TASK steps of one plan, each a task line demonstrating
  * one of its answers:
  *
@@ -11,23 +11,24 @@
  *      import graph reaches from it (`lib/greeting.test.ts`), never the
  *      unrelated `lib/other.test.ts` that sits beside it.
  *   2. A line with no `tests=` whose diff touches `bunfig.toml` alone runs
- *      the FULL suite: `bunfig.toml` is one of `tests.fullSuiteTriggers`'
- *      own defaults (`../config-schema-tests.ts`), a file no import graph
+ *      the FULL suite: `bunfig.toml` is one of the `tests.fullSuiteTriggers`
+ *      the `escalation` template names (`../config/templates.ts`), which
+ *      the planted config adopts, a file no import graph
  *      reaches a test through, so `--changed` could miss what it changes.
  *   3. A line declaring `{tests=full}` runs the full suite regardless of
  *      what its own diff touches (here, a new `NOTES.md` nothing imports
  *      and no trigger glob matches): `declared` outranks every other rule
- *      in `taskStepScope`'s ranking.
+ *      in `resolveChecks`' ranking.
  *   4. A line with no `tests=` whose diff touches a test file directly
  *      (`lib/other.test.ts`) still runs only `bun test --changed=<base>`,
  *      the `affected` default, and the step's summary again names exactly
  *      one file.
  *
  * The four tasks sit in one stage, its plan's only one, so its own stage
- * step never runs: `dueStages` (`./suite-step.ts`) never answers a stage
- * once no task is left open, which is true the moment the fourth task,
- * also the last task of the whole plan, commits. The pre-wrap-up step
- * stands in for it instead, as it does for any last stage
+ * step never runs: `dueStages` (`./suite-stage-ledger.ts`) never
+ * answers a stage once no task is left open, which is true the moment
+ * the fourth task, also the last task of the whole plan, commits. The
+ * pre-wrap-up step stands in for it instead, as it does for any last stage
  * (`./suite-step-no-owns-full-suite-tally-integration.test.ts`'s module
  * note says the same). Six suite runs in all — the baseline, the four
  * task steps, and the pre-wrap-up step — read back from the run record's
@@ -168,8 +169,12 @@ const BUNFIG_SOURCE = [
 /** The flags every `loop start` in this file runs with. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push costs no `gh`. */
-const CONFIG = 'pr:\n  provider: none\n';
+/**
+ * The project config: `pr.provider: none`, so the wrap-up's push costs no
+ * `gh`, and the `escalation` template, which names `bunfig.toml` among
+ * `tests.fullSuiteTriggers`.
+ */
+const CONFIG = 'templates: [escalation]\npr:\n  provider: none\n';
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {
@@ -362,7 +367,7 @@ function hasNoPathArguments(command: readonly string[]): boolean {
   return !command.some((arg) => arg.startsWith('./') || arg.startsWith('../'));
 }
 
-describe('the four answers taskStepScope ranks, over one real bun test --changed', () => {
+describe('the four answers resolveChecks ranks for a task step, over one real bun test --changed', () => {
   it('records affected, full (trigger), full (declared) and affected again, each on its own task step', () => {
     const scratch = plant();
     const run = runLoopStart(scratch);
@@ -413,7 +418,7 @@ describe('the four answers taskStepScope ranks, over one real bun test --changed
     expect(task1Step.summary).toContain('across 1 file');
 
     // 2. No tests=, a diff touching bunfig.toml alone: the full suite,
-    // since that file is one of tests.fullSuiteTriggers' own defaults and
+    // since that file is one of the escalation template's triggers and
     // no import graph reaches a test through it.
     expect(task2Step.scope).toBe('full');
     expect(hasNoChangedFlag(task2Step.command)).toBe(true);

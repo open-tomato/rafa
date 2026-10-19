@@ -15,7 +15,7 @@
  * green.
  *
  * That second task is the stage's last. The stage step that follows has
- * no `Owns:` folders to narrow it (`stageStepScope`'s `fallback` answer),
+ * no `Owns:` folders to narrow it (`resolveChecks`' `fallback` answer),
  * so it runs `bun test --changed=<since>` from the stage's own base: the
  * stage's diff holds `dep.ts`, so it selects `shared.test.ts`, catches it
  * failing fresh against the baseline, and is red. It inserts a `[BLOCKED]`
@@ -268,7 +268,8 @@ function plant(): Scratch {
 
   mkdirSync(join(repo, '.plans'));
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
-  plantProjectConfig(repo);
+  // `checks.stage` names an entry, so the stage step runs; empty, it would run nothing.
+  plantProjectConfig(repo, 'version: 1\nchecks:\n  stage: [related, integration]\n');
 
   return scratch;
 }

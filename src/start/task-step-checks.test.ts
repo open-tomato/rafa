@@ -91,7 +91,7 @@ function contextWith(exitCode: number, interrupted = false, typeExitCode = 0): S
     checkout,
     trackerPath: join(checkout, 'TRACKER.md'),
     sessionId: 'session',
-    settings: { testsAlwaysRun: [], testsFullSuiteTriggers: [], testsIntegration: [], testsRetakeRedAlone: false },
+    settings: { testsAlwaysRun: [], testsFullSuiteTriggers: [], testsIntegration: [], testsRetakeRedAlone: false, testsContract: [], checksTask: ['affected'], checksStage: ['related', 'integration'], checksLoop: ['full'] },
     owns: () => Promise.resolve(null),
     isInterrupted: () => interrupted,
     seams: { git, runLint: lintAnswering(exitCode), runTypes: typesAnswering(typeExitCode) },

@@ -18,8 +18,6 @@
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

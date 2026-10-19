@@ -20,7 +20,6 @@
  * the diff. Unset, or set to anything else, nothing is written and the
  * fixtures are read byte for byte. A later task never regenerates them.
  */
-import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -33,8 +33,6 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

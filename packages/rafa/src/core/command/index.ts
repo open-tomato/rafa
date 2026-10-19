@@ -1,12 +1,13 @@
 /**
  * The barrel over the command contract: every name `command.ts`,
  * `confirm.ts`, `lazy.ts`, `registry-types.ts`, `running.ts`,
- * `spends.ts`, `types.ts` and `version.ts` export, and nothing else.
+ * `shared-flags.ts`, `spends.ts`, `types.ts` and `version.ts` export,
+ * and nothing else.
  *
- * A file outside `packages/rafa/src/core/` imports this file and never the eight
+ * A file outside `packages/rafa/src/core/` imports this file and never the nine
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `packages/rafa/src/core/` imports the eight directly and never this
+ * file inside `packages/rafa/src/core/` imports the nine directly and never this
  * file.
  *
  * ## What sits behind it
@@ -25,6 +26,11 @@
  *     builder stays in `src/cli/registry.ts`;
  *   - `running.ts`: the command this process is running with its parsed
  *     flags, recorded by the dispatcher and read by the spend guard;
+ *   - `shared-flags.ts`: the flags commands of several features
+ *     declare, spelled once: `HINT_FLAG` and `HINT_FLAG_SPEC`, the
+ *     `--no-hint` flag of the six commands that end with a hint, and
+ *     `DEFAULT_CI_TIMEOUT_MIN`, the default of the loop's
+ *     `--ci-timeout` and of `pr wait`'s `--timeout`;
  *   - `spends.ts`: a command's `spends` declaration, `CommandSpend`, its
  *     shape check and the mark help ends a spender's roster line with;
  *   - `types.ts`: the contracts copied from open-tomato's `cli-core`,
@@ -33,13 +39,13 @@
  *   - `version.ts`: the version the running build answers with, and the
  *     line that spells it.
  *
- * The eight hold no name in common, so each name is exported once and
+ * The nine hold no name in common, so each name is exported once and
  * from the file that declares it.
  *
- * ## Why one barrel can hold all eight
+ * ## Why one barrel can hold all nine
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
- * imports the barrel back by value is a runtime cycle. None of the eight
+ * imports the barrel back by value is a runtime cycle. None of the nine
  * imports a file outside `packages/rafa/src/core/` by value. `command.ts` takes
  * `spendsProblem` from `spends.ts` beside it, and both take
  * `describeValue` from `packages/rafa/src/core/config/config-sections.ts`.
@@ -54,7 +60,8 @@
  * `Output` port with `import type`. `registry-types.ts` imports nothing
  * by value either: it names `command.ts` with `import type`, and this
  * file exports its names with `export type`, so loading the barrel
- * never loads it.
+ * never loads it. `shared-flags.ts` imports nothing by value either: it
+ * names `command.ts` with `import type` alone.
  *
  * `command.ts` also names `src/project/scope.ts` with `import type`,
  * which is erased before anything loads; it named `src/cli/registry.ts`
@@ -87,13 +94,23 @@
  * The same `HELP_WORD` control held a sixth, `src/cli/registry.ts`,
  * `command.ts` and this file.
  *
+ * Measured again when `shared-flags.ts` moved in, the same way and with
+ * the untracked new file read: five cycles at the base and four after
+ * the move, none through a file of this folder. The one gone is
+ * `src/next/actions.ts` and `src/next/hint.ts`, broken because
+ * `actions.ts` now takes `HINT_FLAG` from this barrel rather than from
+ * `hint.ts`. The control, `shared-flags.ts` taking one value
+ * (`HINT_TIMEOUT_MS`) from `src/next/hint.ts`, folded this file,
+ * `shared-flags.ts` and `hint.ts` into one strongly connected set of
+ * seventy files.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the config barrels
  * spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the eight files: every name any of
+ * `index.test.ts` holds the list to the nine files: every name any of
  * them exports is here once, as the same binding, and no other name is
  * here.
  */
@@ -142,6 +159,7 @@ export {
   runningCommand,
   setRunningCommand,
 } from './running.js';
+export { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG, HINT_FLAG_SPEC } from './shared-flags.js';
 export {
   SPENDS_GLYPH,
   SPENDS_WHEN,

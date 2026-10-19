@@ -13,8 +13,6 @@
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

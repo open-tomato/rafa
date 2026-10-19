@@ -162,7 +162,7 @@ function stepsOver(runs: readonly Planted[], alwaysRun: readonly string[] = []):
     checkout: dir,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: alwaysRun, testsRetakeRedAlone: false },
+    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: alwaysRun, testsRetakeRedAlone: false, testsContract: [], checksTask: ['affected'], checksStage: ['related', 'integration'], checksLoop: ['full'] },
     planContent: TRACKER,
     gh: () => Promise.reject(new Error('gh is not read by these cases')),
     seams: {

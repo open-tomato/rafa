@@ -36,7 +36,7 @@
  * The load hook is module state too, apart from the registry. Each case
  * that sets one reads the hook in place first and puts it back in a
  * `finally`, so the hook `src/config-registry.ts` set for every later
- * file survives this one.
+ * file survives this one. The template hook is held the same way.
  */
 import type {
   ConfigCheck,
@@ -44,6 +44,7 @@ import type {
   ConfigLoadHook,
   ConfigSection,
   ConfigSectionRegistry,
+  ConfigTemplateHook,
 } from '@open-tomato/rafa/core/config/section';
 
 import '../../../../config-registry.js';
@@ -55,6 +56,7 @@ import { CORE_SECTION } from '@open-tomato/rafa/core/config/core-section';
 import {
   activeChecks,
   activeConfigLoadHook,
+  activeConfigTemplateHook,
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
@@ -67,6 +69,7 @@ import {
   registerConfigSections,
   restoreConfigSections,
   setConfigLoadHook,
+  setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config/section';
 
 /** Core's specs, which the fixture sections borrow. */
@@ -491,6 +494,49 @@ describe('setConfigLoadHook', () => {
       expect(activeConfigLoadHook()).toBe(hook);
     } finally {
       setConfigLoadHook(held);
+    }
+  });
+});
+
+describe('setConfigTemplateHook', () => {
+  it('makes the hook activeConfigTemplateHook answers, answering the one it replaced, and clears it with null', () => {
+    const held = activeConfigTemplateHook();
+    const entry = Object.freeze({ checks: Object.freeze({ task: Object.freeze(['affected']) }) });
+    const first: ConfigTemplateHook = (name) => name === 'first'
+      ? entry
+      : null;
+    const second: ConfigTemplateHook = () => null;
+    try {
+      const replaced = [setConfigTemplateHook(first), setConfigTemplateHook(second)];
+      const active = activeConfigTemplateHook();
+      const cleared = setConfigTemplateHook(null);
+
+      expect(replaced).toEqual([held, first]);
+      expect(active).toBe(second);
+      expect(cleared).toBe(second);
+      expect(activeConfigTemplateHook()).toBeNull();
+      expect(first('first')).toBe(entry);
+      expect(first('stranger')).toBeNull();
+    } finally {
+      setConfigTemplateHook(held);
+    }
+    expect(activeConfigTemplateHook()).toBe(held);
+  });
+
+  it('is left as it was when a registry is restored, and apart from the load hook', () => {
+    const heldTemplate = activeConfigTemplateHook();
+    const heldLoad = activeConfigLoadHook();
+    const hook: ConfigTemplateHook = () => null;
+    try {
+      setConfigTemplateHook(hook);
+      withEmptyRegistry(() => {
+        restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+      });
+
+      expect(activeConfigTemplateHook()).toBe(hook);
+      expect(activeConfigLoadHook()).toBe(heldLoad);
+    } finally {
+      setConfigTemplateHook(heldTemplate);
     }
   });
 });

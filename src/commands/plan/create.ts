@@ -50,7 +50,9 @@
 import type { CommandDeclaration } from '../wrap.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+
+import { endingWith } from '../../next/ending.js';
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 

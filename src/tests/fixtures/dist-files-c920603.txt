@@ -28,6 +28,7 @@ cli.js
 config-registry.d.ts
 config-schema-board-project.d.ts
 config-schema-bugs.d.ts
+config-schema-checks.d.ts
 config-schema-errors.d.ts
 config-schema-features.d.ts
 config-schema-hub.d.ts
@@ -43,6 +44,7 @@ config/entry.d.ts
 config/index.d.ts
 config/index.js
 config/shape.d.ts
+config/templates.d.ts
 continue-criteria.md
 continue-decision-prompt.md
 core/command/command.d.ts
@@ -51,6 +53,7 @@ core/command/index.d.ts
 core/command/lazy.d.ts
 core/command/registry-types.d.ts
 core/command/running.d.ts
+core/command/shared-flags.d.ts
 core/command/spends.d.ts
 core/command/types.d.ts
 core/command/version.d.ts

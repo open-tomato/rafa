@@ -76,6 +76,7 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['taskLessons', 'task.lessons'],
   ['mergeDuplicates', 'merge.duplicates'],
   ['namingBranch', 'naming.branch'],
+  ['templates', 'templates'],
 ];
 
 /** The settings a flag may name, each of them core's. */
@@ -134,6 +135,7 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   taskLessons: 'on',
   mergeDuplicates: 'warn',
   namingBranch: 'feat/{stub}',
+  templates: [],
 };
 
 /** The three map settings, whose defaults are compared by identity or by entries. */
@@ -231,7 +233,7 @@ describe('the defaults of core', () => {
   it('is frozen, with the section, its settings record and every list default', () => {
     const lists = Object.values(CORE_SECTION.defaults).filter((value) => Array.isArray(value));
 
-    expect(lists.length).toBe(8);
+    expect(lists.length).toBe(9);
     expect(lists.every((list) => Object.isFrozen(list))).toBe(true);
     expect(Object.isFrozen(CORE_SECTION.defaults)).toBe(true);
     expect(Object.isFrozen(CORE_SECTION.settings)).toBe(true);
@@ -309,6 +311,37 @@ describe('naming.branch', () => {
 
   it('defaults to feat/{stub}, and takes no flag', () => {
     expect(CORE_SECTION.defaults.namingBranch).toBe('feat/{stub}');
+    expect(spec.cli).toBe(false);
+  });
+});
+
+describe('templates', () => {
+  const spec = CORE_SECTION.settings.templates;
+  const at = { label: spec.key, key: spec.key };
+
+  it('reads a list of template names as itself, in the order written', () => {
+    expect(spec.read(['escalation', 'other'], at)).toEqual({
+      value: ['escalation', 'other'],
+      problems: [],
+      extras: [],
+    });
+  });
+
+  it('refuses an empty string, naming its place in the list', () => {
+    const reading = spec.read(['escalation', ''], at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual(['templates[1] is "", expected a template name']);
+  });
+
+  it('refuses a value that is not a list', () => {
+    const reading = spec.read('escalation', at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual(['templates is "escalation", expected a list of template names']);
+  });
+
+  it('defaults to an empty list, frozen, and takes no flag', () => {
+    expect(CORE_SECTION.defaults.templates).toEqual([]);
+    expect(Object.isFrozen(CORE_SECTION.defaults.templates)).toBe(true);
     expect(spec.cli).toBe(false);
   });
 });

@@ -199,6 +199,11 @@ export interface RafaConfig {
    * once; `loop start` creates the branch it names. `naming.branch`.
    */
   namingBranch: string;
+  /**
+   * The config templates a file adopts, by name: each a non-empty
+   * string, in the order written. `templates`.
+   */
+  templates: readonly string[];
 }
 
 /** The name of one setting, as a field of {@link RafaConfig}. */

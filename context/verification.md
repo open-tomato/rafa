@@ -3,36 +3,39 @@
 ### Scoped first, full at merge
 
 A change made through an agent, a loop task or a session by hand, is
-tested at its scope first: `changed` (`bun test --changed=<base>`, the
-`tests=affected` scope below) for an isolated change, `related` (the
-touched module's test files by path, the `tests=module` scope) when it
-reaches further. The full suite runs 6.4 minutes a pass as measured in
-stretch 4, so it is the warranty before a merge, run once every scoped
-run is green, and never the quick check between edits.
+tested at its scope first: `affected` (`bun test --changed=<base>`, the
+`tests=affected` scope below) for an isolated change, `related` (the test
+files under the touched `Owns:` folder, by path, the `tests=module` scope)
+when it reaches further. The full suite runs 6.4 minutes a pass as measured
+in stretch 4, so it is the warranty before a merge, run once every scoped run
+is green, and never the quick check between edits.
 
 A change still asks for the full suite before the merge-time run when:
 
-- it touches a file in `tests.fullSuiteTriggers` (`bunfig.toml`,
-  `tsconfig*.json`, `package.json`, the lockfile, a test preload);
+- it touches a file in `tests.fullSuiteTriggers`, which widens an `affected`
+  entry to `full`. The list defaults to empty; the `escalation` template names
+  the files, below;
 - it changes a module used across the codebase, the `tests=full` case;
-- a scoped run is green and the failure it chases is still unexplained,
-  so the full run is the capture that names it.
+- a scoped run is green and the failure it chases is still unexplained, so
+  the full run is the capture that names it.
 
-The runner's recorded steps below run at fixed points of a loop. The
-baseline and the pre-wrap-up step are always full runs, a task step is
-full when its line declares `tests=full` or a trigger escalates it, and a
-session never adds its own between them. A whole-suite run is the
-runner's to take: a session that runs `bun test` with no path in one Bash
-call can outlast that call's 10-minute limit, so `rafa plan risk` flags a
-task text that asks for one (the `long-run` note, `context/workflow.md`).
+Each check point reads one check-point entry, `checks.task`, `checks.stage` or
+`checks.loop`: a list of check names that rafa runs and nothing more. An empty
+entry runs nothing and blocks nothing. The runner's recorded steps are set out
+under "Gate tiers and task declaration" below. A session never adds its own
+between them. A whole-suite run is the runner's to take: a session that runs
+`bun test` with no path in one Bash call can outlast that call's 10-minute
+limit, so `rafa plan risk` flags a task text that asks for one (the `long-run`
+note, `context/workflow.md`).
 
 ### Gate tiers and task declaration
 
 **A task session runs a targeted subset of checks; the runner runs the full
 suite at defined stages.** A task line declares `tests=affected` (the
-default), `tests=module`, or `tests=full`: the runner's task step runs that
-scope after the session commits, and the session itself checks only what
-its change reaches.
+default), `tests=module`, or `tests=full`: the runner's task step reads
+`checks.task` with that value after the session commits, running no test
+when the entry is empty, and the session itself checks only what its
+change reaches.
 
 **Task session gates** (read one exit code from each):
 - `bun test --changed=<base>` (affected tests), then `bun test
@@ -73,41 +76,126 @@ it lints `src/`, and each member's own `lint` script runs `eslint .` from its
 directory, so a changed package file belongs in the scoped
 `bunx eslint <changed files>` run too.
 
-**Runner recorded steps** (recorded at fixed points, each with its scope):
-- `baseline` — Full suite once at plan start (first dispatch); a run that
-  failed outside any test case halts the run and is not written
-- `task` — Scope from `taskStepScope` over the task's diff after
-  each task's session ends and commits
-- `stage` — After a stage's last task: the tests under the `Owns:`
-  folders it changed, or `bun test --changed=<since>` with the
-  `tests.alwaysRun` files when the plan has no `Owns:` folder
-- `pre-wrap-up` — Full suite before wrap-up session starts
+**Check points and the runner's recorded steps.** Four recorded steps read
+the check points. Each takes its scope from `resolveChecks`
+(`src/suite/checks.ts`) over its check-point entry and runs what the answer
+names:
 
-Each recorded step names its scope (affected, module, full, or a
-file/folder list it ran on) and its reason where it has one (`declared`
-for a task step whose line declares `tests=module` or `tests=full`;
-`trigger` when changed files match `tests.fullSuiteTriggers` and
-escalate the scope; `fallback` for a stage step with no `Owns:` folder
-running `bun test --changed=<since>`; `no-module-tests` when a task
-names `tests=module` but the module has no test files; `stage` for a
-stage step's `Owns:` path list). The baseline and the pre-wrap-up step
-carry no reason, as they always run the full suite. Each also records
-the command, exit code, Bun's summary line, every failing test (file +
-full test name pairs), and which failures are new against the baseline
-(not present in `baseline`'s captured failures).
+- `baseline` — the full suite once at plan start (first dispatch), taken
+  only when `checks.task`, `checks.stage` or `checks.loop` names a check.
+  With all three empty it reads and writes no baseline file, records
+  nothing, prints `📏 No check-point entry names a check; no suite baseline
+  is taken.`, and every later step is a `none` step. A run that failed
+  outside any test case halts the run and is not written. The baseline
+  carries no reason.
+- `task` — after each task's session ends and commits: `resolveChecks` of
+  `checks.task` over the task's diff from its base commit to HEAD, read
+  with the line's `tests=` value (below).
+- `stage` — after a stage's last task: `resolveChecks` of `checks.stage`
+  over the stage's diff. `related` takes the tests under the `Owns:` folders
+  the stage changed; with no `Owns:` folder it runs `affected`, reason
+  `fallback`. A stage step once ran the full suite here; #874 records that
+  as contradicting `context/workflow.md` and the code, and the entry
+  replaces it.
+- `pre-wrap-up` — before the wrap-up session starts: `resolveChecks` of
+  `checks.loop` over the plan's diff from the baseline's commit to HEAD,
+  with no `tests=` value. A `full` answer runs the whole project and reads
+  no diff. The wrap-up starts once the step settles.
 
-**Declaration key `tests=` on a task line** sets what the runner's task
-step runs after the task's session commits; the session runs only what
+**The `none` step.** An empty entry records its step at once, with scope
+`none`, reason `no-check`, an empty command, exit code 0 and no failures. It
+runs no suite and reads no diff, is never red, and so inserts no repair. It
+prints one line:
+
+- task: `🧪 task step: no check configured (checks.task is empty); nothing
+  ran.`, with ` (tests=<value> set aside)` after it when the task line
+  declares a `tests=` value;
+- stage: `🧪 stage step for "<stage>": no check configured (checks.stage is
+  empty); nothing ran.`, and the stage enters the ledger as a step that ran;
+- pre-wrap-up: `🧪 pre-wrap-up step: no check configured (checks.loop is
+  empty); nothing ran.`, and the wrap-up starts on it.
+
+**The six check names.** An entry holds names from a closed list: `affected`,
+`related`, `unit`, `contract`, `integration` and `full`. Each name is written
+at most once, a name outside the list is refused naming the key and the six,
+and no entry holds a shell command. Each name resolves as follows:
+
+- `affected`: `bun test --changed=<base>`, widened to `full` (reason
+  `trigger`) when the diff touches a `tests.fullSuiteTriggers` glob or a
+  preload file of `bunfig.toml`.
+- `related`: the test files under each `Owns:` folder the diff touched, each
+  changed path counted in the deepest folder holding it. With no `Owns:`
+  folder it runs as `affected`, reason `fallback`, and a trigger never widens
+  that fallback.
+- `unit`: every test file that no `tests.contract` glob and no
+  `tests.integration` glob matches.
+- `contract`: every test file a `tests.contract` glob matches.
+- `integration`: every test file a `tests.integration` glob matches.
+- `full`: the whole project, one `bun test` with no path.
+
+An entry folds its names into one run, the first match winning. An empty
+entry is `none`. A `full` in the entry, or `tests=full` on the task line, runs
+`full` and swallows the other names (reason `declared`). An `affected` with a
+trigger in the diff runs `full` (reason `trigger`). An `affected` alone runs
+`affected` (reason `declared`), and `related` with no `Owns:` folder runs it as
+`fallback`. Otherwise the files of every `related`, `unit`, `contract` and
+`integration` in the entry run as one `bun test`, each file once and sorted.
+The `tests.alwaysRun` files join that list when `related` is named or an
+`affected` stands beside it, and an `affected` run takes them as a second run.
+
+**Recorded scopes and reasons.** Each recorded step names its scope: `affected`,
+`module`, `full`, `none`, or the file list it ran on. Its reason, where it has
+one, is:
+
+- `declared`: a `full` the entry or a `tests=full` line named, an `affected`
+  the entry named, or a path list (`unit` in place of `declared` for a task or
+  pre-wrap-up path list whose entry names `unit`, unless the line declares
+  `tests=module`);
+- `trigger`: a `full` that an `affected` widened on a trigger;
+- `fallback`: a `related` with no `Owns:` folder, run as `affected`;
+- `no-module-tests`: a `tests=module` line whose touched folders hold no test
+  file, so the entry's `affected` runs again;
+- `stage`: a stage step's path list;
+- `no-check`: a `none` step.
+
+A pre-wrap-up step records as a task step does. Each step also records the
+command, the exit code, Bun's summary line, every failing test (file and full
+test name) and which failures are new against the baseline.
+
+**Declaration key `tests=` on a task line** sets what the task step reads from
+`checks.task` after the task's session commits. Under an empty `checks.task` it
+is set aside, and the `none` step names it. The session itself runs only what
 its change reaches:
-- `tests=affected` (default): `bun test --changed=<base>` plus types and
-  lint on the changed files
-- `tests=module`: the test files under each `Owns:` folder the task's
-  diff touches, or `tests=affected` when no touched folder holds a test
-  file
-- `tests=full`: the full suite after the commit, whatever the diff
-  touches; the session never runs it
+- `tests=affected` (default): the entry as written;
+- `tests=module`: the entry's `affected` read as `related`. A trigger still
+  widens it to `full`, and when no touched `Owns:` folder holds a test file it
+  runs as `affected` again (reason `no-module-tests`);
+- `tests=full`: `full` after the commit, whatever the diff touches. It widens
+  any non-empty entry. The session never runs it.
 
 **Config keys for test selection and running:**
+- `checks.task`, `checks.stage` and `checks.loop` are the check points the
+  runner reads (`checksTask`, `checksStage`, `checksLoop`,
+  `src/config-schema-checks.ts`). Each is a list of check names defaulting to
+  empty, and an empty list runs nothing and blocks nothing at that point.
+  `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
+  `checks.publish` take the same reader and default empty too, but no step
+  reads them yet.
+- `templates` (a list of template names, `src/config/templates.ts`) holds the
+  one template, `escalation`. `templates: [escalation]` adopts it: the three
+  glob keys below, and `checks.task: [affected]`, `checks.stage: [related,
+  integration]` and `checks.loop: [full]`. The other four check points keep
+  their empty default. A name no template holds is refused, listing the names
+  that exist.
+- `tests.fullSuiteTriggers`, `tests.integration` and `tests.contract` (glob
+  lists, each defaulting to empty, so a project that names no template has
+  none of them). The `escalation` template names `tests.fullSuiteTriggers` as
+  `bunfig.toml`, `tsconfig*.json`, `package.json`, `bun.lock` and `bun.lockb`
+  (the files `[test] preload` names in `bunfig.toml` are added either way);
+  `tests.integration` as `**/*-integration.test.ts`,
+  `**/*.integration.test.ts`, `**/*-spawned*.test.ts` and `**/*-cli.test.ts`;
+  and `tests.contract` as `**/*.contract.test.ts`. The `contract`, `unit` and
+  `integration` names read the last two.
 - `tests.alwaysRun` (glob list, defaults to `src/**/*.sweep.test.ts`) —
   content sweeps that always run alongside scoped tests in every task's
   gates, since they read files at run time and `--changed` follows only
@@ -116,20 +204,24 @@ its change reaches:
   graph check over the live tree, beside the turbo-config sweep
   (`src/tests/turbo-config.sweep.test.ts`), which holds `turbo.json`'s
   `agentGuidance` key and its three tasks
-- `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
-  `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
-  named in `[test] preload` of `bunfig.toml`)
-- `tests.integration` (glob list, defaults to `**/*-integration.test.ts`,
-  `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
-- `tests.contract` (glob list, defaults to `**/*.contract.test.ts`) — the
-  contract tests, each checking the promise a package makes to others with
-  a fixture; no step reads this key yet
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a
   test file the step's own change touches ran before it; `false`
   switches that retake off and nothing else; read "A newly red file is
   run alone once" below
+
+**This project's own table.** Decision 0009's table, with the stage at
+`related`, is this project's baseline. The epic's third criterion, per-change
+test time after the cut, is measured against the check-point table the
+project's config holds, not against the full run. That config
+(`.rafa/config.yaml`, gitignored, so not in the tree) adopts
+`templates: [escalation]` and holds `checks.task: [affected]`,
+`checks.stage: [related]`, `checks.loop: [related, contract, integration]`,
+`checks.pullRequest: [unit, contract, integration]`,
+`checks.stretch: [related, contract, integration]`,
+`checks.releasePullRequest: [integration]` and `checks.publish: [full]`. The
+runner reads the first three today.
 
 **The baseline is the `baseline` step's recorded failures.** A failure
 is identified by its test file path and full test name (the pair the
@@ -190,8 +282,12 @@ invisible codepoint. The hook is live only where `git config core.hooksPath
 
 ### Baseline and known failures
 
-**Every run starts by recording a baseline.** The first step of every plan
-is a full-suite run that establishes what the tree held at that moment.
+**A run that checks anything starts by recording a baseline.** The first
+step of every plan whose `checks.task`, `checks.stage` or `checks.loop`
+names a check is a full-suite run that establishes what the tree held at
+that moment. With all three empty no step runs a test, so none is taken:
+the runner prints `📏 No check-point entry names a check; no suite
+baseline is taken.` and records nothing.
 Later steps compare their failures against this baseline to separate
 inherited failures from new ones. A baseline failure (one present in the
 baseline step) does not block work; a new failure (one that first appears

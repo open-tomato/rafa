@@ -5,7 +5,9 @@
  *
  * Both files are built here as literals, each answering a different
  * entry for the same setting, so an origin read off the wrong layer
- * names the other file or the other entry.
+ * names the other file or the other entry. The template cases lay a
+ * different template under each file, so a template origin read off the
+ * wrong file names the other file and the other template.
  */
 import type { ConfigFile, ConfigLayer, ConfigSetting } from './config.js';
 
@@ -23,6 +25,11 @@ function fileAt(path: string, entries?: ReadonlyMap<ConfigSetting, number>): Con
       ? {}
       : { entries }),
   };
+}
+
+/** `file` recording `template` as the template that answered each of `settings`. */
+function withTemplate(file: ConfigFile, template: string, settings: readonly ConfigSetting[]): ConfigFile {
+  return { ...file, templates: new Map(settings.map((setting) => [setting, template])) };
 }
 
 const PROJECT = fileAt('/repo/rafa.config.ts', new Map<ConfigSetting, number>([['store', 2]]));
@@ -47,6 +54,27 @@ describe('originOf', () => {
 
   it('names nothing for a file source with no file, rather than throwing', () => {
     expect([originOf('file', 'store', null, USER), originOf('user', 'store', PROJECT, null)]).toEqual([null, null]);
+  });
+
+  it('names the project file, its templates entry and the template for a setting its template answered', () => {
+    const project = withTemplate(
+      fileAt('/repo/rafa.config.ts', new Map<ConfigSetting, number>([['store', 2], ['templates', 1]])),
+      'escalation',
+      ['checksTask'],
+    );
+    const user = withTemplate(USER, 'other', ['checksTask', 'checksStage']);
+
+    expect(originOf('template', 'checksTask', project, user))
+      .toEqual({ file: '/repo/rafa.config.ts', entry: 1, template: 'escalation' });
+    expect(originOf('template', 'checksStage', project, user))
+      .toEqual({ file: '/home/me/.rafa/config.yaml', entry: 0, template: 'other' });
+  });
+
+  it('carries no template for a file source, and names nothing for a template no file records', () => {
+    const project = withTemplate(PROJECT, 'escalation', ['checksTask']);
+
+    expect(originOf('file', 'store', project, USER)).toEqual({ file: '/repo/rafa.config.ts', entry: 2 });
+    expect(originOf('template', 'checksLoop', project, USER)).toBeNull();
   });
 
   it('answers a frozen origin', () => {

@@ -8,7 +8,7 @@
  * `src/config/shape.ts` composes into `ConfigShape`, the nested file
  * shape. `config-registry.ts` registers the section fourteenth in
  * `CONFIG_SECTIONS`, and its `CONFIG_DEFAULTS` and `SETTINGS` spread the
- * objects below last, after the `tests` section.
+ * objects below last, after the `checks` section.
  *
  * ## The keys
  *

@@ -291,6 +291,18 @@ describe('the injection mode a run resolves', () => {
     expect(injectSourceLabel(fromDefault)).toBe('the default');
   });
 
+  it('labels a mode a template answered by the template and the file that named it', async () => {
+    const resolved = await loadRunConfig(scopesOf(rootWith(null)), []);
+    const named = join(rootWith(null), '.rafa', 'config.yaml');
+    const fromTemplate = {
+      ...resolved,
+      sources: { ...resolved.sources, inject: 'template' as const },
+      provenance: { ...resolved.provenance, inject: { file: named, entry: 0, template: 'escalation' } },
+    };
+
+    expect(injectSourceLabel(fromTemplate)).toBe(`the escalation template named by ${named}`);
+  });
+
   it('refuses a flag value no mode answers to', () => {
     const root = rootWith(FILE_CONFIG);
 

@@ -16,8 +16,6 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { IssueDraft, IssueEdit, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

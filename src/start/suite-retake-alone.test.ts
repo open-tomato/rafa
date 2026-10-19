@@ -171,6 +171,10 @@ function contextWith(answers: readonly Answer[], options: { readonly retake?: bo
       testsIntegration: [],
       testsAlwaysRun: [],
       testsRetakeRedAlone: options.retake ?? true,
+      testsContract: [],
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
     },
     owns: () => Promise.resolve(options.owns ?? null),
     seams: {

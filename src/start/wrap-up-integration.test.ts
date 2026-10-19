@@ -27,8 +27,6 @@ import type { ReleaseStageSettings } from './release-stage.js';
 import type { Instinct } from '../schema/instinct.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

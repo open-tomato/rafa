@@ -99,12 +99,31 @@
  * own, beside the registry rather than in it: restoring a registry
  * leaves the hook as it was, and a case that sets one puts the previous
  * hook back in a `finally`, as a case that registers does.
+ *
+ * ## The template hook
+ *
+ * A config template is a named entry a file adopts with its `templates`
+ * key, and the templates live outside `packages/rafa/src/core/` too,
+ * in `src/config/templates.ts`, which core must not import. So core
+ * takes one {@link ConfigTemplateHook} through
+ * {@link setConfigTemplateHook}, for the module that lists the sections
+ * to set, and answers it off {@link activeConfigTemplateHook} for the
+ * loader to call by name. The hook answers the entry a name
+ * stands for, a mapping nested as a file nests its keys (the shape of a
+ * `ConfigEntry`, `src/config/entry.ts`, typed here as a plain
+ * {@link Mapping} since core imports nothing from `src/config/`), or null
+ * for a name it does not know, and may carry the `names` it knows, which
+ * the loader lists when it refuses a name. Like the load hook it is a module-level
+ * value of its own, beside the registry: restoring a registry leaves it
+ * as it was, and a case that sets one puts the previous hook back in a
+ * `finally`.
  */
 import type {
   ConfigSetting,
   RafaConfig,
   SettingSpec,
 } from './config-schema.js';
+import type { Mapping } from './config-sections.js';
 import type { ConfigSource } from './config.js';
 
 /** Every setting's spec, by name: the record a section hands a part of. */
@@ -462,4 +481,38 @@ export function setConfigLoadHook(hook: ConfigLoadHook | null): ConfigLoadHook |
 /** The hook `loadConfig` calls with every config it resolves, or null when none is set. */
 export function activeConfigLoadHook(): ConfigLoadHook | null {
   return loadHook;
+}
+
+/**
+ * The entry a config template's name stands for, a mapping nested as a
+ * file nests its keys, or null for a name the hook does not know. See
+ * "The template hook" in the module note.
+ */
+export interface ConfigTemplateHook {
+  /** The entry `name` stands for, or null for a name the hook does not know. */
+  (name: string): Mapping | null;
+  /**
+   * Every name the hook knows, which `loadConfig` lists when it refuses
+   * one a file gives. Absent from a hook that cannot list its names.
+   */
+  readonly names?: readonly string[];
+}
+
+/** The module-level hook {@link activeConfigTemplateHook} answers. */
+let templateHook: ConfigTemplateHook | null = null;
+
+/**
+ * Makes `hook` the one core reads a config template's entry from, or
+ * clears it with null. Answers the hook it replaced, for a caller to put
+ * back.
+ */
+export function setConfigTemplateHook(hook: ConfigTemplateHook | null): ConfigTemplateHook | null {
+  const previous = templateHook;
+  templateHook = hook;
+  return previous;
+}
+
+/** The hook core reads a config template's entry from, or null when none is set. */
+export function activeConfigTemplateHook(): ConfigTemplateHook | null {
+  return templateHook;
 }

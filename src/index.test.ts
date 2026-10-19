@@ -407,7 +407,8 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
 /**
  * The runtime names the config barrel holds and the root does not
  * publish: core's section, the routing defaults, the item readers and
- * the section registry with its key indexes and its load hook.
+ * the section registry with its key indexes and its load hook, and the
+ * laying of a file's templates under its keys.
  */
 const CONFIG_BARREL_ONLY: readonly string[] = [
   'CORE_SECTION',
@@ -420,6 +421,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'REQUIRED_ITEM_KEYS',
   'activeChecks',
   'activeConfigLoadHook',
+  'activeConfigTemplateHook',
   'activeDefaults',
   'activeKnownKeysAbove',
   'activeSectionPaths',
@@ -429,6 +431,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'dangerousKeys',
   'dangerousPassLines',
   'dangerousPhrases',
+  'layTemplatesUnder',
   'mergeConfigSections',
   'moduleSource',
   'optionalPrerequisite',
@@ -440,6 +443,7 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'restoreDangerousPhrases',
   'runWithDangerousPhrases',
   'setConfigLoadHook',
+  'setConfigTemplateHook',
   'setDangerousPhrases',
   'writeDangerousPassLines',
 ];
@@ -495,7 +499,8 @@ const CLI_IMPORTS: ImportList = [
  */
 const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/plan/create.js', [
-    ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
+    ['@open-tomato/rafa/core/command', ['HINT_FLAG_SPEC']],
+    ['../../next/ending.js', ['endingWith']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
     ['./refs-check.js', ['CREATE_DANGEROUS_PHRASES', 'registryRoster']],
@@ -548,8 +553,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./spec-route.js', ['resolveCreateSpec']],
   ]],
   ['./commands/loop/start.js', [
-    ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
-    ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS', 'DEFAULT_CI_TIMEOUT_MIN']],
+    ['@open-tomato/rafa/core/command', ['DEFAULT_CI_TIMEOUT_MIN', 'HINT_FLAG_SPEC']],
+    ['../../next/ending.js', ['endingWith']],
+    ['../../start/pr-lifecycle.js', ['DEFAULT_CI_ATTEMPTS']],
     ['../../start/runtime.js', ['refuseMisplacedRuntime']],
     ['../../start.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],

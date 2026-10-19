@@ -10,7 +10,9 @@
  * than the field, and one naming a phase this rafa does not know, each
  * beside a control holding a known phase. The step `reason` cases do the
  * same for a step from rafa 0.35.0, written before the key, and for a
- * reason this rafa does not know. The per-field cases for `hop`,
+ * reason this rafa does not know. The `none` step cases read one back,
+ * each refusal of its shape beside the control it differs from, and an
+ * empty command at scope `full` refused as before the scope. The per-field cases for `hop`,
  * `worktree`, `steps` and the writes of `phase` stay in `sessions-hop.test.ts`, `sessions-worktree.test.ts` and
  * `sessions-steps.test.ts` and `sessions-phase.test.ts`, beside the
  * writes of each field.
@@ -21,6 +23,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   isSessionId,
+  NONE_STEP_SCOPE,
   parseSessionRecord,
   SESSION_PHASES,
   SESSION_STATES,
@@ -201,7 +204,7 @@ function readStep(text: string): SessionStep {
 
 describe('the reason of a step', () => {
   it('lists the reasons a step runs at its scope, frozen', () => {
-    expect(SESSION_STEP_REASONS).toEqual(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage']);
+    expect(SESSION_STEP_REASONS).toEqual(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage', 'no-check', 'unit']);
     expect(Object.isFrozen(SESSION_STEP_REASONS)).toBe(true);
   });
 
@@ -260,6 +263,108 @@ describe('the reason of a step', () => {
   });
 });
 
+/** A task step that ran nothing: its entry named no check, its line declared `tests=module`. */
+const NONE_STEP: SessionStep = {
+  kind: 'task',
+  scope: 'none',
+  reason: 'no-check',
+  declared: 'module',
+  command: [],
+  exitCode: 0,
+  summary: null,
+  failures: [],
+  newFailures: [],
+};
+
+/** The record text holding one step: {@link NONE_STEP} with `extra` laid over it. */
+function noneRecordText(extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({ ...record(), steps: [{ ...NONE_STEP, ...extra }] });
+}
+
+/** The message `parseSessionRecord` refuses `text` with. */
+function refusalOf(text: string): string {
+  return (thrownBy(() => parseSessionRecord(text, FILE)) as SessionRecordError).message;
+}
+
+describe('a none step', () => {
+  it('names the scope none', () => {
+    expect(NONE_STEP_SCOPE).toBe('none');
+  });
+
+  it('round-trips through the record, its keys in the written order and frozen', () => {
+    const text = noneRecordText();
+
+    const step = readStep(text);
+
+    expect(step).toEqual(NONE_STEP);
+    expect(Object.keys(step)).toEqual(['kind', 'scope', 'reason', 'declared', 'command', 'exitCode', 'summary', 'failures', 'newFailures']);
+    expect(Object.isFrozen(step)).toBe(true);
+    expect(JSON.stringify({ ...record(), steps: [step] })).toBe(text);
+  });
+
+  it('reads a none step whose line declared no tests= value without a declared key', () => {
+    const step = readStep(noneRecordText({ declared: undefined }));
+
+    expect(Object.keys(step)).not.toContain('declared');
+    expect(step.scope).toBe('none');
+  });
+
+  it.each([
+    ['a value outside the test scopes', 'nightly'],
+    ['null', null],
+  ] as const)('leaves out a declared that is %s, refusing nothing', (_label, value) => {
+    const step = readStep(noneRecordText({ declared: value }));
+
+    expect(Object.keys(step)).not.toContain('declared');
+  });
+
+  it('leaves out declared on a step at any other scope, refusing nothing', () => {
+    const step = readStep(stepRecordText({ declared: 'module' }));
+
+    expect(Object.keys(step)).not.toContain('declared');
+    expect(step).toEqual(STEP_0_35_0);
+  });
+
+  it.each([
+    ['a command', { command: ['bun', 'test'] }, 'steps[0].command is ["bun","test"], expected an empty list on a none step'],
+    ['an exit code of 1', { exitCode: 1 }, 'steps[0].exitCode is 1, expected 0 on a none step'],
+    [
+      'a failing test',
+      { failures: [{ file: 'src/a.test.ts', name: 'a > b' }] },
+      'steps[0].failures is [{"file":"src/a.test.ts","name":"a > b"}], expected none on a none step',
+    ],
+  ] as const)('refuses a none step holding %s, naming the field', (_label, extra, problem) => {
+    expect(refusalOf(noneRecordText(extra))).toBe(`session record ${FILE}: ${problem}`);
+  });
+
+  it('names a none step\'s exit code of the wrong type once, as on any step', () => {
+    expect(refusalOf(noneRecordText({ exitCode: 'zero' }))).toBe(`session record ${FILE}: steps[0].exitCode is "zero", expected a whole number`);
+  });
+
+  it('refuses an empty command at scope full, as before the none scope', () => {
+    const control = stepRecordText({ scope: 'full', command: ['bun', 'test'] });
+    expect(readStep(control).scope).toBe('full');
+
+    expect(refusalOf(stepRecordText({ scope: 'full', command: [] })))
+      .toBe(`session record ${FILE}: steps[0].command is [], expected a non-empty list of arguments`);
+  });
+
+  it('still reads a record from rafa 0.35.0, steps without reason or declared', () => {
+    const older = JSON.stringify({ ...record(), steps: [STEP_0_35_0, { ...STEP_0_35_0, kind: 'stage', scope: ['src/a'] }] });
+    expect(older).not.toContain('"none"');
+    expect(older).not.toContain('"declared"');
+
+    const steps = sessionSteps(parseSessionRecord(older, FILE));
+
+    expect(steps).toEqual([STEP_0_35_0, { ...STEP_0_35_0, kind: 'stage', scope: ['src/a'] }]);
+  });
+
+  it('refuses a scope outside the set, naming none among the expected', () => {
+    expect(refusalOf(stepRecordText({ scope: 'unit' })))
+      .toBe(`session record ${FILE}: steps[0].scope is "unit", expected one of affected, module, full, none or a list of paths`);
+  });
+});
+
 describe('sessions.ts re-exports the reading', () => {
   it('answers the very bindings this module exports, not copies of them', () => {
     expect(sessions.parseSessionRecord).toBe(parseSessionRecord);
@@ -271,6 +376,7 @@ describe('sessions.ts re-exports the reading', () => {
     expect(sessions.SESSION_STATES).toBe(SESSION_STATES);
     expect(sessions.SESSION_STEP_KINDS).toBe(SESSION_STEP_KINDS);
     expect(sessions.SESSION_STEP_REASONS).toBe(SESSION_STEP_REASONS);
+    expect(sessions.NONE_STEP_SCOPE).toBe(NONE_STEP_SCOPE);
   });
 
   it('refuses through sessions.ts with the error class this module throws', () => {
