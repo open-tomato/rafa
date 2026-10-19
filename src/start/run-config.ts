@@ -164,12 +164,13 @@ function warnThroughActiveOutput(message: string): void {
  * record over every source, so a source added to `ConfigSource` fails to
  * compile here until it has one, rather than being named the default.
  */
-export function injectSourceLabel({ sources, path, userPath, provenance }: ResolvedConfig): string {
+export function injectSourceLabel({ sources, path, localPath, userPath, provenance }: ResolvedConfig): string {
   const origin = provenance.inject;
   const labels: Record<ConfigSource, string> = {
     cli: INJECT_FLAG,
+    local: localPath ?? 'the local config file',
     file: path ?? 'the config file',
-    user: userPath ?? 'the user config file',
+    user: origin?.file ?? userPath ?? 'the user config file',
     template: `the ${origin?.template ?? 'config'} template named by ${origin?.file ?? 'a config file'}`,
     default: 'the default',
   };

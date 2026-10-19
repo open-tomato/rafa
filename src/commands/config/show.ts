@@ -39,9 +39,9 @@
  * ## The layers
  *
  * A layer is named as the plan's scopes name it, not as `ConfigSource`
- * spells it: `project` for the project's file (`file` in `sources`),
- * `user` for `~/.rafa/`'s, `template:<name>` for a template either file
- * named (`template` in `sources`, the name read off `provenance`), and
+ * spells it: `project` for the project's files (`file` and `local` in
+ * `sources`), `user` for `~/.rafa/`'s, `template:<name>` for a template
+ * a file named (`template` in `sources`, the name read off `provenance`), and
  * `default`. `cli` is kept for a value a
  * command line gave, which this command never passes, so it does not
  * appear in practice.
@@ -110,6 +110,7 @@ export type ConfigShowResult =
 /** The layer names of each `ConfigSource` but `template`, which {@link layerOf} names. */
 const LAYER_OF: Readonly<Record<Exclude<ConfigSource, 'template'>, ConfigShowLayer>> = Object.freeze({
   cli: 'cli',
+  local: 'project',
   file: 'project',
   user: 'user',
   default: 'default',

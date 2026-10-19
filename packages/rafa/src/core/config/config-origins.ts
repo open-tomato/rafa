@@ -11,17 +11,20 @@
  * file is one entry, so every setting it answers is entry 0. A setting
  * the command line or a default answered has no origin: no file set it.
  *
- * {@link originOf} reads the origin off the layer `resolveConfig`
- * ranked first, so it follows `sources` exactly: `file` names the
- * project's file, `user` the user scope's, and `cli` and `default` name
- * none. A map setting merged across both files names the project's,
- * the file its source names.
+ * `resolveConfig` ranks four files, two per scope: the project's local
+ * file, the project's file, the user scope's local file and the user
+ * scope's file, highest first. {@link originOf} takes the FILE that
+ * answered a setting, never a source name, so the two user files, which
+ * both report source `user`, each name their own path, as the project's
+ * local file (`local`) and its other file (`file`) do. `cli` and
+ * `default` name no file and answer none. A map setting merged across
+ * several files names the highest of them, the file its source names.
  *
  * A setting a template answered (`template`) names the file whose
- * `templates` key named it, the project's where the project's template
- * answered and the user's otherwise, with the entry of that file that
- * last set `templates`, and carries the template's name as `template`.
- * An origin a file's own key gave carries no `template`.
+ * `templates` key named it, which is the file that answered, since a
+ * file's templates are laid under its own keys, with the entry of that
+ * file that last set `templates`, and carries the template's name as
+ * `template`. An origin a file's own key gave carries no `template`.
  *
  * ## A shadowed file
  *
@@ -59,42 +62,25 @@ export interface ShadowedFile {
   readonly by: string;
 }
 
-/** The file whose template answered `setting`: the project's where its template did, else the user's. */
-function templateLayerOf(setting: ConfigSetting, file: ConfigFile | null, user: ConfigFile | null): ConfigFile | null {
-  return file?.templates?.has(setting) === true
-    ? file
-    : user?.templates?.has(setting) === true
-      ? user
-      : null;
-}
-
 /**
- * The origin of `setting`, answered by the layer `source` names; see
- * the module note.
+ * The origin of `setting`, read off the file that answered it; see the
+ * module note.
  *
  * @param source - The layer that answered the setting.
  * @param setting - The setting.
- * @param file - The project's file, or null when there was none.
- * @param user - The user scope's file, or null when there was none.
- * @returns The file and entry, or null for the command line or a default.
+ * @param answeredBy - The file that answered it, or null where the
+ *   command line or a default did.
+ * @returns The file and entry, or null for the command line, a default,
+ *   or a template the file records none for.
  */
 export function originOf(
   source: ConfigSource,
   setting: ConfigSetting,
-  file: ConfigFile | null,
-  user: ConfigFile | null,
+  answeredBy: ConfigFile | null,
 ): SettingOrigin | null {
-  const layer = source === 'file'
-    ? file
-    : source === 'user'
-      ? user
-      : source === 'template'
-        ? templateLayerOf(setting, file, user)
-        : null;
-  if (layer === null) return null;
-  const template = source === 'template'
-    ? layer.templates?.get(setting)
-    : undefined;
-  if (template === undefined) return Object.freeze({ file: layer.path, entry: layer.entries?.get(setting) ?? 0 });
-  return Object.freeze({ file: layer.path, entry: layer.entries?.get('templates') ?? 0, template });
+  if (answeredBy === null || source === 'cli' || source === 'default') return null;
+  if (source !== 'template') return Object.freeze({ file: answeredBy.path, entry: answeredBy.entries?.get(setting) ?? 0 });
+  const template = answeredBy.templates?.get(setting);
+  if (template === undefined) return null;
+  return Object.freeze({ file: answeredBy.path, entry: answeredBy.entries?.get('templates') ?? 0, template });
 }
