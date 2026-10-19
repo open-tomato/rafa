@@ -23,7 +23,7 @@
  */
 import type { Fragment } from './fragment.js';
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
@@ -258,7 +258,10 @@ describe('allocateFragmentName', () => {
 
 describe('package key against real and scoped fragments', () => {
   test('every fragment under this repository\'s .changes/ parses with package null', () => {
+    // A release commit deletes every fragment, and git keeps no empty folder,
+    // so on a just-settled tree `.changes/` is absent: no fragment to read.
     const dir = join(import.meta.dir, '..', '..', '.changes');
+    if (!existsSync(dir)) return;
     const names = readdirSync(dir).filter((name) => name.endsWith('.md'));
 
     for (const name of names) {
