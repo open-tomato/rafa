@@ -28,9 +28,9 @@
  * store. A session with no checklist, its plan and tracker both gone,
  * has no blocked task.
  */
-import type { SessionChecklist } from '../core/loop/readings.js';
+import type { SessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 
-import { splitBlockerComment } from '../utils/tracker.js';
+import { splitBlockerComment } from '@open-tomato/rafa/core/plan';
 
 /** A blocked task line, as `utils/tracker.ts` writes one. The capture is its text, the comment included. */
 const BLOCKED_TASK_LINE = /^- \[BLOCKED\] (.+)/;

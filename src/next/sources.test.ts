@@ -93,11 +93,11 @@
  *  - the walked-into epic never carried as dry: 25 pass and 1 fail, the
  *    dry epic on the roadmap walk.
  */
-import type { NextSources } from './readings.js';
+import type { NextRoadmapReading, NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import type { Place } from '../project/position.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -105,8 +105,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createCommandRegistry } from '../cli/registry.js';
-import { CommandExit } from '../core/command/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { positionAt, writePositionFile } from '../project/position.js';
 import { resolveScope } from '../project/scope.js';
@@ -186,7 +187,7 @@ function contextFor(root: string, home: string, warnings: string[] = []): RafaCo
 }
 
 /** The sources composed for a project holding `config`, over seams that reach nothing real. */
-function sourcesFor(config: string, over: Partial<Parameters<typeof openNextSources>[1]> = {}): NextSources {
+async function sourcesFor(config: string, over: Partial<Parameters<typeof openNextSources>[1]> = {}): Promise<NextSources> {
   const { root, home } = plantProject(config);
   return openNextSources(contextFor(root, home), {
     readRemote: () => GITHUB_REMOTE,
@@ -280,24 +281,24 @@ function fakeGh(board: FakeBoard): { readonly gh: GhRunner; readonly calls: () =
 }
 
 describe('the sources one answer is read over', () => {
-  it('reads the base off pr.base, and main where the config names none', () => {
-    const named = sourcesFor('pr:\n  base: trunk\n');
-    const silent = sourcesFor('plan:\n  dir: .rafa/plans\n');
+  it('reads the base off pr.base, and main where the config names none', async () => {
+    const named = await sourcesFor('pr:\n  base: trunk\n');
+    const silent = await sourcesFor('plan:\n  dir: .rafa/plans\n');
 
     expect([named.base, silent.base]).toEqual(['trunk', DEFAULT_BASE_BRANCH]);
     expect(silent.base).toBe('main');
   });
 
-  it('reads the plans directory off plan.dir, in both spellings, and .rafa/plans where the config names none', () => {
-    const named = sourcesFor('plan:\n  dir: docs/plans\n');
-    const silent = sourcesFor('pr:\n  base: main\n');
+  it('reads the plans directory off plan.dir, in both spellings, and .rafa/plans where the config names none', async () => {
+    const named = await sourcesFor('plan:\n  dir: docs/plans\n');
+    const silent = await sourcesFor('pr:\n  base: main\n');
 
     expect(named.plans.label).toBe('docs/plans');
     expect(named.plans.path.endsWith(join('docs', 'plans'))).toBe(true);
     expect(silent.plans.label).toBe(join('.rafa', 'plans'));
   });
 
-  it('reads the release line off release.changelog, and CHANGELOG.md where the config names none, listing tags only when asked', () => {
+  it('reads the release line off release.changelog, and CHANGELOG.md where the config names none, listing tags only when asked', async () => {
     const { root, home } = plantProject('release:\n  changelog: docs/CHANGES.md\n');
     mkdirSync(join(root, 'docs'), { recursive: true });
     writeFileSync(join(root, 'docs', 'CHANGES.md'), '# Changes\n\n## 0.2.0\n\n## 0.1.0\n', 'utf8');
@@ -308,7 +309,7 @@ describe('the sources one answer is read over', () => {
         ? 'v0.1.0\n'
         : '');
     };
-    const opened = openNextSources(contextFor(root, home), {
+    const opened = await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       openGit: () => git,
       openGh: () => (): Promise<GhResult> => wrote('[]'),
@@ -317,11 +318,11 @@ describe('the sources one answer is read over', () => {
 
     const named = opened.release();
     const bare = plantProject('pr:\n  base: main\n');
-    const silent = openNextSources(contextFor(bare.root, bare.home), {
+    const silent = (await openNextSources(contextFor(bare.root, bare.home), {
       readRemote: () => GITHUB_REMOTE,
       openGit: () => git,
       openGh: () => (): Promise<GhResult> => wrote('[]'),
-    }).release();
+    })).release();
 
     expect(beforeAsking).toEqual([]);
     expect(named).toEqual({ changelog: 'docs/CHANGES.md', versions: ['0.2.0'], problem: null });
@@ -329,7 +330,7 @@ describe('the sources one answer is read over', () => {
     expect(silent.problem).toContain('the changelog could not be read');
   });
 
-  it('reads the session records under the project root, with the pid probe it is handed', () => {
+  it('reads the session records under the project root, with the pid probe it is handed', async () => {
     const { root, home } = plantProject('pr:\n  base: main\n');
     mkdirSync(join(root, '.rafa', 'runs'), { recursive: true });
     writeFileSync(join(root, '.rafa', 'runs', '20260922-090000-abcd.json'), JSON.stringify({
@@ -342,7 +343,7 @@ describe('the sources one answer is read over', () => {
       state: 'running',
       task: null,
     }), 'utf8');
-    const sources = openNextSources(contextFor(root, home), {
+    const sources = await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       isAlive: () => false,
     });
@@ -352,11 +353,11 @@ describe('the sources one answer is read over', () => {
     expect(records.map((record) => [record.sessionId, record.state])).toEqual([['20260922-090000-abcd', 'stopped']]);
   });
 
-  it('takes git, gh and the provider from the seams, each made for the project root', () => {
+  it('takes git, gh and the provider from the seams, each made for the project root', async () => {
     const { root, home } = plantProject('pr:\n  base: main\n');
     const roots: string[] = [];
     const pulls: PullRequests = createPullRequestsDouble({}).pulls;
-    const sources = openNextSources(contextFor(root, home), {
+    const sources = await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       openGh: (dir) => {
         roots.push(`gh:${dir}`);
@@ -376,11 +377,11 @@ describe('the sources one answer is read over', () => {
     expect(sources.pulls).toBe(pulls);
   });
 
-  it('refuses a repository whose provider is not gh with exit 2, and composes over one that is', () => {
-    const composed = sourcesFor('pr:\n  base: main\n', { readRemote: () => GITHUB_REMOTE });
+  it('refuses a repository whose provider is not gh with exit 2, and composes over one that is', async () => {
+    const composed = await sourcesFor('pr:\n  base: main\n', { readRemote: () => GITHUB_REMOTE });
     let refused: CommandExit | null = null;
     try {
-      sourcesFor('pr:\n  base: main\n', { readRemote: () => 'git@gitlab.com:someone/else.git' });
+      await sourcesFor('pr:\n  base: main\n', { readRemote: () => 'git@gitlab.com:someone/else.git' });
     } catch (error) {
       refused = error instanceof CommandExit
         ? error
@@ -392,12 +393,12 @@ describe('the sources one answer is read over', () => {
     expect(refused?.message).toContain('pr.provider');
   });
 
-  it('refuses a config that cannot be used with exit 1, naming rafa next', () => {
+  it('refuses a config that cannot be used with exit 1, naming rafa next', async () => {
     const { root, home } = plantProject('plan:\n  dir: 12\n');
     let refused: CommandExit | null = null;
 
     try {
-      openNextSources(contextFor(root, home), { readRemote: () => GITHUB_REMOTE });
+      await openNextSources(contextFor(root, home), { readRemote: () => GITHUB_REMOTE });
     } catch (error) {
       refused = error instanceof CommandExit
         ? error
@@ -408,12 +409,12 @@ describe('the sources one answer is read over', () => {
     expect(refused?.message).toContain('rafa next: the config cannot be used');
   });
 
-  it('reads nothing off git, the board or the provider until a row asks', () => {
+  it('reads nothing off git, the board or the provider until a row asks', async () => {
     const { root, home } = plantProject('pr:\n  base: main\n');
     const git = recordingGit();
     const gh = fakeGh({});
 
-    openNextSources(contextFor(root, home), {
+    await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       openGit: () => git.git,
       openGh: () => gh.gh,
@@ -448,6 +449,25 @@ describe('the board the roadmap rows are read through', () => {
       'for-each-ref --format=%(refname) refs/heads refs/remotes',
       'ls-remote --heads origin',
     ]);
+  });
+
+  it('reads the line\'s branch under naming.branch, and the default template reads none of it', async () => {
+    const workRef = `refs/remotes/origin/work/rafa-${String(ISSUE)}-x`;
+    const git: GitRunner = (args) => said(args[0] === 'for-each-ref'
+      ? `${workRef}\n`
+      : '');
+    const read = (branchTemplate?: string): Promise<NextRoadmapReading> => {
+      const gh = fakeGh({ issues: { [ROADMAP]: { body: ROADMAP_BODY }, [ISSUE]: {} } });
+      return (branchTemplate === undefined
+        ? ghNextBoard({ gh: gh.gh, git, configured: ROADMAP })
+        : ghNextBoard({ gh: gh.gh, git, configured: ROADMAP, branchTemplate })).next();
+    };
+
+    const templated = await read('work/{stub}');
+    const untemplated = await read();
+
+    expect([templated.line?.issue ?? null, templated.passed]).toEqual([null, 2]);
+    expect([untemplated.line?.issue ?? null, untemplated.passed]).toEqual([ISSUE, 1]);
   });
 
   it('sends no search where roadmap.issue names the issue', async () => {
@@ -751,7 +771,7 @@ describe('the board starting from the current place', () => {
     const { root, home } = plantProject(`pr:\n  base: main\nroadmap:\n  issue: ${String(ROADMAP)}\n`);
     writePositionFile(root, positionAt({ board: BOARD, epic: null }));
     const gh = fakeGh({ issues: ISSUES, listing: LISTING });
-    const sources = openNextSources(contextFor(root, home), {
+    const sources = await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       openGh: () => gh.gh,
       openGit: () => recordingGit().git,
@@ -766,10 +786,10 @@ describe('the board starting from the current place', () => {
 
 describe('the sources of one answer against the next', () => {
   /** A project whose config names the roadmap, over a gh that can be re-labelled. */
-  function overLabels(labels: () => readonly string[]): {
-    readonly sources: ReturnType<typeof openNextSources>;
+  async function overLabels(labels: () => readonly string[]): Promise<{
+    readonly sources: Awaited<ReturnType<typeof openNextSources>>;
     readonly calls: () => readonly string[];
-  } {
+  }> {
     const calls: string[] = [];
     const gh: GhRunner = (args) => {
       calls.push(args.slice(0, 3).join(' '));
@@ -784,7 +804,7 @@ describe('the sources of one answer against the next', () => {
       return Promise.resolve({ ok: false, stdout: '', stderr: `unexpected ${args.join(' ')}` });
     };
     const { root, home } = plantProject(`version: 1\nboard:\n  roadmapIssue: ${String(ROADMAP)}\n`);
-    const sources = openNextSources(contextFor(root, home), {
+    const sources = await openNextSources(contextFor(root, home), {
       readRemote: () => GITHUB_REMOTE,
       openGh: () => gh,
       openGit: () => (): GitResult => said(''),
@@ -795,7 +815,7 @@ describe('the sources of one answer against the next', () => {
 
   it('reads the issue once within one answer, and again for the next one', async () => {
     const held = { labels: [] as readonly string[] };
-    const { sources, calls } = overLabels(() => held.labels);
+    const { sources, calls } = await overLabels(() => held.labels);
 
     expect(await sources.board.isReady(ISSUE)).toBe(false);
     expect(await sources.board.blocking(ISSUE)).toBeNull();
@@ -810,7 +830,7 @@ describe('the sources of one answer against the next', () => {
 
   it('sees a label the last answer did not, which is what a chain turn needs', async () => {
     const held = { labels: [] as readonly string[] };
-    const { sources } = overLabels(() => held.labels);
+    const { sources } = await overLabels(() => held.labels);
 
     expect(await sources.board.isReady(ISSUE)).toBe(false);
     // What `rafa issue ready` does between two turns of the chain.

@@ -46,8 +46,10 @@
  * asked.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
 import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,6 +57,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { KNOWN_LIST_LIMIT } from '../board/blocked-issues.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { createIssueUnblockCommand } from '../commands/issue/unblock.js';
 import { createPrMergeCommand } from '../commands/pr/merge.js';
@@ -127,6 +130,30 @@ function heldIssues(board: Readonly<Record<string, BoardIssue>>): readonly HeldI
   }));
 }
 
+/** How a case's runner reads the board's states, beyond the plain listing. */
+interface BoardReading {
+  /** Fill the state listing to `KNOWN_LIST_LIMIT` rows, leaving this issue out of it. */
+  readonly fullListingWithout?: number;
+  /** Answer every `gh issue view <n> --json number,state` with a failure. */
+  readonly failedViews?: boolean;
+}
+
+/** The first number of the closed filler rows of a full listing, past every issue the board holds. */
+const FILLER_FROM = 1000;
+
+/** `rows` without `left`, topped up with closed filler rows to `KNOWN_LIST_LIMIT`. */
+function fillListing(
+  rows: readonly { number: number; state: string }[],
+  left: number,
+): readonly { number: number; state: string }[] {
+  const kept = rows.filter((row) => row.number !== left);
+  const filler = Array.from({ length: KNOWN_LIST_LIMIT - kept.length }, (_row, index) => ({
+    number: FILLER_FROM + index,
+    state: 'CLOSED',
+  }));
+  return [...kept, ...filler];
+}
+
 /**
  * A `gh` runner over `board`, answering every command the two dispatched
  * commands in this file send: `issue view` for a line naming one issue,
@@ -137,10 +164,11 @@ function heldIssues(board: Readonly<Record<string, BoardIssue>>): readonly HeldI
  * what actually went through `board/issue-board.ts` rather than a
  * stub's own bookkeeping.
  */
-function fakeGh(board: Readonly<Record<string, BoardIssue>>): {
+function fakeGh(board: Readonly<Record<string, BoardIssue>>, reading: BoardReading = {}): {
   run: GhRunner;
   calls: () => readonly (readonly string[])[];
   removed: () => readonly string[];
+  stateViews: () => readonly string[];
 } {
   const calls: (readonly string[])[] = [];
   const removed: string[] = [];
@@ -160,6 +188,12 @@ function fakeGh(board: Readonly<Record<string, BoardIssue>>): {
       return ok(JSON.stringify({ number: ROADMAP_ISSUE, body: roadmapBody }));
     }
     const route = args.slice(0, 2).join(' ');
+    if (route === 'issue view' && args.includes('number,state')) {
+      if (reading.failedViews === true) return Promise.resolve({ ok: false, stdout: '', stderr: 'HTTP 502: bad gateway' });
+      const seen = held.find((issue) => String(issue.number) === args[2]);
+      if (seen === undefined) return Promise.resolve({ ok: false, stdout: '', stderr: `no issue ${args[2] ?? ''}` });
+      return ok(JSON.stringify({ number: seen.number, state: seen.state }));
+    }
     if (route === 'issue view') {
       const found = held.find((issue) => String(issue.number) === args[2]);
       if (found === undefined) return Promise.resolve({ ok: false, stdout: '', stderr: `no issue ${args[2] ?? ''}` });
@@ -180,10 +214,18 @@ function fakeGh(board: Readonly<Record<string, BoardIssue>>): {
       const blocked = held.filter((issue) => issue.state === 'OPEN' && issue.labels.includes(SPEC_BLOCKED_LABEL));
       return ok(JSON.stringify(blocked.map((issue) => ({ number: issue.number, body: issue.body }))));
     }
-    if (args.includes('all')) return ok(JSON.stringify(held.map((issue) => ({ number: issue.number, state: issue.state }))));
+    if (args.includes('all')) {
+      const rows = held.map((issue) => ({ number: issue.number, state: issue.state }));
+      return ok(JSON.stringify(reading.fullListingWithout === undefined
+        ? rows
+        : fillListing(rows, reading.fullListingWithout)));
+    }
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${args.join(' ')}` });
   };
-  return { run, calls: () => calls, removed: () => [...removed] };
+  const stateViews = (): readonly string[] => calls
+    .filter((args) => args.slice(0, 2).join(' ') === 'issue view' && args.includes('number,state'))
+    .map((args) => args[2] ?? '');
+  return { run, calls: () => calls, removed: () => [...removed], stateViews };
 }
 
 /** A prompter answering each question with `answers` in turn, then declining, recording what it was asked. */
@@ -374,4 +416,90 @@ describe('the question asked at the end of a merge that closes #A', () => {
       `#13 is blocked by #${String(C)} (open), so ${SPEC_BLOCKED_LABEL} stays`,
     ]);
   });
+});
+
+describe('a blocker past the state listing, read through one view on either door', () => {
+  const BRANCH = 'feat/rafa-63-blocked-issues';
+  const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
+
+  /** `rafa issue unblock 12 --yes` over the full listing without #A. */
+  async function unblockDoor(reading: BoardReading): Promise<{ gh: ReturnType<typeof fakeGh>; stdout: string; exitCode: number | null }> {
+    const gh = fakeGh(sharedBoard(true), reading);
+    const command = createIssueUnblockCommand({ openGh: () => gh.run, isTerminal: () => true, openPrompter: scriptedPrompter([]).open });
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes', NO_HINT], SUBJECTS, [command], freshProject());
+    return { gh, stdout: outcome.stdout, exitCode: outcome.exitCode };
+  }
+
+  /** `rafa pr merge` of a pull request closing #A over the full listing without #A. */
+  async function mergeDoor(reading: BoardReading): Promise<{ gh: ReturnType<typeof fakeGh>; stdout: string; exitCode: number | null }> {
+    const project = freshProject(ROADMAP_CONFIG);
+    const gh = fakeGh(sharedBoard(true), reading);
+    const detail: PullRequestDetail = {
+      number: 41,
+      title: 'rafa-63: unblock issues waiting on #A',
+      url: 'https://github.com/open-tomato/rafa/pull/41',
+      state: 'open',
+      headRefName: BRANCH,
+      baseRefName: 'main',
+      author: { login: 'octo', isBot: false },
+      isCrossRepository: false,
+      updatedAt: '2026-09-21T09:00:00Z',
+      body: `Closes #${String(A)}`,
+      headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+      headCommittedAt: null,
+      mergeable: 'mergeable',
+      mergeStateStatus: 'CLEAN',
+      labels: [],
+      closes: [],
+    };
+    const git: GitRunner = (args) => {
+      const answers: Record<string, string> = {
+        'worktree list --porcelain': `worktree ${project.root}\nbranch refs/heads/${BRANCH}\n\n`,
+        'rev-parse --show-toplevel': `${project.root}\n`,
+        [`ls-remote --heads origin ${BRANCH}`]: `1f0c2b7\trefs/heads/${BRANCH}\n`,
+      };
+      return { ok: true, stdout: answers[args.join(' ')] ?? '', stderr: '' };
+    };
+    const stub = createPullRequestsDouble({
+      get: () => Promise.resolve(detail),
+      checks: () => Promise.resolve({ rows: [], verdict: 'green' } as ChecksReading),
+      merge: () => Promise.resolve({ merged: true, detail: 'Squashed and merged pull request #41' } as MergeOutcome),
+    }, { refusal: 'this scenario models get, checks and merge alone' });
+    const command = createPrMergeCommand({
+      pullRequests: () => stub.pulls,
+      readBranch: () => BRANCH,
+      readRemote: () => GITHUB_ORIGIN,
+      git: () => git,
+      gh: () => gh.run,
+      isTerminal: () => true,
+      openPrompter: scriptedPrompter(['y']).open,
+    });
+    const outcome = await dispatchInProject(['pr', 'merge', '41', '--yes', NO_HINT], SUBJECTS, [command], project);
+    return { gh, stdout: outcome.stdout, exitCode: outcome.exitCode };
+  }
+
+  const doors = [
+    { name: 'rafa issue unblock 12 --yes', open: unblockDoor },
+    { name: 'rafa pr merge', open: mergeDoor },
+  ] as const;
+
+  for (const door of doors) {
+    it(`${door.name} reads #A through one view and removes the label when the view answers CLOSED`, async () => {
+      const outcome = await door.open({ fullListingWithout: A });
+
+      expect(outcome.exitCode).toBe(0);
+      expect(outcome.gh.stateViews()).toEqual([String(A)]);
+      expect(outcome.gh.removed()).toEqual([`#12 ${SPEC_BLOCKED_LABEL}`]);
+      expect(outcome.stdout).toContain(`Removed ${SPEC_BLOCKED_LABEL} from #12`);
+    });
+
+    it(`${door.name} keeps the label and names #${String(A)} (state not read) when #A's view fails`, async () => {
+      const outcome = await door.open({ fullListingWithout: A, failedViews: true });
+
+      expect(outcome.exitCode).toBe(0);
+      expect(outcome.gh.stateViews()).toEqual([String(A)]);
+      expect(outcome.gh.removed()).toEqual([]);
+      expect(outcome.stdout).toContain(`#${String(A)} (state not read)`);
+    });
+  }
 });

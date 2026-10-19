@@ -1,6 +1,6 @@
 /**
  * Merge fixture extract: the command line of
- * `src/effort/store/fixture-extract.ts`, whose module note is the long
+ * `packages/rafa/src/effort/store/fixture-extract.ts`, whose module note is the long
  * form of what is replaced, what is kept and what is sampled.
  *
  * Usage:
@@ -27,12 +27,14 @@
  *
  * Exit codes: 0 written, 2 the extract could not run.
  */
-import type { Extract, OverlapCap } from '../src/effort/store/fixture-extract.js';
+import type { Extract, OverlapCap } from '@open-tomato/rafa/store/fixture-extract';
 
 import { resolve } from 'node:path';
 
-import { messageOf } from '../src/core/config/sections.js';
-import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE, extractStores, writeExtract } from '../src/effort/store/fixture-extract.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE, extractStores, writeExtract } from '@open-tomato/rafa/store/fixture-extract';
+
+import { fixtureScrubber, machineScrubContext } from '../src/fixtures/scrub.js';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[extract]';
@@ -121,10 +123,14 @@ export function summaryLines(extract: Extract): string[] {
   ));
 }
 
-/** Runs one extract over `args`, writing its lines to `log`, and answers the exit code. */
+/**
+ * Runs one extract over `args`, writing its lines to `log`, and answers
+ * the exit code. The files go through the running machine's fixture
+ * scrub, which this script builds and hands to the store.
+ */
 export function runExtract(args: ExtractArgs, log: (line: string) => void): number {
   const extract = extractStores(args.pathA, args.pathB, args.perSide, args.overlap);
-  const written = writeExtract(extract, args.outDir);
+  const written = writeExtract(extract, args.outDir, fixtureScrubber(machineScrubContext(process.cwd())));
   for (const line of summaryLines(extract)) log(line);
   for (const path of written) log(`${TAG} wrote ${path}`);
   return EXIT_WRITTEN;

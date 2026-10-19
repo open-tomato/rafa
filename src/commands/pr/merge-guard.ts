@@ -24,8 +24,11 @@
  *     `stale` answer under `pr.versionCollision: refuse`, or a
  *     `collision` without `dangerous.acceptVersionCollision`.
  *   - `accept` — a `collision` under `dangerous.acceptVersionCollision`:
- *     the lines as warnings and one more naming the setting that let it
- *     through, and the merge goes on.
+ *     the lines as warnings, and the merge goes on. The setting that let
+ *     it through is named by the loader's pass line, which ends with the
+ *     phrase `pr merge` declares for the key (`MERGE_DANGEROUS_PHRASES`
+ *     in `./declarations.ts`, `packages/rafa/src/core/config/dangerous.ts`),
+ *     so this step prints no line of its own for it.
  *
  * Every refusal names the answer and the setting first and the guard's
  * lines after, so a `stale` or `collision` refusal still ENDS with
@@ -45,12 +48,13 @@
  * no line, and its `pr merge` is what it was before the guard.
  */
 import type { PrContext } from './pr-context.js';
-import type { Prompter } from '../../core/command/index.js';
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { GuardReaction } from '../../release/guard-merge.js';
 import type { GuardAnswer, GuardReading } from '../../release/guard.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
 import { guardLines, localPlanNotes } from '../../release/guard.js';
@@ -143,9 +147,6 @@ function printLines(step: MergeGuardStep, reaction: GuardReaction, lines: readon
     ? step.info
     : step.warn;
   for (const line of lines) write(line);
-  if (reaction === 'accept') {
-    step.warn(`#${step.detail.number} merges anyway: dangerous.acceptVersionCollision is true.`);
-  }
 }
 
 /**

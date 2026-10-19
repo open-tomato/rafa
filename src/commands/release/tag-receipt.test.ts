@@ -46,7 +46,7 @@ function tag(raw: string): ReleaseTag {
   const bare = raw.slice(1);
   const parsed = parseSemanticVersion(bare);
   if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
-  return { tag: raw, version: bare, parsed };
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** Readings that all agree and carry a receipt, narrowed by `over`. */
@@ -54,6 +54,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
   return {
     releaseBranch: DEFAULT_RELEASE_BRANCH,
     branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null },
+    package: null,
     version: { path: 'package.json', text: null, version: VERSION, problem: null },
     changelog: { path: 'CHANGELOG.md', version: VERSION, problem: null },
     tags: { tags: [tag('v0.7.0')], latest: tag('v0.7.0'), problem: null },

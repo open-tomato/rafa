@@ -117,15 +117,17 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan , rejectedPath } from '../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan , rejectedPath } from '@open-tomato/rafa/core/plan';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   enforceSpecReview,
   NO_COMMENT_FLAG,
   readGateFlags,
+  reviewIssueWarning,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
@@ -163,14 +165,21 @@ function reviewOf(...lines: readonly string[]): SpecReviewReading {
   return parseSpecReview(['I read the spec first.', '', '```rafa:spec-review', ...lines, '```', ''].join('\n'));
 }
 
-/** A verdict naming two gaps. */
+/**
+ * A verdict naming two blocking gaps. Each says `blocking: true`
+ * outright: a gap that left it out would be read as blocking all the
+ * same, with an issue the gate warns about, and these cases hold the
+ * refusal's own lines.
+ */
 const NOT_READY = reviewOf(
   'verdict: not-ready',
   'gaps:',
   '  - heading: "Definition of done"',
   '    what: "no item says how the merge clean-up is verified"',
+  '    blocking: true',
   '  - heading: "Tasks the plan must carry"',
   '    what: "the third task does not name what it changes"',
+  '    blocking: true',
 );
 
 /** A verdict naming two gaps, neither of which blocks planning. */
@@ -207,6 +216,20 @@ const ONE_BLOCKING = reviewOf(
 
 /** A verdict that lets the plan stand. */
 const READY = reviewOf('verdict: ready');
+
+/**
+ * A ready verdict the parser read only on its second try: the `what`
+ * is #1089's assumption, unquoted, whose `: ` throws the first parse.
+ * Read after quoting, it carries exactly one issue naming the block's
+ * line.
+ */
+const READY_AFTER_QUOTING = reviewOf(
+  'verdict: ready',
+  'gaps:',
+  '  - heading: Definition of done',
+  '    what: The definition of done is note 5\'s: scripts/survey/cut-table.ts reports the cut',
+  '    blocking: true',
+);
 
 /** A session that said nothing about the spec at all. */
 const ABSENT = parseSpecReview('I wrote the plan and stopped.\n');
@@ -356,7 +379,7 @@ function plantPlanned(text: string): string {
 }
 
 /** The `CommandExit` a run refused with; fails the case when it let the review through. */
-async function refusalOf(run: Promise<void>): Promise<CommandExit> {
+async function refusalOf(run: Promise<unknown>): Promise<CommandExit> {
   try {
     await run;
   } catch (error) {
@@ -418,6 +441,56 @@ describe('enforceSpecReview lets through', () => {
 
     expect(standing).toBe('unjudged');
     expect(existsSync(join(root, PLAN_PATH))).toBe(true);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('enforceSpecReview warns the issues a reading carries', () => {
+  it('one warning for a ready verdict carrying one issue, naming the block line', async () => {
+    const root = plantRepo();
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+    expect(READY_AFTER_QUOTING.ready).toBe(true);
+    expect(READY_AFTER_QUOTING.issues).toHaveLength(1);
+
+    const standing = await enforceSpecReview({
+      review: READY_AFTER_QUOTING,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: true,
+      output,
+    });
+
+    expect(standing).toBe('ready');
+    expect(lines.warn).toEqual(READY_AFTER_QUOTING.issues.map(reviewIssueWarning));
+    expect(lines.warn[0]).toContain('rafa:spec-review block at line 3');
+    expect(lines.warn[0]).toContain('read after quoting');
+    expect(lines.info).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('no warning for a ready verdict carrying none', async () => {
+    const root = plantRepo();
+    const { board, calls } = fakeBoard(false);
+    const { lines, output } = capture();
+    expect(READY.issues).toEqual([]);
+
+    const standing = await enforceSpecReview({
+      review: READY,
+      source: 'issue #20',
+      repoRoot: root,
+      planPath: PLAN_PATH,
+      prerequisitesPath: PREREQUISITES_PATH,
+      issue: { number: 20, board, trust: TRUSTING },
+      comment: true,
+      output,
+    });
+
+    expect(standing).toBe('ready');
+    expect(lines).toEqual({ info: [], warn: [] });
     expect(calls).toEqual([]);
   });
 });

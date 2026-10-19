@@ -1,0 +1,49 @@
+{
+  "name": "@open-tomato/rafa-core",
+  "version": "0.45.0",
+  "description": "rafa's core: the contracts, the effort store and the ports every other part of rafa imports. Private until #808 publishes it.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    "./store": "./src/effort/store/index.ts",
+    "./ports": "./src/ports/index.ts",
+    "./core/adapters": "./src/core/adapters/index.ts",
+    "./core/command": "./src/core/command/index.ts",
+    "./core/config": "./src/core/config/index.ts",
+    "./core/config/load": "./src/core/config/load.ts",
+    "./core/config/sections": "./src/core/config/sections.ts",
+    "./core/git": "./src/core/git/index.ts",
+    "./core/loop": "./src/core/loop/index.ts",
+    "./core/loop/hops": "./src/core/loop/hops.ts",
+    "./core/loop/readings": "./src/core/loop/readings.ts",
+    "./core/output": "./src/core/output/index.ts",
+    "./core/plan": "./src/core/plan/index.ts",
+    "./core/plan/block-reader": "./src/core/plan/block-reader.ts",
+    "./core/runtime": "./src/core/runtime/index.ts",
+    "./report/parse": "./src/report/parse.ts",
+    "./report/record": "./src/report/record.ts",
+    "./schema/tiers": "./src/schema/tiers.ts",
+    "./schema/project-id": "./src/schema/project-id.ts",
+    "./core/config/config-schema": "./src/core/config/config-schema.ts",
+    "./store/*": "./src/effort/store/*.ts",
+    "./ports/*": "./src/ports/*.ts",
+    "./errors/*": "./src/errors/*.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test",
+    "check-types": "tsc --build"
+  },
+  "dependencies": {
+    "@open-tomato/define-config": "0.5.0"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

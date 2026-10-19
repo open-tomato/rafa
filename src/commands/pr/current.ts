@@ -71,11 +71,12 @@
  * request. A checks call that failed is NOT one of them; see above.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksVerdict, PullRequests, PullRequestState } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
+import { PR_CURRENT_DECLARATION } from './declarations.js';
 import { DEFAULT_PR_SEAMS, expectNoArguments, openPrContext, pickPullRequest, PR_USAGE } from './pr-context.js';
 
 /** The usage line this action's refusals name. */
@@ -165,7 +166,7 @@ async function probeChecks(pulls: PullRequests, number: number): Promise<ChecksP
 /** Reads the open pull request of the branch, and everything the line carries; see the module note. */
 export async function readCurrent(context: RafaContext, seams: PrSeams): Promise<PrCurrentResult> {
   expectNoArguments(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, null, USAGE);
   const summary = pick.summary;
   const probe = await probeChecks(pr.pulls, pick.number);
@@ -189,30 +190,7 @@ export async function readCurrent(context: RafaContext, seams: PrSeams): Promise
 /** The command, reaching the provider and the branch through `seams`; see the module note. */
 export function createPrCurrentCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr current',
-    subject: 'pr',
-    action: 'current',
-    summary: 'show the open pull request of the current branch on one line',
-    description: 'Reads the open pull request whose head is the branch checked out at the project root, and'
-      + ' prints one line carrying its number, title, state, the verdict over its checks, and its URL.'
-      + ' A part the provider answered nothing for is left out, so a pull request that only answers a URL'
-      + ' prints as that URL alone. When the checks cannot be read at all the verdict is left out and what'
-      + ' the GitHub CLI said is warned about, where a pull request with no checks prints `checks none`.'
-      + ' With `--output=json` the branch, the line, the parts it was built from and any checks problem are'
-      + ' the data of the terminal result event. Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa pr current',
-        note: 'Prints one line for the open pull request of the branch checked out at the project root.',
-      },
-      {
-        cmd: 'rafa pr current --output=json',
-        note: 'Writes a start event, then a result event holding the branch, the line and each part of it.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_CURRENT_DECLARATION,
     run: async (context) => {
       const current = await readCurrent(context, seams);
       if (context.outputMode === 'json') {

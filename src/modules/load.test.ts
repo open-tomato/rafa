@@ -13,7 +13,10 @@
  * with that one thing put back.
  */
 import type { ModuleSettings } from './load.js';
-import type { ModuleSource } from '../core/config/index.js';
+import type { ModuleSource } from '@open-tomato/rafa/core/config';
+
+import '../config-registry.js';
+import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,10 +24,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../core/adapters/index.js';
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
-import { loadInvocationModules, loadModules, moduleSettings } from './load.js';
+import { disabledFeatures, loadInvocationModules, loadModules, moduleSettings } from './load.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-module-load-')));
 
@@ -371,8 +374,28 @@ describe('moduleSettings', () => {
     const fromFile = resolveConfig({ cli: {}, file: parseConfigText('modules:\n  - path: ../x\n', '/project/.rafa/config.yaml'), user: null });
     const fromUser = resolveConfig({ cli: {}, file: null, user: parseConfigText('modules:\n  - path: ../x\nallowList: [x]\n', '/home/someone/.rafa/config.yaml') });
 
-    expect(moduleSettings(fromFile, place)).toEqual({ modules: [pathSource('../x')], allowList: [], base: '/project' });
-    expect(moduleSettings(fromUser, place)).toEqual({ modules: [pathSource('../x')], allowList: ['x'], base: '/home/someone' });
+    expect(moduleSettings(fromFile, place)).toEqual({ modules: [pathSource('../x')], allowList: [], base: '/project', disabledFeatures: [] });
+    expect(moduleSettings(fromUser, place)).toEqual({ modules: [pathSource('../x')], allowList: ['x'], base: '/home/someone', disabledFeatures: [] });
+  });
+});
+
+describe('disabledFeatures', () => {
+  it('names each feature whose key resolved false, in FEATURES_SETTINGS order, and none for the defaults', () => {
+    const off = resolveConfig({ cli: {}, file: parseConfigText('features:\n  release: false\n  board: false\n  pr: true\n', '/project/.rafa/config.yaml'), user: null });
+    const defaults = resolveConfig({ cli: {}, file: null, user: null });
+
+    expect(disabledFeatures(off.config)).toEqual(['board', 'release']);
+    expect(disabledFeatures(defaults.config)).toEqual([]);
+  });
+});
+
+describe('loadModules and disabledFeatures', () => {
+  it('hands on the features its settings carry, and answers none when they carry none', async () => {
+    const carried = await loadModules({ modules: [], allowList: [], base: tempBase, disabledFeatures: ['pr'] });
+    const left = await loadModules({ modules: [], allowList: [], base: tempBase });
+
+    expect(carried.disabledFeatures).toEqual(['pr']);
+    expect(left.disabledFeatures).toEqual([]);
   });
 });
 
@@ -399,19 +422,60 @@ describe('loadInvocationModules', () => {
     expect(loaded.commands).toEqual([{ name: 'demo', entry: join(dir, 'commands.ts') }]);
   });
 
+  /** `plantProject` with `userText` written as the user scope's config under its home. */
+  function plantWithUser(configText: string, userText: string): { root: string; home: string } {
+    const project = plantProject(configText);
+    mkdirSync(join(project.home, '.rafa'));
+    writeFileSync(join(project.home, '.rafa', 'config.yaml'), userText);
+    return project;
+  }
+
+  it('answers pr disabled for a project config setting features.pr to false, and none for the same project without it', async () => {
+    const off = plantProject('version: 1\nfeatures:\n  pr: false\n');
+    const control = plantProject('version: 1\n');
+
+    const disabled = await loadInvocationModules({ cwd: off.root, home: off.home });
+    const enabled = await loadInvocationModules({ cwd: control.root, home: control.home });
+
+    expect(disabled.disabledFeatures).toEqual(['pr']);
+    expect(enabled.disabledFeatures).toEqual([]);
+  });
+
+  it('reads a user-scope features.pr: false that the project leaves unset, and lets the project outrank it', async () => {
+    const userOnly = plantWithUser('version: 1\n', 'features:\n  pr: false\n');
+    const outranked = plantWithUser('version: 1\nfeatures:\n  pr: true\n', 'features:\n  pr: false\n');
+
+    const fromUser = await loadInvocationModules({ cwd: userOnly.root, home: userOnly.home });
+    const fromProject = await loadInvocationModules({ cwd: outranked.root, home: outranked.home });
+
+    expect(fromUser.disabledFeatures).toEqual(['pr']);
+    expect(fromProject.disabledFeatures).toEqual([]);
+  });
+
+  it('answers no disabled feature outside a project, even with a user-scope file turning pr off', async () => {
+    const outside = mkdtempSync(join(tempBase, 'outside-'));
+    const home = join(outside, 'home');
+    mkdirSync(join(home, '.rafa'), { recursive: true });
+    writeFileSync(join(home, '.rafa', 'config.yaml'), 'features:\n  pr: false\n');
+
+    const loaded = await loadInvocationModules({ cwd: outside, home });
+
+    expect(loaded.disabledFeatures).toEqual([]);
+  });
+
   it('loads none outside a project, warning about nothing', async () => {
     const outside = mkdtempSync(join(tempBase, 'outside-'));
 
     const loaded = await loadInvocationModules({ cwd: outside, home: join(outside, 'home') });
 
-    expect(loaded).toEqual({ adapters: CORE_ADAPTER_REGISTRY, commands: [], modules: [], warnings: [] });
+    expect(loaded).toEqual({ adapters: CORE_ADAPTER_REGISTRY, commands: [], modules: [], warnings: [], disabledFeatures: [] });
   });
 
   it('loads none and warns nothing for a config that cannot be used and for a relative working directory, where the same project with a usable config loads', async () => {
     const dir = plantModule({ name: 'demo', rafa: manifest() });
     const refusedProject = plantProject(`version: 1\nstore: postgres\nmodules:\n  - path: ${dir}\nallowList: [demo]\n`);
     const control = plantProject(`version: 1\nmodules:\n  - path: ${dir}\nallowList: [demo]\n`);
-    const none = { adapters: CORE_ADAPTER_REGISTRY, commands: [], modules: [], warnings: [] };
+    const none = { adapters: CORE_ADAPTER_REGISTRY, commands: [], modules: [], warnings: [], disabledFeatures: [] };
 
     const refused = await loadInvocationModules({ cwd: refusedProject.root, home: refusedProject.home }, { manifest: MANIFEST_SEAMS });
     const relativeCwd = await loadInvocationModules({ cwd: 'relative/dir', home: control.home }, { manifest: MANIFEST_SEAMS });

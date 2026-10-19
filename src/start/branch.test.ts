@@ -33,13 +33,14 @@
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
-import type { Prompter } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { offerRunBranch } from './branch.js';
@@ -373,6 +374,28 @@ describe('--create-branch', () => {
 
     expect(moved(outcome).route).toBe('switch-local');
     expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', `switch ${BRANCH}`]);
+  });
+
+  it('reads and switches to the branch naming.branch names, never feat/<stub>', async () => {
+    const named = 'work/rafa-49';
+    const git = world({
+      [`show-ref --verify --quiet refs/heads/${named}`]: ok(''),
+      [`show-ref --verify --quiet refs/remotes/origin/${named}`]: failed(),
+      [`switch ${named}`]: ok(),
+    });
+    const outcome = await offerRunBranch(
+      request({ createBranch: true, branchTemplate: 'work/{stub}' }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(moved(outcome).branch).toBe(named);
+    expect(moved(outcome).route).toBe('switch-local');
+    expect(git.ran).toEqual([
+      `show-ref --verify --quiet refs/heads/${named}`,
+      `show-ref --verify --quiet refs/remotes/origin/${named}`,
+      'status --porcelain',
+      `switch ${named}`,
+    ]);
   });
 });
 

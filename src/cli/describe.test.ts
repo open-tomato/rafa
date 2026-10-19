@@ -47,12 +47,13 @@
  */
 import type { DescribedAction, DescribeDocument } from './describe.js';
 import type { CommandRegistry } from './registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
+
 import { CORE_REGISTRY } from '../commands/index.js';
-import { commandSpelling, isTopLevel } from '../core/command/index.js';
 
 import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from './describe.js';
 import { createCommandRegistry, mountKey } from './registry.js';
@@ -254,7 +255,8 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'claim')?.actions.map((action) => action.name)).toEqual(['release', 'hand', 'accept', 'take']);
     expect(document.subjects.find((subject) => subject.name === 'loop')?.actions.map((action) => action.name)).toEqual(['start', 'stop', 'pause', 'resume', 'status', 'list', 'wait']);
     expect(document.subjects.find((subject) => subject.name === 'stretch')?.actions.map((action) => action.name)).toContain('start');
-    expect(document.subjects.find((subject) => subject.name === 'bug')?.actions.map((action) => action.name)).toEqual(['codes']);
+    expect(document.subjects.find((subject) => subject.name === 'bug')?.actions.map((action) => action.name)).toEqual(['codes', 'recheck']);
+    expect(document.subjects.find((subject) => subject.name === 'docs')?.actions.map((action) => action.name)).toEqual(['plan']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -266,6 +268,8 @@ describe('the document over the core registry', () => {
     expect(spendsOf('skill', 'backfill')?.when).toBe('with');
     expect(spendsOf('loop', 'start')?.when).toBe('always');
     expect(spendsOf('loop', 'wait')).toBeNull();
+    expect(spendsOf('issue', 'unblock')).toBeNull();
+    expect(actionOf(document, 'issue', 'unblock')?.flags.map((flag) => flag.name)).toContain('yes');
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();
@@ -287,6 +291,8 @@ describe('the document over the core registry', () => {
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
     expect(spendsOf('bug', 'codes')).toBeNull();
+    expect(spendsOf('bug', 'recheck')).toBeNull();
+    expect(spendsOf('docs', 'plan')).toBeNull();
     expect(spendsOf('board', 'sync')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();

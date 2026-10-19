@@ -83,7 +83,10 @@
  * rule throws exit code 1 with one line per broken rule, the plan and
  * its PREREQUISITES file moved into `rejected/` first
  * (`commands/plan/store-check.ts`); that check runs straight after the
- * session and before the gate. Text mode writes
+ * session and before the gate. Straight after it, never as a refusal,
+ * a plan whose task edits an agent or a skill rafa bundles gets a note
+ * per item, its tier pin written as a `[human]` item of the plan's
+ * PREREQUISITES file (`commands/plan/bundled-check.ts`). Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
  *
@@ -158,7 +161,7 @@
  * `src/` in a checkout and `dist/` in a build, where the build copies
  * `src/bundled/` whole; a project running an installed rafa has no copy
  * of its own. The directory is this module's `import.meta.url`, not the
- * entry `bundledSkillsDirectory` measures from (`src/schema/tiers.ts`):
+ * entry `bundledSkillsDirectory` measures from (`packages/rafa/src/schema/tiers.ts`):
  * `planCommand` also runs from the library bundle, `dist/index.js`,
  * where `Bun.main` is the importing program and not rafa's `cli.js`.
  *
@@ -208,8 +211,8 @@
  * ## The settings the session loads
  *
  * The session loads settings from the sources `loop.settingSources`
- * names, resolved from the project's and the user scope's
- * `.rafa/config.yaml` as `rafa start` resolves them (`config-load.ts`),
+ * names, resolved from the project's and the user scope's config
+ * as `rafa start` resolves them (`config-load.ts`),
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
@@ -218,39 +221,41 @@ import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
-import type { AdapterRegistry } from './core/adapters/index.js';
-import type { RafaConfig } from './core/config/index.js';
-import type { RouteTarget } from './core/config/sections.js';
 import type { TierSettings } from './tiers/resolve.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPath } from '@open-tomato/rafa/core/plan';
+import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
+
 import { planFilePath } from './adapters/planner/claude.js';
 import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
+import { notePlanBundledEdits } from './commands/plan/bundled-check.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
-import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
+import { checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
-import { CORE_ADAPTER_REGISTRY } from './core/adapters/index.js';
-import { CommandExit } from './core/command/index.js';
-import { ConfigError } from './core/config/index.js';
-import { loadConfig } from './core/config/load.js';
-import { activeOutput } from './core/output/index.js';
 import { requireNoticesAnswered } from './notices/run.js';
-import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';
 import { resolveSessionTiers } from './start/serving.js';
 import { renderSkillIndex } from './task/skill-index.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
-import { planStubFromPath } from './utils/plan-stamp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -584,9 +589,9 @@ export function runBranchLine(planPath: string): string | null {
  * named, as `rafa start` refuses one, before any session starts: a
  * `CommandExit` with exit code 1 whose message is the whole refusal.
  */
-function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
+async function resolvePlanConfig(repoRoot: string, home: string): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: repoRoot, home }).config;
+    return (await loadConfig({ root: repoRoot, home })).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -601,7 +606,7 @@ export default async function plan(
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const home = homedir();
-  const config = resolvePlanConfig(repoRoot, home);
+  const config = await resolvePlanConfig(repoRoot, home);
   const {
     settingSources,
     routing,
@@ -610,12 +615,10 @@ export default async function plan(
     roadmapIssue,
     boardTrustedAuthors,
     boardRelationships,
+    namingBranch,
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
-  // Before any board read, so an operator who forgot the setting is told
-  // before anything is spent (`commands/plan/refs-check.ts`).
-  announceCreateRefs(args, dangerousAcceptStaleRefs);
 
   // The spec, the cheap refusals over it, then the claim on its issue,
   // all before any session is paid for ("The claim").
@@ -628,6 +631,7 @@ export default async function plan(
       trustedAuthors: boardTrustedAuthors,
       relationships: boardRelationships,
       passOver,
+      branchTemplate: namingBranch,
       projectConfig: config,
     }),
     prepare: async (spec) => {
@@ -704,12 +708,16 @@ export default async function plan(
   await requireNoticesAnswered(settingSources);
 
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
-  const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
+  const answered = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
 
   // The store rules `loop start`'s preflight repeats, read as
   // `plan validate` reads them, before the gate settles a verdict over a
   // plan the loop would refuse anyway.
-  enforceStoreRules(repoRoot, generated);
+  enforceStoreRules(repoRoot, answered);
+
+  // Never a refusal: a note per bundled agent or skill a task edits, its
+  // tier pin written as a [human] prerequisite of the plan.
+  const generated = notePlanBundledEdits(repoRoot, answered);
 
   await settleReview(gate, generated, flags.skipReview);
 

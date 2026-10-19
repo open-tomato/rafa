@@ -76,8 +76,8 @@
  * is resolved 12.
  *
  * The running command cases came with the dispatcher recording the
- * command it runs (`running.ts`). Each sets a record of its own ahead of
- * the invocation, so a record put back is told apart from one cleared,
+ * command it runs (`packages/rafa/src/core/command/running.ts`). Each sets a record of
+ * its own ahead of the invocation, so a record put back is told apart from one cleared,
  * and `afterEach` clears it. Five mutations of `dispatch.ts` were driven
  * on 2026-09-23, one run each over this file with 89 pass before, each
  * restored sha256-identical: no record set reddened two cases, none put
@@ -91,14 +91,23 @@
  * record of their own ahead of the invocation, and now read it as left
  * in place afterwards, hidden only while the command runs. The mutations
  * of the scoped code are counted in `dispatch-scope.test.ts`.
+ *
+ * The dangerous phrase cases came with `RafaCommand.dangerous`: each
+ * command loads a planted config setting `dangerous.acceptStaleRefs`
+ * and reads the pass line its sink is handed, a command declaring no
+ * phrase being the control whose line stays bare. One mutation of
+ * `dispatch.ts`, the command's phrases replaced by none, was driven on
+ * 2026-10-15 and reddened two of the three cases.
  */
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
-import type { RunningCommand } from './running.js';
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { CliEvent, Output } from '../ports/index.js';
+import type { RafaCommand, RafaContext, RunningCommand } from '@open-tomato/rafa/core/command';
+import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, Output } from '@open-tomato/rafa/ports';
+
+import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -107,17 +116,27 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import {
+  CommandExit,
+  restoreRunningCommand,
+  runningCommand,
+  setRunningCommand,
+  versionLine,
+} from '@open-tomato/rafa/core/command';
+import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
+import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
+
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
-import { CommandExit , versionLine } from '../core/command/index.js';
-import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
-import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
 const CLI_DIR = fileURLToPath(new URL('./', import.meta.url));
@@ -369,20 +388,35 @@ describe('the events of one invocation', () => {
       'loop refuse',
       ['loop', 'refuse'],
       3,
-      { type: 'result', ok: false, error: { code: 'command_exit', message: 'plan is not ready' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_exit', message: 'plan is not ready', cause: 'cli:command-exit', module: 'loop', action: 'refuse' },
+        ts: NOW.toISOString(),
+      },
     ],
     [
       'loop quiet',
       ['loop', 'quiet'],
       2,
-      { type: 'result', ok: false, error: { code: 'command_exit', message: 'exit code 2' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_exit', message: 'exit code 2', cause: 'cli:command-exit', module: 'loop', action: 'quiet' },
+        ts: NOW.toISOString(),
+      },
     ],
     ['loop early', ['loop', 'early'], 0, { type: 'result', ok: true, data: 'stopped', ts: NOW.toISOString() }],
     [
       'loop crash',
       ['loop', 'crash'],
       1,
-      { type: 'result', ok: false, error: { code: 'command_error', message: 'boom' }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'command_error', message: 'boom', cause: 'unknown:new-context', module: 'loop', action: 'crash' },
+        ts: NOW.toISOString(),
+      },
     ],
     [
       'loop emit-start',
@@ -394,6 +428,9 @@ describe('the events of one invocation', () => {
         error: {
           code: 'command_error',
           message: 'dispatcher: a command emits no start event; the dispatcher writes the one each invocation has',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'emit-start',
         },
         ts: NOW.toISOString(),
       },
@@ -408,6 +445,9 @@ describe('the events of one invocation', () => {
         error: {
           code: 'command_error',
           message: 'dispatcher: a command emits no result event; the dispatcher writes the one each invocation has',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'emit-result',
         },
         ts: NOW.toISOString(),
       },
@@ -419,7 +459,13 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'command_error', message: 'dispatcher: refused a second result; a command gives exactly one' },
+        error: {
+          code: 'command_error',
+          message: 'dispatcher: refused a second result; a command gives exactly one',
+          cause: 'unknown:new-context',
+          module: 'loop',
+          action: 'twice',
+        },
         ts: NOW.toISOString(),
       },
     ],
@@ -430,7 +476,7 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'unknown_subject', message: 'unknown subject or command "bogus"' },
+        error: { code: 'unknown_subject', message: 'unknown subject or command "bogus"', cause: 'cli:unknown-subject' },
         ts: NOW.toISOString(),
       },
     ],
@@ -441,7 +487,11 @@ describe('the events of one invocation', () => {
       {
         type: 'result',
         ok: false,
-        error: { code: 'missing_action', message: startsWith('"loop" needs an action; one of: start, status,') },
+        error: {
+          code: 'missing_action',
+          message: startsWith('"loop" needs an action; one of: start, status,'),
+          cause: 'cli:missing-action',
+        },
         ts: NOW.toISOString(),
       },
     ],
@@ -460,7 +510,7 @@ describe('the events of one invocation', () => {
     expect(outcome.exitCode).toBe(1);
     expect(outcome.result).toMatchObject({
       ok: false,
-      error: { code: 'result_unwritable', message: startsWith('the result could not be written: ') },
+      error: { code: 'result_unwritable', message: startsWith('the result could not be written: '), cause: 'cli:result-unwritable' },
     });
     expect(eventsOf(stdout)).toHaveLength(2);
   });
@@ -473,6 +523,7 @@ describe('the events of one invocation', () => {
       code: 'invalid_spec',
       message: 'command "loop spec" declares arguments or flags that cannot be read:'
         + ' parseArgs: the spelling "p" names both flag "plan" and flag "path"',
+      cause: 'cli:invalid-spec',
     });
     expect(seen).toBeNull();
   });
@@ -507,6 +558,97 @@ describe('the events of one invocation', () => {
     const { stdout } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'json' } });
 
     expect(eventsOf(stdout).map((event) => event.type)).toEqual(['start', 'log', 'step', 'result']);
+  });
+});
+
+/** A module's error class, as `ScopeError` is the project's: the module is a static. */
+class LoopError extends RafaError {
+  static readonly module = 'loop';
+}
+
+describe('a coded failure', () => {
+  const HINT = 'set user.name and user.email where the commit runs';
+
+  /** The coded error the two coded fixtures throw or wrap. */
+  const coded = (): LoopError => new LoopError({ code: 'git:no-identity', message: 'x' });
+
+  /** The fixture commands: one throwing the coded error, one refusing with it as the cause, and a plain crash. */
+  const CODED_REGISTRY = createCommandRegistry({
+    subjects: [{ name: 'loop', summary: 'the loop' }],
+    commands: [
+      command('loop', 'coded', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw coded(); },
+      }),
+      command('loop', 'coded-exit', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw new CommandExit(3, 'refused', { cause: coded() }); },
+      }),
+      command('loop', 'crash', {
+        outputs: ['text', 'json', 'events'],
+        run: async () => { throw new Error('boom'); },
+      }),
+    ],
+  });
+
+  it('writes the code in brackets and the hint line to stderr, exit 1', async () => {
+    const { outcome, stdout, stderr } = await run(['loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(stderr).toBe(`rafa: x [git:no-identity]\n  hint: ${HINT}\n`);
+    expect(stdout).toBe('');
+  });
+
+  it('carries cause, hint and module in the json error of a thrown coded error', async () => {
+    const { outcome } = await run(['--output=json', 'loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.result).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_error', message: 'x', cause: 'git:no-identity', hint: HINT, module: 'loop', action: 'coded' },
+      ts: NOW.toISOString(),
+    });
+  });
+
+  it('exits 3 as command_exit with the cause of the error it wraps', async () => {
+    const { outcome } = await run(['--output=json', 'loop', 'coded-exit'], { registry: CODED_REGISTRY });
+
+    expect(outcome.exitCode).toBe(3);
+    expect(outcome.result).toEqual({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: 'refused', cause: 'git:no-identity', hint: HINT, module: 'loop', action: 'coded-exit' },
+      ts: NOW.toISOString(),
+    });
+  });
+
+  it('writes an uncoded crash as its message alone, with the unknown cause and the boundary module', async () => {
+    const { outcome, stderr } = await run(['loop', 'crash'], { registry: CODED_REGISTRY });
+    const json = await run(['--output=json', 'loop', 'crash'], { registry: CODED_REGISTRY });
+
+    expect(stderr).toBe('rafa: boom\n');
+    expect(json.outcome.result).toMatchObject({
+      error: { code: 'command_error', cause: 'unknown:new-context', module: 'loop' },
+    });
+    expect(json.outcome.result).not.toHaveProperty('error.hint');
+    expect(outcome.exitCode).toBe(1);
+  });
+
+  it('writes the events-mode line with the bracket and no hint line', async () => {
+    const { stdout, stderr } = await run(['loop', 'coded'], { env: { RAFA_OUTPUT: 'events' }, registry: CODED_REGISTRY });
+
+    expect(stdout).toBe('rafa· error            rafa: x [git:no-identity]\n');
+    expect(stdout).not.toContain('hint');
+    expect(stderr).toBe('');
+  });
+
+  it('keeps the stack of a coded error at debug verbosity 2', async () => {
+    const { stdout, stderr } = await run(['--verbose=2', 'loop', 'coded'], { registry: CODED_REGISTRY });
+
+    expect(stdout).toMatch(/^debug: /);
+    expect(stdout).toContain('LoopError');
+    expect(stderr).toBe(`rafa: x [git:no-identity]\n  hint: ${HINT}\n`);
   });
 });
 
@@ -919,6 +1061,7 @@ describe('the active output and the exit code', () => {
     const cwd = mkdtempSync(join(tempBase, 'exit-code-'));
     plantProjectConfig(cwd);
     writeFileSync(join(cwd, 'probe.ts'), [
+      `(await import(${JSON.stringify(join(CLI_DIR, '..', 'adapter-registry.ts'))})).registerCoreAdapters();`,
       `const { dispatch } = await import(${JSON.stringify(join(CLI_DIR, 'dispatch.ts'))});`,
       `const { createCommandRegistry } = await import(${JSON.stringify(join(CLI_DIR, 'registry.ts'))});`,
       'const registry = createCommandRegistry({',
@@ -1025,6 +1168,89 @@ describe('the running command', () => {
   });
 });
 
+describe('the dangerous phrases', () => {
+  /** The phrase the probe command declares for `dangerous.acceptStaleRefs`. */
+  const PHRASE = 'check 4 re-stamps every reference as reviewed';
+
+  /** Phrases set ahead of the invocation, so leaving them in place is told apart from clearing them. */
+  const OUTER: DangerousPhrases = { 'dangerous.acceptVersionCollision': 'the outer phrase' };
+
+  /** A project of its own, its config setting `dangerous.acceptStaleRefs` off its default. */
+  const DANGEROUS_PROJECT = join(tempBase, 'dangerous-project');
+  const dangerousFile = plantProjectConfig(DANGEROUS_PROJECT, 'dangerous:\n  acceptStaleRefs: true\n');
+
+  /** A registry of a command declaring the phrase and one declaring none, each loading the config while it runs. */
+  function probeRegistry(during: DangerousPhrases[], lines: string[]): CommandRegistry {
+    const probe = async (): Promise<void> => {
+      during.push(dangerousPhrases());
+      await loadConfig({ root: DANGEROUS_PROJECT, home: HOME }, {}, (line) => {
+        lines.push(line);
+      });
+    };
+    return createCommandRegistry({
+      subjects: [{ name: 'plan', summary: 'plans' }],
+      commands: [
+        command('plan', 'declares', { dangerous: { 'dangerous.acceptStaleRefs': PHRASE }, run: probe }),
+        command('plan', 'plain', { run: probe }),
+        command('plan', 'throws', {
+          dangerous: { 'dangerous.acceptStaleRefs': PHRASE },
+          run: async () => {
+            during.push(dangerousPhrases());
+            throw new Error('boom');
+          },
+        }),
+      ],
+    });
+  }
+
+  it('ends the pass line of a key the command declares with its phrase, and leaves the phrases set before in place', async () => {
+    const during: DangerousPhrases[] = [];
+    const lines: string[] = [];
+    const previous = setDangerousPhrases(OUTER);
+    try {
+      const { outcome } = await run(['plan', 'declares'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, lines) });
+
+      expect(outcome.exitCode).toBe(0);
+      expect(during).toEqual([{ 'dangerous.acceptStaleRefs': PHRASE }]);
+      expect(lines).toEqual([`dangerous.acceptStaleRefs: true (${dangerousFile}, entry 0); ${PHRASE}`]);
+      expect(dangerousPhrases()).toEqual(OUTER);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+  });
+
+  it('writes the bare pass line for a command declaring no phrase, hiding the phrases set before while it runs', async () => {
+    const during: DangerousPhrases[] = [];
+    const lines: string[] = [];
+    const previous = setDangerousPhrases(OUTER);
+    try {
+      const { outcome } = await run(['plan', 'plain'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, lines) });
+
+      expect(CONFIG_DEFAULTS.dangerousAcceptStaleRefs).toBe(false);
+      expect(dangerousKeys()).toContain('dangerous.acceptStaleRefs');
+      expect(outcome.exitCode).toBe(0);
+      expect(during).toEqual([{}]);
+      expect(lines).toEqual([`dangerous.acceptStaleRefs: true (${dangerousFile}, entry 0)`]);
+      expect(dangerousPhrases()).toEqual(OUTER);
+    } finally {
+      restoreDangerousPhrases(previous);
+    }
+  });
+
+  it('reads the phrases of a command that throws while it runs, and none once it ends as command_error', async () => {
+    const during: DangerousPhrases[] = [];
+
+    const { outcome } = await run(['plan', 'throws'], { cwd: DANGEROUS_PROJECT, registry: probeRegistry(during, []) });
+
+    expect(outcome.exitCode).toBe(1);
+    expect(during).toEqual([{ 'dangerous.acceptStaleRefs': PHRASE }]);
+    expect(dangerousPhrases()).toEqual({});
+  });
+});
+
+/** The hint rafa's list gives `input:invalid-value`, which a relative working directory is refused with. */
+const INVALID_VALUE_HINT = 'pass one of the values the message lists';
+
 describe('the project a command runs in', () => {
   it('hands the project resolved from a subdirectory of its root, the root a real path', async () => {
     const { outcome } = await run(['loop', 'start'], { cwd: join(PROJECT, 'sub') });
@@ -1039,7 +1265,7 @@ describe('the project a command runs in', () => {
 
     expect(seen).toBeNull();
     expect(outcome.exitCode).toBe(1);
-    expect(outcome.result).toMatchObject({ ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) } });
+    expect(outcome.result).toMatchObject({ ok: false, error: { code: 'no_project', message: initHint(OUTSIDE), cause: 'cli:no-project' } });
     expect(stdout).toBe('');
     expect(stderr).toBe(`rafa: ${initHint(OUTSIDE)}\n`);
   });
@@ -1051,7 +1277,12 @@ describe('the project a command runs in', () => {
     expect(stderr).toBe('');
     expect(eventsOf(stdout)).toEqual([
       { type: 'start', command: 'loop status', ts: NOW.toISOString() },
-      { type: 'result', ok: false, error: { code: 'no_project', message: initHint(OUTSIDE) }, ts: NOW.toISOString() },
+      {
+        type: 'result',
+        ok: false,
+        error: { code: 'no_project', message: initHint(OUTSIDE), cause: 'cli:no-project' },
+        ts: NOW.toISOString(),
+      },
     ]);
   });
 
@@ -1070,8 +1301,27 @@ describe('the project a command runs in', () => {
     expect(start.outcome.exitCode).toBe(1);
     expect(start.outcome.result).toMatchObject({
       ok: false,
-      error: { code: 'no_project', message: expect.stringContaining('not/absolute') },
+      error: { code: 'no_project', message: expect.stringContaining('not/absolute'), cause: 'input:invalid-value' },
     });
+  });
+
+  it('ends a relative working directory as no_project with the cause and hint of the ScopeError the walk threw', async () => {
+    const { outcome, stderr } = await run(['loop', 'start'], { cwd: 'not/absolute' });
+    const json = await run(['--output=json', 'loop', 'start'], { cwd: 'not/absolute' });
+
+    expect(seen).toBeNull();
+    expect(outcome.exitCode).toBe(1);
+    expect(json.outcome.result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'no_project',
+        message: 'rafa scope: start directory is "not/absolute", expected an absolute path',
+        cause: 'input:invalid-value',
+        hint: INVALID_VALUE_HINT,
+        module: 'project',
+      },
+    });
+    expect(stderr).toContain(`[input:invalid-value]\n  hint: ${INVALID_VALUE_HINT}\n`);
   });
 
   it('answers a help request, a routing refusal and an unreadable spec without reading the working directory', async () => {
@@ -1083,8 +1333,8 @@ describe('the project a command runs in', () => {
 
     expect(help.outcome.exitCode).toBe(0);
     expect([refusal.outcome.result, spec.outcome.result]).toMatchObject([
-      { ok: false, error: { code: 'unknown_subject' } },
-      { ok: false, error: { code: 'invalid_spec' } },
+      { ok: false, error: { code: 'unknown_subject', cause: 'cli:unknown-subject' } },
+      { ok: false, error: { code: 'invalid_spec', cause: 'cli:invalid-spec' } },
     ]);
   });
 });

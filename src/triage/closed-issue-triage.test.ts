@@ -11,7 +11,7 @@
  */
 import type { TriageResult } from './triage.js';
 import type { FakeGh } from '../adapters/tracker/github-fake.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,7 +34,7 @@ afterAll(() => {
 const TRACKER_TEXT = ['# Plan', '', '- [BLOCKED] Wire the loop', ''].join('\n');
 const BLOCKED_LINE = 2;
 const ARTIFACT = 'src/parse/parse.test.ts:\nerror: expect(received).toBe(expected)\n(fail) parse > drops the last line';
-const BUG: ReportBug = { what: 'Parser drops the last line', artifact: ARTIFACT, security: false, extras: [] };
+const BUG: ReportBug = { what: 'Parser drops the last line', artifact: ARTIFACT, security: false, kind: 'bug', extras: [] };
 
 interface Case {
   readonly root: string;
@@ -51,6 +51,7 @@ function report(): TaskReport {
     skillsUsed: [],
     blockers: [],
     changes: [],
+    staleDocs: [],
     outOfScopeBugs: [BUG],
     extras: [],
   };

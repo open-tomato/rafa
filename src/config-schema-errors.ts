@@ -1,28 +1,49 @@
 /**
  * The `errors` section of the config schema: `errors.codes`, the cause
- * codes a project adds to rafa's list (#949). `config-schema.ts`'s
- * `RafaConfig` extends {@link ErrorsSettings}, and its `CONFIG_DEFAULTS`
- * and `SETTINGS` spread the objects below right after the `release`
- * section. It has its own module because `config-schema.ts` stood at 643
- * lines and `config-sections.ts` at 744 when it was added.
+ * codes a project adds to rafa's list (#949). {@link ERRORS_SECTION}
+ * hands it to core as one `ConfigSection`, package `errors`, and the
+ * `declare module` below adds {@link ErrorsSettings} to `RafaConfig`.
+ * {@link ErrorsShape} holds the keys a file writes, which
+ * `src/config/shape.ts` composes into `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after the `release` section. It has its
+ * own module because `config-schema.ts` stood at 643 lines and
+ * `config-sections.ts` at 744 when it was added.
  *
  * Each entry is read with the same rules `defineErrorCodes`
- * (`src/errors/codes.ts`) applies to rafa's list, except that `since`
- * may be left out: a project often has no version to name. Then the
- * list as a
+ * (`packages/rafa/src/errors/codes.ts`) applies to rafa's list, except
+ * that `since` may be left out: a project often has no version to name.
+ * Then the list as a
  * whole is checked: a code given twice, or one rafa already declares, is
  * refused with both places named, so neither meaning wins silently. An
  * unknown key inside an entry is kept and warned about, as every other
  * list of mappings does.
  */
 
-import type { SettingSpec } from './core/config/index.js';
-import type { Reader, Reading } from './core/config/sections.js';
-import type { ErrorCodeEntry } from './errors/codes.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
+import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 
-import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from './core/config/sections.js';
-import { codeProblem, ERROR_LEVELS } from './errors/codes.js';
-import { RAFA_CODES } from './errors/rafa-codes.js';
+import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from '@open-tomato/rafa/core/config/sections';
+import { codeProblem, ERROR_LEVELS } from '@open-tomato/rafa/errors/codes';
+import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
+
+declare module '@open-tomato/rafa/core/config/config-schema' {
+  /** The `errors` section's fields, added to core's. */
+  interface RafaConfig extends ErrorsSettings {}
+}
+
+/** The `errors` keys a file writes; `src/config/shape.ts` composes them into `ConfigShape`. */
+export interface ErrorsShape {
+  readonly errors: {
+    readonly codes: readonly ErrorCodeFileItem[];
+  };
+}
+
+/** One `errors.codes` entry as a file writes it, `since` left out or null. */
+type ErrorCodeFileItem = Pick<ErrorCodeEntry, 'code' | 'description' | 'hint' | 'level'> & {
+  readonly since?: string | null;
+};
 
 /** The `errors` settings. */
 export interface ErrorsSettings {
@@ -113,3 +134,10 @@ const errorCodes: Reader<readonly ErrorCodeEntry[]> = (raw, at) => {
 export const ERRORS_SETTINGS: { readonly [K in keyof ErrorsSettings]: SettingSpec<K> } = {
   errorsCodes: { key: 'errors.codes', read: errorCodes, cli: false, itemKeys: ERROR_CODE_KEYS },
 };
+
+/** The `errors` section: `errors.codes`, with their defaults and no check. */
+export const ERRORS_SECTION: ConfigSection = Object.freeze({
+  package: 'errors',
+  settings: Object.freeze(ERRORS_SETTINGS),
+  defaults: ERRORS_DEFAULTS,
+});

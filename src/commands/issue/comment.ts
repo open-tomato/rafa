@@ -27,11 +27,12 @@
  * holds.
  */
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { IssueRef } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { expectOneArgument } from '../plan/plan-files.js';
 
+import { ISSUE_COMMENT_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueName,
@@ -64,42 +65,7 @@ export async function commentOnIssue(context: RafaContext, seams: IssueSeams): P
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueCommentCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue comment',
-    subject: 'issue',
-    action: 'comment',
-    summary: 'comment on one issue on the tracker',
-    description: 'Posts `--body` as a comment on one issue on the tracker `tracker.default` names in'
-      + ' `.rafa/config.yaml`, or on the first `tracker.fallback` kind whose preflight passes when it fails,'
-      + ' each kind passed over warned about. The id is the issue number on that tracker, so on a tracker'
-      + ' fallen back to it names a different issue. With `--output=json` the tracker and the ref commented'
-      + ' on are the data of the terminal result event.',
-    args: [
-      {
-        name: 'id',
-        description: 'The issue id on the tracker: a GitHub issue number, or the number of a file under `.rafa/issues/`.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: 'body',
-        description: 'The comment, as markdown. Required.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue comment 12 --body="Seen again after the retry change."',
-        note: 'Posts one comment on issue 12 on the tracker the chain lands on.',
-      },
-      {
-        cmd: 'rafa issue comment 12 --body=Reproduced --output=json',
-        note: 'Writes a start event, then a result event whose data holds the tracker and the ref commented on.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_COMMENT_DECLARATION,
     run: async (context) => {
       const commented = await commentOnIssue(context, seams);
       if (context.outputMode === 'json') {

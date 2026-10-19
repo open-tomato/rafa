@@ -12,8 +12,8 @@
 import type { MergeGuardSettings } from './guard-merge.js';
 import type { GuardRead, GuardReading, GuardVerdict } from './guard.js';
 import type { SettleSettings } from './settle.js';
-import type { VersionCollisionMode } from '../core/config/sections.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { VersionCollisionMode } from '@open-tomato/rafa/core/config/sections';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { guardReaction, mergeGuardSettings, readMergeGuard } from './guard-merge.js';
 
@@ -40,6 +40,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** When every reading runs. */
@@ -111,7 +112,7 @@ describe('the reaction', () => {
 });
 
 describe('the settings it carries', () => {
-  it('copies the guard\'s eight settings and nothing more off a wider config', () => {
+  it('copies the guard\'s nine settings and nothing more off a wider config', () => {
     const wider: MergeGuardSettings & { readonly planDir: string } = {
       ...SETTINGS,
       releaseEnabled: 'auto',
@@ -129,6 +130,7 @@ describe('the settings it carries', () => {
       'releaseEnabled',
       'releaseFragments',
       'releaseHeading',
+      'releaseMoveLock',
       'releaseStrategy',
       'releaseVersionFile',
     ]);

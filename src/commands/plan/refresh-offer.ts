@@ -14,8 +14,8 @@
  *
  * ## What reads as yes
  *
- * `y` or `yes`, read by `answeredYes` (`src/start/branch-decision.ts`)
- * inside `lazyPrompter`: trimmed and in any case, the reading every
+ * `y` or `yes`, read inside `lazyPrompter`
+ * (`packages/rafa/src/core/command/confirm.ts`): trimmed and in any case, the reading every
  * other `[y/N]` question in rafa makes. Anything else
  * declines, the empty answer included, and so does an input that ended
  * before an answer — the prompter's null — so a closed standard input
@@ -31,7 +31,7 @@
  * before any body is, so what a run without one ends with does not hang
  * on how far the resolution got.
  *
- * The prompter is opened only to ask, through `issue ready`'s own
+ * The prompter is opened only to ask, through the command contract's
  * {@link lazyPrompter}, and closed once the question is answered — or
  * once the prompter threw, which is thrown on unchanged.
  *
@@ -42,11 +42,11 @@
  * them reads standard input or waits on an answer.
  */
 import type { RefreshOffer, RefreshOfferRequest } from '../../board/snapshot-settle.js';
-import type { Prompter } from '../../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { refreshQuestion } from '../../board/snapshot-settle.js';
-import { createLinePrompter } from '../../core/command/index.js';
-import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface RefreshOfferSeams {
@@ -65,7 +65,7 @@ export const DEFAULT_REFRESH_OFFER_SEAMS: RefreshOfferSeams = Object.freeze({});
  *
  * The offer asks {@link refreshQuestion} over the request's issue and the
  * date its saved copy was taken, and answers true on `y` or `yes`
- * (`answeredYes`), false on anything else or an input that ended.
+ * (read by {@link lazyPrompter}), false on anything else or an input that ended.
  * The prompter is closed after every question, answered or thrown.
  */
 export function createPlanRefreshOffer(

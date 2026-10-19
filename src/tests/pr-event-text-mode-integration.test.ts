@@ -18,7 +18,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runsDir } from '../core/loop/index.js';
+import { runsDir } from '@open-tomato/rafa/core/loop';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { EVENTS_EXTENSION } from '../start/loop-events.js';
 

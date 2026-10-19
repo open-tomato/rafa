@@ -6,7 +6,7 @@
  * Copied from `createLocalTracker` in open-tomato's
  * `packages/shared/issue-tracker/src/adapters/local.ts` at commit
  * `45aaab563e5b4f4e6258e19ebf752b7cfeb67bf0` (2026-08-05), and retyped
- * against rafa's `Tracker` port, which `src/ports/index.ts` copies from
+ * against rafa's `Tracker` port, which `packages/rafa/src/ports/index.ts` copies from
  * the same commit's `port.ts`.
  *
  * ## One file per issue
@@ -72,7 +72,7 @@
  *     path naming a file. The source answered no issues for every
  *     failure. An issue file `find` cannot read is skipped and reported
  *     through `warn`, which defaults to the active output's `warn`
- *     (`src/core/output/active.ts`), read when the report is made.
+ *     (`packages/rafa/src/core/output/active.ts`), read when the report is made.
  *     The source wrote the report with `console.warn`.
  *   - Names. The source's say pending, since its captures wait for a
  *     sync rafa does not port: `PendingCapture` is
@@ -93,6 +93,20 @@
  *     is still listed. An issue file it cannot read is skipped and
  *     reported through `warn`, as `find` skips one, the report naming
  *     `openIssues`.
+ *   - `filedIssues`, rafa's own reading, which the source lacks. It
+ *     reads the issue files as `openIssues` does and keeps those of the
+ *     type whose `capturedAt` is at or after `since`, in any state, so an
+ *     issue moved to `done` after it was filed is still listed, and
+ *     answers each with its title, its body and that `capturedAt`, lowest
+ *     number first. At or after, to the millisecond, as the recorded fake
+ *     reads GitHub's `created:>=` qualifier. Where `openIssues` answers a
+ *     null `createdAt` for a `capturedAt` that does not read as a time,
+ *     `filedIssues` skips the issue and reports it through `warn`, as it
+ *     skips an issue file it cannot read, both reports naming
+ *     `filedIssues`: the port's `FiledIssue` is never undated, since a
+ *     listing by filing time cannot place such an issue against `since`.
+ *     A `since` that is not a valid `Date` is refused with a `TypeError`
+ *     before any file is read, rather than answered as no issues.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks.
  *     `editable` reads the file the ref names, as `get` does, and
  *     answers its title, body and `priority` field, open unless its
@@ -117,6 +131,7 @@
  */
 import type {
   EditableIssue,
+  FiledIssue,
   Issue,
   IssueDraft,
   IssueEdit,
@@ -129,13 +144,13 @@ import type {
   Tracker,
   TrackerCapabilities,
   TransitionResult,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 
@@ -479,7 +494,7 @@ function matchesQuery(record: LocalIssueRecord, query: IssueQuery): boolean {
 }
 
 /**
- * The `createdAt` `openIssues` answers for a record: its `capturedAt`
+ * The `createdAt` `openIssues` and `filedIssues` answer for a record: its `capturedAt`
  * as written when that is an ISO 8601 date and time with its offset
  * naming a real instant, else null. The shape is checked beside the
  * instant because `Date.parse` alone reads `1` as the first day of 2001,
@@ -598,6 +613,34 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         body: record.draft.body,
         createdAt: createdAtOf(record),
       }));
+    },
+
+    filedIssues: async (type: IssueType, since: Date): Promise<FiledIssue[]> => {
+      const from = since instanceof Date
+        ? since.getTime()
+        : Number.NaN;
+      if (Number.isNaN(from)) {
+        throw new TypeError(`${PREFIX}: refused filedIssues since a time that is not a valid Date`);
+      }
+      const ofType = (await listLocalIssues(issuesDir, warn, 'filedIssues'))
+        .filter(({ record }) => record.draft.type === type);
+      return ofType.flatMap(({ number, path, record }): FiledIssue[] => {
+        const createdAt = createdAtOf(record);
+        if (createdAt === null) {
+          warn(
+            `${PREFIX}: the issue at ${path} has capturedAt ${describeValue(record.capturedAt)},`
+              + ' not an ISO 8601 date and time; filedIssues skipped it',
+          );
+          return [];
+        }
+        if (Date.parse(createdAt) < from) return [];
+        return [{
+          ref: refFor(number, record.draft.opt),
+          title: record.draft.title,
+          body: record.draft.body,
+          createdAt,
+        }];
+      });
     },
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {

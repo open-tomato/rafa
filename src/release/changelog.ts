@@ -128,7 +128,7 @@
  * entry, so the result carries the trailing newline the empty file
  * had no byte for.
  */
-import type { ChangeLevel } from '../report/parse.js';
+import type { ChangeLevel } from '@open-tomato/rafa/report/parse';
 
 /** The placeholders {@link renderReleaseHeading} fills in. */
 export const RELEASE_HEADING_FIELDS = ['version', 'date', 'title'] as const;

@@ -4,10 +4,22 @@
   "description": "The rafa module providing the service sync strategy, which syncs an effort store through rafa-hub.",
   "private": true,
   "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
   "type": "module",
   "scripts": {
+    "lint": "eslint .",
     "test": "bun test",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --build"
+  },
+  "dependencies": {
+    "@open-tomato/rafa-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
   },
   "rafa": {
     "manifestVersion": 1,

@@ -1,0 +1,73 @@
+{
+  "sessions": [
+    "assistantRecordCount",
+    "branch",
+    "branchRecordCount",
+    "branchStub",
+    "branchType",
+    "distinctBranchCount",
+    "effortCounts",
+    "enqueueRecordIndex",
+    "entrypointCounts",
+    "filePath",
+    "firstTimestamp",
+    "gitBranchCounts",
+    "issueIdentifier",
+    "kind",
+    "lastTimestamp",
+    "lineCount",
+    "mode",
+    "modelCounts",
+    "modifiedAt",
+    "planStub",
+    "planStubMatch",
+    "recordCount",
+    "recordTypeCounts",
+    "sessionId",
+    "sidechainRecordCount",
+    "sizeBytes",
+    "taskText",
+    "unparsedLineCount",
+    "usage",
+    "worktree"
+  ],
+  "commits": [
+    "author",
+    "branch",
+    "deletions",
+    "filesChanged",
+    "insertions",
+    "minutesSincePrevious",
+    "parentCount",
+    "sha",
+    "subject",
+    "timestamp"
+  ],
+  "keyProjections": [
+    "commits",
+    "sessions"
+  ],
+  "staleDocs": [
+    "collectedAt",
+    "id",
+    "kind",
+    "outcome",
+    "planStub",
+    "sessionId",
+    "taskLine",
+    "what",
+    "where"
+  ],
+  "bugRoutes": [
+    "collectedAt",
+    "entryIndex",
+    "id",
+    "kind",
+    "planStub",
+    "route",
+    "said",
+    "sessionId",
+    "taskLine",
+    "what"
+  ]
+}

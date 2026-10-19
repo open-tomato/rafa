@@ -11,8 +11,10 @@
  * A refusal read alone could be a false negative in the other direction:
  * a rule that refused every import would pass it. So each refusal sits
  * beside a control the rule must let through: the same
- * `../core/config/index.js` from outside the library, a sibling import
- * inside it, and the two built-ins the library does use.
+ * `@open-tomato/rafa/core/config` from outside the library, a sibling
+ * import inside it, and the two built-ins the library does use. Core sits
+ * outside `src/` in its own package (#1090), so it has a zone of its own
+ * beside the one over the rest of `src/`, and a refusal for each.
  */
 import type { Linter } from 'eslint';
 
@@ -46,10 +48,20 @@ function ruleIds(messages: Linter.LintMessage[]): (string | null)[] {
 const SCRATCH = 'src/learning/boundary-scratch.ts';
 
 describe('the src/learning/ boundary rule', () => {
-  test('refuses an import of ../core/config/index.js from src/learning/', async () => {
+  test('refuses an import of @open-tomato/rafa/core/config from src/learning/', async () => {
     const messages = await messagesFor(
       SCRATCH,
-      'export { loadConfig } from \'../core/config/index.js\';\n',
+      'export { loadConfig } from \'@open-tomato/rafa/core/config\';\n',
+    );
+
+    expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
+    expect(messages[0]?.message).toContain('src/learning/ imports nothing from core.');
+  });
+
+  test('refuses an import of ../plan/index.js from src/learning/', async () => {
+    const messages = await messagesFor(
+      SCRATCH,
+      'export { parsePlan } from \'../plan/index.js\';\n',
     );
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
@@ -58,10 +70,10 @@ describe('the src/learning/ boundary rule', () => {
     );
   });
 
-  test('lets the same import through outside src/learning/', async () => {
+  test('lets the core import through outside src/learning/', async () => {
     const messages = await messagesFor(
       'src/plan/boundary-scratch.ts',
-      'export { loadConfig } from \'../core/config/index.js\';\n',
+      'export { loadConfig } from \'@open-tomato/rafa/core/config\';\n',
     );
 
     expect(ruleIds(messages)).toEqual([]);

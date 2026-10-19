@@ -11,12 +11,13 @@
  * beside one without, a blank comment beside a written one, and a
  * checklist with no blocked line beside the ones that hold some.
  */
-import type { SessionChecklist } from '../core/loop/readings.js';
+import type { SessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 
 import { describe, expect, it } from 'bun:test';
 
+import { blockerComment } from '@open-tomato/rafa/core/plan';
+
 import { parsePlan } from '../plan/index.js';
-import { blockerComment } from '../utils/tracker.js';
 
 import { blockedTasks } from './blocked-tasks.js';
 

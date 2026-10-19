@@ -81,16 +81,17 @@
  * reading it is a fault, and is rethrown as the command's own read
  * would throw it.
  */
-import type { AdapterRegistry } from '../../core/adapters/index.js';
-import type { ResolvedConfig } from '../../core/config/index.js';
-import type { ConfigRoots } from '../../core/config/load.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
-import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '../../ports/index.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { describeValue, messageOf } from '../../core/config/sections.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
+
+import { baseAdapterRegistry } from '../../modules/activate.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { selectSync } from './select.js';
@@ -204,9 +205,13 @@ function strategyOf(kind: unknown): string {
     : describeValue(kind);
 }
 
-/** Whether core registers `kind`, so a contact leaves it alone. */
+/**
+ * Whether core registers `kind`, so a contact leaves it alone. Read off
+ * `baseAdapterRegistry()`, which holds no module's kind once
+ * `src/rafa.ts` has made the modules' adapters active.
+ */
 function isCoreStrategy(kind: unknown): boolean {
-  return typeof kind === 'string' && CORE_ADAPTER_REGISTRY.find('sync', kind) !== undefined;
+  return typeof kind === 'string' && baseAdapterRegistry().find('sync', kind) !== undefined;
 }
 
 /** Loads the modules and selects the `Sync`, answering the problem instead of throwing. */
@@ -303,7 +308,7 @@ export async function pullBeforeRead(input: PullBeforeReadInput, seams: HubConta
   let resolved: ResolvedConfig;
   try {
     // Read silently: the command reads the config itself and writes its warnings once.
-    resolved = loadConfig(roots, {}, () => {});
+    resolved = await loadConfig(roots, {}, () => {});
   } catch (error) {
     if (error instanceof ConfigError) return null;
     throw error;

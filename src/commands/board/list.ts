@@ -56,8 +56,11 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { OwnerResolution } from '../../board/owner-resolve.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { Place } from '../../project/position.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readBoardBody } from '../../board/board-body.js';
@@ -66,10 +69,10 @@ import { createOwnerResolver } from '../../board/owner-resolve.js';
 import { resolvePlace } from '../../board/place.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
+
+import { BOARD_LIST_DECLARATION } from './declarations.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa board list';
@@ -176,7 +179,7 @@ export async function readBoardList(context: RafaContext, seams: BoardListSeams)
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const listing = await readListing(gh);
   const defaultBoard = defaultBoardOnce(config, gh, listing);
@@ -223,30 +226,7 @@ export async function runBoardList(context: RafaContext, seams: BoardListSeams):
 /** The command, reading the board with `seams`; see the module note. */
 export function createBoardListCommand(seams: BoardListSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'list',
-    subject: 'board',
-    action: 'list',
-    summary: 'list the open boards with their owner, epic count, and the current and home marks',
-    description: 'Lists every open type:roadmap board, lowest number first, and the default board when it is an'
-      + ' unlabelled issue titled "Roadmap" or the roadmap.issue the project names. Each line holds the board\'s'
-      + ' number and title, the owner its Owner: line names (followed by (unresolved) when GitHub knows no such'
-      + ' account or team, and by (unknown) when it could not be asked), the number of epics its checklist names,'
-      + ' and `current` and `home` on the boards this checkout\'s position holds. With no position file both are'
-      + ' the default board. Writes nothing. A board listing that cannot be read is refused with exit code 2.'
-      + ' With `--output=json` the rows and the two places are the data of the terminal result event.',
-    args: [],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa board list',
-        note: 'Lists the open boards, marking the one this checkout is on and its home.',
-      },
-      {
-        cmd: 'rafa board list --output=json',
-        note: 'Gives the same rows, each owner with what GitHub answered for it, as the terminal result.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...BOARD_LIST_DECLARATION,
     run: (context) => runBoardList(context, seams),
   };
   return Object.freeze(command);

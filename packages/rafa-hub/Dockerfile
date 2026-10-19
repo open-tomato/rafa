@@ -3,7 +3,7 @@
 #
 # Build from the repository root, since the hub imports core's
 # `@open-tomato/rafa/store` subpath, which resolves through the root's
-# `tsconfig.packages.json` to `src/` (context/source.md):
+# `tsconfig.packages.json` to `packages/rafa/` (context/source.md):
 #
 #   docker build -f packages/rafa-hub/Dockerfile -t rafa-hub .
 #
@@ -21,8 +21,10 @@ ARG BUN_VERSION=1.3.14
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /repo
-COPY package.json tsconfig.base.json tsconfig.packages.json ./
+COPY package.json tsconfig.packages.json ./
+COPY packages/typescript-config ./packages/typescript-config
 COPY src ./src
+COPY packages/rafa ./packages/rafa
 COPY packages/rafa-hub ./packages/rafa-hub
 RUN bun build packages/rafa-hub/src/bin.ts --target=bun --outfile=/out/rafa-hub.js
 

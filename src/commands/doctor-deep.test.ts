@@ -26,7 +26,8 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { resolveScope } from '../project/scope.js';
 
 import { readSessionEnv } from './doctor-deep-env.js';
@@ -76,11 +77,11 @@ write(planPath, '# Plan\n\n- [ ] Review it {agent=absent-reviewer}\n');
 const shellEnv = { PATH: [toolsBin, ghBin].join(delimiter), HOME: home };
 
 /** Plants `.rafa/config.yaml` with `lines` and answers the project and its resolved config. */
-function projectWith(lines: readonly string[]) {
+async function projectWith(lines: readonly string[]) {
   write(join(projectRoot, '.rafa/config.yaml'), ['version: 1', ...lines, ''].join('\n'));
   const project = resolveScope(projectRoot, { home });
   if (!project.found) throw new Error('the planted project was not found');
-  return { project, resolved: loadConfig({ root: project.root, home }, {}, () => undefined) };
+  return { project, resolved: await loadConfig({ root: project.root, home }, {}, () => undefined) };
 }
 
 /** The config of a project nothing goes through `gh` for. */
@@ -93,8 +94,8 @@ const SEAMS: ReadDeepSeams = {
 };
 
 /** `readDeep` over the world with `lines` as the config. */
-function read(lines: readonly string[], plan: string | null = null, seams: ReadDeepSeams = SEAMS): Promise<DeepReading> {
-  const { project, resolved } = projectWith(lines);
+async function read(lines: readonly string[], plan: string | null = null, seams: ReadDeepSeams = SEAMS): Promise<DeepReading> {
+  const { project, resolved } = await projectWith(lines);
   return readDeep({ project, env: shellEnv, resolved, plan }, seams);
 }
 

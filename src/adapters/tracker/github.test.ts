@@ -77,7 +77,7 @@
  */
 import type { FakeGh, FakeGhOptions } from './github-fake.js';
 import type { GhResult, GhRunner } from './github.js';
-import type { IssueRef, IssueState, Tracker } from '../../ports/index.js';
+import type { IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -790,6 +790,71 @@ describe('reading open issues', () => {
     const { tracker } = overFake({ repo: null });
 
     await expect(tracker.openIssues?.('bug')).rejects.toThrow('github tracker: gh issue list failed: no git remotes found');
+  });
+});
+
+describe('reading filed issues', () => {
+  it('lists a bug closed since the cut-off beside an open one, leaving out one filed before it and a spike', async () => {
+    const times = ['2026-10-14T01:00:00Z', '2026-10-14T01:29:39Z', '2026-10-14T02:00:00Z', '2026-10-14T03:00:00Z'];
+    const { tracker, fake } = overFake({ now: () => times.shift() ?? '' });
+    await tracker.create(draftFixture({ title: 'Filed before' }));
+    const closed = await tracker.create(draftFixture({ title: 'Closed since', body: 'Fixed.\n' }));
+    await tracker.create(draftFixture({ title: 'A spike', type: 'spike' }));
+    await tracker.create(draftFixture({ title: 'Open since', module: 'billing' }));
+    await tracker.transition(closed, 'done');
+    const before = fake.calls().length;
+
+    const filed = await tracker.filedIssues?.('bug', new Date('2026-10-14T01:29:39.400Z'));
+
+    expect(fake.calls().slice(before)).toEqual([[
+      'issue', 'list', '--state', 'all', '--label', 'type:bug', '--search', 'created:>=2026-10-14T01:29:39Z',
+      '--json', 'number,url,labels,title,body,createdAt', '--limit', String(OPEN_ISSUES_LIMIT),
+    ]]);
+    expect(filed).toStrictEqual([
+      {
+        ref: { opt: 0, kind: 'github', externalId: '4', url: 'https://github.com/open-tomato/rafa/issues/4', module: 'billing' },
+        title: 'Open since',
+        body: draftFixture().body,
+        createdAt: '2026-10-14T03:00:00Z',
+      },
+      {
+        ref: { opt: 0, kind: 'github', externalId: '2', url: 'https://github.com/open-tomato/rafa/issues/2', module: 'auth' },
+        title: 'Closed since',
+        body: 'Fixed.\n',
+        createdAt: '2026-10-14T01:29:39Z',
+      },
+    ]);
+    expect(await tracker.openIssues?.('bug')).toHaveLength(2);
+  });
+
+  it('refuses a row with no createdAt, which the fake never lists, beside the same row dated', async () => {
+    const undated = '[{"number":1,"url":"u","labels":[],"title":"t","body":"b"}]';
+    const dated = '[{"number":1,"url":"u","labels":[],"title":"t","body":"b","createdAt":"2026-10-14T02:00:00Z"}]';
+    const since = new Date('2026-10-14T01:29:39Z');
+
+    await expect(createGithubTracker({ gh: scripted(() => wrote(undated)).run }).filedIssues?.('bug', since)).rejects.toThrow(
+      'github tracker: gh issue list answered row 0 with createdAt undefined, expected an ISO 8601 date and time with its offset',
+    );
+    expect(await createGithubTracker({ gh: scripted(() => wrote(dated)).run }).filedIssues?.('bug', since)).toStrictEqual([
+      { ref: { opt: 0, kind: 'github', externalId: '1', url: 'u' }, title: 't', body: 'b', createdAt: '2026-10-14T02:00:00Z' },
+    ]);
+  });
+
+  it('refuses a row for its number before its time, as find refuses one', async () => {
+    const row = '[{"number":"1","url":"u","labels":[],"title":"t","body":"b"}]';
+    const tracker = createGithubTracker({ gh: scripted(() => wrote(row)).run });
+
+    await expect(tracker.filedIssues?.('bug', new Date(0))).rejects.toThrow(
+      'github tracker: gh issue list answered row 0 with number "1", expected an issue number',
+    );
+  });
+
+  it('rejects with what gh wrote when the listing fails', async () => {
+    const { tracker } = overFake({ repo: null });
+
+    await expect(tracker.filedIssues?.('bug', new Date(0))).rejects.toThrow(
+      'github tracker: gh issue list failed: no git remotes found',
+    );
   });
 });
 

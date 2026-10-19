@@ -9,7 +9,7 @@
  * typed, it writes one deprecation line to stderr, and the dispatcher
  * reads it as `--output=json` (`src/cli/dispatch.ts`).
  */
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import report from '../../effort/report.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';

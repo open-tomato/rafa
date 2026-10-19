@@ -1,6 +1,8 @@
 /**
- * Tests for the core roster (`src/commands/index.ts`) and the
+ * Tests for the roster (`src/commands/index.ts`) and the
  * declarations of the commands it registers: what the registry holds,
+ * what `createRosterRegistry` leaves out for a feature turned off and
+ * the name it refuses,
  * how each spelling of the command tree routes, with the deprecation
  * line each alias prints, and that each command wrapping a phase 0
  * command declares the flags its phase 0 module reads.
@@ -8,8 +10,8 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes` and the ten `pr` actions
+ * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
+ * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -69,9 +71,11 @@
  * declaration case, and `effort report` ahead of `effort collect` the
  * roster order case and the refusal listing the actions of `effort`.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+
+import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -80,12 +84,18 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
+
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { commandProblem, commandSpelling } from '../core/command/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from './index.js';
+import { BOARD_FEATURE } from './board/index.js';
+import { RUN_FEATURE } from './claim/index.js';
+import { PR_FEATURE } from './pr/index.js';
+import { RELEASE_FEATURE } from './release/index.js';
+
+import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRosterRegistry, ROSTER_SUBJECTS } from './index.js';
 
 /** The `src/` directory, which the phase 0 modules sit in. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -178,6 +188,10 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release status': ['text', 'json'],
   'release settle': ['text', 'json'],
   'release tag': ['text', 'json'],
+  'release publish': ['text', 'json'],
+  'release workflows': ['text', 'json'],
+  'release fragment': ['text', 'json'],
+  'release list': ['text', 'json'],
   'board list': ['text', 'json'],
   'board sync': ['text', 'json'],
   'claim release': ['text', 'json'],
@@ -193,11 +207,14 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'update next': ['text', 'json'],
   'update latest': ['text', 'json'],
   'config set': ['text', 'json'],
+  'config show': ['text', 'json'],
   'ci status': ['text', 'json'],
   'stretch start': ['text'],
   'stretch item': ['text'],
   'stretch end': ['text'],
   'bug codes': ['text', 'json'],
+  'bug recheck': ['text', 'json'],
+  'docs plan': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -221,8 +238,8 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   ]],
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
-  'issue ready': [['n'], ['yes', 'hint']],
-  'issue unblock': [['n'], ['all']],
+  'issue ready': [['n'], ['yes', 'dry-run', 'hint']],
+  'issue unblock': [['n'], ['all', 'yes']],
   'issue check': [['n'], ['stamp']],
   'issue edit': [['n'], ['append-file', 'append', 'reason', 'replace-file', 'title', 'priority', 'while-in-development', 'dry-run']],
   'pr current': [[], []],
@@ -231,7 +248,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr list': [[], []],
   'pr wait': [['n'], ['timeout', 'hint']],
   'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
-  'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
+  'pr triage': [['n'], ['comment', 'resolve', 'allow-local-config', 'max-attempts', 'hint']],
   'pr open': [[], ['head', 'base', 'title', 'body-file']],
   'pr retarget': [['n'], ['base']],
   'pr close': [['n'], ['reason', 'delete-branch', 'yes']],
@@ -255,6 +272,10 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release status': [[], ['plan']],
   'release settle': [[], ['dry-run']],
   'release tag': [[], ['push']],
+  'release publish': [[], ['tag', 'dry-run']],
+  'release workflows': [[], ['write']],
+  'release fragment': [[], ['plan', 'level', 'title', 'note', 'package']],
+  'release list': [[], []],
   'board list': [[], []],
   'board sync': [[], ['dry-run']],
   'status': [[], []],
@@ -292,11 +313,14 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'update next': [[], []],
   'update latest': [[], []],
   'config set': [['assignment'], []],
+  'config show': [[], ['resolved', 'sources']],
   'ci status': [[], ['branch', 'workflow']],
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
-  'bug codes': [[], ['suggest', 'family', 'check']],
+  'bug codes': [[], ['suggest', 'proposals', 'family', 'check']],
+  'bug recheck': [['n'], ['all', 'comment']],
+  'docs plan': [[], []],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -408,11 +432,14 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['update self 0.34.0', 'update self', ['0.34.0'], ''],
   ['update port', 'update port', [], ''],
   ['config set pr.base=stretch/9', 'config set', ['pr.base=stretch/9'], ''],
+  ['config show --sources', 'config show', ['--sources'], ''],
   ['ci status --branch=stretch/9', 'ci status', ['--branch=stretch/9'], ''],
   ['stretch start --role=watchtower --n=5', 'stretch start', ['--role=watchtower', '--n=5'], ''],
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
   ['stretch end --dry-run', 'stretch end', ['--dry-run'], ''],
   ['bug codes --family=git', 'bug codes', ['--family=git'], ''],
+  ['bug recheck 412 415 --comment', 'bug recheck', ['412', '415', '--comment'], ''],
+  ['docs plan', 'docs plan', [], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -422,8 +449,11 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['describe', 'describe', [], ''],
 ];
 
-/** Each core command by its spelling. */
-const COMMANDS = CORE_COMMANDS.map((command): [string, RafaCommand] => [commandSpelling(command), command]);
+/** Every command the roster registers, hidden ones included: core's, then each bundled feature's. */
+const ROSTER_COMMANDS = CORE_REGISTRY.commands({ includeHidden: true });
+
+/** Each command of the roster by its spelling. */
+const COMMANDS = ROSTER_COMMANDS.map((command): [string, RafaCommand] => [commandSpelling(command), command]);
 
 /** What one line ran, and what it wrote. */
 interface Dispatched {
@@ -450,7 +480,7 @@ function memoryStream(): { stream: OutputStream; text: () => string } {
 /** Dispatches the words of `line` over the roster, each command recording what it was handed in place of running. */
 async function dispatchRecorded(line: string): Promise<Dispatched> {
   const ran: (readonly [string, readonly string[]])[] = [];
-  const commands = CORE_COMMANDS.map((command): RafaCommand => ({
+  const commands = ROSTER_COMMANDS.map((command): RafaCommand => ({
     ...command,
     run: async (context) => {
       ran.push([commandSpelling(command), [...context.argv]]);
@@ -459,7 +489,7 @@ async function dispatchRecorded(line: string): Promise<Dispatched> {
   const stdout = memoryStream();
   const stderr = memoryStream();
   const outcome = await dispatch(line.split(' ').filter((word) => word.length > 0), {
-    registry: createCommandRegistry({ subjects: CORE_SUBJECTS, commands }),
+    registry: createCommandRegistry({ subjects: ROSTER_SUBJECTS, commands }),
     env: {},
     stdout: stdout.stream,
     stderr: stderr.stream,
@@ -510,24 +540,25 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
-  sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
 };
 
-/** The value a spelled English number names, a hyphenated tens word and ones word added together. */
+/** The value a spelled English number names, its words joined by a hyphen or `and` added together. */
 function numberWord(word: string): number {
-  return word.split('-').reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
+  return word.split(/-| and /).reduce((total, part) => total + (NUMBER_WORDS[part] ?? Number.NaN), 0);
 }
 
 /** The module note of `src/commands/index.ts`, read fresh so it stays honest as the roster grows. */
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the eighteen subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug']);
-    expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
+  it('registers the nineteen subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug', 'docs']);
+    expect(CORE_REGISTRY.subjects()).toEqual([...ROSTER_SUBJECTS]);
+    expect(ROSTER_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open, pr retarget and pr close after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, bug codes, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers core\'s commands in roster order, top-level ones last, then the commands of the board, pr, run and release features in theirs, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -542,25 +573,6 @@ describe('the core roster', () => {
       'loop status',
       'loop list',
       'loop wait',
-      'issue list',
-      'issue show',
-      'issue create',
-      'issue comment',
-      'issue move',
-      'issue ready',
-      'issue unblock',
-      'issue check',
-      'issue edit',
-      'pr current',
-      'pr show',
-      'pr view',
-      'pr open',
-      'pr retarget',
-      'pr close',
-      'pr list',
-      'pr wait',
-      'pr merge',
-      'pr triage',
       'effort collect',
       'effort report',
       'effort dashboard',
@@ -588,22 +600,6 @@ describe('the core roster', () => {
       'instinct show',
       'instinct flag',
       'instinct promote',
-      'release status',
-      'release settle',
-      'release tag',
-      'board list',
-      'board sync',
-      'epic show',
-      'epic new',
-      'epic defer',
-      'epic promote',
-      'epic move',
-      'epic close',
-      'epic cancel',
-      'claim release',
-      'claim hand',
-      'claim accept',
-      'claim take',
       'update current',
       'update self',
       'update project',
@@ -613,11 +609,14 @@ describe('the core roster', () => {
       'update next',
       'update latest',
       'config set',
+      'config show',
       'ci status',
       'stretch start',
       'stretch item',
       'stretch end',
       'bug codes',
+      'bug recheck',
+      'docs plan',
       'status',
       'next',
       'roadmap',
@@ -627,13 +626,52 @@ describe('the core roster', () => {
       'cleanup',
       'self-update',
       'describe',
+      'issue list',
+      'issue show',
+      'issue create',
+      'issue comment',
+      'issue move',
+      'issue ready',
+      'issue unblock',
+      'issue check',
+      'issue edit',
+      'board list',
+      'board sync',
+      'epic show',
+      'epic new',
+      'epic defer',
+      'epic promote',
+      'epic move',
+      'epic close',
+      'epic cancel',
+      'pr current',
+      'pr show',
+      'pr view',
+      'pr open',
+      'pr retarget',
+      'pr close',
+      'pr list',
+      'pr wait',
+      'pr merge',
+      'pr triage',
+      'claim release',
+      'claim hand',
+      'claim accept',
+      'claim take',
+      'release status',
+      'release settle',
+      'release tag',
+      'release publish',
+      'release workflows',
+      'release fragment',
+      'release list',
     ]);
-    expect(CORE_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
-    expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length - 2);
+    expect(ROSTER_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
+    expect(CORE_REGISTRY.commands()).toHaveLength(ROSTER_COMMANDS.length - 2);
   });
 
   it('runs every command inside a project but module exec, the two checkers, the seven update stubs, init and describe, which declare needsProject false', () => {
-    const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
+    const outside = ROSTER_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);
   });
@@ -647,6 +685,17 @@ describe('the core roster', () => {
       ]);
   });
 
+  it.each(BUNDLED_FEATURES.map((feature): [string, CommandFeature] => [feature.name, feature]))('registers the subjects and the very commands the %s feature declares, which CORE_SUBJECTS and CORE_COMMANDS hold none of', (_name, feature) => {
+    const subjects = feature.subjects.map((subject) => subject.name);
+    const registered = subjects.flatMap((subject) => CORE_REGISTRY.actionsOf(subject, { includeHidden: true }));
+
+    expect(ROSTER_SUBJECTS.filter((subject) => subjects.includes(subject.name)).map((subject) => feature.subjects.indexOf(subject)))
+      .toEqual(feature.subjects.map((_subject, index) => index));
+    expect(registered.map((command) => feature.commands.indexOf(command))).toEqual(feature.commands.map((_command, index) => index));
+    expect(CORE_SUBJECTS.filter((subject) => subjects.includes(subject.name))).toEqual([]);
+    expect(CORE_COMMANDS.filter((command) => subjects.includes(command.subject ?? ''))).toEqual([]);
+  });
+
   it.each(COMMANDS)('declares for %s a summary, a description, examples of its own spelling and its outputs', (spelling, command) => {
     expect(commandProblem(command)).toBeNull();
     expect(command.summary.length).toBeGreaterThan(0);
@@ -658,15 +707,72 @@ describe('the core roster', () => {
 });
 
 describe('the module note\'s count word', () => {
-  it('names the roster at exactly CORE_COMMANDS.length', () => {
-    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:-[a-z]+)?) registered so far/);
+  it('names the roster at exactly the count of the commands CORE_REGISTRY holds', () => {
+    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:(?:-| and )[a-z]+)?) registered so far/);
 
     expect(match).not.toBeNull();
-    expect(numberWord(match?.[1] ?? '')).toBe(CORE_COMMANDS.length);
+    expect(numberWord(match?.[1] ?? '')).toBe(ROSTER_COMMANDS.length);
   });
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
-    expect(numberWord('forty-two')).not.toBe(CORE_COMMANDS.length);
+    expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-six')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-six')).not.toBe(ROSTER_COMMANDS.length);
+  });
+});
+
+/** Where each of `commands` sits in the roster with every feature on: -1 for one it does not hold. */
+function rosterPlaces(commands: readonly RafaCommand[]): number[] {
+  return commands.map((command) => ROSTER_COMMANDS.indexOf(command));
+}
+
+describe('createRosterRegistry', () => {
+  it('bundles the board, pr, run and release features, in that order', () => {
+    expect(BUNDLED_FEATURES.map((feature) => feature.name)).toEqual(['board', 'pr', 'run', 'release']);
+    expect([BOARD_FEATURE, PR_FEATURE, RUN_FEATURE, RELEASE_FEATURE].map((feature) => BUNDLED_FEATURES.indexOf(feature)))
+      .toEqual([0, 1, 2, 3]);
+  });
+
+  it('holds the 105 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+    const registry = createRosterRegistry();
+
+    expect(registry.commands({ includeHidden: true })).toHaveLength(105);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
+    expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(105);
+  });
+
+  it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
+    const registry = createRosterRegistry({ off: ['pr'] });
+    const kept = ROSTER_COMMANDS.filter((command) => command.subject !== 'pr');
+
+    expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
+    expect(PR_FEATURE.commands).toHaveLength(10);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(95);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
+    expect(registry.subjects().map((subject) => subject.name))
+      .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));
+    expect([registry.subjectOf('pr'), registry.find('pr', 'list')]).toEqual([undefined, undefined]);
+    expect(registry.actionsOf('pr', { includeHidden: true })).toEqual([]);
+  });
+
+  it('holds CORE_SUBJECTS and CORE_COMMANDS alone with all four features off', () => {
+    const registry = createRosterRegistry({ off: ['board', 'pr', 'run', 'release'] });
+
+    expect(registry.subjects()).toEqual([...CORE_SUBJECTS]);
+    expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(CORE_COMMANDS));
+    expect(registry.commands({ includeHidden: true })).toHaveLength(CORE_COMMANDS.length);
+  });
+
+  it('refuses a name in off that is no bundled feature\'s, naming the four, and builds no registry', () => {
+    expect(() => createRosterRegistry({ off: ['pr', 'prs'] }))
+      .toThrow('rafa: cannot build the roster: no bundled feature is named "prs"; the features are board, pr, run, release');
+    expect(() => createRosterRegistry({ off: ['claim'] })).toThrow('no bundled feature is named "claim"');
+  });
+
+  it('reads a count spelled with and as its words added together', () => {
+    expect(numberWord('hundred and one')).toBe(101);
+    expect(numberWord('hundred and')).toBeNaN();
   });
 });
 

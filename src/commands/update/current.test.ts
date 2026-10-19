@@ -1,8 +1,10 @@
 import type { UpdateCurrentResult, UpdateCurrentSeams } from './current.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { SubjectSpec } from '../../cli/registry.js';
-import type { Prompter } from '../../core/command/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

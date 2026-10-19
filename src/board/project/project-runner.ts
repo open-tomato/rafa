@@ -16,10 +16,12 @@
  * | `src/commands/board/sync.ts` | `rafa board sync` |
  * | `src/commands/issue/create.ts` | the `openGh` `rafa issue create` hands `./add-issue.ts` |
  * | `src/commands/epic/epic-project.ts` | the `rafa epic` actions, the add of `epic new` included |
+ * | `src/commands/epic/close-triage.ts` | the `openGh` the gate of `rafa epic close` hands `./add-filed.ts` for the bugs its failed checks filed |
  * | `src/commands/pr/merge-project.ts` | `rafa pr merge` |
  * | `src/commands/release/settle-project.ts` | `rafa release settle` |
  * | `./issue-board-refresh.ts` | the refreshing issue board's refresh, and every caller of `refreshIssueItems` |
  * | `src/commands/doctor-project.ts` | the project section of `rafa doctor` |
+ * | `src/start/triage.ts` | the `openGh` `loop start`'s triage hands `./add-filed.ts` for the bugs a task's report filed |
  *
  * ## Opened once
  *
@@ -38,7 +40,7 @@
  * same line and whose data holds the retry's place, reason, subject,
  * issue and wait. An opener with a command context at hand reports to
  * that command's output; one without reports to the active output
- * (`src/core/output/active.ts`), read at each retry, as the
+ * (`packages/rafa/src/core/output/active.ts`), read at each retry, as the
  * refreshing issue board's warnings are.
  *
  * ## The wait
@@ -49,11 +51,11 @@
  */
 import type { RetryNotice } from './retry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { OutputMode } from '../../core/config/sections.js';
-import type { CliEventNamed, Output } from '../../ports/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { CliEventNamed, Output } from '@open-tomato/rafa/ports';
 
-import { activeOutput, activeOutputMode } from '../../core/output/index.js';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 
 import { retryingGhRunner } from './retry.js';
 

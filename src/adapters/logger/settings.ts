@@ -5,13 +5,14 @@
  * The dispatcher builds a command's logger before the project is found,
  * and a command loads its config later. So the settings cannot be handed
  * to the logger when it is made: `loadConfig`
- * (`src/core/config/config-load.ts`) sets them here once a config is
- * read, as it sets the effort store's, and a logger reads them at each
- * entry. Until then the default applies, with the invocation's
- * verbosity beside it.
+ * (`packages/rafa/src/core/config/config-load.ts`) calls core's load hook once a
+ * config is read, as it sets the effort store's settings, and the hook
+ * `src/config-registry.ts` sets hands the logger section's reading to
+ * this module. A logger reads them at each entry. Until then the default
+ * applies, with the invocation's verbosity beside it.
  *
- * This module imports types and `node:async_hooks` alone, so
- * `config-load.ts` can import it without pulling an adapter in.
+ * This module imports types and `node:async_hooks` alone, so the
+ * registry can import it without pulling an adapter in.
  *
  * ## Where they are held
  *
@@ -45,7 +46,7 @@
  *
  * It replaces that scope's settings, and never the module-level value.
  * This is where the settings differ from the active output
- * (`src/core/output/active.ts`), whose scope cannot be replaced from
+ * (`packages/rafa/src/core/output/active.ts`), whose scope cannot be replaced from
  * inside it: the config naming the settings is loaded inside the run
  * that reads them, so the setter has to reach the run it is called in.
  * The scope therefore holds a cell, and a set swaps the frozen settings
@@ -81,7 +82,7 @@
  * module state, so a case that sets settings outside a scope sets `null`
  * after it.
  */
-import type { LogLevel } from '../../ports/index.js';
+import type { LogLevel } from '@open-tomato/rafa/ports/log-level';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 

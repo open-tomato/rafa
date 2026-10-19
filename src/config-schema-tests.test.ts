@@ -1,6 +1,7 @@
 /**
  * Tests for the `tests` section: `tests.fullSuiteTriggers`,
- * `tests.integration` and `tests.alwaysRun`, the three glob lists, and
+ * `tests.integration`, `tests.contract` and `tests.alwaysRun`, the four
+ * glob lists, and
  * `tests.retakeRedAlone`, the one switch.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
@@ -11,21 +12,23 @@
  * module that renames a key or moves a default fails rather than
  * agreeing with itself.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { globList, TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
-} from './core/config/index.js';
-import { flag } from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config';
+import { flag } from '@open-tomato/rafa/core/config/sections';
+
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -36,8 +39,8 @@ const ROOT = join(import.meta.dir, '..');
 /** What a refused entry is expected to be. */
 const EXPECTED_GLOB = 'expected a glob pattern relative to the repository root';
 
-/** The three settings, their file keys and their defaults, in schema order. */
-const THREE: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
+/** The four glob settings, their file keys and their defaults, in schema order. */
+const GLOB_KEYS: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
   [
     'testsFullSuiteTriggers',
     'tests.fullSuiteTriggers',
@@ -53,6 +56,7 @@ const THREE: readonly (readonly [ConfigSetting, string, readonly string[]])[] = 
       '**/*-cli.test.ts',
     ],
   ],
+  ['testsContract', 'tests.contract', ['**/*.contract.test.ts']],
   ['testsAlwaysRun', 'tests.alwaysRun', ['src/**/*.sweep.test.ts']],
 ];
 
@@ -73,14 +77,14 @@ function refusal(run: () => unknown): ConfigError {
   throw new Error('expected a ConfigError, and nothing was thrown');
 }
 
-describe('the three keys', () => {
-  it.each(THREE)('spells %s as %s, file-only, read through globList', (setting, key) => {
+describe('the four glob keys', () => {
+  it.each(GLOB_KEYS)('spells %s as %s, file-only, read through globList', (setting, key) => {
     expect(SETTINGS[setting].key).toBe(key);
     expect(SETTINGS[setting].cli).toBe(false);
     expect(SETTINGS[setting].read).toBe(globList);
   });
 
-  it.each(THREE)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
+  it.each(GLOB_KEYS)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
     expect(CONFIG_DEFAULTS[setting]).toEqual(value);
     expect(resolveConfig().config[setting]).toEqual(value);
     expect(resolveConfig().sources[setting]).toBe('default');
@@ -90,6 +94,7 @@ describe('the three keys', () => {
     expect(Object.isFrozen(TESTS_DEFAULTS)).toBe(true);
     expect(Object.isFrozen(TESTS_DEFAULTS.testsFullSuiteTriggers)).toBe(true);
     expect(Object.isFrozen(TESTS_DEFAULTS.testsIntegration)).toBe(true);
+    expect(Object.isFrozen(TESTS_DEFAULTS.testsContract)).toBe(true);
     expect(Object.isFrozen(TESTS_DEFAULTS.testsAlwaysRun)).toBe(true);
   });
 
@@ -98,7 +103,7 @@ describe('the three keys', () => {
   });
 });
 
-describe.each(THREE)('%s', (setting, key) => {
+describe.each(GLOB_KEYS)('%s', (setting, key) => {
   it('accepts a list of relative globs, frozen, in the order written', () => {
     const reading = readAs(setting, ['src/**/*.ts', 'bunfig.toml']);
 
@@ -131,6 +136,23 @@ describe.each(THREE)('%s', (setting, key) => {
 
     expect(reading.value).toBeUndefined();
     expect(reading.problems).toEqual([`F: ${key}[1] is ${JSON.stringify(entry)}, ${EXPECTED_GLOB}`]);
+  });
+});
+
+describe('tests.contract', () => {
+  it('matches a contract test\'s name in any folder with its default glob, and a plain test\'s not', () => {
+    const glob = new Bun.Glob('**/*.contract.test.ts');
+
+    expect(glob.match('packages/rafa/src/config/load.contract.test.ts')).toBe(true);
+    expect(glob.match('src/x.contract.test.ts')).toBe(true);
+    expect(glob.match('src/config-schema-tests.test.ts')).toBe(false);
+  });
+
+  it('keeps a file\'s [] as empty, outranking the default', () => {
+    const resolved = resolveConfig({ file: parseConfigText('tests:\n  contract: []\n', PATH) });
+
+    expect(resolved.config.testsContract).toEqual([]);
+    expect(resolved.sources.testsContract).toBe('file');
   });
 });
 
@@ -174,7 +196,13 @@ describe('tests.retakeRedAlone', () => {
     expect(SETTINGS.testsRetakeRedAlone.key).toBe('tests.retakeRedAlone');
     expect(SETTINGS.testsRetakeRedAlone.cli).toBe(false);
     expect(SETTINGS.testsRetakeRedAlone.read).toBe(flag);
-    expect(Object.keys(TESTS_SETTINGS)).toEqual(['testsFullSuiteTriggers', 'testsIntegration', 'testsAlwaysRun', 'testsRetakeRedAlone']);
+    expect(Object.keys(TESTS_SETTINGS)).toEqual([
+      'testsFullSuiteTriggers',
+      'testsIntegration',
+      'testsContract',
+      'testsAlwaysRun',
+      'testsRetakeRedAlone',
+    ]);
   });
 
   it('is on when no layer names it', () => {
@@ -206,19 +234,21 @@ describe('tests.retakeRedAlone', () => {
 describe('the tests section through a file', () => {
   it('resolves every key from the file, outranking the defaults', () => {
     const file = parseConfigText(
-      'tests:\n  fullSuiteTriggers: ["*.toml", test/setup.ts]\n  integration: []\n  alwaysRun: ["e2e/*.sweep.ts"]\n',
+      'tests:\n  fullSuiteTriggers: ["*.toml", test/setup.ts]\n  integration: []\n  contract: ["pkg/**/*.pact.ts"]\n  alwaysRun: ["e2e/*.sweep.ts"]\n',
       PATH,
     );
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.testsFullSuiteTriggers).toEqual(['*.toml', 'test/setup.ts']);
     expect(resolved.config.testsIntegration).toEqual([]);
+    expect(resolved.config.testsContract).toEqual(['pkg/**/*.pact.ts']);
     expect(resolved.config.testsAlwaysRun).toEqual(['e2e/*.sweep.ts']);
     expect([
       resolved.sources.testsFullSuiteTriggers,
       resolved.sources.testsIntegration,
+      resolved.sources.testsContract,
       resolved.sources.testsAlwaysRun,
-    ]).toEqual(['file', 'file', 'file']);
+    ]).toEqual(['file', 'file', 'file', 'file']);
   });
 
   it('refuses a file carrying an absolute pattern, naming the file and the entry', () => {
@@ -227,10 +257,54 @@ describe('the tests section through a file', () => {
     expect(error.problems).toEqual([`${PATH}: tests.integration[0] is "/e2e/*.test.ts", ${EXPECTED_GLOB}`]);
   });
 
-  it('warns of no unknown key for any of them, so all three sit in the known-key index', () => {
-    const file = parseConfigText('tests:\n  fullSuiteTriggers: []\n  integration: []\n  alwaysRun: []\n', PATH);
+  it('warns of no unknown key for any of them, so all four sit in the known-key index', () => {
+    const file = parseConfigText(
+      'tests:\n  fullSuiteTriggers: []\n  integration: []\n  contract: []\n  alwaysRun: []\n',
+      PATH,
+    );
 
     expect(file.extras).toEqual([]);
     expect(resolveConfig({ file }).warnings).toEqual([]);
+  });
+});
+
+describe('the section', () => {
+  it('is package tests, defining its keys in this order with these defaults, with no check', () => {
+    expect(TESTS_SECTION.package).toBe('tests');
+    expect(Object.entries(TESTS_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
+      ['testsIntegration', 'tests.integration'],
+      ['testsContract', 'tests.contract'],
+      ['testsAlwaysRun', 'tests.alwaysRun'],
+      ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
+    ]);
+    expect(TESTS_SECTION.defaults).toEqual({
+      testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+      testsIntegration: ['**/*-integration.test.ts', '**/*.integration.test.ts', '**/*-spawned*.test.ts', '**/*-cli.test.ts'],
+      testsContract: ['**/*.contract.test.ts'],
+      testsAlwaysRun: ['src/**/*.sweep.test.ts'],
+      testsRetakeRedAlone: true,
+    });
+    expect(TESTS_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(TESTS_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(TESTS_SECTION)).toBe(true);
+    expect(Object.isFrozen(TESTS_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(TESTS_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [TESTS_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['tests']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(TESTS_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(TESTS_SECTION.settings).sort());
   });
 });

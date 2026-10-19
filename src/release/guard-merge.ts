@@ -39,10 +39,10 @@
 import type { ReleaseFileSettings } from './enabled.js';
 import type { GuardNotesReader, GuardReading } from './guard.js';
 import type { SettleSettings } from './settle.js';
-import type { VersionCollisionMode } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { VersionCollisionMode } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../core/git/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { readGuard } from './guard.js';
 import { RELEASE_REMOTE } from './version.js';
@@ -89,6 +89,7 @@ export function mergeGuardSettings(config: MergeGuardSettings): MergeGuardSettin
     releaseFragments: config.releaseFragments,
     releaseStrategy: config.releaseStrategy,
     releaseHeading: config.releaseHeading,
+    releaseMoveLock: config.releaseMoveLock,
     prVersionCollision: config.prVersionCollision,
     dangerousAcceptVersionCollision: config.dangerousAcceptVersionCollision,
   };

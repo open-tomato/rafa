@@ -45,8 +45,8 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectWarn } from '../../board/project/issue-board-refresh.js';
 import type { ProjectRefresh, RefreshConfig, RefreshOptions } from '../../board/project/refresh.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import { issueSubjectConfig } from './issue-tracker.js';
 
@@ -83,8 +83,8 @@ export function nativeUnblockReport(): NativeUnblockReport {
  * dropped; a refusal with exit code 1 for a config `loadConfig` refuses.
  * See the module note.
  */
-export function unblockRelationshipsMode(project: ProjectFound): BoardRelationshipMode {
-  return issueSubjectConfig(project, () => undefined).boardRelationships;
+export async function unblockRelationshipsMode(project: ProjectFound): Promise<BoardRelationshipMode> {
+  return (await issueSubjectConfig(project, () => undefined)).boardRelationships;
 }
 
 /** What {@link refreshNativeUnblock} reads and writes through. */

@@ -11,7 +11,8 @@
  * seam across them and `src/plan.ts`: that a refusal is printed in the
  * words a person reads, exits 2, and starts no planner session; that
  * `--accept-refs` plans and leaves the new stamps in the saved copy; and
- * that `dangerous.acceptStaleRefs` prints its pass line and plans.
+ * that `dangerous.acceptStaleRefs` prints one line, the loader's pass
+ * line ending with `plan create`'s phrase, and plans.
  *
  * Each case runs the command as a process, as `plan-board-integration.test.ts`
  * does and for the same reason: the board route builds its own `gh` and
@@ -35,7 +36,7 @@ import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { specPath } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { ACCEPT_REFS_FLAG, acceptStaleRefsPassLine } from '../board/refs-gate.js';
+import { ACCEPT_REFS_FLAG } from '../board/refs-gate.js';
 import { readRefsBlock } from '../refs/stamp.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
@@ -50,6 +51,13 @@ const SRC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 /** Where `--issue` writes its snapshot; a project's own default. */
 const SPECS_DIR = '.rafa/specs';
 
+/**
+ * The words the start-of-run line printed for `dangerous.acceptStaleRefs`
+ * before it was folded into the loader's pass line, written out rather
+ * than read off the source.
+ */
+const ACCEPT_STALE_REFS_WORDS = 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run';
+
 /** The spec issue every case plans from, and the issue its body names. */
 const SPEC_ISSUE = 20;
 const NAMED_ISSUE = 7;
@@ -63,7 +71,11 @@ const SPEC_TITLE = 'The board routes';
 const PROBE = [
   'import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
+  `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+  `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
+  'registerCoreConfigSections();',
+  'registerCoreAdapters();',
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
@@ -326,13 +338,16 @@ describe('check 4 through plan create --issue', () => {
       expect(again.output).not.toContain('suspect');
     });
 
-    it('prints the pass and plans under dangerous.acceptStaleRefs: true, without the flag', () => {
+    it('prints one line for dangerous.acceptStaleRefs, ending with the words of the removed start-of-run line, and plans without the flag', () => {
       const scratch = driftedScratch('dangerous:\n  acceptStaleRefs: true\n');
 
       const run = runPlan(scratch);
 
       expectExit(run, 0, { ...scratch });
-      expect(run.output).toContain(acceptStaleRefsPassLine());
+      const named = run.output.split('\n').filter((line) => line.includes('dangerous.acceptStaleRefs: true'));
+      expect(named).toEqual([
+        `warn: dangerous.acceptStaleRefs: true (${join(scratch.repo, '.rafa', 'config.yaml')}, entry 0); ${ACCEPT_STALE_REFS_WORDS}`,
+      ]);
       expect(sessionsSpent(scratch)).toBe(2);
     });
   });

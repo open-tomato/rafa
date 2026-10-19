@@ -10,7 +10,8 @@ The template is at `https://github.com/orgs/open-tomato/projects/6` (the
 "rafa board template"), public, with five fields, three saved views, and all
 six automations turned off. The template URL is the default of
 `board.project.template`, and `board.project.number` is the number of the
-project copied to the repository's owner. Both are read from `.rafa/config.yaml`.
+project copied to the repository's owner. Both are read from the project's
+config.
 
 Every GitHub project that mirrors rafa's board carries the same five fields
 with the same names and options; rafa finds them by exact match and skips any
@@ -134,6 +135,24 @@ answers the issue in `notFilled`, the same line is printed after the
 refresh's own, at `warn`, and the create still exits 0: the issue is filed
 and sits on the project with no value until the next `rafa board sync`.
 
+The bugs rafa files itself take the same step. `addFiledBugs`
+(`src/board/project/add-filed.ts`) takes the result of one `triageReport`,
+a loop task's report or a failed check of `rafa epic close`, and adds each
+bug settled `filed` on the public `github` tracker, in the order filed,
+through `addAndRefreshIssue`. It passes over every other bug: one
+commented on, inherited, failed, skipped or routed elsewhere; a security
+bug, which goes to the private channel; a bug filed on a `local` or
+`linear` tracker; and a ref whose id is not a positive integer. With
+`board.project.number` unset it sends nothing and prints nothing. Beside the
+refresh's own lines and `added but not filled`, it answers three warnings
+of its own. A token without the `project` scope answers
+`gh auth refresh -s project`, once per bug, so a loop host without the
+scope files each bug and a later `rafa board sync` adds them. A number
+naming no project answers `rafa init --board`. A refresh that rejected
+answers `The project was not updated for #<n>` with `rafa board sync` to
+catch up. A recurring bug is commented on and never added, its issue being
+on the project already.
+
 ### Lists read to their end
 
 The facts reader reads an issue's labels, closing references and
@@ -208,6 +227,15 @@ Commands that call the refresh outside the label wrapper:
 - `rafa issue create` — add the new issue, then refresh it with the item the
   add answered as a known item, and print `#<n> added but not filled:
   <reason>` when the refresh did not fill it
+- `rafa start` (each task's triage) — the same add-then-refresh for each bug
+  the task's report filed on the public `github` tracker, through
+  `addFiledBugs` (`src/board/project/add-filed.ts`, called from
+  `src/start/triage.ts`), every line a `Triage: ` warning after the triage's
+  own
+- `rafa epic close` (the gate) — the same for each bug a failed check filed
+  on the public `github` tracker, through `addFiledBugs`, called from
+  `src/commands/epic/close-triage.ts`, every line a warning after the
+  failure's own
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
   issues they were blocking; an epic whose member it closes is not

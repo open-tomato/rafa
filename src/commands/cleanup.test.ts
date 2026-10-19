@@ -59,10 +59,12 @@ import type {
   WorktreeRow,
 } from '../cleanup/index.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { Prompter } from '../core/command/index.js';
-import type { GitResult } from '../core/git/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitResult } from '@open-tomato/rafa/core/git';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

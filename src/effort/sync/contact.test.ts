@@ -20,9 +20,12 @@
  * holding the project config the helper reads.
  */
 import type { HubContactSeams } from './contact.js';
-import type { AdapterContext } from '../../core/adapters/index.js';
-import type { ResolvedConfig } from '../../core/config/index.js';
-import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { Sync, SyncPullRequest, SyncPushRequest } from '@open-tomato/rafa/ports';
+
+import '../../config-registry.js';
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,9 +34,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
-import { ConfigError, parseConfigText, resolveConfig } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { ConfigError, parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import {
   createHubContact,
@@ -422,11 +425,11 @@ describe('pullBeforeRead', () => {
     expect(service.contexts[0]?.repoRoot).toBe(root);
   });
 
-  it('while the same file read with a sink writes the config warning it kept back, the control', () => {
+  it('while the same file read with a sink writes the config warning it kept back, the control', async () => {
     const root = projectHolding(`${SERVICE}${UNKNOWN_KEY}`);
     const warnings: string[] = [];
 
-    loadConfig({ root, home: HOME }, {}, (line) => warnings.push(line));
+    await loadConfig({ root, home: HOME }, {}, (line) => warnings.push(line));
 
     expect(warnings).toHaveLength(1);
   });
@@ -451,6 +454,6 @@ describe('pullBeforeRead', () => {
     expect(reading).toBeNull();
     expect(lines).toEqual([]);
     expect(service.calls).toEqual([]);
-    expect(() => loadConfig({ root, home: HOME }, {}, () => {})).toThrow(ConfigError);
+    await expect(loadConfig({ root, home: HOME }, {}, () => {})).rejects.toThrow(ConfigError);
   });
 });

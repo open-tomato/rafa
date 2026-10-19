@@ -68,14 +68,17 @@ import type { BackupResult } from '../../backfill/backup.js';
 import type { DerivationAction, DerivationKind, DerivationOptions, DerivationPlan } from '../../backfill/derive.js';
 import type { ProposalFile } from '../../backfill/proposal-file.js';
 import type { ProposalAction, ProposalActionKind } from '../../backfill/propose.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { DemotionScope } from '../../demote/select.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctScope } from '../../schema/instinct.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { backupDirectory, backupFiles, countBackups } from '../../backfill/backup.js';
 import { applyDerivation, countDerivations, DERIVATION_KINDS, planDerivation } from '../../backfill/derive.js';
@@ -87,8 +90,6 @@ import {
   runProposalPass,
 } from '../../backfill/propose.js';
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../core/command/index.js';
-import { loadConfig } from '../../core/config/load.js';
 import { resolveDemotionScope } from '../../demote/select.js';
 
 /** The two things neither the context nor the registry carries. */
@@ -364,11 +365,11 @@ async function runPropose(
   seams: SkillBackfillSeams,
 ): Promise<void> {
   const project = projectOf(context);
-  const config = loadConfig(
+  const { config } = await loadConfig(
     { root: project.root, home: project.home },
     {},
     (message) => { context.output.warn(message); },
-  ).config;
+  );
   const pass = await runProposalPass({
     root: scope.dir,
     backfillDir,

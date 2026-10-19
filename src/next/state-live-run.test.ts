@@ -69,8 +69,8 @@
  *    `./state.test.ts` still passes, since none plants such a record.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { GitResult } from '../pr/index.js';
+import type { SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -78,7 +78,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../core/plan/index.js';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { readNextState } from './state.js';

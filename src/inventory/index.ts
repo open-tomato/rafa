@@ -97,11 +97,12 @@ import type { OverrideReading, OverrideWarning } from './disabled.js';
 import type { AddonModule, PluginSeams, SourceWarning } from './plugins.js';
 import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } from './record.js';
 import type { SourceItem, TreeListing } from './trees.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { Resolution, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
-import { isSkillTier } from '../schema/tiers.js';
+import { isSkillTier } from '@open-tomato/rafa/schema/tiers';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { pinKey, readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveVerdict } from '../tiers/serve.js';
 

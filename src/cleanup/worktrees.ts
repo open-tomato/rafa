@@ -46,7 +46,7 @@
  *   - **current**: the command's working directory is the worktree or a
  *     directory inside it.
  *   - **session**: a loop session record reads `running` or `paused`
- *     (`readState`, `src/core/loop/sessions.ts`: a pid that is gone reads
+ *     (`readState`, `packages/rafa/src/core/loop/sessions.ts`: a pid that is gone reads
  *     `stopped`) and is either kept under the worktree's own
  *     `.rafa/runs/`, or kept under the project root's and names the
  *     worktree's branch. The second is the common case: `.rafa/` is
@@ -89,15 +89,16 @@
  * {@link WorktreesUnread}; a failure reading one worktree is that
  * worktree's `unreadable` blocker.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../core/git/index.js';
-import { readSessions, runsDir } from '../core/loop/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { readSessions, runsDir } from '@open-tomato/rafa/core/loop';
+
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { worktreeDirAt } from '../start/worktree-dir.js';

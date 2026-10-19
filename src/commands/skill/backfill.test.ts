@@ -32,7 +32,9 @@
  * refusal, because `parseArgs` hands the flag the directory as its
  * value, exactly as it does for `rafa skill check --fix`.
  */
-import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,8 +42,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { DRAFT_FILE, REVIEWED_FILE } from '../../backfill/proposal-file.js';
-import { CommandExit } from '../../core/command/index.js';
 import { readFrontmatterDocument } from '../../schema/frontmatter.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 

@@ -32,14 +32,17 @@
  */
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
 import { parsePlan } from '../../plan/index.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 

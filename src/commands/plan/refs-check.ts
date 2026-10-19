@@ -1,7 +1,7 @@
 /**
  * Check 4 of the readiness gate in its place on `rafa plan create`: the
- * start-of-run line `dangerous.acceptStaleRefs` prints, and the check
- * itself run over the saved copy a board route settled, before the
+ * phrase `plan create` declares for `dangerous.acceptStaleRefs`, and the
+ * check itself run over the saved copy a board route settled, before the
  * planner session (`.rafa/specs/rafa-151-references-specs-bugs-are.md`).
  *
  * What the check DOES with each reference state is
@@ -31,11 +31,14 @@
  *
  * `--accept-refs` on the line, and `dangerous.acceptStaleRefs: true` in
  * the config, each re-stamp every reference and plan
- * (`refsAcceptance`, the flag winning). {@link announceCreateRefs}
- * prints the setting's pass line at the START of the run, before any
- * board read, and only on a run check 4 will cover: a board route that
- * is not `--dry-run`. A `--spec` run and a dry run would be told that
- * check 4 re-stamps every reference "on this run" when it reads none.
+ * (`refsAcceptance`, the flag winning). The setting is told once, by
+ * the loader's pass line for the key (`packages/rafa/src/core/config/dangerous.ts`),
+ * written when `src/plan.ts` loads its config and so before any board
+ * read: `plan create` declares {@link CREATE_DANGEROUS_PHRASES} as its
+ * `RafaCommand.dangerous` (`./create.ts`), so the line ends with what
+ * check 4 does under it. The loader writes it on every `plan create`
+ * run with the setting on, a `--spec` run and a dry run included,
+ * which check 4 does not read.
  *
  * ## The verifier
  *
@@ -87,7 +90,7 @@
  * A caller builds it with {@link registryRoster} from the registry its
  * line was routed through, `RafaContext.registry`
 
- * (`src/core/command/command.ts`): `./create.ts`, which hands it to
+ * (`packages/rafa/src/core/command/command.ts`): `./create.ts`, which hands it to
  * `src/plan.ts` and so to check 4, `../issue/check.ts`, and the three
  * commands that read `../doctor-refs.ts`'s row, `../doctor.ts`,
  * `../epic/show.ts` and `../issue/list.ts`. It is `describeRegistry`
@@ -139,23 +142,24 @@
  * driven: a case would wait it out.
  */
 import type { RefsGateAnswer } from '../../board/refs-gate.js';
-import type { SpecSourceRequest, ResolvedSpec } from '../../board/spec-source.js';
+import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { DescribeDocument } from '../../cli/describe.js';
 import type { CommandRegistry } from '../../cli/registry.js';
-import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 import path from 'path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { version } from '../../../package.json';
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { announceAcceptStaleRefs, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
-import { readSpecSourceFlags } from '../../board/spec-source.js';
+import { ACCEPT_STALE_REFS_KEY, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
 import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../../core/git/index.js';
-import { activeOutput } from '../../core/output/index.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
 /** The `name` in `package.json` of a project root that is rafa itself. */
@@ -353,29 +357,13 @@ export function createPlanRefsVerifier(
   };
 }
 
-/** True for a request check 4 covers: `--issue` or `--next`, not `--spec`. */
-function isBoardRequest(request: SpecSourceRequest | null): boolean {
-  return request !== null && request.kind !== 'spec';
-}
-
 /**
- * Prints the `dangerous.acceptStaleRefs` pass line when the setting is
- * on and the line names a board route that is not `--dry-run`; nothing
- * otherwise. Called first thing in a `plan create` run, before any
- * board read.
- *
- * Throws what `readSpecSourceFlags` throws for a line naming two
- * sources, which is the refusal the resolution would throw next.
+ * What `plan create` does under each `dangerous.*` key it reads, its
+ * `RafaCommand.dangerous`; see the module note.
  */
-export function announceCreateRefs(
-  args: readonly string[],
-  acceptStaleRefs: boolean,
-  output: Output = activeOutput(),
-): void {
-  if (!acceptStaleRefs) return;
-  const flags = readSpecSourceFlags(args);
-  announceAcceptStaleRefs(isBoardRequest(flags.request) && !flags.dryRun, output);
-}
+export const CREATE_DANGEROUS_PHRASES: DangerousPhrases = Object.freeze({
+  [ACCEPT_STALE_REFS_KEY]: 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run',
+});
 
 /** What {@link checkCreateRefs} is handed. */
 export interface CreateRefsCheckOptions {

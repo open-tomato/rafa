@@ -35,15 +35,15 @@
  * {@link readSwitch} refuses such a value rather than reading the flag
  * as set and the plan as absent.
  */
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { PlansDir } from '../../core/plan/index.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PlansDir } from '@open-tomato/rafa/core/plan';
 
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { plansDirAt } from '../../core/plan/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 /**
  * The project the dispatcher resolved for a command that declares it
@@ -59,25 +59,25 @@ export function requireProject(context: RafaContext, command: string): ProjectFo
  * that resolves there; a refusal with exit code 1 naming `command` for a
  * config `loadConfig` refuses. See the module note.
  */
-export function resolvePlansDir(
+export async function resolvePlansDir(
   project: ProjectFound,
   command: string,
   warn: (message: string) => void,
-): PlansDir {
-  return plansDirAt(project.root, resolveProjectConfig(project, command, warn).planDir);
+): Promise<PlansDir> {
+  return plansDirAt(project.root, (await resolveProjectConfig(project, command, warn)).planDir);
 }
 
 /**
  * The config that resolves for `project`; a refusal with exit code 1
  * naming `command` and every problem for a config `loadConfig` refuses.
  */
-export function resolveProjectConfig(
+export async function resolveProjectConfig(
   project: ProjectFound,
   command: string,
   warn: (message: string) => void,
-): RafaConfig {
+): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [

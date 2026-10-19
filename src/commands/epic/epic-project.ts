@@ -73,14 +73,15 @@ import type { EpicMoveResult } from './move.js';
 import type { EpicNewResult } from './new.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectRefresh, RefreshConfig, RefreshOptions, RefreshWidening } from '../../board/project/refresh.js';
-import type { RafaContext } from '../../core/command/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
-import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig } from '../issue/issue-tracker.js';
 
 /** Refreshes `issues`, widened by `widening`; `refreshProjectItems` unless a test plants another. */
@@ -203,7 +204,7 @@ export async function refreshProjectAfterEpic(
   let warnings: readonly string[];
   try {
     // Its warnings dropped: the action wrote them for the same file, or reads no config of its own.
-    const config = issueSubjectConfig(project, () => undefined);
+    const config = await issueSubjectConfig(project, () => undefined);
     if (config.boardProjectNumber === null) return null;
     const retry = commandRetrySeams(context.output, context.outputMode, seams.sleep);
     const openGh = (): GhRunner => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, retry);

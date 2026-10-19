@@ -11,14 +11,14 @@
  * a real tsc, in `type-step.test.ts`.
  */
 
-import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { createTextOutput } from '../adapters/output/text.js';
+import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { TESTS_DEFAULTS } from '../config-schema-tests.js';
-import { setActiveOutput } from '../core/output/index.js';
 
 import {
   alwaysRunFiles,

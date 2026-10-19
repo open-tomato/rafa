@@ -5,7 +5,7 @@
  * Copied from `createGithubTracker` in open-tomato's
  * `packages/shared/issue-tracker/src/adapters/github.ts` at commit
  * `45aaab563e5b4f4e6258e19ebf752b7cfeb67bf0` (2026-08-05), and retyped
- * against rafa's `Tracker` port, which `src/ports/index.ts` copies from
+ * against rafa's `Tracker` port, which `packages/rafa/src/ports/index.ts` copies from
  * the same commit's `port.ts`.
  *
  * ## The `gh` runner seam
@@ -111,6 +111,12 @@
  *     for each row's title, body and `createdAt` beside what `find` asks
  *     for. `github-open-issues.ts` holds the reading and its note, and
  *     is handed the readers `find` checks a row with.
+ *   - `filedIssues`, rafa's own reading, which the source lacks: one
+ *     `gh issue list --state all` narrowed by the `type:` label and by
+ *     a `--search` of `created:>=<since>`, asking for what `openIssues`
+ *     asks for, and refusing a row with no readable `createdAt`.
+ *     `github-filed-issues.ts` holds the reading and its note, and is
+ *     handed the readers `openIssues` is.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks:
  *     one `gh issue view --json title,body,state,labels,author`, and one
  *     `gh issue edit` with the body handed to `gh` on stdin through
@@ -139,6 +145,8 @@
  * --reason` makes no call on an issue already closed and drops the
  * changed reason; a reopen goes through `gh issue reopen`.
  */
+import type { GithubOpenIssuesReaders } from './github-open-issues.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa/core/git';
 import type {
   Issue,
   IssueDraft,
@@ -150,32 +158,19 @@ import type {
   Tracker,
   TrackerCapabilities,
   TransitionResult,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGithubEditMembers } from './github-edit.js';
+import { createGithubFiledIssues } from './github-filed-issues.js';
 import { createGithubOpenIssues } from './github-open-issues.js';
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 
 /** What every refusal opens with. */
 const PREFIX = 'github tracker';
 
-/** What one `gh` command answered. */
-export interface GhResult {
-  /** True when `gh` exited 0. */
-  readonly ok: boolean;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-/**
- * Runs `gh` with the arguments after its name. A command that fails,
- * or could not be run, answers `ok` false rather than rejecting.
- * `stdin`, when given, is the whole of what `gh` reads on its standard
- * input; left out, `gh` reads a closed one.
- */
-export type GhRunner = (args: readonly string[], stdin?: string) => Promise<GhResult>;
+export type { GhResult, GhRunner };
 
 /** What the runner spawning `gh` is made with. */
 export interface GhRunnerOptions {
@@ -573,7 +568,7 @@ function listedIssues(stdout: string): ListedIssue[] {
   return listedRows(stdout).map(listedRow);
 }
 
-/** The ref `find` and `openIssues` answer for a listed row: opt 0, and the module label when it has one. */
+/** The ref `find`, `openIssues` and `filedIssues` answer for a listed row: opt 0, and the module label when it has one. */
 function refOfRow(row: ListedIssue): IssueRef {
   const module = labelValue(row.labels, GITHUB_LABELS.modulePrefix);
   const ref: IssueRef = { opt: 0, kind: 'github', externalId: String(row.number), url: row.url };
@@ -687,6 +682,14 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
     knownLabels = new Set([...knownLabels, ...missing]);
   }
 
+  // What `openIssues` and `filedIssues` read a listing with: `find`'s own checks.
+  const listingReaders: GithubOpenIssuesReaders = {
+    run,
+    listedRows,
+    refOfRow: (row, index) => refOfRow(listedRow(row, index)),
+    typeLabel: (type) => `${GITHUB_LABELS.typePrefix}${type}`,
+  };
+
   const tracker: Tracker = {
     kind: 'github',
 
@@ -775,12 +778,9 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
       return listedIssues(stdout).map(refOfRow);
     },
 
-    openIssues: createGithubOpenIssues({
-      run,
-      listedRows,
-      refOfRow: (row, index) => refOfRow(listedRow(row, index)),
-      typeLabel: (type) => `${GITHUB_LABELS.typePrefix}${type}`,
-    }),
+    openIssues: createGithubOpenIssues(listingReaders),
+
+    filedIssues: createGithubFiledIssues(listingReaders),
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {
       const number = issueNumberOfRef(ref);

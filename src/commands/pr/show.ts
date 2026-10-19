@@ -86,14 +86,16 @@
  */
 import type { LastTriage } from './last-triage.js';
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../core/config/sections.js';
 import { formatRows } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';
+import { PR_SHOW_DECLARATION } from './declarations.js';
 import { readLastTriage } from './last-triage.js';
 import {
   DEFAULT_PR_SEAMS,
@@ -125,21 +127,6 @@ export const OTHER_REPOSITORY = 'another repository';
 
 /** The `owner/name` a GitHub pull request URL is under. */
 const PULL_URL_REPOSITORY = /^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+\/?$/u;
-
-/**
- * The keys of the json result's `data`, in the order the command's
- * description names them: {@link PrShowResult}'s own keys, which
- * `show.test.ts` holds this list to.
- */
-export const PR_SHOW_JSON_FIELDS: readonly ['detail', 'bodyCloses', 'checks', 'checksProblem', 'triage', 'triageProblem', 'text'] = Object.freeze([
-  'detail',
-  'bodyCloses',
-  'checks',
-  'checksProblem',
-  'triage',
-  'triageProblem',
-  'text',
-] as const);
 
 /** Everything the report is rendered from: what was read, and what could not be. */
 export interface PrShowReading {
@@ -339,7 +326,7 @@ async function probe<T>(call: () => Promise<T>): Promise<Probe<T>> {
 /** Reads one pull request, its checks and its last triage; see the module note. */
 export async function readShow(context: RafaContext, seams: PrSeams): Promise<PrShowResult> {
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   const detail = await onProvider(`read pull request #${pick.number}`, () => pr.pulls.get(pick.number));
   if (detail === null) {
@@ -363,44 +350,7 @@ export async function readShow(context: RafaContext, seams: PrSeams): Promise<Pr
 /** The command, reaching the provider and the branch through `seams`; see the module note. */
 export function createPrShowCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr show',
-    subject: 'pr',
-    action: 'show',
-    summary: 'show one pull request in detail, with its checks and its last triage',
-    description: 'Reads one pull request in full and prints its number and title, its state, author, head branch,'
-      + ' base branch and mergeability, its URL, the issues it closes, every check with its state and its link, and'
-      + ' the last rafa triage comment made on it. The closes line marks an issue the provider links that the body'
-      + ' names by no closing keyword, and an issue the body names by keyword that the provider does not link.'
-      + ' Without a number it reads the open pull request whose head is the branch checked out'
-      + ' at the project root. The checks and the triage comment are read separately, and one that cannot be read'
-      + ' says so in its own section rather than refusing the command, where a pull request with no checks reads'
-      + ' `checks none`. With `--output=json` the data of the terminal result event holds the fields '
-      + PR_SHOW_JSON_FIELDS.map((field) => `\`${field}\``).join(', ')
-      + ': the pull request, the issues its body closes by keyword, the checks, the triage and the rendered text,'
-      + ' each read that failed carrying its problem. Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [
-      {
-        name: 'n',
-        description: 'The pull request number. The open pull request of the current branch when it is left out.',
-        type: 'number',
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa pr show',
-        note: 'Shows the open pull request of the branch checked out at the project root.',
-      },
-      {
-        cmd: 'rafa pr show 41',
-        note: 'Shows pull request 41, whatever branch is checked out.',
-      },
-      {
-        cmd: 'rafa pr show 41 --output=json',
-        note: 'Writes a start event, then a result event holding the pull request, its checks and its last triage.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_SHOW_DECLARATION,
     run: async (context) => {
       const shown = await readShow(context, seams);
       if (context.outputMode === 'json') {

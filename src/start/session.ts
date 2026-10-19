@@ -111,6 +111,8 @@
  * warning above.
  */
 import type { PassOverList } from './pass-over.js';
+import type { HopRecord } from '../next/hop-record.js';
+import type { TaskInfo } from '../utils/tracker.js';
 import type {
   PidProbe,
   SessionChange,
@@ -118,15 +120,13 @@ import type {
   SessionDraft,
   SessionReadSeams,
   SessionRecord,
-} from '../core/loop/index.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { TaskInfo } from '../utils/tracker.js';
+} from '@open-tomato/rafa/core/loop';
 
 import { randomUUID } from 'node:crypto';
 import { relative } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import {
   beginSession,
   errorCode,
@@ -138,12 +138,13 @@ import {
   sessionFilePath,
   SessionRecordError,
   updateSession,
-} from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
+} from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { stripTaskDeclaration } from '@open-tomato/rafa/core/plan';
+
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import { readHopRecord, staleAgainst } from '../next/hop-record.js';
 import { readPositionFile } from '../project/position.js';
-import { stripTaskDeclaration } from '../utils/declaration.js';
 
 /** The last line of every refusal the open throws. */
 export const NOTHING_DISPATCHED = '   Nothing was checked and nothing was dispatched.';

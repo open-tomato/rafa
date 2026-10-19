@@ -53,11 +53,11 @@
  * reference by, counts as none ({@link artifactOf}).
  */
 import type { TestFailure } from './test-failure.js';
-import type { ReportBug } from '../report/parse.js';
+import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename } from 'node:path';
 
-import { textProblem } from '../effort/store/findings.js';
+import { textProblem } from '@open-tomato/rafa/store/findings';
 
 import { testFailureOf } from './test-failure.js';
 

@@ -12,9 +12,11 @@
  * a list that throws when it runs out, so a write minting more than the
  * case expects fails there.
  */
-import type { StoreIdentitySeams, StoreMeta } from '../../effort/store/store-meta.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { StoreIdentitySeams, StoreMeta } from '@open-tomato/rafa/store/store-meta';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,10 +25,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { bringForward, MIGRATION_LOG_TABLE } from '../../effort/store/bring-forward.js';
-import { SQLITE_MIGRATIONS, sqliteStorePath, withSqliteStore } from '../../effort/store/sqlite.js';
-import { readHostId } from '../../effort/store/store-identity.js';
-import { readStoreMeta } from '../../effort/store/store-meta.js';
+import { bringForward, MIGRATION_LOG_TABLE } from '@open-tomato/rafa/store/bring-forward';
+import { SQLITE_MIGRATIONS, sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { readHostId } from '@open-tomato/rafa/store/store-identity';
+import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import { createCopyCommand } from './copy.js';

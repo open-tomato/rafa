@@ -122,14 +122,15 @@
  * `print`, the active output's `warn` when none is given, read at each
  * notice as `config-load.ts` reads it. Nothing here reads the home.
  */
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-import { describeValue, messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { HOP_FILE } from '../next/hop-record.js';
 
 import { POSITION_FILE } from './position.js';

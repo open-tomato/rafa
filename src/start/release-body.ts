@@ -60,8 +60,9 @@
  */
 import type { PrProviderReading, PullRequests } from '../pr/index.js';
 
-import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 import { bodyWithRelease } from '../release/branch-forecast.js';
 
@@ -74,6 +75,12 @@ export interface BodyWrite {
   /** What a reader sees of the two, for the terminal line naming them. */
   readonly lines: readonly string[];
 }
+
+/** The body to write, built from the body as read; see {@link writeBodyWith}. */
+export type BodyRebuild = (body: string) => string;
+
+/** Prints what a write that reached a provider did with its `count` lines. */
+export type BodyAnnouncer = (write: ReleaseBodyWrite, count: number) => void;
 
 /** What became of what the body had to be given. */
 export interface ReleaseBodyWrite {
@@ -132,8 +139,8 @@ function unwritten(number: number | null, problem: string): ReleaseBodyWrite {
 }
 
 /**
- * Puts `write` in the pull request body of `branch`, unless the body
- * already carries it.
+ * Rebuilds the pull request body of `branch` through `rebuild`, unless
+ * the body it answers is the body already there.
  *
  * Reported and never thrown; see the module note for why the read comes
  * first and why a body the write would not change is left alone.
@@ -141,7 +148,7 @@ function unwritten(number: number | null, problem: string): ReleaseBodyWrite {
 async function carryIntoBody(
   pulls: PullRequests,
   branch: string,
-  write: BodyWrite,
+  rebuild: BodyRebuild,
 ): Promise<ReleaseBodyWrite> {
   try {
     const found = await pulls.findOpen(branch);
@@ -153,7 +160,7 @@ async function carryIntoBody(
     if (detail === null) {
       return unwritten(found.number, `pull request #${found.number} could not be read back`);
     }
-    const next = bodyWithRelease(detail.body, write.sentence, write.block);
+    const next = rebuild(detail.body);
     if (next === detail.body) {
       return { number: found.number, carried: true, already: true, problem: null };
     }
@@ -203,14 +210,24 @@ function announceBody(write: ReleaseBodyWrite, count: number): void {
 }
 
 /**
- * Writes `write` into the pull request body of `target.branch` through
- * the resolved provider, or prints the one line naming what went
- * unwritten.
+ * Rebuilds the pull request body of `target.branch` through `rebuild`
+ * and the resolved provider, or prints the one line naming `lines` as
+ * unwritten. The read-modify-write every body writer goes through: the
+ * release's own {@link writeBody}, and the plan's conventions section
+ * (`./convention-body.ts`).
+ *
+ * `rebuild` is handed the body as read and answers the body to write;
+ * answering it unchanged leaves the pull request alone. `lines` is what
+ * a reader sees of the write, for the terminal line naming them, which
+ * `announce` prints once a provider answered; by default the release's
+ * own lines, with a problem at error level.
  */
-export async function writeBody(
+export async function writeBodyWith(
   seams: ReleaseBodySeams,
   target: ReleaseBodyTarget,
-  write: BodyWrite,
+  lines: readonly string[],
+  rebuild: BodyRebuild,
+  announce: BodyAnnouncer = announceBody,
 ): Promise<ReleaseBodyWrite> {
   // Read BEFORE the provider is built, so a `none` repository spawns no
   // `gh`; the one line it prints names what went unwritten. See the
@@ -218,13 +235,26 @@ export async function writeBody(
   const reading = seams.readProvider(target.repoRoot);
   if (reading.provider !== 'gh') {
     const problem = noProviderProblem(reading);
-    activeOutput().info(`   No pull request body carries ${JSON.stringify(write.lines.join(' '))}: ${problem}.`);
+    activeOutput().info(`   No pull request body carries ${JSON.stringify(lines.join(' '))}: ${problem}.`);
     return unwritten(null, problem);
   }
 
-  const body = await carryIntoBody(seams.pulls(target.repoRoot), target.branch, write);
-  announceBody(body, write.lines.length);
+  const body = await carryIntoBody(seams.pulls(target.repoRoot), target.branch, rebuild);
+  announce(body, lines.length);
   return body;
+}
+
+/**
+ * Writes `write` into the pull request body of `target.branch` through
+ * the resolved provider, or prints the one line naming what went
+ * unwritten.
+ */
+export function writeBody(
+  seams: ReleaseBodySeams,
+  target: ReleaseBodyTarget,
+  write: BodyWrite,
+): Promise<ReleaseBodyWrite> {
+  return writeBodyWith(seams, target, write.lines, (body) => bodyWithRelease(body, write.sentence, write.block));
 }
 
 /**

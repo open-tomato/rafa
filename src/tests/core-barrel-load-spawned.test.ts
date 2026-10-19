@@ -6,29 +6,50 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'bun:test';
 
+import { baseName, CORE_BARRELS, CORE_FOLDER, subjectFolder } from '../../scripts/survey/core-moves.js';
+
 import { expectExit } from './cli-capture.js';
 
 /**
  * A barrel that closes a runtime cycle fails with a `ReferenceError` in one
  * import order only, so a green `tsc` proves nothing. Each case here loads
- * one file first in a fresh `bun` process, then reads a setting.
+ * one file first in a fresh `bun` process, then the registry
+ * (`src/config-registry.ts`), whose `registerCoreConfigSections` it calls
+ * to register the sections with core, and
+ * reads a setting both off the registry's `SETTINGS` and off the specs the
+ * core barrel's `activeSettings()` answers.
+ *
+ * The barrels are those `scripts/survey/core-moves.ts` lists, under the
+ * folder it names for core, so the cases follow core when it moves.
  */
 
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SRC = fileURLToPath(new URL('..', import.meta.url));
-const CONFIG_BARREL_DIR = join(SRC, 'core', 'config');
+const CONFIG_BARREL_DIR = join(REPO_ROOT, subjectFolder('config'));
 
-const CONFIG_BARRELS: string[] = ['index.ts', 'sections.ts', 'load.ts'];
+/** The folder core's paths lie under: `src/` until core moves into its package. */
+const CORE_ROOT = CORE_FOLDER.slice(0, -'core/'.length);
+
+/** A core path as the case names it: under {@link CORE_ROOT}, `core/plan/index.ts`. */
+function corePath(path: string): string {
+  return path.slice(CORE_ROOT.length);
+}
+
+const CONFIG_BARRELS: string[] = CORE_BARRELS.config.map((barrel) => baseName(barrel));
 
 /** Section files hold their `*_SETTINGS` records; a test file is no section. */
 const SECTION_FILES = readdirSync(SRC)
   .filter((name) => /^config-schema-.+\.ts$/.test(name) && !name.endsWith('.test.ts'))
   .sort();
 
-/** The child's program: load `first`, then read from the config barrel. */
+/** The child's program: load `first`, then the registry, then read from both and the config barrel. */
 const CHILD = `
-const [first, barrel] = process.argv.slice(1);
+const [first, registry, barrel] = process.argv.slice(1);
 const loaded = await import(first);
+const { registerCoreConfigSections, SETTINGS } = await import(registry);
+registerCoreConfigSections();
 const config = await import(barrel);
+const active = config.activeSettings();
 const records = Object.entries(loaded)
   .filter(([name]) => name.endsWith('_SETTINGS'))
   .map(([, record]) => record);
@@ -36,15 +57,16 @@ const read = [];
 for (const record of records) {
   const key = Object.keys(record)[0];
   if (key === undefined) throw new Error('an empty settings record in ' + first);
-  if (config.SETTINGS[key] !== record[key]) throw new Error('SETTINGS does not hold ' + key + ' from ' + first);
+  if (SETTINGS[key] !== record[key]) throw new Error('SETTINGS does not hold ' + key + ' from ' + first);
+  if (active[key] !== record[key]) throw new Error('activeSettings() does not hold ' + key + ' from ' + first);
   read.push(key);
 }
-console.log(JSON.stringify({ names: Object.keys(loaded).length, read, settings: Object.keys(config.SETTINGS).length }));
+console.log(JSON.stringify({ names: Object.keys(loaded).length, read, settings: Object.keys(active).length }));
 `;
 
 async function loadFirst(first: string): Promise<CapturedRun> {
   const child = Bun.spawn(
-    ['bun', '-e', CHILD, first, join(CONFIG_BARREL_DIR, 'index.ts')],
+    ['bun', '-e', CHILD, first, join(SRC, 'config-registry.ts'), join(CONFIG_BARREL_DIR, 'index.ts')],
     { cwd: SRC, stdout: 'pipe', stderr: 'pipe' },
   );
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -93,7 +115,7 @@ describe('each config-schema section file loaded first in a fresh process', () =
   });
 });
 
-const CORE_DIR = join(SRC, 'core');
+const CORE_DIR = join(REPO_ROOT, CORE_FOLDER);
 
 /** The command, output, adapters and git barrels: one folder, one `index.ts`. */
 const FOLDER_BARRELS: string[] = ['command', 'output', 'adapters', 'git'];
@@ -133,16 +155,14 @@ describe('the entry point in a fresh process', () => {
 
 /** The plan and loop barrels, and the store's entry, each loaded first. */
 const PLAN_LOOP_STORE_FIRST: string[] = [
-  join('core', 'plan', 'index.ts'),
-  join('core', 'plan', 'block-reader.ts'),
-  join('core', 'loop', 'index.ts'),
-  join('core', 'loop', 'readings.ts'),
+  ...CORE_BARRELS.plan.map((barrel) => corePath(barrel)),
+  ...CORE_BARRELS.loop.map((barrel) => corePath(barrel)),
   join('effort', 'store', 'index.ts'),
 ];
 
 describe('each plan and loop barrel, and the store entry, loaded first in a fresh process', () => {
   test.each(PLAN_LOOP_STORE_FIRST)('%s loads first and exits 0', async (file) => {
-    const run = await spawnBun(['-e', BARREL_CHILD, join(SRC, file)]);
+    const run = await spawnBun(['-e', BARREL_CHILD, join(REPO_ROOT, CORE_ROOT, file)]);
     expectExit(run, 0);
     expect((JSON.parse(run.stdout.trim()) as { names: number }).names).toBeGreaterThan(0);
   });

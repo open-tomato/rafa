@@ -74,19 +74,20 @@
  * `rafa`, a planning session or a loop.
  */
 import type { ItemMergeSeams } from './item-merge.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
-import type { PlansDir } from '../../core/plan/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { PlansDir } from '@open-tomato/rafa/core/plan';
 
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
+import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+
 import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { boardId } from '../../board/naming.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { isPidAlive, readSessions } from '../../core/loop/index.js';
-import { plansDirAt, stubOfPlanFile } from '../../core/plan/index.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 import {
@@ -406,7 +407,7 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
   const project = requireProject(context, COMMAND_NAME);
   const { root } = project;
   const warn = (text: string): void => context.output.warn(text);
-  const config = resolveProjectConfig(project, COMMAND_NAME, warn);
+  const config = await resolveProjectConfig(project, COMMAND_NAME, warn);
   const n = requireStretchBase(config.prBase);
   const plans = plansDirAt(root, config.planDir);
   const kept = existingPlan(plans, line.issue);

@@ -8,10 +8,12 @@
  * Each case dispatches one fixture command over a planted project, so
  * the config the command loads is the file the case wrote.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { Logger } from '@open-tomato/rafa/ports';
+
+import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -59,7 +61,7 @@ const DEMO: RafaCommand = Object.freeze({
   examples: [{ cmd: 'rafa demo run', note: 'Runs the fixture.' }],
   outputs: ['text', 'json'] as const,
   run: async (context: RafaContext) => {
-    resolveProjectConfig(requireProject(context, COMMAND_NAME), COMMAND_NAME, (message) => {
+    await resolveProjectConfig(requireProject(context, COMMAND_NAME), COMMAND_NAME, (message) => {
       context.output.warn(message);
     });
     context.output.info('answer');

@@ -23,13 +23,16 @@
 import type { ShowView } from '../../inventory/show.js';
 import type { Resolution } from '../../tiers/resolve.js';
 
+import '../../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createSkillShowCommand, skillShowView, unknownSkillMessage } from './show.js';

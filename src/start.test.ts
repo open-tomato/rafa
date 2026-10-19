@@ -69,7 +69,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { readSessions } from './core/loop/index.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+
 import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
 import { CHECKOUT_MOVED } from './start/checkout-guard.js';
 import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
@@ -279,7 +280,7 @@ describe('the two directories start.ts points each call at', () => {
   });
 
   it('guards and records the branch that settling answered, and commits in the checkout', () => {
-    expect(callTo(EVERY, 'guardRunBranch').args).toEqual(['planStub', 'branch', 'args']);
+    expect(callTo(EVERY, 'guardRunBranch').args).toEqual(['planStub', 'branch', 'args', 'runConfig.config.namingBranch']);
     expect(firstArgument('openRunSession')).toContain('branch,');
     expect(callTo(EVERY, 'announceRunDirs').args).toEqual(['{ projectRoot: repoRoot, checkout }']);
     expect(firstArgument('finishCleanExit')).toContain('repoRoot: checkout,');
@@ -347,9 +348,16 @@ describe('the two directories start.ts points each call at', () => {
     expect(firstArgument('runStartPreflight')).toContain('repoRoot,');
     expect(firstArgument('holdWhilePaused')).toContain('repoRoot,');
     expect(firstArgument('createStartTriage')).toContain('repoRoot,');
-    for (const name of ['loadRunConfig', 'runStartPreflight', 'holdWhilePaused', 'createStartTriage']) {
+    for (const name of ['loadRunConfig', 'runStartPreflight', 'holdWhilePaused']) {
       expect(firstArgument(name)).not.toContain('checkout');
     }
+    // The triage's store and issues stay at the project root; the checkout
+    // goes to `triageReport`, which takes its paths out and reads `Refs`
+    // there, and to its kind check, which runs git and named tests there
+    // (`start/triage-kinds.ts`).
+    expect(firstArgument('createStartTriage')).not.toContain('repoRoot: checkout');
+    expect(firstArgument('createStartTriage')).toContain('repoRoot, checkout,');
+    expect(firstArgument('createStartTriage')).toContain('kinds: { checkout,');
     // The session record is written at the project root, and handed the
     // checkout only to record it as the run's `worktree` (`start/session.ts`).
     expect(firstArgument('openRunSession')).not.toContain('repoRoot: checkout');
@@ -416,8 +424,10 @@ describe('where start.ts takes the suite steps', () => {
   });
 
   it('takes the task step from the task\'s base once its commit is stored', () => {
-    expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
-    const after = indexOf(EVERY, 'afterTask');
+    // `staleDocs.afterTask` shares the name; the suite step's is the one over the task and its base.
+    const suiteAfter = EVERY.find((call) => call.name === 'afterTask' && call.args.length === 2);
+    expect(suiteAfter?.args).toEqual(['taskInfo', 'base']);
+    const after = EVERY.findIndex((call) => call === suiteAfter);
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
     expect(START).toContain(
@@ -652,6 +662,7 @@ describe('the events file start.ts binds around the run', () => {
   it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {
     expect(finallyOf(STATEMENTS)).toEqual([
       'decisionsAtEnd();',
+      'staleDocs.atRunEnd();',
       // The test files a suite step read red only in the step, printed as the run's last lines (`start/step-only-report.ts`).
       'announceRunStepOnly(readRunStepOnly(repoRoot, session.id));',
       'unbindEventsFile();',

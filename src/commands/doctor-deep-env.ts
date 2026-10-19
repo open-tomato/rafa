@@ -12,9 +12,9 @@
  *
  * Two layers, the second over the first:
  *
- *   1. **The spawn.** `sessionSpawnEnv(env)` (`src/utils/session-env.ts`),
+ *   1. **The spawn.** `sessionSpawnEnv(env)` (`packages/rafa/src/core/loop/session-env.ts`),
  *      where `env` is the invocation's `RafaContext.env`: the function
- *      both spawn doors in `src/core/loop/claude.ts` call, called here
+ *      both spawn doors in `packages/rafa/src/core/loop/claude.ts` call, called here
  *      rather than spelled again, so the reading cannot drift from what
  *      a spawn hands `Bun.spawn`.
  *   2. **The settings files.** Claude Code then assigns the `env`
@@ -109,13 +109,14 @@
  * Nothing here throws, writes, or reads `process.env`, `process.cwd()`
  * or the real home: every input comes from {@link SessionEnvSeams}.
  */
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { SpawnEnv } from '../utils/session-env.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
+
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
+import { sessionSpawnEnv } from '@open-tomato/rafa/core/loop';
 
 import { pathDirectories } from '../check/references.js';
-import { describeValue, isMapping } from '../core/config/sections.js';
 import { OVERRIDE_SCOPES, overrideSettingsPath, readSettings } from '../inventory/disabled.js';
-import { sessionSpawnEnv } from '../utils/session-env.js';
 
 /** The Claude Code version the settings `env` rules were read from. */
 export const SESSION_ENV_CLI_VERSION = '2.1.280';

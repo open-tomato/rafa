@@ -28,8 +28,8 @@ import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +37,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { positionAt, positionFilePath, writePositionFile } from '../project/position.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
@@ -629,6 +630,24 @@ describe('the has column', () => {
   it('prints plan, branch and every closing pull request in that order', () => {
     expect(hasText([{ kind: 'plan' }, { kind: 'branch', ref: 'feat/rafa-1-x' }, { kind: 'pr', number: 4 }, { kind: 'pr', number: 5 }]))
       .toBe('plan, branch, pr #4, pr #5');
+  });
+});
+
+describe('the has column under the configured branch template', () => {
+  const line = { issue: 20, ticked: false, why: 'a blocker of #16', lineNumber: 3 };
+  const git = plantedGit(['refs/heads/main', 'refs/heads/work/rafa-20-x']);
+
+  it('shows branch for refs/heads/work/rafa-20-x under work/{stub}', async () => {
+    const read = await readLineRows([line], planted({ git, branchTemplate: 'work/{stub}' }).options);
+
+    expect(rowFor(read.rows, 20).has).toEqual([{ kind: 'branch', ref: 'refs/heads/work/rafa-20-x' }]);
+    expect(hasText(rowFor(read.rows, 20).has)).toBe('branch');
+  });
+
+  it('shows nothing for the same branch with the template left out, the control for the case above', async () => {
+    const read = await readLineRows([line], planted({ git }).options);
+
+    expect(hasText(rowFor(read.rows, 20).has)).toBe('');
   });
 });
 

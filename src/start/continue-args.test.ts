@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import {
   CONTINUE_OFF,

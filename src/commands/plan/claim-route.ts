@@ -72,17 +72,18 @@ import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { AheadRequest } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { ClaimsAhead } from '../../core/config/sections.js';
-import type { Output } from '../../ports/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
+import type { Output } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */
@@ -237,11 +238,12 @@ export async function resolveAndClaim(seams: ClaimRouteSeams): Promise<ClaimedRo
  * writes refreshing the issue on the project
  * (`../../board/project/issue-board-refresh.ts`), this
  * device's store id read under `config.store`, `claims.staleAfter`,
- * `claims.ahead`, and the clock at the call.
+ * `claims.ahead`, the `naming.branch` template the claim branches are
+ * named and read under, and the clock at the call.
  */
 export function createPlanClaimContext(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead'> & RefreshConfig,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead' | 'namingBranch'> & RefreshConfig,
 ): PlanClaimContext {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
@@ -253,5 +255,6 @@ export function createPlanClaimContext(
     staleAfter: config.claimsStaleAfter,
     claimsAhead: config.claimsAhead,
     now: new Date(),
+    branchTemplate: config.namingBranch,
   };
 }

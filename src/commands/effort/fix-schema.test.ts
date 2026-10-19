@@ -8,8 +8,10 @@
  * project outside the child's temporary directory.
  */
 import type { FixSchemaCommandSeams } from './fix-schema.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,10 +20,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../core/loop/index.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '@open-tomato/rafa/store/sqlite';
+
 import { fileStamp } from '../../effort/file-stamp.js';
-import { bringForward } from '../../effort/store/bring-forward.js';
-import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../../effort/store/sqlite.js';
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createFixSchemaCommand } from './fix-schema.js';

@@ -22,7 +22,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createGitRunner } from '../../pr/index.js';
 import { serializeFragment } from '../../release/fragment.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
@@ -61,6 +62,7 @@ const RELEASE: MergeGuardSettings = {
   releaseHeading: '## {version} — {date}, {title}',
   prVersionCollision: 'report',
   dangerousAcceptVersionCollision: false,
+  releaseMoveLock: false,
 };
 
 /** Runs git in `cwd` under a fixed identity and no system config, answering what it wrote. */
@@ -243,7 +245,7 @@ describe('followUpsFor and reportFollowUps', () => {
     mkdirSync(join(at.root, '.changes'), { recursive: true });
     levels.forEach((level, index) => {
       const plan = `rafa-${String(index + 1)}`;
-      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], notes: ['- loop: a change'] };
+      const fragment = { plan, title: `Plan ${plan}`, level: level as Fragment['level'], package: null, notes: ['- loop: a change'] };
       writeFileSync(join(at.root, '.changes', `${plan}.md`), serializeFragment(fragment));
     });
     runGit(at.root, 'init', '--quiet', '--initial-branch=main');

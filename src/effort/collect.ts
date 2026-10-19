@@ -68,7 +68,7 @@
  * the reading that says the collector's key and the store's agree.
  *
  * The store is the one a caller passes as {@link CollectOptions.store},
- * else the one the config selects: `.rafa/config.yaml` under the repo
+ * else the one the config selects: the project's config under the repo
  * root over the user scope's under {@link CollectOptions.home}, and
  * `sqlite` when neither names one. That selection is made ONCE per run,
  * before either half reads a log or runs git, and both halves use the
@@ -171,21 +171,24 @@ import type {
   CommitStats,
 } from './commits.js';
 import type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type {
   EffortStore,
   SessionEffortRow,
   SessionMode,
-} from './store/types.js';
-import type { ResolvedConfig } from '../core/config/index.js';
+} from '@open-tomato/rafa/store/types';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -194,7 +197,6 @@ import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { readCommitLog } from './commits.js';
 import { listProjectSessionLogs, projectLogDirs } from './session-log-dirs.js';
 import { readLines, readSessionLog } from './session-log.js';
-import { selectEffortStore } from './store/index.js';
 import { createHubContact } from './sync/contact.js';
 
 /**
@@ -208,7 +210,7 @@ const SESSION_MODE: SessionMode = 'local';
  * is appended through, which depends on nothing in this module, and is
  * re-exported here so the collector still names what it builds.
  */
-export type { SessionEffortRow } from './store/types.js';
+export type { SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 /* The argv parser moved to its own module; re-exported so callers keep one import. */
 export type { CollectArgs } from './collect-args.js';
@@ -565,16 +567,16 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
  * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
  */
-function resolveSources(
+async function resolveSources(
   options: CollectOptions,
   log: (line: string) => void,
-): Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string } {
+): Promise<Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string }> {
   const { repoRoot: root, store, plansDir } = options;
   if (store !== undefined && plansDir !== undefined) {
     return { store, plansDir, worktreeDir: options.worktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir };
   }
 
-  const { config } = loadConfig({ root, home: options.home }, {}, log);
+  const { config } = await loadConfig({ root, home: options.home }, {}, log);
   return {
     store: store ?? selectEffortStore(root, config),
     plansDir: plansDir ?? resolve(root, config.planDir),
@@ -608,7 +610,7 @@ export async function collectEffort(
   const { repoRoot } = options;
   const verbose = options.verbose ?? false;
   const log = options.log ?? ((line: string) => activeOutput().info(line));
-  const { worktreeDir, ...sources } = resolveSources(options, log);
+  const { worktreeDir, ...sources } = await resolveSources(options, log);
   const context: HalfContext = {
     repoRoot,
     logDirs: logDirsOf(options, worktreeDir),
@@ -732,7 +734,7 @@ export default async function collect(args: string[], repoRoot: string): Promise
       verbose: parsed.verbose,
     });
     // Read again for the contact, silently: `collectEffort` warned about it once.
-    resolved = loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
+    resolved = await loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);

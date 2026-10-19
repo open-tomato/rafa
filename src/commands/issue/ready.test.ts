@@ -1,7 +1,7 @@
 /**
  * Tests for `rafa issue ready` (`ready.ts`): the two readings it
  * prints, the order they run in, the question it puts, the one label
- * swap, the run without a terminal, `--yes`, the line refusals, the
+ * swap, the run without a terminal, `--yes`, `--dry-run`, the line refusals, the
  * declared flags and the `describe` entry.
  *
  * Every case drives a fake of its own — a recorded `gh` runner, a
@@ -22,7 +22,7 @@
  *
  * ## The controls
  *
- * Seven readings here could pass while wrong, and each is paired:
+ * Eight readings here could pass while wrong, and each is paired:
  *
  *  - The swap case runs one issue twice, answering the question yes and
  *    then no, and holds the write against no write. Without the pair, a
@@ -52,14 +52,21 @@
  *    recording board, so "nothing written under `--yes`" cannot pass on
  *    a run that never writes. Those refusals passed before `--yes`
  *    existed; the passing halves were what failed first.
+ *  - The `--dry-run` passing case runs one issue with the flag and
+ *    without it over the same scripted yes and recording board, so "no
+ *    ask, no write" is held against the run that asks and writes; its
+ *    template-gap and prompter cases hold the same silence beside a
+ *    control that writes.
  */
 import type { ReadyAsk, ReadySeams } from './ready.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -67,11 +74,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { describeRegistry } from '../../cli/describe.js';
-import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, endingProbe } from '../../tests/ending-probe.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
@@ -560,6 +568,96 @@ describe('yes, which marks with no question once both checks pass', () => {
   });
 });
 
+describe('dry-run, which checks and writes nothing', () => {
+  it('reports checked, asking nothing and writing nothing, against the same run without it', async () => {
+    const ask = scriptedAsk(true);
+    const board = recordingBoard();
+    const options = {
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: ask.ask,
+      board: board.board,
+      readIssue: fakeReader().read,
+    };
+
+    const checked = await runIssueReady({ ...options, dryRun: true });
+
+    expect(checked).toMatchObject({
+      status: 'checked',
+      trust: `#57 was opened by maintainer, who has write access to ${REPO}`,
+      checked: completeLine(57),
+      message: '#57 is ready to mark; --dry-run wrote nothing.',
+    });
+    expect([ask.asked(), board.swapped()]).toEqual([[], []]);
+
+    const marked = await runIssueReady(options);
+
+    expect([marked.status, ask.asked(), board.swapped()])
+      .toEqual(['marked', [readyQuestion(57)], ['#57 -spec:needs-work +spec:ready']]);
+  });
+
+  it('refuses a body with gaps with exit 2 naming every gap, writing nothing, and checks the complete body', async () => {
+    const board = recordingBoard();
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, ask: null, board: board.board, dryRun: true };
+
+    const exit = await refusal(() => runIssueReady({ ...options, readIssue: fakeReader({ body: THIN }).read }));
+    const plain = await refusal(() => runIssueReady({
+      ...options,
+      dryRun: false,
+      readIssue: fakeReader({ body: THIN }).read,
+    }));
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toContain('"Tasks the plan must carry" is missing');
+    expect(exit.message).toBe(plain.message);
+    expect(board.swapped()).toEqual([]);
+
+    const passed = await runIssueReady({ ...options, readIssue: fakeReader().read });
+
+    expect([passed.status, board.swapped()]).toEqual(['checked', []]);
+  });
+
+  it('reports already for an issue carrying spec:ready, writing nothing', async () => {
+    const board = recordingBoard();
+
+    const report = await runIssueReady({
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: null,
+      board: board.board,
+      readIssue: fakeReader({ labels: [SPEC_LABEL, SPEC_READY_LABEL] }).read,
+      dryRun: true,
+    });
+
+    expect(report).toMatchObject({ status: 'already', message: '#57 is already marked spec:ready' });
+    expect(board.swapped()).toEqual([]);
+  });
+
+  it('never calls a prompter that is there, under yes too, which writes without the flag', async () => {
+    const ask = scriptedAsk(true);
+    const board = recordingBoard();
+    const options = {
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: ask.ask,
+      board: board.board,
+      readIssue: fakeReader().read,
+      yes: true,
+    };
+
+    const checked = await runIssueReady({ ...options, dryRun: true });
+
+    expect([checked.status, ask.asked(), board.swapped()]).toEqual(['checked', [], []]);
+
+    const marked = await runIssueReady(options);
+
+    expect([marked.status, board.swapped()]).toEqual(['marked', ['#57 -spec:needs-work +spec:ready']]);
+  });
+});
+
 /** Two `epic:` labels on one spec, the fault the epic label check refuses. */
 const TWO_EPICS = [SPEC_LABEL, 'epic:board', 'epic:views'];
 
@@ -890,6 +988,92 @@ describe('rafa issue ready, dispatched', () => {
     expect(gh.calls()).toEqual([]);
   });
 
+  /** A command at a terminal whose prompter may not be opened, for the `--dry-run` cases. */
+  function terminalWithoutPrompter(gh: ReturnType<typeof dispatchedGh>): RafaCommand {
+    return createIssueReadyCommand({
+      openGh: () => gh.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --dry-run');
+      },
+    });
+  }
+
+  it('refuses --dry-run with --yes with exit 1 naming both flags, sending no command', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', '--yes', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('--dry-run');
+    expect(outcome.stderr).toContain('--yes');
+    expect(outcome.stderr).toContain(`Usage: ${READY_USAGE}`);
+    expect(outcome.stdout).toBe('');
+    expect(gh.calls()).toEqual([]);
+  });
+
+  it('checks at a terminal under --dry-run, opening no prompter and sending no edit, which the run without it sends', async () => {
+    const dry = dispatchedGh();
+    const plain = dispatchedGh();
+    const answering = createIssueReadyCommand({
+      openGh: () => plain.run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => ({ say: () => undefined, ask: () => Promise.resolve('y'), close: () => undefined }),
+    });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', NO_HINT], SUBJECTS, [terminalWithoutPrompter(dry)], plant());
+    await dispatchInProject(['issue', 'ready', '57', NO_HINT], SUBJECTS, [answering], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: `#57 was opened by maintainer, who has write access to ${REPO}\n`
+        + '#57 fills every heading the spec template asks for, with no placeholder left\n'
+        + '#57 is ready to mark; --dry-run wrote nothing.\n',
+      stderr: '',
+    });
+    expect(dry.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(false);
+    expect(plain.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(true);
+  });
+
+  it('refuses a body with gaps under --dry-run with exit 2, naming the heading and sending no edit', async () => {
+    const gh = dispatchedGh({ body: THIN });
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run', NO_HINT], SUBJECTS, [terminalWithoutPrompter(gh)], plant());
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.stderr).toContain('issue #57 is not ready to plan from:');
+    expect(outcome.stderr).toContain('"What you get" is missing');
+    expect(gh.calls().some((args) => args[0] === 'issue' && args[1] === 'edit')).toBe(false);
+  });
+
+  it('gives status checked as the data of the one result event in json mode under --dry-run', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run', '--output=json', NO_HINT],
+      SUBJECTS,
+      [terminalWithoutPrompter(gh)],
+      plant(),
+    );
+    const results = eventsOf(outcome.stdout).filter((event) => event.type === 'result');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.data).toMatchObject({ issue: 57, status: 'checked' });
+  });
+
+  it('refuses a value given to --dry-run with exit 1, sending no command', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--dry-run=maybe', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('--dry-run takes no value');
+    expect(gh.calls()).toEqual([]);
+  });
+
   it('refuses a line naming no issue, a second word and a word that is no number, sending no command', async () => {
     const gh = dispatchedGh();
     const command = createIssueReadyCommand({
@@ -988,11 +1172,33 @@ describe('the ending it names the next step with', () => {
     expect([probe.reads(), outcome.stdout.includes('Next:')]).toEqual([0, false]);
   });
 
+  it('reads nothing under --dry-run, on a checked issue or one already carrying spec:ready', async () => {
+    const checked = endingProbe();
+    const already = endingProbe();
+
+    const first = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh(), 'y', checked.seams)],
+      plant(),
+    );
+    const second = await dispatchInProject(
+      ['issue', 'ready', '57', '--dry-run'],
+      SUBJECTS,
+      [commandAnswering(dispatchedGh({ labels: [SPEC_READY_LABEL] }), 'y', already.seams)],
+      plant(),
+    );
+
+    expect([first.exitCode, second.exitCode]).toEqual([0, 0]);
+    expect([checked.reads(), already.reads()]).toEqual([0, 0]);
+    expect(first.stdout.includes('Next:') || second.stdout.includes('Next:')).toBe(false);
+  });
+
   it('declares the flag that turns it off beside --yes, which skips the marking question alone', () => {
     const command = createIssueReadyCommand();
 
     expect(command.flags.map((flag) => [flag.name, flag.type, flag.default]))
-      .toEqual([['yes', 'boolean', undefined], ['hint', 'boolean', true]]);
+      .toEqual([['yes', 'boolean', undefined], ['dry-run', 'boolean', undefined], ['hint', 'boolean', true]]);
   });
 });
 
@@ -1010,5 +1216,20 @@ describe('the describe entry', () => {
       aliases: [],
     });
     expect(ready?.examples.map((example) => example.cmd)).toContain('rafa issue ready 57 --yes');
+  });
+
+  it('lists --dry-run as a boolean that is not required and has no default, with its example', () => {
+    const ready = describeRegistry(CORE_REGISTRY, '0.0.0').subjects
+      .find((subject) => subject.name === 'issue')
+      ?.actions
+      .find((action) => action.name === 'ready');
+
+    expect(ready?.flags.find((flag) => flag.name === 'dry-run')).toMatchObject({
+      type: 'boolean',
+      required: false,
+      default: null,
+      aliases: [],
+    });
+    expect(ready?.examples.map((example) => example.cmd)).toContain('rafa issue ready 57 --dry-run');
   });
 });

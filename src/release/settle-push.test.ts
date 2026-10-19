@@ -20,7 +20,7 @@ import type { Fragment } from './fragment.js';
 import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,7 +29,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
@@ -53,6 +54,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** The manifest on `main`. */
@@ -102,7 +104,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits on `main`, and the caller's clone. */
@@ -174,6 +176,22 @@ function landTwo(w: World): void {
   w.land({ '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', ['- Loop: a fix']) }, 'merge rafa-1');
 }
 
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = MANIFEST.replace('\n}', ',\n\t"workspaces": ["packages/*"]\n}');
+
+/** The publishable member's manifest. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/**
+ * Makes `main` a workspace holding a publishable `packages/plugin`, then
+ * lands `rafa-9` (minor) for the root and `rafa-7` (minor) for the plugin.
+ */
+function landBothUnits(w: World): void {
+  w.land({ 'package.json': WORKSPACE_MANIFEST, 'packages/plugin/package.json': PLUGIN_MANIFEST }, 'add the plugin');
+  w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
+  w.land({ '.changes/rafa-7.md': serializeFragment({ plan: 'rafa-7', title: 'title of rafa-7', level: 'minor', package: '@scope/plugin', notes: ['- Plugin: a hook'] }) }, 'merge rafa-7');
+}
+
 /** What a settle answered, with every argv its worktree ran. */
 interface Settled {
   readonly outcome: SettlePushOutcome;
@@ -182,9 +200,14 @@ interface Settled {
 
 /**
  * Runs `settleByPush` in a settle worktree of the caller's `origin/main`.
- * `beforePush[n]` runs just before the n-th push reaches git.
+ * `beforePush[n]` runs just before the n-th push reaches git, and
+ * `configFile` is the project scope's config file a rule refusal names.
  */
-async function settleIn(w: World, beforePush: readonly (() => void)[] = []): Promise<Settled> {
+async function settleIn(
+  w: World,
+  beforePush: readonly (() => void)[] = [],
+  configFile = '.rafa/config.yaml',
+): Promise<Settled> {
   const argv: string[][] = [];
   let pushes = 0;
   const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (made: SettleWorktree) => {
@@ -196,7 +219,7 @@ async function settleIn(w: World, beforePush: readonly (() => void)[] = []): Pro
       }
       return made.git(args);
     };
-    return settleByPush({ ...made, git }, SETTINGS);
+    return settleByPush({ ...made, git }, SETTINGS, configFile);
   });
   if (!outcome.ok) throw new Error(outcome.problem);
   return { outcome: outcome.value, argv };
@@ -324,8 +347,8 @@ describe('settleByPush, the refused-push rule', () => {
     if (settled.outcome.outcome !== 'pushed') return;
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.commit).toBe(arrived);
-    expect(settled.outcome.build.version).toBe('1.0.0');
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md']);
+    expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['1.0.0']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-9.md', '.changes/rafa-1.md', '.changes/rafa-4.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
     expect(w.git(w.origin, ['log', '-1', '--format=%s%n%P', 'main'])).toBe(`chore: release 1.0.0\n${arrived}`);
     expect(originFragments(w)).toEqual([]);
@@ -344,8 +367,8 @@ describe('settleByPush, the refused-push rule', () => {
     if (settled.outcome.outcome !== 'pushed') return;
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.build.baseVersion).toBe('0.5.0');
-    expect(settled.outcome.build.version).toBe('0.5.1');
-    expect(settled.outcome.build.deleted).toEqual(['.changes/rafa-1.md']);
+    expect(settled.outcome.build.units.map((unit) => unit.version)).toEqual(['0.5.1']);
+    expect(settled.outcome.build.deleted).toEqual([{ package: null, paths: ['.changes/rafa-1.md'] }]);
     expect(originMain(w)).toBe(settled.outcome.build.release);
   });
 
@@ -386,7 +409,7 @@ describe('settleByPush, the refused-push rule', () => {
         if (args[0] === 'fetch') return { ok: false, stdout: '', stderr: 'planted fetch failure' };
         return made.git(args);
       };
-      return settleByPush({ ...made, git }, SETTINGS);
+      return settleByPush({ ...made, git }, SETTINGS, '.rafa/config.yaml');
     });
 
     if (!outcome.ok) throw new Error(outcome.problem);
@@ -451,6 +474,36 @@ describe('settleByPush, a protected base', () => {
   });
 });
 
+describe('settleByPush, a release moving the root and a package', () => {
+  it('pushes one commit under the subject naming both moves', async () => {
+    const w = world();
+    landBothUnits(w);
+
+    const settled = await settleIn(w);
+
+    expect(settled.outcome).toMatchObject({ outcome: 'pushed', exitCode: 0, attempts: 1 });
+    expect(w.git(w.origin, ['log', '-1', '--format=%s', 'main'])).toBe('chore: release 0.5.0, @scope/plugin@0.2.0');
+    expect(originFragments(w)).toEqual([]);
+  });
+
+  it('names both moves in the sentences of a protected base and of a hook that declined', async () => {
+    const w = world();
+    landBothUnits(w);
+    w.refuseWith(`#!/bin/sh\necho "${GH006}" >&2\nexit 1\n`);
+
+    const protectedRun = await settleIn(w);
+    w.refuseWith('#!/bin/sh\necho "planted: commit messages must carry a ticket" >&2\nexit 1\n');
+    const declined = await settleIn(w);
+
+    expect(protectedRun.outcome.outcome).toBe('protected');
+    if (protectedRun.outcome.outcome !== 'protected') return;
+    expect(protectedRun.outcome.sentence).toStartWith('origin main refused chore: release 0.5.0, @scope/plugin@0.2.0 as a protected branch');
+    expect(declined.outcome.outcome).toBe('unpushed');
+    if (declined.outcome.outcome !== 'unpushed') return;
+    expect(declined.outcome.sentence).toStartWith('chore: release 0.5.0, @scope/plugin@0.2.0 could not be pushed to origin main: ');
+  });
+});
+
 describe('settleByPush, a repository rule', () => {
   it('exits 1 not delivered, in one line naming the rule GitHub gave and release.settle: pr, without retrying', async () => {
     const w = world();
@@ -470,6 +523,28 @@ describe('settleByPush, a repository rule', () => {
     expect(pushesOf(settled)).toHaveLength(1);
     expect(originMain(w)).toBe(before);
     expect(originFragments(w)).toEqual(['.changes/rafa-1.md', '.changes/rafa-9.md']);
+  });
+
+  it('names rafa.config.ts in the rule sentence of a project that holds one, the protected sentence still naming the key alone', async () => {
+    const ruled = world();
+    landTwo(ruled);
+    ruled.refuseWith(refusingHook(GH013));
+    const guarded = world();
+    landTwo(guarded);
+    guarded.refuseWith(`#!/bin/sh\necho "${GH006}" >&2\nexit 1\n`);
+
+    const rule = await settleIn(ruled, [], 'rafa.config.ts');
+    const protectedBase = await settleIn(guarded, [], 'rafa.config.ts');
+
+    expect(rule.outcome.outcome).toBe('rule');
+    if (rule.outcome.outcome !== 'rule') return;
+    expect(rule.outcome.sentence).toEndWith('set release.settle: pr in rafa.config.ts to deliver it through a pull request.');
+    expect(rule.outcome.sentence).not.toContain('.rafa/config.yaml');
+    expect(protectedBase.outcome.outcome).toBe('protected');
+    if (protectedBase.outcome.outcome !== 'protected') return;
+    expect(protectedBase.outcome.sentence).toContain('set release.settle: pr to deliver it through a pull request');
+    expect(protectedBase.outcome.sentence).not.toContain('rafa.config.ts');
+    expect(protectedBase.outcome.sentence).not.toContain('config.yaml');
   });
 
   it('is the control: git itself ends the refused push\'s porcelain stdout on Done, exiting 1', () => {

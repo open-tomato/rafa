@@ -4,17 +4,19 @@
  * to the reader — which default, why null or never null, and why a key
  * is or is not a `CommandLineSetting` — argued once.
  *
- * `config-schema.ts` holds the settings these readings are about:
- * `RafaConfig`, `CONFIG_DEFAULTS`, `SETTINGS` and `CommandLineSetting`
- * are all there, and so are the four readings the phase-1 spec leaves
- * to the reader (open tracker kinds, empty prerequisite tiers,
- * `version: 1` alone, `loop.settingSources` as an ordered list). The
- * readings below sat in that module's note until it reached 780 lines
+ * `packages/rafa/src/core/config/` holds the settings these readings are about:
+ * `RafaConfig` and `CommandLineSetting` in `config-schema.ts`, core's
+ * specs and defaults in `core-section.ts` with the four readings the
+ * phase-1 spec leaves to the reader (open tracker kinds, empty
+ * prerequisite tiers, `version: 1` alone, `loop.settingSources` as an
+ * ordered list); `CONFIG_DEFAULTS` and `SETTINGS` are merged in
+ * `src/config-registry.ts`. The readings below sat in `config-schema.ts`'s
+ * note until that module reached 780 lines
  * of the 800-line cap of `context/source.md`, and moved here before
  * another key was added, so a new key is not paid for by rewrapping
  * prose. This module exports nothing and runs nothing: it is
  * a note, and a new section's readings are written here beside its key
- * in `config-schema.ts`. What each VALUE may be stays
+ * in `core-section.ts`. What each VALUE may be stays
  * `config-sections.ts`'s to say.
  *
  * ## The `pr` section

@@ -13,9 +13,11 @@
  *
  * The record and result types are declared in `./types.js` and
  * re-exported here as types, so importing the entry adds no value for
- * them. `src/ports/index.ts` re-exports the same declarations, so a
- * service typing a `Learning` adapter against `./ports` and one calling
- * the library through `./learning` read one declaration.
+ * them. `packages/rafa/src/ports/index.ts` exports core's declaration of the same six,
+ * from `packages/rafa/src/ports/learning.ts`, and `src/tests/learning-contract.test.ts`
+ * holds each pair mutually assignable, so a service typing a `Learning`
+ * adapter against `./ports` and one calling the library through
+ * `./learning` read the same shapes.
  *
  * Like the rest of `src/learning/`, the entry imports nothing from the
  * rest of `src/`: it needs no `bun:` module, only `node:crypto`, and

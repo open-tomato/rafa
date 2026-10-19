@@ -13,13 +13,15 @@
  * stub-naming case, where the same store answers non-zero.
  */
 import type { EpicCostRow } from './epic-cost.js';
-import type { EffortRow } from './store/types.js';
+import type { EffortRow } from '@open-tomato/rafa/store/types';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
 
 import {
   MEMBERSHIP_NOTE,
@@ -29,7 +31,6 @@ import {
   summariseEpicCost,
 } from './epic-cost.js';
 import { emptyUsageTotals } from './session-log.js';
-import { openNdjsonStore, openSqliteStore } from './store/index.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-epic-cost-'));
 let planted = 0;

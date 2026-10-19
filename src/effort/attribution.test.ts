@@ -55,7 +55,7 @@ import type { PlanStubMatch } from './attribution.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { stampPrompt } from '../utils/plan-stamp.js';
+import { stampPrompt } from '@open-tomato/rafa/core/plan';
 
 import {
   attributeBranch,

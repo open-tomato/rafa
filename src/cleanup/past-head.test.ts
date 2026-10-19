@@ -4,8 +4,8 @@
  * and one branch per case, each with a head commit a merged pull
  * request carries and the commits past it.
  */
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { MergedPullRequest } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

@@ -2,7 +2,7 @@
  * Loop-owned triage: what a task report's blockers and out-of-scope bugs
  * become once the report is stored and the task's tracker line is marked.
  *
- * {@link triageReport} takes one parsed report and does two things, in
+ * {@link triageReport} takes one parsed report and does three things, in
  * this order:
  *
  *   - Blockers. The `what` of every blocker that has one, joined with
@@ -19,10 +19,16 @@
  *     machine-fault reading answers, and otherwise by its `security`
  *     flag. A bug with no usable `what` is skipped: it says nothing to
  *     file, and the store's triage writer refuses it for the same
- *     reason. A public bug the run inherited files nothing; see below.
+ *     reason. Given {@link TriageOptions.kinds}, every other entry is
+ *     then routed by its kind (`./kind-route.ts`), and only one read as
+ *     `bug`, or one the security rule keeps private, goes on to a
+ *     tracker. A public bug the run inherited files nothing; see below.
+ *   - `stale_docs` entries, each answered as `skipped` on the `docs`
+ *     channel, which has no tracker either (`./stale-docs.ts`).
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
- * declares a task for it.
+ * declares a task for it. A leftover of the plan's own, `own-fallout` or
+ * `own-gap`, is no bug: `./kind-route.ts` inserts its repair task.
  *
  * ## The key a bug is looked up by
  *
@@ -72,11 +78,18 @@
  *      holds open issues only, and its reference is stored under the key,
  *      so a later recurrence is answered by step 1. Its `foundBy` is
  *      `similarity` and its `score` the score. A listing that fails answers
- *      `failed`, as a failed `find` does.
+ *      `failed`, as a failed `find` does. When none is at the threshold,
+ *      the same listing is ranked for step 4's list by `rankedCandidates`
+ *      (`./similarity.ts`): the word score plus a bonus for the same
+ *      cause, the same cause family and the same module and action, read
+ *      from the bug's record and each open bug's body and weighed by the
+ *      `triage.similarity.weights` settings the option names. The bonuses
+ *      reach that list alone: the same-bug decision is on words only, so
+ *      a rank at or above the threshold never makes a recurrence.
  *   4. None of those: the bug is filed with `tracker.create`, and the
  *      reference it answers is stored under the key. When step 3 ran and
  *      found nothing at its threshold, the body ends with a `Possible
- *      duplicates` section listing the nearest open bugs it scored, up to
+ *      duplicates` section listing the open bugs step 3 ranked, up to
  *      the configured count.
  *
  * Step 3 is off when the option is left out or its threshold is `false`,
@@ -170,9 +183,10 @@
  *
  * A bug whose `what` and `artifact` name a system toolchain, a machine's
  * SDK path or a package-manager build failure is a fault of the MACHINE
- * the session ran on and not of rafa. `./machine-fault.ts` is the whole
- * of that reading, and its note holds the families, the near misses that
- * shaped them and what it reads over the 27 bugs rafa's own runs filed.
+ * the session ran on and not of rafa. `./machine-fault.ts` re-exports
+ * `packages/rafa/src/effort/store/machine-fault.ts`, the whole of that reading, whose
+ * note holds the families, the near misses that shaped them and what it
+ * reads over the 27 bugs rafa's own runs filed.
  * Such a bug goes to a third channel, which has no tracker at all:
  *
  *   - neither tracker is asked anything, the public one or the private
@@ -206,20 +220,40 @@
  * The draft is a `bug` with `opt: 0`, since rafa keeps no OPT ledger and
  * each adapter numbers its own issues, `priority: null`, which the port
  * spells as the adapter applying `needs-triage`, no project and no
- * blocking issue. Its `module` is {@link TRIAGE_MODULE}, `unassigned`,
- * the module the GitHub adapter's `get` answers for an issue with no
- * module label, since a report names no module.
+ * blocking issue.
  *
- * The title and the body, its sections and the comment a recurrence
- * gets are `./issue-text.ts`'s, whose note holds what each shows. The
- * `Refs` section among them is built here, from the redacted artifact,
- * by {@link TriageOptions.verifyRefs}.
+ * Each bug is filed with its bug record (#991), built by
+ * `./bug-filing.ts` from the report, the dispatch and the checkout, git
+ * runner, environment and rules this module is handed; its note holds
+ * each fill. The title is `bugTitle` over the record and the rules'
+ * template (`../bugs/record.ts`), the summary already cut and redacted.
+ * The draft's `module` is the record's, or {@link TRIAGE_MODULE},
+ * `unassigned`, for `unknown`: the module the GitHub adapter's `get`
+ * answers for an issue with no module label. Its `cause` is the
+ * record's, which the `github` adapter files as a label and the `local`
+ * adapter keeps in its file. The private tracker's issue carries the
+ * same record, and a machine fault is skipped before any is built.
+ *
+ * The body, its sections and the comment a recurrence gets are
+ * `./issue-text.ts`'s, whose note holds what each shows: the body
+ * carries the record's sections after `Feedback`, and the comment the
+ * record's `Versions` alone. The `Refs` section among them is built
+ * here, from the redacted artifact, by {@link TriageOptions.verifyRefs}.
  *
  * ## Local paths and named secrets
  *
  * Every value a session or the plan supplied, and every problem this
  * module answers, has its local paths taken out first, as the key does
  * ({@link TriageOptions.home} names the home), then its secrets.
+ *
+ * The paths are taken out over two roots in one pass, the checkout the
+ * task ran in ({@link TriageOptions.checkout}) and the project root, the
+ * longer first (`./local-paths.ts`). A loop in a worktree outside the
+ * project then leaves no folder between the home and the worktree, and
+ * the default worktree under the root leaves no `.rafa/worktrees/<stub>/`
+ * ahead of a path. Two passes would leave either one. The `Refs` section
+ * is read in the checkout too, so a path a filed body names is stamped
+ * against the tree the session saw.
  *
  * {@link namedSecrets} answers the value of every `env` item under
  * `prerequisites`, both tiers, and of each of {@link SECRET_ENV_NAMES}
@@ -244,43 +278,52 @@
  * reference then cannot be stored keeps its action and names the store's
  * problem.
  */
+import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
-import type { MachineFault } from './machine-fault.js';
-import type { ComparedText, ScoredIssue } from './similarity.js';
+import type { KindRouteOptions } from './kind-route.js';
+import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
-import type { RafaConfig } from '../core/config/index.js';
+import type { BugRecord, BugRules } from '../bugs/record.js';
+import type { RefVerifier } from '../refs/verify.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
+import type { BugKind, ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type {
   FindingOutcome,
   FindingsDispatch,
   FindingsWriterSeams,
-} from '../effort/store/findings.js';
-import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
-import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
-import type { RefVerifier } from '../refs/verify.js';
-import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
+} from '@open-tomato/rafa/store/findings';
+import type { MachineFault } from '@open-tomato/rafa/store/machine-fault';
+import type { TrackerRefWriteAction } from '@open-tomato/rafa/store/tracker-refs';
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
+import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { messageOf } from '../core/config/sections.js';
-import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
+import { bugTitle } from '../bugs/record.js';
+import { UNKNOWN_VALUE } from '../bugs/title.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
+import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
 import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import {
   COMMENT_OPENING,
   ISSUE_OPENING,
   issueText,
-  issueTitle,
   similarCommentOpening,
 } from './issue-text.js';
+import { routeByKind } from './kind-route.js';
 import { localPathRedactor } from './local-paths.js';
-import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
-import { nearestOpenBugs } from './similarity.js';
+import { nearestOpenBugs, rankedCandidates } from './similarity.js';
+import { triageStaleDocs } from './stale-docs.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
@@ -294,9 +337,8 @@ export const TRIAGE_MODULE = 'unassigned';
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
 
-/** Names `./bug-key.ts` and `./issue-text.ts` now hold, still answered from here. */
+/** Names `./bug-key.ts` now holds, still answered from here. */
 export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
-export { TITLE_MAX_LENGTH, issueTitle } from './issue-text.js';
 
 /** One named secret: the variable's name and the value it held. */
 export interface NamedSecret {
@@ -306,9 +348,9 @@ export interface NamedSecret {
 
 /**
  * Where a bug goes: the tracker the chain landed on, the private one, or
- * `machine`, the channel with no tracker at all; see the module note.
+ * neither: `machine` and `docs` have no tracker at all; see the module note.
  */
-export type BugChannel = 'public' | 'private' | 'machine';
+export type BugChannel = 'public' | 'private' | 'machine' | 'docs';
 
 /** What became of one bug. */
 export type BugTriageAction =
@@ -323,12 +365,20 @@ export type BugTriageAction =
    */
   | 'inherited'
   /**
-   * Nothing was called for it: it is machine-scoped, or it had no `what`
-   * to file. Its problem says which.
+   * Nothing was called for it: it is machine-scoped, it had no `what` to
+   * file, or it is a `stale_docs` entry. Its problem says which.
    */
   | 'skipped'
   /** A step failed before an issue was filed or commented on. */
-  | 'failed';
+  | 'failed'
+  /** A plan's own leftover: a repair task was inserted for it (`./kind-route.ts`). */
+  | 'repair'
+  /** A plan's own leftover past the repair cap: it goes to the plan's follow-up issue. */
+  | 'follow-up'
+  /** A `convention` entry: it goes to the pull request's body. */
+  | 'pr-body'
+  /** A `docs` entry: it was stored as a stale-doc row. */
+  | 'docs';
 
 /**
  * How the issue a recurrence was commented on was found: by a stored
@@ -369,6 +419,10 @@ export interface BugTriage {
    * a failed one found by it; absent otherwise.
    */
   readonly score?: number;
+  /** The kind it was routed under (`./kind-route.ts`); absent with {@link TriageOptions.kinds} left out. */
+  readonly kind?: BugKind;
+  /** For a `repair`, the inserted task's line, counting from zero; absent otherwise. */
+  readonly repairLine?: number;
 }
 
 /** What {@link triageReport} did. */
@@ -376,6 +430,8 @@ export interface TriageResult {
   readonly blocker: BlockerTriage;
   /** One per out-of-scope bug, in the report's order. */
   readonly bugs: readonly BugTriage[];
+  /** One per `stale_docs` entry, in the report's order, each `skipped` on `docs`. */
+  readonly staleDocs: readonly BugTriage[];
 }
 
 /** What {@link triageReport} needs to triage one report. */
@@ -408,7 +464,8 @@ export interface TriageOptions {
   readonly secrets: readonly NamedSecret[];
   /**
    * Reads the paths and symbols a bug's artifact names, for its `Refs`
-   * section. `createArtifactRefsVerifier` over `repoRoot` when left out.
+   * section. `createArtifactRefsVerifier` over {@link checkout}, with
+   * {@link env}, when left out.
    */
   readonly verifyRefs?: RefVerifier;
   /** The home directory taken out of every filed text; `os.homedir()` when left out. */
@@ -426,7 +483,41 @@ export interface TriageOptions {
    * step; see the module note. Left out, or with a threshold of `false`,
    * that step is off.
    */
-  readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
+  readonly similarity?: Pick<
+    RafaConfig,
+    | 'triageSimilarityThreshold'
+    | 'triageSimilarityCandidates'
+    | 'triageSimilarityWeightsCauseLeaf'
+    | 'triageSimilarityWeightsCauseFamily'
+    | 'triageSimilarityWeightsBoundary'
+  >;
+  /** The kind check's readings and the repair cap; left out, no entry is routed by its kind. */
+  readonly kinds?: KindRouteOptions;
+  /**
+   * The checkout the task ran in: the project root itself, or a worktree
+   * of it, under the root or anywhere else. Its paths are taken out of
+   * every filed text together with `repoRoot`'s, and the `Refs` section is
+   * read in it; see the module note. `repoRoot` when left out.
+   */
+  readonly checkout?: string;
+  /**
+   * A git runner in {@link checkout}, which the bug record (#991) reads
+   * the code version through; left out, its `Versions` say `code: unknown`.
+   */
+  readonly git?: GitRunner;
+  /**
+   * The environment the run sees. The default `Refs` verifier looks for
+   * `ts-symbols` on its `PATH`, and the bug record suggests its place
+   * from it; left out, both read the process's own.
+   */
+  readonly env?: SecretEnvironment;
+  /**
+   * The rules a bug record is built under, as `bugRulesOf`
+   * (`src/config-schema-issues.ts`) answers them from the run's config:
+   * the title template, the summary cap, the vocabulary and the cause
+   * codes. `DEFAULT_BUG_RULES` (`./bug-filing.ts`) when left out.
+   */
+  readonly bugRules?: BugRules;
 }
 
 /** The environment a secret's value is read from. */
@@ -541,19 +632,54 @@ interface Filing {
    * {@link key} itself.
    */
   readonly legacyKeys: readonly string[];
-  /** The values {@link draft}'s body was built from, for the body of an issue filed in place of a closed one. */
+  /**
+   * The values {@link draft}'s body was built from, the record among them,
+   * for the body of an issue filed in place of a closed one.
+   */
   readonly values: BugValues;
+  /** The values {@link comment} was built from: the record left out, its `Versions` kept. */
+  readonly commentValues: BugValues;
   /** The `what` and artifact with local paths taken out, as the similarity step compares them. */
   readonly compared: ComparedText;
 }
 
-/** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
+/** How a bug's text is redacted: `local` takes out paths only, `redact` secrets too. */
+interface Redactors {
+  readonly local: (text: string) => string;
+  readonly redact: (text: string) => string;
+}
+
+/** The module a draft is filed under: the record's, or {@link TRIAGE_MODULE} for `unknown`. */
+function draftModuleOf(record: BugRecord): string {
+  return record.module === null || record.module === UNKNOWN_VALUE
+    ? TRIAGE_MODULE
+    : record.module;
+}
+
+/** The draft a bug is filed as: titled and labelled from its record; see the module note. */
+function draftOf(filing: BugFiling, rules: BugRules, redact: (text: string) => string): IssueDraft {
+  const { record } = filing;
+  return {
+    opt: 0,
+    title: bugTitle(record, rules),
+    body: issueText(ISSUE_OPENING, filing.values, redact),
+    type: 'bug',
+    module: draftModuleOf(record),
+    priority: null,
+    project: null,
+    blockedBy: [],
+    ...record.cause === null
+      ? {}
+      : { cause: record.cause },
+  };
+}
+
+/** The filing for one bug; see the module note. */
 async function filingFor(
   what: string,
   bug: ReportBug,
   options: TriageOptions,
-  local: (text: string) => string,
-  redact: (text: string) => string,
+  { local, redact }: Redactors,
   verifyRefs: RefVerifier,
 ): Promise<Filing> {
   const reported = artifactOf(bug);
@@ -569,31 +695,41 @@ async function filingFor(
   const refs = await buildRefsSection(artifact === null
     ? null
     : redact(artifact), verifyRefs);
-  const values: BugValues = {
+  const context: BugFilingContext = {
+    checkout: options.checkout ?? options.repoRoot,
+    ...options.git === undefined
+      ? {}
+      : { git: options.git },
+    ...options.env === undefined
+      ? {}
+      : { env: options.env },
+    ...options.bugRules === undefined
+      ? {}
+      : { bugRules: options.bugRules },
+  };
+  const filing = bugFilingOf({
+    bug,
     what,
-    artifact,
+    dispatch: options.dispatch,
+    feedback: options.report.feedback,
     key: searchText,
     refs,
-    planStub: options.dispatch.planStub,
-    taskText: options.dispatch.taskLine,
-    feedback: options.report.feedback,
-  };
+    context,
+    local,
+    redact,
+  });
+  const values: BugValues = { ...filing.values, record: filing.record, reported: filing.reported };
+  const commentValues: BugValues = filing.record.versions === null
+    ? filing.values
+    : { ...filing.values, versions: filing.record.versions };
   return {
-    draft: {
-      opt: 0,
-      title: issueTitle(redact(what)),
-      body: issueText(ISSUE_OPENING, values, redact),
-      type: 'bug',
-      module: TRIAGE_MODULE,
-      priority: null,
-      project: null,
-      blockedBy: [],
-    },
-    comment: issueText(COMMENT_OPENING, values, redact),
+    draft: draftOf({ ...filing, values }, options.bugRules ?? DEFAULT_BUG_RULES, redact),
+    comment: issueText(COMMENT_OPENING, commentValues, redact),
     searchText,
     key,
     legacyKeys: legacyKeysOf(options.trackerPath, key, reported, artifact),
     values,
+    commentValues,
     compared: { what: local(what), artifact },
   };
 }
@@ -610,8 +746,8 @@ function legacyKeysOf(
   return [...new Set(keys)].filter((legacy) => legacy !== key);
 }
 
-/** The channels that have a tracker to route a bug to: every one but `machine`. */
-type TrackedChannel = Exclude<BugChannel, 'machine'>;
+/** The channels that have a tracker to route a bug to: every one but `machine` and `docs`. */
+type TrackedChannel = Exclude<BugChannel, 'machine' | 'docs'>;
 
 /** Where one channel files, and the store calls only the public channel makes. */
 interface Route {
@@ -634,14 +770,22 @@ interface Route {
 interface SimilarityStep {
   readonly threshold: number;
   readonly candidates: number;
+  /** What each bonus adds to a rank of the `Possible duplicates` list. */
+  readonly weights: SimilarityWeights;
 }
 
 /** The similarity step `options` turn on, or null when they leave it off. */
 function similarityStepOf(options: TriageOptions): SimilarityStep | null {
-  const threshold = options.similarity?.triageSimilarityThreshold;
-  const candidates = options.similarity?.triageSimilarityCandidates;
-  return typeof threshold === 'number' && typeof candidates === 'number'
-    ? { threshold, candidates }
+  const { similarity } = options;
+  if (similarity === undefined) return null;
+  const threshold = similarity.triageSimilarityThreshold;
+  const weights: SimilarityWeights = {
+    causeLeaf: similarity.triageSimilarityWeightsCauseLeaf,
+    causeFamily: similarity.triageSimilarityWeightsCauseFamily,
+    boundary: similarity.triageSimilarityWeightsBoundary,
+  };
+  return typeof threshold === 'number'
+    ? { threshold, candidates: similarity.triageSimilarityCandidates, weights }
     : null;
 }
 
@@ -793,15 +937,15 @@ async function answerRecurrence(run: BugRun, { ref, foundBy }: Recurrence): Prom
 /** Comments on the open bug the similarity step matched, naming its score; see the module note. */
 async function commentOnNearest(run: BugRun, nearest: ScoredIssue, threshold: number): Promise<BugTriage> {
   const opening = similarCommentOpening(nearest.score, threshold);
-  const comment = issueText(opening, run.filing.values, run.redact);
+  const comment = issueText(opening, run.filing.commentValues, run.redact);
   const result = await commentOn(run, nearest.issue.ref, 'similarity', 'commented', comment);
   return { ...result, score: nearest.score };
 }
 
 /**
  * Step 3, after a `find` miss: comments on the nearest open bug at or above
- * the threshold, or files the bug listing the nearest below it; files it
- * plainly where the step does not run. See the module note.
+ * the threshold, or files the bug listing the open bugs ranked by words and
+ * record; files it plainly where the step does not run. See the module note.
  */
 async function answerMiss(run: BugRun): Promise<BugTriage> {
   const { tracker, similarity } = run.route;
@@ -810,11 +954,12 @@ async function answerMiss(run: BugRun): Promise<BugTriage> {
 
   const listed = await step(run, `the ${run.route.channel} tracker openIssues`, () => list.call(tracker, 'bug'));
   if (!listed.ok) return resultOf(run, 'failed', { problem: listed.problem });
-  const nearest = nearestOpenBugs(run.filing.compared, listed.value);
-  const [first] = nearest;
-  return first !== undefined && first.score >= similarity.threshold
-    ? commentOnNearest(run, first, similarity.threshold)
-    : fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: nearest.slice(0, similarity.candidates) } });
+  const [first] = nearestOpenBugs(run.filing.compared, listed.value);
+  if (first !== undefined && first.score >= similarity.threshold) {
+    return commentOnNearest(run, first, similarity.threshold);
+  }
+  const ranked = rankedCandidates(run.filing.compared, run.filing.values.record, listed.value, similarity.weights);
+  return fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: ranked.slice(0, similarity.candidates) } });
 }
 
 /** Looks the bug up by its key, then answers what is found, or what step 3 makes of a miss. */
@@ -901,8 +1046,8 @@ function checkPrivateTracker(tracker: Tracker, privateTracker: Tracker): void {
  * tracker line, then files, or comments on, each out-of-scope bug
  * through the channel it is routed to — the machine one, which files
  * nothing, when the machine-fault reading answers, and otherwise the one
- * its `security` flag names — and answers what became of each; see the
- * module note.
+ * its `security` flag names — and answers what became of each, and of
+ * each `stale_docs` entry, which reaches no tracker; see the module note.
  *
  * Rejects, having written and called nothing, only for a private tracker
  * it refuses. Every other failure is answered in the result.
@@ -913,9 +1058,10 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   checkPrivateTracker(options.tracker, privateTracker);
 
   const blocker = triageBlockers(options);
-  const local = localPathRedactor(repoRoot, options.home ?? homedir());
+  const checkout = options.checkout ?? repoRoot;
+  const local = localPathRedactor([checkout, repoRoot], options.home ?? homedir());
   const redact = (text: string): string => redactSecrets(local(text), options.secrets);
-  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(repoRoot);
+  const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(checkout, options.env);
   const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
       channel: 'public',
@@ -944,6 +1090,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   };
 
   const bugs: BugTriage[] = [];
+  const commented = options.inherited?.commented ?? new Set<string>();
   for (const [index, bug] of options.report.outOfScopeBugs.entries()) {
     const fault = readMachineFault(bug);
     if (fault !== null) {
@@ -958,15 +1105,23 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
-    const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
+    const routed = await routeByKind({ bug, index, what, redact }, options);
+    if (routed.settled) {
+      bugs.push(routed.row);
+      continue;
+    }
+    const filing = await filingFor(what, bug, options, { local, redact }, verifyRefs);
     const run: BugRun = { route, index, filing, redact };
     const { inherited } = options;
-    const isInherited = route.channel === 'public'
+    const isInherited = routed.inherited || (route.channel === 'public'
       && inherited !== undefined
-      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null;
-    bugs.push(isInherited
-      ? await triageInherited(run, inherited.commented)
-      : await triageBug(run));
+      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null);
+    const result = isInherited
+      ? await triageInherited(run, commented)
+      : await triageBug(run);
+    bugs.push(routed.kind === null
+      ? result
+      : { ...result, kind: routed.kind });
   }
-  return { blocker, bugs };
+  return { blocker, bugs, staleDocs: triageStaleDocs(options.report.staleDocs, redact) };
 }

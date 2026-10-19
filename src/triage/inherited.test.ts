@@ -12,9 +12,9 @@
  */
 import type { InheritedTriage } from './inherited.js';
 import type { TriageResult } from './triage.js';
-import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
 import type { SuiteFailure, SuiteSpawner } from '../suite/run.js';
+import type { IssueDraft, IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,6 +55,7 @@ const BUG: ReportBug = {
   what: 'Parser drops the last line',
   artifact: ARTIFACT,
   security: false,
+  kind: 'bug',
   extras: [],
 };
 
@@ -175,6 +176,8 @@ function reportOf(bug: ReportBug): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [bug],
+    staleDocs: [],
+    changes: [],
     extras: [],
   };
 }

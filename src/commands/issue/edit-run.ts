@@ -87,12 +87,16 @@ import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EditKind, EditStateInput, EditStateReading } from '../../board/issue-edit-state.js';
 import type { BoardTrust, EditorLogin, EditorRefusal, TrustReading } from '../../board/trust.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '../../ports/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import {
@@ -121,9 +125,6 @@ import {
   TRUST_REFUSAL_EXIT,
   trustRefusalMessage,
 } from '../../board/trust.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 
 import { planPriorityEdit, priorityMessage, readPriorityFlag } from './edit-priority.js';
@@ -436,6 +437,11 @@ export interface EditRunOptions {
   readonly root: string;
   /** `specs.dir`, where a saved copy is looked for. */
   readonly specsDir: string;
+  /**
+   * `naming.branch`, the template the loop's branch is named under in
+   * gate 4; `DEFAULT_BRANCH_TEMPLATE` when left out.
+   */
+  readonly branchTemplate?: string;
   /** Makes the trust gates 1 and 2 weigh over; never called on the `local` tracker. */
   readonly trust: () => BoardTrust;
   /** Reads the login running the edit; never called on the `local` tracker. */
@@ -580,6 +586,7 @@ function weighState(options: EditRunOptions, found: EditableIssue, gates: Gates)
     savedCopies: findSavedCopies(options.root, options.specsDir, request.issue),
     kind: request.kind,
     whileInDevelopment: request.whileInDevelopment,
+    branchTemplate: options.branchTemplate,
   };
   const reading = readEditState(input);
   if (!reading.pass) gates.refuse(reading.refusal, editStateRefusalMessage(input, reading));
@@ -767,8 +774,9 @@ export interface IssueEditResult extends EditReport {
 
 /**
  * Runs the edit a line asks for: the line and its text read first, then
- * the tracker through the chain, the project's `specs.dir` and
- * `board.trustedAuthors`, and {@link runIssueEdit} over them, the trust
+ * the tracker through the chain, the project's `specs.dir`,
+ * `naming.branch` and `board.trustedAuthors`, and {@link runIssueEdit}
+ * over them, the trust
  * read over `seams.gh` (the tracker's own runner) and the repository
  * label over `seams.openGit`.
  */
@@ -778,8 +786,8 @@ export async function editIssue(context: RafaContext, seams: EditSeams): Promise
   const project = issueProject(context);
   const { tracker, data } = await resolveIssueTracker(context, seams);
   const editing = requireEditingTracker(tracker);
-  // The chain read the config and wrote its warnings once; this read is for two keys and stays quiet.
-  const config = issueSubjectConfig(project, () => undefined);
+  // The chain read the config and wrote its warnings once; this read is for three keys and stays quiet.
+  const config = await issueSubjectConfig(project, () => undefined);
   const gh: GhRunner = seams.gh ?? createGhRunner({ cwd: project.root });
   const openGit = seams.openGit ?? createGitRunner;
 
@@ -788,6 +796,7 @@ export async function editIssue(context: RafaContext, seams: EditSeams): Promise
     tracker: editing,
     root: project.root,
     specsDir: config.specsDir,
+    branchTemplate: config.namingBranch,
     trust: () => ghBoardTrust({
       gh,
       trustedAuthors: config.boardTrustedAuthors,

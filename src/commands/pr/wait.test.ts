@@ -55,8 +55,6 @@
  * to come from the read at the ending.
  */
 import type { PrWaitReading, PrWaitSeams } from './wait.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,
   ChecksReading,
@@ -65,6 +63,10 @@ import type {
   PullRequestSummary,
 } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -78,10 +80,10 @@ import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
+import { DEFAULT_WAIT_TIMEOUT_MIN } from './declarations.js';
 import { PR_USAGE } from './pr-context.js';
 import {
   createPrWaitCommand,
-  DEFAULT_WAIT_TIMEOUT_MIN,
   readTimeoutMinutes,
   renderWait,
   WAIT_EXIT_CODES,

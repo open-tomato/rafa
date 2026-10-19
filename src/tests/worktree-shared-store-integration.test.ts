@@ -30,7 +30,7 @@
  */
 import type { ScratchRepo } from './cli-capture.js';
 import type { EffortReport } from '../effort/report.js';
-import type { TaskReportTally } from '../effort/store/reports.js';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -40,8 +40,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

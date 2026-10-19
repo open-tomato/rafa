@@ -1,0 +1,688 @@
+/**
+ * Reading rafa's settings: the phase 1 schema of the project's config
+ * (`.rafa/config.yaml`, `rafa.config.ts` or `rafa.config.mjs`).
+ *
+ * Every setting takes the value the COMMAND LINE gave it, else the
+ * value the project's config gave it, else the value the user scope's
+ * config under `~/.rafa/` gave it, else its default. Each
+ * setting is ranked on its own, so a flag naming one leaves the others
+ * to the files and a project file naming one leaves the others to the
+ * user's, and {@link ResolvedConfig.sources} records which layer
+ * answered each. That record keeps precedence observable when two
+ * layers agree: a file spelling the default still reports `file`, where
+ * the value alone could not tell a file that was read from one that was
+ * skipped. `file` names the project's file, as it did when that was the
+ * only file read, and `user` names the user scope's.
+ *
+ * This module is the pure half: text, or a document already parsed,
+ * into a layer, and layers into one resolution. Finding and reading each
+ * scope's file, behind a home seam, is `config-load.ts`, which reads a
+ * module file's merged entries through the same {@link readConfigDocument}
+ * a YAML file's document goes through. Scope resolution and `rafa init`
+ * are not here.
+ *
+ * ## Where the rules live
+ *
+ * The reader is three modules and a helper of the schema's, and a name
+ * moving between them is a refactor, never a change of behaviour. This
+ * file is intended as the public surface, re-exporting everything the
+ * other two modules export for a caller to import rather than reaching
+ * into a sibling; however, most
+ * callers import `config-sections.ts`'s names directly,
+ * through its barrel `core/config/sections.js`. The pull request port
+ * owns `MergeMethod`: a caller reading {@link RafaConfig.prMergeMethod}
+ * imports it from `./pr/index.js`, and neither this module nor
+ * `config-sections.ts` re-exports it, which would make the config a
+ * second place to learn it from.
+ *
+ *   - `config-sections.ts` holds every rule about a VALUE: the readers,
+ *     the closed lists of values, and why nothing is coerced.
+ *   - `config-items.ts` holds the prerequisite item and module source
+ *     shapes, read through the helpers `config-sections.ts` exports.
+ *     This module re-exports its types and kind lists, as it did while
+ *     they sat in `config-sections.ts`.
+ *   - The rules about a KEY sit in three modules. `config-schema.ts`
+ *     declares {@link RafaConfig}'s core fields and the setting types,
+ *     and exports no value. `core-section.ts` holds core's file keys,
+ *     specs and defaults, and {@link CONFIG_FILE}. `section.ts` holds
+ *     the registry the sections are handed to, and the setting, section
+ *     and known-key indexes it reads off the registered specs. This
+ *     module reads each spec, each default and every index off that
+ *     registry, and names no section. `src/config-registry.ts`, outside
+ *     `packages/rafa/src/core/`, lists the sections and exports the merged schema,
+ *     `CONFIG_DEFAULTS` and `SETTINGS` among it. The four readings the
+ *     spec leaves to the reader — open tracker kinds, empty
+ *     prerequisite tiers, `version: 1` alone, and `loop.settingSources`
+ *     as an ordered list — are argued in `core-section.ts`; the readings each
+ *     later section's spec leaves are argued in
+ *     `config-schema-readings.ts`, a note that exports nothing, except
+ *     the `pr` and `release` sections', which sit with their fields in
+ *     `config-schema-release.ts`, the `tests` section's, which sit
+ *     with theirs in `config-schema-tests.ts`, the `triage`
+ *     section's, in `config-schema-triage.ts`, and the `errors`
+ *     section's, in `config-schema-errors.ts`, each handed to core as
+ *     a section by `src/config-registry.ts`.
+ *   - `config-readers.ts` holds `mapOf` and the named readers
+ *     `core-section.ts` reads its settings through. No caller reads a
+ *     setting through them but the schema, so nothing here re-exports
+ *     them.
+ *   - This module holds the rules about LAYERS: which layer answers a
+ *     setting, what a file may carry, and what is refused.
+ *
+ * The split is what keeps each under the 800-line cap of
+ * `context/source.md`, which no gate reads. Measured with `wc -l` at the
+ * commit that added the `pr` section: `config.ts` is 506 lines,
+ * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
+ * one field in `config-schema.ts` with one default and one spec in
+ * `core-section.ts` (in
+ * `config-schema-release.ts` for a `pr` or `release` key, in
+ * `config-schema-tests.ts` for a `tests` key, in
+ * `config-schema-triage.ts` for a `triage` key, in
+ * `config-schema-errors.ts` for an `errors` key), and its reader
+ * in `config-sections.ts`. Nothing here names it: {@link readLayer}
+ * and {@link resolveConfig} loop over the names registered with
+ * `section.ts` (`activeSettings()`) and take each default from
+ * `activeDefaults()`, so a layer and a resolution hold every registered
+ * setting, in registration order. `src/config-registry.ts`, outside
+ * `packages/rafa/src/core/`, registers the fourteen sections when its
+ * `registerCoreConfigSections` is called; a process that has not called
+ * it reads no setting at all, where the
+ * literal this loop replaced held every setting whatever was registered.
+ *
+ * {@link parseConfigText} turns YAML text into one file layer and
+ * {@link resolveConfig} ranks the layers. Both are pure, so every
+ * precedence case is tested without a disk. The only read and the only
+ * place that prints are in `config-load.ts`.
+ *
+ * ## Unknown keys and unusable values
+ *
+ * The two are treated differently, and the difference is who the file
+ * was written for.
+ *
+ *   - An UNKNOWN key is retained and warned about, never refused. It
+ *     lands in {@link ConfigFile.extras} under its path (`nonesuch`,
+ *     `plan.depth`, `prerequisites.required[0].timeout`) with the value
+ *     it carried, and acts on nothing. A file written for a later phase
+ *     names keys this one has never heard of; refusing them would make
+ *     every addition to the schema a breaking change for older
+ *     installs. That is the reason `core/plan/declaration.ts` keeps an
+ *     unrecognised declaration key in its `extras`, and it holds here
+ *     unchanged. The warning lists the keys known where the unknown one
+ *     sits: the top level's, a section's, or an item's.
+ *   - An UNUSABLE value for a key this module DOES answer to is
+ *     refused with a {@link ConfigError}. `store: postgres` asks for a
+ *     backend nothing here provides, and falling back to the default
+ *     would write rows into a store other than the one the operator
+ *     named — a silent success, the failure the collector refuses an
+ *     unrecognised argument to prevent. Every problem is collected
+ *     before the throw, so one run names all of them. A section that is
+ *     not a mapping is one: `tracker: linear` is refused, where a
+ *     phase 0 file could carry it as an unknown key.
+ *
+ * A refusal that reads two settings at once is a section's `checks`
+ * (`section.ts`), since the two may come from different files:
+ * {@link resolveConfig} runs every registered section's checks once
+ * every setting is ranked and throws one {@link ConfigError} with every
+ * problem they report. The one check today is the `hub` section's,
+ * `effort.sync: service` with no `hub.url` in any layer, naming the
+ * file that chose `service`; `config-schema-hub.ts` argues it.
+ *
+ * A file is judged whole, whatever the command line says. A flag that
+ * outranks an unusable file value does not excuse it, because the next
+ * run without the flag reads it.
+ *
+ * A `null` value says nothing; it is neither a value nor a problem.
+ * YAML makes `null` of a key whose children are all commented out —
+ * `plan:` above `  # inject: full` parses to `{ plan: null }` — and
+ * refusing it would punish the commonest edit a config file receives.
+ * Three settings RESOLVE to null — `pr.provider`, `pr.base` and
+ * `roadmap.issue` — and the rule holds for them unchanged: a file naming one with no value is
+ * silent, and silence there resolves to the same null from the defaults
+ * layer, reported as `default` rather than `file`. What null means to a
+ * caller is `core-section.ts`'s and `config-schema-release.ts`'s to say.
+ *
+ * A setting's dotted path is built by joining keys, so `plan.inject`
+ * written flat at the top level reaches the same setting as `inject`
+ * nested under `plan`. Both spellings are accepted, and a file giving
+ * one setting in both is refused: they are different YAML keys, so the
+ * parser keeps both, and letting one win would be a silent choice.
+ *
+ * Every key here is looked up in the `Map` and the `Set` `section.ts`
+ * builds off the registered settings, never with `in` or an object
+ * index; the reason is argued there.
+ *
+ * ## The parser, measured on bun 1.3.14
+ *
+ * `Bun.YAML.parse` is the whole parser; the repo takes no YAML
+ * dependency. Six of its behaviours shape the rules above, each read
+ * off the parser rather than its documentation:
+ *
+ *   - An empty file, a whitespace-only one, a comment-only one and a
+ *     bare `---` all parse to `null`, and read as a file that says
+ *     nothing.
+ *   - A multi-document stream parses to a LIST of documents, which is
+ *     refused with every other top level that is not a mapping.
+ *   - A duplicated key is not an error: the last occurrence wins and
+ *     the first leaves no trace, so nothing here can warn about it.
+ *   - Malformed YAML throws a `SyntaxError` whose message carries no
+ *     line or column. The refusal names the file; it cannot name the
+ *     line.
+ *   - A child indented with a TAB parses differently by version: on
+ *     bun 1.3.14 `plan:` over a tab-indented `inject: full` parses as
+ *     `plan: null` beside a top-level `inject`, and on bun 1.4.2 it
+ *     throws `Tab characters cannot be used as indentation`. So a line
+ *     whose indentation holds a tab is refused, by line number, before
+ *     the parser sees the text, and every bun gives one answer. A blank
+ *     or comment line may carry one, and a tab inside a value parses as
+ *     the value's own on both. One cost: a block scalar line whose
+ *     content opens with a tab after its spaces is refused too.
+ *   - `yes` and `on` parse as strings, and `True` and `TRUE` as the
+ *     boolean. So a `tracking` flag spelled `yes` is refused rather
+ *     than read as true.
+ */
+import type { SettingOrigin, ShadowedFile } from './config-origins.js';
+import type {
+  CommandLineSetting,
+  ConfigSetting,
+  RafaConfig,
+  SettingSpec,
+} from './config-schema.js';
+import type {
+  ConfigExtra,
+  Mapping,
+  ValueAt,
+} from './config-sections.js';
+
+import { join } from 'node:path';
+
+import { originOf } from './config-origins.js';
+import {
+  describeValue,
+  isMapping,
+  messageOf,
+} from './config-sections.js';
+import { CONFIG_FILE } from './core-section.js';
+import {
+  activeChecks,
+  activeDefaults,
+  activeKnownKeysAbove,
+  activeSectionPaths,
+  activeSettingByKey,
+  activeSettings,
+} from './section.js';
+
+export type {
+  CommandLineSetting,
+  ConfigSetting,
+  RafaConfig,
+} from './config-schema.js';
+export { CONFIG_FILE } from './core-section.js';
+export type {
+  BoardRelationshipMode,
+  ClaimsAhead,
+  ClaimsStaleAfter,
+  ClaudeSettingSource,
+  ConfigExtra,
+  ConfigVersion,
+  InjectMode,
+  LessonSwitch,
+  OutputMode,
+  PrProvider,
+  ReleaseEnabled,
+  RouteTarget,
+  SkillResolverName,
+  StoreBackend,
+  SyncStrategy,
+  TierPin,
+  TierSwitch,
+} from './config-sections.js';
+export {
+  BOARD_PROJECT_TEMPLATE_DEFAULT,
+  BOARD_RELATIONSHIP_MODES,
+  CLAUDE_SETTING_SOURCES,
+  CONFIG_VERSIONS,
+  INJECT_MODES,
+  OUTPUT_MODES,
+  PR_PROVIDERS,
+  RELEASE_AUTO,
+  STORE_BACKENDS,
+  SYNC_STRATEGIES,
+} from './config-sections.js';
+export type {
+  ModuleSource,
+  ModuleSourceKind,
+  OptionalPrerequisiteItem,
+  PrerequisiteItem,
+  PrerequisiteKind,
+  PrerequisiteScope,
+} from './config-items.js';
+export { MODULE_SOURCE_KINDS, PREREQUISITE_KINDS } from './config-items.js';
+
+/**
+ * The layer that answered a setting: the command line, the project's
+ * file, the user scope's file, or the default.
+ */
+export type ConfigSource = 'cli' | 'file' | 'user' | 'default';
+
+/**
+ * One layer's say on every setting: a value, or undefined for silence.
+ *
+ * Every key is REQUIRED, with undefined standing for silence, so a
+ * setting added to {@link RafaConfig} is a compile error wherever a
+ * layer is built rather than a setting some layer forgot.
+ */
+export type ConfigLayer = {
+  readonly [K in ConfigSetting]: RafaConfig[K] | undefined;
+};
+
+/**
+ * Command-line values as a flag parser hands them over: the raw string,
+ * or undefined when the flag was not given. {@link resolveConfig}
+ * validates them and refuses what the file would refuse, an empty
+ * string included. A key naming no {@link CommandLineSetting} is not
+ * read.
+ */
+export type ConfigOverrides = {
+  readonly [K in CommandLineSetting]?: string | undefined;
+};
+
+/** What one config file said. */
+export interface ConfigFile {
+  /** The file, as the caller named it. */
+  path: string;
+  /** Its value for each setting, or undefined where it said nothing. */
+  values: ConfigLayer;
+  /** Every key that names no setting and opens no section. */
+  extras: readonly ConfigExtra[];
+  /**
+   * The zero-based entry that last set each setting, for a file of
+   * several entries. Absent for a file of one, a YAML file, whose every
+   * setting is entry 0.
+   */
+  entries?: ReadonlyMap<ConfigSetting, number>;
+}
+
+/** The layers {@link resolveConfig} ranks, highest first. */
+export interface ConfigLayers {
+  /** Command-line values. Absent is the same as no flag given. */
+  cli?: ConfigOverrides;
+  /** The project's parsed file, or null when there is none. */
+  file?: ConfigFile | null;
+  /** The user scope's parsed file, or null when there is none. */
+  user?: ConfigFile | null;
+}
+
+/** Every setting resolved, with the layer each value came from. */
+export interface ResolvedConfig {
+  /** The value each setting resolved to. */
+  config: RafaConfig;
+  /** The layer that answered each setting. */
+  sources: Readonly<Record<ConfigSetting, ConfigSource>>;
+  /** The project's file consulted, or null when there was none. */
+  path: string | null;
+  /** The user scope's file consulted, or null when there was none. */
+  userPath: string | null;
+  /** The project file's unknown keys, retained. Empty with no file. */
+  extras: readonly ConfigExtra[];
+  /** The user file's unknown keys, retained. Empty with no file. */
+  userExtras: readonly ConfigExtra[];
+  /** One sentence per retained unknown key, the user file's first. */
+  warnings: readonly string[];
+  /**
+   * The file and entry that answered each setting, or null where the
+   * command line or a default did (`config-origins.ts`).
+   */
+  provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
+  /** The YAML files a module file of their scope left unread. Empty here; `config-load.ts` fills it. */
+  shadowed: readonly ShadowedFile[];
+}
+
+/**
+ * A config the loop cannot run on: unreadable, not YAML, not a
+ * mapping, or naming a value a setting does not accept.
+ *
+ * Its own class so a caller can tell a refusal it should print and
+ * exit on from a fault it should not swallow.
+ */
+export class ConfigError extends Error {
+  /** Every problem found, one sentence each. */
+  readonly problems: readonly string[];
+
+  constructor(problems: readonly string[], options?: ErrorOptions) {
+    super(`rafa config: ${problems.join('; ')}`, options);
+    this.name = 'ConfigError';
+    this.problems = problems;
+  }
+}
+
+/** A layer read, with what its readers found. */
+interface LayerReading {
+  layer: ConfigLayer;
+  problems: readonly string[];
+  extras: readonly ConfigExtra[];
+}
+
+/** Every registered setting's name, in registration order. */
+function registeredNames(): ConfigSetting[] {
+  return Object.keys(activeSettings()) as ConfigSetting[];
+}
+
+/** The registered spec of `setting`, which {@link registeredNames} named. */
+function specOf(setting: ConfigSetting): SettingSpec<ConfigSetting> {
+  const spec = activeSettings()[setting] as SettingSpec<ConfigSetting> | undefined;
+  if (spec === undefined) throw new Error(`rafa config: setting ${setting} is not registered`);
+  return spec;
+}
+
+/** True for a registered setting a command line can name. */
+function isCommandLineSetting(setting: ConfigSetting): setting is CommandLineSetting {
+  return specOf(setting).cli;
+}
+
+/**
+ * Reads one raw value per registered setting into a layer. Undefined is
+ * silence; any other value goes through the setting's reader at the
+ * place `atOf` names. The layer holds every registered setting, in
+ * registration order, and nothing else; it is a {@link ConfigLayer}
+ * once the module listing the sections has registered them all.
+ */
+function readLayer(
+  rawOf: (setting: ConfigSetting) => unknown,
+  atOf: (setting: ConfigSetting) => ValueAt,
+): LayerReading {
+  const problems: string[] = [];
+  const extras: ConfigExtra[] = [];
+  const entries = registeredNames().map((setting) => {
+    const raw = rawOf(setting);
+    if (raw === undefined) return [setting, undefined] as const;
+
+    const reading = specOf(setting).read(raw, atOf(setting));
+    problems.push(...reading.problems);
+    extras.push(...reading.extras);
+    return [setting, reading.value] as const;
+  });
+  const layer = Object.fromEntries(entries) as unknown as ConfigLayer;
+  return { layer, problems, extras };
+}
+
+/**
+ * Every key in `mapping` as a dotted path, descending into each
+ * section that holds a mapping. A section holding anything else is
+ * yielded as itself, for the caller to judge.
+ */
+function* entriesOf(mapping: Mapping, prefix: string): Generator<ConfigExtra> {
+  const sectionPaths = activeSectionPaths();
+  for (const [name, value] of Object.entries(mapping)) {
+    const key = prefix === ''
+      ? name
+      : `${prefix}.${name}`;
+    if (sectionPaths.has(key) && isMapping(value)) yield* entriesOf(value, key);
+    else yield { key, value };
+  }
+}
+
+/** A document's keys, sorted into what they are. */
+interface SortedKeys {
+  /** The raw non-null value of each setting the document named. */
+  named: ReadonlyMap<ConfigSetting, unknown>;
+  /** Keys naming no setting and opening no section, retained. */
+  extras: readonly ConfigExtra[];
+  /** Sections that are not mappings, and settings given twice. */
+  problems: readonly string[];
+}
+
+/** Sorts every key of a parsed document. See the module note. */
+function sortKeys(document: Mapping, path: string): SortedKeys {
+  const named = new Map<ConfigSetting, unknown>();
+  const seen = new Set<ConfigSetting>();
+  const extras: ConfigExtra[] = [];
+  const problems: string[] = [];
+  const settingByKey = activeSettingByKey();
+  const sectionPaths = activeSectionPaths();
+
+  for (const entry of entriesOf(document, '')) {
+    const setting = settingByKey.get(entry.key);
+    if (setting !== undefined) {
+      if (seen.has(setting)) {
+        problems.push(`${path}: ${entry.key} is given more than once`);
+      } else if (entry.value !== null) {
+        named.set(setting, entry.value);
+      }
+      seen.add(setting);
+      continue;
+    }
+
+    if (!sectionPaths.has(entry.key)) {
+      extras.push(entry);
+      continue;
+    }
+    // A section reaches here only when it holds no mapping.
+    if (entry.value !== null) {
+      const found = describeValue(entry.value);
+      problems.push(`${path}: ${entry.key} must be a mapping, found ${found}`);
+    }
+  }
+
+  return { named, extras, problems };
+}
+
+/**
+ * A line whose leading whitespace holds a tab and whose content after it
+ * is neither empty nor a comment. Such a line is a tab-indented one.
+ */
+const TAB_INDENTED_LINE = /^[ \t]*\t[ \t]*[^\s#]/;
+
+/**
+ * One problem per line that indents its content with a tab, named by
+ * line number. A blank line or a comment may carry a tab; a tab after
+ * the first non-blank character, inside a value, is the value's own.
+ */
+function tabIndentProblems(text: string, path: string): string[] {
+  return text.split(/\r?\n/).flatMap((line, index) => TAB_INDENTED_LINE.test(line)
+    ? [`${path}: line ${index + 1} is indented with a tab; YAML indents with spaces only`]
+    : []);
+}
+
+/**
+ * Parses YAML into its document, refusing text that is not YAML with
+ * the file named. A tab in a line's indentation is refused before the
+ * parser sees the text, because bun's parser answers it differently by
+ * version. Judges no key: {@link readConfigDocument} does.
+ */
+export function parseConfigDocument(text: string, path: string): unknown {
+  const tabProblems = tabIndentProblems(text, path);
+  if (tabProblems.length > 0) throw new ConfigError(tabProblems);
+  try {
+    return Bun.YAML.parse(text);
+  } catch (error) {
+    const problem = `${path}: not valid YAML (${messageOf(error)})`;
+    throw new ConfigError([problem], { cause: error });
+  }
+}
+
+/** The config file's path under `root`. */
+export function configFilePath(root: string): string {
+  return join(root, CONFIG_FILE);
+}
+
+/**
+ * Reads config text into one file layer. Pure: `path` only labels the
+ * layer and the refusals.
+ *
+ * Throws a {@link ConfigError} naming every problem the text has — a
+ * line indented with a tab, not YAML, not a mapping at the top, a section that is not a mapping, a
+ * setting given twice, a value a setting does not accept. An unknown
+ * key is none of these: it is retained in {@link ConfigFile.extras},
+ * the keys an item carried after the keys of the document.
+ */
+export function parseConfigText(text: string, path: string): ConfigFile {
+  return readConfigDocument(parseConfigDocument(text, path), path);
+}
+
+/**
+ * Reads a parsed document into one file layer, as {@link parseConfigText}
+ * reads the text it parses: null says nothing, anything but a mapping at
+ * the top is refused, and every key is judged. Pure; `path` only labels.
+ */
+export function readConfigDocument(parsed: unknown, path: string): ConfigFile {
+  const document = parsed ?? {};
+  if (!isMapping(document)) {
+    const found = describeValue(document);
+    throw new ConfigError([
+      `${path}: expected a mapping at the top level, found ${found}`,
+    ]);
+  }
+
+  const sorted = sortKeys(document, path);
+  const read = readLayer(
+    (setting) => sorted.named.get(setting),
+    (setting) => ({
+      label: `${path}: ${specOf(setting).key}`,
+      key: specOf(setting).key,
+    }),
+  );
+  const all = [...sorted.problems, ...read.problems];
+  if (all.length > 0) throw new ConfigError(all);
+
+  return { path, values: read.layer, extras: [...sorted.extras, ...read.extras] };
+}
+
+/**
+ * Whether `setting` is a map merged by key across layers: its registered
+ * spec sets `map`. Read off the active registry, so core names no
+ * section's map setting.
+ */
+function isMapSetting(setting: ConfigSetting): boolean {
+  return specOf(setting).map === true;
+}
+
+/**
+ * Merges map layers by key, later layers over earlier ones. A `false`
+ * is kept as the answer for its key, so it shadows a lower layer's
+ * entry instead of leaving it standing.
+ */
+function mergeMaps(...layers: unknown[]): ReadonlyMap<string, unknown> {
+  const merged = new Map<string, unknown>();
+  for (const layer of layers) {
+    if (!(layer instanceof Map)) continue;
+    for (const [name, value] of layer) merged.set(name, value);
+  }
+  return merged;
+}
+
+/**
+ * One warning per pin in `layer` naming the rafa tier while `tiers.rafa`
+ * is off. A pin to a tier that is not loaded cannot win, which is worth
+ * saying, but is no reason to refuse the file: the operator may switch
+ * the tier back on.
+ */
+function unloadedPinWarnings(layer: ConfigFile): string[] {
+  const pins = [
+    ['tiers.skills', layer.values.tiersSkills],
+    ['tiers.agents', layer.values.tiersAgents],
+  ] as const;
+  return pins.flatMap(([key, map]) => [...(map ?? [])]
+    .filter(([, pin]) => pin === 'rafa')
+    .map(([name]) => `rafa config: ${key}.${name} in ${layer.path} pins the rafa tier, `
+      + 'which is not loaded (tiers.rafa is off), so the pin has no effect'));
+}
+
+/** One setting's answer, and the layer that gave it. */
+interface Ranked<K extends ConfigSetting> {
+  value: RafaConfig[K];
+  source: ConfigSource;
+}
+
+/** The sentence an operator reads about one retained unknown key. */
+function unknownKeyWarning(key: string, path: string): string {
+  const quoted = JSON.stringify(key);
+  const [under, names] = activeKnownKeysAbove(key);
+  const where = under === ''
+    ? ''
+    : ` under ${under}`;
+  return `rafa config: unknown key ${quoted} in ${path} has no effect `
+    + `in this version (known keys${where}: ${names.join(', ')})`;
+}
+
+/**
+ * Ranks the layers: for each registered setting, the command line over
+ * the project's file, the project's over the user scope's, and the
+ * user's over its registered default (`activeDefaults()` in
+ * `section.ts`).
+ *
+ * Pure. Warnings come back as data — one per unknown key either file
+ * retained, the user file's first — and are never printed here. A command-line value no
+ * setting accepts throws a {@link ConfigError} naming every one, and
+ * is never downgraded to the file's value: an operator who mistyped a
+ * flag asked for something, and running on something else is the
+ * silent success the module note refuses. Every registered section's
+ * checks then run over the resolution, and any problem one reports
+ * throws a {@link ConfigError} too naming every such problem: the
+ * `hub` section's refuses `effort.sync: service` with no `hub.url` in
+ * any layer, naming the file that chose `service`.
+ */
+export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
+  const file = layers.file ?? null;
+  const user = layers.user ?? null;
+  const overrides = layers.cli ?? {};
+  const { layer: cli, problems } = readLayer(
+    (setting) => isCommandLineSetting(setting)
+      ? overrides[setting]
+      : undefined,
+    (setting) => ({ label: `command line: ${setting}`, key: setting }),
+  );
+  if (problems.length > 0) throw new ConfigError(problems);
+
+  const defaults = activeDefaults();
+  const rank = <K extends ConfigSetting>(setting: K): Ranked<K> => {
+    const fromCli = cli[setting];
+    if (fromCli !== undefined) return { value: fromCli, source: 'cli' };
+    const fromFile = file?.values[setting];
+    const fromUser = user?.values[setting];
+    if (isMapSetting(setting)) {
+      const merged = mergeMaps(defaults[setting], fromUser, fromFile);
+      const source = fromFile !== undefined
+        ? 'file'
+        : fromUser !== undefined
+          ? 'user'
+          : 'default';
+      return { value: merged as RafaConfig[K], source };
+    }
+    if (fromFile !== undefined) return { value: fromFile, source: 'file' };
+    if (fromUser !== undefined) return { value: fromUser, source: 'user' };
+    return { value: defaults[setting] as RafaConfig[K], source: 'default' };
+  };
+  const ranked = registeredNames().map((setting) => [setting, rank(setting)] as const);
+  const config = Object.fromEntries(ranked.map(([setting, { value }]) => [setting, value])) as unknown as RafaConfig;
+  const sources = Object.fromEntries(
+    ranked.map(([setting, { source }]) => [setting, source]),
+  ) as Record<ConfigSetting, ConfigSource>;
+  const provenance = Object.fromEntries(
+    ranked.map(([setting, { source }]) => [setting, originOf(source, setting, file, user)]),
+  ) as Record<ConfigSetting, SettingOrigin | null>;
+  const path = file?.path ?? null;
+  const userPath = user?.path ?? null;
+  const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath }));
+  if (checkProblems.length > 0) throw new ConfigError(checkProblems);
+  const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
+  const warnings = [user, file].flatMap((layer) => layer === null
+    ? []
+    : [
+      ...layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)),
+      ...(rafaLoaded
+        ? []
+        : unloadedPinWarnings(layer)),
+    ]);
+
+  return {
+    config,
+    sources,
+    path,
+    userPath,
+    extras: file?.extras ?? [],
+    userExtras: user?.extras ?? [],
+    warnings,
+    provenance,
+    shadowed: [],
+  };
+}

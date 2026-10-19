@@ -14,12 +14,14 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/report/parse.test.ts` goes where `src/report/parse.ts` goes;
+ *      `src/start/branch-decision.test.ts` goes where
+ *      `src/start/branch-decision.ts` goes;
  *   2. otherwise the longest folder that holds it decides, among the
- *      packages' folders and the unassigned folders. `src/effort/store/`
- *      (core) is longer than `src/effort/` (`rafa-effort`);
+ *      packages' folders and the unassigned folders. A folder closes
+ *      with its `/`, so `packages/rafa/` (core) does not hold
+ *      `packages/rafa-hub/src/bin.ts`;
  *   3. otherwise the file is left to place, and counts as a file of the
- *      package named under `rest`, `@open-tomato/rafa-cli`, which takes
+ *      package named under `rest`, `@open-tomato/rafa`, which takes
  *      every file no line above holds.
  *
  * What the CLI holds by rule is the dispatcher (`src/cli/`, with the bin
@@ -37,7 +39,7 @@
  * never upward; it is counted on the folder instead, by the package at
  * its other end.
  *
- * An upward edge from a file under `src/core/config/` into a
+ * An upward edge from a file under `packages/rafa/src/core/config/` into a
  * `src/config-schema-<section>.ts` file is marked as cleared by #118,
  * which makes each package own its config section. It still counts as
  * upward: `remaining` is the count less the cleared edges.
@@ -56,6 +58,7 @@ import type { EdgeKind, ImportEdge } from './import-graph';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
+import { CORE_PACKAGE as CORE_PACKAGE_FOLDER, subjectFolder } from './core-moves';
 import { OUTPUT_DIR, stableJson } from './import-graph';
 
 /** The files and folders one future package holds by rule. */
@@ -217,7 +220,7 @@ export const GRAPH_PATH: string = `${OUTPUT_DIR}/import-graph.json`;
 export const SECTIONS_ISSUE = 118;
 
 /** The folder whose imports of section files #118 clears, with its closing `/`. */
-export const SECTION_IMPORTER_FOLDER = 'src/core/config/';
+export const SECTION_IMPORTER_FOLDER: string = subjectFolder('config');
 
 /** A config section file: `src/config-schema-<section>.ts`, at the top of `src/`. */
 export const SECTION_FILE: RegExp = /^src\/config-schema-[^/]+\.ts$/;
@@ -225,11 +228,14 @@ export const SECTION_FILE: RegExp = /^src\/config-schema-[^/]+\.ts$/;
 /** How many files the summary lists by the upward edges that end on them. */
 export const TOP_TARGETS = 20;
 
-/** The name of the core package. */
-export const CORE_PACKAGE = '@open-tomato/rafa';
+/** The name of the core package, its manifest's private name (#808). */
+export const CORE_PACKAGE = '@open-tomato/rafa-core';
 
-/** The name of the CLI package, which takes every file no rule holds. */
-export const CLI_PACKAGE = '@open-tomato/rafa-cli';
+/**
+ * The name of the CLI package, which takes every file no rule holds: the
+ * root, the one package that publishes (#808).
+ */
+export const CLI_PACKAGE = '@open-tomato/rafa';
 
 /**
  * The fifteen `src/board/` files `docs/survey/cluster-map.json` puts in
@@ -254,15 +260,31 @@ export const BOARD_FILES_OF_C6: readonly string[] = [
 ];
 
 /**
- * The ten packages, lowest first, seeded from the survey's cluster order,
- * with the three folders left for the second architect pass.
+ * The twelve packages, lowest first, seeded from the survey's cluster
+ * order, with the three folders left for the second architect pass. The
+ * two shared-config packages sit lowest, since nothing in the graph
+ * imports them, `rafa-eslint-config` under `rafa-typescript-config`,
+ * whose manifest takes it as a dev dependency. Core is its workspace
+ * package, `CORE_PACKAGE` of `core-moves.ts`, which spells where core is:
+ * one folder and no named file, as each service's rule and each
+ * shared-config package's rule.
  */
 export const CUT_RULES: CutRules = {
   packages: [
     {
-      folders: ['src/core/', 'src/effort/store/', 'src/ports/'],
+      folders: ['packages/eslint-config/'],
+      name: 'rafa-eslint-config',
+      named: [],
+    },
+    {
+      folders: ['packages/typescript-config/'],
+      name: 'rafa-typescript-config',
+      named: [],
+    },
+    {
+      folders: [CORE_PACKAGE_FOLDER],
       name: CORE_PACKAGE,
-      named: ['src/report/parse.ts', 'src/report/record.ts', 'src/schema/project-id.ts', 'src/schema/tiers.ts'],
+      named: [],
     },
     {
       folders: [
@@ -424,7 +446,7 @@ export function placeFile(path: string, rules: CutRules = CUT_RULES): FilePlace 
 
 /**
  * Whether #118 clears an upward edge: it leaves a file under
- * `src/core/config/` and ends on a config section file.
+ * `packages/rafa/src/core/config/` and ends on a config section file.
  *
  * @param edge - An upward edge.
  * @returns `true` when #118 clears it.

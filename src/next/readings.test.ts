@@ -82,8 +82,8 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -91,8 +91,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
+
+import { scanClaimBranches } from '../board/roadmap.js';
 import { formatClaimMessage } from '../claims/record.js';
-import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
@@ -419,6 +421,40 @@ describe('the branch refs of this clone and its remote', () => {
     expect(readRefs(sourcesOf({ git: git.git }), 'origin', kept.note)).toEqual(['refs/heads/main']);
     expect(kept.held()).toHaveLength(1);
     expect(kept.held()[0]).toContain('could not be read');
+  });
+
+  it('scans under work/{stub} asking the work/rafa-* glob, and feat/rafa-* with the template left out', () => {
+    const answers = {
+      'for-each-ref --format=%(refname) refs/heads refs/remotes': said('refs/remotes/origin/work/rafa-20-x\n'),
+      'ls-remote --heads origin': said('ab2\trefs/heads/work/rafa-20-x\nab3\trefs/heads/feat/rafa-21-y\n'),
+    };
+    const fetched = (template: string | undefined): { refs: readonly string[]; fetches: readonly string[] } => {
+      const git = gitOf(answers);
+      const over = template === undefined
+        ? {}
+        : { branchTemplate: template };
+      const refs = readRefs(
+        sourcesOf({ git: git.git, ...over }),
+        'origin',
+        notes().note,
+        (runner, remote, scanTemplate) => {
+          const scan = scanClaimBranches(runner, remote, scanTemplate);
+          scan.claimOf?.('work/rafa-20-x');
+          scan.claimOf?.('feat/rafa-21-y');
+          return scan;
+        },
+      );
+      return { refs, fetches: git.ran().filter((call) => call.startsWith('fetch')) };
+    };
+
+    const templated = fetched('work/{stub}');
+    expect(templated.refs).toContain('refs/remotes/origin/work/rafa-20-x');
+    expect(templated.fetches.join('\n')).toContain('+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+    expect(templated.fetches.join('\n')).not.toContain('feat/rafa-*');
+
+    const control = fetched(undefined);
+    expect(control.fetches.join('\n')).not.toContain('work/rafa-*');
+    expect(control.fetches.join('\n')).toContain('feat/rafa-*');
   });
 });
 
@@ -818,6 +854,63 @@ describe('a plan branch that holds claim commits alone', () => {
 
     expect(openWorld(sourcesOf({ git: claimed.git, plans: plans('claimed') })).unstartedPlan()?.stub).toBe(STUB);
     expect(openWorld(sourcesOf({ git: worked.git, plans: plans('worked') })).unstartedPlan()).toBeNull();
+  });
+});
+
+/** A `naming.branch` template other than the default. */
+const WORK_TEMPLATE = 'work/{stub}';
+
+/** A plan stub whose branch exists only under {@link WORK_TEMPLATE}. */
+const WORK_STUB = 'rafa-7-x';
+
+/** The plan branch of {@link WORK_STUB} under {@link WORK_TEMPLATE}. */
+const WORK_BRANCH = 'work/rafa-7-x';
+
+describe('a plan branch under the naming.branch template', () => {
+  const plans = [
+    { stub: WORK_STUB, plan: '/p/PLAN-x.md', tracker: null, tasks: { total: 1, done: 0, blocked: 0, open: 1 }, issues: 0 },
+  ];
+
+  it('finds the plan a branch names under the template, and none with the template left out', () => {
+    expect(readBranchPlan(WORK_BRANCH, plans, WORK_TEMPLATE)?.stub).toBe(WORK_STUB);
+    expect(readBranchPlan(WORK_BRANCH, plans)).toBeNull();
+  });
+
+  it('reads no plan from a default-template branch under another template', () => {
+    expect(readBranchPlan(`feat/${WORK_STUB}`, plans, WORK_TEMPLATE)).toBeNull();
+  });
+
+  it('sees the remote branch under the template, and nothing with the template left out', () => {
+    const refs = [`refs/remotes/origin/${WORK_BRANCH}`];
+
+    expect(hasBranch(refs, WORK_STUB, WORK_TEMPLATE)).toBe(true);
+    expect(hasBranch(refs, WORK_STUB)).toBe(false);
+  });
+
+  it('resolves the tips of the branch the sources template names', () => {
+    const tracking = `refs/remotes/origin/${WORK_BRANCH}`;
+    const git = gitOf({ [resolveArgv(tracking)]: said('abc1234\n'), [resolveArgv(`refs/heads/${WORK_BRANCH}`)]: refused('') });
+
+    expect(readBranchTips(sourcesOf({ git: git.git, branchTemplate: WORK_TEMPLATE }), 'origin', WORK_STUB, notes().note)).toEqual([tracking]);
+    expect(readBranchTips(sourcesOf({ git: git.git }), 'origin', WORK_STUB, notes().note)).toEqual([]);
+  });
+
+  it('names the unfetched branch from the template in its note', () => {
+    const git = gitOf();
+    const noted = notes();
+    const sources = sourcesOf({ git: git.git, branchTemplate: WORK_TEMPLATE });
+
+    expect(hasStartedBranch(sources, 'origin', [`refs/remotes/origin/${WORK_BRANCH}`], WORK_STUB, noted.note)).toBe(true);
+    expect(noted.held()).toEqual([`\`${WORK_BRANCH}\` is on origin but not fetched here, so its commits were not read and its plan reads as started`]);
+  });
+
+  it('reads the branch plan of the world through the sources template', () => {
+    const git = gitOf({ 'rev-parse --abbrev-ref HEAD': said(`${WORK_BRANCH}\n`) });
+    const root = plantPlans('work-template', { [WORK_STUB]: PLAN });
+    const plansDir = plansDirAt(root, '.rafa/plans');
+
+    expect(openWorld(sourcesOf({ git: git.git, plans: plansDir, branchTemplate: WORK_TEMPLATE })).branchPlan()?.stub).toBe(WORK_STUB);
+    expect(openWorld(sourcesOf({ git: git.git, plans: plansDir })).branchPlan()).toBeNull();
   });
 });
 

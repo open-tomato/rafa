@@ -21,10 +21,10 @@
  */
 import type { TriageReading } from './triage-report.js';
 import type { ResolveRun } from './triage-resolve.js';
-import type { Output } from '../../ports/index.js';
 import type { PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { TriageClass } from '../../pr/triage/classes.js';
 import type { SettleSettings } from '../../release/settle.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,7 +33,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
@@ -59,6 +60,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** The stamped branch. */

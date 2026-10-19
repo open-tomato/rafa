@@ -25,8 +25,8 @@
  * from the system clock in place of `now` reddened six, and the output
  * left unfrozen the frozen case alone.
  */
-import type { OutputStream } from './stream.js';
-import type { CliEvent, Output } from '../../ports/index.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

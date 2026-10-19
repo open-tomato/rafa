@@ -48,14 +48,14 @@
  *
  * Exit code 1: the refusals `loop-sessions.ts` names.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../core/loop/readings.js';
-import type { TaskCounts } from '../../core/plan/index.js';
 import type { BlockedTask } from '../../loop/blocked-tasks.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '@open-tomato/rafa/core/loop/readings';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
-import { messageOf } from '../../core/config/sections.js';
-import { sessionPhase } from '../../core/loop/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { sessionPhase } from '@open-tomato/rafa/core/loop';
 import {
   estimateEta,
   isLive,
@@ -63,8 +63,9 @@ import {
   readSessionFinishes,
   resolveLoopSeams,
   sessionLine,
-} from '../../core/loop/readings.js';
-import { countTasks } from '../../core/plan/index.js';
+} from '@open-tomato/rafa/core/loop/readings';
+import { countTasks } from '@open-tomato/rafa/core/plan';
+
 import { blockedTasks } from '../../loop/blocked-tasks.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 

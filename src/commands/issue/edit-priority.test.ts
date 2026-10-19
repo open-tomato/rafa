@@ -14,7 +14,7 @@
  * reaches GitHub or spawns a process.
  */
 import type { LineFlags } from './issue-tracker.js';
-import type { EditableIssue, IssuePriority, IssueRef, Tracker } from '../../ports/index.js';
+import type { EditableIssue, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,17 +22,18 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
-import { CommandExit } from '../../core/command/index.js';
 
+import { PRIORITY_FLAG } from './declarations.js';
 import {
   holdsPriorityAlone,
   planPriorityEdit,
-  PRIORITY_FLAG,
   PRIORITY_RIVALS,
   priorityMessage,
   readPriorityFlag,

@@ -45,9 +45,10 @@
  * `browse` the provider rejected.
  */
 import type { PrSeams, PullSource } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { SEPARATOR } from './current.js';
+import { PR_VIEW_DECLARATION } from './declarations.js';
 import {
   DEFAULT_PR_SEAMS,
   onProvider,
@@ -93,7 +94,7 @@ export function renderView(number: number, url: string | null): string {
 /** Picks the pull request and hands it to the provider's browser; see the module note. */
 export async function runView(context: RafaContext, seams: PrSeams): Promise<PrViewResult> {
   const asked = readPullArgument(context.args, USAGE);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   await onProvider(`open pull request #${pick.number} in the browser`, () => pr.pulls.browse(pick.number));
   const url = trimmedOrNull(pick.summary?.url ?? '');
@@ -109,40 +110,7 @@ export async function runView(context: RafaContext, seams: PrSeams): Promise<PrV
 /** The command, reaching the provider and the branch through `seams`; see the module note. */
 export function createPrViewCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr view',
-    subject: 'pr',
-    action: 'view',
-    summary: 'open a pull request in the browser',
-    description: 'Hands one pull request to the GitHub CLI to open in the browser, and writes one line naming what'
-      + ' was opened. Without a number it opens the open pull request whose head is the branch checked out at the'
-      + ' project root, and the line carries that pull request\'s URL; with a number it opens that pull request and'
-      + ' names it alone, reading nothing else about it. A GitHub CLI that could not open it — absent,'
-      + ' unauthenticated, or holding no such pull request — refuses with exit code 1 carrying what it said. With'
-      + ' `--output=json` the number, where it came from, the branch, the URL and the line are the data of the'
-      + ' terminal result event. Refuses with exit code 2 where `pr.provider` is not `gh`.',
-    args: [
-      {
-        name: 'n',
-        description: 'The pull request number. The open pull request of the current branch when it is left out.',
-        type: 'number',
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa pr view',
-        note: 'Opens the open pull request of the branch checked out at the project root.',
-      },
-      {
-        cmd: 'rafa pr view 41',
-        note: 'Opens pull request 41, whatever branch is checked out.',
-      },
-      {
-        cmd: 'rafa pr view 41 --output=json',
-        note: 'Writes a start event, then a result event naming the pull request that was opened.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_VIEW_DECLARATION,
     run: async (context) => {
       const viewed = await runView(context, seams);
       if (context.outputMode === 'json') {

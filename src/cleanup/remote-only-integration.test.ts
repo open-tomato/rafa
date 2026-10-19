@@ -32,6 +32,8 @@ import type { ScratchRepository } from './scratch-repository.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CapturedRun } from '../tests/cli-capture.js';
 
+import '../adapter-registry.js';
+
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { cleanupGroups, cleanupQuestion, createCleanupCommand } from '../commands/cleanup.js';

@@ -19,9 +19,11 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -440,6 +442,17 @@ describe('the drift report', () => {
     expect(drifted.stdout).toContain('warn: claim drift: #51 is ticked on #31 (line 2) but still labelled rafa:in-development (open)\n');
     expect(branched.stdout).not.toContain('claim drift');
     expect(branched.exitCode).toBe(0);
+  });
+
+  it('reads the claim branches under naming.branch, and the default template reads none of them', async () => {
+    const work = ['refs/heads/work/rafa-7-x'];
+
+    const templated = await run(['40'], plantCase('tracker:\n  default: local\nnaming:\n  branch: work/{stub}\n'), { listing: DRIFTED }, work);
+    const untemplated = await run(['40'], plantCase(), { listing: DRIFTED }, work);
+
+    expect(templated.exitCode).toBe(0);
+    expect(templated.stdout).not.toContain('claim drift: #7');
+    expect(untemplated.stdout).toContain('claim drift: #7 is labelled rafa:claimed (open)');
   });
 
   it('reads no branch when no issue carries a stage label, where a labelled board reads them', async () => {

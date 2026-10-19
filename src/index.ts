@@ -32,15 +32,15 @@
  *     selector, with what the workspace packages take from it: the
  *     sync wire codec, `mergeStore` and `TRUSTED_PERMISSIONS`.
  *   - The whole config, `config.ts` and `config-load.ts`:
- *     {@link loadConfig}, which reads the project's `.rafa/config.yaml`
- *     under a root and the user scope's under a home and ranks the
+ *     {@link loadConfig}, which reads the project's config under a root
+ *     and the user scope's under a home and ranks the
  *     command line over both, the pure {@link parseConfigText} and
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
  *     {@link ConfigError}, and the names and defaults every setting
  *     takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
- *     which walks up from a directory to the nearest one holding
- *     `.rafa/config.yaml`, or else to the main checkout of the
+ *     which walks up from a directory to the nearest one holding a
+ *     project config, or else to the main checkout of the
  *     repository holding it when that checkout holds one, and answers
  *     the project root with both scopes,
  *     the `ConfigRoots` {@link loadConfig} reads, or the `rafa init` hint
@@ -49,8 +49,11 @@
  *     reads.
  *   - The whole adapter registry, `core/adapters/registry.ts`:
  *     {@link createAdapterRegistry}, {@link CORE_ADAPTER_REGISTRY}, which
- *     holds core's own adapters keyed by port type and kind, and
- *     {@link PORT_VERSIONS}, the version core serves of each port.
+ *     answers the adapters registered on it keyed by port type and kind,
+ *     core's own once this entry is imported, {@link PORT_VERSIONS}, the
+ *     version core serves of each port, and {@link registerAdapters},
+ *     {@link restoreAdapters} and {@link activeAdapterRegistry}, which
+ *     register on, put back and read the registry it answers.
  *   - The whole manifest module, `modules/manifest.ts`:
  *     {@link validateManifest}, which reads the `rafa` manifest of a
  *     module's `package.json` and names every failure, with the schema's
@@ -64,17 +67,31 @@
  * re-exports, and `index.test.ts` holds each value identical to its
  * module's own.
  *
+ * ## The registries load first
+ *
+ * Neither `config-registry.ts` nor `adapter-registry.ts` registers
+ * anything as it is imported. Once its imports have loaded, the entry
+ * calls {@link registerCoreConfigSections}, which hands the fourteen
+ * sections of the config schema to core, so every setting is
+ * registered before a caller of this entry loads or reads a config,
+ * then {@link registerCoreAdapters}, which hands core's adapters to the
+ * adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers every core
+ * kind before a caller resolves one. A call is what survives a bundler
+ * that drops an import kept for its effect alone. The entry exports
+ * both roots, {@link CONFIG_DEFAULTS} (the registry's own) and
+ * {@link CORE_ADAPTERS} too; a second call of either registers nothing.
+ *
  * ## Why the commands carry a `Command` suffix
  *
  * A command is the terminal's contract, not a library call. Each takes
  * the argument list the command line would get, then the root of the
  * project it acts on, which behind the terminal is the nearest directory
- * at or above the working directory holding `.rafa/config.yaml`, and
+ * at or above the working directory holding a project config, and
  * prints what the command prints. Each writes through the active output
- * (`src/core/output/active.ts`), the `text` adapter on
+ * (`packages/rafa/src/core/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
  * `process.exit`: a refusal throws `CommandExit`
- * (`src/core/command/command.ts`)
+ * (`packages/rafa/src/core/command/command.ts`)
  * with the refusal as its message, which the command leaves to its caller
  * to print. `planCommand` also throws it with the exit code a `claude`
  * planner's rejection carries, and `startCommand` with exit code 0 once
@@ -114,14 +131,17 @@
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
+import { registerCoreAdapters } from './adapter-registry.js';
+import { registerCoreConfigSections } from './config-registry.js';
+
 export type {
   Adapter,
   AdapterContext,
   AdapterRegistry,
   AnyAdapter,
   PortImplementations,
-} from './core/adapters/index.js';
-export type { ConfigRoots } from './core/config/load.js';
+} from '@open-tomato/rafa/core/adapters';
+export type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -138,7 +158,7 @@ export type {
   PrerequisiteScope,
   RafaConfig,
   ResolvedConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
 export type {
   BoardRelationshipMode,
   ClaudeSettingSource,
@@ -150,7 +170,7 @@ export type {
   ReleaseEnabled,
   StoreBackend,
   SyncStrategy,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 export type {
   AppendResult,
   CommitEffortRow,
@@ -176,7 +196,7 @@ export type {
   WirePayload,
   WireRow,
   WireValue,
-} from './effort/store/index.js';
+} from '@open-tomato/rafa/store';
 export type {
   AdapterProvision,
   CommandsProvision,
@@ -252,10 +272,18 @@ export type {
   ScopeSeams,
 } from './project/scope.js';
 
-export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
-export { loadConfig, readConfigFile } from './core/config/load.js';
 export {
-  CONFIG_DEFAULTS,
+  activeAdapterRegistry,
+  CORE_ADAPTER_REGISTRY,
+  createAdapterRegistry,
+  PORT_VERSIONS,
+  registerAdapters,
+  restoreAdapters,
+} from '@open-tomato/rafa/core/adapters';
+export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
+export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
+export {
   CONFIG_FILE,
   ConfigError,
   configFilePath,
@@ -263,7 +291,7 @@ export {
   parseConfigText,
   PREREQUISITE_KINDS,
   resolveConfig,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
 export {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -275,7 +303,7 @@ export {
   RELEASE_AUTO,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 export { default as effortCollectCommand } from './effort/collect.js';
 export { default as effortReportCommand } from './effort/report.js';
 export {
@@ -293,7 +321,7 @@ export {
   WIRE_VERSION,
   WireExportRefusal,
   WireFormatError,
-} from './effort/store/index.js';
+} from '@open-tomato/rafa/store';
 export {
   FEATURE_TYPES,
   MANIFEST_VERSION,
@@ -334,3 +362,6 @@ export {
   selfAndAncestors,
 } from './project/scope.js';
 export { default as startCommand } from './start.js';
+
+registerCoreConfigSections();
+registerCoreAdapters();

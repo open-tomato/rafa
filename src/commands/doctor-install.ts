@@ -13,15 +13,16 @@
  * a null, never a failure, and none changes the exit code.
  */
 import type { PreviousCopiesReading } from './doctor-previous.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 
-import { loadConfig } from '../core/config/load.js';
-import { messageOf } from '../core/config/sections.js';
-import { readLegacyStore } from '../effort/store/legacy.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
+
 import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 
@@ -49,9 +50,9 @@ export interface InstallReadings {
  * the preflight loads it, with the warnings dropped so a person reads
  * each of them once: `resolvedConfig` writes them.
  */
-function readPreInit(project: InstallProject): PreInitDirsReading | null {
+async function readPreInit(project: InstallProject): Promise<PreInitDirsReading | null> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
     return readPreInitDirs(config);
   } catch {
     return null;
@@ -59,9 +60,9 @@ function readPreInit(project: InstallProject): PreInitDirsReading | null {
 }
 
 /** The previous-copy count under `specs.dir`; null for a config that could not be loaded or a `previous/` that could not be read. */
-function readPrevious(project: InstallProject): PreviousCopiesReading | null {
+async function readPrevious(project: InstallProject): Promise<PreviousCopiesReading | null> {
   try {
-    const { config } = loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
+    const { config } = await loadConfig({ root: project.root, home: project.home }, {}, () => undefined);
     return readPreviousCopies(project.root, config);
   } catch {
     return null;
@@ -69,10 +70,10 @@ function readPrevious(project: InstallProject): PreviousCopiesReading | null {
 }
 
 /** Every reading about the install; a store that cannot be checked is a warning, not a failure. */
-export function readInstall(context: Pick<RafaContext, 'env'>, project: InstallProject): InstallReadings {
+export async function readInstall(context: Pick<RafaContext, 'env'>, project: InstallProject): Promise<InstallReadings> {
   const binPath = readBinPath(context.env['PATH'], project.home);
-  const preInitDirs = readPreInit(project);
-  const previousCopies = readPrevious(project);
+  const preInitDirs = await readPreInit(project);
+  const previousCopies = await readPrevious(project);
   try {
     return { binPath, legacyStore: readLegacyStore(project.root), preInitDirs, previousCopies, storeProblem: null };
   } catch (error) {

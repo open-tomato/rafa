@@ -10,8 +10,8 @@ import { LIVE_PARITY_ENV, LIVE_PARITY_OFF_REASON } from './parity-fixture.js';
 const STAGE_TEST_FILES = [
   './src/tests/parity-lineage.test.ts',
   './src/tests/parity-differential.test.ts',
-  './src/core/plan/parse.test.ts',
-  './src/effort/store/migrations.test.ts',
+  './src/tests/core-coupled/core/plan/parse.test.ts',
+  './src/tests/core-coupled/effort/store/migrations.test.ts',
 ];
 
 const NESTED_RUN_TIMEOUT_MS = 120_000;

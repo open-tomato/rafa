@@ -133,9 +133,9 @@ import type { SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';
@@ -292,7 +292,7 @@ async function orEmpty<T>(read: () => Promise<T> | T, fallback: T): Promise<T> {
 }
 
 /** The seams {@link claimsOf} reads through. */
-export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'pullRequests'>;
+export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'branchTemplate' | 'pullRequests'>;
 
 /**
  * The listing as the issue reader the taken reading weighs a claim's
@@ -326,7 +326,7 @@ export async function claimsOf(issues: readonly BoardIssue[], seams: ClaimSeams)
   const names = await orEmpty(seams.planNames, []);
   const readings = createRoadmapReadings({
     issues: listingIssues(issues),
-    branches: scanClaimBranches(seams.git, seams.remote),
+    branches: scanClaimBranches(seams.git, seams.remote, seams.branchTemplate),
     pullRequests: seams.pullRequests,
   });
   const claimed = await Promise.all(issues.map(async ({ number }) => hasPlanFor(names, number)

@@ -8,7 +8,7 @@
  * `src/effort/collect-args.ts` and refuses any other, and the ones
  * declared here are those it reads.
  */
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import collect from '../../effort/collect.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';

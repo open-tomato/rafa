@@ -29,17 +29,21 @@
 import type { LineFlags } from './issue-tracker.js';
 import type { RoadmapListResult } from './list.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { Issue, IssueDraft } from '../../ports/index.js';
 import type { LiveReading } from '../../refs/stamp.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Issue, IssueDraft } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { createGithubTracker } from '../../adapters/tracker/github.js';
@@ -48,7 +52,6 @@ import { changedArgs, WATERMARK_ARGS } from '../../board/board-cache.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
-import { CommandExit } from '../../core/command/index.js';
 import { ABSENT, PRESENT, UNREADABLE, writeRefsBlock } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
@@ -806,6 +809,52 @@ describe('rafa issue list --roadmap', () => {
   });
 });
 
+/**
+ * A `git` whose remote holds #11's branch only as `work/rafa-11-x`,
+ * answering every other command with nothing, and keeping each command
+ * it was sent.
+ */
+function workBranchGit(): { git: GitRunner; sent: () => readonly string[] } {
+  let sent: readonly string[] = [];
+  return {
+    git: (args) => {
+      sent = [...sent, args.join(' ')];
+      return args[0] === 'ls-remote'
+        ? { ok: true, stdout: `${'f'.repeat(40)}\trefs/heads/work/rafa-11-x\n`, stderr: '' }
+        : { ok: true, stdout: '', stderr: '' };
+    },
+    sent: () => sent,
+  };
+}
+
+describe('rafa issue list --roadmap under the configured branch template', () => {
+  it('asks its git for the work/rafa-* glob under naming.branch: work/{stub}, and shows #11\'s branch', async () => {
+    const project = plantRoadmapCase(`${ROADMAP_CONFIG}naming:\n  branch: work/{stub}\n`);
+    const planted = workBranchGit();
+    const command = createIssueListCommand({ gh: plantedGh({}, []), git: planted.git, terminalWidth: () => undefined });
+
+    const outcome = await run(['issue', 'list', '--roadmap'], project, command);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.sent()).toContain('fetch --quiet --prune --no-tags origin +refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*');
+    expect(outcome.stdout).toContain('#11  open   code  🚀    -              branch  -     Ready spec');
+  });
+
+  it('asks no work/rafa-* glob and shows no branch for #11 with naming.branch left out, the control for the case above', async () => {
+    const project = plantRoadmapCase();
+    const planted = workBranchGit();
+    const command = createIssueListCommand({ gh: plantedGh({}, []), git: planted.git, terminalWidth: () => undefined });
+
+    const outcome = await run(['issue', 'list', '--roadmap'], project, command);
+
+    expect(outcome.exitCode).toBe(0);
+    // The scan read the same remote, so what follows is the template's doing alone.
+    expect(planted.sent()).toContain('ls-remote --heads origin');
+    expect(planted.sent().filter((sent) => sent.includes('work/rafa-*'))).toEqual([]);
+    expect(outcome.stdout).toContain('#11  open   code  🚀    -              -       -     Ready spec');
+  });
+});
+
 /** The Roadmap naming epics: a spec, the `now` epic, the `next` epic, a spec. */
 const EPIC_ROADMAP_BODY = [
   '## Next, in order',
@@ -1185,7 +1234,7 @@ describe('rafa issue list --roadmap --check', () => {
     expect(events.at(-1)).toEqual({
       type: 'result',
       ok: false,
-      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE },
+      error: { code: 'command_exit', message: ALPHA_DONE_FAILURE, cause: 'cli:command-exit', module: 'issue', action: 'list' },
       ts: expect.any(String),
     });
   });

@@ -25,7 +25,7 @@
  */
 import type { Key, NoTerminalOptions, Terminal } from './terminal.js';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { INTERRUPT_EXIT_CODE, processTerminal, rawSession, stdinKeys } from './terminal.js';
 

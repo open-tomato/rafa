@@ -46,6 +46,8 @@
  * rendered empty; with both absent the prompt is the one built before
  * sections existed. After them, when the run started on a red suite, goes
  * the `## Failures this run inherited` section (`start/inherited-notice.ts`).
+ * A task declared `docs=repair` is handed the doc task's section last,
+ * ahead of `PROMPT.md` (`start/doc-task.ts`).
  *
  * Two directories reach a dispatch, and are never confused. The PROJECT
  * ROOT, {@link TaskDispatchOptions.repoRoot}, holds `.rafa/`: the store
@@ -91,38 +93,40 @@
  * {@link TaskDispatch.halted} with no session spawned.
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
+import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { AdapterRegistry } from '../core/adapters/index.js';
-import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core/config/sections.js';
-import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
-import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { InjectionRequest, PlanInjection } from '../plan/index.js';
-import type { Learning } from '../ports/index.js';
-import type { TaskReportRecord } from '../report/record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
+import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { Learning } from '@open-tomato/rafa/ports';
+import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import { randomUUID } from 'crypto';
 
-import { runClaudeCaptured } from '../core/loop/index.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
-import { writeDispatch } from '../effort/store/dispatches.js';
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration, resolveDeclarationFlags , escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { describeTaskReportRecord, recordTaskReport } from '@open-tomato/rafa/report/record';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
-import { describeTaskReportRecord, recordTaskReport } from '../report/record.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { agentEffortLookup } from '../utils/agent-definition.js';
-import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
-import { escapeBlockerText } from '../utils/tracker.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
+import { docTaskPrompt } from './doc-task.js';
 import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
@@ -316,6 +320,8 @@ export interface TaskDispatchOptions {
    * driving the `run` seam with no checkout of its own names.
    */
   guard?: DispatchGuard | null;
+  /** Where a `docs=repair` task reads its section (`start/doc-task.ts`). None when left out. */
+  docTask?: DocTaskPlace | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -627,7 +633,7 @@ export async function dispatchTask(
 
   const prompt = withStamp(buildTaskPrompt(
     taskText,
-    options.promptContent,
+    docTaskPrompt(options.promptContent, { ...options, declaration, place: options.docTask }),
     injection.text,
     options.knownMissing,
     taskInfo.blocker ?? null,

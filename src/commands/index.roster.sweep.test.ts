@@ -1,7 +1,16 @@
 /**
  * The roster's identity: each module `src/commands/index.ts` imports by
- * name default-exports the very object the roster holds, and `rafa
- * describe` lists the command names it listed at `origin/stretch/102`.
+ * name default-exports the very object `CORE_COMMANDS` holds, each
+ * feature and each feature subject it imports by name is the one
+ * `BUNDLED_FEATURES` and `ROSTER_SUBJECTS` hold, and `rafa describe`
+ * lists the subjects of `ROSTER_SUBJECTS` in its order and the command
+ * names it listed at `origin/stretch/102`, with `docs plan` registered
+ * since after `bug codes`, `config show` since after `config set`,
+ * `release list` since after `release tag`, `release publish` since
+ * between those two, `release workflows` since between `release
+ * publish` and `release list` and `release fragment` since between
+ * `release workflows` and `release list`, and `bug recheck` since after
+ * `bug codes`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -12,15 +21,16 @@ import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { expectExit } from '../tests/cli-capture.js';
 import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 
-import { CORE_COMMANDS } from './index.js';
+import { BUNDLED_FEATURES, CORE_COMMANDS, ROSTER_SUBJECTS } from './index.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
 const DEFAULT_IMPORT = /^import (\w+) from '(\.\/[^']+)\.js';$/gm;
+const NAMED_IMPORT = /^import \{ (\w+) \} from '(\.\/[^']+\/(?:declarations|index))\.js';$/gm;
 
-/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`: `<subject> <action>`, then top-level names. */
+/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list`, `release publish`, `release workflows`, `release fragment` and `bug recheck` added: `<subject> <action>`, then top-level names. */
 const BASE_NAMES: readonly string[] = [
   'plan create',
   'plan list',
@@ -84,6 +94,10 @@ const BASE_NAMES: readonly string[] = [
   'release status',
   'release settle',
   'release tag',
+  'release publish',
+  'release workflows',
+  'release fragment',
+  'release list',
   'board list',
   'board sync',
   'epic show',
@@ -104,11 +118,14 @@ const BASE_NAMES: readonly string[] = [
   'update next',
   'update latest',
   'config set',
+  'config show',
   'ci status',
   'stretch start',
   'stretch item',
   'stretch end',
   'bug codes',
+  'bug recheck',
+  'docs plan',
   'status',
   'next',
   'roadmap',
@@ -142,7 +159,7 @@ describe('the commands roster', () => {
     const modules = await Promise.all(imports.map(async ({ path }) => (await import(`${path}.js`)).default as unknown));
 
     // Assert
-    expect(imports.length).toBeGreaterThan(90);
+    expect(imports.length).toBeGreaterThan(60);
     modules.forEach((exported, position) => {
       expect(CORE_COMMANDS.includes(exported as (typeof CORE_COMMANDS)[number]), imports[position]?.path).toBe(true);
     });
@@ -150,15 +167,33 @@ describe('the commands roster', () => {
     expect(CORE_COMMANDS.length).toBe(modules.length);
   });
 
-  it('lists through `rafa describe` the same command names as at origin/stretch/102', () => {
+  it('holds, for each feature and feature subject it imports by name, the object BUNDLED_FEATURES or ROSTER_SUBJECTS holds', async () => {
+    // Arrange
+    const source = readFileSync(resolve(HERE, 'index.ts'), 'utf8');
+    const imports = [...source.matchAll(NAMED_IMPORT)].map((match) => ({ local: match[1] ?? '', path: match[2] ?? '' }));
+    const held: readonly unknown[] = [...BUNDLED_FEATURES, ...ROSTER_SUBJECTS];
+
+    // Act
+    const values = await Promise.all(imports.map(async ({ local, path }) => (await import(`${path}.js`) as Record<string, unknown>)[local]));
+
+    // Assert
+    expect(imports.map(({ local }) => local).filter((local) => local.endsWith('_FEATURE'))).toHaveLength(BUNDLED_FEATURES.length);
+    expect(imports.map(({ local }) => local).filter((local) => local.endsWith('_SUBJECT'))).toHaveLength(6);
+    values.forEach((value, position) => {
+      expect(held.includes(value), imports[position]?.local).toBe(true);
+    });
+  });
+
+  it('lists through `rafa describe` the same command names as at origin/stretch/102, docs plan, config show, release list, release publish, release workflows, release fragment and bug recheck added', () => {
     // Arrange
     const spawned = Bun.spawnSync(['bun', 'src/rafa.ts', 'describe'], { cwd: REPO_ROOT, stderr: 'pipe' });
 
     // Act
-    const names = readNames(JSON.parse(spawned.stdout.toString()) as DescribeDocument);
+    const document = JSON.parse(spawned.stdout.toString()) as DescribeDocument;
 
     // Assert
     expectExit({ exitCode: spawned.exitCode, stdout: spawned.stdout.toString(), stderr: spawned.stderr.toString() }, 0);
-    expect(names).toEqual([...BASE_NAMES]);
+    expect(document.subjects.map((subject) => subject.name)).toEqual(ROSTER_SUBJECTS.map((subject) => subject.name));
+    expect(readNames(document)).toEqual([...BASE_NAMES]);
   });
 });

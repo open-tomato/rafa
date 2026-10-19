@@ -50,6 +50,16 @@
  *     adapter's, so ids are compared sorted. An adapter run with
  *     `readsOpenIssues: false` is held to leaving the reading out
  *     instead, by one case in place of the four.
+ *   - `filedIssues`: rafa's own optional reading, which the source
+ *     lacks, with two cases of its own. A bug moved to `done` after the
+ *     cut-off is answered, in any state, with its title, body and a
+ *     `createdAt` at or after the cut-off, beside a spike filed after it
+ *     and a bug filed before it, which a listing of bugs leaves out; and
+ *     a cut-off after every issue answers none. The first waits past a
+ *     second boundary between the earlier bug and the cut-off, since a
+ *     GitHub issue is dated to the second. Like `openIssues`, an adapter
+ *     run with `readsFiledIssues: false` is held to leaving the reading
+ *     out instead, by one case in place of the two.
  *   - `editable` and `edit`: rafa's own optional pair, which the source
  *     lacks, with five cases of their own. `editable` answers a created
  *     issue's title, body and open state, with labels and an author
@@ -86,7 +96,7 @@ import type {
   IssueType,
   Tracker,
   TrackerKind,
-} from '../../ports/index.js';
+} from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -114,6 +124,8 @@ export interface TrackerContractOptions {
   readonly unknownExternalId?: string;
   /** Whether the adapter implements the optional `openIssues` reading. True when left out. */
   readonly readsOpenIssues?: boolean;
+  /** Whether the adapter implements the optional `filedIssues` reading. True when left out. */
+  readonly readsFiledIssues?: boolean;
   /**
    * Whether the adapter implements the optional `editable` and `edit`
    * pair. False when left out, so an adapter declares the pair it edits
@@ -176,6 +188,70 @@ async function openIssueRows(tracker: Tracker, type: IssueType): Promise<OpenIss
 /** True when `value` is a string `Date.parse` reads as a time, which a null or absent `createdAt` is not. */
 function parsesAsTime(value: unknown): boolean {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+/** The `filedIssues` reading of a tracker. Throws when the tracker has none. */
+function filedIssuesOf(tracker: Tracker): NonNullable<Tracker['filedIssues']> {
+  if (tracker.filedIssues === undefined) throw new Error(`the ${tracker.kind} tracker has no filedIssues reading`);
+  return tracker.filedIssues;
+}
+
+/** Longer than the second a GitHub issue is dated to, so a later cut-off falls after an earlier issue. */
+const SECOND_BOUNDARY_WAIT_MS = 1100;
+
+/** A day, the distance of a cut-off no issue just created is filed after. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The cases of the optional `filedIssues` reading, or the one case holding it left out. */
+function filedIssuesCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
+  const { create } = options;
+  if (options.readsFiledIssues === false) {
+    return [
+      {
+        name: 'leaves out the filedIssues reading it is run without',
+        run: async () => {
+          const tracker = await create();
+
+          expect(tracker.filedIssues).toBeUndefined();
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'filedIssues answers a bug moved to done after the cut-off, leaving out a spike and an earlier bug',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        await tracker.create(draftFixture({ opt: 0, title: 'Filed before', body: 'Early.\n' }));
+        await new Promise((resolve) => setTimeout(resolve, SECOND_BOUNDARY_WAIT_MS));
+        const cutOff = new Date(Math.floor(Date.now() / 1000) * 1000);
+        const closed = await tracker.create(draftFixture({ opt: 0, title: 'Filed then fixed', body: 'Late.\n' }));
+        const spike = await tracker.create(draftFixture({ opt: 0, type: 'spike', title: 'Try passkeys', body: 'Idea.\n' }));
+        await tracker.transition(closed, 'done');
+
+        const bugs = await filedIssuesOf(tracker)('bug', cutOff);
+        const spikes = await filedIssuesOf(tracker)('spike', cutOff);
+
+        expect(bugs.every((issue) => issue.ref.kind === tracker.kind)).toBe(true);
+        expect(bugs.map((issue) => [issue.ref.externalId, issue.title, issue.body]))
+          .toEqual([[closed.externalId, 'Filed then fixed', 'Late.\n']]);
+        expect(bugs.filter((issue) => !(Date.parse(issue.createdAt) >= cutOff.getTime())).map((issue) => issue.title)).toEqual([]);
+        expect(spikes.map((issue) => [issue.ref.externalId, issue.title])).toEqual([[spike.externalId, 'Try passkeys']]);
+      },
+    },
+    {
+      name: 'filedIssues answers nothing for a cut-off after every issue was filed',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        await tracker.create(draftFixture({ opt: 0 }));
+
+        expect(await filedIssuesOf(tracker)('bug', new Date(Date.now() + DAY_MS))).toEqual([]);
+      },
+    },
+  ];
 }
 
 /** The cases of the optional `openIssues` reading, or the one case holding it left out. */
@@ -676,6 +752,7 @@ export function trackerContractCases(options: TrackerContractOptions): readonly 
       },
     },
     ...openIssuesCases(options),
+    ...filedIssuesCases(options),
     ...editCases(options),
   ];
 }

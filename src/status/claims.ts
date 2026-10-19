@@ -6,11 +6,15 @@
  *
  * ## What is read, and what is not
  *
- * The claim branches are the `refs/remotes/origin/feat/rafa-*` refs AS
- * LAST FETCHED: {@link readClaimBranches} lists them with one
- * `for-each-ref` and reads each with `readClaimBranch`
- * (`src/claims/git.ts`), which reads the remote-tracking ref and runs
- * no fetch. `rafa status` fetches nothing, so this is a local reading,
+ * The claim branches are the `naming.branch` template's
+ * `refs/remotes/origin/<claimBranchGlob>` refs AS LAST FETCHED,
+ * `refs/remotes/origin/feat/rafa-*` under the default `feat/{stub}`:
+ * {@link readClaimBranches} lists them with one `for-each-ref`, keeps
+ * the ones `claimBranchIssue` reads an issue off under the same
+ * template, and reads each with `readClaimBranch` (`src/claims/git.ts`),
+ * which reads the remote-tracking ref and runs no fetch. Only the
+ * template given is read: under `work/{stub}`, `feat/rafa-7-x` is no
+ * claim, and under the default `work/rafa-7-x` is none either. `rafa status` fetches nothing, so this is a local reading,
  * read with the branch and the loops before any `gh` is spawned. What
  * moves those refs is the claim commands, `plan create`'s and
  * `loop start`'s claim pushes, and the fetch a refused wrap-up push runs
@@ -49,18 +53,20 @@
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimOwnership, ClaimStateName } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
-import { claimBranchIssue, readClaimBranch } from '../claims/git.js';
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+
+import { claimBranchGlob, claimBranchIssue, readClaimBranch } from '../claims/git.js';
 import { STAGE_LABELS } from '../claims/labels.js';
 import { readClaimState } from '../claims/stale.js';
 import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, REMOTE } from '../start/branch-decision.js';
+import { REMOTE } from '../start/branch-decision.js';
 
 /** One claim branch as `rafa status` shows it; see the module note's table. */
 export interface ClaimRow {
-  /** The branch, `feat/rafa-<n>-<slug>`. */
+  /** The branch: the template with the stub, `feat/rafa-<n>-<slug>` by default. */
   readonly branch: string;
   /** The issue the branch claims. */
   readonly issue: number;
@@ -88,8 +94,14 @@ export interface ClaimsReading {
   readonly notes: readonly string[];
 }
 
-/** A claim branch found carrying at least one ownership commit. */
-export type FoundClaim = Extract<ClaimBranchReading, { readonly state: 'found' }> & { readonly ownership: ClaimOwnership };
+/**
+ * A claim branch found carrying at least one ownership commit, with the
+ * issue read off its name under the template it was listed under.
+ */
+export type FoundClaim = Extract<ClaimBranchReading, { readonly state: 'found' }> & {
+  readonly ownership: ClaimOwnership;
+  readonly issue: number;
+};
 
 /** What {@link readClaimBranches} read: the claim branches, and the ones it could not. */
 export interface ClaimBranches {
@@ -113,30 +125,33 @@ export interface ClaimsInput {
 }
 
 /**
- * Every claim branch on the remote as last fetched, read with no fetch;
- * see the module note. Throws, with what git said, when the remote
- * branches cannot be listed.
+ * Every claim branch under `template` on the remote as last fetched,
+ * read with no fetch; see the module note. `template` is the
+ * `naming.branch` template, `config.namingBranch`, the default
+ * `feat/{stub}` when left out. Throws, with what git said, when the
+ * remote branches cannot be listed.
  */
-export function readClaimBranches(git: GitRunner): ClaimBranches {
-  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${BRANCH_PREFIX}`]);
+export function readClaimBranches(git: GitRunner, template: string = DEFAULT_BRANCH_TEMPLATE): ClaimBranches {
+  const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${claimBranchGlob(template)}`]);
   if (!listed.ok) throw new Error(`the ${REMOTE} branches could not be listed: ${gitSaid(listed)}`);
   const branches = listed.stdout
     .split('\n')
     .map((line) => line.trim())
-    .filter((name) => name !== '' && claimBranchIssue(name) !== null)
+    .filter((name) => name !== '' && claimBranchIssue(name, template) !== null)
     .sort();
   let found: readonly FoundClaim[] = [];
   let notes: readonly string[] = [];
   for (const branch of branches) {
-    const reading = readClaimBranch(git, branch);
+    const reading = readClaimBranch(git, branch, template);
     if (reading.state === 'unreadable') notes = [...notes, `the claim on ${branch} could not be read: ${reading.reason}`];
-    if (isClaim(reading)) found = [...found, reading];
+    const issue = claimBranchIssue(branch, template);
+    if (isClaim(reading) && issue !== null) found = [...found, { ...reading, issue }];
   }
   return { found, notes };
 }
 
 /** True for a branch found carrying an ownership commit: a claim, held or released. */
-function isClaim(reading: ClaimBranchReading): reading is FoundClaim {
+function isClaim(reading: ClaimBranchReading): reading is Omit<FoundClaim, 'issue'> {
   return reading.state === 'found' && reading.ownership.state !== 'none';
 }
 
@@ -153,8 +168,7 @@ function labelsOf(labels: ClaimLabels, issue: number): readonly string[] | null 
 
 /** One row for `reading`, weighed under `input`; see the module note. */
 function rowOf(reading: FoundClaim, input: ClaimsInput): ClaimRow {
-  const { ownership, tipCommittedAt, branch } = reading;
-  const issue = claimBranchIssue(branch) ?? 0;
+  const { ownership, tipCommittedAt, branch, issue } = reading;
   const labels = labelsOf(input.labels, issue);
   const state = readClaimState({ ownership, tipCommittedAt, labels: labels ?? [], staleAfter: input.staleAfter, now: input.now });
   const elapsed = input.now.getTime() - tipCommittedAt.getTime();

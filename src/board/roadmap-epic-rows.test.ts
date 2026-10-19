@@ -25,7 +25,7 @@ import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -36,6 +36,7 @@ import { completeSpecBody } from '../tests/spec-bodies.js';
 import { renderCancelledEpicNotice } from './epic-cancel-notice.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import {
+  claimsOf,
   FALLBACK_HORIZON,
   groupByHorizon,
   hasEpicLines,
@@ -421,6 +422,36 @@ describe('readRoadmapEpicRows weighs a branch through the roadmap taken reading'
     await betaState(git.run);
 
     expect(git.calls()).toEqual(['for-each-ref', 'ls-remote', 'fetch', 'rev-parse', 'log', 'log']);
+  });
+});
+
+/** A git whose only claim branch is #201's under `work/{stub}`, held in this checkout. */
+const workBranchGit: GitRunner = (args) => args[0] === 'for-each-ref'
+  ? { ok: true, stdout: 'refs/heads/main\nrefs/heads/work/rafa-201-x\n', stderr: '' }
+  : { ok: true, stdout: '', stderr: '' };
+
+describe('readRoadmapEpicRows under the configured branch template', () => {
+  it('reads an epic whose open member\'s only branch is work/rafa-201-x as in-progress under work/{stub}', async () => {
+    const { options } = planted(MIXED, { git: workBranchGit, branchTemplate: 'work/{stub}' });
+    const read = await readRoadmapEpicRows({ ...options, today: TODAY });
+
+    expect(read.groups[0]?.rows[1]?.epic.number).toBe(200);
+    expect(read.groups[0]?.rows[1]?.epic.state).toBe('in-progress');
+  });
+
+  it('reads the same epic as backlog with the template left out, the control for the case above', async () => {
+    const { options } = planted(MIXED, { git: workBranchGit });
+    const read = await readRoadmapEpicRows({ ...options, today: TODAY });
+
+    expect(read.groups[0]?.rows[1]?.epic.number).toBe(200);
+    expect(read.groups[0]?.rows[1]?.epic.state).toBe('backlog');
+  });
+
+  it('counts #201 claimed through claimsOf\'s own seams under work/{stub}, and not with the template left out', async () => {
+    const seams = { git: workBranchGit, planNames: () => [], pullRequests: () => Promise.resolve([]) };
+
+    expect([...await claimsOf(BOARD, { ...seams, branchTemplate: 'work/{stub}' })]).toEqual([201]);
+    expect([...await claimsOf(BOARD, seams)]).toEqual([]);
   });
 });
 

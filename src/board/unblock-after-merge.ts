@@ -28,7 +28,7 @@
  * unblocks nothing, and {@link unblockAfterMerge} answers null for it
  * BEFORE the board is asked anything. A merge that DOES close an issue
  * costs one `gh issue list` for the open `spec:blocked` issues, and
- * the state listing and the label write only where one of them names
+ * the state reading and the label write only where one of them names
  * a closed issue. A repository that keeps no blocked issue therefore
  * pays one listing answering `[]` and prints nothing at all — an
  * empty reading is silence here, where in `rafa issue unblock` it is
@@ -41,8 +41,9 @@
  * `runUnblock`'s `naming`: an issue whose line names none of them was
  * not touched by this merge and is nobody's business here. Whether
  * each named blocker is actually closed is still the BOARD's answer
- * and not this module's — the state listing `runUnblock` sends is what
- * decides, so an issue also blocked by something still open keeps its
+ * and not this module's — the state listing `runUnblock` sends, and
+ * the view of each blocker a full listing did not hold, are what
+ * decide, so an issue also blocked by something still open keeps its
  * label with that blocker named, exactly as `rafa issue unblock` reads
  * it.
  *
@@ -78,7 +79,7 @@
 import type { UnblockAsk, UnblockReport } from './unblock.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { closedIssuesIn } from './roadmap.js';
 import { isUnblockFailure, runUnblock } from './unblock.js';

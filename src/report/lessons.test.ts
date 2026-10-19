@@ -15,14 +15,16 @@
  * confidence (1).
  */
 import type { LessonContext } from './lessons.js';
-import type { TaskReportRecord } from './record.js';
 import type { DescribedInstinctRecord } from '../adapters/learning/local.js';
+import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
 
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { recordTaskReport } from '@open-tomato/rafa/report/record';
 
 import { createLocalLearning } from '../adapters/learning/local.js';
 import { actionHash } from '../learning/index.js';
@@ -35,7 +37,6 @@ import {
   lessonId,
   reportLessons,
 } from './lessons.js';
-import { recordTaskReport } from './record.js';
 
 const roots: string[] = [];
 

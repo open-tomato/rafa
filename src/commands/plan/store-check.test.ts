@@ -8,7 +8,7 @@
  * read the plan cannot pass for one that read it and found nothing. The
  * files a refusal moves are read off disk, at both ends of the move.
  */
-import type { GeneratedPlan } from '../../ports/index.js';
+import type { GeneratedPlan } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,7 +16,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { checkStoreRules, enforceStoreRules } from './store-check.js';

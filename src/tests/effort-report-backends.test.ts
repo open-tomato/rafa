@@ -28,6 +28,8 @@ import type { CollectOptions } from '../effort/collect.js';
 import type { CommitLogOptions, CommitLogParseResult } from '../effort/commits.js';
 import type { EffortReport } from '../effort/report.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -206,7 +208,7 @@ describe('buildReport over a real collect, per backend', () => {
   ] as const)('answers both planted rows under store: %s', async (backend) => {
     const { root, home } = await collectPlantedSessions(backend);
 
-    const report = buildReport({ home, repoRoot: root });
+    const report = await buildReport({ home, repoRoot: root });
 
     expect(report.rowsRead).toBe(SESSIONS.length);
     expect(report.totals.sessions).toBe(SESSIONS.length);
@@ -238,7 +240,7 @@ function runReportJson(root: string, home: string): CommandRun {
 describe('a spawned effort report over the SQLite store a collect wrote', () => {
   it('reads the same two rows buildReport reads in-process', async () => {
     const { root, home } = await collectPlantedSessions('sqlite');
-    const inProcess = buildReport({ home, repoRoot: root });
+    const inProcess = await buildReport({ home, repoRoot: root });
 
     const run = runReportJson(root, home);
 

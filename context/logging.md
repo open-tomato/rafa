@@ -15,7 +15,8 @@ It sits beside `Output`, and the two never share a job.
 
 ### The port
 
-`src/ports/index.ts` declares it:
+`packages/rafa/src/ports/index.ts` declares it, and re-exports its `LogLevel`
+from the leaf `packages/rafa/src/ports/log-level.ts`:
 
 - `log(entry)` writes a `LogEntry`: `level`, `message`, and optionally
   `module`, `action`, `code` (a cause code, `context/error-codes.md`),
@@ -26,8 +27,8 @@ It sits beside `Output`, and the two never share a job.
 - `enabled(level, module)` says whether an entry would be written.
 
 `logger` is the seventh port type of the adapter registry
-(`src/core/adapters/registry.ts`), at version 1, and core registers
-`logger/console`.
+(`packages/rafa/src/core/adapters/registry.ts`), at version 1, and the
+composition root `src/adapter-registry.ts` registers `logger/console`.
 
 ### Which entries are written
 
@@ -259,10 +260,11 @@ never ends the run it reports on.
 
 A module can provide a logger adapter in its manifest, as it provides a
 tracker (`rafa.provides.logger` with a `kind` and an `entry`). Its kind is
-registered when the module loads. It is not selected yet: the registry a
-module fills reaches no reader today, for any port, and the dispatcher
-resolves through `CORE_ADAPTER_REGISTRY`. `context/cli.md` says the same
-of every port.
+registered when the module loads, and `src/rafa.ts` makes the registry
+it was registered on the active one before it dispatches
+(`activateModuleAdapters`, `src/modules/activate.ts`). The dispatcher's
+resolver reads `CORE_ADAPTER_REGISTRY`, so a `logger.kind` naming the
+module's kind selects it. `context/cli.md` says the same of every port.
 
 ### The contract
 

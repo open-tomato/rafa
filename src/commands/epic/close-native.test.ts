@@ -23,7 +23,9 @@
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardSubIssuesSummary } from '../../board/roadmap-board.js';
-import type { CapturingSpawner } from '../../core/loop/index.js';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +33,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { createNativeRelations } from '../../board/relations/native.js';
 import { nativeBoardListFields } from '../../board/roadmap-board.js';
-import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import { createEpicCloseCommand, EPIC_CLOSE_REFUSAL_EXIT, readEpicToClose } from './close.js';

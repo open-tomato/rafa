@@ -42,8 +42,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { assumptionsHeading } from '../board/review-stamp.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { verifyRelease } from '../release/verify.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -666,6 +667,24 @@ describe('finishRelease on the run\'s head branch', () => {
     expect(finish.body?.number).toBe(PR);
     expect(provider.asked).toEqual([BRANCH]);
     expect(provider.edits).toEqual([`#${PR}: Closes #21\n\n${SKIP_SENTENCE}`]);
+  });
+});
+
+describe('prepareReleaseStage over a real checkout', () => {
+  it('writes a fragment with no package line', () => {
+    setActiveOutput(sinkOutput({}));
+    const dir = checkoutOnBase();
+    writeFileSync(join(dir, 'package.json'), '{"version":"1.0.0"}\n');
+    writeFileSync(join(dir, 'CHANGELOG.md'), '# Changelog\n');
+    gitIn(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+
+    const result = prepareReleaseStage({ ...STAGE_INPUT, repoRoot: dir });
+
+    expect(result?.kind).toBe('prepared');
+    const written = textAt(join(dir, '.changes', `${PLAN_ID}.md`));
+    expect(written).not.toBeNull();
+    expect(written).toContain('level: ');
+    expect(written).not.toContain('package');
   });
 });
 

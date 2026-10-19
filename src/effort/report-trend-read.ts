@@ -19,16 +19,16 @@ import type { TrendOptions, TrendReport, TrendSessionRow } from './report-trend.
 
 import { homedir } from 'node:os';
 
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+import { readSessionAgents } from '@open-tomato/rafa/store/dispatches';
+import { readReportedSkills } from '@open-tomato/rafa/store/reports';
 
 import { formatTrendReport } from './report-trend-format.js';
 import { summariseTrend } from './report-trend.js';
-import { readSessionAgents } from './store/dispatches.js';
-import { selectEffortStore } from './store/index.js';
-import { readReportedSkills } from './store/reports.js';
 
 /** Where the trend report reads from. */
 export interface TrendReadOptions {
@@ -52,8 +52,8 @@ export interface TrendInputs {
  * Throws a `ConfigError`, having read no row, when a config file under
  * the repo root or the home is one the loop cannot run on.
  */
-export function readTrendInputs(repoRoot: string, home: string): TrendInputs {
-  const { config } = loadConfig({ root: repoRoot, home });
+export async function readTrendInputs(repoRoot: string, home: string): Promise<TrendInputs> {
+  const { config } = await loadConfig({ root: repoRoot, home });
   return {
     rows: selectEffortStore(repoRoot, config).read('sessions'),
     outcomes: new Map(readReportedSkills(repoRoot).map((report) => [report.sessionId, report.outcome])),
@@ -70,8 +70,8 @@ export function trendReportOf(inputs: TrendInputs, options: TrendOptions): Trend
  * The trend report over the store under the repo root. Throws as
  * {@link readTrendInputs} throws.
  */
-export function readTrendReport({ repoRoot, home, options }: TrendReadOptions): TrendReport {
-  return trendReportOf(readTrendInputs(repoRoot, home), options);
+export async function readTrendReport({ repoRoot, home, options }: TrendReadOptions): Promise<TrendReport> {
+  return trendReportOf(await readTrendInputs(repoRoot, home), options);
 }
 
 /**
@@ -81,10 +81,10 @@ export function readTrendReport({ repoRoot, home, options }: TrendReadOptions): 
  * run on is refused with exit code 1, one line per problem, as the
  * session report refuses it.
  */
-export function writeTrendReport(options: TrendOptions, json: boolean, repoRoot: string): void {
+export async function writeTrendReport(options: TrendOptions, json: boolean, repoRoot: string): Promise<void> {
   let built: TrendReport;
   try {
-    built = readTrendReport({ repoRoot, home: homedir(), options });
+    built = await readTrendReport({ repoRoot, home: homedir(), options });
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, error.problems.map((problem) => `rafa effort report: ${problem}`).join('\n'));

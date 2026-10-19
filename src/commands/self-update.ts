@@ -106,17 +106,18 @@
  * Whether a record's pid is alive is its `isAlive`, `isPidAlive` when left
  * out, so a case plants a live loop without a process of its own.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { BuildLines } from '../runtime/install.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 
-import { CommandExit } from '../core/command/index.js';
-import { SETTINGS } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { messageOf } from '../core/config/sections.js';
-import { isPidAlive } from '../core/loop/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { isPidAlive } from '@open-tomato/rafa/core/loop';
+
+import { SETTINGS } from '../config-registry.js';
 import { readBinPath } from '../project/bin-path.js';
 import { exitCodeFor, installRuntime, outcomeProblem, runBuild } from '../runtime/install.js';
 import { liveLoopsOf } from '../runtime/live-loops.js';
@@ -179,19 +180,19 @@ export function liveLoopRefusalLines(loops: readonly SessionRecord[]): string[] 
 }
 
 /** Runs `read`, answering what it throws as a could-not-run exit naming `stage`. */
-function orCouldNotRun<T>(stage: string, read: () => T): T {
+async function orCouldNotRun<T>(stage: string, read: () => T | Promise<T>): Promise<T> {
   try {
-    return read();
+    return await read();
   } catch (error) {
     throw new CommandExit(2, `FAIL — ${stage}: ${messageOf(error)}\nnothing was built, copied or linked.`);
   }
 }
 
 /** Refuses while a loop of the project is live, unless the config lets it through; see the module note. */
-function refuseDuringLiveLoop(project: ProjectFound, isAlive: PidProbe): void {
-  const loops = orCouldNotRun('loops', () => liveLoopsOf(project.root, isAlive));
+async function refuseDuringLiveLoop(project: ProjectFound, isAlive: PidProbe): Promise<void> {
+  const loops = await orCouldNotRun('loops', () => liveLoopsOf(project.root, isAlive));
   if (loops.length === 0) return;
-  const config = orCouldNotRun('config', () => loadConfig({ root: project.root, home: project.home }, {}, () => {}).config);
+  const config = await orCouldNotRun('config', async () => (await loadConfig({ root: project.root, home: project.home }, {}, () => {})).config);
   if (config.dangerousSelfUpdateDuringLoop) return;
   throw new CommandExit(1, liveLoopRefusalLines(loops).join('\n'));
 }
@@ -206,10 +207,10 @@ async function runSelfUpdate(context: RafaContext, seams: SelfUpdateSeams): Prom
   const force = readForceFlag(context.flags['force']);
   const project = projectOf(context);
   const isAlive = seams.isAlive ?? isPidAlive;
-  refuseDuringLiveLoop(project, isAlive);
+  await refuseDuringLiveLoop(project, isAlive);
   const info = (line: string): void => context.output.info(line);
   const warn = (line: string): void => context.output.warn(line);
-  const outcome = installRuntime({
+  const outcome = await installRuntime({
     repoRoot: project.root,
     home: project.home,
     build: (repoRoot) => seams.build(repoRoot, { info, warn }),

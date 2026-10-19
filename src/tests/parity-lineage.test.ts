@@ -120,7 +120,7 @@ import type { ParityFixturePaths } from './parity-fixture.js';
 import type {
   CommitEffortRow,
   SessionEffortRow,
-} from '../effort/store/types.js';
+} from '@open-tomato/rafa/store/types';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -128,9 +128,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { openNdjsonStore } from '@open-tomato/rafa/store';
+import { readStoreRows } from '@open-tomato/rafa/store/ndjson-files';
+
 import { collectEffort } from '../effort/collect.js';
-import { openNdjsonStore } from '../effort/store/index.js';
-import { readStoreRows } from '../effort/store.js';
 
 import { resolveLiveParity } from './parity-fixture.js';
 

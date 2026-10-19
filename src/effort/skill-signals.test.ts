@@ -12,7 +12,7 @@
  */
 import type { SkillFact, SkillFactEntry } from './skill-facts.js';
 import type { RecurrenceMatcher } from './skill-signals.js';
-import type { PlanCiRow } from './store/plan-ci.js';
+import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { describe, expect, it } from 'bun:test';
 

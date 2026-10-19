@@ -17,8 +17,10 @@
  * default probe, whose record names this test process's own pid.
  */
 import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
-import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
+import type { SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -328,6 +330,27 @@ describe('rafa self-update beside a live loop', () => {
     expect(run.exitCode).toBe(0);
     expect(builds).toEqual([project.root]);
     expect(readlinkSync(join(rafaBinOf(project), 'rafa'))).toBe(join(project.home, '.rafa', 'runtime', VERSION, 'cli.js'));
+  });
+
+  it('lets a scratch rafa.config.ts holding dangerous.selfUpdateDuringLoop past a live loop, printing the pass line, and refuses without the key', async () => {
+    const project = plantCheckout();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const builds: string[] = [];
+    const tsFile = join(project.root, 'rafa.config.ts');
+
+    // The same file without the key: refused, naming the loop's branch.
+    writeFile(tsFile, 'export default [{}];\n');
+    const refused = await selfUpdate(project, probedBuild(builds));
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain('loop on feature/a (pid 4242, session running)');
+    expect(builds).toEqual([]);
+
+    writeFile(tsFile, 'export default [{ dangerous: { selfUpdateDuringLoop: true } }];\n');
+    const run = await selfUpdate(project, probedBuild(builds));
+
+    expect(run.exitCode).toBe(0);
+    expect(builds).toEqual([project.root]);
+    expect(`${run.stdout}\n${run.stderr}`).toContain(`${DURING_LOOP_KEY}: true (${tsFile}, entry 0)`);
   });
 
   it('installs beside a tracker with a task left when no loop is live, warning once with the tracker named', async () => {

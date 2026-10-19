@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Workspace packages: core subpaths mapped to source, see context/source.md",
-  "extends": "./tsconfig.base.json",
+  "display": "Workspace packages and the root: core's subpaths mapped to packages/rafa/src, see context/source.md",
+  "extends": "@open-tomato/rafa-typescript-config/base",
   "compilerOptions": {
     "lib": ["ES2022"],
     "module": "ESNext",
@@ -12,8 +12,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "paths": {
-      "@open-tomato/rafa/store": ["./src/effort/store/index.ts"],
-      "@open-tomato/rafa/ports": ["./src/ports/index.ts"]
+      "@open-tomato/rafa/store": ["./packages/rafa/src/effort/store/index.ts"],
+      "@open-tomato/rafa/ports": ["./packages/rafa/src/ports/index.ts"],
+      "@open-tomato/rafa/store/*": ["./packages/rafa/src/effort/store/*"],
+      "@open-tomato/rafa/*": ["./packages/rafa/src/*"]
     }
   }
 }

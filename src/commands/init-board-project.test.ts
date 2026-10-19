@@ -35,11 +35,15 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeFactsIssue } from '../board/project/facts-fake.js';
 import type { FakeProjectField, FakeProjectGh } from '../board/project/project-fake.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { parseConfigText } from '@open-tomato/rafa/core/config';
 
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
@@ -49,7 +53,6 @@ import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } fr
 import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
 import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { callNumber } from '../board/project/retry.js';
-import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';

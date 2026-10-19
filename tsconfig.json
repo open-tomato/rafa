@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Umbrella root (src + scripts + root files)",
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.packages.json",
   "compilerOptions": {
     "lib": ["ES2022"],
     "module": "ESNext",

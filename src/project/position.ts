@@ -42,22 +42,22 @@
  * answers a position whose previous is home too. {@link positionAt} is the
  * position a first switch starts from.
  */
+import type { Place } from '@open-tomato/rafa/core/loop/hops';
+
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { asPlace, isRecord } from '@open-tomato/rafa/core/loop/hops';
 
 import { scopeAt } from './scope.js';
 
+export type { Place };
+export { asPlace };
+
 /** The position's file name, under the project's `.rafa/`. */
 export const POSITION_FILE = 'position.json';
-
-/** A (board, epic) pair of issue numbers; `epic` is null on a board with no epic chosen. */
-export interface Place {
-  readonly board: number;
-  readonly epic: number | null;
-}
 
 /** The place triple the file holds; see the module note. */
 export interface Position {
@@ -78,23 +78,6 @@ export type PositionReading =
 /** `<root>/.rafa/position.json`. */
 export function positionFilePath(root: string): string {
   return join(scopeAt(root).dir, POSITION_FILE);
-}
-
-/** True for a plain object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** True for an issue number: a positive integer. */
-function isIssueNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
-}
-
-/** `value` as a place, or null when it is not one; the hop record reads its places through it. */
-export function asPlace(value: unknown): Place | null {
-  if (!isRecord(value) || !isIssueNumber(value.board)) return null;
-  if (value.epic !== null && !isIssueNumber(value.epic)) return null;
-  return { board: value.board, epic: value.epic };
 }
 
 /** `value` as a position, or null when it is not one. */

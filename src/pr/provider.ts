@@ -31,7 +31,7 @@
  * `https://github.com/o/r.git`, `git@github.com:o/r`,
  * `ssh://git@ssh.github.com:443/o/r` and `git://github.com/o/r` all
  * read as GitHub, a port on the host included. The host is taken from
- * `normalizeRemote` (`src/schema/project-id.ts`), which already strips
+ * `normalizeRemote` (`packages/rafa/src/schema/project-id.ts`), which already strips
  * the scheme, any embedded credentials, the scp-style colon and a
  * trailing `.git`, so there is one parser for a remote URL in this
  * repository rather than two that can disagree. It leaves a port on the
@@ -65,10 +65,10 @@
  * twice for every action. A reading of `gh` means the operator asked for
  * the GitHub CLI, not that the CLI answered.
  */
-import type { PrProvider } from '../core/config/sections.js';
+import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 
-import { CommandExit } from '../core/command/index.js';
-import { gitRemoteUrl, normalizeRemote } from '../schema/project-id.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { gitRemoteUrl, normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 
 /** The host a GitHub remote names; its subdomains carry it as a suffix. */
 const GITHUB_HOST = 'github.com';

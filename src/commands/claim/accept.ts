@@ -14,10 +14,13 @@
  *
  * The line first: exactly one argument, the issue number
  * (`readIssueArgument`). Then this device's store id with the ids that
- * store replaced (`readClaimDevice`), then one fetch of the
- * `feat/rafa-*` branches and every remote branch of the issue, as
- * `rafa claim release` reads them (`./release.ts`). No network means no
- * acceptance.
+ * store replaced (`readClaimDevice`), then one fetch of the claim
+ * branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`): each is the project's
+ * `naming.branch` template with the stub, `feat/rafa-<n>-<slug>` by default
+ * and `work/rafa-<n>-<slug>` under `work/{stub}`. Only the configured
+ * template is read, and the accept commit is pushed under it. No network
+ * means no acceptance.
  *
  * ## Which handover it accepts
  *
@@ -83,15 +86,18 @@
 import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { holdsClaim } from '../../claims/device.js';
 import { parseClaimMessage } from '../../claims/record.js';
-import { CommandExit } from '../../core/command/index.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
+import { CLAIM_ACCEPT_DECLARATION } from './declarations.js';
 import { pushOnClaimTip, readClaimDevice, readIssueArgument, readIssueBranches } from './release.js';
 
 /** The usage line a refusal names. */
@@ -215,15 +221,16 @@ function findOffer(readings: readonly ClaimBranchReading[], issue: number, devic
 }
 
 /** Accepts the handover of the issue the line names to this device; see the module note. */
-export function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): ClaimAcceptResult {
+export async function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): Promise<ClaimAcceptResult> {
   const issue = readIssueArgument(context.args, USAGE);
   const project = requireProject(context, COMMAND);
-  const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
+  const config = await resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
-  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse), issue, device);
-  const sha = pushOnClaimTip(seams.git, reading, { action: 'accept', issue, store: storeId }, refuse, ACCEPTING);
+  const template = seams.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
+  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse, template), issue, device);
+  const sha = pushOnClaimTip(seams.git, reading, { action: 'accept', issue, store: storeId }, refuse, ACCEPTING, template);
   return { issue, branch: reading.branch, storeId, from, handSha, sha };
 }
 
@@ -233,44 +240,18 @@ export function renderAccept(result: ClaimAcceptResult): string {
     + ` accept commit ${result.sha} pushed to ${REMOTE}; this device (store ${result.storeId}) now owns the claim.`;
 }
 
-/** The default seams: the ones `loop start`'s claim check reads through. */
-const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => createStartPreflightClaim(root, config);
+/** The default seams: the ones `loop start`'s claim check reads through, with the project's `naming.branch` template. */
+const DEFAULT_SEAMS: ClaimSeamsFactory = (root, config) => ({
+  ...createStartPreflightClaim(root, config),
+  branchTemplate: config.namingBranch,
+});
 
 /** The command, reaching git and the store through `makeSeams`; see the module note. */
 export function createClaimAcceptCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'claim accept',
-    subject: 'claim',
-    action: 'accept',
-    summary: 'take up a handover of an issue\'s claim offered to this device',
-    description: 'Pushes one accept commit naming this device\'s store to the issue\'s claim branch on'
-      + ' origin, leased on the tip it read, so this device owns the claim from then on and no other'
-      + ' device\'s push is overwritten. Refused when no handover pending on the branch names this'
-      + ' device\'s store, when the handover was withdrawn or replaced, when the branch moved meanwhile,'
-      + ' and when origin cannot be reached. No label and no local branch moves. With `--output=json`'
-      + ' the issue, the branch, the stores and the commits are the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number whose handover this device accepts.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa claim accept 324',
-        note: 'Accepts the handover of #324 offered to this device\'s store; this device owns the claim from then on.',
-      },
-      {
-        cmd: 'rafa claim accept 324 --output=json',
-        note: 'Writes a start event, then a result event whose data holds the branch and the accept commit.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...CLAIM_ACCEPT_DECLARATION,
     run: async (context) => {
-      const result = acceptClaim(context, makeSeams);
+      const result = await acceptClaim(context, makeSeams);
       if (context.outputMode === 'json') {
         context.output.result(result);
       } else {

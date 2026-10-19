@@ -77,7 +77,7 @@
 import type { Choice } from './select.js';
 import type { Key, NoTerminalOptions, Terminal } from './terminal.js';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { DEFAULT_PAGE_SIZE, matchChoices, NO_MATCHES_TEXT } from './select.js';
 import { INTERRUPT_EXIT_CODE, processTerminal, rawSession, stdinKeys } from './terminal.js';

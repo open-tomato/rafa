@@ -44,7 +44,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../core/loop/index.js';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

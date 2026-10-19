@@ -24,7 +24,7 @@
  *     `rafa effort collect`.
  *   - `settingSources`: what the session loads settings from, the run's
  *     resolved `loop.settingSources`. There is no default, for the reason
- *     `src/core/loop/claude.ts` gives.
+ *     `packages/rafa/src/core/loop/claude.ts` gives.
  *   - `buildPrompt`: the session's prompt for one spec and stub, with
  *     the plans directory it is to name the files in, which is `planDir`
  *     resolved absolute against the root. See "Paths" below.
@@ -145,16 +145,20 @@
  * `rafa loop start --plan=` takes them against the root.
  */
 import type { SpecReviewReading } from '../../board/spec-review.js';
-import type { ClaudeSettingSource } from '../../core/config/sections.js';
-import type { CapturingSpawner } from '../../core/loop/index.js';
-import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
+import type { PlanPromptBuilder } from '@open-tomato/rafa/core/adapters';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { GeneratedPlan, Planner, PlanRequest } from '@open-tomato/rafa/ports';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
+import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+
 import { parseSpecReview } from '../../board/spec-review.js';
-import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
+
+export type { PlanPromptBuilder } from '@open-tomato/rafa/core/adapters';
 
 /** The exit code of a rejection no session exit code stands behind. */
 const FAILURE_EXIT_CODE = 1;
@@ -167,13 +171,6 @@ const FAILURE_EXIT_CODE = 1;
 export function planFilePath(planDir: string, fileName: string): string {
   return posix.join(planDir, fileName);
 }
-
-/**
- * Builds one session's prompt from the spec's content, the plan's stub
- * and `planDir`, the plans directory as an absolute path: the files the
- * prompt tells the session to write are named in it.
- */
-export type PlanPromptBuilder = (specContent: string, stub: string, planDir: string) => string;
 
 /** What {@link createClaudePlanner} makes a planner with. */
 export interface ClaudePlannerOptions {

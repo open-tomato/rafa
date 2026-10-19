@@ -7,7 +7,7 @@
  * `packages/shared/issue-tracker/src/resolve.ts` at commit
  * `47abf440a9748aa6cec1c64bf91b210c5444bbab` (2026-07-28). The copy is
  * retyped against rafa's `Tracker` port and makes each adapter through
- * `src/core/adapters/registry.ts`.
+ * `packages/rafa/src/core/adapters/registry.ts`.
  *
  * ## Never silent
  *
@@ -100,12 +100,13 @@
  *     {@link ResolveTrackerOptions}. The resolution and its attempts are
  *     frozen, as the trackers are.
  */
-import type { AdapterContext, AdapterRegistry } from '../../core/adapters/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { PreflightResult, Tracker, TrackerKind } from '../../ports/index.js';
+import type { AdapterContext, AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PreflightResult, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { activeLogger } from '../logger/active.js';
 
 /** What every report and refusal opens with. */

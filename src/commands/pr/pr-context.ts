@@ -90,19 +90,20 @@
  * request, and a provider call that rejected.
  */
 import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import { execFileSync } from 'node:child_process';
 
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { mergeGuardSettings } from '../../release/guard-merge.js';
 
@@ -135,7 +136,7 @@ export const PR_USAGE: Readonly<Record<PrAction, string>> = Object.freeze({
   view: 'rafa pr view [<n>]',
   list: 'rafa pr list',
   merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]',
-  triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]',
+  triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]',
   wait: 'rafa pr wait [<n>] [--timeout=<minutes>]',
   open: 'rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>',
   retarget: 'rafa pr retarget <n> --base=<branch>',
@@ -279,9 +280,9 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** The `pr` settings as the config resolves for the project, refusing a config `loadConfig` refuses. */
-function prConfig(project: ProjectFound, warn: (message: string) => void): PrConfig {
+async function prConfig(project: ProjectFound, warn: (message: string) => void): Promise<PrConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(
@@ -306,9 +307,9 @@ function gitBranch(root: string): string {
  * the config raises are written through the command's output. See the
  * module note for what it checks and what it leaves to preflight.
  */
-export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_SEAMS): PrContext {
+export async function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_SEAMS): Promise<PrContext> {
   const project = projectOf(context);
-  const config = prConfig(project, (message: string) => {
+  const config = await prConfig(project, (message: string) => {
     context.output.warn(message);
   });
   const reading = requireGhProvider(resolvePrProvider({

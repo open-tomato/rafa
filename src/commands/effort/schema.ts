@@ -2,7 +2,7 @@
  * `rafa effort schema [--check]`: what the project's SQLite effort store
  * holds, set against the migrations this rafa knows, and whether this
  * rafa would use it, read by `readSchemaReport`
- * (`src/effort/store/schema-report.ts`, whose note is the long form).
+ * (`packages/rafa/src/effort/store/schema-report.ts`, whose note is the long form).
  * Starts no Claude session and declares no `spends`.
  *
  * It opens the store read-only and migrates nothing, so a store with a
@@ -24,16 +24,17 @@
  * location refuses, and exit code 2 when the file cannot be read as a
  * store.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { SchemaReport, SchemaReportOptions } from '../../effort/store/schema-report.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SchemaReport, SchemaReportOptions } from '@open-tomato/rafa/store/schema-report';
 
 import { join } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { effortStoreDir } from '../../effort/store/location.js';
-import { gateMeaning, readSchemaReport } from '../../effort/store/schema-report.js';
-import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { effortStoreDir } from '@open-tomato/rafa/store/location';
+import { gateMeaning, readSchemaReport } from '@open-tomato/rafa/store/schema-report';
+import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
+
 import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

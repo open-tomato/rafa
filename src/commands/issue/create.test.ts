@@ -52,11 +52,15 @@ import type { LineFlags } from './issue-tracker.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
@@ -66,7 +70,6 @@ import { createGhProjectPort } from '../../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from '../../board/project/project-fake.js';
 import { notFoundWarning } from '../../board/project/refresh-warnings.js';
 import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
-import { CommandExit } from '../../core/command/index.js';
 import {
   dispatchInProject,
   eventsOf,

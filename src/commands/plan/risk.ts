@@ -46,19 +46,20 @@
  * the plan as its value, and the line is refused with exit code 1 rather
  * than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
 import type { AccountSeams } from '../../plan/risk/accounts.js';
 import type { RiskFinding, RiskReport } from '../../plan/risk.js';
 import type { ProjectFound } from '../../project/scope.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { isFile, plural } from '@open-tomato/rafa/core/plan';
+
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { CommandExit } from '../../core/command/index.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { isFile, plural } from '../../core/plan/index.js';
 import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 
@@ -190,7 +191,7 @@ export function createPlanRiskCommand(seams: PlanRiskSeams = {}): RafaCommand {
       const strict = readSwitch('strict', context.flags['strict'], STRICT_HINT);
       const typed = expectAtMostOneArgument(context.args, USAGE);
       const project = requireProject(context, COMMAND);
-      const config = resolveProjectConfig(project, COMMAND, (message) => {
+      const config = await resolveProjectConfig(project, COMMAND, (message) => {
         context.output.warn(message);
       });
       const path = riskPlanPath(project.root, config.planDir, typed);

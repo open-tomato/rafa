@@ -1,5 +1,5 @@
 /** `rafa update board`: a stub until #717; see `./stub.ts`. */
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { createUpdateStub } from './stub.js';
 

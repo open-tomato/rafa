@@ -6,7 +6,7 @@
 
 import type { AccountFinding, AccountSettings, AccountSubject } from './accounts.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 

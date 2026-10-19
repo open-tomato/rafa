@@ -160,6 +160,12 @@
  * sense the spec has, and the check comes before the worktree, the plan
  * and the counter alike.
  *
+ * The head's config module is trusted next, after the cross-repository
+ * refusal and before either path adds a worktree: `requireTrustedConfig`
+ * (`./triage-config-trust.ts`) refuses with exit 1 a `rafa.config.ts`
+ * or `rafa.config.mjs` that `origin/<base>` does not hold as the same
+ * blob, unless the line says `--allow-local-config`.
+ *
  * The bump bots are allowed because they are what `--resolve` is for: a
  * lockfile conflict on a dependabot branch is the class the pinned
  * plans were written against, and dependabot holds no write access for
@@ -177,7 +183,6 @@
 import type { ResolveLoopOutcome, ResolveLoopRunner } from './resolve-loop.js';
 import type { TriageReading } from './triage-report.js';
 import type { TriageTrust } from './triage-trust.js';
-import type { Output } from '../../ports/index.js';
 import type { GitRunner, PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { AttemptOutcome, AttemptReading } from '../../pr/triage/attempts.js';
 import type { TriageAssessment } from '../../pr/triage/classify.js';
@@ -185,9 +190,11 @@ import type { TriageBlock } from '../../pr/triage/comment.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 import type { SettleSettings } from '../../release/settle.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
 import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';
@@ -205,6 +212,7 @@ import {
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
+import { requireTrustedConfig } from './triage-config-trust.js';
 import { runVersionConversion } from './triage-convert.js';
 import { evidenceOf, workflowCountOf } from './triage-report.js';
 import { readTrustedTriageComment, requireTrustedResolveAuthor } from './triage-trust.js';
@@ -242,6 +250,8 @@ export interface ResolveRun {
   readonly number: number;
   /** The assessment this run acts on, as `./triage.ts` read it. */
   readonly reading: TriageReading;
+  /** `--allow-local-config`: a head config module the base lacks runs, with a warning. */
+  readonly allowLocalConfig: boolean;
   /** `--max-attempts`. */
   readonly maxAttempts: number;
   /** `pr.resolveBudget`, in US dollars, which every session is capped at. */
@@ -582,7 +592,8 @@ function attemptHeadline(run: ResolveRun, assessment: TriageAssessment, guard: A
  * caller renders the run's report and then ends with
  * {@link ResolveResult.exitCode}. It throws `CommandExit` only where no
  * run could be started at all: a cross-repository pull request (exit
- * {@link RESOLVE_REFUSE_EXIT}) and a worktree git refused (exit 1).
+ * {@link RESOLVE_REFUSE_EXIT}), a head config module the base does not
+ * hold (exit 1) and a worktree git refused (exit 1).
  */
 export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult> {
   const { reading } = run;
@@ -601,6 +612,14 @@ export async function resolvePullRequest(run: ResolveRun): Promise<ResolveResult
   }
   const refusal = crossRepositoryRefusal(detail);
   if (refusal !== null) throw new CommandExit(RESOLVE_REFUSE_EXIT, `❌ ${refusal}`);
+  requireTrustedConfig({
+    git: run.git(run.root),
+    number: run.number,
+    headRefName: detail.headRefName,
+    baseRefName: detail.baseRefName,
+    allowLocalConfig: run.allowLocalConfig,
+    output: run.output,
+  });
   if (converts(first)) return runConversion(run, detail);
 
   return runAttempts(run, detail, first);

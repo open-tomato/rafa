@@ -91,14 +91,15 @@ import type { AlternativeOffer } from '../../board/blocked-line.js';
 import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { RefreshOffer } from '../../board/snapshot-settle.js';
-import type { BoardRelationshipMode } from '../../core/config/sections.js';
+import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import fs from 'fs';
 import path from 'path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { resolvePlanSpec } from '../../board/plan-spec.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
-import { CommandExit } from '../../core/command/index.js';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 import { createPlanReadyOffer } from './ready-offer.js';
@@ -159,6 +160,8 @@ export interface SpecRouteOptions {
   readonly relationships?: BoardRelationshipMode;
   /** Issues a `--next` walk passes over, each with the branch whose claim was refused (`./claim-route.ts`). */
   readonly passOver?: ReadonlyMap<number, string>;
+  /** `naming.branch` as config resolved it, which a `--next` walk reads a claim branch under; the default, `feat/{stub}`, when left out. */
+  readonly branchTemplate?: string;
   /** The keys the project refresh reads, so the gate's and the offer's label swaps refresh the issue; none sent when left out. */
   readonly projectConfig?: RefreshConfig;
 }
@@ -224,6 +227,9 @@ export async function resolveCreateSpec(
     ...options.passOver === undefined
       ? {}
       : { passOver: options.passOver },
+    ...options.branchTemplate === undefined
+      ? {}
+      : { branchTemplate: options.branchTemplate },
     ...options.projectConfig === undefined
       ? {}
       : { projectConfig: options.projectConfig },

@@ -11,27 +11,30 @@
  * read off the module, so a module that renames a key or moves a
  * default fails rather than agreeing with itself.
  */
-import type { ConfigSetting } from './core/config/index.js';
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import {
   CONTINUE_CRITERIA_MODES,
   FORCE_WRAP_UP_MAX_NEW_FAILURES_MAX,
   FORCE_WRAP_UP_MAX_NEW_FAILURES_MIN,
   LOOP_CONTINUE_DEFAULTS,
+  LOOP_CONTINUE_SECTION,
   RETRIES_ON_CONTINUE_MAX,
   RETRIES_ON_CONTINUE_MIN,
 } from './config-schema-loop-continue.js';
-import {
-  CONFIG_DEFAULTS,
-  ConfigError,
-  parseConfigText,
-  resolveConfig,
-  SETTINGS,
-} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -253,5 +256,44 @@ describe('through a file', () => {
     const error = refusal(() => parseConfigText('loop:\n  continue:\n    criteriaMode: append\n', PATH));
 
     expect(error.message).toContain('loop.continue.criteriaMode is "append", expected one of: extend, replace');
+  });
+});
+
+describe('the section', () => {
+  it('is package loop-continue, defining its keys in this order with these defaults, with no check', () => {
+    expect(LOOP_CONTINUE_SECTION.package).toBe('loop-continue');
+    expect(Object.entries(LOOP_CONTINUE_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['loopRetriesOnContinue', 'loop.retriesOnContinue'],
+      ['loopContinueCriteria', 'loop.continue.criteria'],
+      ['loopContinueCriteriaMode', 'loop.continue.criteriaMode'],
+      ['loopForceWrapUpMaxNewFailures', 'loop.forceWrapUp.maxNewFailures'],
+    ]);
+    expect(LOOP_CONTINUE_SECTION.defaults).toEqual({
+      loopRetriesOnContinue: 1,
+      loopContinueCriteria: join('.rafa', 'continue-criteria.md'),
+      loopContinueCriteriaMode: 'extend',
+      loopForceWrapUpMaxNewFailures: false,
+    });
+    expect(LOOP_CONTINUE_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(LOOP_CONTINUE_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(LOOP_CONTINUE_SECTION)).toBe(true);
+    expect(Object.isFrozen(LOOP_CONTINUE_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(LOOP_CONTINUE_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [LOOP_CONTINUE_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['loop-continue']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(LOOP_CONTINUE_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(LOOP_CONTINUE_SECTION.settings).sort());
   });
 });

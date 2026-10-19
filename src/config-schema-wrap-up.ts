@@ -1,19 +1,25 @@
 /**
  * The `loop.wrapUp` section of the config schema: the one setting the
- * wrap-up reads when its session ends without an open pull request,
- * with its field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link WrapUpSettings}, and
- * its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after `loop.worktreeDir`, so the order settings are reported in holds
- * the `loop` section together.
+ * wrap-up reads when its session ends without an open pull request, with
+ * its field, its default, its spec and its reader.
+ * {@link WRAP_UP_SECTION} hands it to core as one `ConfigSection`,
+ * package `wrap-up`, and the `declare module` below adds
+ * {@link WrapUpSettings} to `RafaConfig`.
+ * {@link WrapUpShape} holds its part of the shared `loop` namespace,
+ * which `src/config/shape.ts` composes into `LoopShape` of `ConfigShape`,
+ * the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `loop.worktreeDir`, so the order
+ * settings are reported in holds the `loop` section together.
  *
  * The section has its own module, as `config-schema-release.ts` and
  * `config-schema-tests.ts` do, because `config-schema.ts` stood at 578
  * lines and `config-sections.ts` at 642, measured with `wc -l`, when
  * this key was added: the schema module's own note asks a new section
  * for a sibling, and the reader is a rule about a VALUE that only this
- * key reads, so it sits here beside it. Only `config-schema.ts` imports
- * this file; a caller reads the setting off the resolved `RafaConfig`.
+ * key reads, so it sits here beside it. `config-registry.ts` imports this
+ * file to spread it; a caller reads the setting off the resolved
+ * `RafaConfig`.
  *
  * ## The key
  *
@@ -42,10 +48,25 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
-import { refused } from './core/config/sections.js';
+import { refused } from '@open-tomato/rafa/core/config/sections';
+
+declare module '@open-tomato/rafa/core/config/config-schema' {
+  /** The `wrap-up` section's fields, added to core's. */
+  interface RafaConfig extends WrapUpSettings {}
+}
+
+/**
+ * `loop.wrapUp.retries`, the section's part of the shared `loop`
+ * namespace; `src/config/shape.ts` composes it into `LoopShape`.
+ */
+export interface WrapUpShape {
+  readonly wrapUp: {
+    readonly retries: WrapUpRetries;
+  };
+}
 
 /** The fewest retry sessions `loop.wrapUp.retries` accepts as a number. */
 export const WRAP_UP_RETRIES_MIN = 1;
@@ -95,3 +116,10 @@ export const WRAP_UP_SETTINGS: {
 } = {
   loopWrapUpRetries: { key: 'loop.wrapUp.retries', read: wrapUpRetries, cli: false },
 };
+
+/** The `wrap-up` section: `loop.wrapUp.retries`, with their defaults and no check. */
+export const WRAP_UP_SECTION: ConfigSection = Object.freeze({
+  package: 'wrap-up',
+  settings: Object.freeze(WRAP_UP_SETTINGS),
+  defaults: WRAP_UP_DEFAULTS,
+});

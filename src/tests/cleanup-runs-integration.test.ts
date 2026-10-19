@@ -12,16 +12,19 @@
 import type { CapturedRun } from './cli-capture.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { Prompter } from '../core/command/index.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { readSession, runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { createCleanupCommand } from '../commands/cleanup.js';
-import { readSession, runsDir, sessionFilePath } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { eventsFilePath } from '../start/loop-events.js';
 

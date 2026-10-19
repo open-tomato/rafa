@@ -37,13 +37,15 @@
  * reads is written under the case's own temporary directory, and each
  * loader case asserts the path it names resolves under that directory.
  */
+import '../config-registry.js';
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
 import {
   loadPlanPrerequisites,

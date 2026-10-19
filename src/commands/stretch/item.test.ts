@@ -13,13 +13,16 @@
 import type { LaunchedLoop, StretchItemSeams } from './item.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../core/loop/index.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+
 import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
@@ -132,7 +135,7 @@ function plant(options: CaseOptions = {}): Case {
       const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, number: Number(args[2]), state: 'OPEN' };
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
-    tracker: () => ({ openIssues: async () => Promise.resolve([]) }),
+    tracker: () => ({ openIssues: async () => Promise.resolve([]), filedIssues: async () => Promise.resolve([]) }),
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();

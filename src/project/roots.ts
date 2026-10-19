@@ -98,7 +98,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
-import { describeValue, messageOf } from '../core/config/sections.js';
+import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { DISK_FILE_SYSTEM, SCOPE_DIR, selfAndAncestors } from './scope.js';
 import { NOT_A_REPOSITORY } from './worktree-root.js';

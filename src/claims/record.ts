@@ -3,8 +3,9 @@
  * how its message is written and read back, and who holds the claim once
  * a branch's ownership commits are read in order.
  *
- * A claim lives in git, on the branch `feat/rafa-<n>-<slug>` the loop
- * already runs on. Every change of ownership is one empty commit on that
+ * A claim lives in git, on the branch the loop already runs on: the
+ * `naming.branch` template with the stub, `feat/rafa-<n>-<slug>` by
+ * default. Every change of ownership is one empty commit on that
  * branch, and its message is the whole record. Nothing here touches git:
  * making, reading and pushing those commits is `./git.ts`'s, and this
  * module only turns a record into a message and a list of messages into

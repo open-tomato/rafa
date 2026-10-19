@@ -106,16 +106,17 @@
  * the fetch, `rev-parse`, `merge-base`, `show`, `ls-tree`, `add` and
  * `commit`. The guard's own readings are `readGuard`'s, over `HEAD`.
  */
-import type { GitRunner } from '../../core/git/index.js';
-import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { GuardAnswer, GuardStamp } from '../../release/guard.js';
 import type { SettleSettings } from '../../release/settle.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { messageOf } from '../../core/config/sections.js';
-import { gitSaid } from '../../core/git/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+
 import { directoryPrefix } from '../../release/fragment-tree.js';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
@@ -335,7 +336,7 @@ function fragmentFor(
     : stampedNotes;
   const taken = commits.flatMap((commit) => fragmentNamesAt(git, commit, settings.releaseFragments));
   const fragmentPath = posix.join(directoryPrefix(settings.releaseFragments), allocateFragmentName(plan, taken));
-  return { plan, fragmentPath, fragmentText: serializeFragment({ plan, title, level, notes }) };
+  return { plan, fragmentPath, fragmentText: serializeFragment({ plan, title, level, package: null, notes }) };
 }
 
 /**

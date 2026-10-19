@@ -15,8 +15,10 @@
  * same project beside it, which merges with 0.
  */
 import type { MergeCommandSeams } from './merge.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,10 +27,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../core/loop/index.js';
-import { bringForward } from '../../effort/store/bring-forward.js';
-import { MOVE_TO_SQLITE } from '../../effort/store/merge-store.js';
-import { sqliteStorePath } from '../../effort/store/sqlite.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

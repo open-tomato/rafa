@@ -38,11 +38,12 @@
  * the {@link PrRetargetResult} is the data of the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { retargetedLine } from '../../start/pr-retarget.js';
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
+import { PR_RETARGET_DECLARATION } from './declarations.js';
 import { DEFAULT_PR_SEAMS, lineRefusal, onProvider, openPrContext, PR_USAGE, readPullArgument } from './pr-context.js';
 
 /** The usage line this action's refusals name. */
@@ -79,7 +80,7 @@ export function readRetargetLine(args: readonly string[], flags: LineFlags): PrR
 /** Retargets the pull request a line names, or answers that it is already on the base; see the module note. */
 export async function retargetPull(context: RafaContext, seams: PrSeams): Promise<PrRetargetResult> {
   const { number, base } = readRetargetLine(context.args, context.flags);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
 
   const pull = await onProvider(`read pull request #${String(number)}`, () => pr.pulls.get(number));
   if (pull === null) {
@@ -105,32 +106,7 @@ export function renderRetarget(result: PrRetargetResult): string {
 /** The command, reaching the provider through `seams`; see the module note. */
 export function createPrRetargetCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr retarget',
-    subject: 'pr',
-    action: 'retarget',
-    summary: 'move a pull request onto another base branch',
-    description: 'Moves the pull request `<n>` onto the branch `--base` and prints one line naming it and'
-      + ' both bases. A pull request already on that base is left alone: nothing is sent, a line says so,'
-      + ' and the exit code is 0. Exit code 1, with nothing sent, for a line naming no number or more than'
-      + ' one, a `--base` left out or blank, and a pull request the repository does not hold, and 1 for an'
-      + ' edit the provider refused. With `--output=json` the number, whether it was retargeted and the two'
-      + ' bases are the data of the terminal result event. Refuses with exit code 2 where `pr.provider` is'
-      + ' not `gh`. Starts no session.',
-    args: [{ name: 'n', description: 'The number of the pull request to retarget.', type: 'number', required: true }],
-    flags: [
-      { name: 'base', description: 'The branch to move the pull request onto.', type: 'string' },
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr retarget 41 --base=stretch/9',
-        note: 'Moves #41 onto stretch/9, or says it is already there.',
-      },
-      {
-        cmd: 'rafa pr retarget 41 --base=main --output=json',
-        note: 'Gives the number, whether it was retargeted and both bases as the terminal result.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_RETARGET_DECLARATION,
     run: async (context) => {
       const result = await retargetPull(context, seams);
       if (context.outputMode === 'json') {

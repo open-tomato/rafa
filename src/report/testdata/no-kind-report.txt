@@ -1,0 +1,21 @@
+Added the retry counter to the loop and its unit tests. Two things outside the task are listed under out_of_scope_bugs.
+
+```rafa:report
+status: done
+feedback: |
+  Added the retry counter and its tests. The scoped gates are green.
+findings: []
+skills_used: []
+blockers: []
+out_of_scope_bugs:
+  - what: "the stage step reads the retry count before the config is loaded"
+    artifact: "retries is undefined"
+    security: false
+  - what: "a plan path with a space is passed unquoted to the shell"
+    artifact: "No such file or directory"
+    security: true
+changes:
+  - level: patch
+    area: "loop"
+    summary: "a failed task is retried up to the configured count"
+```

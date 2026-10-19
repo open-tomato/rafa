@@ -34,7 +34,7 @@
  * and the two commands that reach it, while a false would read as an
  * answer nobody gave.
  *
- * The prompter is opened only to ask, through `rafa issue ready`'s own
+ * The prompter is opened only to ask, through the command contract's
  * {@link lazyPrompter}, and closed as soon as the question is answered —
  * the same pair the other offer opens, spelled once.
  *
@@ -45,11 +45,11 @@
  * drives a fake and none of them opens a terminal or waits on an answer.
  */
 import type { AlternativeOffer, AlternativeOfferRequest } from '../../board/blocked-line.js';
-import type { Prompter } from '../../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { alternativeQuestion } from '../../board/blocked-line.js';
-import { createLinePrompter } from '../../core/command/index.js';
-import { lazyPrompter } from '../issue/ready.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface BlockedOfferSeams {

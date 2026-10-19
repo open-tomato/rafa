@@ -60,7 +60,7 @@
  * first survived, and the whole-line case was written for it.
  */
 import type { TrackingFlags } from './gitignore.js';
-import type { Output } from '../ports/index.js';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -79,8 +79,8 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createTextOutput } from '../adapters/output/text.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {

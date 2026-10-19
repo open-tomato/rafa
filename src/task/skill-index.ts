@@ -45,8 +45,9 @@
 import type { InventoryState } from '../inventory/record.js';
 import type { Resolution, ServedItem, TierRow } from '../tiers/resolve.js';
 
+import { SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
+
 import { countCharacters } from '../schema/skill.js';
-import { SKILL_TIERS } from '../schema/tiers.js';
 
 /** Longest one index line may be, in codepoints. */
 export const LINE_LIMIT = 160;

@@ -9,14 +9,16 @@
  *
  * The line is one epic number, a whole number from 1, and `--reason`,
  * optional text for the epic's comment; anything else is refused with
- * exit code 1. The board listing is read once (`createGhBoardListing`);
- * one that cannot be read is refused with {@link EPIC_CANCEL_REFUSAL_EXIT}.
- * Off it, {@link readEpicToCancel} refuses with the same exit code an
- * issue not on the listing, one that is not `type:epic`, and an epic
- * closed as completed, since a finished epic is not cancelled. An epic
- * already closed as NOT PLANNED — by hand on GitHub, or by an earlier
- * cancel whose writes did not all land — is not refused: the close is
- * skipped and the questions are asked.
+ * exit code 1. The config is loaded once (`issueSubjectConfig`), for
+ * `naming.branch` alone; a config it refuses is refused with exit code 1.
+ * The board listing is read once (`createGhBoardListing`); one that cannot
+ * be read is refused with {@link EPIC_CANCEL_REFUSAL_EXIT}. Off it,
+ * {@link readEpicToCancel} refuses with the same exit code an issue not
+ * on the listing, one that is not `type:epic`, and an epic closed as
+ * completed, since a finished epic is not cancelled. An epic already
+ * closed as NOT PLANNED — by hand on GitHub, or by an earlier cancel whose
+ * writes did not all land — is not refused: the close is skipped and the
+ * questions are asked.
  *
  * The dependents are `readEpicDependents`'s (`src/board/epic-dependents.ts`):
  * every open issue outside the epic whose `Blocked by:` line names one of
@@ -54,9 +56,9 @@
  * stderr, {@link dependentQuestion}: `m` or `move`, `u` or `unblock`, `c`
  * or `cancel`, any case. Any other answer is told the three and asked
  * again. A move asks {@link targetQuestion} for the epic, and reads the
- * move with `readEpicMove` (`./move.ts`), so a target `epic move` would
- * refuse — not an open epic, its own epic — and the epic being cancelled
- * are said and the question is asked again. Every answer is taken BEFORE
+ * move with `readEpicMove` (`./move.ts`) under that branch template, so
+ * a target `epic move` would refuse — not an open epic, its own epic —
+ * and the epic being cancelled are said and the question is asked again. Every answer is taken BEFORE
  * any write, so an input that ends early changes nothing.
  *
  * With no terminal and at least one dependent, nothing changes: the list
@@ -120,8 +122,12 @@ import type { BoardRelations } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
@@ -140,12 +146,10 @@ import { createLabelsRelations, LABELS_READS } from '../../board/relations/label
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
+import { issueProject, issueSubjectConfig, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';
+import { EPIC_CANCEL_DECLARATION } from './declarations.js';
 import { cancelTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { applyEpicMove, readEpicMove } from './move.js';
 
@@ -367,6 +371,8 @@ export interface AskDependentsInput {
   readonly dependents: readonly EpicDependent[];
   readonly prompter: Prompter;
   readonly git: GitRunner;
+  /** The branch template a move answer's open work is read under, the project's `naming.branch`; `DEFAULT_BRANCH_TEMPLATE` when left out. */
+  readonly branchTemplate?: string;
   readonly pullRequests: OpenPullRequestLister;
 }
 
@@ -382,7 +388,8 @@ async function moveTo(input: AskDependentsInput, issue: number, answer: string):
   const to = Number(found[1]);
   if (to === input.epic) return `Epic ${ref(to)} is the epic being cancelled; name another.`;
   try {
-    return await readEpicMove({ issues: input.issues, issue, to, git: input.git, pullRequests: input.pullRequests });
+    const { issues, git, branchTemplate, pullRequests } = input;
+    return await readEpicMove({ issues, issue, to, git, branchTemplate, pullRequests });
   } catch (error) {
     return `Cannot move ${ref(issue)} to epic ${ref(to)}: ${plainMessage(error)}`;
   }
@@ -684,6 +691,7 @@ async function askAll(input: Omit<AskDependentsInput, 'prompter'>, seams: EpicCa
 export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): Promise<EpicCancelResult> {
   const line = readCancelLine(context);
   const project = issueProject(context);
+  const config = await issueSubjectConfig(project, (message) => print(context, warn(message)));
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const relations = seams.relations ?? LABELS_READS;
   const issues = await readListing(gh, relations);
@@ -700,7 +708,8 @@ export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): 
       return unchanged('unasked', target);
     }
     const git = seams.git ?? createGitRunner(project.root);
-    const answered = await askAll({ epic, issues, dependents: target.dependents, git, pullRequests: createGhOpenPullRequests({ gh }) }, seams);
+    const pullRequests = createGhOpenPullRequests({ gh });
+    const answered = await askAll({ epic, issues, dependents: target.dependents, git, branchTemplate: config.namingBranch, pullRequests }, seams);
     if (answered === null) {
       print(context, warn(endedCancelMessage(epic)));
       return unchanged('ended', target);
@@ -747,40 +756,7 @@ export async function runEpicCancel(context: RafaContext, seams: EpicCancelSeams
 /** The command, reaching `gh`, `git`, the clock and the terminal through `seams`; see the module note. */
 export function createEpicCancelCommand(seams: EpicCancelSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic cancel',
-    subject: 'epic',
-    action: 'cancel',
-    summary: 'cancel an epic, asking what becomes of each issue outside it that its open members block',
-    description: 'Lists every open issue outside the epic whose "Blocked by:" line names one of its open members,'
-      + ' and asks for each one: move it to another epic (the same move as rafa epic move), unblock it (an'
-      + ' "Updated" note below its body, spec:blocked taken off when nothing else it names is open, and a'
-      + ' comment), or cancel it (closed as not planned with a comment). Every answer is taken before any write.'
-      + ' Then the epic is closed as not planned with a comment naming what became of each issue; an epic closed'
-      + ' as not planned already is not closed again. With no terminal and an issue to ask about, the list is'
-      + ' printed and nothing changes. An issue that is not an epic, and an epic closed as completed, are refused'
-      + ' with exit code 2. With `--output=json` what each write did is the data of the terminal result event.',
-    args: [
-      {
-        name: 'n',
-        description: 'The epic\'s issue number.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: REASON_FLAG,
-        description: 'Why the epic is cancelled, written in its closing comment.',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic cancel 40 --reason="sign-in moved to the platform team"',
-        note: 'Asks about each issue #40\'s open members block, then closes #40 as not planned.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...EPIC_CANCEL_DECLARATION,
     run: (context) => runEpicCancel(context, seams),
   };
   return Object.freeze(command);

@@ -49,7 +49,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import {
   CONFIG_SETTINGS_LINES,
@@ -135,8 +137,9 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file });
 
     expect(resolved.config).toEqual(CONFIG_DEFAULTS);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file'))
-      .toEqual(VALUELESS.map((pair) => [...pair]));
+    const unanswered: (readonly [string, string])[] = Object.entries(resolved.sources)
+      .filter(([, source]) => source !== 'file');
+    expect(unanswered.sort()).toEqual([...VALUELESS].sort());
     expect(file.extras).toEqual([]);
   });
 
@@ -221,26 +224,27 @@ describe('the config files', () => {
       '# tests:',
       '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
       '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
+      '#   contract: ["**/*.contract.test.ts"]',
       '#   alwaysRun: ["src/**/*.sweep.test.ts"]',
       '#   retakeRedAlone: true',
     ]);
-    expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsAlwaysRun])
-      .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsAlwaysRun]);
+    expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsContract, resolved.config.testsAlwaysRun])
+      .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsContract, CONFIG_DEFAULTS.testsAlwaysRun]);
     expect(resolved.config.testsRetakeRedAlone).toBe(true);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
-      .toEqual(['file', 'file', 'file', 'file']);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsContract, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
+      .toEqual(['file', 'file', 'file', 'file', 'file']);
   });
 
   it('answers each tests setting from the default once its line is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration|alwaysRun|retakeRedAlone):/.test(line));
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration|contract|alwaysRun|retakeRedAlone):/.test(line));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 4);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
-      .toEqual(['default', 'default', 'default', 'default']);
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 5);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsContract, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
+      .toEqual(['default', 'default', 'default', 'default', 'default']);
   });
 
-  it('carries the triage section, threshold at 0.3 and candidates at 3, which resolve from the file once uncommented', () => {
+  it('carries the triage section, threshold at 0.3, candidates at 3 and the weights at 0.15, 0.05 and 0.1, which resolve from the file once uncommented', () => {
     const triage = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# triage:'),
       CONFIG_SETTINGS_LINES.indexOf('# release:'),
@@ -252,17 +256,36 @@ describe('the config files', () => {
       '#   similarity:',
       '#     threshold: 0.3',
       '#     candidates: 3',
+      '#     weights:',
+      '#       causeLeaf: 0.15',
+      '#       causeFamily: 0.05',
+      '#       boundary: 0.1',
     ]);
     expect([resolved.config.triageSimilarityThreshold, resolved.config.triageSimilarityCandidates]).toEqual([0.3, 3]);
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates]).toEqual(['file', 'file']);
+    expect([
+      resolved.config.triageSimilarityWeightsCauseLeaf,
+      resolved.config.triageSimilarityWeightsCauseFamily,
+      resolved.config.triageSimilarityWeightsBoundary,
+    ]).toEqual([0.15, 0.05, 0.1]);
+    expect([
+      resolved.sources.triageSimilarityWeightsCauseLeaf,
+      resolved.sources.triageSimilarityWeightsCauseFamily,
+      resolved.sources.triageSimilarityWeightsBoundary,
+    ]).toEqual(['file', 'file', 'file']);
   });
 
   it('answers each triage setting from the default once its line is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {5}(?:threshold|candidates):/.test(line));
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {5}(?:threshold|candidates):|^# {7}(?:causeLeaf|causeFamily|boundary):/.test(line));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 2);
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 5);
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates]).toEqual(['default', 'default']);
+    expect([
+      resolved.sources.triageSimilarityWeightsCauseLeaf,
+      resolved.sources.triageSimilarityWeightsCauseFamily,
+      resolved.sources.triageSimilarityWeightsBoundary,
+    ]).toEqual(['default', 'default', 'default']);
   });
 
   it('carries the loop section, worktreeDir at .rafa/worktrees, retries at false, the --continue keys at their defaults and wrapUp.retries at 1, which resolve from the file once uncommented', () => {
@@ -451,6 +474,32 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
     expect([resolved.config.taskSkills, resolved.config.taskLessons]).toEqual(['none', 'off']);
+  });
+
+  it('carries release.publish at manual right after publishCommand, which resolves from the file once uncommented', () => {
+    const at = CONFIG_SETTINGS_LINES.findIndex((line) => line.startsWith('#   publish:'));
+    const pair = CONFIG_SETTINGS_LINES.slice(at - 1, at + 1);
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', '# release:', ...pair].join('\n')), 'c.yaml') });
+
+    expect(at).toBeGreaterThan(CONFIG_SETTINGS_LINES.indexOf('# release:'));
+    expect(at).toBeLessThan(CONFIG_SETTINGS_LINES.indexOf('# errors:'));
+    expect(pair.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '#   publishCommand: npm publish',
+      '#   publish: manual',
+    ]);
+    expect(pair[1]).toContain('# manual | ci,');
+    expect(resolved.config.releasePublish).toBe('manual');
+    expect(resolved.sources.releasePublish).toBe('file');
+  });
+
+  it('answers release.publish from the file once its line is changed, and from the default once dropped, so the reading above can fail', () => {
+    const changed = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}publish:) manual/, '$1 ci'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   publish:'));
+    const resolve = (lines: readonly string[]) => resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(resolve(changed).config.releasePublish).toBe('ci');
+    expect(dropped).toHaveLength(CONFIG_SETTINGS_LINES.length - 1);
+    expect(resolve(dropped).sources.releasePublish).toBe('default');
   });
 
   it('opens each file with its own header and ends it with a line break', () => {

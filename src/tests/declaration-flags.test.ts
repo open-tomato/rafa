@@ -1,7 +1,7 @@
 /**
  * The declaration-to-flag mapping, every side of the priority rule.
  *
- * `utils/declaration.test.ts` beside the module drives the grammar and
+ * `core/plan/declaration.test.ts` beside the module drives the grammar and
  * hands this matrix here by name, keeping exactly one claim of its own:
  * a null declaration resolves to no flags at all. What is left is the
  * rule the grammar duplicates ON PURPOSE. An `agent` outranks `model`
@@ -52,7 +52,7 @@
  *
  * ## The mutation grid
  *
- * Twenty mutations of `utils/declaration.ts` were driven against this
+ * Twenty mutations of `core/plan/declaration.ts` were driven against this
  * file, each run TWICE with the failing case NAMES identical on both
  * passes, and the module restored byte-identical (sha256 checked) after
  * each. NINETEEN reddened at least one of the 14 cases here, and their
@@ -85,7 +85,7 @@
  *
  * The three cases under `a budget passes whatever routes the task` came
  * with the `budget` key, after that grid, so its counts are of the 14
- * cases before them. Three legs of `utils/declaration.ts` were driven on
+ * cases before them. Three legs of `core/plan/declaration.ts` were driven on
  * 2026-09-15 against this file and the three other declaration suites,
  * each restored sha256-identical, and each reddened a case here: the
  * budget dropped beside an agent (1), the budget emitted after the tools
@@ -95,14 +95,14 @@ import type {
   AgentEffortLookup,
   ResolvedFlags,
   TaskDeclaration,
-} from '../utils/declaration.js';
+} from '@open-tomato/rafa/core/plan';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
   parseTaskDeclaration,
   resolveDeclarationFlags,
-} from '../utils/declaration.js';
+} from '@open-tomato/rafa/core/plan';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

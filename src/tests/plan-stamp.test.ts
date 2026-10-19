@@ -1,5 +1,5 @@
 /**
- * Tests for the plan stamp (src/utils/plan-stamp.ts) and the
+ * Tests for the plan stamp (packages/rafa/src/core/plan/plan-stamp.ts) and the
  * attribution tier that reads it.
  *
  * The load-bearing case is `keeps every prompt shape classifiable`:
@@ -11,15 +11,16 @@
 
 import { describe, expect, it } from 'bun:test';
 
-import { resolveSessionPlan } from '../effort/attribution.js';
-import { classifyPromptContent } from '../effort/classify.js';
 import {
   isStampableStub,
   planStampLine,
   planStubFromPath,
   planStubFromPrompt,
   stampPrompt,
-} from '../utils/plan-stamp.js';
+} from '@open-tomato/rafa/core/plan';
+
+import { resolveSessionPlan } from '../effort/attribution.js';
+import { classifyPromptContent } from '../effort/classify.js';
 
 const STUB = 'q16a-compose-n8n';
 

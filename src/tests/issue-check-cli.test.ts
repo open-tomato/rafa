@@ -5,7 +5,7 @@
  * carries `kind`, `line`, `state` and `fingerprint`, and that `--stamp`
  * leaves a copy whose next check reads every reference `ok`.
  */
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

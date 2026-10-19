@@ -28,11 +28,13 @@
  *    would merge again and fail it.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { Fragment } from '../release/fragment.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+
+import '../adapter-registry.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -301,7 +303,7 @@ function plantProject(name: string, level: Fragment['level']): Planted {
   writeFileSync(join(root, '.rafa', 'config.yaml'), `pr:\n  base: ${BASE}\nroadmap:\n  issue: 31\n`, 'utf8');
   writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'other', version: '1.2.3' }));
   writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n');
-  const fragment = { plan: 'rafa-63', title: 'One command, the next step', level, notes: ['- next: a change'] };
+  const fragment = { plan: 'rafa-63', title: 'One command, the next step', level, package: null, notes: ['- next: a change'] };
   writeFileSync(join(root, '.changes', 'rafa-63.md'), serializeFragment(fragment));
   runGit(root, 'init', '--quiet', `--initial-branch=${BASE}`);
   runGit(root, 'add', '-A');

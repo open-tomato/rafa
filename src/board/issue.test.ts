@@ -156,8 +156,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createFakeGh } from '../adapters/tracker/github-fake.js';
-import { CommandExit } from '../core/command/index.js';
 import { blobFingerprint, readRefsBlock, REFS_BLOCK_OPEN, RefsBlockError, writeRefsBlock } from '../refs/stamp.js';
 
 import {

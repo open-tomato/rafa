@@ -40,23 +40,31 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
-} from '../core/config/index.js';
-import type { ConfigRoots } from '../core/config/load.js';
+} from '@open-tomato/rafa/core/config';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type {
   RouteTarget,
   TierPin,
-} from '../core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import {
+  ConfigError,
+  ConfigSectionError,
+  CORE_SECTION,
+  registerConfigSections,
+  restoreConfigSections,
+} from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
+
 import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { setActiveStoreSettings } from '../effort/store/settings.js';
+import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));
 let planted = 0;
@@ -110,15 +118,15 @@ function sink(): { lines: string[]; warn: (line: string) => void } {
 /** A warning sink that keeps nothing. */
 function quiet(): void {}
 
-/** The {@link ConfigError} `run` throws. Fails when it throws none. */
-function refusal(run: () => unknown): ConfigError {
+/** The {@link ConfigError} `run` rejects with. Fails when it settles otherwise. */
+async function refusal(run: () => Promise<unknown>): Promise<ConfigError> {
   try {
-    run();
+    await run();
   } catch (error) {
     if (error instanceof ConfigError) return error;
     throw error;
   }
-  throw new Error('expected a ConfigError, and nothing was thrown');
+  throw new Error('expected a ConfigError, and the load resolved');
 }
 
 /** Every setting name, read off {@link CONFIG_DEFAULTS}; see the module note. */
@@ -218,6 +226,10 @@ const PROJECT_TEXT = [
   '  similarity:',
   '    threshold: 0.6',
   '    candidates: 7',
+  '    weights:',
+  '      causeLeaf: 0.4',
+  '      causeFamily: 0.2',
+  '      boundary: 0.3',
   'release:',
   '  enabled: true',
   '  versionFile: project.json',
@@ -228,6 +240,8 @@ const PROJECT_TEXT = [
   '  settle: pr',
   '  tag: settle',
   '  publishCommand: pnpm publish',
+  '  publish: ci',
+  '  moveLock: true',
   'errors:',
   '  codes:',
   '    - code: deploy:missing-secret',
@@ -235,6 +249,10 @@ const PROJECT_TEXT = [
   '      hint: set the secret',
   '      level: error',
   '      since: v1',
+  'bugs:',
+  '  recheck:',
+  '    runs: 12',
+  '    timeoutSeconds: 900',
   'logger:',
   '  kind: winston',
   '  level: debug',
@@ -273,11 +291,21 @@ const PROJECT_TEXT = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'merge:',
+  '  duplicates: allow',
+  'naming:',
+  '  branch: "project/{stub}"',
   'tests:',
   '  fullSuiteTriggers: ["project/*.toml"]',
   '  integration: ["project/**/*.e2e.ts"]',
+  '  contract: ["project/**/*.pact.ts"]',
   '  alwaysRun: ["project/**/*.sweep.ts"]',
   '  retakeRedAlone: false',
+  'features:',
+  '  board: false',
+  '  pr: false',
+  '  run: false',
+  '  release: false',
   '',
 ].join('\n');
 
@@ -348,6 +376,9 @@ const PROJECT_VALUES: RafaConfig = {
   claimsAhead: 'allow',
   triageSimilarityThreshold: 0.6,
   triageSimilarityCandidates: 7,
+  triageSimilarityWeightsCauseLeaf: 0.4,
+  triageSimilarityWeightsCauseFamily: 0.2,
+  triageSimilarityWeightsBoundary: 0.3,
   releaseEnabled: true,
   releaseVersionFile: 'project.json',
   releaseChangelog: 'docs/PROJECT-CHANGES.md',
@@ -357,7 +388,11 @@ const PROJECT_VALUES: RafaConfig = {
   releaseSettle: 'pr',
   releaseTag: 'settle',
   releasePublishCommand: 'pnpm publish',
+  releasePublish: 'ci',
+  releaseMoveLock: true,
   errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+  bugsRecheckRuns: 12,
+  bugsRecheckTimeoutSeconds: 900,
   loggerKind: 'winston',
   loggerLevel: 'debug',
   loggerTheme: 'plain',
@@ -386,10 +421,17 @@ const PROJECT_VALUES: RafaConfig = {
   ]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  mergeDuplicates: 'allow',
+  namingBranch: 'project/{stub}',
   testsFullSuiteTriggers: ['project/*.toml'],
   testsIntegration: ['project/**/*.e2e.ts'],
+  testsContract: ['project/**/*.pact.ts'],
   testsAlwaysRun: ['project/**/*.sweep.ts'],
   testsRetakeRedAlone: false,
+  featuresBoard: false,
+  featuresPr: false,
+  featuresRun: false,
+  featuresRelease: false,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -471,6 +513,10 @@ const USER_TEXT = [
   '  similarity:',
   '    threshold: false',
   '    candidates: 1',
+  '    weights:',
+  '      causeLeaf: 0',
+  '      causeFamily: 1',
+  '      boundary: 0.5',
   'release:',
   '  enabled: false',
   '  versionFile: user.json',
@@ -481,6 +527,8 @@ const USER_TEXT = [
   '  settle: push',
   '  tag: manual',
   '  publishCommand: yarn npm publish',
+  '  publish: manual',
+  '  moveLock: false',
   'errors:',
   '  codes:',
   '    - code: deploy:health-timeout',
@@ -488,6 +536,10 @@ const USER_TEXT = [
   '      hint: read the service log',
   '      level: warn',
   '      since: v2',
+  'bugs:',
+  '  recheck:',
+  '    runs: 3',
+  '    timeoutSeconds: 60',
   'logger:',
   '  kind: pino',
   '  level: error',
@@ -521,11 +573,21 @@ const USER_TEXT = [
   'task:',
   '  skills: none',
   '  lessons: on',
+  'merge:',
+  '  duplicates: error',
+  'naming:',
+  '  branch: "user/{stub}"',
   'tests:',
   '  fullSuiteTriggers: []',
   '  integration: ["user/**/*.e2e.ts"]',
+  '  contract: ["user/**/*.pact.ts"]',
   '  alwaysRun: []',
   '  retakeRedAlone: true',
+  'features:',
+  '  board: true',
+  '  pr: true',
+  '  run: true',
+  '  release: true',
   '',
 ].join('\n');
 
@@ -586,6 +648,9 @@ const USER_VALUES: RafaConfig = {
   claimsAhead: 'off',
   triageSimilarityThreshold: false,
   triageSimilarityCandidates: 1,
+  triageSimilarityWeightsCauseLeaf: 0,
+  triageSimilarityWeightsCauseFamily: 1,
+  triageSimilarityWeightsBoundary: 0.5,
   releaseEnabled: false,
   releaseVersionFile: 'user.json',
   releaseChangelog: 'docs/USER-CHANGES.md',
@@ -595,7 +660,11 @@ const USER_VALUES: RafaConfig = {
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'yarn npm publish',
+  releasePublish: 'manual',
+  releaseMoveLock: false,
   errorsCodes: [{ code: 'deploy:health-timeout', description: 'a deploy health check times out', hint: 'read the service log', level: 'warn', since: 'v2' }],
+  bugsRecheckRuns: 3,
+  bugsRecheckTimeoutSeconds: 60,
   loggerKind: 'pino',
   loggerLevel: 'error',
   loggerTheme: 'plain',
@@ -620,10 +689,17 @@ const USER_VALUES: RafaConfig = {
   routing: new Map([...CONFIG_DEFAULTS.routing, ['review', 'typescript-reviewer']]),
   taskSkills: 'none',
   taskLessons: 'on',
+  mergeDuplicates: 'error',
+  namingBranch: 'user/{stub}',
   testsFullSuiteTriggers: [],
   testsIntegration: ['user/**/*.e2e.ts'],
+  testsContract: ['user/**/*.pact.ts'],
   testsAlwaysRun: [],
   testsRetakeRedAlone: true,
+  featuresBoard: true,
+  featuresPr: true,
+  featuresRun: true,
+  featuresRelease: true,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -640,9 +716,9 @@ const CLI_OVERRIDES: ConfigOverrides = {
 };
 
 describe('loadConfig across the whole schema', () => {
-  it('lets the project file outrank the user file, setting by setting', () => {
+  it('lets the project file outrank the user file, setting by setting', async () => {
     const roots = scopes(PROJECT_TEXT, USER_TEXT);
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual(PROJECT_VALUES);
     expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
@@ -650,14 +726,14 @@ describe('loadConfig across the whole schema', () => {
     // The control: the same home with no project file to outrank it
     // answers the user's own values, so the project's above was a real
     // override and not an accident of the defaults.
-    const userAlone = loadConfig({ root: freshDir('no-project'), home: roots.home }, {}, quiet);
+    const userAlone = await loadConfig({ root: freshDir('no-project'), home: roots.home }, {}, quiet);
     expect(userAlone.config).toEqual(USER_VALUES);
     expect(userAlone.sources).toEqual(sourcesWith({}, 'user'));
   });
 
-  it('lets a command-line value outrank both files', () => {
+  it('lets a command-line value outrank both files', async () => {
     const roots = scopes(PROJECT_TEXT, USER_TEXT);
-    const flagged = loadConfig(roots, CLI_OVERRIDES, quiet);
+    const flagged = await loadConfig(roots, CLI_OVERRIDES, quiet);
 
     expect(flagged.config).toEqual({
       ...PROJECT_VALUES,
@@ -685,17 +761,17 @@ describe('loadConfig across the whole schema', () => {
 
     // The control: the same roots with no flag answer the project's
     // values for every setting the flag named above.
-    const unflagged = loadConfig(roots, {}, quiet);
+    const unflagged = await loadConfig(roots, {}, quiet);
     expect(unflagged.config).toEqual(PROJECT_VALUES);
     expect(unflagged.sources).toEqual(sourcesWith({}, 'file'));
   });
 });
 
 describe('an unknown key nested under a section', () => {
-  it('is retained in extras, with exactly one warning naming it', () => {
+  it('is retained in extras, with exactly one warning naming it', async () => {
     const roots = scopes('tracker:\n  default: linear\n  kind: legacy\n', null);
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.trackerDefault).toBe('linear');
     expect(resolved.extras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
@@ -708,7 +784,7 @@ describe('an unknown key nested under a section', () => {
     // nothing, so the single warning above was earned by `kind` alone.
     const clean = scopes('tracker:\n  default: linear\n', null);
     const cleanSink = sink();
-    loadConfig(clean, {}, cleanSink.warn);
+    await loadConfig(clean, {}, cleanSink.warn);
     expect(cleanSink.lines).toEqual([]);
   });
 });
@@ -969,6 +1045,21 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'triage:\n  similarity:\n    candidates: 2', 'triageSimilarityCandidates', 2,
   ],
   [
+    'triage.similarity.weights.causeLeaf', 'triage:\n  similarity:\n    weights:\n      causeLeaf: 1.5',
+    'triage.similarity.weights.causeLeaf is 1.5, expected a number from 0 to 1',
+    'triage:\n  similarity:\n    weights:\n      causeLeaf: 0', 'triageSimilarityWeightsCauseLeaf', 0,
+  ],
+  [
+    'triage.similarity.weights.causeFamily', 'triage:\n  similarity:\n    weights:\n      causeFamily: -0.1',
+    'triage.similarity.weights.causeFamily is -0.1, expected a number from 0 to 1',
+    'triage:\n  similarity:\n    weights:\n      causeFamily: 0.2', 'triageSimilarityWeightsCauseFamily', 0.2,
+  ],
+  [
+    'triage.similarity.weights.boundary', 'triage:\n  similarity:\n    weights:\n      boundary: false',
+    'triage.similarity.weights.boundary is false, expected a number from 0 to 1',
+    'triage:\n  similarity:\n    weights:\n      boundary: 1', 'triageSimilarityWeightsBoundary', 1,
+  ],
+  [
     'release.enabled', 'release:\n  enabled: "true"',
     'release.enabled is "true", expected true, false or auto',
     'release:\n  enabled: auto', 'releaseEnabled', 'auto',
@@ -1014,10 +1105,30 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'release:\n  publishCommand: bun publish', 'releasePublishCommand', 'bun publish',
   ],
   [
+    'release.publish', 'release:\n  publish: github',
+    'release.publish is "github", expected one of: manual, ci',
+    'release:\n  publish: ci', 'releasePublish', 'ci',
+  ],
+  [
+    'release.moveLock', 'release:\n  moveLock: "true"',
+    'release.moveLock is "true", expected true or false',
+    'release:\n  moveLock: true', 'releaseMoveLock', true,
+  ],
+  [
     'errors.codes', 'errors:\n  codes:\n    - code: git:no-identity\n      description: d\n      hint: h\n      level: error\n      since: v1',
     'errors.codes[0].code is "git:no-identity", which rafa already declares; add a leaf of your own instead',
     'errors:\n  codes:\n    - code: git:shallow-clone\n      description: d\n      hint: h\n      level: warn\n      since: v1',
     'errorsCodes', [{ code: 'git:shallow-clone', description: 'd', hint: 'h', level: 'warn', since: 'v1' }],
+  ],
+  [
+    'bugs.recheck.runs', 'bugs:\n  recheck:\n    runs: 1.5',
+    'bugs.recheck.runs is 1.5, expected a whole number from 1 to 20',
+    'bugs:\n  recheck:\n    runs: 20', 'bugsRecheckRuns', 20,
+  ],
+  [
+    'bugs.recheck.timeoutSeconds', 'bugs:\n  recheck:\n    timeoutSeconds: "300"',
+    'bugs.recheck.timeoutSeconds is "300", expected a whole number from 1 to 3600',
+    'bugs:\n  recheck:\n    timeoutSeconds: 1', 'bugsRecheckTimeoutSeconds', 1,
   ],
   [
     'logger.kind', 'logger:\n  kind: ""',
@@ -1140,6 +1251,16 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'task:\n  lessons: off', 'taskLessons', 'off',
   ],
   [
+    'merge.duplicates', 'merge:\n  duplicates: Warn',
+    'merge.duplicates is "Warn", expected one of: warn, error, allow',
+    'merge:\n  duplicates: allow', 'mergeDuplicates', 'allow',
+  ],
+  [
+    'naming.branch', 'naming:\n  branch: feat/rafa',
+    'naming.branch is "feat/rafa", expected a branch name template holding {stub} exactly once',
+    'naming:\n  branch: "feat/{stub}"', 'namingBranch', 'feat/{stub}',
+  ],
+  [
     'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: [""]',
     'tests.fullSuiteTriggers[0] is "", expected a glob pattern relative to the repository root',
     'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1148,6 +1269,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.integration', 'tests:\n  integration: { e2e: true }',
     'tests.integration is a mapping, expected a list of glob patterns',
     'tests:\n  integration: []', 'testsIntegration', [],
+  ],
+  [
+    'tests.contract', 'tests:\n  contract: "*.contract.test.ts"',
+    'tests.contract is "*.contract.test.ts", expected a list of glob patterns',
+    'tests:\n  contract: ["pkg/**/*.contract.test.ts"]', 'testsContract', ['pkg/**/*.contract.test.ts'],
   ],
   [
     'tests.alwaysRun', 'tests:\n  alwaysRun: ["/src/*.sweep.test.ts"]',
@@ -1159,6 +1285,26 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.retakeRedAlone is "false", expected true or false',
     'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
   ],
+  [
+    'features.board', 'features:\n  board: 0',
+    'features.board is 0, expected true or false',
+    'features:\n  board: false', 'featuresBoard', false,
+  ],
+  [
+    'features.pr', 'features:\n  pr: "false"',
+    'features.pr is "false", expected true or false',
+    'features:\n  pr: false', 'featuresPr', false,
+  ],
+  [
+    'features.run', 'features:\n  run: off',
+    'features.run is "off", expected true or false',
+    'features:\n  run: false', 'featuresRun', false,
+  ],
+  [
+    'features.release', 'features:\n  release: 1',
+    'features.release is 1, expected true or false',
+    'features:\n  release: false', 'featuresRelease', false,
+  ],
 ];
 
 describe('each section, an unusable value refused by name beside an accepting control', () => {
@@ -1168,10 +1314,10 @@ describe('each section, an unusable value refused by name beside an accepting co
 
   it.each(SECTION_CASES)(
     'refuses an unusable %s through loadConfig, naming the real file',
-    (_label, unusable, problem) => {
+    async (_label, unusable, problem) => {
       const roots = scopes(`${unusable}\n`, null);
 
-      expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+      expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
         `${literalPath(roots.root)}: ${problem}`,
       ]);
     },
@@ -1179,9 +1325,9 @@ describe('each section, an unusable value refused by name beside an accepting co
 
   it.each(SECTION_CASES)(
     'accepts a usable %s into the config, sourced from the file',
-    (_label, _unusable, _problem, usable, setting, expected) => {
+    async (_label, _unusable, _problem, usable, setting, expected) => {
       const roots = scopes(`${usable}\n`, null);
-      const resolved = loadConfig(roots, {}, quiet);
+      const resolved = await loadConfig(roots, {}, quiet);
 
       expect<unknown>(resolved.config[setting]).toEqual(expected);
       expect(resolved.sources[setting]).toBe('file');
@@ -1190,12 +1336,12 @@ describe('each section, an unusable value refused by name beside an accepting co
 });
 
 describe('maps merged across the user and project layers', () => {
-  it('merges tiers.skills by key, the project outranking the user on a shared name', () => {
+  it('merges tiers.skills by key, the project outranking the user on a shared name', async () => {
     const roots = scopes(
       'tiers:\n  skills: { documentation: project, lint: rafa }\n',
       'tiers:\n  skills: { documentation: user, react-query: user }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.tiersSkills).toEqual(new Map<string, TierPin>([
       ['documentation', 'project'],
@@ -1205,12 +1351,12 @@ describe('maps merged across the user and project layers', () => {
     expect(resolved.sources.tiersSkills).toBe('file');
   });
 
-  it('merges routing by key over the defaults, user rows then project rows', () => {
+  it('merges routing by key over the defaults, user rows then project rows', async () => {
     const roots = scopes(
       'routing: { cleanup: refactor-cleaner }\n',
       'routing: { review: typescript-reviewer, cleanup: user-cleaner }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.routing).toEqual(new Map<string, RouteTarget>([
       ...CONFIG_DEFAULTS.routing,
@@ -1219,12 +1365,12 @@ describe('maps merged across the user and project layers', () => {
     ]));
   });
 
-  it('lets a project false shadow the user pin and a user false shadow a default row', () => {
+  it('lets a project false shadow the user pin and a user false shadow a default row', async () => {
     const roots = scopes(
       'tiers:\n  skills: { documentation: false }\n',
       'tiers:\n  skills: { documentation: user }\nrouting: { tests: false }\n',
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config.tiersSkills.get('documentation')).toBe(false);
     expect(resolved.config.routing.get('tests')).toBe(false);
@@ -1235,10 +1381,10 @@ describe('maps merged across the user and project layers', () => {
 describe('a user-level pin naming an unloaded tier', () => {
   const USER_PIN = 'tiers:\n  rafa: off\n  skills: { documentation: rafa }\n';
 
-  it('warns naming the pin and the file, and still loads the config', () => {
+  it('warns naming the pin and the file, and still loads the config', async () => {
     const roots = scopes(null, USER_PIN);
     const { lines, warn } = sink();
-    const resolved = loadConfig(roots, {}, warn);
+    const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.tiersSkills.get('documentation')).toBe('rafa');
     expect(lines).toEqual([
@@ -1247,10 +1393,10 @@ describe('a user-level pin naming an unloaded tier', () => {
     ]);
   });
 
-  it('does not warn while the rafa tier is loaded', () => {
+  it('does not warn while the rafa tier is loaded', async () => {
     const roots = scopes(null, 'tiers:\n  skills: { documentation: rafa }\n');
     const { lines, warn } = sink();
-    loadConfig(roots, {}, warn);
+    await loadConfig(roots, {}, warn);
 
     expect(lines).toEqual([]);
   });
@@ -1267,7 +1413,7 @@ describe('a user-level pin naming an unloaded tier', () => {
  * covers only with an absolute path.
  */
 describe('the release plan\'s six keys, through loadConfig', () => {
-  it('reads all six from .rafa/config.yaml, sourced from the file', () => {
+  it('reads all six from .rafa/config.yaml, sourced from the file', async () => {
     const roots = scopes(
       [
         'pr:',
@@ -1283,7 +1429,7 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       ].join('\n'),
       null,
     );
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toMatchObject({
       prVersionCollision: 'ask',
@@ -1303,9 +1449,9 @@ describe('the release plan\'s six keys, through loadConfig', () => {
     });
   });
 
-  it('falls back to defaults, together, when no config file names them', () => {
+  it('falls back to defaults, together, when no config file names them', async () => {
     const roots = scopes(null, null);
-    const resolved = loadConfig(roots, {}, quiet);
+    const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toMatchObject({
       prVersionCollision: CONFIG_DEFAULTS.prVersionCollision,
@@ -1325,12 +1471,183 @@ describe('the release plan\'s six keys, through loadConfig', () => {
     });
   });
 
-  it('reports a release.fragments planted under .rafa/, naming the real file', () => {
+  it('reports a release.fragments planted under .rafa/, naming the real file', async () => {
     const roots = scopes('release:\n  fragments: .rafa/changes\n', null);
 
-    expect(refusal(() => loadConfig(roots, {}, quiet)).problems).toEqual([
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
       `${literalPath(roots.root)}: release.fragments is ".rafa/changes", `
         + 'expected a relative directory path not under .rafa/',
     ]);
+  });
+});
+
+describe('every registered setting, resolved through loadConfig', () => {
+  it('names each registered setting in both files and in the defaults', () => {
+    expect([...Object.keys(PROJECT_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
+    expect([...Object.keys(USER_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
+    expect([...Object.keys(CONFIG_DEFAULTS)].sort()).toEqual([...SETTING_NAMES].sort());
+  });
+
+  it('resolves the project file over the user file over the default, key by key', async () => {
+    const project = scopes(PROJECT_TEXT, USER_TEXT);
+    const both = await loadConfig(project, {}, quiet);
+    const userOnly = await loadConfig({ root: freshDir('no-project'), home: project.home }, {}, quiet);
+    const neither = await loadConfig({ root: freshDir('no-project'), home: freshDir('no-home') }, {}, quiet);
+
+    for (const name of SETTING_NAMES) {
+      expect({ name, value: both.config[name], source: both.sources[name] })
+        .toEqual({ name, value: PROJECT_VALUES[name], source: 'file' });
+      expect({ name, value: userOnly.config[name], source: userOnly.sources[name] })
+        .toEqual({ name, value: USER_VALUES[name], source: 'user' });
+      expect({ name, value: neither.config[name], source: neither.sources[name] })
+        .toEqual({ name, value: CONFIG_DEFAULTS[name], source: 'default' });
+    }
+  });
+});
+
+describe('a second section redefining dangerous.acceptStaleRefs', () => {
+  it('is refused at registration, the refusal naming both packages', async () => {
+    const rival = {
+      package: '@example/rival',
+      settings: { dangerousAcceptStaleRefs: SETTINGS.dangerousAcceptStaleRefs },
+      defaults: { dangerousAcceptStaleRefs: false },
+    };
+    let registry: ReturnType<typeof registerConfigSections> | null = null;
+    try {
+      let thrown: unknown = null;
+      try {
+        registry = registerConfigSections([rival]);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigSectionError);
+      const message = (thrown as ConfigSectionError).message;
+      expect(message).toContain('dangerous.acceptStaleRefs');
+      expect(message).toContain(`"${CORE_SECTION.package}"`);
+      expect(message).toContain('"@example/rival"');
+    } finally {
+      if (registry !== null) restoreConfigSections(registry);
+    }
+
+    // The refused registration left the registry as it was.
+    const loaded = await loadConfig(scopes(null, null), {}, quiet);
+    expect(loaded.config.dangerousAcceptStaleRefs).toBe(false);
+  });
+});
+
+/** Writes `text` at `path`, creating its directory, and answers `path`. */
+function writeAt(path: string, text: string): string {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+  return path;
+}
+
+/** A module file's text: `export default` of `entries` as JSON, typed by `satisfies Config`. */
+function typedModuleText(entries: unknown): string {
+  return 'import type { Config } from \'@open-tomato/rafa/config\';\n'
+    + `export default ${JSON.stringify(entries)} satisfies Config;\n`;
+}
+
+/**
+ * Runs `run` with the working directory at `dir` and puts it back after.
+ * `dir` sits under the temporary root, so no `node_modules` stands above it
+ * and nothing named `@open-tomato/rafa` can be found from it.
+ */
+async function withCwd<T>(dir: string, run: () => Promise<T>): Promise<T> {
+  const before = process.cwd();
+  process.chdir(dir);
+  try {
+    return await run();
+  } finally {
+    process.chdir(before);
+  }
+}
+
+describe('loadConfig over a project whose rafa.config.ts holds only types', () => {
+  it('reads naming.branch from the TS file over pr.base from a user YAML file', async () => {
+    const roots = scopes(null, 'pr:\n  base: develop\n');
+    const path = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      typedModuleText([{ naming: { branch: 'work/{stub}' } }]),
+    );
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', roots.root)).toThrow();
+    const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, quiet));
+
+    expect(resolved.config.namingBranch).toBe('work/{stub}');
+    expect(resolved.sources.namingBranch).toBe('file');
+    expect(resolved.provenance.namingBranch).toEqual({ file: path, entry: 0 });
+    expect(resolved.config.prBase).toBe('develop');
+    expect(resolved.sources.prBase).toBe('user');
+  });
+
+  it('reads the TS file over a YAML file of the same scope, warning about the shadow once', async () => {
+    const roots = scopes('naming:\n  branch: yaml/{stub}\npr:\n  base: yaml-base\n', null);
+    const ts = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      typedModuleText([{ naming: { branch: 'ts/{stub}' } }]),
+    );
+    const { lines, warn } = sink();
+    const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, warn));
+
+    expect(resolved.config.namingBranch).toBe('ts/{stub}');
+    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual([CONFIG_DEFAULTS.prBase, 'default']);
+    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
+    expect(lines.filter((line) => line.includes(literalPath(roots.root)))).toHaveLength(1);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('warns about two entries of one TS file setting pr.base at warn, and refuses at error', async () => {
+    const entries = [{ pr: { base: 'first' } }, { pr: { base: 'second' } }];
+    const warned = scopes(null, null);
+    const warnedPath = writeAt(join(warned.root, 'rafa.config.ts'), typedModuleText(entries));
+    const { lines, warn } = sink();
+    const resolved = await withCwd(warned.root, () => loadConfig(warned, {}, warn));
+
+    expect(resolved.config.prBase).toBe('second');
+    expect(lines).toEqual([
+      `rafa config: ${warnedPath}: pr.base is set more than once within one layer: layer "project" (entries 0, 1)`,
+    ]);
+
+    const refused = scopes(null, null);
+    const refusedPath = writeAt(
+      join(refused.root, 'rafa.config.ts'),
+      typedModuleText([{ merge: { duplicates: 'error' } }, ...entries]),
+    );
+    const error = await withCwd(refused.root, () => refusal(() => loadConfig(refused, {}, quiet)));
+
+    expect(error.problems).toEqual([
+      `${refusedPath}: pr.base is set more than once within one layer: layer "project" (entries 1, 2)`,
+    ]);
+  });
+
+  it('refuses a user-scope TS file holding flows, naming the layer and the file', async () => {
+    const roots = scopes(null, null);
+    const path = writeAt(
+      join(roots.home, '.rafa', 'rafa.config.ts'),
+      typedModuleText([{ flows: { next: {} } }]),
+    );
+    const error = await withCwd(roots.root, () => refusal(() => loadConfig(roots, {}, quiet)));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toContain(path);
+    expect(error.problems[0]).toContain('flows is refused in the user layer');
+  });
+
+  it('refuses a project file with a value import of @open-tomato/rafa/config, naming the module and the install', async () => {
+    const roots = scopes(null, null);
+    const path = writeAt(
+      join(roots.root, 'rafa.config.ts'),
+      'import { defineConfig } from \'@open-tomato/rafa/config\';\n'
+        + 'export default defineConfig([{ pr: { base: \'trunk\' } }]);\n',
+    );
+
+    expect(() => Bun.resolveSync('@open-tomato/rafa/config', roots.root)).toThrow();
+    const error = await withCwd(roots.root, () => refusal(() => loadConfig(roots, {}, quiet)));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toContain(path);
+    expect(error.problems[0]).toContain('@open-tomato/rafa/config');
+    expect(error.problems[0]).toContain('bun add -d @open-tomato/rafa');
   });
 });

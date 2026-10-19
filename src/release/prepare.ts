@@ -88,13 +88,14 @@ import type { TreeFragment } from './fragment-tree.js';
 import type { Fragment } from './fragment.js';
 import type { ReleaseLevelReading, ReleaseLevelSource } from './level.js';
 import type { BaseVersionOptions } from './version.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { gitSaid } from '../pr/index.js';
 
 import { groupChangeNotes, renderNoteLines } from './changelog.js';
@@ -374,7 +375,7 @@ export function prepareRelease(input: ReleasePreparationInput): ReleasePreparati
   const level = reading.level;
   const title = fragmentTitle(input.title, input.plan);
   const lines = fragmentNotes(input, level, title);
-  const fragment: Fragment = { plan: input.plan, title, level, notes: lines.notes };
+  const fragment: Fragment = { plan: input.plan, title, level, package: null, notes: lines.notes };
   const name = allocateFragmentName(input.plan, read.base.waiting.map((waiting) => nameOf(waiting.path)));
   const path = posix.join(input.settings.releaseFragments.replace(/\\/g, '/'), name);
   const resolved = join(input.repoRoot, path);

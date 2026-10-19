@@ -19,8 +19,8 @@
  * sent before the flag existed, which the recorded calls pin.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaContext } from '../core/command/index.js';
 import type { GitRunner } from '../pr/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -107,7 +107,7 @@ function context(): RafaContext {
 }
 
 /** The sources opened over a fresh project and stand-in, `roadmap` as given. */
-function opened(roadmap: boolean | null): { readonly sources: ReturnType<typeof openNextSources>; readonly calls: string[] } {
+async function opened(roadmap: boolean | null): Promise<{ readonly sources: Awaited<ReturnType<typeof openNextSources>>; readonly calls: string[] }> {
   const { gh, calls } = fakeGh();
   const seams = {
     readRemote: () => 'git@github.com:open-tomato/rafa.git',
@@ -116,23 +116,23 @@ function opened(roadmap: boolean | null): { readonly sources: ReturnType<typeof 
     pullRequests: () => createPullRequestsDouble({}).pulls,
   };
   const sources = roadmap === null
-    ? openNextSources(context(), seams)
-    : openNextSources(context(), seams, { roadmap });
+    ? await openNextSources(context(), seams)
+    : await openNextSources(context(), seams, { roadmap });
   return { sources, calls };
 }
 
 describe('the sources rafa next --roadmap opens', () => {
-  it('carry the roadmap key with the owner gate, on the sources and on every answer', () => {
-    const { sources } = opened(true);
+  it('carry the roadmap key with the owner gate, on the sources and on every answer', async () => {
+    const { sources } = await opened(true);
 
     expect(Object.keys(sources)).toContain('roadmap');
     expect(Object.keys(sources.answer())).toContain('roadmap');
     expect(typeof sources.roadmap?.ownerApproval).toBe('function');
   });
 
-  it('leave the key out, not undefined, without the option or with it false', () => {
+  it('leave the key out, not undefined, without the option or with it false', async () => {
     for (const roadmap of [null, false]) {
-      const { sources } = opened(roadmap);
+      const { sources } = await opened(roadmap);
 
       expect(Object.keys(sources)).not.toContain('roadmap');
       expect(Object.keys(sources.answer())).not.toContain('roadmap');
@@ -140,7 +140,7 @@ describe('the sources rafa next --roadmap opens', () => {
   });
 
   it('build the board with roadmap, so the walk carries the hop reading', async () => {
-    const reading = await opened(true).sources.board.next();
+    const reading = await (await opened(true)).sources.board.next();
 
     expect(Object.keys(reading)).toContain('hop');
     expect(reading.line?.issue).toBe(LINE);
@@ -148,7 +148,7 @@ describe('the sources rafa next --roadmap opens', () => {
   });
 
   it('build it without, the walk carrying no hop key and sending the commands it always sent', async () => {
-    const { sources, calls } = opened(null);
+    const { sources, calls } = await opened(null);
 
     const reading = await sources.board.next();
 

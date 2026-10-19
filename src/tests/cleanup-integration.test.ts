@@ -20,7 +20,9 @@ import type { CapturedRun } from './cli-capture.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import '../adapter-registry.js';
 
 import { existsSync } from 'node:fs';
 

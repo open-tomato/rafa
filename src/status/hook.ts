@@ -45,10 +45,10 @@
 import type { SeenConfig, SeenInput, SeenReading, SeenSnapshot } from './seen.js';
 import type { CommandHook } from '../cli/dispatch.js';
 import type { CommandRoute } from '../cli/route.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import { loadConfig } from '../core/config/load.js';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { noticeLine } from './notice.js';
 import { readSeenFile, takeSeenSnapshot, writeSeenFile } from './seen.js';
@@ -62,14 +62,14 @@ export type StatusHookConfig = SeenConfig & Pick<RafaConfig, 'statusNotice'>;
 /** How the hook reaches the system; each left out is the system's own. */
 export interface StatusHookSeams {
   /** The config resolved for `project`. `loadConfig` with its warnings dropped when left out. */
-  readonly config?: (project: ProjectFound) => StatusHookConfig;
+  readonly config?: (project: ProjectFound) => StatusHookConfig | Promise<StatusHookConfig>;
   /** Takes the reading. `takeSeenSnapshot` with its own seams when left out. */
   readonly take?: (input: SeenInput) => Promise<SeenReading>;
 }
 
 /** The config `loadConfig` resolves for `project`, its warnings dropped. Throws on one it refuses. */
-function projectConfig(project: ProjectFound): StatusHookConfig {
-  return loadConfig({ root: project.root, home: project.home }, {}, () => undefined).config;
+async function projectConfig(project: ProjectFound): Promise<StatusHookConfig> {
+  return (await loadConfig({ root: project.root, home: project.home }, {}, () => undefined)).config;
 }
 
 /** True for a core command `before` answers no line for. */
@@ -84,7 +84,7 @@ export function createStatusHook(seams: StatusHookSeams = {}): CommandHook {
 
   /** The fresh reading's snapshot, or null with `status.notice` false. Throws on a failed reading. */
   const snapshot = async (project: ProjectFound): Promise<SeenSnapshot | null> => {
-    const config = configOf(project);
+    const config = await configOf(project);
     if (!config.statusNotice) return null;
     const reading = await take({ root: project.root, home: project.home, config });
     if (!reading.ok) throw new Error(`the status reading failed: ${reading.detail}`);

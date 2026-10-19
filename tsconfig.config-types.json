@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Declarations of the ./config subpath, written into dist by the build after core's (packages/rafa/tsconfig.types.json)",
+  "extends": "@open-tomato/rafa-typescript-config/base",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "declarationDir": "dist",
+    "paths": {
+      "@open-tomato/rafa/store": ["./dist/effort/store/index.d.ts"],
+      "@open-tomato/rafa/ports": ["./dist/ports/index.d.ts"],
+      "@open-tomato/rafa/store/*": ["./dist/effort/store/*"],
+      "@open-tomato/rafa/*": ["./dist/*"]
+    }
+  },
+  "include": ["src/config/index.ts"]
+}

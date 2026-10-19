@@ -80,22 +80,22 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectFieldKey, ProjectRef } from '../../board/project/port.js';
 import type { ProjectChange } from '../../board/project/refresh-values.js';
 import type { ProjectSynced } from '../../board/project/sync.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { commandProgressFeed } from '../../board/project/progress.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { rateLimitWarning } from '../../board/project/refresh-warnings.js';
 import { syncProject } from '../../board/project/sync.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
+
+import { BOARD_SYNC_DECLARATION, BOARD_SYNC_DRY_RUN_FLAG } from './declarations.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa board sync [--dry-run]';
-
-/** The flag that reads without writing. */
-const DRY_RUN_FLAG = 'dry-run';
 
 /** The exit code of a sync that could not finish; see the module note. */
 export const BOARD_SYNC_REFUSAL_EXIT = 2;
@@ -251,14 +251,14 @@ export async function runBoardSync(context: RafaContext, seams: BoardSyncSeams):
     throw lineRefusal(`Expected no arguments, got ${String(context.args.length)}: ${context.args.join(' ')}`, USAGE);
   }
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => {
+  const config = await issueSubjectConfig(project, (message) => {
     context.output.warn(message);
   });
   if (config.boardProjectNumber === null) {
     throw new CommandExit(1, `❌ board.project.number is not set, so there is no project to sync. Run \`${PROJECT_INIT_FIX}\` to create one.`);
   }
   const gh = openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep));
-  const dryRun = context.flags[DRY_RUN_FLAG] === true;
+  const dryRun = context.flags[BOARD_SYNC_DRY_RUN_FLAG] === true;
   const progress = commandProgressFeed(context.output, context.outputMode, config.boardProjectProgressSeconds, seams.now === undefined
     ? {}
     : { now: seams.now });
@@ -292,48 +292,7 @@ function writeResult(context: RafaContext, result: BoardSyncResult): void {
 /** The command, reaching `gh` with `seams`; see the module note. */
 export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'sync',
-    subject: 'board',
-    action: 'sync',
-    summary: 'bring the repository\'s GitHub project in step with its issues',
-    description: 'Refreshes every item of this repository on the GitHub project board.project.number names, writing'
-      + ' only the Stage, Horizon, Rank, Blocked by and Progress values that differ from what rafa reads of the'
-      + ' issues, then adds every open issue missing from the project and fills its fields. It repairs what changed'
-      + ' outside rafa: a label edited in the web UI, an issue closed by hand, the Roadmap issue\'s order edited in'
-      + ' its body. Prints one line per change and per issue added, then a closing count of the changes written'
-      + ' and of the issues added and filled. An issue added whose fields could not be filled is counted apart'
-      + ' and named in a warning, `#<n> added but not filled: <reason>`; the next run fills it. With `--dry-run` it'
-      + ' prints the same lines and writes nothing. With `--output=json` the changes are the data of the terminal'
-      + ' result event. An issue whose facts could not be read is named in a warning, `#<n> not refreshed:'
-      + ' <reason>`, while the others are synced; the exit code stays 0 and the next run reads it again. Adding'
-      + ' the issues, reading their facts and writing their fields each print a start line with the total, a'
-      + ' progress line at most every board.project.progressSeconds, as `reading facts: 146/283, 6m 40s`, and an'
-      + ' end line; with `--output=json` each is a `progress` event. Refused'
-      + ' with exit code 1 when board.project.number is unset, and with exit code 2 when the token lacks the'
-      + ' project scope, the number names no project, or the rate limit stopped the writes.',
-    args: [],
-    flags: [
-      {
-        name: DRY_RUN_FLAG,
-        description: 'Print each change the sync would make and each issue it would add, and write nothing.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa board sync --dry-run',
-        note: 'Shows what drifted on the project since rafa last wrote it, writing nothing.',
-      },
-      {
-        cmd: 'rafa board sync',
-        note: 'Writes those changes and adds the open issues the project lacks.',
-      },
-      {
-        cmd: 'rafa board sync --output=json',
-        note: 'Gives the changes, the issues added, those of them filled and the counts as the terminal result.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...BOARD_SYNC_DECLARATION,
     run: async (context) => {
       writeResult(context, await runBoardSync(context, seams));
     },

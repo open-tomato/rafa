@@ -41,12 +41,13 @@
  *   that could only be printed while everything answered would be no use
  *   when something does not.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { readStatusSections } from '../status/sections.js';
@@ -92,7 +93,7 @@ function expectNoWord(args: readonly string[]): void {
 export async function runStatus(context: RafaContext, seams: StatusCommandSeams): Promise<void> {
   expectNoWord(context.args);
   const project = projectOf(context);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const warn = (message: string): void => {
@@ -124,8 +125,9 @@ export function createStatusCommand(seams: StatusCommandSeams = DEFAULT_STATUS_S
       + ' how many tasks are blocked, with a line under it for each running loop and each blocked task. Pull'
       + ' request: the branch\'s open pull request, whether it can be merged and its checks. Board: the'
       + ' Roadmap\'s next issue and whether it is ready, and how many issues carry `spec:blocked`. Claims: each'
-      + ' `feat/rafa-<n>` claim branch on origin as last fetched, with a line under it for each naming the store'
-      + ' that owns the claim, the stage label on its issue and whether it is stale. Housekeeping:'
+      + ' claim branch on origin as last fetched, the `naming.branch` template with a `rafa-<n>` stub'
+      + ' (`feat/rafa-<n>-<slug>` by default), with a line under it for each naming the store that owns'
+      + ' the claim, the stage label on its issue and whether it is stale. Housekeeping:'
       + ' what `rafa cleanup` would list, counted per group, and how many worktrees are idle. Git, the session'
       + ' records, the plans and the claim branches are read first; the pull request, the board and the stage'
       + ' labels are read through `gh` under a'

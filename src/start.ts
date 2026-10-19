@@ -13,7 +13,7 @@
  * its blocker text (`start/budget.ts`). Each of those stops the run.
  * Re-running resumes: blocked tasks are retried first.
  *
- * A task line may carry a trailing routing declaration (`utils/declaration.ts`).
+ * A task line may carry a trailing routing declaration (`core/plan/declaration.ts`).
  * The loop reads it, dispatches that task under the flags it names, and keeps
  * the block out of everything downstream — the prompt, the operator's log and
  * the commit message all see the task sentence alone. A `rafa:*` block is kept
@@ -25,7 +25,7 @@
  * (`plan/inject.ts`): `full` hands over the plan as it stands, `stage` the plan
  * context plus the task's stage, `task` the plan context plus the task line.
  * The mode is resolved once, before the run is deferred, from `--inject=`
- * over `.rafa/config.yaml` over the default (`config.ts`), and a value no mode
+ * over the project's config over the default (`config.ts`), and a value no mode
  * answers to refuses the run. Every part of the plan `parsePlan` does not read
  * as written is named to the operator once, at start. `start/run-config.ts`
  * does both. The same resolution names the setting sources every session the
@@ -43,11 +43,12 @@
  * Two directories, never confused (`start/checkout.ts`). The PROJECT
  * ROOT is the dispatcher's root, the one holding `.rafa/`: the config,
  * the plan and its tracker, `PROMPT.md`, the session record, the
- * preflight, the store, the learning adapter and triage are all read
- * and written there. The CHECKOUT is the working tree the run was
- * started in, when it is one of the project's own: every git command
- * runs there — the branch read, offered and guarded, each task's
- * commit, the release's files, commit and push, and the CI gate — and
+ * preflight, the store, the learning adapter and triage's issues are
+ * all read and written there. The CHECKOUT is the working tree the run
+ * was started in, when it is one of the project's own: every git
+ * command runs there — the branch read, offered and guarded, each
+ * task's commit, the release's files, commit and push, the CI gate and
+ * triage's git runner and `Refs` — and
  * every session, task, wrap-up and CI repair alike, is spawned there,
  * with `progress.txt` written there for it to read. From a linked
  * worktree that is the worktree, and under `--as-worktree` it is the
@@ -357,23 +358,25 @@
  * `interrupted`, no task is marked, and the run returns, its record
  * `stopped`, as it does when a pause's hold ends on the signal.
  */
-import type { ResolvedConfig } from './core/config/index.js';
-import type { FindingOutcome } from './effort/store/findings.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { TaskHandout } from './start/handout.js';
 import type { SessionServing } from './start/serving.js';
 import type { WrapUpLearning } from './start/wrap-up.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { CommandExit } from './core/command/index.js';
-import { ConfigError } from './core/config/index.js';
-import { messageOf } from './core/config/sections.js';
-import { interruptClaudeSessions } from './core/loop/index.js';
-import { activeOutput } from './core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { interruptClaudeSessions } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-tomato/rafa/core/plan';
+
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';
@@ -427,6 +430,7 @@ import {
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { haltBeforeSession } from './start/session-guard.js';
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
+import { createStartStaleDocs } from './start/stale-docs.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { announceRunStepOnly, readRunStepOnly } from './start/step-only-report.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
@@ -434,10 +438,8 @@ import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
-import { parseTaskDeclaration } from './utils/declaration.js';
-import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
-import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
+import { findNextTask, updateTrackerLine } from './utils/tracker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -465,7 +467,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // config then has lost the night, where refusing now costs one command.
   let runConfig: ResolvedConfig;
   try {
-    runConfig = loadRunConfig({ root: repoRoot, home: homedir() }, args);
+    runConfig = await loadRunConfig({ root: repoRoot, home: homedir() }, args);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     const problems = error.problems.map((problem) => `   ${problem}`);
@@ -513,8 +515,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     prBase: runConfig.config.prBase,
     planStub,
     args,
+    branchTemplate: runConfig.config.namingBranch,
   });
-  guardRunBranch(planStub, branch, args);
+  guardRunBranch(planStub, branch, args, runConfig.config.namingBranch);
   // What the loop guard holds the checkout to: its branch at the HEAD it
   // starts from, moved on by each task commit (`start/checkout-watch.ts`).
   let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });
@@ -546,6 +549,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // (`start/loop-events.ts`).
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   bindEventsFile(repoRoot, session.id);
+  // The doc task's unsettled lines: an issue line each, or the print at the end (`start/stale-docs.ts`).
+  const staleDocs = createStartStaleDocs({ repoRoot, checkout, planPath, config: runConfig.config });
   // Set once the run's `--continue` decisions are made, and asked at its
   // end however it ends: a `--decide` no decision point used is named.
   let decisionsAtEnd = (): void => undefined;
@@ -624,7 +629,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.
-    const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
+    const triageTask = createStartTriage({ repoRoot, checkout, config: runConfig.config, kinds: { checkout, prBase: runConfig.config.prBase, retries: runRetries } });
 
     // The runner's suite steps around the sessions (`start/suite-steps-run.ts`):
     // `bun test` run here, in the checkout, and recorded on the run record.
@@ -795,6 +800,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         handout,
         base,
         guard: { expected, trackerPath },
+        docTask: { planStub, prBase: runConfig.config.prBase },
       });
       const { exitCode } = dispatch;
 
@@ -815,6 +821,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
+        await staleDocs.afterTask({ planStub, dispatch, outcome });
         await hubContact.pushThenPull();
         return stored;
       };
@@ -902,6 +909,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     throw error;
   } finally {
     decisionsAtEnd();
+    staleDocs.atRunEnd();
     // The test files a suite step read red only in the step, which
     // blocked nothing: named once more as the run's last lines.
     announceRunStepOnly(readRunStepOnly(repoRoot, session.id));

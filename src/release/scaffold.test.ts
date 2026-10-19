@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
@@ -38,8 +38,8 @@ function keysOf(lines: readonly string[]): readonly string[] {
 }
 
 describe('RELEASE_FRAGMENT_LINES', () => {
-  it('spells the four settings in the order the scaffold places them', () => {
-    expect(keysOf(RELEASE_FRAGMENT_LINES)).toEqual(['fragments', 'strategy', 'settle', 'tag']);
+  it('spells the five settings in the order the scaffold places them', () => {
+    expect(keysOf(RELEASE_FRAGMENT_LINES)).toEqual(['fragments', 'strategy', 'settle', 'tag', 'moveLock']);
   });
 
   it('is commented on every line, which a line with its mark dropped is not', () => {
@@ -57,6 +57,7 @@ describe('RELEASE_FRAGMENT_LINES', () => {
       CONFIG_DEFAULTS.releaseStrategy,
       CONFIG_DEFAULTS.releaseSettle,
       CONFIG_DEFAULTS.releaseTag,
+      String(CONFIG_DEFAULTS.releaseMoveLock),
     ]);
     expect(values).not.toContain('pr');
   });

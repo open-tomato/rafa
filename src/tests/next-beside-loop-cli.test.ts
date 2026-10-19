@@ -24,7 +24,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../core/loop/index.js';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

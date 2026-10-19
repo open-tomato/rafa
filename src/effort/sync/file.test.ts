@@ -20,9 +20,11 @@
  * never by bytes.
  */
 import type { FileSyncOptions } from './file.js';
-import type { AdapterContext } from '../../core/adapters/index.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { Device } from '../../tests/merged-stores.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,14 +33,15 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { beginSession } from '../../core/loop/index.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { beginSession } from '@open-tomato/rafa/core/loop';
+import { EffortCopyRefusal } from '@open-tomato/rafa/store/copy';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { MergeRefusal, MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
+import { SQLITE_STORE_FILE_NAME, sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { storeRows } from '@open-tomato/rafa/store/testdata/store-rows';
+
 import { copyDevice, freshDevice } from '../../tests/merged-stores.js';
-import { EffortCopyRefusal } from '../store/copy.js';
-import { writeDispatch } from '../store/dispatches.js';
-import { MergeRefusal, MOVE_TO_SQLITE } from '../store/merge-store.js';
-import { SQLITE_STORE_FILE_NAME, sqliteStorePath } from '../store/sqlite.js';
-import { storeRows } from '../store/testdata/store-rows.js';
 
 import { createFileSync, FileSyncRefusal } from './file.js';
 import { selectSync } from './select.js';

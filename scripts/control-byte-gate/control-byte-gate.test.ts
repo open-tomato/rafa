@@ -213,7 +213,7 @@ describe('scanText (codepoint scan)', () => {
 // unsafe.
 describe('agreement with the ESLint rule', () => {
   it('flags the same characters as ar/no-unsafe-unicode', async () => {
-    const mod = await import('../unsafeUnicode.mjs');
+    const mod = await import('../../packages/eslint-config/rules/unsafe-unicode.mjs');
     const findUnsafeUnicode = mod.findUnsafeUnicode as (t: string) => unknown[];
     const probes = [
       0x00, 0x01, 0x1b, 0x7f, 0x00ad, 0x200b, 0x200e, 0x200f, 0x2028, 0x2029,

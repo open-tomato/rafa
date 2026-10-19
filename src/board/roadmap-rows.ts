@@ -17,8 +17,9 @@
  *    asked for; in `native` mode the relationships port's `blockersOf`
  *    (`./relations/port.ts`), each state off its `blockedBy` node;
  *  - `has`: {@link stubOfPlanFile} over the plan dir's file names, the
- *    branch scan {@link scanClaimBranches} with {@link branchClaims}, and
- *    the open pull request list with {@link closedIssuesIn};
+ *    branch scan {@link scanClaimBranches} with {@link branchClaims} under
+ *    the scan's own template, and the open pull request list with
+ *    {@link closedIssuesIn};
  *  - `refs`: whatever {@link RoadmapRefs} answers, asked once for every
  *    selected line; `issue list --roadmap` hands in the reading `rafa
  *    doctor`'s references row makes (`src/commands/doctor-refs.ts`).
@@ -199,13 +200,14 @@ import type { ReadinessGap } from './readiness.js';
 import type { BlockersReading } from './relations/port.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapLine, RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, readdirSync } from 'node:fs';
 
-import { messageOf } from '../core/config/sections.js';
-import { stubOfPlanFile } from '../core/plan/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+
 import { positionFilePath } from '../project/position.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 
@@ -327,6 +329,13 @@ export interface RoadmapRowsOptions {
   readonly git: GitRunner;
   /** The remote the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * `naming.branch` as config resolved it, which the branch scan reads
+   * a claim branch under; `DEFAULT_BRANCH_TEMPLATE`, `feat/{stub}`, when
+   * left out. Only this template is read: under `work/{stub}`,
+   * `feat/rafa-20-x` names no `branch` in the `has` column.
+   */
+  readonly branchTemplate?: string;
   /** The open pull requests, asked once and only when the board answered. */
   readonly pullRequests: OpenPullRequestLister;
   /** The plan dir's file names. */
@@ -523,6 +532,8 @@ export function hasPlanFor(names: readonly string[], issue: number): boolean {
 interface HasSources {
   readonly planNames: readonly string[];
   readonly refs: readonly string[];
+  /** The template the branch scan was taken under, which a ref claims an issue by. */
+  readonly branchTemplate?: string;
   readonly pulls: readonly RoadmapPullRequest[];
 }
 
@@ -531,7 +542,7 @@ function readHasColumn(issue: number, sources: HasSources): readonly HasMark[] {
   const plan: readonly HasMark[] = hasPlanFor(sources.planNames, issue)
     ? [{ kind: 'plan' }]
     : [];
-  const ref = sources.refs.find((candidate) => branchClaims(candidate, issue));
+  const ref = sources.refs.find((candidate) => branchClaims(candidate, issue, sources.branchTemplate));
   const branch: readonly HasMark[] = ref === undefined
     ? []
     : [{ kind: 'branch', ref }];
@@ -638,7 +649,7 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
 export async function readLineRows(lines: readonly RoadmapLine[], options: LineRowsOptions): Promise<LineRows> {
   const selected = lines.filter((line) => options.all === true || !line.ticked);
   const listed = await listBoard(options.board);
-  const scan = scanClaimBranches(options.git, options.remote);
+  const scan = scanClaimBranches(options.git, options.remote, options.branchTemplate);
   const pulls = listed.issues === null
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');
@@ -654,7 +665,7 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
       'the saved copies could not be read, so the refs column is empty',
     );
 
-  const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
+  const sources: HasSources = { planNames: plans.value, refs: scan.refs, branchTemplate: scan.branchTemplate, pulls: pulls.value };
   const rows = selected.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 
   const warnings = [

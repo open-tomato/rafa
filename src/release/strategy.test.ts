@@ -17,7 +17,7 @@ import type { FoldResult, ReleaseStrategyAdapter } from './strategy.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { RELEASE_STRATEGIES } from '../core/config/sections.js';
+import { RELEASE_STRATEGIES } from '@open-tomato/rafa/core/config/sections';
 
 import {
   foldWithStrategy,
@@ -44,7 +44,7 @@ describe('the strategy registry', () => {
 
   test('builds semver-by-level over the configured heading', () => {
     const strategy = releaseStrategyFor('semver-by-level', { heading: '# v{version}' });
-    const fragment = { plan: 'rafa-1', title: 'one', level: 'patch' as const, notes: ['- x'] };
+    const fragment = { plan: 'rafa-1', title: 'one', level: 'patch' as const, package: null, notes: ['- x'] };
     const answer = strategy.fold('0.1.0', [{ id: 'rafa-1', addedOn: '2026-09-29', fragment }]);
     expect(answer?.section.split('\n')[0]).toBe('# v0.1.1');
   });
@@ -89,7 +89,7 @@ describe('foldWithStrategy', () => {
 
   test('turns the real adapter\'s throw into that line', () => {
     const strategy = releaseStrategyFor('semver-by-level', { heading: '## {version}' });
-    const fragment = { plan: 'rafa-1', title: 'one', level: 'minor' as const, notes: ['- x'] };
+    const fragment = { plan: 'rafa-1', title: 'one', level: 'minor' as const, package: null, notes: ['- x'] };
     const outcome = foldWithStrategy(strategy, 'garbage', [{ id: 'rafa-1', addedOn: '2026-09-29', fragment }]);
     expect(outcome).toEqual({
       ok: false,

@@ -24,8 +24,10 @@
  * `eventsOf` to prove the data parses, and a planted `FAKE_TOKEN` read
  * from the real environment a spawned process inherits.
  */
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,7 +35,8 @@ import { join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { EVERY_TOOL, RISK_FOOTER } from '../../plan/risk.js';
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 

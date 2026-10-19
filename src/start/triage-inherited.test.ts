@@ -17,8 +17,8 @@
  * inherited at all.
  */
 import type { StartTriage, TaskTriageInput } from './triage.js';
-import type { CliEvent, Tracker } from '../ports/index.js';
 import type { JunitReading, SuiteFailure } from '../suite/run.js';
+import type { CliEvent, Tracker } from '@open-tomato/rafa/ports';
 
 import {
   existsSync,
@@ -39,8 +39,11 @@ import {
   it,
 } from 'bun:test';
 
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
@@ -175,6 +178,19 @@ function triageFor(f: Fixture): StartTriage {
       prerequisitesOptional: [],
       triageSimilarityThreshold: 0.3,
       triageSimilarityCandidates: 3,
+      triageSimilarityWeightsCauseLeaf: 0.15,
+      triageSimilarityWeightsCauseFamily: 0.05,
+      triageSimilarityWeightsBoundary: 0.1,
+      ...ISSUES_DEFAULTS,
+      boardRelationships: CONFIG_DEFAULTS.boardRelationships,
+      boardProjectNumber: CONFIG_DEFAULTS.boardProjectNumber,
+      roadmapIssue: CONFIG_DEFAULTS.roadmapIssue,
+      boardProjectRetries: CONFIG_DEFAULTS.boardProjectRetries,
+      boardProjectRetryWaitSeconds: CONFIG_DEFAULTS.boardProjectRetryWaitSeconds,
+      boardProjectWriteBatchSize: CONFIG_DEFAULTS.boardProjectWriteBatchSize,
+      boardProjectWritePauseMs: CONFIG_DEFAULTS.boardProjectWritePauseMs,
+      releaseFragments: CONFIG_DEFAULTS.releaseFragments,
+      errorsCodes: [],
     },
     env: {},
     resolve: () => Promise.resolve({
@@ -329,6 +345,7 @@ describe('the note for an inherited bug', () => {
         },
         { ...unset, index: 2, channel: 'public', action: 'inherited' },
       ],
+      staleDocs: [],
     } as const;
 
     expect(describeStartTriage(result, new Map([[0, FAILURE], [1, FAILURE]])).notes).toEqual([

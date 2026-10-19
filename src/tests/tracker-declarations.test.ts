@@ -1,7 +1,7 @@
 /**
  * The two tracker parsers, driven over lines that carry declarations.
  *
- * `utils/declaration.ts` was written on a claim about code it does not
+ * `core/plan/declaration.ts` was written on a claim about code it does not
  * own: that `findNextTask` and `updateTrackerLine` need no change to
  * survive a trailing routing block. Its own TSDoc states it, and the
  * colocated suite cannot check it — every fixture there is a bare
@@ -108,8 +108,8 @@
  * declared one and belongs beside the rest of them in
  * `tests/findNextTask.test.ts`.
  */
-import type { TestScope } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { TestScope } from '@open-tomato/rafa/core/plan';
 
 import {
   mkdirSync,
@@ -127,7 +127,8 @@ import {
   parseTaskDeclaration,
   readTestScope,
   stripTaskDeclaration,
-} from '../utils/declaration.js';
+} from '@open-tomato/rafa/core/plan';
+
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 /** The two spaces a tracker line puts between text and block. */

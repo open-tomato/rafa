@@ -38,13 +38,16 @@ import type { IssueBoard } from '../board/issue-board.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { ReadinessGap } from '../board/readiness.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { rejectedPath } from '@open-tomato/rafa/core/plan';
 
 import {
   enforceSpecReview,
@@ -71,8 +74,6 @@ import {
   stampReviewSkipped,
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
-import { CommandExit } from '../core/command/index.js';
-import { rejectedPath } from '../core/plan/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 
@@ -150,7 +151,7 @@ function thrownBy(run: () => void): CommandExit {
 }
 
 /** What an asynchronous refusal throws; fails the case when it resolves. */
-async function asyncThrownBy(run: Promise<void>): Promise<CommandExit> {
+async function asyncThrownBy(run: Promise<unknown>): Promise<CommandExit> {
   try {
     await run;
   } catch (error) {
@@ -165,14 +166,21 @@ function reviewOutput(...lines: readonly string[]): string {
   return ['I read the issue first.', '', '```rafa:spec-review', ...lines, '```', ''].join('\n');
 }
 
-/** A verdict naming the two gaps the code check itself would have caught, had it not judged the issue complete. */
+/**
+ * A verdict naming the two gaps the code check itself would have caught,
+ * had it not judged the issue complete. Each says `blocking: true`
+ * outright: one left unsaid is read as blocking all the same, but with an
+ * issue the gate warns about, and the refusal cases hold its own lines.
+ */
 const NOT_READY_OUTPUT = reviewOutput(
   'verdict: not-ready',
   'gaps:',
   '  - heading: "Definition of done"',
   '    what: "no item says how the label swap is verified"',
+  '    blocking: true',
   '  - heading: "Tasks the plan must carry"',
   '    what: "the second task does not name what file it adds the check to"',
+  '    blocking: true',
 );
 
 /**

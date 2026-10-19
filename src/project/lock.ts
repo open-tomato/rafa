@@ -16,7 +16,8 @@
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { parseSemanticVersion } from '../release/version.js';
 
 /** The lock's file name, at the project root. */
@@ -95,6 +96,17 @@ export function readProjectLock(root: string): ProjectLock | null {
   } catch (error) {
     refuse(`could not be read: ${messageOf(error)}`);
   }
+  return parseProjectLock(text);
+}
+
+/**
+ * `text` read as a lock, so a lock held anywhere but on disk (a git blob)
+ * is read by the same rules as the file.
+ *
+ * @throws ProjectLockError, naming `rafa.lock`, for text that is not JSON,
+ * is in another format, or names no version.
+ */
+export function parseProjectLock(text: string): ProjectLock {
   let value: unknown;
   try {
     value = JSON.parse(text);

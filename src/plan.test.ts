@@ -61,10 +61,12 @@
  * asked for. Three cases: refused with exit 2 and no session, planned
  * under `--accept-refs` with the `absent` stamp left in the snapshot,
  * and planned with `dangerous.acceptStaleRefs: true` in the config,
- * whose pass line is the run's first. Dropping the `checkCreateRefs`
- * call from `src/plan.ts` reddened all three, and dropping the
- * `announceCreateRefs` call reddened the third alone (2026-09-24, 25
- * and 27 pass of 28, the module restored and checked with `shasum -c`).
+ * whose pass line is the run's first and its one line for the key,
+ * ending with the words check 4's own line printed before it was folded
+ * into the loader's ({@link ACCEPT_STALE_REFS_WORDS}). Dropping the
+ * `checkCreateRefs` call from `src/plan.ts` reddened all three
+ * (2026-09-24, 25 of 28, the module restored and checked with
+ * `shasum -c`).
  *
  * That every `--spec` case is green is a reading of its own: the board
  * seams are built for every run (`src/board/plan-spec.ts`) and a file
@@ -97,7 +99,7 @@
  *
  * Nine mutations of `plan.ts` were driven on 2026-09-14 over this file,
  * `src/adapters/planner/claude.test.ts` and
- * `src/core/adapters/registry.test.ts`, one run each, with 79 pass before
+ * `packages/rafa/src/core/adapters/registry.test.ts`, one run each, with 79 pass before
  * and after and the module restored byte-identical (sha256), and every one
  * reddened at least one case. The command resolving core's registry in
  * place of the one handed over reddened the five cases that reach the
@@ -166,7 +168,7 @@
 import type { GhRunner } from './adapters/tracker/github.js';
 import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
-import type { CliEvent } from './ports/index.js';
+import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import {
   chmodSync,
@@ -184,10 +186,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { epicContextArgs } from './board/epic-context.js';
 import { specPath } from './board/naming.js';
-import { acceptStaleRefsPassLine } from './board/refs-gate.js';
-import { loadConfig } from './core/config/load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,
@@ -236,6 +238,14 @@ const ISSUE = {
  * repository tracks, so check 4 reads it `dangling`.
  */
 const GONE_BODY = completeSpecBody('Spec: the board routes', 'Touches `src/gone.ts`.');
+
+/**
+ * The words check 4's own line printed for `dangerous.acceptStaleRefs`
+ * before it was folded into the loader's pass line, written out here
+ * rather than read off the source, so a phrase that drifts from them
+ * reddens the case.
+ */
+const ACCEPT_STALE_REFS_WORDS = 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run';
 
 /** The spec content the fixture hands the context's builder. */
 const FIXTURE_SPEC = 'the spec as the fixture hands it to the builder\n';
@@ -300,9 +310,13 @@ type Outcome =
 const PROBE = [
   'import { mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
+  `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+  `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
+  'registerCoreConfigSections();',
+  'registerCoreAdapters();',
   `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
@@ -489,8 +503,8 @@ const DEFAULT_PLAN_DIR = '.rafa/plans';
 const PLAN_MODULE = join(SRC_DIR, 'plan.ts');
 
 /** The skill index the command reads for `scratch`, under the config it resolves there. */
-function scratchSkillIndex(scratch: Scratch): string {
-  const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+async function scratchSkillIndex(scratch: Scratch): Promise<string> {
+  const { config } = await loadConfig({ root: scratch.repo, home: scratch.home });
   return readPlanSkillIndex(scratch.repo, scratch.home, config, PLAN_MODULE);
 }
 
@@ -501,11 +515,11 @@ function scratchSkillIndex(scratch: Scratch): string {
  * planner hands it to the command's builder and as the `claude` planner
  * does (`src/adapters/planner/claude.ts`, "Paths").
  */
-function expectedPrompt(
+async function expectedPrompt(
   scratch: Scratch,
   progress: string | undefined,
   planDir: string = DEFAULT_PLAN_DIR,
-): string {
+): Promise<string> {
   const template = readFileSync(join(SRC_DIR, 'plan-prompt.md'), 'utf8');
   return buildPlanPrompt(
     template,
@@ -515,7 +529,7 @@ function expectedPrompt(
     join(realpathSync(scratch.repo), planDir),
     progress,
     undefined,
-    scratchSkillIndex(scratch),
+    await scratchSkillIndex(scratch),
   );
 }
 
@@ -733,11 +747,11 @@ describe('the skill index the command reads', () => {
     return { root, home };
   }
 
-  it('lists a project skill ahead of the rafa tier, and not one the config switches off', () => {
+  it('lists a project skill ahead of the rafa tier, and not one the config switches off', async () => {
     const { root, home } = plantRoots();
     plantProjectSkill(root, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray', 'tags: [probe]']);
     plantProjectSkill(root, 'zz-off', ['description: "Use when never"', 'prevents: nothing at all']);
-    const settings = loadConfig({ root, home }).config;
+    const settings = (await loadConfig({ root, home })).config;
     const off = { ...settings, tiersSkills: new Map([['zz-off', false as const]]) };
 
     const shown = readPlanSkillIndex(root, home, settings, PLAN_MODULE).split('\n');
@@ -751,10 +765,10 @@ describe('the skill index the command reads', () => {
     expect(index.some((line) => line.startsWith('dev-planner — '))).toBe(true);
   });
 
-  it('leaves the user tier out while loop.settingSources does not name user', () => {
+  it('leaves the user tier out while loop.settingSources does not name user', async () => {
     const { root, home } = plantRoots();
     plantProjectSkill(home, 'user-probe', ['description: "Use when probing"', 'prevents: a user probe']);
-    const settings = loadConfig({ root, home }).config;
+    const settings = (await loadConfig({ root, home })).config;
 
     const index = readPlanSkillIndex(root, home, settings, PLAN_MODULE);
     const withUser = readPlanSkillIndex(root, home, { ...settings, settingSources: ['user', 'project', 'local'] }, PLAN_MODULE);
@@ -766,7 +780,7 @@ describe('the skill index the command reads', () => {
 });
 
 describe('rafa plan through the adapter registry', () => {
-  it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', () => {
+  it('resolves the claude planner with the run sources, plan.dir, the spec as --spec names it and the built prompt', async () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
@@ -777,7 +791,7 @@ describe('rafa plan through the adapter registry', () => {
       planDir: DEFAULT_PLAN_DIR,
       settingSources: ['project', 'local'],
       request: { specPath: 'spec.md', stub: 'spec' },
-      prompt: expectedPrompt(scratch, undefined),
+      prompt: await expectedPrompt(scratch, undefined),
     });
     expect(run.stdout).toContain('📝 Generating .rafa/plans/PLAN-spec.md from spec.md...');
     expect(run.stdout).toContain('\n✅ Plan ready: .rafa/plans/PLAN-spec.md\n');
@@ -791,29 +805,29 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('hands the planner the plan.dir a config names, and names the plan in it', () => {
+  it('hands the planner the plan.dir a config names, and names the plan in it', async () => {
     // Deliberate custom-directory fixture: configures `plan.dir` to `.plans` to verify the planner reads the custom setting.
     const scratch = plantScratch();
     plantProjectConfig(scratch.repo, 'version: 1\nplan:\n  dir: .plans\n');
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
-    expect(expectedPrompt(scratch, undefined, '.plans')).not.toBe(expectedPrompt(scratch, undefined));
+    expect(await expectedPrompt(scratch, undefined, '.plans')).not.toBe(await expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: expectedPrompt(scratch, undefined, '.plans') });
+    expect(readRecord(scratch)).toMatchObject({ planDir: '.plans', prompt: await expectedPrompt(scratch, undefined, '.plans') });
     expect(run.stdout).toContain('📝 Generating .plans/PLAN-spec.md from spec.md...');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('renders the routing the config resolves into the prompt, not rafa\'s defaults alone', () => {
+  it('renders the routing the config resolves into the prompt, not rafa\'s defaults alone', async () => {
     const scratch = plantScratch({ config: 'routing:\n  cleanup: refactor-cleaner\n  tests: false\n' });
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md', '--no-progress']);
 
     // The control: the defaults' prompt routes `tests` and not `cleanup`,
     // so the two readings below are the config's doing.
-    expect(expectedPrompt(scratch, undefined)).toContain('| `tests` | `tdd-guide` |');
-    expect(expectedPrompt(scratch, undefined)).not.toContain('`cleanup`');
+    expect(await expectedPrompt(scratch, undefined)).toContain('| `tests` | `tdd-guide` |');
+    expect(await expectedPrompt(scratch, undefined)).not.toContain('`cleanup`');
     expect(run.exitCode).toBe(0);
     const prompt = String(readRecord(scratch)['prompt']);
     expect(prompt).toContain('| `cleanup` | `refactor-cleaner` |');
@@ -822,7 +836,7 @@ describe('rafa plan through the adapter registry', () => {
     expect(prompt).not.toContain('{ROUTING}');
   }, 30_000);
 
-  it('renders the skill index the tiers resolve into the prompt, a project skill included', () => {
+  it('renders the skill index the tiers resolve into the prompt, a project skill included', async () => {
     const scratch = plantScratch();
     plantProjectSkill(scratch.repo, 'aa-probe', ['description: "Use when probing"', 'prevents: a probe gone astray']);
 
@@ -830,7 +844,7 @@ describe('rafa plan through the adapter registry', () => {
 
     expect(run.exitCode).toBe(0);
     const prompt = String(readRecord(scratch)['prompt']);
-    expect(prompt).toBe(expectedPrompt(scratch, undefined));
+    expect(prompt).toBe(await expectedPrompt(scratch, undefined));
     expect(prompt).toContain(`${SKILL_INDEX_HEADING}\n`);
     expect(prompt).toContain('\naa-probe — a probe gone astray\n');
     expect(prompt).not.toContain('{SKILL_INDEX}');
@@ -942,13 +956,16 @@ describe('rafa plan through the adapter registry', () => {
     expect(readRecord(scratch)).toMatchObject({ request: { specPath: snapshot } });
   }, 30_000);
 
-  it('prints the dangerous.acceptStaleRefs pass line first and plans past check 4 with the setting on', () => {
+  it('prints one line for dangerous.acceptStaleRefs, the loader pass line ending with check 4\'s words, and plans past check 4 with the setting on', () => {
     const scratch = plantScratch({ body: GONE_BODY, config: 'dangerous:\n  acceptStaleRefs: true\n' });
 
     const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
 
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
-    expect(run.stdout.split('\n')[0]).toBe(`warn: ${acceptStaleRefsPassLine()}`);
+    const configFile = join(realpathSync(scratch.repo), '.rafa', 'config.yaml');
+    const lines = run.stdout.split('\n');
+    expect(lines[0]).toBe(`warn: dangerous.acceptStaleRefs: true (${configFile}, entry 0); ${ACCEPT_STALE_REFS_WORDS}`);
+    expect(lines.filter((line) => line.startsWith('warn:') && line.includes('dangerous.acceptStaleRefs'))).toHaveLength(1);
     expect(run.stdout).toContain('🔖 dangerous.acceptStaleRefs: re-stamped 1 reference of issue #20 as reviewed.');
     expect(existsSync(scratch.record)).toBe(true);
   }, 30_000);
@@ -976,14 +993,14 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('hands the planner a prompt holding progress.txt when --no-progress is not given', () => {
+  it('hands the planner a prompt holding progress.txt when --no-progress is not given', async () => {
     const scratch = plantScratch();
 
     const run = runPlan(scratch, 'plan', ['--spec=spec.md']);
 
-    expect(expectedPrompt(scratch, PROGRESS)).not.toBe(expectedPrompt(scratch, undefined));
+    expect(await expectedPrompt(scratch, PROGRESS)).not.toBe(await expectedPrompt(scratch, undefined));
     expect(run.exitCode).toBe(0);
-    expect(readRecord(scratch)['prompt']).toBe(expectedPrompt(scratch, PROGRESS));
+    expect(readRecord(scratch)['prompt']).toBe(await expectedPrompt(scratch, PROGRESS));
     expect(run.stdout).toContain('📎 Including findings from progress.txt (disable with --no-progress).');
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);

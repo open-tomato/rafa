@@ -24,15 +24,19 @@
  *      its deprecation lines when it has any and runs in an async scope
  *      of its own (see "The scope a command runs in"), with its
  *      context's output as the active output
- *      (`src/core/output/active.ts`) in the invocation's output mode,
+ *      (`packages/rafa/src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
- *      flags (`running.ts`), for a reader below its `run` to ask; a help
+ *      flags (`packages/rafa/src/core/command/running.ts`), for a reader below its
+ *      `run` to ask, with its `dangerous` phrases beside the record
+ *      (`packages/rafa/src/core/config/dangerous.ts`), which end the loader's pass
+ *      line of each key it declares; a help
  *      request, a version request, a refusal and `no_project` run no
  *      command and record none. Its context's `registry` is the one the
  *      line was routed through, with every module that loaded mounted on
  *      it, and its `project` the project resolved for it.
- *   6. The terminal result event is written, and the exit code answered.
+ *   6. The terminal result event is written, and the exit code answered
+ *      (`ending.ts`).
  *
  * A command that runs inside a project in text mode runs between the two
  * calls of the command hook, when the caller hands one in (see "The
@@ -49,7 +53,10 @@
  * for without a context handed down to it. Each invocation carries its
  * own in an async scope, an `AsyncLocalStorage` each of the four modules
  * holds (`runWithActiveOutput`, `runAsRunningCommand`,
- * `runWithActiveLogger`, `runWithLoggerSettings`): they are read inside
+ * `runWithActiveLogger`, `runWithLoggerSettings`), and the command's
+ * dangerous phrases in a fifth (`runWithDangerousPhrases`, set beside
+ * the running command's record and read by the loader's pass lines
+ * alone): they are read inside
  * the command's `run` and everything it awaits, and nothing of them is
  * left once it ends, whether it returns or throws. The dispatcher sets
  * and puts back no module-level value.
@@ -62,7 +69,7 @@
  * values and put the previous ones back in a `finally`, a stack: two
  * that overlapped and ended in the order they started left the first's
  * output and record for the rest of the process, and the spend guard
- * (`src/core/loop/claude.ts`) then refused every session a later test file
+ * (`packages/rafa/src/core/loop/claude.ts`) then refused every session a later test file
  * started, naming a command that had ended. The logger and its settings
  * were the same stack: each of the two read the other's while both ran,
  * and the last to end left a logger and settings of a command that had
@@ -94,7 +101,9 @@
  * as one line, and a result a command gave is written as the `text`
  * adapter writes one. Help and the version are text only: in json mode
  * each writes its two events and no text. Either way the terminal event is
- * answered with the exit code, in {@link DispatchOutcome}.
+ * answered with the exit code, in {@link DispatchOutcome}. `ending.ts`
+ * builds that event from how the route settled and writes it, in each
+ * mode.
  *
  * ## What a command writes through
  *
@@ -145,15 +154,29 @@
  *     with the thrown message, `rafa: <message>` on stderr in text mode,
  *     and the stack as a `debug` line.
  *
+ * Either throw is read by the error handler, `failureOf`
+ * (`src/errors/handler.ts`), with the command's subject and action as
+ * its boundary, so the error carries a `cause` and the `module` and
+ * `action`: a `RafaError` thrown, or one in a `CommandExit`'s `cause`
+ * chain, gives its own code, hint, module and action, and the line ends
+ * with the code in brackets, its hint on a line below in text mode.
+ *
  * A refusal from routing, `invalid_spec` or `no_project` ends with exit
- * code 1 and `rafa: <message>` on stderr in text mode. A terminal event
- * that cannot be written, such as a payload `JSON.stringify` refuses, is
- * replaced by the `result_unwritable` failure with exit code 1.
+ * code 1 and `rafa: <message>` on stderr in text mode, its `cause` the
+ * `cli:` code of its dispatcher code. A `no_project` built from a coded
+ * error the walk threw carries that error's code and hint instead, with
+ * the command's action where the error names none. An error thrown past
+ * the command, caught by the catch-all as `command_error`, is read with
+ * no boundary. A terminal event that cannot be written, such as a
+ * payload `JSON.stringify` refuses, is replaced by the
+ * `result_unwritable` failure with exit code 1. The ending each of these
+ * gives, the bracket and the hint line, and the fallback, are
+ * `ending.ts`'s.
  *
  * ## The project
  *
  * A command runs inside a project unless it declares
- * `needsProject: false` (`src/core/command/command.ts`), as
+ * `needsProject: false` (`packages/rafa/src/core/command/command.ts`), as
  * `module exec`, `init` and `describe` do.
  * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
@@ -207,7 +230,7 @@
  * command declares one. A help request names a command without running
  * it, and prints none.
  *
- * A flag declaring `deprecated` (`src/core/command/command.ts`) is read
+ * A flag declaring `deprecated` (`packages/rafa/src/core/command/command.ts`) is read
  * as its `use` when it is typed bare ahead of any `--`, spelled
  * `--<name>` or `-<name>`, or so for one of its aliases, which
  * `parseArgs` reads alike. The words of
@@ -219,30 +242,34 @@
  *
  *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
-import type { CliContext } from './core/types.js';
+import type { Ending } from './ending.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { LoggerResolver } from '../adapters/logger/active.js';
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
-import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '../ports/index.js';
+import type { FailureBoundary } from '../errors/handler.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '@open-tomato/rafa/ports';
 
 import { homedir } from 'node:os';
+
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { CommandExit , versionLine , runAsRunningCommand } from '@open-tomato/rafa/core/command';
+import { runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { CommandExit , versionLine } from '../core/command/index.js';
-import { runWithActiveOutput } from '../core/output/index.js';
+import { failureOf } from '../errors/handler.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';
+import { endingError, failure, finish, messageOf, success } from './ending.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
-import { runAsRunningCommand } from './running.js';
 
 /** What every refusal the dispatcher throws opens with. */
 const REFUSAL = 'dispatcher';
@@ -347,16 +374,6 @@ interface Settings {
   readonly commandHook: CommandHook | null;
 }
 
-/** How a route settled, before its terminal event is built. */
-interface Ending {
-  readonly exitCode: number;
-  /** The payload a command gave, or null. */
-  readonly payload: { readonly value: unknown } | null;
-  readonly error: { readonly code: DispatchErrorCode; readonly message: string } | null;
-  /** The line text mode writes to stderr, or null. */
-  readonly stderrLine: string | null;
-}
-
 /** An output that holds a command's result, and the payload it holds. */
 interface GuardedOutput {
   readonly output: Output;
@@ -439,23 +456,6 @@ export function readDeprecatedFlags(route: CommandRoute): DeprecatedFlagReading 
 /** The line a deprecated flag typed writes to stderr; see the module note. */
 export function deprecatedFlagLine(route: CommandRoute, flag: DeprecatedFlagTyped): string {
   return `rafa: "rafa ${route.label} ${flag.typed}" is deprecated; use "rafa ${route.label} ${flag.use}"`;
-}
-
-/** What was thrown, as a message. */
-function messageOf(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : String(error);
-}
-
-/** A failure with exit code 1 and the `rafa: <message>` stderr line. */
-function failure(code: DispatchErrorCode, message: string): Ending {
-  return { exitCode: 1, payload: null, error: { code, message }, stderrLine: `rafa: ${message}` };
-}
-
-/** A success, carrying the payload a command gave. */
-function success(payload: { readonly value: unknown } | null): Ending {
-  return { exitCode: 0, payload, error: null, stderrLine: null };
 }
 
 /**
@@ -555,6 +555,11 @@ function assemble(route: Route, settings: Settings): { base: CliContext; problem
   }
 }
 
+/** The command that ran, as the error handler reads it: its subject as the module, and its action. */
+function boundaryOf(command: RafaCommand): FailureBoundary {
+  return { module: command.subject, action: command.action };
+}
+
 /** Runs a routed command with its context; see the module note. */
 async function runCommand(
   route: CommandRoute,
@@ -580,38 +585,45 @@ async function runCommand(
     await runWithCommandLogger(logger, async () => runAsRunningCommand(
       route.command,
       base.flags,
-      async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+      async () => runWithDangerousPhrases(
+        route.command.dangerous,
+        async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+      ),
     ));
     return success(guarded.payload());
   } catch (error) {
+    const found = failureOf(error, boundaryOf(route.command));
     if (!(error instanceof CommandExit)) {
       if (error instanceof Error && error.stack !== undefined) base.output.debug(error.stack);
-      return failure('command_error', messageOf(error));
+      return failure('command_error', messageOf(error), found);
     }
     if (error.exitCode === 0) {
       if (error.message !== '') base.output.info(error.message);
       return success(guarded.payload());
     }
+    const message = error.message === ''
+      ? `exit code ${error.exitCode}`
+      : error.message;
     return {
       exitCode: error.exitCode,
       payload: null,
-      error: {
-        code: 'command_exit',
-        message: error.message === ''
-          ? `exit code ${error.exitCode}`
-          : error.message,
-      },
+      error: endingError('command_exit', message, found),
       stderrLine: error.message === ''
         ? null
         : error.message,
+      coded: found.coded,
     };
   }
 }
 
-/** Where a command runs: in a project, outside any for one needing none, or refused with a message. */
+/**
+ * Where a command runs: in a project, outside any for one needing none,
+ * or refused with a message and the error the walk threw, null for its
+ * plain answer that no project holds the working directory.
+ */
 type Placement =
   | { readonly kind: 'placed'; readonly project: ProjectFound | null }
-  | { readonly kind: 'refused'; readonly message: string };
+  | { readonly kind: 'refused'; readonly message: string; readonly error: ScopeError | null };
 
 /** Resolves the project a command runs in; see the module note. */
 function placeCommand(command: RafaCommand, settings: Settings): Placement {
@@ -620,10 +632,10 @@ function placeCommand(command: RafaCommand, settings: Settings): Placement {
     const scope = resolveScope(settings.cwd(), { home: settings.home() });
     return scope.found
       ? { kind: 'placed', project: scope }
-      : { kind: 'refused', message: scope.hint };
+      : { kind: 'refused', message: scope.hint, error: null };
   } catch (error) {
     if (!(error instanceof ScopeError)) throw error;
-    return { kind: 'refused', message: error.message };
+    return { kind: 'refused', message: error.message, error };
   }
 }
 
@@ -644,6 +656,21 @@ async function callHook<T>(half: 'before' | 'after', call: () => Promise<T>, bas
   }
 }
 
+/**
+ * The `no_project` failure a refused placement ends as. The error the
+ * walk threw is read by the error handler with the command's boundary,
+ * and lends the failure its cause, hint, module and action only when it
+ * is coded, since the command never ran; see the module note.
+ */
+function refusedPlacement(placement: Extract<Placement, { kind: 'refused' }>, command: RafaCommand): Ending {
+  const found = placement.error === null
+    ? null
+    : failureOf(placement.error, boundaryOf(command));
+  return failure('no_project', placement.message, found?.coded === true
+    ? found
+    : null);
+}
+
 /** Runs a command whose spec was read in the project it needs, or ends as `no_project`; see the module note. */
 async function settleCommand(
   route: CommandRoute,
@@ -652,7 +679,7 @@ async function settleCommand(
   settings: Settings,
 ): Promise<Ending> {
   const placement = placeCommand(route.command, settings);
-  if (placement.kind === 'refused') return failure('no_project', placement.message);
+  if (placement.kind === 'refused') return refusedPlacement(placement, route.command);
   const { project } = placement;
   const hook = base.outputMode === 'text'
     ? settings.commandHook
@@ -692,48 +719,6 @@ async function settle(
   }
 }
 
-/** The terminal event an ending is told as. */
-function resultEvent(ending: Ending, now: () => Date): CliEventResult {
-  const ts = now().toISOString();
-  if (ending.error !== null) return { type: 'result', ok: false, error: { ...ending.error }, ts };
-  return ending.payload === null
-    ? { type: 'result', ok: true, ts }
-    : { type: 'result', ok: true, data: ending.payload.value, ts };
-}
-
-/**
- * Writes an ending's terminal event, or in text mode what a person reads
- * of it. In events mode a failed ending is one `rafa· error` line on
- * stdout, its exit code when it carries no message, so a watcher reading
- * only those lines sees how the run ended.
- */
-function writeEnding(ending: Ending, event: CliEventResult, base: CliContext, settings: Settings): void {
-  if (base.outputMode === 'json') {
-    base.output.emit(event);
-    return;
-  }
-  if (base.outputMode === 'events') {
-    if (ending.exitCode !== 0) base.output.error(ending.stderrLine ?? `exit code ${ending.exitCode}`);
-    return;
-  }
-  if (ending.stderrLine !== null) settings.stderr.write(`${ending.stderrLine}\n`);
-  if (ending.payload !== null) base.output.result(ending.payload.value);
-}
-
-/** Writes the terminal event, falling back to `result_unwritable`, and answers the outcome. */
-function finish(ending: Ending, base: CliContext, settings: Settings): DispatchOutcome {
-  const event = resultEvent(ending, settings.now);
-  try {
-    writeEnding(ending, event, base, settings);
-    return { exitCode: ending.exitCode, result: event };
-  } catch (error) {
-    const fallback = failure('result_unwritable', `the result could not be written: ${messageOf(error)}`);
-    const fallbackEvent = resultEvent(fallback, settings.now);
-    writeEnding(fallback, fallbackEvent, base, settings);
-    return { exitCode: fallback.exitCode, result: fallbackEvent };
-  }
-}
-
 /**
  * Runs one invocation of rafa over the words of its line, `process.argv`
  * without the runtime and the script, and answers its exit code and
@@ -764,7 +749,7 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
   try {
     ending = await settle(route, base, problem, loaded.registry, settings);
   } catch (error) {
-    ending = failure('command_error', messageOf(error));
+    ending = failure('command_error', messageOf(error), failureOf(error, null));
   }
   return finish(ending, base, settings);
 }

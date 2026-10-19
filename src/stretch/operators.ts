@@ -43,10 +43,11 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RAFA_VERSION } from '../core/command/index.js';
-import { errorCode } from '../core/loop/index.js';
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { errorCode } from '@open-tomato/rafa/core/loop';
+import { realEntry } from '@open-tomato/rafa/schema/tiers';
+
 import { readManifestVersion } from '../release/version.js';
-import { realEntry } from '../schema/tiers.js';
 
 import { stretchFolder } from './folder.js';
 

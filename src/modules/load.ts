@@ -16,8 +16,8 @@
  * A source names its module by what phase 1 can read of it:
  *
  *   - `path`: the directory, resolved against the project root when the
- *     project's `.rafa/config.yaml` gives `modules:` and against the home
- *     when the user scope's does. Its `package.json` is read, and the
+ *     project's config gives `modules:` and against the home when the
+ *     user scope's does. Its `package.json` is read, and the
  *     module's name is that file's `name`, its manifest the `rafa` key.
  *   - `npm`: the package name. Refused: installing a package is phase 7's.
  *   - `github`: the `owner/repo` it names. Refused, for the same reason.
@@ -72,11 +72,27 @@
  * ## Where the answer goes
  *
  * `src/rafa.ts` calls {@link loadInvocationModules} before it dispatches,
- * handing the dispatcher the command entries and the warnings. The
- * adapter registry it answers reaches no reader yet: `resolveTracker`,
- * `selectEffortStore` and `rafa plan` resolve through
- * `CORE_ADAPTER_REGISTRY`, so a module's `tracker.default: linear` is
- * registered and listed by `rafa module list`, and selected by nothing.
+ * handing the dispatcher the command entries and the warnings, and hands
+ * the adapter registry it answers to `activateModuleAdapters`
+ * (`activate.ts`), which makes it the active registry. So
+ * `resolveTracker`, `selectEffortStore` and `rafa plan`, resolving
+ * through `CORE_ADAPTER_REGISTRY`, find a loaded module's kind for the
+ * rest of the invocation.
+ *
+ * Handed no registry, {@link loadModules} registers on
+ * `baseAdapterRegistry()`, the registry activation replaced, holding
+ * core's adapters and no module's: a second load from the config, as
+ * `rafa module list` makes, then finds no module's kind already held.
+ *
+ * ## Disabled features
+ *
+ * {@link moduleSettings} reads the `features` section off the resolved
+ * config with {@link disabledFeatures}: the name of each bundled feature
+ * whose `features.<name>` resolved `false`, the project's file
+ * outranking the user scope's. {@link loadModules} hands that list on
+ * untouched as `LoadedModules.disabledFeatures`, and answers it empty
+ * when its settings carry none, as {@link noModules} does. Nothing here
+ * acts on it: the list is what the invocation's composition root reads.
  *
  * ## Prototype keys
  *
@@ -87,19 +103,23 @@
  */
 import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
 import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
-import type { AdapterRegistry, AnyAdapter } from '../core/adapters/index.js';
-import type { ModuleSource, ResolvedConfig } from '../core/config/index.js';
+import type { FeaturesSettings } from '../config-schema-features.js';
+import type { AdapterRegistry, AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { ModuleSource, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { importModuleEntry } from '../cli/modules.js';
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { FEATURES_SETTINGS } from '../config-schema-features.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
+import { baseAdapterRegistry } from './activate.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 
 /** What a configured module came to. */
@@ -139,6 +159,8 @@ export interface LoadedModules {
   readonly modules: readonly ConfiguredModule[];
   /** One sentence per problem of an enabled module, and per `allowList:` name no source gives. */
   readonly warnings: readonly string[];
+  /** The bundled features whose `features.<name>` resolved `false`, by name, in `FEATURES_SETTINGS` order. */
+  readonly disabledFeatures: readonly string[];
 }
 
 /** What {@link loadModules} reads of a config. */
@@ -147,6 +169,8 @@ export interface ModuleSettings {
   readonly allowList: readonly string[];
   /** The absolute directory a relative `path` source resolves against. */
   readonly base: string;
+  /** The bundled features turned off, handed on as `LoadedModules.disabledFeatures`. None when left out. */
+  readonly disabledFeatures?: readonly string[];
 }
 
 /** What the loader reaches the system through. Each left out is the running one. */
@@ -157,7 +181,7 @@ export interface ModuleLoadSeams {
   readonly readText?: (path: string) => string;
   /** The rafa and port versions a manifest is held to. The running ones when left out. */
   readonly manifest?: ManifestSeams;
-  /** The registry adapters are registered on. `CORE_ADAPTER_REGISTRY` when left out. */
+  /** The registry adapters are registered on. `baseAdapterRegistry()` (`activate.ts`) when left out. */
   readonly adapters?: AdapterRegistry;
 }
 
@@ -333,7 +357,7 @@ function repeatedName(name: string | null, at: string, seen: ReadonlyMap<string,
 export async function loadModules(settings: ModuleSettings, seams: ModuleLoadSeams = {}): Promise<LoadedModules> {
   const importModule = seams.importModule ?? importModuleEntry;
   const allowed = new Set(settings.allowList);
-  let adapters = seams.adapters ?? CORE_ADAPTER_REGISTRY;
+  let adapters = seams.adapters ?? baseAdapterRegistry();
   const seen = new Map<string, string>();
   const modules: ConfiguredModule[] = [];
   const commands: ModuleCommandEntry[] = [];
@@ -393,7 +417,23 @@ export async function loadModules(settings: ModuleSettings, seams: ModuleLoadSea
     commands: Object.freeze(commands),
     modules: Object.freeze(modules),
     warnings: Object.freeze(warnings),
+    disabledFeatures: Object.freeze([...(settings.disabledFeatures ?? [])]),
   });
+}
+
+/** The prefix every `features` key opens with, cut to leave the feature's name. */
+const FEATURE_KEY_PREFIX = 'features.';
+
+/**
+ * The bundled features a resolved config turns off: the name each
+ * `features.<name>` key that resolved `false` gives, in the order
+ * `FEATURES_SETTINGS` (`src/config-schema-features.ts`) lists them.
+ */
+export function disabledFeatures(config: RafaConfig): readonly string[] {
+  const settings = Object.keys(FEATURES_SETTINGS) as (keyof FeaturesSettings)[];
+  return Object.freeze(settings
+    .filter((setting) => config[setting] === false)
+    .map((setting) => FEATURES_SETTINGS[setting].key.slice(FEATURE_KEY_PREFIX.length)));
 }
 
 /** What {@link loadModules} reads of a resolved config, relative `path` sources resolving against the layer that gave them. */
@@ -404,6 +444,7 @@ export function moduleSettings(resolved: ResolvedConfig, place: { readonly root:
     base: resolved.sources.modules === 'user'
       ? place.home
       : place.root,
+    disabledFeatures: disabledFeatures(resolved.config),
   };
 }
 
@@ -414,6 +455,7 @@ function noModules(): LoadedModules {
     commands: Object.freeze([]),
     modules: Object.freeze([]),
     warnings: Object.freeze([]),
+    disabledFeatures: Object.freeze([]),
   });
 }
 
@@ -438,7 +480,7 @@ export async function loadInvocationModules(place: InvocationPlace, seams: Modul
   try {
     const scope = resolveScope(place.cwd, { home: place.home });
     if (!scope.found) return noModules();
-    const resolved = loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
+    const resolved = await loadConfig({ root: scope.root, home: scope.home }, {}, () => {});
     return await loadModules(moduleSettings(resolved, scope), seams);
   } catch (error) {
     if (error instanceof ConfigError || error instanceof ScopeError) return noModules();

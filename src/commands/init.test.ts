@@ -79,7 +79,9 @@
  */
 import type { InitResult, InitSeams } from './init.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+
+import '../adapter-registry.js';
 
 import {
   existsSync,
@@ -98,8 +100,9 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { parseConfigText } from '@open-tomato/rafa/core/config';
+
 import { BOARD_LABELS } from '../board/setup.js';
-import { parseConfigText } from '../core/config/index.js';
 import { readBinPath } from '../project/bin-path.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
@@ -233,19 +236,22 @@ interface FakeGhOptions {
 
 /**
  * A `gh` runner over one imaginary repository, private and holding no
- * label and no issue, keeping the first two words of every call. What
+ * label and no issue, keeping the first two words of every call and the
+ * last argument of every `gh issue create`, its body. What
  * each part of the board comes to is held in `init-board.test.ts` and
  * `src/board/setup.test.ts`; this is here so a case can drive the step
  * through the command without reaching GitHub.
  */
 function fakeGh(options: FakeGhOptions = {}) {
   const routes: string[] = [];
+  const bodies: string[] = [];
   const labels: string[] = [];
   const fails = options.fails ?? {};
 
   const run: GhRunner = (args) => {
     const route = args.slice(0, 2).join(' ');
     routes.push(route);
+    if (route === 'issue create') bodies.push(args.at(-1) ?? '');
     const failure = fails[route];
     if (failure !== undefined) return Promise.resolve({ ok: false, stdout: '', stderr: failure });
 
@@ -262,7 +268,7 @@ function fakeGh(options: FakeGhOptions = {}) {
     return Promise.resolve({ ok: false, stdout: '', stderr: `no route for ${route}` });
   };
 
-  return { run, routes: () => [...routes] };
+  return { run, routes: () => [...routes], bodies: () => [...bodies] };
 }
 
 /** Every path under `dir`, `dir` first. */
@@ -817,6 +823,31 @@ describe('the board step', () => {
     expect(readFileSync(join(world.repo, '.rafa', 'config.yaml'), 'utf8')).toContain('roadmap:\n  issue: 7');
     expect(existsSync(join(world.repo, '.github', 'ISSUE_TEMPLATE', 'spec.md'))).toBe(true);
     expect(gh.routes()).toContain('label create');
+  });
+
+  it('opens the Roadmap issue under the naming.branch the project config already sets, and under feat/ without it', async () => {
+    const templated = plantWorld();
+    const control = plantWorld();
+    mkdirSync(join(templated.repo, '.rafa'));
+    writeFileSync(join(templated.repo, '.rafa', 'config.yaml'), `${projectConfigText()}naming:\n  branch: work/{stub}\n`);
+    const ghTemplated = fakeGh();
+    const ghControl = fakeGh();
+    const onGitHub = (world: World, gh: ReturnType<typeof fakeGh>) => seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+      gh: () => gh.run,
+    });
+
+    const run = await init(templated, ['--yes', '--board'], onGitHub(templated, ghTemplated));
+    const plain = await init(control, ['--yes', '--board'], onGitHub(control, ghControl));
+
+    expect([run.exitCode, plain.exitCode]).toEqual([0, 0]);
+    expect(ghTemplated.routes()).toContain('issue list');
+    expect(ghTemplated.bodies()).toHaveLength(1);
+    expect(ghTemplated.bodies()[0]).toContain('the branch `work/rafa-<n>-<slug>`');
+    expect(ghTemplated.bodies()[0]).not.toContain('feat/');
+    expect(ghControl.bodies()).toHaveLength(1);
+    expect(ghControl.bodies()[0]).toContain('the branch `feat/rafa-<n>-<slug>`');
+    expect(ghControl.bodies()[0]).not.toContain('work/');
   });
 
   it('gives the step as the board of the result in json mode, and warns what it came back with', async () => {

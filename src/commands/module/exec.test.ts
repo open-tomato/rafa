@@ -9,8 +9,10 @@
  * `src/cli/modules.test.ts` holds. The control for the bare refusal is
  * the same line with a module and an action after it, which runs.
  */
-import type { OutputStream } from '../../adapters/output/stream.js';
-import type { RafaCommand } from '../../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

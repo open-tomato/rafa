@@ -97,12 +97,13 @@ import type { EpicTickOptions } from '../../board/epic-tick.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
 import { tickEpics } from '../../board/epic-tick.js';
 import { createGhRoadmapBody, tickRoadmapIssue } from '../../board/roadmap-tick.js';
 import { closedIssuesIn, createGhRoadmapSearch, parseRoadmapBody } from '../../board/roadmap.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
-import { messageOf } from '../../core/config/sections.js';
 
 /** What {@link tickRoadmapAfterMerge} is asked: what the epic tick reads, and what the boards add. */
 export interface MergeTickOptions extends EpicTickOptions {

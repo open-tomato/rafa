@@ -48,7 +48,7 @@
  * `effort collect` and `effort report` each throw one on a refusal, and
  * `start` also when a task is interrupted.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 /** The global flag the dispatcher reads the output mode from, which no phase 0 command is handed. */
 const OUTPUT_FLAG = 'output';

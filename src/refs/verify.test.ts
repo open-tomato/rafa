@@ -28,7 +28,7 @@
 import type { RefVerifySeams, SymbolOutliner } from './verify.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -37,10 +37,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
-import { SETTINGS } from '../core/config/index.js';
-import { createGitRunner } from '../core/git/index.js';
+import { SETTINGS } from '../config-registry.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner, verifyRef } from './verify.js';
@@ -101,7 +102,7 @@ const COMMITTED: Readonly<Record<string, string>> = {
     'callOnly(INLINE, typedValue, FIXTURE);',
     '',
   ].join('\n'),
-  'src/report/record.ts': 'export const RECORD_KIND = \'record\';\n',
+  'packages/rafa/src/report/record.ts': 'export const RECORD_KIND = \'record\';\n',
   'src/one/index.ts': 'export {};\n',
   'src/two/index.ts': 'export {};\n',
   'docs/guide.md': '# Guide\n',
@@ -317,7 +318,7 @@ describe('a path', () => {
   it('reads a path written short as the one tracked file it ends', async () => {
     const verify = createRefVerifier(seams());
 
-    expect(await verify({ kind: 'path', text: 'report/record.ts' })).toEqual(blobFingerprint(hashOf('src/report/record.ts')));
+    expect(await verify({ kind: 'path', text: 'report/record.ts' })).toEqual(blobFingerprint(hashOf('packages/rafa/src/report/record.ts')));
     expect(await verify({ kind: 'path', text: 'guide.md' })).toEqual(blobFingerprint(hashOf('docs/guide.md')));
     expect(await verify({ kind: 'path', text: 'report/' })).toEqual(PRESENT);
   });

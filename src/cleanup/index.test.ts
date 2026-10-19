@@ -13,9 +13,9 @@
  * none of the remote-only calls past that listing proves none ran.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { MergedPullRequest, PullRequestSummary } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,8 +24,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+
 import { formatClaimMessage } from '../claims/record.js';
-import { runsDir, sessionFilePath } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';

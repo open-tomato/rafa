@@ -34,9 +34,9 @@
  */
 import type { CleanupSettings } from './index.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 /** What a cleanup reading that never fetches reads from. */
 export interface DoctorCleanupInput {

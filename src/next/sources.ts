@@ -252,13 +252,19 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { ConfigRoots } from '../core/config/load.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
@@ -267,11 +273,6 @@ import { createGhSpecIssueReader } from '../board/issue.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { readCurrentPlace } from '../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
-import { CommandExit } from '../core/command/index.js';
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
-import { readRecords, resolveLoopSeams } from '../core/loop/readings.js';
-import { plansDirAt } from '../core/plan/index.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { readEpicEndRelease } from './epic-end.js';
@@ -321,6 +322,11 @@ export interface NextBoardOptions {
   readonly configured: number | null;
   /** The remote the pushed half of the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /**
+   * `naming.branch`, the template the branch scan matches a claim branch
+   * by; the default, `feat/{stub}`, when left out.
+   */
+  readonly branchTemplate?: string;
   /** The board listing the walk reads, for a caller that reads it too; `createGhBoardListing` over `gh` when left out. */
   readonly listing?: BoardListing;
   /** The project root whose position file names the current place; left out, the walk starts from the default board. */
@@ -346,7 +352,7 @@ export interface NextBoardOptions {
 }
 
 /** The settings the composition reads off the config. */
-type NextConfig = Pick<RafaConfig, 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
+type NextConfig = Pick<RafaConfig, 'namingBranch' | 'planDir' | 'prBase' | 'prProvider' | 'releaseChangelog' | 'roadmapIssue' | keyof MergeGuardSettings>;
 
 /** `read`, called at most once per issue; the module note holds how long the memo lives. */
 function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
@@ -383,7 +389,7 @@ async function cancelledNotices(listing: BoardListing): Promise<readonly string[
  * for the problems it carries.
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
-  const { gh, git, configured, remote, root, relations } = options;
+  const { gh, git, configured, remote, root, relations, branchTemplate } = options;
   const listed = options.listing ?? createGhBoardListing(relations === undefined
     ? { gh }
     : { gh, mode: relations.mode });
@@ -411,7 +417,7 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
         : await readCurrentPlace(root, listing, fallback);
       const roadmap = current?.place?.board ?? fallback;
       const epic = current?.place?.epic ?? null;
-      const branches = scanClaimBranches(git, remote);
+      const branches = scanClaimBranches(git, remote, branchTemplate);
       const readings = createRoadmapReadings({
         issues,
         branches,
@@ -474,9 +480,9 @@ function nextProject(context: RafaContext): ProjectFound {
 }
 
 /** The settings the composition reads, or the exit-1 refusal of a config that cannot be used. */
-function nextConfig(project: ProjectFound, warn: (message: string) => void): NextConfig {
+async function nextConfig(project: ProjectFound, warn: (message: string) => void): Promise<NextConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, [
@@ -539,13 +545,13 @@ export interface OpenedNextSources extends NextSources {
  * read off git, the board or the provider here: every reading is a
  * function the table calls only where a row asks for it.
  */
-export function openNextSources(
+export async function openNextSources(
   context: RafaContext,
   seams: NextSourceSeams = DEFAULT_NEXT_SOURCE_SEAMS,
   options: NextSourcesOptions = {},
-): OpenedNextSources {
+): Promise<OpenedNextSources> {
   const project = nextProject(context);
-  const config = nextConfig(project, (message: string) => {
+  const config = await nextConfig(project, (message: string) => {
     context.output.warn(message);
   });
   requireGhProvider(resolvePrProvider({
@@ -563,6 +569,7 @@ export function openNextSources(
     gh,
     git,
     configured: config.roadmapIssue,
+    branchTemplate: config.namingBranch,
     root: project.root,
     noticeCancelled: true,
     ...roadmap
@@ -579,6 +586,7 @@ export function openNextSources(
     runs: (): readonly SessionRecord[] => readRecords(project.root, loop),
     git,
     pulls,
+    branchTemplate: config.namingBranch,
     ...roadmap
       ? { roadmap: Object.freeze({ ownerApproval: nextOwnerGate({ gh, root: project.root, pulls, configured: config.roadmapIssue }) }) }
       : {},

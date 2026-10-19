@@ -18,12 +18,12 @@ import type { GhResult } from '../adapters/tracker/github.js';
 import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { PullRequestDetail, PullRequestState } from '../pr/types.js';
 import type { Position } from '../project/position.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

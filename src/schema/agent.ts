@@ -38,7 +38,7 @@
  */
 import type { Provenance, ProvenanceIssueCode } from './provenance.js';
 
-import { isAgentName } from '../utils/declaration.js';
+import { isAgentName } from '@open-tomato/rafa/core/plan';
 
 import { checkProvenance, readProvenance } from './provenance.js';
 

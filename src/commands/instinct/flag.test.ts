@@ -18,8 +18,10 @@
  * is read off the same adapter's `pullBlessed` before the flag, where
  * the lesson is blessed, and after it, where it is not.
  */
-import type { AnyAdapter } from '../../core/adapters/index.js';
-import type { BlessedBundle, Learning, MergeResult } from '../../ports/index.js';
+import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
+import type { BlessedBundle, Learning, MergeResult } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,8 +29,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+
 import { createLocalLearning, localInstinctsDir } from '../../adapters/learning/local.js';
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';

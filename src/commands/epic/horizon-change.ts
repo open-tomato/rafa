@@ -91,8 +91,13 @@ import type { Epic } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { applyHorizonChange, EPIC_HORIZON_REFUSAL_EXIT, readHorizonChange } from '../../board/epic-horizon.js';
@@ -108,16 +113,10 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
+import { DEFER_TARGETS, PROMOTE_TARGETS, TO_FLAG } from './declarations.js';
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';
-
-/** The flag naming the horizon the epic moves to. */
-export const TO_FLAG = 'to';
 
 /** An issue number as a line types it: a whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -138,14 +137,14 @@ export interface HorizonAction {
 /** `rafa epic defer`'s action. */
 export const DEFER_ACTION: HorizonAction = Object.freeze({
   name: 'defer',
-  targets: Object.freeze(['next', 'later'] as const),
+  targets: DEFER_TARGETS,
   usage: 'rafa epic defer <n> --to=next|later [--reason="<why>"]',
 });
 
 /** `rafa epic promote`'s action. */
 export const PROMOTE_ACTION: HorizonAction = Object.freeze({
   name: 'promote',
-  targets: Object.freeze(['now', 'next'] as const),
+  targets: PROMOTE_TARGETS,
   usage: 'rafa epic promote <n> --to=now|next [--reason="<why>"]',
 });
 
@@ -370,7 +369,7 @@ async function closeWork(board: IssueBoard, change: HorizonChange, reason: strin
 export async function changeEpicHorizon(context: RafaContext, action: HorizonAction, seams: EpicHorizonSeams): Promise<EpicHorizonResult> {
   const line = readHorizonLine(context, action);
   const project = issueProject(context);
-  const config = issueSubjectConfig(project, (message) => {
+  const config = await issueSubjectConfig(project, (message) => {
     context.output.warn(message);
   });
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
@@ -380,6 +379,7 @@ export async function changeEpicHorizon(context: RafaContext, action: HorizonAct
     epic: line.epic,
     to: line.to,
     git: seams.git ?? createGitRunner(project.root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(project.root, config.planDir).path),
   });

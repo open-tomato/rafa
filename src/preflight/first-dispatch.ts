@@ -56,8 +56,8 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { readRafaBlocks } from '../core/plan/block-reader.js';
-import { trackerPathFor } from '../utils/tracker.js';
+import { trackerPathFor } from '@open-tomato/rafa/core/plan';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 /** A ticked task line, as the loop and an operator write one. */
 const TICKED_TASK = /^- \[[xX]\] (.+)/;

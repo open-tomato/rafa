@@ -68,6 +68,8 @@
  * (`claimsOf`) and the rows' `has` column read the same answers. The
  * claims also weigh each branch's claim as the roadmap walk does, so a
  * released claim's branch still shows under `has` but claims nothing.
+ * The scan reads a claim branch under the config's `naming.branch`
+ * alone, `feat/rafa-<n>-<slug>` by default.
  *
  * ## What it writes
  *
@@ -129,10 +131,15 @@ import type { Epic, EpicRelations, Epics } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { TableStyle } from '../issue/roadmap-table.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
@@ -149,10 +156,6 @@ import {
   parseRoadmapBody,
   ROADMAP_REFUSAL_EXIT,
 } from '../../board/roadmap.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { roadmapBoard } from '../issue/list.js';
@@ -160,6 +163,8 @@ import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
 import { readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
+
+import { EPIC_SHOW_DECLARATION } from './declarations.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa epics [<n>] [--labels] [--texts] [--refresh]';
@@ -334,6 +339,7 @@ function rowSeams(context: RafaContext, seams: EpicShowSeams, config: RafaConfig
   return onceSeams({
     board,
     git: seams.git ?? createGitRunner(root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(root, config.planDir).path),
     refs,
@@ -355,7 +361,7 @@ export async function readEpicsView(context: RafaContext, seams: EpicShowSeams):
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const read = rowSeams(context, seams, config, gh);
   const roadmap = asked === null
@@ -416,66 +422,7 @@ export async function runEpics(context: RafaContext, seams: EpicShowSeams): Prom
 /** The command, reading the board with `seams`; see the module note. */
 export function createEpicShowCommand(seams: EpicShowSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic show',
-    subject: 'epic',
-    action: 'show',
-    summary: 'list one epic\'s issues as the Roadmap table: the epic numbered, or the first now epic not done',
-    description: 'Prints one epic\'s issues as `rafa roadmap` prints its spec lines, with the spec, blocked by,'
-      + ' has and refs columns: the unticked lines of the epic\'s checklist in its order, then its open members'
-      + ' missing from the checklist by number. The epic is the type:epic issue numbered, or, with no number,'
-      + ' the current place\'s epic, the one `rafa switch` moved to; a place naming a board alone, or no'
-      + ' position file, takes the first epic that board (with no position file `roadmap.issue`, else the'
-      + ' lowest-numbered open type:roadmap board, else the open issue titled Roadmap) names that is open,'
-      + ' horizon:now and not done, the one `rafa next` walks into. The table is headed by the epic\'s title,'
-      + ' computed state and done/total, and a stored state disagreeing with the computed one is printed'
-      + ' under it. No issue of another epic is named. Each label problem about the epic and each reading that'
-      + ' failed is warned about; an unreachable board prints the epic unknown with the reason. With'
-      + ' `--output=json` the epic, its rows, its problems and the warnings are the data of the terminal result'
-      + ' event. `rafa epics` and `rafa epic` are the same command, typed by the subject alone.',
-    args: [
-      {
-        name: 'n',
-        description: 'The epic\'s issue number on the GitHub board. Left out, the current place\'s epic, else the first now epic on its board that is not done.',
-        type: 'string',
-        required: false,
-      },
-    ],
-    flags: [
-      {
-        name: 'labels',
-        description: 'Print each issue\'s labels on a row of their own under it; they are no column.',
-        type: 'boolean',
-      },
-      {
-        name: 'texts',
-        description: 'Spell the spec and blocked by columns in words instead of symbols, with no legend.',
-        type: 'boolean',
-        aliases: ['t'],
-      },
-      {
-        name: 'refresh',
-        description: 'Read the whole board again instead of only what changed since the listing kept under .rafa/cache/.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic show',
-        note: 'Prints the issues of the epic `rafa next` is walking: the first now epic on the Roadmap not done.'
-          + ' `rafa epics` prints the same.',
-      },
-      {
-        cmd: 'rafa epic show 252',
-        note: 'Prints the issues of epic #252, whatever its horizon, in its checklist\'s order, as `rafa epics 252` does.',
-      },
-      {
-        cmd: 'rafa epic show 252 --output=json',
-        note: 'Writes a result event whose data holds epic #252 as computed, its rows and its label problems.',
-      },
-    ],
-    outputs: ['text', 'json'],
-    aliases: ['epic'],
-    lastingAliases: ['epic'],
+    ...EPIC_SHOW_DECLARATION,
     run: (context) => runEpics(context, seams),
   };
   return Object.freeze(command);

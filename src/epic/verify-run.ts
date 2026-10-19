@@ -113,18 +113,19 @@
  * command. Every check runs whatever the ones before it answered.
  */
 import type { CriterionCheck } from './verify-plan.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
-import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
-import type { RafaBlock } from '../core/plan/block-reader.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
-import { claudeArgs, spawnClaudeCaptured } from '../core/loop/index.js';
-import { readRafaBlocks } from '../core/plan/block-reader.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 import { shellQuote } from '../pr/preflight-items.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';

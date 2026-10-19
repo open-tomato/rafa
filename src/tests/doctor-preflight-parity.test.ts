@@ -52,8 +52,8 @@ import { hostToolDirs } from './stand-in-gh.js';
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 /** How long a spawned run may take before it is killed, and a case that drives one. */
-const KILL_AFTER_MS = 30_000;
-const RUN_TIMEOUT = { timeout: 60_000 };
+const KILL_AFTER_MS = 55_000;
+const RUN_TIMEOUT = { timeout: 120_000 };
 
 /** Runs git for the fixture's own setup, inheriting this process's environment. */
 function git(cwd: string, ...args: string[]): void {

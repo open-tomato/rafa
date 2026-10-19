@@ -13,7 +13,7 @@
  * ```
  *
  * Each is callable on its own and none of them knows about the other
- * two: the git seam is {@link GitRunner} from `src/core/git/git.ts`,
+ * two: the git seam is {@link GitRunner} from `packages/rafa/src/core/git/git.ts`,
  * the level is whatever `./level.ts` resolved, and the write takes a path
  * and a string. So `./version.test.ts` drives the middle step from
  * literals, the first from a fake runner beside one real repository,
@@ -111,13 +111,13 @@
  * equal to the parse of the original. A candidate that fails either
  * check is skipped and the next pair tried.
  */
-import type { GitRunner } from '../core/git/index.js';
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 /** The remote the base version is read from, unless a caller names another. */
 export const RELEASE_REMOTE = 'origin';
@@ -239,6 +239,23 @@ export function readManifestVersion(text: string): string | null {
   const fields = manifestFields(text);
   if (fields === null) return null;
   const value = fields['version'];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === ''
+    ? null
+    : trimmed;
+}
+
+/**
+ * The `name` a manifest's text declares, trimmed, or null when the text
+ * is no JSON object or its `name` is absent, blank or not a string. The
+ * sibling of {@link readManifestVersion}: settle reads it to tell rafa's
+ * own manifest from a project's (`./settle-lock.ts`).
+ */
+export function readManifestName(text: string): string | null {
+  const fields = manifestFields(text);
+  if (fields === null) return null;
+  const value = fields['name'];
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed === ''

@@ -9,16 +9,20 @@
  * so a module that renames the key or moves the default fails rather
  * than agreeing with itself.
  */
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
+
 import { describe, expect, it } from 'bun:test';
 
-import { WRAP_UP_DEFAULTS, wrapUpRetries } from './config-schema-wrap-up.js';
 import {
-  CONFIG_DEFAULTS,
   ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
   parseConfigText,
   resolveConfig,
-  SETTINGS,
-} from './core/config/index.js';
+} from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
+import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, wrapUpRetries } from './config-schema-wrap-up.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -108,5 +112,38 @@ describe('through a file', () => {
     const error = refusal(() => parseConfigText(`loop:\n  wrapUp:\n    retries: ${spelled}\n`, PATH));
 
     expect(error.message).toContain(`${KEY} is ${spelled}, ${EXPECTED}`);
+  });
+});
+
+describe('the section', () => {
+  it('is package wrap-up, defining its keys in this order with these defaults, with no check', () => {
+    expect(WRAP_UP_SECTION.package).toBe('wrap-up');
+    expect(Object.entries(WRAP_UP_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['loopWrapUpRetries', 'loop.wrapUp.retries'],
+    ]);
+    expect(WRAP_UP_SECTION.defaults).toEqual({
+      loopWrapUpRetries: 1,
+    });
+    expect(WRAP_UP_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(WRAP_UP_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(WRAP_UP_SECTION)).toBe(true);
+    expect(Object.isFrozen(WRAP_UP_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(WRAP_UP_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [WRAP_UP_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['wrap-up']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(WRAP_UP_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(WRAP_UP_SECTION.settings).sort());
   });
 });

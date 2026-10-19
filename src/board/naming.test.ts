@@ -57,14 +57,22 @@
  *
  * The two local-notes cases came later, with `src/board/issue.ts`,
  * which appends that file to the snapshot it writes. They were not in
- * the 23 and no count above counts them, which is why this file now
- * holds 25.
+ * the 23 and no count above counts them.
+ *
+ * The branch is the one spelling a project configures (`naming.branch`),
+ * and its cases came later again: the default template's branch beside
+ * the same call under `work/{stub}`, and `branchGlob` over the default
+ * pinned as `feat/` with the id prefix, which the default's branch
+ * matches and the `work/` branch does not. They replaced one case and
+ * added two. The last added is that no fixed `BRANCH_PREFIX` is
+ * exported beside the template, so this file now holds 28.
  */
 import { describe, expect, it } from 'bun:test';
 
+import { branchGlob, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+
 import {
   boardId,
-  BRANCH_PREFIX,
   branchName,
   FALLBACK_SLUG,
   ID_PREFIX,
@@ -168,9 +176,28 @@ describe('the four spellings', () => {
       .toBe('/tmp/proj/.rafa/specs/rafa-20-pull-request-commands.md');
   });
 
-  it('spells the branch as the stub under the feat prefix', () => {
+  it('spells the branch as the stub under the default template, feat/{stub}', () => {
     expect(branchName(ISSUE, TITLE)).toBe('feat/rafa-20-pull-request-commands');
-    expect(branchName(ISSUE, TITLE).startsWith(`${BRANCH_PREFIX}/`)).toBe(true);
+    expect(branchName(ISSUE, TITLE, DEFAULT_BRANCH_TEMPLATE)).toBe(branchName(ISSUE, TITLE));
+  });
+
+  it('spells the branch as the stub under the template it is handed', () => {
+    expect(branchName(ISSUE, TITLE, 'work/{stub}')).toBe('work/rafa-20-pull-request-commands');
+    expect(branchName(ISSUE, TITLE, '{stub}-wip')).toBe('rafa-20-pull-request-commands-wip');
+  });
+
+  it('spells a default branch the default glob takes: feat/, the id prefix, then -*', () => {
+    expect(branchGlob(DEFAULT_BRANCH_TEMPLATE)).toBe(`feat/${ID_PREFIX}-*`);
+    expect(new Bun.Glob(branchGlob(DEFAULT_BRANCH_TEMPLATE)).match(branchName(ISSUE, TITLE))).toBe(true);
+    expect(new Bun.Glob(branchGlob(DEFAULT_BRANCH_TEMPLATE)).match(branchName(ISSUE, TITLE, 'work/{stub}'))).toBe(false);
+  });
+
+  it('exports no fixed BRANCH_PREFIX: the branch comes from the template alone', async () => {
+    const naming = await import('./naming.js');
+    expect('BRANCH_PREFIX' in naming).toBe(false);
+    // The control: the same reading finds a name the module does export.
+    expect('ID_PREFIX' in naming).toBe(true);
+    expect(branchName(ISSUE, TITLE)).toBe('feat/rafa-20-pull-request-commands');
   });
 
   it('spells the pull-request title as the id and the whole title', () => {
@@ -191,6 +218,7 @@ describe('the four spellings', () => {
     expect(() => specFileName(0, TITLE)).toThrow(RangeError);
     expect(() => specPath('.specs', 0, TITLE)).toThrow(RangeError);
     expect(() => branchName(0, TITLE)).toThrow(RangeError);
+    expect(() => branchName(0, TITLE, 'work/{stub}')).toThrow(RangeError);
     expect(() => pullRequestTitle(0, TITLE)).toThrow(RangeError);
   });
 });

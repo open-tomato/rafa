@@ -24,8 +24,10 @@
  * with a bare `origin`, with the recorded `gh` fake as the provider.
  */
 import type { ReleaseStageSettings } from './release-stage.js';
-import type { ReportChange } from '../report/parse.js';
 import type { Instinct } from '../schema/instinct.js';
+import type { ReportChange } from '@open-tomato/rafa/report/parse';
+
+import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,11 +35,12 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 
+import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+import { writeChanges } from '@open-tomato/rafa/store/changes';
+
 import { localInstinctsDir } from '../adapters/learning/local.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { RELEASE_AUTO } from '../core/config/sections.js';
-import { activeOutput, setActiveOutput } from '../core/output/index.js';
-import { writeChanges } from '../effort/store/changes.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';

@@ -257,21 +257,22 @@ import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../core/loop/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { PreloadReading, TaskStepScope } from '../suite/scope.js';
-import type { TestScope } from '../utils/declaration.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
+import type { TestScope } from '@open-tomato/rafa/core/plan';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { runsDir, updateSession } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
-import { parsePlan } from '../core/plan/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { runsDir, updateSession } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
 import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
   BASELINE_FILE_PREFIX,

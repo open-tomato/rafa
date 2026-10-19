@@ -77,10 +77,12 @@
  * `board/trust.ts` or `triage-trust.ts` in isolation.
  */
 import type { TriageSeams } from './triage.js';
-import type { RafaCommand } from '../../core/command/index.js';
 import type { FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

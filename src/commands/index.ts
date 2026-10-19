@@ -1,6 +1,8 @@
 /**
- * rafa's core roster: the subjects and commands `src/rafa.ts` dispatches
- * through, as one static list, and the registry built from it.
+ * rafa's roster: the subjects and commands `src/rafa.ts` dispatches
+ * through, and the registry built from them. Core's own commands are one
+ * static list; the four bundled features hand theirs in as
+ * `CommandFeature`s.
  *
  * ## Why a static list
  *
@@ -9,13 +11,30 @@
  * never found on disk at run time. The run-time imports are the module
  * command entries, which live outside the bundle (`src/cli/modules.ts`).
  *
+ * ## The features
+ *
+ * {@link BUNDLED_FEATURES} lists the four features, each imported by
+ * name from the `index.ts` of its folder: `board` (the `issue`, `board`
+ * and `epic` subjects), `pr`, `run` (the `claim` subject) and `release`.
+ * A feature's commands are `lazyCommand`s over their declarations, so
+ * importing this file loads the declaration files and no feature command
+ * module: such a module is imported when its command runs.
+ * {@link ROSTER_SUBJECTS} spells every subject in roster order, each
+ * feature subject the one its declaration file exports.
+ * {@link createRosterRegistry} builds one registry from
+ * {@link CORE_COMMANDS} followed by the commands of every feature its
+ * `off` does not name, in {@link BUNDLED_FEATURES} order, under the
+ * subjects of {@link ROSTER_SUBJECTS} a kept command declares; a name in
+ * `off` that is no bundled feature's is refused, naming the four.
+ * {@link CORE_REGISTRY} is that registry with every feature on.
+ *
  * ## The layout
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-eight registered so far wrap a
- * phase 0 command (`wrap.ts`), which keeps its own parser and its own
- * writes. `describe` wraps none: it builds its document from the registry
+ * of each is its command. Four of the hundred and five registered so far
+ * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
+ * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, which read plan files
  * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
@@ -57,11 +76,20 @@
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the ten `pr` actions, which read, open, retarget, close, wait on,
  * merge and triage one repository's pull requests through the
- * PullRequests port and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
+ * `release publish`, which runs `release.publishCommand` in each tagged
+ * unit's directory through `./release/tag-units.ts`,
+ * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * `release workflows`, which reads the ladder's files through
+ * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `src/release/templates.ts`, nor
+ * `release fragment`, which writes one change fragment through
+ * `src/release/fragment.ts` and reads the waiting ones through
+ * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
@@ -85,14 +113,19 @@
  * which read an issue's claim branches and push one ownership commit on
  * them through `src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
- * through `src/config-set.ts`, nor `ci status`, which reads a branch's
+ * through `src/config-set.ts`, nor `config show`, which prints the
+ * config `loadConfig` resolves, nor `ci status`, which reads a branch's
  * newest run through the readers under `src/ci/`, nor `stretch start`,
  * which opens a stretch through the readings of `src/stretch/`, nor
  * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
  * and `pr merge` as child processes, nor `stretch end`, which opens its
  * pull request through `pr open`'s `openPull` and puts `pr.base` back
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
- * codes of `src/errors/` beside the project's `errors.codes`.
+ * codes of `src/errors/` beside the project's `errors.codes`, nor
+ * `bug recheck`, which reads each bug's `Rerun` through
+ * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
+ * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
+ * stale-docs issues through `src/docs/open-lines.ts`.
  *
  * ## What is registered
  *
@@ -120,12 +153,13 @@
  *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
- *   - `issue ready <n> [--yes] [--no-hint]`, an issue marked
+ *   - `issue ready <n> [--yes] [--dry-run] [--no-hint]`, an issue marked
  *     `spec:ready` once its author and its body check out, and
- *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
- *     whose `Blocked by:` line names only closed issues. Both read the
- *     GitHub board rather than the tracker chain. `issue unblock` always
- *     asks; `issue ready` asks unless `--yes` is typed.
+ *     `issue unblock [<n>] [--all] [--yes]`, `spec:blocked` taken off an
+ *     issue whose `Blocked by:` line names only closed issues. Both read
+ *     the GitHub board rather than the tracker chain. `issue unblock`
+ *     asks unless `--yes` is typed; `issue ready` asks unless `--yes` or
+ *     `--dry-run` is typed.
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.
@@ -231,11 +265,28 @@
  *     a scratch worktree, commits `chore: release <version>` and
  *     delivers it by `release.settle`, printing the fragments in fold
  *     order, the strategy and the version and exiting 0 or 1 by the
- *     settle's outcome, `--dry-run` writing nothing; and `release tag`,
+ *     settle's outcome, `--dry-run` writing nothing; `release tag`,
  *     which puts `v<version>` on the release branch's HEAD and prints
  *     the push and publish lines rather than running them, refusing on
  *     another branch, on a tag already there, and where the two release
- *     files disagree.
+ *     files disagree; `release publish [--tag=<tag>] [--dry-run]`,
+ *     which runs `release.publishCommand` in the directory of each
+ *     release unit whose tag points at HEAD, skipping a version the
+ *     registry holds and stopping at the first publish that fails;
+ *     `release workflows [--write]`, one row per workflow file of the
+ *     release ladder with the levels it serves, whether the configured
+ *     level needs it and whether it is present, missing or differs from
+ *     the shipped template, `--write` writing each needed missing one
+ *     and exiting 0 in every case; `release fragment --plan=<id>
+ *     --level=<level> --title=<text> [--note=<area>: <summary>]...
+ *     [--package=<name>]`, which writes one change fragment under
+ *     `release.fragments` for a branch with no wrap-up, named free of
+ *     the fragments waiting on `origin/<pr.base>` after a fetch, and
+ *     prints the path written; and
+ *     `release list`, one row per unit that
+ *     releases on its own, the root first and then each publishable
+ *     workspace package, with its version, the fragments waiting for it
+ *     and its newest tag, writing nothing.
  *   - `board list`, every open `type:roadmap` board, and the default
  *     board when it lacks the label, one line each: its number and
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
@@ -320,6 +371,12 @@
  *     and new values printed; exit code 1, with nothing written, for an
  *     argument that is not `<key>=<value>` and for each refusal of
  *     `src/config-set.ts`. It starts no session.
+ *   - `config show [--resolved | --sources]`: every setting the config
+ *     resolves, with its merged value nested as a config file spells it,
+ *     or under `--sources` with the layer, the file and the entry index
+ *     that answered it (`default` with no file); exit code 1 for both
+ *     flags at once and for a config that cannot be used. It starts no
+ *     session.
  *   - `ci status --branch=<branch> [--workflow=<name>]`: the newest run
  *     on a branch, its state, its short commit and, when it is red, the
  *     bun cases it failed by file and case; exit code 0 green, 1 red, 2
@@ -354,12 +411,27 @@
  *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
  *     names no `stretch/<n>` branch or there is no `report.md`. It
  *     starts no session.
- *   - `bug codes [--suggest=<text>] [--family=<family>] [--check]`: the
+ *   - `bug codes [--suggest=<text> [--no-proposals]] [--family=<family>] [--check]`: the
  *     cause codes a bug can carry, rafa's own and then the project's
  *     `errors.codes`, by family; `--suggest` ranks the closest to a
- *     cause in words, and `--check` exits 1 when two codes of one family
+ *     cause in words, the open bugs' proposed codes beside them unless
+ *     `--no-proposals`, and `--check` exits 1 when two codes of one family
  *     read alike, the two refused together (`./bug/codes.ts`). It
  *     writes nothing and starts no session.
+ *   - `bug recheck [<n>…] [--all] [--comment]`: reruns the test each
+ *     bug's `Rerun` section names, read strictly as
+ *     `bun test <file> [-t "<case>"]` and run with no shell, and judges
+ *     each bug `reproduces`, `gone`, `flaky`, `stale`, `manual` or
+ *     `skipped`; only a trusted author's bug runs, off the `local`
+ *     tracker, and `--comment` posts the verdict on `gone` and `flaky`
+ *     bugs, redacted, closing none (`./bug/recheck.ts`). Exits 0 whatever
+ *     the verdicts, and starts no session.
+ *   - `docs plan`: `<plan.dir>/PLAN-rafa-<n>-doc-update.md`, titled
+ *     `chore(doc-update)`, written from every open line of the open
+ *     stale-docs issues, one `{agent=doc-updater}` task each, every line
+ *     escaped; refused with exit code 1, writing nothing, when the plan
+ *     file exists, when no line is open and when no tracker can be read
+ *     (`./docs/plan.ts`). It starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -386,13 +458,14 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are those `CORE_SUBJECTS` lists, each with an action
+ * The subjects are those `ROSTER_SUBJECTS` lists, each with an action
  * registered: a subject with none would show in every roster and
- * dispatch nothing. `skill index` is in the command tree and is not
+ * dispatch nothing, so `createRosterRegistry` drops the subjects of a
+ * feature turned off. `skill index` is in the command tree and is not
  * registered, because nothing dispatches it yet.
  */
 import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
@@ -400,17 +473,18 @@ import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
-import boardList from './board/list.js';
-import boardSync from './board/sync.js';
+import { BOARD_SUBJECT } from './board/declarations.js';
+import { BOARD_FEATURE } from './board/index.js';
 import bugCodes from './bug/codes.js';
+import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
-import claimAccept from './claim/accept.js';
-import claimHand from './claim/hand.js';
-import claimRelease from './claim/release.js';
-import claimTake from './claim/take.js';
+import { CLAIM_SUBJECT } from './claim/declarations.js';
+import { RUN_FEATURE } from './claim/index.js';
 import cleanup from './cleanup.js';
 import configSet from './config/set.js';
+import configShow from './config/show.js';
 import describe from './describe.js';
+import docsPlan from './docs/plan.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
 import effortCopy from './effort/copy.js';
@@ -422,28 +496,14 @@ import effortMigrate from './effort/migrate.js';
 import effortMove from './effort/move.js';
 import effortReport from './effort/report.js';
 import effortSchema from './effort/schema.js';
-import epicCancel from './epic/cancel.js';
-import epicClose from './epic/close.js';
-import epicDefer from './epic/defer.js';
-import epicMove from './epic/move.js';
-import epicNew from './epic/new.js';
-import epicPromote from './epic/promote.js';
-import epicShow from './epic/show.js';
+import { EPIC_SUBJECT } from './epic/declarations.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
 import instinctList from './instinct/list.js';
 import instinctPromote from './instinct/promote.js';
 import instinctShow from './instinct/show.js';
-import issueCheck from './issue/check.js';
-import issueComment from './issue/comment.js';
-import issueCreate from './issue/create.js';
-import issueEdit from './issue/edit.js';
-import issueList from './issue/list.js';
-import issueMove from './issue/move.js';
-import issueReady from './issue/ready.js';
-import issueShow from './issue/show.js';
-import issueUnblock from './issue/unblock.js';
+import { ISSUE_SUBJECT } from './issue/declarations.js';
 import loopList from './loop/list.js';
 import loopPause from './loop/pause.js';
 import loopResume from './loop/resume.js';
@@ -460,19 +520,10 @@ import planNeeds from './plan/needs.js';
 import planRisk from './plan/risk.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
-import prClose from './pr/close.js';
-import prCurrent from './pr/current.js';
-import prList from './pr/list.js';
-import prMerge from './pr/merge.js';
-import prOpen from './pr/open.js';
-import prRetarget from './pr/retarget.js';
-import prShow from './pr/show.js';
-import prTriage from './pr/triage.js';
-import prView from './pr/view.js';
-import prWait from './pr/wait.js';
-import releaseSettle from './release/settle.js';
-import releaseStatus from './release/status.js';
-import releaseTag from './release/tag.js';
+import { PR_SUBJECT } from './pr/declarations.js';
+import { PR_FEATURE } from './pr/index.js';
+import { RELEASE_SUBJECT } from './release/declarations.js';
+import { RELEASE_FEATURE } from './release/index.js';
 import roadmap from './roadmap.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';
@@ -495,29 +546,61 @@ import updateProject from './update/project.js';
 import updateRafa from './update/rafa.js';
 import updateSelf from './update/self.js';
 
-/** The core subjects, in roster order. */
+const PLAN_SUBJECT: SubjectSpec = { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' };
+const LOOP_SUBJECT: SubjectSpec = { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' };
+const EFFORT_SUBJECT: SubjectSpec = { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' };
+const MODULE_SUBJECT: SubjectSpec = { name: 'module', summary: 'list the configured modules; run an action a module provides' };
+const AGENT_SUBJECT: SubjectSpec = { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' };
+const SKILL_SUBJECT: SubjectSpec = { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' };
+const INSTINCT_SUBJECT: SubjectSpec = { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' };
+const UPDATE_SUBJECT: SubjectSpec = { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' };
+const CONFIG_SUBJECT: SubjectSpec = { name: 'config', summary: 'show every setting and where it came from; set one key in the project\'s config, keeping every comment' };
+const CI_SUBJECT: SubjectSpec = { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' };
+const STRETCH_SUBJECT: SubjectSpec = { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' };
+const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, check for codes that read alike, and recheck whether a bug still reproduces' };
+const DOCS_SUBJECT: SubjectSpec = { name: 'docs', summary: 'write a plan repairing the open lines of the stale-docs issues' };
+
+/** Core's own subjects, in roster order: those no bundled feature declares. */
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
-  { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
-  { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
-  { name: 'issue', summary: 'the tracker: list, show, create, edit, comment on and move issues; mark one ready, unblock it and check its references' },
-  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; open, list, wait on, merge and triage them' },
-  { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' },
-  { name: 'module', summary: 'list the configured modules; run an action a module provides' },
-  { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
-  { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
-  { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
-  { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
-  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home; sync the GitHub project' },
-  { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
-  { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
-  { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
-  { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
-  { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
-  { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
-  { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' },
+  PLAN_SUBJECT,
+  LOOP_SUBJECT,
+  EFFORT_SUBJECT,
+  MODULE_SUBJECT,
+  AGENT_SUBJECT,
+  SKILL_SUBJECT,
+  INSTINCT_SUBJECT,
+  UPDATE_SUBJECT,
+  CONFIG_SUBJECT,
+  CI_SUBJECT,
+  STRETCH_SUBJECT,
+  BUG_SUBJECT,
+  DOCS_SUBJECT,
 ]);
 
-/** The core commands, in roster order. */
+/** Every subject, core's and the bundled features', in roster order: the order the root help lists them in. */
+export const ROSTER_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
+  PLAN_SUBJECT,
+  LOOP_SUBJECT,
+  ISSUE_SUBJECT,
+  PR_SUBJECT,
+  EFFORT_SUBJECT,
+  MODULE_SUBJECT,
+  AGENT_SUBJECT,
+  SKILL_SUBJECT,
+  INSTINCT_SUBJECT,
+  RELEASE_SUBJECT,
+  BOARD_SUBJECT,
+  EPIC_SUBJECT,
+  CLAIM_SUBJECT,
+  UPDATE_SUBJECT,
+  CONFIG_SUBJECT,
+  CI_SUBJECT,
+  STRETCH_SUBJECT,
+  BUG_SUBJECT,
+  DOCS_SUBJECT,
+]);
+
+/** Core's own commands, in roster order, top-level ones last: those no bundled feature declares. */
 export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   planCreate,
   planList,
@@ -532,25 +615,6 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   loopStatus,
   loopList,
   loopWait,
-  issueList,
-  issueShow,
-  issueCreate,
-  issueComment,
-  issueMove,
-  issueReady,
-  issueUnblock,
-  issueCheck,
-  issueEdit,
-  prCurrent,
-  prShow,
-  prView,
-  prOpen,
-  prRetarget,
-  prClose,
-  prList,
-  prWait,
-  prMerge,
-  prTriage,
   effortCollect,
   effortReport,
   effortDashboard,
@@ -578,22 +642,6 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctShow,
   instinctFlag,
   instinctPromote,
-  releaseStatus,
-  releaseSettle,
-  releaseTag,
-  boardList,
-  boardSync,
-  epicShow,
-  epicNew,
-  epicDefer,
-  epicPromote,
-  epicMove,
-  epicClose,
-  epicCancel,
-  claimRelease,
-  claimHand,
-  claimAccept,
-  claimTake,
   updateCurrent,
   updateSelf,
   updateProject,
@@ -603,11 +651,14 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   updateNext,
   updateLatest,
   configSet,
+  configShow,
   ciStatus,
   stretchStart,
   stretchItem,
   stretchEnd,
   bugCodes,
+  bugRecheck,
+  docsPlan,
   status,
   next,
   roadmap,
@@ -619,5 +670,43 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   describe,
 ]);
 
-/** The registry `src/rafa.ts` dispatches through. */
-export const CORE_REGISTRY: CommandRegistry = createCommandRegistry({ subjects: CORE_SUBJECTS, commands: CORE_COMMANDS });
+/** The features rafa bundles, in the order their commands follow core's: `board`, `pr`, `run` and `release`. */
+export const BUNDLED_FEATURES: readonly CommandFeature[] = Object.freeze([
+  BOARD_FEATURE,
+  PR_FEATURE,
+  RUN_FEATURE,
+  RELEASE_FEATURE,
+]);
+
+/** What {@link createRosterRegistry} builds a registry from. */
+export interface RosterRegistryOptions {
+  /** The bundled features left out, by name. None when left out. */
+  readonly off?: readonly string[];
+}
+
+/** The words a refusal of {@link createRosterRegistry} opens with. */
+const ROSTER_REFUSAL = 'rafa: cannot build the roster';
+
+/**
+ * The registry of {@link CORE_COMMANDS} followed by the commands of every
+ * feature of {@link BUNDLED_FEATURES} that `off` does not name, under the
+ * subjects of {@link ROSTER_SUBJECTS} a kept command declares, both in
+ * roster order. Throws, building no registry, on a name in `off` that is
+ * no bundled feature's, naming the four.
+ */
+export function createRosterRegistry(options: RosterRegistryOptions = {}): CommandRegistry {
+  const off = options.off ?? [];
+  const names = BUNDLED_FEATURES.map((feature) => feature.name);
+  const unknown = off.filter((name) => !names.includes(name));
+  if (unknown.length > 0) {
+    const named = unknown.map((name) => `"${name}"`).join(', ');
+    throw new Error(`${ROSTER_REFUSAL}: no bundled feature is named ${named}; the features are ${names.join(', ')}`);
+  }
+  const kept = BUNDLED_FEATURES.filter((feature) => !off.includes(feature.name));
+  const commands = [...CORE_COMMANDS, ...kept.flatMap((feature) => feature.commands)];
+  const subjects = ROSTER_SUBJECTS.filter((subject) => commands.some((command) => command.subject === subject.name));
+  return createCommandRegistry({ subjects, commands });
+}
+
+/** The registry `src/rafa.ts` dispatches through: every bundled feature on. */
+export const CORE_REGISTRY: CommandRegistry = createRosterRegistry();

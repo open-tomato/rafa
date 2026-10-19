@@ -9,7 +9,8 @@
 
 import { describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
 import { openTasks } from '../risk.js';
 
 import { LONG_RUN_FIX, longRunOf, readLongRuns } from './long-runs.js';

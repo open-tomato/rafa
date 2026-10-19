@@ -21,10 +21,12 @@
  * issue, so the notes file and a neighbour are not read as the copy.
  */
 import type { IssueCheckResult } from './check.js';
-import type { RafaCommand } from '../../core/command/index.js';
 import type { LiveReading, RefStamp } from '../../refs/stamp.js';
 import type { RefVerifier } from '../../refs/verify.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

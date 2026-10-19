@@ -78,24 +78,25 @@
  * @module commands/loop/wait
  */
 import type { PickedSession } from './loop-sessions.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { PidProbe, SessionRecord, SessionState } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../core/loop/readings.js';
 import type { AwakeClock, AwakeMark, AwakeReading } from '../../loop/awake-clock.js';
 import type { EventLine } from '../../loop/events-file.js';
 import type { WaitReason, WaitReasonRow, WaitUntil } from '../../loop/wait-reasons.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PidProbe, SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import { relative } from 'node:path';
 
-import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { readSession, SessionRecordError } from '../../core/loop/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readSession, SessionRecordError } from '@open-tomato/rafa/core/loop';
 import {
   refusal,
   resolveLoopSeams,
-} from '../../core/loop/readings.js';
-import { plural } from '../../core/plan/index.js';
+} from '@open-tomato/rafa/core/loop/readings';
+import { plural } from '@open-tomato/rafa/core/plan';
+
+import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import {

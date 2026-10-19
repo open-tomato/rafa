@@ -21,11 +21,13 @@
  *     to cost no `gh` command beyond the list's own `1 + 2n`.
  */
 import type { BaseNow, BaseReader, PrListForecast } from './list-forecast.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { BranchForecast } from '../../release/branch-forecast.js';
 import type { FoldFragment } from '../../release/strategy.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+
+import '../../adapter-registry.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -71,7 +73,7 @@ function fragmentOf(id: string, level: PlanReleaseLevel): FoldFragment {
   const notes = level === 'none'
     ? []
     : [`- Area ${id}: change`];
-  return { id, addedOn: '2026-09-29', fragment: { plan: id, title: `title of ${id}`, level, notes } };
+  return { id, addedOn: '2026-09-29', fragment: { plan: id, title: `title of ${id}`, level, package: null, notes } };
 }
 
 /** The body the wrap-up writes for a minor branch fragment over `waiting` at `baseVersion`. */
@@ -249,7 +251,7 @@ function world(files: Readonly<Record<string, string>>): World {
 function baseFiles(withChangelog = true): Readonly<Record<string, string>> {
   return {
     'package.json': MANIFEST,
-    '.changes/rafa-19.md': serializeFragment({ plan: 'rafa-19', title: 'title of rafa-19', level: 'patch', notes: ['- Area: fix'] }),
+    '.changes/rafa-19.md': serializeFragment({ plan: 'rafa-19', title: 'title of rafa-19', level: 'patch', package: null, notes: ['- Area: fix'] }),
     ...(withChangelog
       ? { 'CHANGELOG.md': '# Changelog\n\n## 0.25.0 — 2026-09-01, first\n\n- first\n' }
       : {}),

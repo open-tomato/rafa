@@ -27,13 +27,16 @@
  */
 import type { CheckIssue, CheckReport } from '../check/run.js';
 
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { dispatchCaptured, eventsOf } from '../tests/cli-capture.js';
 
 import {

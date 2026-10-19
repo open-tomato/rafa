@@ -33,22 +33,23 @@
  * Exit code 1 for an argument, and for records that cannot be read. The
  * command declares no flag.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams } from '../../core/loop/readings.js';
-import type { TaskCounts } from '../../core/plan/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '@open-tomato/rafa/core/loop/readings';
+import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { isAbsolute, relative } from 'node:path';
 
-import { sessionPhase } from '../../core/loop/index.js';
+import { sessionPhase } from '@open-tomato/rafa/core/loop';
 import {
   isLive,
   readRecords,
   readSessionChecklist,
   resolveLoopSeams,
   sessionLine,
-} from '../../core/loop/readings.js';
-import { countTasks } from '../../core/plan/index.js';
+} from '@open-tomato/rafa/core/loop/readings';
+import { countTasks } from '@open-tomato/rafa/core/plan';
+
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

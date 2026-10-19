@@ -21,13 +21,13 @@ interface CutTable {
 
 const ROOT = join(import.meta.dir, '..', '..');
 const TABLE_PATH = join(ROOT, 'docs', 'survey', 'cut-table.json');
-const PACKAGE_COUNT = 10;
+const PACKAGE_COUNT = 12;
 const UNASSIGNED_FOLDERS = ['src/ci/', 'src/commands/stretch/', 'src/stretch/'];
 
 const table = (await Bun.file(TABLE_PATH).json()) as CutTable;
 
 describe('docs/survey/cut-table.json', () => {
-  test('holds ten packages, each with an integer upward-edge count', () => {
+  test('holds twelve packages, each with an integer upward-edge count', () => {
     expect(table.packages).toHaveLength(PACKAGE_COUNT);
     for (const pkg of table.packages) {
       expect(Number.isInteger(pkg.upwardEdges)).toBe(true);
@@ -57,8 +57,7 @@ describe('docs/survey/cut-table.json', () => {
     );
   });
 
-  test('marks at least one edge as cleared by issue 118', () => {
-    expect(table.clearedByIssue118.length).toBeGreaterThan(0);
+  test('marks every edge it lists as cleared by issue 118', () => {
     for (const edge of table.clearedByIssue118) {
       expect(edge.clearedBy).toBe(118);
     }

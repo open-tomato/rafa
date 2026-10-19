@@ -61,7 +61,7 @@
  *
  * Nothing here throws, opens a file or changes a value passed in.
  */
-import { readRafaBlocks } from '../core/plan/block-reader.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
 /** The kind of the block the wrap-up session answers in. */
 export const PROMOTED_BLOCK_KIND = 'promoted';

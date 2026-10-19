@@ -3,8 +3,12 @@
  * prints in table mode: the per-plan session table, then, when any task
  * report is stored, the reports tallied by plan, status and outcome, then,
  * when any run's preflight halted, the required checks that halted it,
- * and then, when any session was dispatched with a budget, each such
- * session's budget beside the tokens it used.
+ * then, when any session was dispatched with a budget, each such
+ * session's budget beside the tokens it used, then, when any bug a
+ * tracker could be handed is stored, the one line counting those that
+ * name only documentation, and then, when any out-of-scope entry was
+ * routed, one line per plan counting its entries by kind and the share
+ * filed.
  *
  * Pure over an {@link EffortReport}: no store, no config and no clock
  * reach it, so `report.ts` decides every figure and this module decides
@@ -20,9 +24,13 @@
  * again rather than deriving one of its own.
  */
 import type { BudgetedSession } from './report-budgets.js';
+import type { DocOnlyBugs } from './report-doc-bugs.js';
+import type { BugKindsReading, PlanBugKinds } from './report-kinds.js';
 import type { EffortGroup, EffortReport } from './report.js';
-import type { HaltedCheck, PreflightHalt } from './store/preflight.js';
-import type { TaskReportTally } from './store/reports.js';
+import type { HaltedCheck, PreflightHalt } from '@open-tomato/rafa/store/preflight';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
+
+import { BUG_KINDS } from '@open-tomato/rafa/report/parse';
 
 /** Decimal places a formatted minute figure carries in the table. */
 const TABLE_MINUTE_DECIMALS = 1;
@@ -360,14 +368,98 @@ export function formatBudgets(report: EffortReport): string[] {
   return [...lines, ...alignRows(BUDGET_COLUMNS, rows, BUDGET_RIGHT_ALIGNED)];
 }
 
+/**
+ * The reading "filed bugs naming only documentation": a blank line, then
+ * one line holding how many of the stored bugs of scope `rafa` name only
+ * documentation, and how many such bugs there are.
+ *
+ * Nothing at all when no such bug is stored, so a store holding none
+ * prints what it printed before the line existed. A store holding some
+ * prints the line at zero too: zero of them is the reading the line is
+ * there for, and a line left out would not say it was taken. The filters
+ * do not narrow the count, since a bug row carries neither a kind nor an
+ * entrypoint; the line has no note saying so, being one line.
+ */
+export function formatDocOnlyBugs(counted: DocOnlyBugs): string[] {
+  if (counted.bugs === 0) return [];
+
+  return [
+    '',
+    `filed bugs naming only documentation: ${formatCount(counted.docOnly)} of ${formatCount(counted.bugs)}`,
+  ];
+}
+
+/** The bug kinds section's columns, in order. */
+const BUG_KINDS_COLUMNS = ['plan', 'entries', 'filed', 'share', 'kinds'] as const;
+
+/** The bug kinds columns rendered right-aligned. */
+const BUG_KINDS_RIGHT_ALIGNED: ReadonlySet<string> = new Set(['entries', 'filed', 'share']);
+
+/** A share from 0 to 1 as a whole percentage. */
+function formatShare(share: number): string {
+  return `${Math.round(share * 100)}%`;
+}
+
+/** One plan's counts as its table cells, in {@link BUG_KINDS_COLUMNS} order. */
+function bugKindsCells(plan: PlanBugKinds): string[] {
+  const kinds = BUG_KINDS
+    .filter((kind) => plan.kinds[kind] > 0)
+    .map((kind) => `${kind}=${formatCount(plan.kinds[kind])}`);
+  return [
+    plan.planStub ?? NO_PLAN_CELL,
+    formatCount(plan.entries),
+    formatCount(plan.filed),
+    formatShare(plan.filedShare),
+    kinds.join(' '),
+  ];
+}
+
+/**
+ * The reading "out-of-scope entries by routed kind" (`report-kinds.ts`):
+ * a blank line, a heading counting the plans, and one row per plan, its
+ * entries, those filed and their share, and each kind an entry was routed
+ * under with its count, in the order of `BUG_KINDS`.
+ *
+ * Nothing at all when no entry was routed, so a store holding no
+ * `bug_routes` row prints what it printed before the section existed. A
+ * store that could not be read prints the heading's line with the
+ * problem in place of the table. The filters do not narrow the rows,
+ * since a route row carries neither a kind of session nor an entrypoint.
+ */
+export function formatBugKinds(reading: BugKindsReading): string[] {
+  if (reading.problem !== null) return ['', `out-of-scope entries by routed kind: ${reading.problem}`];
+  const { plans } = reading;
+  if (plans.length === 0) return [];
+
+  const noun = plans.length === 1
+    ? 'plan'
+    : 'plans';
+  const lines = ['', `out-of-scope entries by routed kind: ${formatCount(plans.length)} ${noun}, and the share filed`];
+  return [...lines, ...alignRows(BUG_KINDS_COLUMNS, plans.map(bugKindsCells), BUG_KINDS_RIGHT_ALIGNED)];
+}
+
+/**
+ * The sections read from the tables beside the session rows, in the order
+ * they print: task reports, preflight halts, budgets, the doc-only bug
+ * line, then the bug kinds by plan. Each is nothing when its table holds nothing to show, so the
+ * command prints these under its no-rows line as well as under the table.
+ */
+export function formatStoredSections(report: EffortReport): string[] {
+  return [
+    ...formatTaskReports(report),
+    ...formatPreflightHalts(report),
+    ...formatBudgets(report),
+    ...formatDocOnlyBugs(report.docOnlyBugs),
+    ...formatBugKinds(report.bugKinds),
+  ];
+}
+
 /** Everything the command prints in table mode. */
 export function formatReport(report: EffortReport): string[] {
   return [
     ...formatReportHeader(report),
     '',
     ...formatReportTable(report),
-    ...formatTaskReports(report),
-    ...formatPreflightHalts(report),
-    ...formatBudgets(report),
+    ...formatStoredSections(report),
   ];
 }

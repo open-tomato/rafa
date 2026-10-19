@@ -56,18 +56,19 @@
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
-import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js';
-import type { CapturingSpawner } from '../core/loop/index.js';
 import type { InstinctRecord } from '../learning/index.js';
-import type { Learning } from '../ports/index.js';
 import type { PullRequests } from '../pr/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
+import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { Learning } from '@open-tomato/rafa/ports';
 
 import { posix } from 'node:path';
 
-import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
-import { runClaudeCaptured } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
+import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
+import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';
@@ -203,7 +204,7 @@ function pullRequestNamingBullets(branch: string, provider: PrProvider): readonl
   if (provider === 'none') return [];
   return [
     '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
-    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
+    `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is the \`naming.branch\` template with the plan's stub, \`feat/rafa-<n>-<slug>\` by default.`,
     '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
   ];

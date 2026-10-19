@@ -6,8 +6,8 @@
  * and comments on it, and two different failures in one test case file two.
  */
 import type { TriageResult } from './triage.js';
-import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
-import type { ReportBug, TaskReport } from '../report/parse.js';
+import type { IssueDraft, IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -79,12 +79,14 @@ function reportOf(bug: ReportBug): TaskReport {
     skillsUsed: [],
     blockers: [],
     outOfScopeBugs: [bug],
+    staleDocs: [],
+    changes: [],
     extras: [],
   };
 }
 
 function testBug(what: string, artifact: string): ReportBug {
-  return { what, artifact, security: false, extras: [] };
+  return { what, artifact, security: false, kind: 'bug', extras: [] };
 }
 
 function triagePlan(

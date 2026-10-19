@@ -12,8 +12,8 @@
  */
 import type { PlantedProject } from './cli-capture.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { SessionRecord } from '../core/loop/index.js';
-import type { LoopSessionSeams } from '../core/loop/readings.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import {
   mkdirSync,
@@ -24,7 +24,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { runsDir, sessionFilePath } from '../core/loop/index.js';
+import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 
 import { eventsOf, plantProject } from './cli-capture.js';
 

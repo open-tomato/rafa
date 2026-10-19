@@ -15,8 +15,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../board/epic-template.js';
-import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 import {
   buildVerifyPrompt,

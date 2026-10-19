@@ -220,10 +220,19 @@ merged now. The fragment is stored under `release.fragments` (default
 waiting and suggests running settle. `rafa pr list` marks forecasts as
 `(base moved)` if the base branch changed since the forecast was written.
 
+A workspace package under `packages/` that is not `private: true` can release
+on its own. A fragment names it with a fourth front-matter line,
+`package: <name>` (the package's manifest `name`); a fragment without the line
+is the root's. Settle then moves that package's version, changelog and tag
+beside the root's, and `rafa release list` prints one row per unit that
+releases: the root, then each publishable package, with its version, waiting
+fragments and newest tag. `context/release.md` has the rules.
+
 Every project starts with fragments settling to the base branch and tagging
 by hand. You can configure settle to open a pending release pull request
 instead (for protected base branches), and have settle tag the commit
-automatically (for CI ownership of releases). Four keys, all optional:
+automatically (for CI ownership of releases). Every key is optional; the
+examples below set `release.settle`, `release.tag` and `pr.versionCollision`:
 
 ```yaml
 # Empty config: fragments in .changes/, semver-by-level, settle pushes, tags by hand
@@ -244,14 +253,74 @@ pr:
   versionCollision: refuse
 ```
 
-The keys are: `release.fragments` (path, default `.changes/`), `release.strategy`
-(fold strategy, default `semver-by-level`), `release.settle` (`push` or `pr`,
-default `push`), `release.tag` (`manual` or `settle`, default `manual`),
-`release.publishCommand` (the publish line `rafa release tag` prints and never
-runs, default `npm publish`). `pr.versionCollision` controls what happens when a merge would collide
-(default `report`). Read `context/release.md` for the full design,
-`docs/ci-release-settle.md` for automating settle in CI, and
-`rafa release settle --help` for the settle command.
+The keys are: `release.fragments` (path, default `.changes/`),
+`release.strategy` (fold strategy, default `semver-by-level`),
+`release.settle` (`push` or `pr`, default `push`), `release.tag` (`manual` or
+`settle`, default `manual`), `release.publish` (`manual` or `ci`, who publishes
+a tagged version, default `manual`), `release.publishCommand` (the publish line
+`rafa release tag` prints and `rafa release publish` runs in each tagged unit's
+folder, default `npm publish`), `release.moveLock` (`true` has settle write
+`rafa.lock` in its release commit, default `false`), and `pr.versionCollision`
+(what happens when a merge would collide, default `report`). Read
+`context/release.md` for the full design, `docs/ci-release-settle.md` for
+automating settle in CI, and `rafa release settle --help` for the settle
+command.
+
+### The release ladder
+
+The release keys step a project up a ladder, one level at a time, from nothing
+on its own (0) to a release on every merge (4):
+
+| Level | `release.settle` | `release.tag` | `release.publish` | Runs on its own |
+|---|---|---|---|---|
+| 0 Manual | any | `manual` | `manual` | nothing |
+| 1 Settle tags | `push` | `settle` | `manual` | version, changelog and tag in one settle |
+| 2 CI publishes | `push` | `manual` | `ci` | a pushed tag runs the gates and publishes with provenance |
+| 3 Release PR | `pr` | `settle` | `ci` | every merge updates one release pull request; merging it tags and publishes |
+| 4 Continuous | `push` | `settle` | `ci` | every push to the default branch settles, then publishes the release it tags |
+
+`rafa doctor` prints the reading of the keys as its `Release ladder:` row, with
+what the level still needs. The row never refuses a setting. The release order
+across packages is parked until two publishable packages depend on each other.
+
+To move to level 2, where a pushed tag publishes, take four steps:
+
+1. Set the key in `.rafa/config.yaml`:
+
+   ```yaml
+   release:
+     publish: ci
+   ```
+
+2. Run `rafa release workflows --write`. It writes
+   `.github/workflows/release-publish.yml` from the shipped template. A file
+   already at that path is left as it is.
+3. On npmjs.com, add a trusted publisher for the package that names this
+   repository and `release-publish.yml`. Trusted publishing needs npm 11.5.1 or
+   newer.
+4. In the repository's GitHub settings, open Settings > Secrets and variables >
+   Actions > Variables, and add the repository variable `RAFA_RELEASE_PUBLISH`
+   with the value `ci`. From a shell, the same is:
+
+   ```bash
+   gh variable set RAFA_RELEASE_PUBLISH --body ci
+   ```
+
+Until the variable is `ci`, the publish job is skipped, and a skipped job is not
+a failed run. Then `rafa release tag --push` tags the release and pushes the
+tag, and the publish workflow runs the gates and publishes it with provenance.
+
+The release commands beyond settle and tag:
+
+```bash
+rafa release publish [--tag=<tag>] [--dry-run]   # publishCommand in each unit tagged at HEAD
+rafa release workflows [--write]                  # the ladder's workflow files
+rafa release fragment --plan=<id> --level=<level> --title=<text>   # a branch with no wrap-up
+```
+
+`rafa release publish` skips a version the registry already holds, so a rerun
+after a publish that stopped halfway publishes only the units the registry
+lacks.
 
 ### Tracking effort and learning from skills
 
@@ -265,8 +334,11 @@ rafa effort import <file>  # merge another device's store into this one
 ```
 
 `rafa effort report` shows the per-plan tables (sessions by status and
-outcome), the task report tallies, and any runs whose preflight halted. To
-see which skills earned their place and which are ignored:
+outcome), the task report tallies, any runs whose preflight halted,
+how many of the filed bugs name only documentation, and per plan its
+out-of-scope entries by the kind the loop routed them under, with the
+share filed. To see which skills earned their place and which are
+ignored:
 
 ```bash
 rafa effort report --skills
@@ -405,7 +477,12 @@ writes it; you can change it.
   `project` pin while a loaded user tier does; pin the tier the refusal
   names, or delete or rename the copy it names. `loop start` refuses a
   plan that names an agent or a skill it cannot resolve before any
-  session is paid for.
+  session is paid for. `rafa plan validate` names a plan whose task edits
+  an agent or a skill rafa bundles, with the pin that item needs, and
+  writes the pin as a `[human]` prerequisite of the plan, so a clone that
+  merges the plan sets the pin itself; that note is never a refusal. The
+  pin is not set at merge, since a pin is per clone and gitignored, and
+  one set unasked would hide the drift `doctor` shows.
 - User-tier items are invisible unless `loop.settingSources` includes
   `user`. `rafa agent list` shows what a run sees, `rafa agent vendor
   <name>` copies one in or updates it, and `rafa skill check .claude/skills
@@ -517,15 +594,120 @@ rafa· no pr            no open pull request for feat/rafa-485
 
 ## Configuration
 
-Settings live in `.rafa/config.yaml` in the project, and in
-`~/.rafa/config.yaml` for every project on the machine; a setting in the
-project's file outranks the same one in yours. `rafa init` writes both
-with every setting commented out at its default, so uncomment a line,
-with its section line, to change it.
+rafa reads its settings from one file per scope. The project scope is
+the repository's root; the user scope is `~/.rafa/`, read under every
+project on the machine. In each scope the lookup takes the first of
+three names that is a file, and the others are not read:
+
+1. `rafa.config.ts`, a TypeScript module
+2. `rafa.config.mjs`, a JavaScript module
+3. `.rafa/config.yaml` in the project, `~/.rafa/config.yaml` for the user
+
+The layers stack: rafa's defaults, under the user scope's file, under the
+project's. A setting the project's file names outranks the same one in
+the user's, key by key; a setting neither file names takes its default.
+`rafa init` writes both YAML files with every setting commented out at
+its default, so uncomment a line, with its section line, to change it.
 
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
 the line that carries a tab; use spaces only.
+
+### Which form to use
+
+Pick the lightest form your situation needs:
+
+- **No config at all.** rafa runs on its defaults, as it always has.
+- **An older project on YAML.** Nothing changes; `.rafa/config.yaml` is
+  read as before.
+- **A solo Python repository with rafa installed globally.** Write
+  `rafa.config.mjs` holding a plain list, or `rafa.config.ts` with only
+  an `import type`. The type import is erased before the file runs, so
+  nothing is needed at run time. A module that imports
+  `@open-tomato/rafa` at run time finds no such package here and is
+  refused, naming the file.
+- **A JS or TS project that installs rafa as a dev dependency.** Write
+  `satisfies Config` or `defineConfig`, both from
+  `@open-tomato/rafa/config`, and your editor checks the entries.
+- **A project moving from YAML to TypeScript.** For a while both files
+  sit side by side. The TypeScript file is read, and a warning names the
+  YAML file as not read; `rafa doctor` lists it until its keys have
+  moved, and then it can be removed.
+
+The same setting in each form:
+
+```yaml
+# .rafa/config.yaml
+naming:
+  branch: feat/{stub}
+```
+
+```js
+// rafa.config.mjs
+export default [{ naming: { branch: 'feat/{stub}' } }];
+```
+
+```ts
+// rafa.config.ts
+import type { Config } from '@open-tomato/rafa/config';
+
+export default [{ naming: { branch: 'feat/{stub}' } }] satisfies Config;
+```
+
+```ts
+// rafa.config.ts
+import { defineConfig } from '@open-tomato/rafa/config';
+
+export default defineConfig([{ dangerous: { selfUpdateDuringLoop: true } }]);
+```
+
+The import from `@open-tomato/rafa/config` is the one that needs the
+package installed where the file runs. For this iteration it can be
+solved with something simple attacking the type project specifically,
+but the bigger issue remains.
+
+Some routes were set aside, each for one reason. Merging both files of
+one scope is not done: a scope reads one file, so one answer per key.
+A Bun plugin redirecting the import does not resolve, as measured.
+Setting `NODE_PATH` and starting rafa again is not done: it would start
+a second process to load one file. Requiring a local install, as ESLint
+and Vite do, is not done: it would refuse the global Python case above.
+
+### Shadowed YAML and `rafa config show`
+
+When a scope holds a module file and a YAML file, the YAML file is not
+read, and every load says so:
+
+```text
+rafa config: /repo/.rafa/config.yaml is not read: /repo/rafa.config.ts holds the project scope's config, so move its keys into rafa.config.ts and remove it
+```
+
+`rafa config show` prints every setting with its merged value, nested
+as a config file spells it. `rafa config show --sources` prints one line
+per setting instead: its value, the layer that answered (`project`,
+`user` or `default`) and, for a file, the file and the zero-based entry
+that last set it; a YAML file is entry 0. `--output=json` carries the
+same data for a script. The two views are refused together.
+
+### Changing a key with `config set`
+
+`rafa config set <key>=<value>` edits the project's `.rafa/config.yaml`
+in place and keeps its comments. In a project whose config is
+`rafa.config.ts` or `rafa.config.mjs`, it refuses with exit 1, naming
+that file and writing nothing, because a module is code the command does
+not rewrite. Edit the module by hand until #893 gives the command a file
+to write.
+
+### `dangerous.*` settings
+
+A `dangerous.*` key is a person's consent, so rafa says what is in force:
+once per run, before its work starts, every command that loads the
+config prints one line for each `dangerous.*` key set off its default,
+naming the file and entry that set it, such as:
+
+```text
+dangerous.selfUpdateDuringLoop: true (/repo/rafa.config.ts, entry 0)
+```
 
 ### `effort`
 
@@ -692,6 +874,52 @@ dangerous:
   selfUpdateDuringLoop: true   # update the binary even while a loop runs
 ```
 
+### `merge`
+
+One setting says what a load does when one key is set twice in a file.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `merge.duplicates` | `warn` | `warn` prints each duplicate, `error` refuses the load with every one, `allow` drops them |
+
+Two entries of one module file setting one key, or a YAML key given
+twice, are duplicates. The project's file decides the level, over the
+user's. `config set` refuses a key written twice in the same file, as
+the same mistake.
+
+```yaml
+merge:
+  duplicates: error
+```
+
+### `naming`
+
+One setting names the branch `rafa loop start` creates for a plan.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `naming.branch` | `feat/{stub}` | the branch name; `{stub}` appears exactly once and stands for the plan's stub |
+
+A template with no `{stub}`, or with it twice, is refused. The value is
+kept as written.
+
+```yaml
+naming:
+  branch: feat/{stub}
+```
+
+### Config code and `pr triage --resolve`
+
+A `rafa.config.ts` or `rafa.config.mjs` is a module rafa imports, so it
+runs with your shell, credentials and remotes. `pr triage --resolve`
+checks a pull request's branch out and starts a loop in it, and that loop
+loads whatever config the branch carries. So under `--resolve`, a head
+carrying a config module that `origin/<base>` does not hold as the same
+file (compared byte for byte) is refused with exit 1, before the worktree
+is added. Passing `--allow-local-config` runs it anyway and prints one
+warning line naming what it let through. A YAML config is data and is not
+checked this way.
+
 ## Specs, issues and the roadmap
 
 You can plan from a local file and never touch a board. When you want
@@ -784,6 +1012,9 @@ The full guide, with the spec template explained, a prompt for drafting
 a spec, epics, boards and every gate in order, is
 [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md).
 
+The version policy, the bump levels, which package publishes and the
+`REFACTOR_NEEDED.md` rule are in [docs/versioning.md](docs/versioning.md).
+
 ## From a checkout
 
 To install dependencies:
@@ -800,7 +1031,7 @@ bun src/rafa.ts loop start --plan=<file>
 
 Every command but `init`, the help and `describe` runs inside a rafa
 project: the nearest directory at or above the working directory holding
-`.rafa/config.yaml`. Outside one it prints the `rafa init` hint and exits
+`rafa.config.ts`, `rafa.config.mjs` or `.rafa/config.yaml`. Outside one it prints the `rafa init` hint and exits
 1; `bun src/rafa.ts init --yes` sets up the git toplevel as one.
 
 `bun run build` writes `dist/`, which the `rafa` bin and the package's
@@ -868,11 +1099,12 @@ takes `--yes`. The rest of `rafa update` (`self`, `project`, `board`,
 The build targets bun, and `engines` names `bun` alone: there is no
 `engines.node`, because no node version runs the binary. The package
 root, `./cli` and `./store` import `bun:sqlite`, which node's ESM loader
-refuses before any module code runs, so only `./plan`, `./ports` and
-`./learning` load under node at all. `module` points at
-`./dist/index.js`, the same build the root of `exports` names. The package ships no type declarations:
-`exports` names no `types`, and a TypeScript consumer gets TS7016 under
-`strict`.
+refuses before any module code runs, so only `./plan`, `./ports`,
+`./learning` and `./config` load under node at all. `module` points at
+`./dist/index.js`, the same build the root of `exports` names. Only
+`./config` ships type declarations, at `./dist/config/index.d.ts`, which
+its `exports` entry names as `types`. No other entry names `types`, and
+a TypeScript consumer importing one gets TS7016 under `strict`.
 
 ## Roadmap
 

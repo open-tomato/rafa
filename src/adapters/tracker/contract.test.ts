@@ -68,7 +68,7 @@
  * priority reddens the one case standing in for the four.
  */
 import type { TrackerContractOptions } from './contract.js';
-import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '../../ports/index.js';
+import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -96,6 +96,8 @@ const CASES = {
   openClosed: 'openIssues leaves out an issue moved to done or to cancelled',
   openNone: 'openIssues answers nothing for a type with no open issue',
   openCreatedAt: 'openIssues answers each open issue with a createdAt that parses as a time',
+  filedDone: 'filedIssues answers a bug moved to done after the cut-off, leaving out a spike and an earlier bug',
+  filedNone: 'filedIssues answers nothing for a cut-off after every issue was filed',
   editable: 'editable answers the title, body and open state of a created issue',
   editableClosed: 'editable answers an issue moved to done or to cancelled as closed',
   editBody: 'edit writes a body read back byte for byte, leaving the title and every other issue',
@@ -109,6 +111,9 @@ const CASES = {
 
 /** The case an adapter run with `readsOpenIssues: false` gets in place of the four `openIssues` cases. */
 const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
+
+/** The case an adapter run with `readsFiledIssues: false` gets in place of the two `filedIssues` cases. */
+const FILED_LEFT_OUT_CASE = 'leaves out the filedIssues reading it is run without';
 
 /** The case an adapter run without `editsIssues` gets in place of the nine `editable` and `edit` cases. */
 const EDIT_LEFT_OUT_CASE = 'leaves out the editable and edit pair it is run without';
@@ -148,6 +153,12 @@ interface Faults {
   readonly anyType?: boolean;
   /** `openIssues` answers the first issue created with its time, and every later one with none. */
   readonly datesFirstOnly?: boolean;
+  /** `filedIssues` answers open issues alone. */
+  readonly openOnlyFiled?: boolean;
+  /** `filedIssues` answers issues of every type. */
+  readonly anyTypeFiled?: boolean;
+  /** `filedIssues` answers issues filed before its cut-off too. */
+  readonly ignoresCutOff?: boolean;
   /** `edit` writes its change onto every issue held, not the one its ref names. */
   readonly editsEveryIssue?: boolean;
   /** `edit` given no title clears the one held. */
@@ -236,6 +247,19 @@ function memoryTracker(faults: Faults = {}): {
         title: issue.draft.title,
         body: issue.draft.body,
         createdAt: issue.createdAt,
+      })),
+    filedIssues: async (type, since) => [...issues]
+      .flatMap(([externalId, issue]) => (issue.createdAt === null
+        ? []
+        : [{ externalId, issue, createdAt: issue.createdAt }]))
+      .filter(({ issue, createdAt }) => (faults.anyTypeFiled === true || issue.draft.type === type)
+        && (faults.openOnlyFiled !== true || !CLOSED.has(issue.state))
+        && (faults.ignoresCutOff === true || Date.parse(createdAt) >= since.getTime()))
+      .map(({ externalId, issue, createdAt }) => ({
+        ref: { opt: issue.draft.opt, kind: 'memory', externalId, url: null },
+        title: issue.draft.title,
+        body: issue.draft.body,
+        createdAt,
       })),
     editable: async (ref) => {
       const issue = held(ref);
@@ -336,7 +360,7 @@ async function rejectedCases(options: TrackerContractOptions): Promise<string[]>
 
 /** Each break: what the tracker does, its options, and the cases it must redden. */
 const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly string[]])[] = [
-  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create, CASES.openOfType, CASES.editable]],
+  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create, CASES.openOfType, CASES.filedDone, CASES.editable]],
   [
     'claims project support',
     contractOptions({}, (base) => ({ capabilities: () => ({ ...base.capabilities(), projects: true }) })),
@@ -371,6 +395,8 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.openClosed,
       CASES.openNone,
       CASES.openCreatedAt,
+      CASES.filedDone,
+      CASES.filedNone,
       CASES.editable,
       CASES.editableClosed,
       CASES.editBody,
@@ -392,6 +418,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.titleText,
       CASES.openOfType,
       CASES.openClosed,
+      CASES.filedDone,
       CASES.editBody,
       CASES.editablePriority,
       CASES.editPriority,
@@ -482,7 +509,28 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     })),
     [CASES.openCreatedAt],
   ],
-  ['dates the first open issue alone', contractOptions({ datesFirstOnly: true }), [CASES.openCreatedAt]],
+  ['dates the first open issue alone', contractOptions({ datesFirstOnly: true }), [CASES.openCreatedAt, CASES.filedDone]],
+  [
+    'has no filedIssues reading',
+    contractOptions({}, () => ({ filedIssues: undefined })),
+    [CASES.filedDone, CASES.filedNone],
+  ],
+  ['answers open issues alone from filedIssues', contractOptions({ openOnlyFiled: true }), [CASES.filedDone]],
+  ['ignores the type in filedIssues', contractOptions({ anyTypeFiled: true }), [CASES.filedDone]],
+  ['ignores the cut-off in filedIssues', contractOptions({ ignoresCutOff: true }), [CASES.filedDone, CASES.filedNone]],
+  [
+    'answers no filed issue at all',
+    contractOptions({}, () => ({ filedIssues: async () => [] })),
+    [CASES.filedDone],
+  ],
+  [
+    'answers filed issues under another kind',
+    contractOptions({}, (base) => ({
+      filedIssues: async (type, since) => ((await base.filedIssues?.(type, since)) ?? [])
+        .map((issue) => ({ ...issue, ref: { ...issue.ref, kind: 'github' } })),
+    })),
+    [CASES.filedDone],
+  ],
   [
     'answers no open issue at all',
     contractOptions({}, () => ({ openIssues: async () => [] })),
@@ -624,10 +672,30 @@ describe('the Tracker contract cases', () => {
     const without = { ...contractOptions(), readsOpenIssues: false };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
-      ...Object.values(CASES).filter((name) => !name.startsWith('openIssues ') && !EDIT_CASES.includes(name)),
+      ...Object.values(CASES).filter((name) => !name.startsWith('openIssues ') && !name.startsWith('filedIssues ') && !EDIT_CASES.includes(name)),
       LEFT_OUT_CASE,
+      CASES.filedDone,
+      CASES.filedNone,
       ...EDIT_CASES,
     ]);
+  });
+
+  it('swaps the two filedIssues cases for one holding the reading left out, when run without it', () => {
+    const without = { ...contractOptions(), readsFiledIssues: false };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !name.startsWith('filedIssues ') && !EDIT_CASES.includes(name)),
+      FILED_LEFT_OUT_CASE,
+      ...EDIT_CASES,
+    ]);
+  });
+
+  it('holds a tracker run without filedIssues to having none, beside one that has one', async () => {
+    const withReading = { ...contractOptions(), readsFiledIssues: false };
+    const withoutReading = { ...contractOptions({}, () => ({ filedIssues: undefined })), readsFiledIssues: false };
+
+    expect(await rejectedCases(withReading)).toEqual([FILED_LEFT_OUT_CASE]);
+    expect(await rejectedCases(withoutReading)).toEqual([]);
   });
 
   it('holds a tracker run without openIssues to having none, beside one that has none', async () => {

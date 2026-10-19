@@ -21,12 +21,13 @@
  * replaces, so a reader that relaxed the rule on anything would redden.
  */
 import type { UncheckedMerge, UncheckedMergeOptions } from './merge-unchecked.js';
-import type { Prompter } from '../../core/command/index.js';
 import type { GitResult, GitRunner, PullRequestComment } from '../../pr/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import {
   NO_WORKFLOW_WARNING,

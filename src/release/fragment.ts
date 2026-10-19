@@ -15,9 +15,9 @@
  * - next: one hop to a blocker's epic, and back home
  * ```
  *
- * A front matter block fenced by two `---` lines holds exactly three
- * fields, `plan`, `title` and `level`, one `key: value` line each, in
- * any order. The value is the rest of the line after the first colon,
+ * A front matter block fenced by two `---` lines holds the three
+ * fields `plan`, `title` and `level`, and an optional fourth, `package`,
+ * one `key: value` line each, in any order. The value is the rest of the line after the first colon,
  * trimmed, so a title may hold colons of its own; there is no quoting,
  * because nothing here needs it and a YAML reader would bring a second
  * spelling of every value. Below the block are the notes, one line per
@@ -30,6 +30,12 @@
  * a `patch` with no notes would fold into a changelog section with
  * nothing under its heading.
  *
+ * `package` names the workspace package the fragment releases, one word
+ * such as `@scope/plugin`. A fragment without the line is the root
+ * package's, read as `package: null`; the serialiser writes the line
+ * after `level` only when it is set, so a root fragment keeps the
+ * three-line front matter byte for byte.
+ *
  * ## Refusals
  *
  * {@link parseFragment} answers a {@link FragmentReading}: the fragment,
@@ -38,8 +44,9 @@
  * level, an empty body under a level other than `none`, and a malformed
  * front matter. Malformed covers everything else about the block: no
  * opening or closing fence, a line that is not `key: value`, a key
- * other than the three, a key given twice, and a missing or unusable
- * `plan` or `title`. Windows line endings are read as plain ones, since
+ * other than the four, a key given twice, a missing or unusable `plan`
+ * or `title`, and a `package` line whose value is empty or holds
+ * whitespace. Windows line endings are read as plain ones, since
  * a checkout with `core.autocrlf` would otherwise refuse every fragment.
  *
  * ## Names
@@ -55,11 +62,11 @@
  * {@link serializeFragment} writes the format back and throws on a
  * fragment the parser would refuse, so nothing this module writes is a
  * file it would then refuse to read. The level words and their order are
- * `PLAN_RELEASE_LEVELS` from `src/core/plan/parse.ts`, not a third spelling.
+ * `PLAN_RELEASE_LEVELS` from `packages/rafa/src/core/plan/parse.ts`, not a third spelling.
  */
-import type { PlanReleaseLevel } from '../core/plan/index.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
-import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
+import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
 
 /** The fence line that opens and closes a fragment's front matter. */
 export const FRAGMENT_FENCE = '---';
@@ -84,6 +91,11 @@ export interface Fragment {
   readonly title: string;
   /** The bump this fragment asks for; `none` ships no version change. */
   readonly level: PlanReleaseLevel;
+  /**
+   * The workspace package this fragment releases, e.g. `@scope/plugin`;
+   * null for the root package, the fragment with no `package` line.
+   */
+  readonly package: string | null;
   /** The notes below the front matter, one trimmed non-blank line each. */
   readonly notes: readonly string[];
 }
@@ -96,7 +108,7 @@ export type FragmentRefusal =
   | 'unknown-level'
   /** No note below the front matter, under a level other than `none`. */
   | 'empty-body'
-  /** The front matter block is not the three-field block this reads. */
+  /** The front matter block is not the block of the four keys this reads. */
   | 'malformed-front-matter';
 
 /** What {@link parseFragment} answers: the fragment, or why not. */
@@ -109,8 +121,11 @@ export type FragmentReading =
     readonly sentence: string;
   };
 
-/** The three front matter keys, in the order the serialiser writes them. */
-const FRONT_MATTER_KEYS = ['plan', 'title', 'level'] as const;
+/**
+ * The four front matter keys, in the order the serialiser writes them;
+ * `package` is written only when it is set.
+ */
+const FRONT_MATTER_KEYS = ['plan', 'title', 'level', 'package'] as const;
 
 type FrontMatterKey = (typeof FRONT_MATTER_KEYS)[number];
 
@@ -135,6 +150,17 @@ function planIdProblem(plan: string): string | null {
   if (!FRAGMENT_PLAN_ID_PATTERN.test(plan)) {
     return `the plan id ${JSON.stringify(plan)} is not letters, digits, '.', '_' and '-' starting with a letter or digit`;
   }
+  return null;
+}
+
+/**
+ * Why `name` cannot be a fragment's `package`, or null when it can: one
+ * non-empty word with no whitespace. Shared by the parser and the
+ * serialiser, so nothing written is refused on read.
+ */
+function packageNameProblem(name: string): string | null {
+  if (name === '') return 'the package is empty';
+  if (/\s/.test(name)) return `the package ${JSON.stringify(name)} holds whitespace`;
   return null;
 }
 
@@ -209,6 +235,14 @@ export function parseFragment(text: string): FragmentReading {
     return refuse('malformed-front-matter', 'The fragment\'s front matter is malformed: the title is empty.');
   }
 
+  const packageValue = frontMatter.values.get('package');
+  const packageProblem = packageValue === undefined
+    ? null
+    : packageNameProblem(packageValue);
+  if (packageProblem !== null) {
+    return refuse('malformed-front-matter', `The fragment's front matter is malformed: ${packageProblem}.`);
+  }
+
   const level = readLevel(frontMatter.values.get('level'));
   if (typeof level !== 'string') return level;
 
@@ -218,7 +252,7 @@ export function parseFragment(text: string): FragmentReading {
   if (notes.length === 0 && level !== 'none') {
     return refuse('empty-body', `The fragment of ${plan} is level ${level} and carries no notes.`);
   }
-  return { ok: true, fragment: { plan, title, level, notes } };
+  return { ok: true, fragment: { plan, title, level, package: packageValue ?? null, notes } };
 }
 
 /**
@@ -234,6 +268,10 @@ function fragmentProblem(fragment: Fragment): string | null {
   if (!isReleaseLevel(fragment.level)) {
     return `the level ${JSON.stringify(fragment.level)} is not one of ${PLAN_RELEASE_LEVELS.join(', ')}`;
   }
+  if (fragment.package !== null) {
+    const packageProblem = packageNameProblem(fragment.package);
+    if (packageProblem !== null) return packageProblem;
+  }
   const badNote = fragment.notes.find((note) => note === '' || note !== note.trim() || /[\r\n]/.test(note));
   if (badNote !== undefined) return `the note ${JSON.stringify(badNote)} is not one trimmed non-empty line`;
   if (fragment.notes.length === 0 && fragment.level !== 'none') {
@@ -243,8 +281,8 @@ function fragmentProblem(fragment: Fragment): string | null {
 }
 
 /**
- * The file text for `fragment`: the three-field front matter in the
- * order `plan`, `title`, `level`, a blank line, then one note per line,
+ * The file text for `fragment`: the front matter in the order `plan`,
+ * `title`, `level`, then `package` only when it is set, a blank line, then one note per line,
  * ending in a newline. Throws when the fragment is one
  * {@link parseFragment} would refuse or read back differently.
  */
@@ -256,6 +294,9 @@ export function serializeFragment(fragment: Fragment): string {
     `plan: ${fragment.plan}`,
     `title: ${fragment.title}`,
     `level: ${fragment.level}`,
+    ...(fragment.package === null
+      ? []
+      : [`package: ${fragment.package}`]),
     FRAGMENT_FENCE,
   ];
   const body = fragment.notes.length === 0

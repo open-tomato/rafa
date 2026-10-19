@@ -27,12 +27,12 @@ import type { BlockedLine } from '../board/blocked-line.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { SessionRecord } from '../core/loop/index.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/types.js';
 import type { Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,12 +40,13 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { runsDir } from '@open-tomato/rafa/core/loop';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
 import { readBlockedBy } from '../board/blocked.js';
 import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';
-import { runsDir } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { positionFilePath, writePositionFile } from '../project/position.js';
 import {
@@ -908,5 +909,28 @@ describe('the loop worktrees the housekeeping section counts', () => {
 
   it('counts the two under .rafa/worktrees, and not the other, when the config names the default', async () => {
     expect(await idleUnder('.rafa/worktrees')).toBe(5);
+  });
+});
+
+describe('the board section under naming.branch', () => {
+  /** The template `readStatusSections` hands the board under `namingBranch`. */
+  async function handedTemplate(namingBranch: string): Promise<readonly (string | undefined)[]> {
+    const handed: (string | undefined)[] = [];
+    const base = world();
+    const seams: StatusSeams = {
+      ...base.seams,
+      board: (options) => {
+        handed.push(options.branchTemplate);
+        return scriptedBoard(() => Promise.resolve(NO_LINE), true, null, []);
+      },
+    };
+
+    await sections(projectWith(), seams, { ...CONFIG, namingBranch });
+    return handed;
+  }
+
+  it('hands the board work/{stub} when the config names it, and the default when it names the default', async () => {
+    expect(await handedTemplate('work/{stub}')).toEqual(['work/{stub}']);
+    expect(await handedTemplate('feat/{stub}')).toEqual(['feat/{stub}']);
   });
 });

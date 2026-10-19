@@ -11,8 +11,8 @@
  * one. The error is a plain `Error` so renamed: a module imports no
  * value from core.
  */
-import type { AdapterContext } from '../../../core/adapters/index.js';
-import type { Sync } from '../../../ports/index.js';
+import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
+import type { Sync } from '@open-tomato/rafa/ports';
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';

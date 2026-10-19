@@ -2,7 +2,7 @@
  * The three directory trees the inventory reads skills and agents from:
  * the project's, rafa's own and the home's.
  *
- * `src/schema/tiers.ts` names the three tiers and resolves the skills
+ * `packages/rafa/src/schema/tiers.ts` names the three tiers and resolves the skills
  * directory of each; this module walks them and turns what it finds
  * into inventory rows ({@link SourceItem}). Plugins and add-ons are
  * other sources with other readers beside this one, and precedence,
@@ -70,14 +70,15 @@
  */
 import type { InventoryKind, InventoryRecord, InventorySource } from './record.js';
 import type { CheckReport } from '../check/run.js';
-import type { SkillTier, TierSeams } from '../schema/tiers.js';
+import type { SkillTier, TierSeams } from '@open-tomato/rafa/schema/tiers';
 
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
+import { realEntry, SKILL_TIERS, skillTierDirectory, tierExists } from '@open-tomato/rafa/schema/tiers';
+
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { realEntry, SKILL_TIERS, skillTierDirectory, tierExists } from '../schema/tiers.js';
 import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 import { checkVerdict, EMPTY_FRONTMATTER, readInventoryText, summarize } from './record.js';

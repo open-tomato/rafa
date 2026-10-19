@@ -42,11 +42,13 @@
  * project that named one keeps naming it whether or not it has written
  * there yet.
  */
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { normalize, sep } from 'node:path';
 
-import { CONFIG_DEFAULTS, CONFIG_FILE } from '../core/config/index.js';
+import { CONFIG_FILE } from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 /** The two settings this reading judges. */
 export type PreInitSetting = 'planDir' | 'specsDir';

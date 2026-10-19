@@ -1,8 +1,17 @@
 /**
  * The claim half of the roadmap's taken reading: what the claim on a
- * `feat/rafa-<n>-*` branch says, read off the remote once per walk and
- * weighed with the stale reading. `./roadmap.ts` asks the question and
- * words the answer; this module only reads and weighs.
+ * claim branch says, read off the remote once per walk and weighed with
+ * the stale reading. `./roadmap.ts` asks the question and words the
+ * answer; this module only reads and weighs.
+ *
+ * ## The claim branch, through the template
+ *
+ * A claim branch is the `naming.branch` template with the stub in it,
+ * `feat/rafa-<n>-<slug>` under the default, `feat/{stub}`. Every reading
+ * here takes the template as an optional trailing `template`, defaulting
+ * to `DEFAULT_BRANCH_TEMPLATE`, and reads only that template: under
+ * `work/{stub}`, `feat/rafa-20-x` is no claim branch, and under the
+ * default `work/rafa-20-x` is none.
  *
  * ## Which branches carry a claim reading
  *
@@ -18,9 +27,10 @@
  *
  * ## One fetch, on the first line that asks
  *
- * {@link createRemoteClaimReader} fetches the `feat/rafa-*` branches
- * (`fetchClaimBranches`) the first time a line asks about a branch the
- * remote holds, and never again in the same walk; each branch is then
+ * {@link createRemoteClaimReader} fetches the template's claim branches,
+ * `feat/rafa-*` by default (`fetchClaimBranches`), the first time a
+ * line asks about a branch the remote holds, and never again in the
+ * same walk; each branch is then
  * read once (`readClaimBranch`) and kept. A walk whose lines are all
  * ticked, closed or unbranched spends no fetch at all, and a failed
  * fetch answers every branch `unreadable` with git's own words, which
@@ -41,8 +51,10 @@
  */
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimState } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '../claims/git.js';
 import { readClaimState } from '../claims/stale.js';
@@ -74,32 +86,41 @@ export interface ClaimWeights {
   readonly now: Date;
 }
 
-/** A ref's branch name from `feat/` on: `refs/remotes/origin/feat/rafa-2-x` is `feat/rafa-2-x`. */
-const CLAIM_BRANCH_IN_REF = /(?:^|\/)(feat\/rafa-[1-9]\d*(?:-\S*)?)$/u;
-
 /**
- * The claim branch a ref names, whatever prefix the ref carries, or
- * null when it names none: `origin/feat/rafa-20-x`,
- * `refs/heads/feat/rafa-20-x` and `feat/rafa-20-x` all name
- * `feat/rafa-20-x`.
+ * The claim branch a ref names under `template`, whatever prefix the
+ * ref carries, or null when it names none. Under the default template
+ * `origin/feat/rafa-20-x`, `refs/heads/feat/rafa-20-x` and
+ * `feat/rafa-20-x` all name `feat/rafa-20-x`; under `work/{stub}`,
+ * `origin/work/rafa-20-x` names `work/rafa-20-x` and
+ * `origin/feat/rafa-20-x` names none.
+ *
+ * The ref is read from each of its `/` boundaries in turn, the whole ref
+ * first, and the first tail that is a claim branch under the template
+ * (`claimBranchIssue`) is the answer, so the longest such tail wins.
  */
-export function claimBranchOfRef(ref: string): string | null {
-  const name = CLAIM_BRANCH_IN_REF.exec(ref)?.[1] ?? null;
-  return name !== null && claimBranchIssue(name) !== null
-    ? name
-    : null;
+export function claimBranchOfRef(ref: string, template: string = DEFAULT_BRANCH_TEMPLATE): string | null {
+  const starts = [0, ...[...ref.matchAll(/\//gu)].map((slash) => slash.index + 1)];
+  return starts
+    .map((start) => ref.slice(start))
+    .find((tail) => claimBranchIssue(tail, template) !== null) ?? null;
 }
 
 /**
- * The claim reader over `git`, for the claim branches among `pushedRefs`,
- * the refs `git ls-remote --heads <remote>` answered. It fetches once, on
- * the first branch asked about that the remote holds, and reads each
- * branch once. Answers null for every branch when `remote` is not the
- * remote claims are read from; see the module note.
+ * The claim reader over `git`, for the claim branches under `template`
+ * among `pushedRefs`, the refs `git ls-remote --heads <remote>` answered.
+ * It fetches the template's claim branches once, on the first branch
+ * asked about that the remote holds, and reads each branch once. Answers
+ * null for every branch when `remote` is not the remote claims are read
+ * from; see the module note.
  */
-export function createRemoteClaimReader(git: GitRunner, remote: string, pushedRefs: readonly string[]): RemoteClaimReader {
+export function createRemoteClaimReader(
+  git: GitRunner,
+  remote: string,
+  pushedRefs: readonly string[],
+  template: string = DEFAULT_BRANCH_TEMPLATE,
+): RemoteClaimReader {
   const pushed = new Set(remote === REMOTE
-    ? pushedRefs.map(claimBranchOfRef).filter((name) => name !== null)
+    ? pushedRefs.map((ref) => claimBranchOfRef(ref, template)).filter((name) => name !== null)
     : []);
   let fetched: ReturnType<typeof fetchClaimBranches> | null = null;
   const read = new Map<string, ClaimBranchReading>();
@@ -109,9 +130,9 @@ export function createRemoteClaimReader(git: GitRunner, remote: string, pushedRe
     const kept = read.get(branch);
     if (kept !== undefined) return kept;
 
-    fetched = fetched ?? fetchClaimBranches(git);
+    fetched = fetched ?? fetchClaimBranches(git, template);
     const reading: ClaimBranchReading = fetched.ok
-      ? readClaimBranch(git, branch)
+      ? readClaimBranch(git, branch, template)
       : { state: 'unreadable', branch, reason: fetched.reason };
     read.set(branch, reading);
     return reading;

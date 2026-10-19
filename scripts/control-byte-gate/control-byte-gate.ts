@@ -60,9 +60,10 @@ export const FORBIDDEN_BYTES: ReadonlySet<number> = new Set([
  * this set.
  *
  * Kept deliberately in sync with `ar/no-unsafe-unicode` in
- * `unsafeUnicode.mjs` at the repo root; control-byte-gate.test.ts
- * asserts the two agree. The duplication is on purpose: this gate
- * imports nothing, so it runs on a bare checkout with no install.
+ * `packages/eslint-config/rules/unsafe-unicode.mjs`;
+ * control-byte-gate.test.ts asserts the two agree. The duplication is on
+ * purpose: this gate imports nothing, so it runs on a bare checkout with
+ * no install.
  */
 export const FORBIDDEN_CODEPOINTS: ReadonlySet<number> = new Set([
   // Bidirectional overrides and isolates — Trojan Source.

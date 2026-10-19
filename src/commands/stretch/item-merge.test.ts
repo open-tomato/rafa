@@ -20,8 +20,10 @@
 import type { StretchItemSeams } from './item.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
-import type { OpenIssue } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { OpenIssue } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +31,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { beginSession } from '@open-tomato/rafa/core/loop';
+
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
 import { runListArgs } from '../../ci/runs.js';
-import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
@@ -109,6 +112,10 @@ interface CaseOptions {
   /** How many `run list` reads fail before the fake answers. */
   readonly failedListReads?: number;
   readonly bugs?: readonly OpenIssue[];
+  /** The bugs `filedIssues` answers, filed after the cut-off or not, when it is not derived from `bugs`. */
+  readonly filed?: readonly OpenIssue[];
+  /** The message `filedIssues` throws, when it should. */
+  readonly filedThrows?: string;
 }
 
 interface Case {
@@ -191,7 +198,17 @@ function plant(options: CaseOptions = {}): Case {
     },
     isAlive: (pid) => pid === LOOP_PID,
     gh: () => gh,
-    tracker: () => ({ openIssues: async () => Promise.resolve([...(options.bugs ?? [])]) }),
+    tracker: () => ({
+      openIssues: async () => Promise.resolve([...(options.bugs ?? [])]),
+      filedIssues: async (_type, since) => {
+        if (options.filedThrows !== undefined) throw new Error(options.filedThrows);
+        return Promise.resolve((options.filed ?? options.bugs ?? []).flatMap(({ ref, title, body, createdAt }) => (
+          createdAt !== null && Date.parse(createdAt) > since.getTime()
+            ? [{ ref, title, body, createdAt }]
+            : []
+        )));
+      },
+    }),
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
@@ -317,6 +334,43 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).not.toContain('#869');
     expect(planted.ghCalls.filter((args) => args[0] === 'issue' && args[1] === 'view')).toEqual([]);
     expect(planted.ghCalls.filter((args) => args[0] === 'issue')).toEqual([]);
+  });
+
+  it('lists a bug filed after the cut-off and closed since, absent from the open listing, with its first body line', async () => {
+    const closed: OpenIssue = { ...bug('1084', 'filed after the cut-off, closed by the pit stop', '2026-10-07T09:10:00Z'), body: 'It broke on stretch 7.\nMore detail.\n' };
+    const planted = plant({
+      bugs: [bug('870', 'still open', '2026-10-07T06:00:00Z')],
+      filed: [closed],
+    });
+    mkdirSync(join(planted.project.root, '.rafa', 'stretch', '4'), { recursive: true });
+    writeFileSync(stretchRecordPath(planted.project.root, 4), JSON.stringify({ startedAt: '2026-10-07T05:00:00.000Z' }));
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expectInOrder(outcome.stdout, [
+      'Bugs: 1 open.',
+      'Filed since 2026-10-07T05:00:00.000Z: 1.',
+      '   #1084 filed after the cut-off, closed by the pit stop: It broke on stretch 7.',
+    ]);
+    expect(outcome.stdout).not.toContain('More detail.');
+    expect(outcome.stdout).not.toContain('#870');
+  });
+
+  it('prints the filed-since reading as not read when filedIssues throws, the open count still printed', async () => {
+    const planted = plant({
+      bugs: [bug('870', 'still open', '2026-10-07T09:10:00Z'), bug('871', 'also open', '2026-10-07T09:11:00Z')],
+      filedThrows: 'gh issue list: HTTP 502',
+    });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('Bugs: 2 open.');
+    expect(outcome.stdout).toContain('Filed since the last item: not read: ');
+    expect(outcome.stdout).toContain('HTTP 502');
+    expect(outcome.stdout).not.toContain('Filed since 2026');
+    expect(outcome.stdout).not.toContain('none');
   });
 
   it('counts new bugs from stretch.json\'s start when the ledger is empty', async () => {

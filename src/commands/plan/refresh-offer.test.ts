@@ -33,7 +33,7 @@
  *    cases. A prompter left open holds standard input past the question.
  */
 import type { RefreshOfferRequest } from '../../board/snapshot-settle.js';
-import type { Prompter } from '../../core/command/index.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 

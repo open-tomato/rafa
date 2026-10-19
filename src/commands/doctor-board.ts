@@ -108,7 +108,7 @@ import type { DoctorRelationsReport } from './doctor-relations.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardStatus } from '../board/status.js';
-import type { BoardRelationshipMode, PrProvider } from '../core/config/sections.js';
+import type { BoardRelationshipMode, PrProvider } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { readBlockedIssues } from '../board/blocked-issues.js';

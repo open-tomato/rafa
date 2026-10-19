@@ -65,12 +65,14 @@
  * {@link PrCloseResult} is the data of the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { Prompter, RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ClosingIssue, PullRequestDetail } from '../../pr/index.js';
+import type { Prompter, RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit, createLinePrompter } from '../../core/command/index.js';
+import { CommandExit, createLinePrompter } from '@open-tomato/rafa/core/command';
+
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
+import { PR_CLOSE_DECLARATION } from './declarations.js';
 import {
   DEFAULT_PR_SEAMS,
   lineRefusal,
@@ -221,7 +223,7 @@ function closedLine(result: PrCloseResult): string {
  */
 export async function closePull(context: RafaContext, seams: CloseSeams): Promise<PrCloseResult> {
   const line = readCloseLine(context.args, context.flags);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
 
   const detail = await onProvider(`read pull request #${String(line.number)}`, () => pr.pulls.get(line.number));
   if (detail === null) {
@@ -259,54 +261,7 @@ export async function closePull(context: RafaContext, seams: CloseSeams): Promis
 /** The command, reaching the provider and the terminal through `seams`; see the module note. */
 export function createPrCloseCommand(seams: CloseSeams = DEFAULT_CLOSE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr close',
-    subject: 'pr',
-    action: 'close',
-    summary: 'close a pull request without merging it',
-    description: 'Closes the open pull request `<n>` without merging it, leaving `--reason` as its closing'
-      + ' comment. It prints the title, the head branch and the issues a merge would have closed, which stay'
-      + ' open, then asks `Close #<n> without merging? [y/N]`; `--yes` skips the question, and without a'
-      + ' terminal and without `--yes` it refuses. An answer that is not yes closes nothing and the exit code'
-      + ' is 0. The head branch stays on the remote unless `--delete-branch` is on the line. Exit code 1, with'
-      + ' nothing closed, for a line naming no number or more than one, a `--reason` left out or blank, a pull'
-      + ' request the repository does not hold, one already merged and one already closed, and 1 for a close'
-      + ' the provider refused. With `--output=json` the number, the title, the head branch, those issues,'
-      + ' whether it was closed and whether the branch was deleted are the data of the terminal result event.'
-      + ' Refuses with exit code 2 where `pr.provider` is not `gh`. Starts no session.',
-    args: [{ name: 'n', description: 'The number of the pull request to close.', type: 'number', required: true }],
-    flags: [
-      {
-        name: 'reason',
-        description: 'Why the pull request is closed unmerged. Posted as its closing comment.',
-        type: 'string',
-      },
-      {
-        name: 'delete-branch',
-        description: 'Delete the head branch with the close, on the remote and in this checkout.'
-          + ' The branch stays when it is left out.',
-        type: 'boolean',
-      },
-      {
-        name: 'yes',
-        description: 'Close without asking. Needed where standard input is no terminal.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr close 41 --reason="Replaced by #52 on the new base."',
-        note: 'Shows #41 and the issues that stay open, asks, then closes it with that comment.',
-      },
-      {
-        cmd: 'rafa pr close 41 --reason="Replaced by #52." --delete-branch --yes',
-        note: 'Closes #41 without asking and deletes its head branch.',
-      },
-      {
-        cmd: 'rafa pr close 41 --reason="Replaced by #52." --yes --output=json',
-        note: 'Gives the number, the title, the head, the issues left open and both outcomes as the terminal result.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_CLOSE_DECLARATION,
     run: async (context) => {
       const result = await closePull(context, seams);
       if (context.outputMode === 'json') context.output.result(result);

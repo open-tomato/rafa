@@ -91,8 +91,8 @@
  * incremental one `src/board/board-cache.ts` would spend; the boards
  * compared are the listing's `type:roadmap` rows, its epics and
  * `roadmap.issue` when set. The branches are read through
- * `scanClaimBranches` (`src/board/roadmap.ts`), and only when some issue
- * carries a stage label. The report is report-only: it edits no label,
+ * `scanClaimBranches` (`src/board/roadmap.ts`) under `naming.branch`,
+ * and only when some issue carries a stage label. The report is report-only: it edits no label,
  * no checklist and no body, and neither what it finds nor a board or
  * git it cannot read changes the exit code. A refused switch reports no
  * drift.
@@ -113,10 +113,14 @@ import type { BoardView } from '../board/epic-board.js';
 import type { EpicRelations, Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveDefaultBoard } from '../board/boards.js';
@@ -129,9 +133,6 @@ import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
 import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
@@ -188,6 +189,8 @@ interface SwitchMove {
   readonly listing: readonly BoardIssue[];
   /** `roadmap.issue`, or null when no layer names one. */
   readonly configured: number | null;
+  /** `naming.branch`, the template the drift report's branch scan matches a claim branch by. */
+  readonly branchTemplate: string;
 }
 
 /** A refusal with {@link SWITCH_REFUSAL_EXIT}. */
@@ -371,7 +374,7 @@ async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<S
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const { relations, listing } = await readBoard(config, gh);
   const defaultBoard = defaultBoardOnce(config, gh, listing);
@@ -408,7 +411,7 @@ async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<S
     rehomed,
     line: placeLine(position.current, board, epics),
   });
-  return { result, root: project.root, listing, configured: config.roadmapIssue };
+  return { result, root: project.root, listing, configured: config.roadmapIssue, branchTemplate: config.namingBranch };
 }
 
 /** Reads the line, moves, and writes the position; see the module note. */
@@ -418,7 +421,7 @@ export async function runSwitchMove(context: RafaContext, seams: SwitchSeams): P
 
 /** The drift report over the listing `move` read, as the lines to warn; see the module note. */
 export async function switchDriftLines(
-  move: Pick<SwitchMove, 'root' | 'listing' | 'configured'>,
+  move: Pick<SwitchMove, 'root' | 'listing' | 'configured' | 'branchTemplate'>,
   git: GitRunner | undefined,
 ): Promise<readonly string[]> {
   const report = await checkDrift({
@@ -426,7 +429,7 @@ export async function switchDriftLines(
     boards: move.configured === null
       ? []
       : [move.configured],
-    branches: () => scanClaimBranches(git ?? createGitRunner(move.root)),
+    branches: () => scanClaimBranches(git ?? createGitRunner(move.root), undefined, move.branchTemplate),
   });
   return driftLines(report);
 }

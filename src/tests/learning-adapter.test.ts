@@ -6,7 +6,7 @@
  * later push.
  */
 import type { DescribedInstinctRecord, PushLogLine } from '../adapters/learning/local.js';
-import type { Learning, SyncPayload } from '../ports/index.js';
+import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

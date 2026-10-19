@@ -48,8 +48,8 @@
  *
  * Nothing here opens a file, reads a clock or changes a value passed in.
  */
-import type { InstinctRecord } from '../../ports/index.js';
 import type { Instinct } from '../../schema/instinct.js';
+import type { InstinctRecord } from '@open-tomato/rafa/ports';
 
 import { actionHash, triggerKey } from '../../learning/index.js';
 

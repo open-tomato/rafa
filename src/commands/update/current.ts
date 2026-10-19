@@ -42,21 +42,22 @@
  * recorded `gh` with no network.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { BoardAccess, UpdateApplied, UpdatePlan } from '../../project/update-current.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+
+import { CommandExit , createLinePrompter , RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { CommandExit , createLinePrompter , RAFA_VERSION } from '../../core/command/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 import { LOCK_FILE, readProjectLock } from '../../project/lock.js';
 import { scaffoldConflicts } from '../../project/scaffold.js';
 import { applyUpdatePlan, planChanges, readUpdatePlan, UpdateStepError } from '../../project/update-current.js';
 import { readCurrentRange } from '../../project/update-range.js';
 import { mainCheckoutOf } from '../../project/worktree-root.js';
-import { gitRemoteUrl } from '../../schema/project-id.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 /** The usage line a refusal ends with. */
@@ -133,10 +134,10 @@ function projectOf(context: RafaContext): ProjectFound {
 }
 
 /** The board the plan reads: `gh` when the project resolves to it. */
-function boardAccess(project: ProjectFound, seams: UpdateCurrentSeams): BoardAccess {
+async function boardAccess(project: ProjectFound, seams: UpdateCurrentSeams): Promise<BoardAccess> {
   let configured;
   try {
-    configured = loadConfig({ root: project.root, home: project.home }, {}, () => {}).config.prProvider;
+    configured = (await loadConfig({ root: project.root, home: project.home }, {}, () => {})).config.prProvider;
   } catch (error) {
     throw couldNotRun(`config: ${messageOf(error)}`);
   }
@@ -275,7 +276,7 @@ async function runUpdateCurrent(context: RafaContext, seams: UpdateCurrentSeams)
   const lockRoot = seams.lockRootOf(project.root);
   const range = readRange(lockRoot, seams.installed);
   refuseConflicts(project);
-  const access = boardAccess(project, seams);
+  const access = await boardAccess(project, seams);
   const plan = await readUpdatePlan({ root: project.root, lockRoot }, range, access);
   for (const line of planLines(plan)) context.output.info(line);
 

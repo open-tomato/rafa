@@ -16,6 +16,8 @@
 import type { ScratchRepo } from './cli-capture.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 
+import '../adapter-registry.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -100,7 +102,7 @@ function world(): World {
   writeFileSync(join(caller, 'package.json'), MANIFEST);
   writeFileSync(
     join(caller, '.changes', 'rafa-9.md'),
-    serializeFragment({ plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', notes: ['- Walk: one hop'] }),
+    serializeFragment({ plan: 'rafa-9', title: 'title of rafa-9', level: 'minor', package: null, notes: ['- Walk: one hop'] }),
   );
   git(caller, ['add', '-A']);
   git(caller, ['commit', '-q', '-m', 'first']);

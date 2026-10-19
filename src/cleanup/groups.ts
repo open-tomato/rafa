@@ -131,14 +131,15 @@
 import type { BranchesRead, BranchesUnread, LocalBranch } from './branches.js';
 import type { PastHeadRead, PastHeadReading, PastHeadSettings } from './past-head.js';
 import type { WorktreeBlockKind, WorktreeRow } from './worktrees.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { MergedPullRequest, PullRequests } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { basename } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+
 import { RELEASE_DEFAULTS } from '../config-schema-release.js';
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
 
 import { readPastHead } from './past-head.js';
 

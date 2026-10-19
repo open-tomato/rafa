@@ -19,11 +19,13 @@
  * have made no provider.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

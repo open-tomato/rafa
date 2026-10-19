@@ -63,7 +63,7 @@
 import type { ChangelogNote } from './changelog.js';
 import type { ReleasePrepared, ReleaseSettings } from './prepare.js';
 import type { ReleaseVerificationContext } from './verify.js';
-import type { GitRunner } from '../core/git/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -72,7 +72,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RELEASE_AUTO } from '../core/config/sections.js';
+import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
@@ -223,6 +224,7 @@ describe('verifyRelease over a session that did as it was told', () => {
         plan: PLAN,
         title: 'releases settle on the base branch',
         level: 'minor',
+        package: null,
         notes: ['- loop: the loop writes a fragment itself and reports what a diff is worth'],
       },
       text,

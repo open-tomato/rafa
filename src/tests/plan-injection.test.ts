@@ -30,10 +30,10 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { ConfigRoots } from '../core/config/load.js';
-import type { InjectMode } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
 
 import {
   mkdirSync,
@@ -56,15 +56,17 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
@@ -235,25 +237,25 @@ describe('the injection mode a run resolves', () => {
     expect(FILE_MODE).not.toBe(CONFIG_DEFAULTS.inject);
   });
 
-  it('answers the default with no flag and no file', () => {
-    const resolved = loadRunConfig(scopesOf(rootWith(null)), ['--plan=PLAN-x.md']);
+  it('answers the default with no flag and no file', async () => {
+    const resolved = await loadRunConfig(scopesOf(rootWith(null)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(CONFIG_DEFAULTS.inject);
     expect(resolved.sources.inject).toBe('default');
     expect(resolved.path).toBeNull();
   });
 
-  it('takes the file over the default', () => {
-    const resolved = loadRunConfig(scopesOf(rootWith(FILE_CONFIG)), ['--plan=PLAN-x.md']);
+  it('takes the file over the default', async () => {
+    const resolved = await loadRunConfig(scopesOf(rootWith(FILE_CONFIG)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(FILE_MODE);
     expect(resolved.sources.inject).toBe('file');
   });
 
-  it('lets --inject= outrank the file', () => {
+  it('lets --inject= outrank the file', async () => {
     const root = rootWith(FILE_CONFIG);
-    const flagged = loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md', `--inject=${FLAG_MODE}`]);
-    const unflagged = loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md']);
+    const flagged = await loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md', `--inject=${FLAG_MODE}`]);
+    const unflagged = await loadRunConfig(scopesOf(root), ['--plan=PLAN-x.md']);
 
     expect(flagged.config.inject).toBe(FLAG_MODE);
     expect(flagged.sources.inject).toBe('cli');
@@ -263,22 +265,22 @@ describe('the injection mode a run resolves', () => {
     expect(unflagged.sources.inject).toBe('file');
   });
 
-  it('leaves the store to the file when the flag names the mode', () => {
+  it('leaves the store to the file when the flag names the mode', async () => {
     const root = rootWith(`store: ndjson\n${FILE_CONFIG}`);
-    const resolved = loadRunConfig(scopesOf(root), [`--inject=${FLAG_MODE}`]);
+    const resolved = await loadRunConfig(scopesOf(root), [`--inject=${FLAG_MODE}`]);
 
     expect(resolved.config.store).toBe('ndjson');
     expect(resolved.sources.store).toBe('file');
     expect(resolved.sources.inject).toBe('cli');
   });
 
-  it('reads the user file under the home, and labels each layer the mode came from', () => {
+  it('reads the user file under the home, and labels each layer the mode came from', async () => {
     const home = rootWith(FILE_CONFIG);
     const projectRoot = rootWith(FILE_CONFIG);
-    const fromUser = loadRunConfig({ root: rootWith(null), home }, []);
-    const fromFile = loadRunConfig({ root: projectRoot, home }, []);
-    const fromFlag = loadRunConfig({ root: rootWith(null), home }, [`--inject=${FLAG_MODE}`]);
-    const fromDefault = loadRunConfig(scopesOf(rootWith(null)), []);
+    const fromUser = await loadRunConfig({ root: rootWith(null), home }, []);
+    const fromFile = await loadRunConfig({ root: projectRoot, home }, []);
+    const fromFlag = await loadRunConfig({ root: rootWith(null), home }, [`--inject=${FLAG_MODE}`]);
+    const fromDefault = await loadRunConfig(scopesOf(rootWith(null)), []);
 
     expect(fromUser.config.inject).toBe(FILE_MODE);
     expect(fromUser.sources.inject).toBe('user');
@@ -296,17 +298,17 @@ describe('the injection mode a run resolves', () => {
     expect(() => loadRunConfig(scopesOf(root), ['--inject=stages'])).toThrow('command line: inject is "stages"');
   });
 
-  it('refuses a bare --inject rather than reading it as absent', () => {
+  it('refuses a bare --inject rather than reading it as absent', async () => {
     const root = rootWith(FILE_CONFIG);
 
     expect(() => loadRunConfig(scopesOf(root), ['--inject'])).toThrow(ConfigError);
-    expect(loadRunConfig(scopesOf(root), []).config.inject).toBe(FILE_MODE);
+    expect((await loadRunConfig(scopesOf(root), [])).config.inject).toBe(FILE_MODE);
   });
 
-  it('hands a warning per unknown key to the sink it is given', () => {
+  it('hands a warning per unknown key to the sink it is given', async () => {
     const seen: string[] = [];
     const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
-    const resolved = loadRunConfig(scopesOf(root), [], (message) => {
+    const resolved = await loadRunConfig(scopesOf(root), [], (message) => {
       seen.push(message);
     });
 
@@ -316,7 +318,7 @@ describe('the injection mode a run resolves', () => {
     expect(warnings).toEqual([]);
   });
 
-  it('writes a warning per unknown key through the active output when it is given no sink', () => {
+  it('writes a warning per unknown key through the active output when it is given no sink', async () => {
     const routed: string[] = [];
     const consoleWarned: string[] = [];
     const root = rootWith(`${FILE_CONFIG}nonesuch: linear\n`);
@@ -329,7 +331,7 @@ describe('the injection mode a run resolves', () => {
       },
     }));
 
-    const resolved = loadRunConfig(scopesOf(root), []);
+    const resolved = await loadRunConfig(scopesOf(root), []);
 
     expect(routed).toHaveLength(1);
     expect(routed[0]).toContain('"nonesuch"');

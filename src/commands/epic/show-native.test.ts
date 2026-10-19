@@ -29,8 +29,10 @@
  */
 import type { EpicsResult } from './show.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

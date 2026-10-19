@@ -12,7 +12,7 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
+import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
 
 import { setActivePlanStub, withStamp } from './stamp.js';
 

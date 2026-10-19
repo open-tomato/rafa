@@ -115,19 +115,21 @@
  * that rejects is refused as any other tracker call.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueDraft, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
-import { messageOf } from '../../core/config/sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import { BUG_FLAGS, readBugLine } from './create-bug.js';
+import { DEFAULT_ISSUE_TYPE, ISSUE_CREATE_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueName,
@@ -159,9 +161,6 @@ const NO_PRIORITY = 'needs-triage';
 
 /** The `--body-file` value that reads standard input. */
 export const STDIN_PATH = '-';
-
-/** The type a draft takes when the line names none; see the module note. */
-export const DEFAULT_ISSUE_TYPE: IssueType = 'code';
 
 /** What json mode gives as the terminal result's `data`. */
 export interface IssueCreateResult {
@@ -290,7 +289,7 @@ export async function createIssue(context: RafaContext, seams: IssueSeams): Prom
     ? (message: string): void => context.output.warn(message)
     : (): void => undefined;
   const read = base.type === BUG_TYPE
-    ? readBugLine(context, seams, base, { usage: USAGE, warn }).draft
+    ? (await readBugLine(context, seams, base, { usage: USAGE, warn })).draft
     : base;
   const blockedLine = readSpecLine(read);
   if (dryRun) return { dryRun: true, draft: read };
@@ -331,7 +330,7 @@ export async function addCreatedToProject(context: RafaContext, seams: IssueSeam
   if (issue === null) return;
   const project = issueProject(context);
   // Its warnings dropped: `resolveIssueTracker` already wrote them for the same config.
-  const config = issueSubjectConfig(project, () => undefined);
+  const config = await issueSubjectConfig(project, () => undefined);
   const lines = await addAndRefreshIssue({
     config,
     openGh: () => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep)),
@@ -342,126 +341,7 @@ export async function addCreatedToProject(context: RafaContext, seams: IssueSeam
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue create',
-    subject: 'issue',
-    action: 'create',
-    summary: 'create an issue on the tracker from a title and a body, a bug from its fields',
-    description: 'Files one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
-      + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-      + ' `--title` is required for every type but `bug`. The issue is of type `code` and module `unassigned` unless'
-      + ' `--type` and `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. A'
-      + ' `--type=bug` line is filed from its fields: `--module`, `--action`, `--summary`, `--cause` and'
-      + ' `--reproduce`, each also read from a section of the body, with rafa filling the versions and the place,'
-      + ' rendering the title through `issues.titles.bug` and refusing a record missing a field, naming each. The body is'
-      + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
-      + ' carries a `Blocked by: #24` line is filed blocked, and refused when the line names no issue, the'
-      + ' issue itself or an issue the board does not hold. With `board.project.number` set, a GitHub issue is'
-      + ' added to the project and its fields filled, any failure there a warning that keeps the exit code. Prints the'
-      + ' tracker and id of the issue filed, and its URL when there is one. With `--output=json` the tracker'
-      + ' and the ref are the data of the terminal result event. `--dry-run` prints the title and body the line'
-      + ' would file, resolves no tracker and files nothing.',
-    args: [],
-    flags: [
-      {
-        name: 'title',
-        description: 'The title of the issue. Required for every type but bug, whose title is rendered from its fields.',
-        type: 'string',
-      },
-      {
-        name: 'body',
-        description: 'The body of the issue, as markdown. Empty when left out. Not with --body-file.',
-        type: 'string',
-      },
-      {
-        name: 'body-file',
-        description: 'A file holding the body of the issue, read whole; `-` reads standard input. Not with --body.',
-        type: 'string',
-      },
-      {
-        name: 'type',
-        description: `What the issue is for: one of ${ISSUE_TYPES.join(', ')}.`,
-        type: 'string',
-        default: DEFAULT_ISSUE_TYPE,
-      },
-      {
-        name: 'module',
-        description: `The module the issue belongs to; ${TRIAGE_MODULE} when left out. A bug names one, or unknown.`,
-        type: 'string',
-      },
-      {
-        name: 'priority',
-        description: `How urgent the issue is: one of ${ISSUE_PRIORITIES.join(', ')}. Marked needs-triage when left out.`,
-        type: 'string',
-      },
-      {
-        name: 'summary',
-        description: 'A bug: one line saying what is wrong, the last part of its title.',
-        type: 'string',
-      },
-      {
-        name: 'action',
-        description: 'A bug: what was running, a command, a step or a test; or unknown.',
-        type: 'string',
-      },
-      {
-        name: 'cause',
-        description: 'A bug: its cause code from `rafa bug codes`, or <family>:new-context when no leaf fits.',
-        type: 'string',
-      },
-      {
-        name: 'proposed',
-        description: 'A bug: beside a new-context cause, the leaf you would have used, as <family>:<leaf>.',
-        type: 'string',
-      },
-      {
-        name: 'reproduce',
-        description: 'A bug: the steps, or the condition that revealed it. Never unknown.',
-        type: 'string',
-      },
-      {
-        name: 'rerun',
-        description: 'A bug: one command that shows it again.',
-        type: 'string',
-      },
-      {
-        name: 'env',
-        description: 'A bug: the place it was seen, one of local, ci, prod, a place `issues.environments` adds, or'
-          + ' unknown. Left out, ci when the CI variable is set and local otherwise.',
-        type: 'string',
-      },
-      {
-        name: 'project',
-        description: 'A bug: the project, where one tracker holds several.',
-        type: 'string',
-      },
-      {
-        name: 'path',
-        description: 'A bug: the file the error points at, which names the package its Versions section holds. Left'
-          + ' out, the first file of the project the artifact names.',
-        type: 'string',
-      },
-      {
-        name: 'dry-run',
-        description: 'Print the title and the body the line would file, resolve no tracker and file nothing.',
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue create --type=bug --module=loop --action=start --summary="resume does not find the worktree branch"'
-          + ' --reproduce="rafa loop start --continue after a stop" --cause=git:new-context --proposed=git:branch-not-found --dry-run',
-        note: 'Prints the title `loop - start: resume does not find the worktree branch` and the body of the bug, and files nothing.',
-      },
-      {
-        cmd: 'rafa issue create --title="Document issue move" --priority=low --output=json',
-        note: 'Writes a start event, then a result event whose data holds the tracker and the ref of the issue.',
-      },
-      {
-        cmd: 'rafa issue create --title="Faster plan show" --body-file=spec.md',
-        note: 'Files an issue whose body is what spec.md holds; --body-file=- reads it from standard input.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_CREATE_DECLARATION,
     run: async (context) => {
       const created = await createIssue(context, seams);
       if (isDryRun(created)) {

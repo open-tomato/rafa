@@ -47,12 +47,13 @@
  *   out of, and with two it cannot tell which. The owner may be closed:
  *   an issue can leave a finished epic.
  *
- * A closed issue moves too. Only an OPEN issue has its work read: every
- * scanned branch ref `branchClaims` reads as the issue's, named as a
- * person types it (`branchNameOf`, `src/board/epic-horizon.ts`), and every
- * open pull request whose body closes it or whose head branch claims it,
- * in ascending number. A reading that fails is a problem sentence, never
- * a throw, and the command warns that the work named may be short.
+ * A closed issue moves too. Only an OPEN issue has its work read
+ * (`./move-work.ts`): every scanned branch ref `branchClaims` reads as the
+ * issue's under the template `naming.branch` names, named as a person
+ * types it (`branchNameOf`, `src/board/epic-horizon.ts`), and every open
+ * pull request whose body closes it or whose head branch claims it, in
+ * ascending number. A reading that fails is a problem sentence, never a
+ * throw, and the command warns that the work named may be short.
  *
  * ## The line that moves
  *
@@ -144,12 +145,15 @@ import type { EpicRelations } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { BoardRelations, RelationWrite } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
+import type { OpenPullRequestLister } from '../../board/roadmap.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { branchNameOf } from '../../board/epic-horizon.js';
 import {
   blankReasonMessage,
   REASON_FLAG,
@@ -161,14 +165,12 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
-import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
+import { createGhOpenPullRequests, parseRoadmapBody } from '../../board/roadmap.js';
+import { issueProject, issueSubjectConfig, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
+import { EPIC_MOVE_DECLARATION, TO_FLAG } from './declarations.js';
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';
-import { TO_FLAG, workPhrase } from './horizon-change.js';
+import { workPhrase } from './horizon-change.js';
 import {
   configuredMoveRelations,
   NATIVE_MODE,
@@ -177,6 +179,7 @@ import {
   nativeEpicLeft,
   nativeParentLine,
 } from './move-native.js';
+import { openWorkOf } from './move-work.js';
 
 /** The exit code every refusal of a move ends the command with. */
 export const EPIC_MOVE_REFUSAL_EXIT = 2;
@@ -207,6 +210,8 @@ export interface EpicMoveInput {
   readonly git: GitRunner;
   /** The remote the branch scan asks; `origin` when left out. */
   readonly remote?: string;
+  /** The branch template a branch claims the issue under, the project's `naming.branch`; `DEFAULT_BRANCH_TEMPLATE` when left out. */
+  readonly branchTemplate?: string;
   /** Every open pull request. */
   readonly pullRequests: OpenPullRequestLister;
   /** The board's relationships, which read the epic a native issue leaves; `labels` mode when left out. See the module note. */
@@ -420,32 +425,6 @@ function movedLineOf(from: BoardIssue, issue: BoardIssue): MovedLine {
   return Object.freeze({ why, ticked: old?.ticked ?? issue.state === 'CLOSED' });
 }
 
-/** True when `pull` is `issue`'s: its body closes it or its head branch claims it. */
-function pullIsFor(pull: RoadmapPullRequest, issue: number): boolean {
-  return closedIssuesIn(pull.body).includes(issue) || branchClaims(pull.headRefName, issue);
-}
-
-/** The open work of `issue`, with a sentence per reading that failed. */
-async function openWorkOf(input: EpicMoveInput): Promise<{ work: OpenWork; problems: readonly string[] }> {
-  const scan = scanClaimBranches(input.git, input.remote);
-  const problems = [...scan.problems];
-  let pulls: readonly RoadmapPullRequest[] = [];
-  try {
-    pulls = await input.pullRequests();
-  } catch (error) {
-    problems.push(`the open pull requests could not be read, so none is named: ${messageOf(error)}`);
-  }
-  const branches = scan.refs.filter((scanned) => branchClaims(scanned, input.issue)).map(branchNameOf);
-  const numbers = pulls.filter((pull) => pullIsFor(pull, input.issue)).map((pull) => pull.number);
-  return {
-    work: Object.freeze({
-      branches: Object.freeze([...new Set(branches)]),
-      pullRequests: Object.freeze([...new Set(numbers)].sort((left, right) => left - right)),
-    }),
-    problems: Object.freeze(problems),
-  };
-}
-
 /** The move `input` asks for, read in `native` mode through `relations`; see the module note. */
 async function readNativeMove(input: EpicMoveInput, relations: EpicRelations): Promise<NativeMoveReading> {
   const issue = memberRow(input.issues, input.issue);
@@ -609,15 +588,17 @@ async function askReason(reading: EpicMoveReading, flag: string | null, seams: E
 export async function moveEpicIssue(context: RafaContext, seams: EpicMoveSeams): Promise<EpicMoveResult> {
   const line = readMoveLine(context);
   const project = issueProject(context);
+  const config = await issueSubjectConfig(project, () => undefined);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   const relations = seams.relations
-    ?? await configuredMoveRelations(project, gh, () => readOrRefuse('the board\'s repository', () => readBoardRepository(gh)));
+    ?? await configuredMoveRelations(config, gh, () => readOrRefuse('the board\'s repository', () => readBoardRepository(gh)));
   const listing = await readOrRefuse('the board', () => createGhBoardListing({ gh, mode: relations.mode })());
   const reading = await readEpicMove({
     issues: listing,
     issue: line.issue,
     to: line.to,
     git: seams.git ?? createGitRunner(project.root),
+    branchTemplate: config.namingBranch,
     pullRequests: createGhOpenPullRequests({ gh }),
     relations,
   });
@@ -739,47 +720,7 @@ export async function runEpicMove(context: RafaContext, seams: EpicMoveSeams): P
 /** The command, reaching `gh`, `git` and the terminal through `seams`; see the module note. */
 export function createEpicMoveCommand(seams: EpicMoveSeams = {}): RafaCommand {
   const command: RafaCommand = {
-    name: 'epic move',
-    subject: 'epic',
-    action: 'move',
-    summary: 'move an issue to another epic, its label, its checklist line and a comment with the reason',
-    description: 'Swaps the issue\'s epic: label for the target epic\'s in one edit, moves its checklist line from'
-      + ' the old epic\'s body to the new one\'s keeping every other byte, and comments "Moved from epic #A to #B:'
-      + ' <reason>" on the issue, naming its open branches and pull requests, which stay as they are. The issue is'
-      + ' never recreated or closed. The reason is --reason, or asked once where there is a terminal; with neither,'
-      + ' nothing changes and the question is printed. An issue with no epic: label, a target that is not an open'
-      + ' epic and a move to its own epic are refused with exit code 2 before anything is written. With'
-      + ' `--output=json` the move and what each write did are the data of the terminal result event. With'
-      + ' board.relationships set to native it sets the issue\'s parent to the target epic in one edit instead,'
-      + ' and no label or checklist line is read or written; the comment is the same.',
-    args: [
-      {
-        name: 'issue',
-        description: 'The number of the issue that moves.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [
-      {
-        name: TO_FLAG,
-        description: 'The number of the open epic it moves to. Required.',
-        type: 'string',
-        required: true,
-      },
-      {
-        name: REASON_FLAG,
-        description: 'Why it moves, commented on the issue. Asked once when left out.',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa epic move 12 --to=40 --reason="belongs with sign-in"',
-        note: 'Swaps #12\'s epic: label for #40\'s, moves its line into #40\'s checklist and comments the move on #12.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...EPIC_MOVE_DECLARATION,
     run: (context) => runEpicMove(context, seams),
   };
   return Object.freeze(command);

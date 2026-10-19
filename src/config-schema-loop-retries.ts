@@ -1,17 +1,23 @@
 /**
- * `loop.retries`, the loop's own retry count: how many times in a row one
- * run re-enters its task loop after a stop a blind re-run is known to pass,
- * with its field, its default, its spec and its reader.
- * `config-schema.ts`'s `RafaConfig` extends {@link LoopRetriesSettings},
- * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
- * after `loop.worktreeDir` and ahead of `loop.wrapUp`, so the order
- * settings are reported in holds the `loop` section together.
+ * `loop.retries`, the loop's own retry count: how many times in a row
+ * one run re-enters its task loop after a stop a blind re-run is known
+ * to pass, with its field, its default, its spec and its reader.
+ * {@link LOOP_RETRIES_SECTION} hands it to core as one `ConfigSection`,
+ * package `loop-retries`, and the `declare module` below adds
+ * {@link LoopRetriesSettings} to `RafaConfig`.
+ * {@link LoopRetriesShape} holds its part of the shared `loop` namespace,
+ * which `src/config/shape.ts` composes into `LoopShape` of `ConfigShape`,
+ * the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `loop.worktreeDir` and ahead of
+ * `loop.wrapUp`, so the order settings are reported in holds the `loop`
+ * section together.
  *
  * The key has its own module, as `config-schema-wrap-up.ts` has, because
  * `config-schema.ts`'s own note asks a new section for a sibling, and
  * the reader is a rule about a VALUE that only this key reads, so it
- * sits here beside it. Only `config-schema.ts` imports this file; a
- * caller reads the setting off the resolved `RafaConfig`, and
+ * sits here beside it. `config-registry.ts` imports this file to spread
+ * it; a caller reads the setting off the resolved `RafaConfig`, and
  * `start/run-setup.ts` checks `--retry` against the same two bounds.
  *
  * ## The key
@@ -43,10 +49,23 @@
  * flag that outranks it for one run is `loop start --retry=<n>`, read
  * by `start/run-setup.ts`.
  */
-import type { SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
-import { refused } from './core/config/sections.js';
+import { refused } from '@open-tomato/rafa/core/config/sections';
+
+declare module '@open-tomato/rafa/core/config/config-schema' {
+  /** The `loop-retries` section's fields, added to core's. */
+  interface RafaConfig extends LoopRetriesSettings {}
+}
+
+/**
+ * `loop.retries`, the section's part of the shared `loop` namespace;
+ * `src/config/shape.ts` composes it into `LoopShape`.
+ */
+export interface LoopRetriesShape {
+  readonly retries: LoopRetries;
+}
 
 /** The fewest retries `loop.retries` accepts as a number. */
 export const LOOP_RETRIES_MIN = 1;
@@ -93,3 +112,10 @@ export const LOOP_RETRIES_SETTINGS: {
 } = {
   loopRetries: { key: 'loop.retries', read: loopRetries, cli: false },
 };
+
+/** The `loop-retries` section: `loop.retries`, with their defaults and no check. */
+export const LOOP_RETRIES_SECTION: ConfigSection = Object.freeze({
+  package: 'loop-retries',
+  settings: Object.freeze(LOOP_RETRIES_SETTINGS),
+  defaults: LOOP_RETRIES_DEFAULTS,
+});

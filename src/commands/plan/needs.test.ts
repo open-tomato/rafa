@@ -21,8 +21,10 @@
  * `src/tests/plan-needs.test.ts`'s.
  */
 import type { PlanSpecOptions, PlanSpecResolution } from '../../board/plan-spec.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,7 +32,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

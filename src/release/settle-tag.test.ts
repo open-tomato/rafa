@@ -13,8 +13,8 @@ import type { Fragment } from './fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
-import type { ReleaseTagMode } from '../core/config/sections.js';
 import type { GitResult, GitRunner, PullRequestSummary } from '../pr/index.js';
+import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../core/git/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
@@ -48,6 +49,7 @@ const SETTINGS: SettleSettings = {
   releaseFragments: '.changes',
   releaseStrategy: 'semver-by-level',
   releaseHeading: '## {version} — {date}, {title}',
+  releaseMoveLock: false,
 };
 
 /** The manifest on `main`. */
@@ -78,7 +80,7 @@ function isolatedEnv(home: string): Record<string, string> {
 
 /** A fragment's text. */
 function fragmentText(plan: string, level: Fragment['level'], notes: readonly string[]): string {
-  return serializeFragment({ plan, title: `title of ${plan}`, level, notes });
+  return serializeFragment({ plan, title: `title of ${plan}`, level, package: null, notes });
 }
 
 /** A bare origin, a clone that lands commits on `main`, and the caller's clone. */
@@ -138,6 +140,21 @@ function world(): World {
   w.land({ '.changes/rafa-9.md': fragmentText('rafa-9', 'minor', ['- Walk: one hop']) }, 'merge rafa-9');
   w.land({ '.changes/rafa-1.md': fragmentText('rafa-1', 'patch', ['- Loop: a fix']) }, 'merge rafa-1');
   return w;
+}
+
+/** The root manifest of a workspace base: {@link MANIFEST} with `workspaces` naming `packages/*`. */
+const WORKSPACE_MANIFEST = MANIFEST.replace('\n}', ',\n\t"workspaces": ["packages/*"]\n}');
+
+/** The publishable member's manifest. */
+const PLUGIN_MANIFEST = '{\n  "name": "@scope/plugin",\n  "version": "0.1.0"\n}\n';
+
+/** The tag a settle of the plugin's planted fragment writes: 0.1.0 bumped by a minor. */
+const PLUGIN_TAG = '@scope/plugin@0.2.0';
+
+/** Makes `main` a workspace holding a publishable `packages/plugin`, and lands `rafa-7` (minor) for it. */
+function landPlugin(w: World): void {
+  w.land({ 'package.json': WORKSPACE_MANIFEST, 'packages/plugin/package.json': PLUGIN_MANIFEST }, 'add the plugin');
+  w.land({ '.changes/rafa-7.md': serializeFragment({ plan: 'rafa-7', title: 'title of rafa-7', level: 'minor', package: '@scope/plugin', notes: ['- Plugin: a hook'] }) }, 'merge rafa-7');
 }
 
 /** What one settle answered, with every argv the tag step ran. */
@@ -243,7 +260,7 @@ describe('tagSettle under release.tag: settle and a push delivery', () => {
     expect(run.tagged).toEqual({
       outcome: 'tagged',
       exitCode: 0,
-      tag: TAG,
+      tags: [TAG],
       commit: build.release,
       sentence: `${TAG} names ${build.release.slice(0, 12)} and is pushed to origin`,
     });
@@ -275,7 +292,7 @@ describe('tagSettle under release.tag: settle and a push delivery', () => {
 
     expect(run.delivered.outcome.attempts).toBe(2);
     const build = pushedBuild(run.delivered);
-    expect(build.deleted).toContain('.changes/rafa-4.md');
+    expect(build.deleted.flatMap((unit) => unit.paths)).toContain('.changes/rafa-4.md');
     expect(run.tagged.outcome).toBe('tagged');
     expect(tagCommit(w, w.origin, TAG)).toBe(originMain(w));
     expect(originMain(w)).toBe(build.release);
@@ -385,7 +402,8 @@ describe('tagSettle, a tag that cannot land', () => {
       tag: TAG,
       commit: build.release,
       written: false,
-      sentence: `${TAG} already names ${elsewhere.slice(0, 12)}, not the release commit ${build.release.slice(0, 12)}; settle wrote no tag, so move or delete it by hand and run ${RELEASE_TAG_COMMAND}`,
+      tags: [],
+      sentence: `${TAG} already names ${elsewhere.slice(0, 12)}, not the release commit ${build.release.slice(0, 12)}; settle did not move it, so move or delete it by hand and run ${RELEASE_TAG_COMMAND}`,
     });
     expect(run.tagArgv.some((args) => args[0] === 'push' || args[0] === 'tag')).toBe(false);
     expect(tagCommit(w, w.caller, TAG)).toBe(elsewhere);
@@ -439,5 +457,79 @@ describe('tagSettle, a tag that cannot land', () => {
     expect(run.tagged.sentence).toBe(`${TAG} is written on ${build.release.slice(0, 12)} but could not be pushed to origin: ${PUSH_SAID_NOTHING}`);
     expect(linesOf(run.tagged.sentence)).not.toContain('Done');
     expect(tagsIn(w, w.origin)).toEqual([]);
+  });
+});
+
+describe('tagSettle, a release moving the root and a package', () => {
+  it('writes and pushes one tag per unit on the release commit, the root\'s first', async () => {
+    const w = world();
+    landPlugin(w);
+
+    const run = await settleAndTag(w);
+
+    const build = pushedBuild(run.delivered);
+    expect(build.units.map((unit) => unit.package)).toEqual([null, '@scope/plugin']);
+    expect(run.tagged).toEqual({
+      outcome: 'tagged',
+      exitCode: 0,
+      tags: [TAG, PLUGIN_TAG],
+      commit: build.release,
+      sentence: `${TAG}, ${PLUGIN_TAG} name ${build.release.slice(0, 12)} and are pushed to origin`,
+    });
+    const pushes = run.tagArgv.filter((args) => args[0] === 'push');
+    expect(pushes).toEqual([
+      ['push', '--porcelain', 'origin', `refs/tags/${TAG}:refs/tags/${TAG}`],
+      ['push', '--porcelain', 'origin', `refs/tags/${PLUGIN_TAG}:refs/tags/${PLUGIN_TAG}`],
+    ]);
+    expect(tagCommit(w, w.origin, TAG)).toBe(build.release);
+    expect(tagCommit(w, w.origin, PLUGIN_TAG)).toBe(build.release);
+    expect(originMain(w)).toBe(build.release);
+  });
+
+  it('tags a package alone with its own tag and no v<version>', async () => {
+    const w = world();
+    w.land({ '.changes/rafa-9.md': null, '.changes/rafa-1.md': null }, 'drop the root fragments');
+    landPlugin(w);
+
+    const run = await settleAndTag(w);
+
+    const build = pushedBuild(run.delivered);
+    expect(run.tagged).toMatchObject({ outcome: 'tagged', tags: [PLUGIN_TAG], sentence: `${PLUGIN_TAG} names ${build.release.slice(0, 12)} and is pushed to origin` });
+    expect(tagsIn(w, w.origin)).toEqual([PLUGIN_TAG]);
+  });
+
+  it('stops at the package tag the remote refuses, naming the root tag that landed before it', async () => {
+    const w = world();
+    landPlugin(w);
+    const elsewhere = originMain(w);
+    w.git(w.origin, ['tag', PLUGIN_TAG, elsewhere]);
+
+    const run = await settleAndTag(w);
+
+    const build = pushedBuild(run.delivered);
+    const short = build.release.slice(0, 12);
+    expect(run.tagged).toMatchObject({ outcome: 'failed', exitCode: 1, tag: PLUGIN_TAG, commit: build.release, written: true, tags: [TAG] });
+    if (run.tagged.outcome !== 'failed') return;
+    expect(run.tagged.sentence).toStartWith(`${PLUGIN_TAG} is written on ${short} but could not be pushed to origin: `);
+    expect(run.tagged.sentence).toContain('[rejected] (already exists)');
+    expect(run.tagged.sentence).toEndWith(`; ${TAG} names ${short} and is pushed to origin already`);
+    expect(tagCommit(w, w.origin, TAG)).toBe(build.release);
+    expect(tagCommit(w, w.origin, PLUGIN_TAG)).toBe(elsewhere);
+  });
+
+  it('tries no package tag once the root tag fails', async () => {
+    const w = world();
+    landPlugin(w);
+    const elsewhere = w.git(w.caller, ['rev-parse', 'origin/main']);
+    w.git(w.caller, ['tag', TAG, elsewhere]);
+
+    const run = await settleAndTag(w);
+
+    expect(run.tagged).toMatchObject({ outcome: 'failed', exitCode: 1, tag: TAG, written: false, tags: [] });
+    if (run.tagged.outcome !== 'failed') return;
+    expect(run.tagged.sentence).toEndWith(`and run ${RELEASE_TAG_COMMAND}`);
+    expect(run.tagArgv.some((args) => args.some((arg) => arg.includes(PLUGIN_TAG)))).toBe(false);
+    expect(tagsIn(w, w.origin)).toEqual([]);
+    expect(tagsIn(w, w.caller)).toEqual([TAG]);
   });
 });

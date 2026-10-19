@@ -88,14 +88,15 @@ import type { RoadmapLine, RoadmapReadings, RoadmapSkip } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
-import type { ClaimsStaleAfter } from '../core/config/sections.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CLAIMS_STALE_DISABLED } from '@open-tomato/rafa/core/config/sections';
+
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../core/command/index.js';
-import { CLAIMS_STALE_DISABLED } from '../core/config/sections.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {
@@ -565,6 +566,87 @@ describe('createRoadmapReadings', () => {
 
     expect(readings.branchFor(20)).toBeNull();
     expect(listReads).toBe(0);
+  });
+});
+
+describe('the taken reading under the work/{stub} template', () => {
+  /** The one ref every case reads, a branch that exists only under `work/`. */
+  const WORK_REF = 'refs/remotes/origin/work/rafa-20-x';
+
+  /** The walk's readings over a scan of a checkout holding {@link WORK_REF}, taken under `template`. */
+  const readingsUnder = (template?: string): RoadmapReadings => {
+    const git = stubGit({ 'for-each-ref': gitOk(`refs/heads/main\n${WORK_REF}\n`), 'ls-remote': gitOk('') });
+    return createRoadmapReadings({
+      issues: (issue) => Promise.resolve(specIssue(issue, 'OPEN')),
+      branches: template === undefined
+        ? scanClaimBranches(git.run)
+        : scanClaimBranches(git.run, DEFAULT_REMOTE, template),
+      pullRequests: () => Promise.resolve([]),
+    });
+  };
+
+  it('claims the issue from the template\'s prefix and suffix wherever the ref puts them', () => {
+    const claimed = [
+      branchClaims(WORK_REF, 20, 'work/{stub}'),
+      branchClaims('work/rafa-20', 20, 'work/{stub}'),
+      branchClaims('origin/team/rafa-20-x/wip', 20, 'team/{stub}/wip'),
+      branchClaims('origin/team/rafa-20/wip', 20, 'team/{stub}/wip'),
+    ];
+    const unclaimed = [
+      branchClaims(WORK_REF, 2, 'work/{stub}'),
+      branchClaims('refs/remotes/origin/work/rafa-200-x', 20, 'work/{stub}'),
+      branchClaims('refs/remotes/origin/feat/rafa-20-x', 20, 'work/{stub}'),
+      branchClaims('refs/remotes/origin/mywork/rafa-20-x', 20, 'work/{stub}'),
+      branchClaims('origin/team/rafa-20-x', 20, 'team/{stub}/wip'),
+      branchClaims(WORK_REF, 20, 'work/rafa'),
+    ];
+
+    expect(claimed).toEqual([true, true, true, true]);
+    expect(unclaimed).toEqual([false, false, false, false, false, false]);
+  });
+
+  it('claims nothing from a work/ ref under the default template', () => {
+    expect([branchClaims(WORK_REF, 20), branchClaims('work/rafa-20', 20)]).toEqual([false, false]);
+  });
+
+  it('records the template on the scan, and the default when the caller names none', () => {
+    const git = stubGit({ 'for-each-ref': gitOk(''), 'ls-remote': gitOk('') });
+
+    expect(scanClaimBranches(git.run, DEFAULT_REMOTE, 'work/{stub}').branchTemplate).toBe('work/{stub}');
+    expect(scanClaimBranches(git.run).branchTemplate).toBe('feat/{stub}');
+  });
+
+  it('carries a claim reader that fetches the work/rafa-* branches for a work/ branch the remote holds', () => {
+    const git = stubGit({
+      'for-each-ref': gitOk(''),
+      'ls-remote': gitOk('ab2\trefs/heads/work/rafa-20-x\n'),
+      'fetch': { ok: false, stdout: '', stderr: 'fatal: unable to access origin' },
+    });
+
+    const reading = scanClaimBranches(git.run, DEFAULT_REMOTE, 'work/{stub}').claimOf?.('work/rafa-20-x');
+
+    expect(reading?.state).toBe('unreadable');
+    expect(git.calls().at(-1)).toEqual(['fetch', '--quiet', '--prune', '--no-tags', 'origin', '+refs/heads/work/rafa-*:refs/remotes/origin/work/rafa-*']);
+  });
+
+  it('skips the line as branch under work/{stub}, and picks it under the default template', async () => {
+    const lines = parseRoadmapBody('- [ ] #20 pull request commands\n- [ ] #33 the board setup');
+
+    const templated = await pickNextRoadmapLine(lines, readingsUnder('work/{stub}'));
+    const untemplated = await pickNextRoadmapLine(lines, readingsUnder());
+
+    expect(templated.line?.issue).toBe(33);
+    expect(templated.skipped.map((skip) => [skip.line.issue, skip.reason, skip.detail])).toEqual([[20, 'branch', WORK_REF]]);
+    expect(untemplated.line?.issue).toBe(20);
+    expect(untemplated.skipped).toEqual([]);
+  });
+
+  it('answers the branch for the issue under work/{stub}, and none under the default template', async () => {
+    const templated = readingsUnder('work/{stub}');
+    const untemplated = readingsUnder();
+
+    expect([templated.branchFor(20), await templated.branchClaimFor(20)]).toEqual([WORK_REF, { branch: WORK_REF, claim: { state: 'none' } }]);
+    expect([untemplated.branchFor(20), await untemplated.branchClaimFor(20)]).toEqual([null, null]);
   });
 });
 

@@ -40,15 +40,16 @@
  * shared assertion made vacuous (the control alone, each), and the plan
  * text replaced by `PROMPT.md` (the control and the literal-choice case).
  */
-import type { ReportPresent } from '../report/parse.js';
+import type { ReportPresent } from '@open-tomato/rafa/report/parse';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readRafaBlocks } from '../core/plan/block-reader.js';
-import { parseReport } from '../report/parse.js';
+import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+import { parseReport } from '@open-tomato/rafa/report/parse';
+
 import { buildTaskPrompt } from '../start/dispatch.js';
 
 /** `src/PROMPT.md`, the file the build copies and the loop reads. */
@@ -124,6 +125,15 @@ describe('the report ask in src/PROMPT.md', () => {
     expect(reading.issues).toEqual([]);
     expect(reading.report.status).toBe('done');
     expect(reading.report.findings).toHaveLength(1);
+    expect(reading.report.outOfScopeBugs).toHaveLength(1);
+    expect(reading.report.outOfScopeBugs[0]).toMatchObject({
+      kind: 'bug',
+      module: expect.any(String),
+      action: expect.any(String),
+      reproduce: expect.any(String),
+      cause: expect.any(String),
+      extras: [],
+    });
   });
 
   it('reports the status of an example that copies the spec choice literally', () => {

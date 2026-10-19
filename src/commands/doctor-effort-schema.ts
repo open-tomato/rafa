@@ -43,22 +43,22 @@
  * as `doctor`'s other warnings do, so json mode reads each as a `log`
  * event. {@link effortSchemaRefusal} is the text `doctor` exits 1 with.
  */
-import type { RafaContext } from '../core/command/index.js';
-import type { StoreEnvironment } from '../effort/store/location.js';
-import type { SchemaReport, SchemaReportOptions, SchemaStatus } from '../effort/store/schema-report.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { StoreEnvironment } from '@open-tomato/rafa/store/location';
+import type { SchemaReport, SchemaReportOptions, SchemaStatus } from '@open-tomato/rafa/store/schema-report';
 
 import { join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { EFFORT_DIR_VARIABLE, effortStoreDir } from '../effort/store/location.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { EFFORT_DIR_VARIABLE, effortStoreDir } from '@open-tomato/rafa/store/location';
 import {
   developmentApplied,
   NO_NEXT_STEP,
   readSchemaReport,
   unknownAdditive,
   unknownAdditiveWarning,
-} from '../effort/store/schema-report.js';
-import { SQLITE_STORE_FILE_NAME } from '../effort/store/sqlite.js';
+} from '@open-tomato/rafa/store/schema-report';
+import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
 
 /** The row's name, as its lines and the refusal spell it. */
 export const EFFORT_SCHEMA_ROW = 'effort store schema';

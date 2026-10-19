@@ -1,10 +1,10 @@
 /**
- * `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all
- * closed, asked about one at a time, and `spec:blocked` taken off each
- * one the answer says yes for.
+ * `rafa issue unblock [<n>] [--all] [--yes]`: the issues whose blockers
+ * have all closed, asked about one at a time, and `spec:blocked` taken
+ * off each one the answer says yes for, or that `--yes` answered.
  *
  * This is the command half. The library half, `src/board/unblock.ts`,
- * holds the run itself: `runUnblock`, the three `gh` commands it sends,
+ * holds the run itself: `runUnblock`, the four `gh` commands it sends,
  * the question's spelling, the one write, the report and its statuses,
  * and what a half-read board costs. This file reads the line, opens the
  * runner and the prompter, hands them to `runUnblock`, and writes what
@@ -22,14 +22,29 @@
  * not `y` or `yes` declines, the empty answer and an input that ended
  * included: the question is spelled `[y/N]`.
  *
- * Without a terminal nothing is asked and nothing is written. The issue
- * is reported `unasked`, with the line naming the command to run where
- * an answer can be typed — `rafa init` reads a root the same way, and
- * refusing here would make the command fail inside a script over a
- * label that is no worse for staying on.
+ * Without a terminal and without `--yes` nothing is asked and nothing
+ * is written. The issue is reported `unasked`, with the line naming the
+ * command to run where an answer can be typed — `rafa init` reads a
+ * root the same way, and refusing here would make the command fail
+ * inside a script over a label that is no worse for staying on.
  *
  * The prompter is opened LAZILY, on the first question, and closed once
  * the run is over, so a run with nothing to ask opens none.
+ *
+ * ## `--yes`, the answer typed on the line
+ *
+ * `--yes` answers the QUESTION, and nothing else: an issue every one of
+ * whose blockers is closed has `spec:blocked` taken off with no
+ * question put, terminal or not, and the prompter is never opened. Its
+ * line names the issue and the blockers the run read closed:
+ * `Removed spec:blocked from #12 under --yes; every blocker is closed: #24 #26`.
+ * Every other reading is kept as it is without the flag: a blocker
+ * still open is named and the label stays, and a `Blocked by:` line
+ * that is missing, names itself or names an id the board has no issue
+ * for is reported and nothing is written. `--yes` beside an issue
+ * number and beside `--all` are both lines this reads. It is a boolean
+ * switch, read as `--all` is, and a value given to it (`--yes=maybe`)
+ * is a line refusal.
  *
  * ## What it reports, and its exit code
  *
@@ -45,9 +60,10 @@
  *
  * Exit code 1, as `./issue-tracker.ts` words them: a line naming
  * neither an issue nor `--all`, one naming both, a second word, a word
- * that is no whole number from 1, a value given to `--all`, and a
- * blocked listing that failed before any issue was read. A line is read
- * BEFORE the runner is opened, so a refused line sends no command.
+ * that is no whole number from 1, a value given to `--all` or `--yes`,
+ * and a blocked listing that failed before any issue was read. A line
+ * is read BEFORE the runner is opened, so a refused line sends no
+ * command.
  *
  * ## Native mode
  *
@@ -68,22 +84,21 @@
 import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
-import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
-import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 
+import { ISSUE_UNBLOCK_DECLARATION, UNBLOCK_ALL_FLAG, UNBLOCK_YES_FLAG } from './declarations.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';
 
 /** The usage line a refusal names. */
-export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all]';
-
-/** The flag that reads every open issue labelled `spec:blocked`. */
-const ALL_FLAG = 'all';
+export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all] [--yes]';
 
 /** An issue number as a line types it: a whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
@@ -95,20 +110,26 @@ const YES_ANSWERS: readonly string[] = ['y', 'yes'];
 export interface UnblockLine {
   /** The issues to consider, or null for `--all`. */
   readonly issues: readonly number[] | null;
+  /** True when `--yes` answered the question; see the module note. */
+  readonly yes: boolean;
 }
 
-/** A boolean flag as the line spelled it; any value but a boolean one is refused. */
-function readAllFlag(flags: RafaContext['flags']): boolean {
-  const value = flags[ALL_FLAG];
+/**
+ * Whether the line typed the switch `name`, or a refusal with exit code
+ * 1 naming the usage for a value given to it.
+ */
+function readUnblockSwitch(flags: RafaContext['flags'], name: string): boolean {
+  const value = flags[name];
   if (value === undefined) return false;
   if (typeof value === 'boolean') return value;
   if (value === 'true' || value === 'false') return value === 'true';
-  throw lineRefusal(`--${ALL_FLAG} takes no value, and read "${value}" as one`, UNBLOCK_USAGE);
+  throw lineRefusal(`--${name} takes no value, and read "${value}" as one`, UNBLOCK_USAGE);
 }
 
 /** What the line asked for, or a refusal with exit code 1 naming the usage; see the module note. */
 export function readUnblockLine(context: RafaContext): UnblockLine {
-  const all = readAllFlag(context.flags);
+  const all = readUnblockSwitch(context.flags, UNBLOCK_ALL_FLAG);
+  const yes = readUnblockSwitch(context.flags, UNBLOCK_YES_FLAG);
   const { args } = context;
   if (args.length > 1) {
     throw lineRefusal(`Expected at most one issue number, got ${String(args.length)}: ${args.join(' ')}`, UNBLOCK_USAGE);
@@ -116,19 +137,19 @@ export function readUnblockLine(context: RafaContext): UnblockLine {
 
   const word = args[0];
   if (word === undefined) {
-    if (all) return { issues: null };
+    if (all) return { issues: null, yes };
     throw lineRefusal(
-      `Name an issue number, or pass --${ALL_FLAG} to read every open issue labelled ${SPEC_BLOCKED_LABEL}`,
+      `Name an issue number, or pass --${UNBLOCK_ALL_FLAG} to read every open issue labelled ${SPEC_BLOCKED_LABEL}`,
       UNBLOCK_USAGE,
     );
   }
   if (all) {
-    throw lineRefusal(`Name an issue number or pass --${ALL_FLAG}, not both`, UNBLOCK_USAGE);
+    throw lineRefusal(`Name an issue number or pass --${UNBLOCK_ALL_FLAG}, not both`, UNBLOCK_USAGE);
   }
   if (!ISSUE_NUMBER.test(word)) {
     throw lineRefusal(`"${word}" is no issue number, which is a whole number from 1`, UNBLOCK_USAGE);
   }
-  return { issues: [Number(word)] };
+  return { issues: [Number(word)], yes };
 }
 
 /** How the board, the terminal and the question are reached; each left out is the system's own. */
@@ -155,6 +176,14 @@ function isYes(answer: string | null): boolean {
   return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
 }
 
+/** How a run's question is answered: by `--yes`, through the prompter on a terminal, or not at all. */
+function askFor(line: UnblockLine, isTerminal: () => boolean, prompt: UnblockAsk): UnblockAsk | null {
+  if (line.yes) return answeredByYesFlag;
+  return isTerminal()
+    ? prompt
+    : null;
+}
+
 /** The prompter every question of one run goes through, opened on the first and closed by `close`. */
 function lazyPrompter(open: () => Prompter): { ask: UnblockAsk; close: () => void } {
   let prompter: Prompter | null = null;
@@ -170,11 +199,30 @@ function lazyPrompter(open: () => Prompter): { ask: UnblockAsk; close: () => voi
   };
 }
 
+/** The question as `--yes` answers it: yes, with nothing put and no prompter opened. */
+const answeredByYesFlag: UnblockAsk = () => Promise.resolve(true);
+
+/** The line a removal `--yes` answered for is written as, naming the issue and its blockers. */
+export function yesRemovalLine(issue: number, blockers: readonly number[]): string {
+  const named = blockers.map((id) => `#${String(id)}`).join(' ');
+  return `Removed ${SPEC_BLOCKED_LABEL} from #${String(issue)} under --${UNBLOCK_YES_FLAG}; every blocker is closed: ${named}`;
+}
+
+/** `report` with each removal's message spelled by {@link yesRemovalLine}; every other outcome as it was. */
+function withYesRemovalLines(report: UnblockReport): UnblockReport {
+  const issues = report.issues.map((outcome) => outcome.status === 'removed'
+    ? Object.freeze({ ...outcome, message: yesRemovalLine(outcome.issue, outcome.blockers) })
+    : outcome);
+  return Object.freeze({ ...report, issues: Object.freeze(issues) });
+}
+
 /**
  * Runs the unblock a line asks for, asking through the prompter when
- * there is a terminal. Its board refreshes each issue it unlabels on the
- * project (`../../board/project/issue-board-refresh.ts`), each line the
- * refresh answers written at `warn`.
+ * there is a terminal, or answering yes with no prompter under `--yes`,
+ * whose removals are reported by {@link yesRemovalLine}. Its board
+ * refreshes each issue it unlabels on the project
+ * (`../../board/project/issue-board-refresh.ts`), each line the refresh
+ * answers written at `warn`.
  */
 export async function unblockIssues(context: RafaContext, seams: UnblockSeams): Promise<UnblockReport> {
   const line = readUnblockLine(context);
@@ -184,20 +232,21 @@ export async function unblockIssues(context: RafaContext, seams: UnblockSeams): 
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
 
   // Its warnings dropped, as `unblockRelationshipsMode` drops them when the run reads the mode.
-  const config = issueSubjectConfig(issueProject(context), () => undefined);
+  const config = await issueSubjectConfig(issueProject(context), () => undefined);
   const gh = openGh(root);
   const prompter = lazyPrompter(openPrompter);
   try {
-    return await runUnblock({
+    const report = await runUnblock({
       gh,
       board: createRefreshingGhIssueBoard({ gh, config, warn: (message) => {
         context.output.warn(message);
       } }),
       issues: line.issues,
-      ask: isTerminal()
-        ? prompter.ask
-        : null,
+      ask: askFor(line, isTerminal, prompter.ask),
     });
+    return line.yes
+      ? withYesRemovalLines(report)
+      : report;
   } finally {
     prompter.close();
   }
@@ -224,11 +273,11 @@ function writeReport(context: RafaContext, report: UnblockReport): void {
 }
 
 /** The native-mode refresh's config, runner and warn, from `context` and `seams`. */
-function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): NativeUnblockRefreshOptions {
+async function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): Promise<NativeUnblockRefreshOptions> {
   const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
   return {
     // Its warnings dropped, as `unblockRelationshipsMode` drops them.
-    config: issueSubjectConfig(issueProject(context), () => undefined),
+    config: await issueSubjectConfig(issueProject(context), () => undefined),
     openGh: () => openGh(projectRoot(context)),
     warn: (message) => {
       context.output.warn(message);
@@ -241,50 +290,13 @@ function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): Native
 /** The command, reading the board with `seams`; see the module note. */
 export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue unblock',
-    subject: 'issue',
-    action: 'unblock',
-    summary: `take ${SPEC_BLOCKED_LABEL} off an issue whose blockers have all closed`,
-    description: `Reads the "Blocked by: #24 #26" line of an issue labelled ${SPEC_BLOCKED_LABEL} on the GitHub`
-      + ' board, asks the board for each blocker\'s state, and when every blocker is closed asks whether to'
-      + ` remove ${SPEC_BLOCKED_LABEL} and removes it on a yes. With a blocker still open it names it and`
-      + ` changes nothing. An issue labelled ${SPEC_BLOCKED_LABEL} whose "Blocked by:" line is missing, names`
-      + ' itself or names an id the board has no issue for is reported and never guessed at. Without a'
-      + ' terminal it asks nothing and writes nothing. With `--output=json` the outcome of each issue is the'
-      + ' data of the terminal result event. With board.relationships set to native it reads nothing and'
-      + ' writes nothing: GitHub clears a blocker by itself when the blocking issue closes.',
-    args: [
-      {
-        name: 'n',
-        description: 'The issue number on the GitHub board. Left out, `--all` reads every blocked issue.',
-        type: 'string',
-        required: false,
-      },
-    ],
-    flags: [
-      {
-        name: ALL_FLAG,
-        description: `Read every open issue labelled ${SPEC_BLOCKED_LABEL}, asking about each one in turn.`,
-        type: 'boolean',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa issue unblock 57',
-        note: `Asks whether to remove ${SPEC_BLOCKED_LABEL} from #57 when every issue its "Blocked by:" line names is closed.`,
-      },
-      {
-        cmd: 'rafa issue unblock --all',
-        note: 'Walks every open blocked issue on the board, asking about each one whose blockers have all closed.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_UNBLOCK_DECLARATION,
     run: async (context) => {
       const line = readUnblockLine(context);
-      if (unblockRelationshipsMode(issueProject(context)) === 'native') {
+      if (await unblockRelationshipsMode(issueProject(context)) === 'native') {
         if (context.outputMode === 'json') context.output.result(nativeUnblockReport());
         else context.output.info(NATIVE_UNBLOCK_LINE);
-        await refreshNativeUnblock(line.issues, nativeRefreshOptions(context, seams));
+        await refreshNativeUnblock(line.issues, await nativeRefreshOptions(context, seams));
         return;
       }
       const report = await unblockIssues(context, seams);

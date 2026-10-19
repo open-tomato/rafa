@@ -14,8 +14,8 @@
  * ## The tracker, through the chain
  *
  * An action reads its line first. Then it resolves the config as
- * `loop start` does (`config-load.ts`): the project's
- * `.rafa/config.yaml` over the user scope's, over the defaults. It hands
+ * `loop start` does (`config-load.ts`): the project's config over the
+ * user scope's, over the defaults. It hands
  * `tracker.default` and `tracker.fallback` to `resolveTracker`
  * (`adapters/tracker/resolve.ts`), the chain `loop start`'s triage files
  * through, with the project root as the repository. The chain tries
@@ -86,19 +86,20 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { AdapterRegistry } from '../../core/adapters/index.js';
-import type { RafaContext } from '../../core/command/index.js';
-import type { RafaConfig } from '../../core/config/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DoctorRefsSeams } from '../doctor-refs.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { CommandExit } from '../../core/command/index.js';
-import { ConfigError } from '../../core/config/index.js';
-import { loadConfig } from '../../core/config/load.js';
-import { messageOf } from '../../core/config/sections.js';
 
 /** How the chain is resolved; see the module note. Each left out is the chain's own. */
 export interface IssueSeams {
@@ -240,9 +241,9 @@ export function issueProject(context: RafaContext): ProjectFound {
  * `./ready.ts` takes `board.trustedAuthors`. One reader is what keeps
  * the refusal spelled once for the subject.
  */
-export function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): RafaConfig {
+export async function issueSubjectConfig(project: ProjectFound, warn: (message: string) => void): Promise<RafaConfig> {
   try {
-    return loadConfig({ root: project.root, home: project.home }, {}, warn).config;
+    return (await loadConfig({ root: project.root, home: project.home }, {}, warn)).config;
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(1, ['❌ The config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)].join('\n'));
@@ -262,7 +263,7 @@ export async function resolveIssueTracker(context: RafaContext, seams: IssueSeam
   const warn = (message: string): void => {
     context.output.warn(message);
   };
-  const config = issueSubjectConfig(project, warn);
+  const config = await issueSubjectConfig(project, warn);
 
   let resolution: TrackerResolution;
   try {

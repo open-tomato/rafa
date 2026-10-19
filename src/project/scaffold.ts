@@ -69,8 +69,10 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CONFIG_DEFAULTS, configFilePath } from '../core/config/index.js';
-import { messageOf } from '../core/config/sections.js';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
@@ -129,6 +131,11 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   plans: ${String(CONFIG_DEFAULTS.trackingPlans)}                 # true tracks .rafa/plans/ in git`,
   `#   all: ${String(CONFIG_DEFAULTS.trackingAll)}                   # true tracks .rafa/ but its private triage`,
   '# modules: []',
+  '# features:',
+  `#   board: ${String(CONFIG_DEFAULTS.featuresBoard)}                 # false drops the board feature's commands`,
+  `#   pr: ${String(CONFIG_DEFAULTS.featuresPr)}                    # false drops the pull-request feature's commands`,
+  `#   run: ${String(CONFIG_DEFAULTS.featuresRun)}                   # false drops the run feature's commands`,
+  `#   release: ${String(CONFIG_DEFAULTS.featuresRelease)}               # false drops the release feature's commands`,
   '# allowList: []',
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
@@ -148,6 +155,10 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '#   base:                        # the branch a PR opens into; unset is the remote default',
   `#   resolveBudget: ${String(CONFIG_DEFAULTS.prResolveBudget)}             # US dollars per pr triage --resolve session`,
   PR_VERSION_COLLISION_LINE,
+  '# merge:',
+  `#   duplicates: ${CONFIG_DEFAULTS.mergeDuplicates}               # warn | error | allow, two entries of one file setting one key`,
+  '# naming:',
+  `#   branch: ${CONFIG_DEFAULTS.namingBranch}          # the branch loop start creates, {stub} once for the plan's stub`,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
   `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,
@@ -168,6 +179,10 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '#   similarity:',
   `#     threshold: ${String(CONFIG_DEFAULTS.triageSimilarityThreshold)}             # above 0 and at most 1 | false; the least score at which triage comments on the nearest open bug`,
   `#     candidates: ${String(CONFIG_DEFAULTS.triageSimilarityCandidates)}              # 1..10, the nearest issues a new bug lists as Possible duplicates`,
+  '#     weights:                   # 0..1 each, 0 turns it off; bonuses that rank Possible duplicates, never the comment-on-match decision',
+  `#       causeLeaf: ${String(CONFIG_DEFAULTS.triageSimilarityWeightsCauseLeaf)}          # the same cause code`,
+  `#       causeFamily: ${String(CONFIG_DEFAULTS.triageSimilarityWeightsCauseFamily)}        # the same cause family, another leaf`,
+  `#       boundary: ${String(CONFIG_DEFAULTS.triageSimilarityWeightsBoundary)}            # the same module and action`,
   '# release:',
   `#   enabled: ${String(CONFIG_DEFAULTS.releaseEnabled)}               # true | false | auto, which is on when both files below exist`,
   `#   versionFile: ${CONFIG_DEFAULTS.releaseVersionFile}`,
@@ -175,8 +190,13 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
   ...RELEASE_FRAGMENT_LINES,
   `#   publishCommand: ${CONFIG_DEFAULTS.releasePublishCommand}      # the publish line release tag prints and never runs`,
+  `#   publish: ${CONFIG_DEFAULTS.releasePublish}              # manual | ci, who publishes a tagged version; ci publishes from the pushed tag`,
   '# errors:',
   '#   codes: []                    # cause codes this project adds to rafa\'s list, each code/description/hint/level/since',
+  '# bugs:',
+  '#   recheck:',
+  `#     runs: ${String(CONFIG_DEFAULTS.bugsRecheckRuns)}                    # 1..20, the further runs bug recheck makes after a first pass`,
+  `#     timeoutSeconds: ${String(CONFIG_DEFAULTS.bugsRecheckTimeoutSeconds)}        # 1..3600, the deadline of one recheck run`,
   '# logger:',
   `#   level: ${CONFIG_DEFAULTS.loggerLevel}                  # error | warn | debug, the loudest diagnostics written`,
   `#   theme: ${CONFIG_DEFAULTS.loggerTheme}               # default | plain, which writes no colour`,
@@ -214,6 +234,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '# tests:',
   `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
   `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
+  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
   `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
 ]);

@@ -50,12 +50,14 @@
  * the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
+import { PR_OPEN_DECLARATION } from './declarations.js';
 import { DEFAULT_PR_SEAMS, expectNoArguments, lineRefusal, onProvider, openPrContext, PR_USAGE } from './pr-context.js';
 
 /** The usage line this action's refusals name. */
@@ -112,7 +114,7 @@ export async function readOpenBody(path: string): Promise<string> {
 export async function openPull(context: RafaContext, seams: PrSeams): Promise<PrOpenResult> {
   const line = readOpenLine(context.args, context.flags);
   const body = await readOpenBody(line.bodyFile);
-  const pr = openPrContext(context, seams);
+  const pr = await openPrContext(context, seams);
   const { head, base } = line;
 
   const open = await onProvider(
@@ -147,40 +149,7 @@ export function renderOpen(result: PrOpenResult): string {
 /** The command, reaching the provider through `seams`; see the module note. */
 export function createPrOpenCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'pr open',
-    subject: 'pr',
-    action: 'open',
-    summary: 'open a pull request from a pushed branch, or print the one already open on it',
-    description: 'Opens a pull request from the branch `--head` into the branch `--base`, titled `--title`,'
-      + ' its body what the file `--body-file` holds, and prints its number, title, branches and URL. The'
-      + ' head is a branch already pushed: nothing is pushed for it. When the head already has an open pull'
-      + ' request, that pull request is printed and none is opened, with a warning when it is into another'
-      + ' base. Exit code 1, with nothing opened, for a flag left out or blank, a head equal to the base,'
-      + ' and a body file that cannot be read or holds nothing but whitespace. With `--output=json` whether'
-      + ' it opened one, the two branches and the pull request are the data of the terminal result event.'
-      + ' Refuses with exit code 2 where `pr.provider` is not `gh`. Starts no session.',
-    args: [],
-    flags: [
-      { name: 'head', description: 'The branch to open the pull request from, already pushed.', type: 'string' },
-      { name: 'base', description: 'The branch to open the pull request into.', type: 'string' },
-      { name: 'title', description: 'The title of the pull request.', type: 'string' },
-      {
-        name: 'body-file',
-        description: 'The file holding the body, as markdown; read from the directory rafa runs in.',
-        type: 'string',
-      },
-    ],
-    examples: [
-      {
-        cmd: 'rafa pr open --head=feat/rafa-9 --base=stretch/9 --title="rafa-9: one item" --body-file=body.md',
-        note: 'Opens feat/rafa-9 into stretch/9, or prints the pull request already open on feat/rafa-9.',
-      },
-      {
-        cmd: 'rafa pr open --head=feat/rafa-9 --base=main --title="rafa-9" --body-file=body.md --output=json',
-        note: 'Gives whether one was opened, the two branches and the pull request as the terminal result.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...PR_OPEN_DECLARATION,
     run: async (context) => {
       const result = await openPull(context, seams);
       if (context.outputMode === 'json') {

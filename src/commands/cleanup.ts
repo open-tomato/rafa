@@ -75,7 +75,7 @@
  *      that did not, and exit code 1 when any did not.
  *
  * The yes-or-no questions, yes being `y` or `yes`, go through a line
- * {@link Prompter} that `lazyPrompter` (`./issue/ready.ts`) opens only
+ * {@link Prompter} that `lazyPrompter` (`@open-tomato/rafa/core/command`) opens only
  * once the checklist has answered, since two readers over one standard
  * input would each take part of what is typed. A stale row is
  * confirmed by the final question alone, and so is an Only on origin
@@ -114,10 +114,12 @@ import type {
 } from '../cleanup/index.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { ProjectFound } from '../project/scope.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import {
   cleanupSteps,
@@ -129,7 +131,6 @@ import {
 } from '../cleanup/index.js';
 import { multiSelect } from '../cli/prompt/multi-select.js';
 import { processTerminal } from '../cli/prompt/terminal.js';
-import { CommandExit , createLinePrompter } from '../core/command/index.js';
 import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import {
@@ -142,7 +143,6 @@ import {
   runRowLine,
   worktreeRowLine,
 } from './cleanup-render.js';
-import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from './plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -432,7 +432,7 @@ export async function runCleanup(context: RafaContext, seams: CleanupCommandSeam
   expectNoArgument(context.args, CLEANUP_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${CLEANUP_USAGE}`);
   const project = projectOf(context);
-  const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
   const cwd = (seams.cwd ?? ((): string => process.cwd()))();

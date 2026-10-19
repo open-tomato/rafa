@@ -1,6 +1,7 @@
 /**
- * Tests for scope resolution: the walk up to `.rafa/config.yaml`, the
- * home passed over, the `rafa init` hint and the refusals.
+ * Tests for scope resolution: the walk up to the first directory
+ * holding `rafa.config.ts`, `rafa.config.mjs` or `.rafa/config.yaml`,
+ * the home passed over, the `rafa init` hint and the refusals.
  *
  * Two filesystems drive it. Cases on DISK plant their trees under this
  * file's temporary root and compare every answered root with a real
@@ -24,7 +25,15 @@
  * the same seams resolving. Every in-memory case answers "no
  * repository" for the main checkout, whose fallback
  * `scope-fallback.test.ts` reads. Paths are planted at the LITERAL
- * `.rafa/config.yaml`, never through the module's constants.
+ * lookup names, never through the module's constants.
+ *
+ * The three lookup names were driven the same way, with `scope.ts`
+ * restored byte-identical after each: the lookup cut to the YAML file
+ * alone (18 cases red), the two module names swapped (11), the fallback
+ * probing the YAML file alone (5), the project scope's file put back to
+ * the YAML path (6), the passed home file named through its real path
+ * rather than the home as given (2), and the passed home file named as
+ * the YAML path whichever name was found (2).
  *
  * Eighteen module mutations were driven against this file one at a
  * time, each an exact string found once, with `scope.ts` restored
@@ -44,14 +53,18 @@
  */
 import type { ScopeFileSystem, ScopeResolution } from './scope.js';
 
+import '../config-registry.js';
+import '../adapter-registry.js';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../core/config/index.js';
-import { loadConfig } from '../core/config/load.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
 
 import {
   DISK_FILE_SYSTEM,
@@ -90,6 +103,19 @@ function plantConfig(dir: string, text = 'version: 1\n'): string {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, text);
   return file;
+}
+
+/** Plants `text` at `name`, a path relative to `dir`, and answers its path. */
+function plantFile(dir: string, name: string, text = 'export default [];\n'): string {
+  const file = join(dir, name);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  return file;
+}
+
+/** The three paths the walk probes under `dir`, in its order, spelled as literals. */
+function lookups(dir: string): readonly string[] {
+  return [join(dir, 'rafa.config.ts'), join(dir, 'rafa.config.mjs'), join(dir, '.rafa', 'config.yaml')];
 }
 
 /** The root a resolution found, failing the case when it found none. */
@@ -155,6 +181,101 @@ describe('scopeAt and SCOPE_DIR', () => {
       configFile: '/srv/app/.rafa/config.yaml',
     });
   });
+
+  it('names the file given as the scope\'s config file, keeping the .rafa directory', () => {
+    expect(scopeAt('/srv/app', '/srv/app/rafa.config.ts')).toEqual({
+      dir: '/srv/app/.rafa',
+      configFile: '/srv/app/rafa.config.ts',
+    });
+  });
+});
+
+describe('resolveScope over the three lookup names', () => {
+  it.each(['rafa.config.ts', 'rafa.config.mjs', join('.rafa', 'config.yaml')])(
+    'finds a project holding %s alone, naming it the file loadConfig reads',
+    async (name) => {
+      const project = freshDir();
+      const text = name.endsWith('.yaml')
+        ? 'store: ndjson\n'
+        : 'export default [{ "store": "ndjson" }];\n';
+      plantFile(project, name, text);
+      const home = makeDir(join(freshDir(), 'home'));
+
+      const resolution = resolveScope(makeDir(join(project, 'src')), { home });
+      if (!resolution.found) throw new Error(resolution.hint);
+      const loaded = await loadConfig(resolution, {}, () => {});
+
+      const root = realpathSync(project);
+      expect(resolution.root).toBe(root);
+      expect(resolution.project.configFile).toBe(join(root, name));
+      expect([loaded.path, loaded.config.store]).toEqual([resolution.project.configFile, 'ndjson']);
+    },
+  );
+
+  it('names rafa.config.ts when a root holds all three, probing nothing after it', () => {
+    const fs = memoryFs({
+      dirs: ['/', '/srv', '/srv/app'],
+      files: ['/srv/app/rafa.config.ts', '/srv/app/rafa.config.mjs', '/srv/app/.rafa/config.yaml'],
+    });
+
+    const resolution = resolveScope('/srv/app', { home: '/home/op', fs, mainCheckout: noRepository });
+
+    expect(resolution).toEqual({
+      found: true,
+      root: '/srv/app',
+      home: '/home/op',
+      project: { dir: '/srv/app/.rafa', configFile: '/srv/app/rafa.config.ts' },
+      user: { dir: '/home/op/.rafa', configFile: '/home/op/.rafa/config.yaml' },
+    });
+    expect(fs.probes).toEqual(['/srv/app/rafa.config.ts']);
+  });
+
+  it('names rafa.config.mjs ahead of the YAML file, and the YAML file alone once the module files go', () => {
+    const both = memoryFs({ dirs: ['/', '/srv'], files: ['/srv/rafa.config.mjs', '/srv/.rafa/config.yaml'] });
+    const yamlOnly = memoryFs({ dirs: ['/', '/srv'], files: ['/srv/.rafa/config.yaml'] });
+
+    const fromBoth = resolveScope('/srv', { home: '/home/op', fs: both, mainCheckout: noRepository });
+    const fromYaml = resolveScope('/srv', { home: '/home/op', fs: yamlOnly, mainCheckout: noRepository });
+
+    if (!fromBoth.found || !fromYaml.found) throw new Error('expected both to find /srv');
+    expect(fromBoth.project.configFile).toBe('/srv/rafa.config.mjs');
+    expect(fromYaml.project.configFile).toBe('/srv/.rafa/config.yaml');
+    expect(both.probes).toEqual(['/srv/rafa.config.ts', '/srv/rafa.config.mjs']);
+  });
+
+  it('stops at the nearer directory holding a module file over a farther one holding the YAML file', () => {
+    const outer = freshDir();
+    plantConfig(outer);
+    const inner = makeDir(join(outer, 'inner'));
+    plantFile(inner, 'rafa.config.mjs');
+    const home = join(freshDir(), 'home');
+
+    expect(rootOf(resolveScope(makeDir(join(inner, 'src')), { home }))).toBe(realpathSync(inner));
+    expect(rootOf(resolveScope(makeDir(join(outer, 'other')), { home }))).toBe(realpathSync(outer));
+  });
+
+  it('passes over a home holding rafa.config.ts alone, naming it in the hint, and takes it with the home elsewhere', () => {
+    const fs = memoryFs({ dirs: ['/', '/home', '/home/op', '/home/op/work', '/home/other'], files: ['/home/op/rafa.config.ts'] });
+
+    const underHome = resolveScope('/home/op/work', { home: '/home/op', fs, mainCheckout: noRepository });
+    const elsewhere = resolveScope('/home/op/work', { home: '/home/other', fs, mainCheckout: noRepository });
+
+    expect(hintOf(underHome)).toBe(initHint('/home/op/work', '/home/op/rafa.config.ts'));
+    expect(hintOf(underHome)).toContain('/home/op/rafa.config.ts is in the home directory');
+    expect(rootOf(elsewhere)).toBe('/home/op');
+  });
+
+  it('names the passed home file under the home as given when the home is spelled through a link', () => {
+    const fs = memoryFs({
+      dirs: ['/', '/home', '/home/op', '/home/op/work'],
+      files: ['/home/op/rafa.config.mjs'],
+      links: { '/Users/op': '/home/op' },
+    });
+
+    const hint = hintOf(resolveScope('/home/op/work', { home: '/Users/op', fs, mainCheckout: noRepository }));
+
+    expect(hint).toBe(initHint('/home/op/work', '/Users/op/rafa.config.mjs'));
+  });
 });
 
 describe('resolveScope on disk', () => {
@@ -210,11 +331,11 @@ describe('resolveScope on disk', () => {
 
     const root = realpathSync(project);
     expect(probes).toEqual([
-      join(root, 'a', 'b', '.rafa', 'config.yaml'),
+      ...lookups(join(root, 'a', 'b')),
       join(root, 'a', 'b', '.git'),
-      join(root, 'a', '.rafa', 'config.yaml'),
+      ...lookups(join(root, 'a')),
       join(root, 'a', '.git'),
-      join(root, '.rafa', 'config.yaml'),
+      ...lookups(root),
     ]);
   });
 
@@ -245,7 +366,7 @@ describe('resolveScope on disk', () => {
     expect(rootOf(resolveScope(link, { home: join(freshDir(), 'home') }))).toBe(realpathSync(project));
   });
 
-  it('finds a directory planted at the config path, which loadConfig then refuses', () => {
+  it('finds a directory planted at the config path, which loadConfig then refuses', async () => {
     const parent = freshDir();
     plantConfig(parent);
     const child = join(parent, 'child');
@@ -255,7 +376,7 @@ describe('resolveScope on disk', () => {
 
     expect(rootOf(resolution)).toBe(realpathSync(child));
     if (!resolution.found) return;
-    expect(() => loadConfig(resolution, {}, () => {})).toThrow(ConfigError);
+    await expect(loadConfig(resolution, {}, () => {})).rejects.toThrow(ConfigError);
   });
 
   it('walks past a .rafa directory that holds no config file', () => {
@@ -299,7 +420,7 @@ describe('resolveScope on disk', () => {
     });
   });
 
-  it('answers the roots loadConfig reads the project and user files from', () => {
+  it('answers the roots loadConfig reads the project and user files from', async () => {
     const project = freshDir();
     plantConfig(project, 'version: 1\nstore: ndjson\n');
     const home = makeDir(join(freshDir(), 'home'));
@@ -307,7 +428,7 @@ describe('resolveScope on disk', () => {
 
     const resolution = resolveScope(makeDir(join(project, 'src')), { home });
     if (!resolution.found) throw new Error(resolution.hint);
-    const loaded = loadConfig(resolution, {}, () => {});
+    const loaded = await loadConfig(resolution, {}, () => {});
 
     expect(loaded.config.store).toBe('ndjson');
     expect(loaded.sources.store).toBe('file');
@@ -334,13 +455,13 @@ describe('resolveScope without a project', () => {
       hint: initHint('/srv/app/src'),
     });
     expect(fs.probes).toEqual([
-      '/srv/app/src/.rafa/config.yaml',
+      ...lookups('/srv/app/src'),
       '/srv/app/src/.git',
-      '/srv/app/.rafa/config.yaml',
+      ...lookups('/srv/app'),
       '/srv/app/.git',
-      '/srv/.rafa/config.yaml',
+      ...lookups('/srv'),
       '/srv/.git',
-      '/.rafa/config.yaml',
+      ...lookups('/'),
       '/.git',
     ]);
   });
@@ -351,14 +472,15 @@ describe('resolveScope without a project', () => {
     expect(rootOf(resolveScope('/srv/app/src', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe('/');
   });
 
-  it('names the start directory, the config file and rafa init in the hint', () => {
+  it('names the start directory, the three lookup names and rafa init in the hint', () => {
     const hint = hintOf(resolveScope('/srv/app/src', { home: '/home/op', fs: memoryFs(tree), mainCheckout: noRepository }));
 
     expect(INIT_COMMAND).toBe('rafa init');
-    expect(hint).toContain('/srv/app/src');
-    expect(hint).toContain('.rafa/config.yaml');
+    expect(hint.split('\n')[0]).toBe(
+      'not inside a rafa project: no rafa.config.ts, rafa.config.mjs or .rafa/config.yaml in /srv/app/src or any directory above it',
+    );
     expect(hint).toContain('`rafa init`');
-    expect(hint).not.toContain('user scope');
+    expect(hint).not.toContain('home directory');
     expect(hint).not.toContain('main checkout');
   });
 
@@ -373,7 +495,7 @@ describe('resolveScope without a project', () => {
     const homeElsewhere = resolveScope('/home/op/work', { home: '/home/other', fs, mainCheckout: noRepository });
 
     expect(hintOf(fromWork)).toBe(initHint('/home/op/work', '/home/op/.rafa/config.yaml'));
-    expect(hintOf(fromWork)).toContain('/home/op/.rafa/config.yaml is the user scope');
+    expect(hintOf(fromWork)).toContain('/home/op/.rafa/config.yaml is in the home directory');
     expect(hintOf(fromHome)).toBe(initHint('/home/op', '/home/op/.rafa/config.yaml'));
     expect(rootOf(homeElsewhere)).toBe('/home/op');
   });
@@ -387,7 +509,7 @@ describe('resolveScope without a project', () => {
     const hint = hintOf(resolveScope('/srv/app', { home: '/home/op', fs, mainCheckout: noRepository }));
 
     expect(hint).toBe(initHint('/srv/app'));
-    expect(hint).not.toContain('user scope');
+    expect(hint).not.toContain('home directory');
   });
 
   it('names the home as given in the hint when it is spelled through a link', () => {
@@ -425,6 +547,31 @@ describe('resolveScope refusals', () => {
     expect(hintOf(resolveScope('/work', { home: '/home/op', fs, mainCheckout: noRepository }))).toBe(initHint('/work'));
   });
 
+  it('codes a relative start or home input:invalid-value, of the project module, with the code\'s hint', () => {
+    const fs = memoryFs(tree);
+    const refusals = [
+      { start: 'work', home: '/home/op' },
+      { start: '/work', home: 'home/op' },
+    ].map(({ start, home }) => {
+      try {
+        resolveScope(start, { home, fs, mainCheckout: noRepository });
+      } catch (error) {
+        return error;
+      }
+      return null;
+    });
+
+    for (const refusal of refusals) {
+      expect(refusal).toBeInstanceOf(RafaError);
+      expect(refusal).toMatchObject({
+        name: 'ScopeError',
+        code: 'input:invalid-value',
+        module: 'project',
+        hint: 'pass one of the values the message lists',
+      });
+    }
+  });
+
   it('refuses a relative home before probing, and resolves with the absolute one', () => {
     const fs = memoryFs(tree);
 
@@ -460,6 +607,7 @@ describe('resolveScope refusals', () => {
     expect(name).toBe('ScopeError');
     expect(message).toStartWith(`rafa scope: start directory ${missing} does not resolve (`);
     expect(cause).toBeInstanceOf(Error);
+    expect(refusal).toMatchObject({ code: 'fs:not-found', module: 'project' });
 
     makeDir(missing);
     expect(rootOf(resolveScope(missing, { home }))).toBe(realpathSync(project));

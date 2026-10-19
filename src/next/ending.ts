@@ -6,14 +6,18 @@
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start` each call {@link endWithNextStep} as the last thing they
  * do, and each declares {@link HINT_FLAG_SPEC} so `--no-hint` turns it
- * off. Two things live here rather than in `./hint.ts` and rather than
- * six times over:
+ * off, the three `pr` commands through `PR_HINT_FLAG_SPEC`
+ * (`src/commands/pr/declarations.ts`) and `issue ready` through
+ * `ISSUE_HINT_FLAG_SPEC` (`src/commands/issue/declarations.ts`), copies
+ * their tests hold equal to this one, since a declaration imports no
+ * module under `src/`. Two things live here rather than in `./hint.ts`
+ * and rather than six times over:
  *
  *  - the QUESTION being put and the action being run, which
  *    `./hint.ts` deliberately does neither of: it words the ending and
  *    reads the state, and nothing in it opens a prompter or calls a
  *    command;
- *  - the one flag declaration, so the six spell `--no-hint` once and
+ *  - the flag declaration, so the six spell `--no-hint` the same and
  *    the help of all six reads the same.
  *
  * ## A yes runs the step, through the same call `rafa next` makes
@@ -72,10 +76,11 @@
  * the chain ends once, with the chain's reading, rather than twice.
  */
 import type { NextHintSeams, NextStepHint } from './hint.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec , Prompter } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec , Prompter } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
-import { createLinePrompter } from '../core/command/index.js';
+import { createLinePrompter } from '@open-tomato/rafa/core/command';
+
 import { answeredYes } from '../start/branch-decision.js';
 
 import { runAction } from './actions.js';
@@ -83,7 +88,8 @@ import { HINT_FLAG, nextStepHint } from './hint.js';
 
 /**
  * The flag each of the six declares, so `--no-hint` suppresses the
- * ending. Boolean and defaulting to true, which is what makes
+ * ending: this value, or for the three `pr` commands and `issue ready`
+ * a copy of it. Boolean and defaulting to true, which is what makes
  * `--no-hint` read as false for it (`src/cli/core/parseArgs.ts`).
  */
 export const HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({

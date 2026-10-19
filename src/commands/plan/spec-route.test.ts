@@ -42,8 +42,9 @@ import { join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { noSourceMessage, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
-import { CommandExit } from '../../core/command/index.js';
 
 import { findSpec, resolveCreateSpec, specCandidates, usageRefusal } from './spec-route.js';
 
@@ -274,6 +275,24 @@ describe('the issues a --next walk passes over', () => {
     await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [] }, route.seams);
 
     expect(Object.keys(route.asked())).not.toContain('passOver');
+  });
+});
+
+describe('the branch template a --next walk reads claims under', () => {
+  it('hands naming.branch to the resolution as given', async () => {
+    const route = recording();
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [], branchTemplate: 'work/{stub}' }, route.seams);
+
+    expect(route.asked().branchTemplate).toBe('work/{stub}');
+  });
+
+  it('leaves the key out for a run given no template, the control for the case above', async () => {
+    const route = recording();
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [] }, route.seams);
+
+    expect(Object.keys(route.asked())).not.toContain('branchTemplate');
   });
 });
 

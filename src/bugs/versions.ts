@@ -18,8 +18,8 @@
  *     (`keyText`, `../triage/bug-key.ts`), so two runs of one failure
  *     give one line.
  */
-import type { GitRunner } from '../core/git/index.js';
 import type { PackageOwner } from '../project/package-of.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { keyText } from '../triage/bug-key.js';
 

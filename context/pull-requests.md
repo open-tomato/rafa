@@ -23,8 +23,8 @@ Ten actions read and control pull requests:
   no fetch, no fold, no extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
-- `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
-  it or resolve it when simple
+- `pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
+  [--max-attempts=2]` — assess it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
 - `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`
   — open one from a pushed head over `PullRequests.create`, or print the one
@@ -105,10 +105,10 @@ later.
 Every `pr` action without a usable `gh` exits 2 with the same message.
 
 The port carries `comment`, `editComment` and `editBody`. `editBody` is
-rafa-21's: the release stage writes its failure sentence into a pull
-request body the wrap-up session already wrote, when the provider that
-stage resolves is `gh`. The port is NOT in
-`PORT_VERSIONS` (`src/core/adapters/registry.ts` versions tracker, store,
+rafa-21's: the release stage writes its failure sentence into a pull request
+body the wrap-up session already wrote, when the provider that stage resolves is
+`gh`. The port is NOT in `PORT_VERSIONS`
+(`packages/rafa/src/core/adapters/registry.ts` versions tracker, store,
 learning, output, planner, sync and logger only), so adding a method to it bumps
 no version.
 
@@ -496,7 +496,7 @@ rejected.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. SEVEN routes ask the question. Two are
+someone allowed to change the repo. EIGHT routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
 the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
@@ -538,6 +538,17 @@ through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
 answers) and whose issue (the issue's author). A lookup that fails refuses
 as `ownership-unknown`, exit 2, before the issue is written.
 
+The EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), which
+runs the test a bug's `Rerun` section names. It IGNORES rather than
+refuses: it asks `readBoardTrust` about the bug's author once per login,
+only for a bug whose reference is runnable and on any tracker but `local`,
+which has no author to check. An untrusted author is a `skipped` row whose
+reason is "opened by <login>, " and `trustRefusalClause`'s clause; an
+author the tracker does not name is `skipped` with no lookup. No board text
+reaches a prompt or a shell through it: the `Rerun` value is parsed, never
+passed on, and the argv is built here. Nothing is spawned for either, and
+the exit code stays 0.
+
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`
 (`src/commands/doctor-deep-providers.ts`) asks it, with an empty
@@ -561,7 +572,15 @@ permission lookup is a refusal, never a pass. Applied on every repository,
 public or not.
 
 For `pr triage --resolve`, a PR whose author is untrusted is refused unless
-it is `dependabot[bot]` or listed. For marker comments, one from an untrusted
+it is `dependabot[bot]` or listed. Its head's config module is trusted
+apart from its author (`src/commands/pr/triage-config-trust.ts`), after the
+cross-repository refusal and before the worktree is added: a
+`rafa.config.ts` or `rafa.config.mjs` on the head (the local branch, else
+`origin/<branch>`, as `git worktree add` takes it) whose blob
+`origin/<base>` as last fetched does not hold, by `git rev-parse`, is
+refused with exit 1 naming the file, the base and `--allow-local-config`.
+That flag lets it through with one warning line. A config module is code
+the resolve loop imports when it starts in the worktree. For marker comments, one from an untrusted
 author is ignored and reported, so a planted triage comment cannot supply the
 follow-up prompt.
 
@@ -647,6 +666,11 @@ the session check 3 is part of, so a refusal from it spends no session:
    writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
    the standing it answers is `assumed` and the command does not refuse.
 
+   Whatever the verdict, each issue the reader filed against the block is
+   one warning line of its own (`reviewIssueWarning`), so a block read only
+   after its `heading`, `what` and `assumption` values were quoted names
+   its line on the terminal, `verdict: ready` included.
+
    A MISSING or malformed block is not that verdict and is not treated as
    one. It is weighed against the plan the session wrote: one that
    `plan validate` reads without an issue STANDS, with one warning, no
@@ -705,10 +729,14 @@ the session check 3 is part of, so a refusal from it spends no session:
    target appears, prints `🔖 --accept-refs: re-stamped <count> references of
    issue #<n> as reviewed.` with each row it let through, and plans.
    `dangerous.acceptStaleRefs: true` in the config does the same on every run
-   and names itself in that line; it also prints one warn line at the very
-   start of a board-route run that is not `--dry-run`, before any board read,
-   so a forgotten setting is seen before anything is spent. When both are on,
-   the flag is the one named.
+   and names itself in that line; its one warn line is the loader's pass
+   line for the key, written when the config is loaded and so before any
+   board read, ending `; check 4 re-stamps every reference of the spec as
+   reviewed and refuses none on this run` (the phrase `plan create`
+   declares, `src/commands/plan/refs-check.ts`), so a forgotten setting is
+   seen before anything is spent. It is printed on every `plan create` run
+   with the key on, a `--spec` or `--dry-run` one included. When both are
+   on, the flag is the one named.
 
 `--skip-review` bypasses check 3 only, and the plan's `rafa:plan` block
 records `review: skipped`. No flag but `--accept-refs`, and no setting
@@ -804,7 +832,7 @@ session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it
-lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
+lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup-roadmap.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
@@ -1073,6 +1101,11 @@ runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
 spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
 `afterMerge`). `--yes` does not answer that question; every failure is a warning.
+Each blocker's state is read the way `rafa issue unblock` reads it
+(`src/board/blocker-states.ts`): one `gh issue list --state all --limit 500`,
+then one `gh issue view <n> --json number,state` for each blocker that a full
+listing did not hold. A blocker whose state is not read counts as not cleared,
+so its issue keeps the label and the run names it `#<n> (state not read)`.
 
 In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
 the open issues the merge freed, read through the port's `freedBy`, and sends no
@@ -1110,8 +1143,8 @@ and number together; the repository comes from its `url`.
 ### Claims
 
 A claim reserves an issue for one device to work alone. The claim lives in
-git as the ownership record on the branch `feat/<stub>` (formatted
-`feat/rafa-<n>-<slug>` where the branch already runs). Its first commit is
+git as the ownership record on the plan's branch, the `naming.branch`
+template with the stub (`feat/rafa-<n>-<slug>` by default). Its first commit is
 an empty CLAIM commit naming the claiming store's id (`store_meta.store_id`
 from the effort store) in the trailer `Rafa-Claim-Store:`. Every later
 ownership change (release, handover, acceptance, takeover) is one empty

@@ -17,14 +17,16 @@
  */
 import type { Resolution, TierRow, TierSettings } from './resolve.js';
 import type { RoutingContext } from './routing.js';
-import type { RouteTarget, ValueAt } from '../core/config/sections.js';
 import type { InventorySource } from '../inventory/record.js';
+import type { RouteTarget, ValueAt } from '@open-tomato/rafa/core/config/sections';
 
 import { describe, expect, it } from 'bun:test';
 
+import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { routeTable } from '@open-tomato/rafa/core/config/sections';
+
 import { BUILT_IN_AGENTS } from '../agents/roster.js';
-import { CONFIG_DEFAULTS, parseConfigText } from '../core/config/index.js';
-import { routeTable } from '../core/config/sections.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { resolveTiers } from './resolve.js';
 import {

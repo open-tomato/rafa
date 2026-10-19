@@ -83,24 +83,25 @@
  * git, tmux, `claude` or the real HOME.
  */
 import type { ConfigSetEdit } from '../../config-set.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
-import type { PidProbe } from '../../core/loop/index.js';
 import type { StretchFolderSeams } from '../../stretch/folder.js';
 import type { OperatorRole } from '../../stretch/launch.js';
 import type { OperatorsSeams } from '../../stretch/operators.js';
 import type { PromptSeams } from '../../stretch/prompt.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PidProbe } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+
 import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { CommandExit } from '../../core/command/index.js';
-import { configFilePath } from '../../core/config/index.js';
-import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../../core/git/index.js';
-import { readSessions } from '../../core/loop/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import {
   agentFilePath,

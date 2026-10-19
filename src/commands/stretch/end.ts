@@ -85,27 +85,27 @@
  * GitHub.
  */
 import type { StretchRecord } from './start.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../core/git/index.js';
 import type { MergedPullRequest } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { PrSeams } from '../pr/pr-context.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { CommandExit } from '../../core/command/index.js';
-import { configFilePath } from '../../core/config/index.js';
-import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
-import { baseWarning, openPull, renderOpen } from '../pr/open.js';
 import { DEFAULT_PR_SEAMS, onProvider, openPrContext } from '../pr/pr-context.js';
 
 import { stretchOfBase } from './item.js';
@@ -327,6 +327,8 @@ async function openEnd(context: RafaContext, input: EndInput, body: string, seam
   } catch (error) {
     throw failure(`${path} could not be written: ${messageOf(error)}. No pull request was opened.`);
   }
+  // Imported here, not at the top: `pr open` is the `pr` feature's command module, loaded when it is used.
+  const { baseWarning, openPull, renderOpen } = await import('../pr/open.js');
   const result = await openPull({ ...context, args: [], flags }, seams.pr);
   const warning = baseWarning(result);
   if (warning !== null) context.output.warn(warning);
@@ -339,7 +341,7 @@ export async function runStretchEnd(context: RafaContext, seams: StretchEndSeams
   const line = readEndLine(context);
   const project = requireProject(context, COMMAND_NAME);
   const { root } = project;
-  const config = resolveProjectConfig(project, COMMAND_NAME, (text) => context.output.warn(text));
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (text) => context.output.warn(text));
   const n = requireStretchBase(config.prBase);
   const report = readReport(root, n);
   const closes = closesLines(ledgerItems(context, root, n));
@@ -350,7 +352,7 @@ export async function runStretchEnd(context: RafaContext, seams: StretchEndSeams
     + ` Closes line(s) from the ledger${line.dryRun
       ? ', dry run: each step is printed and none is run'
       : ''}`);
-  const pr = openPrContext(context, seams.pr);
+  const pr = await openPrContext(context, seams.pr);
   const merges = await onProvider('read the merged pull requests', () => pr.pulls.listMerged());
   const input: EndInput = { root, n, defaultBranch, record, dryRun: line.dryRun };
   const merged = merges.find((pull) => pull.headRefName === stretchBranch(n));

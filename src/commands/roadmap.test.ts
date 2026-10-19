@@ -20,10 +20,12 @@
  * the Roadmap's #13 and #11, is the control.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+
+import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +38,8 @@ import { positionAt, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
-import { createIssueListCommand, ISSUE_LIST_FLAGS } from './issue/list.js';
+import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
+import { createIssueListCommand } from './issue/list.js';
 import { createRoadmapCommand, ROADMAP_FLAGS } from './roadmap.js';
 
 /** A temporary directory of this file's own. */

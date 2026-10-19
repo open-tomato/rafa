@@ -61,7 +61,7 @@
  *   prints {@link blankReasonMessage}. A trail entry without a reason
  *   answers nothing, so an empty one is refused rather than posted.
  *
- * The asker is the `ask` of a `Prompter` (`src/core/command/confirm.ts`),
+ * The asker is the `ask` of a `Prompter` (`packages/rafa/src/core/command/confirm.ts`),
  * handed in by the command, which passes null where standard input is no
  * terminal: this module never looks at a stream itself.
  */

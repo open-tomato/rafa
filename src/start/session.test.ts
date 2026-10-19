@@ -19,7 +19,7 @@
  * repositories under a stand-in `claude`.
  */
 import type { RunSessionOptions } from './session.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import {
   mkdirSync,
@@ -34,9 +34,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../core/command/index.js';
-import { readSessions, runsDir, sessionFilePath } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { readSessions, runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 

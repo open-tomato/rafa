@@ -39,7 +39,7 @@
  * read as empty, and the plan stub, `cause` and `kind` columns misread.
  */
 import type { ProgressFinding } from './progress.js';
-import type { ReportFinding } from '../report/parse.js';
+import type { ReportFinding } from '@open-tomato/rafa/report/parse';
 
 import {
   existsSync,
@@ -54,6 +54,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writeFindings } from '@open-tomato/rafa/store/findings';
+
 import {
   EMOJI_JOINERS,
   FORBIDDEN_BYTES,
@@ -61,7 +63,6 @@ import {
   scanBuffer,
   scanText,
 } from '../../scripts/control-byte-gate/control-byte-gate.js';
-import { writeFindings } from '../effort/store/findings.js';
 import { formatProgressSection } from '../plan.js';
 
 import {

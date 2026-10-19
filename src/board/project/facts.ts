@@ -107,10 +107,11 @@
 import type { FilesPage, FragmentLookup, IssueList, ListPage } from './facts-query.js';
 import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { BoardIssueState } from '../roadmap-board.js';
+import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
-import { describeValue, isMapping } from '../../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
+
 import { directoryPrefix, fragmentIdOf } from '../../release/fragment-tree.js';
 import { parseFragment } from '../../release/fragment.js';
 

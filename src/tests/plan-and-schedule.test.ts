@@ -1,7 +1,8 @@
 /**
- * Tests for the merged loop's new pieces: per-plan tracker derivation,
- * --start-at time math, plan-prompt templating, and where the plan format
- * the prompt inlines is read from.
+ * Tests for the merged loop's new pieces: --start-at time math,
+ * plan-prompt templating, and where the plan format the prompt inlines
+ * is read from. The per-plan tracker derivation, `trackerPathFor`, is
+ * held by `packages/rafa/src/core/plan/tracker-path.test.ts`.
  *
  * Every file a `readPlanFormat` case plants sits under this file's own
  * temporary directory. The one case reading outside it reads this
@@ -28,7 +29,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import {
   buildPlanPrompt,
   formatProgressSection,
@@ -41,19 +43,8 @@ import {
 } from '../plan.js';
 import { DEFAULT_ROUTES, DEFAULT_ROUTING } from '../tiers/routing.js';
 import { deferUntil, msUntil } from '../utils/schedule.js';
-import { trackerPathFor } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
-
-describe('trackerPathFor', () => {
-  it('maps the default plan to the default tracker', () => {
-    expect(trackerPathFor('/repo/PLAN.md')).toBe('/repo/PLAN_TRACKER.md');
-  });
-
-  it('keeps the stub suffix so plans get independent trackers', () => {
-    expect(trackerPathFor('/repo/PLAN-auth-basic.md')).toBe('/repo/PLAN_TRACKER-auth-basic.md');
-  });
-});
 
 describe('msUntil', () => {
   it('computes the delay to a later time today', () => {

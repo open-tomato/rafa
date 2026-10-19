@@ -24,10 +24,12 @@
  * home — and dispatches through it, so no case reads another's config and
  * nothing here touches the real home.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { DescribeDocument } from '../cli/describe.js';
 import type { ModuleListing } from '../commands/module/list.js';
-import type { CliEvent, CliEventLog, CliEventResult } from '../ports/index.js';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent, CliEventLog, CliEventResult } from '@open-tomato/rafa/ports';
+
+import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,7 +40,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { dispatch } from '../cli/dispatch.js';
 import { renderHelp } from '../cli/help.js';
-import { CORE_REGISTRY } from '../commands/index.js';
+import { createRosterRegistry } from '../commands/index.js';
 import { loadInvocationModules } from '../modules/load.js';
 
 /** A temporary directory of this file's own, holding one project per case. */
@@ -103,14 +105,19 @@ interface Run {
 /**
  * Loads the modules of `place` as `src/rafa.ts` does, then dispatches
  * `words` over the core registry with their command entries and
- * warnings, with streams and a clock of its own.
+ * warnings, with streams and a clock of its own. The registry is
+ * `createRosterRegistry({ off })`, as `src/rafa.ts` builds it.
  */
-async function runOver(words: readonly string[], place: PlantedProject): Promise<Run> {
+async function runOver(
+  words: readonly string[],
+  place: PlantedProject,
+  off: readonly string[] = [],
+): Promise<Run> {
   const stdout = memoryStream();
   const stderr = memoryStream();
   const modules = await loadInvocationModules({ cwd: place.root, home: place.home });
   const { exitCode } = await dispatch(words, {
-    registry: CORE_REGISTRY,
+    registry: createRosterRegistry({ off }),
     renderHelp,
     modules: modules.commands,
     warnings: modules.warnings,
@@ -239,5 +246,30 @@ describe('a command entry with a syntax error', () => {
 
     const modules = (resultOf(listed.stdout).data as { readonly modules: readonly ModuleListing[] }).modules;
     expect(modules[0]).toMatchObject({ name: 'syntax-fixture', state: 'loaded', commands: entry, mounted: false });
+  });
+});
+
+describe('the feature roster over a dispatch', () => {
+  it.each([
+    [['pr', 'list', '--help'], 'rafa pr list'],
+    [['release', 'status', '--help'], 'rafa release status'],
+  ])('renders the action help of rafa %p with every feature on', async (words, heading) => {
+    const place = plantProject('version: 1\n');
+
+    const run = await runOver(words, place);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(run.stdout).toStartWith(heading);
+  });
+
+  it('refuses pr as an unknown subject when the pr feature is off', async () => {
+    const place = plantProject('version: 1\n');
+
+    const run = await runOver(['pr', '--help'], place, ['pr']);
+
+    expect(run.exitCode).not.toBe(0);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain('pr');
+    expect(run.stderr.toLowerCase()).toContain('unknown');
   });
 });

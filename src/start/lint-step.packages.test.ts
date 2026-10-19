@@ -8,8 +8,13 @@
  * `@open-tomato/rafa/store` (resolved through the packages' tsconfig
  * `paths`, which the scratch repository carries a stub target for).
  *
- * The scratch repository lives under the checkout's gitignored `.tmp/`
- * so that Node resolution finds the installed `node_modules` above it.
+ * The scratch repository copies the root `eslint.config.mjs` alone, not
+ * the shared config it builds on, and lives under the checkout's
+ * gitignored `.tmp/` so that Node resolution finds the installed
+ * `node_modules` above it: `@open-tomato/rafa-eslint-config`, the shared
+ * config the copied leaf imports, with the plugins it declares, and
+ * `@open-tomato/rafa-typescript-config`, the base the copied
+ * `tsconfig.packages.json` extends.
  */
 import type { GitResult, GitRunner } from '../pr/index.js';
 
@@ -18,14 +23,15 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { runLintStep } from './lint-step.js';
 
 const ROOT = join(import.meta.dir, '..', '..');
 const STOP = 130;
-const CONFIG_FILES = ['eslint.config.mjs', 'eslint.base.mjs', 'sharedRules.mjs', 'tsconfig.json', 'tsconfig.base.json', 'tsconfig.packages.json'];
+const CONFIG_FILES = ['eslint.config.mjs', 'tsconfig.json', 'tsconfig.packages.json'];
 const PACKAGE_FILE = 'packages/scratch-pkg/src/planted.ts';
 const LINT_TIMEOUT_MS = 120_000;
 
@@ -65,10 +71,9 @@ beforeEach(() => {
   mkdirSync(join(ROOT, '.tmp'), { recursive: true });
   repo = mkdtempSync(join(ROOT, '.tmp', 'lint-step-packages-'));
   for (const name of CONFIG_FILES) cpSync(join(ROOT, name), join(repo, name));
-  cpSync(join(ROOT, 'scripts', 'unsafeUnicode.mjs'), join(repo, 'scripts', 'unsafeUnicode.mjs'));
   write('packages/scratch-pkg/tsconfig.json', '{ "extends": "../../tsconfig.packages.json", "include": ["src"] }\n');
-  write('src/effort/store/index.ts', 'export const STORE_STUB = 1;\n');
-  write('src/ports/index.ts', 'export const PORTS_STUB = 1;\n');
+  write('packages/rafa/src/effort/store/index.ts', 'export const STORE_STUB = 1;\n');
+  write('packages/rafa/src/ports/index.ts', 'export const PORTS_STUB = 1;\n');
   git(['init', '-q']);
   printed = [];
   setActiveOutput(sinkOutput({ info: (message) => printed.push(message) }));

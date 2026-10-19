@@ -13,9 +13,11 @@
 import type { ClaimCommandSeams } from './release.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { DeviceStoreId } from '../../claims/device.js';
-import type { RafaCommand } from '../../core/command/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,11 +100,11 @@ function remoteTip(world: World, branch: string = BRANCH): string | null {
     : null;
 }
 
-/** Pushes `store`'s claim on `branch` from `git`, answering the remote tip. */
-function claimBranch(world: World, git: GitRunner, store: string, branch: string = BRANCH): string {
+/** Pushes `store`'s claim on `branch`, named under `template`, from `git`, answering the remote tip. */
+function claimBranch(git: GitRunner, store: string, branch: string = BRANCH, template?: string): string {
   const made = makeOwnershipCommit(git, 'main', { action: 'claim', issue: ISSUE, store });
   if (!made.ok) throw new Error(made.reason);
-  const pushed = pushNewClaimBranch(git, made.sha, branch);
+  const pushed = pushNewClaimBranch(git, made.sha, branch, template);
   if (pushed.outcome !== 'pushed') throw new Error(`claim push: ${pushed.outcome}`);
   return made.sha;
 }
@@ -171,7 +173,7 @@ describe('readIssueArgument', () => {
 describe('rafa claim release, by the owner', () => {
   it('pushes a release commit on the remote tip and takes both stage labels off', async () => {
     const world = plantWorld('owner');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     const { board, calls } = recordingBoard();
 
     const run = await release(world, [String(ISSUE)], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
@@ -190,7 +192,7 @@ describe('rafa claim release, by the owner', () => {
 
   it('releases a claim naming an id the store replaced, the release commit naming the store\'s own id', async () => {
     const world = plantWorld('replaced');
-    const claim = claimBranch(world, world.a, STORE_A_REPLACED);
+    const claim = claimBranch(world.a, STORE_A_REPLACED);
     const { board, calls } = recordingBoard();
     const seams = { git: world.a, board, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) };
 
@@ -208,7 +210,7 @@ describe('rafa claim release, by the owner', () => {
 
   it('answers the branch, store and release commit as the json result', async () => {
     const world = plantWorld('json');
-    claimBranch(world, world.a, STORE_A);
+    claimBranch(world.a, STORE_A);
     const { board } = recordingBoard();
 
     const run = await release(world, ['7', '--output=json'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
@@ -222,7 +224,7 @@ describe('rafa claim release, by the owner', () => {
 
   it('ends a pending handover: the release is the latest ownership commit', async () => {
     const world = plantWorld('pending');
-    claimBranch(world, world.a, STORE_A);
+    claimBranch(world.a, STORE_A);
     pushRecord(world, world.a, { action: 'hand', issue: ISSUE, store: STORE_A, to: STORE_B });
 
     const run = await release(world, ['7'], { git: world.a, board: recordingBoard().board, readStoreId: storeIdOf(STORE_A) });
@@ -234,7 +236,7 @@ describe('rafa claim release, by the owner', () => {
   it('stands, with a warning, when the board is not gh or the label write fails', async () => {
     for (const board of [null, recordingBoard(true).board]) {
       const world = plantWorld('label-warning');
-      const claim = claimBranch(world, world.a, STORE_A);
+      const claim = claimBranch(world.a, STORE_A);
 
       const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
 
@@ -248,7 +250,7 @@ describe('rafa claim release, by the owner', () => {
 
   it('moves no local ref of the releasing clone but its remote-tracking one', async () => {
     const world = plantWorld('local');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     must(world.a, ['update-ref', `refs/heads/${BRANCH}`, claim]);
 
     const run = await release(world, ['7'], { git: world.a, board: null, readStoreId: storeIdOf(STORE_A) });
@@ -270,7 +272,7 @@ describe('rafa claim release, refused', () => {
 
   it('when another store holds the claim, naming the owner', async () => {
     const world = plantWorld('other-owner');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['7'], { git: world.b, board, readStoreId: storeIdOf(STORE_B) });
@@ -280,7 +282,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the holder is an id another store replaced, naming this store\'s own id', async () => {
     const world = plantWorld('replaced-stranger');
-    const claim = claimBranch(world, world.a, STORE_A_REPLACED);
+    const claim = claimBranch(world.a, STORE_A_REPLACED);
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['7'], { git: world.b, board, readStoreId: storeIdOf(STORE_B, ['store-b-replaced']) });
@@ -290,8 +292,8 @@ describe('rafa claim release, refused', () => {
 
   it('when this store holds the issue on two branches, one under a replaced id, naming both', async () => {
     const world = plantWorld('two-replaced');
-    const first = claimBranch(world, world.a, STORE_A_REPLACED);
-    claimBranch(world, world.a, STORE_A, 'feat/rafa-7-second');
+    const first = claimBranch(world.a, STORE_A_REPLACED);
+    claimBranch(world.a, STORE_A, 'feat/rafa-7-second');
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) });
@@ -301,7 +303,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the claim was already released', async () => {
     const world = plantWorld('released');
-    claimBranch(world, world.a, STORE_A);
+    claimBranch(world.a, STORE_A);
     const released = pushRecord(world, world.a, { action: 'release', issue: ISSUE, store: STORE_A });
     const { board, calls } = recordingBoard();
 
@@ -312,7 +314,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the handover was accepted: the receiver owns it now', async () => {
     const world = plantWorld('accepted');
-    claimBranch(world, world.a, STORE_A);
+    claimBranch(world.a, STORE_A);
     pushRecord(world, world.a, { action: 'hand', issue: ISSUE, store: STORE_A, to: STORE_B });
     const accepted = pushRecord(world, world.b, { action: 'accept', issue: ISSUE, store: STORE_B });
     const { board, calls } = recordingBoard();
@@ -324,7 +326,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the remote holds no branch of the issue', async () => {
     const world = plantWorld('absent');
-    claimBranch(world, world.a, STORE_A, 'feat/rafa-8-other');
+    claimBranch(world.a, STORE_A, 'feat/rafa-8-other');
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
@@ -345,8 +347,8 @@ describe('rafa claim release, refused', () => {
 
   it('when this store holds the issue on two branches, naming both', async () => {
     const world = plantWorld('two');
-    const first = claimBranch(world, world.a, STORE_A);
-    claimBranch(world, world.a, STORE_A, 'feat/rafa-7-second');
+    const first = claimBranch(world.a, STORE_A);
+    claimBranch(world.a, STORE_A, 'feat/rafa-7-second');
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
@@ -356,7 +358,7 @@ describe('rafa claim release, refused', () => {
 
   it('when this device has no store id, before any git call', async () => {
     const world = plantWorld('no-id');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     const gitCalls: string[][] = [];
     const git: GitRunner = (args) => {
       gitCalls.push([...args]);
@@ -373,7 +375,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the store cannot be read', async () => {
     const world = plantWorld('store-throws');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     const { board, calls } = recordingBoard();
     const readStoreId = (): DeviceStoreId => {
       throw new Error('database disk image is malformed');
@@ -386,7 +388,7 @@ describe('rafa claim release, refused', () => {
 
   it('when origin cannot be reached', async () => {
     const world = plantWorld('offline');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     must(world.a, ['remote', 'set-url', 'origin', join(scope, 'nowhere.git')]);
     const { board, calls } = recordingBoard();
 
@@ -397,7 +399,7 @@ describe('rafa claim release, refused', () => {
 
   it('when the branch moves between the fetch and the push: the lease refuses it', async () => {
     const world = plantWorld('race');
-    claimBranch(world, world.a, STORE_A);
+    claimBranch(world.a, STORE_A);
     let raced: string | null = null;
     const git: GitRunner = (args) => {
       if (args[0] === 'push' && raced === null) raced = pushRecord(world, world.b, { action: 'take', issue: ISSUE, store: STORE_B });
@@ -414,11 +416,58 @@ describe('rafa claim release, refused', () => {
 
   it('when the argument is no issue number, before reading anything', async () => {
     const world = plantWorld('bad-arg');
-    const claim = claimBranch(world, world.a, STORE_A);
+    const claim = claimBranch(world.a, STORE_A);
     const { board, calls } = recordingBoard();
 
     const run = await release(world, ['seven'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
 
     expectRefused(run, '"seven" is no issue number', world, claim, calls);
+  });
+});
+
+describe('rafa claim release, under the naming.branch template', () => {
+  const TEMPLATE = 'work/{stub}';
+  const WORK_BRANCH = 'work/rafa-7-x';
+
+  it('finds and releases work/rafa-7-x under work/{stub}', async () => {
+    const world = plantWorld('template');
+    const claim = claimBranch(world.a, STORE_A, WORK_BRANCH, TEMPLATE);
+    const { board, calls } = recordingBoard();
+
+    const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A), branchTemplate: TEMPLATE });
+
+    expect(run.exitCode).toBe(0);
+    const tip = remoteTip(world, WORK_BRANCH);
+    expect(tip).not.toBe(claim);
+    expect(must(world.origin, ['rev-parse', `${tip ?? ''}^`])).toBe(claim);
+    expect(tipRecord(world, WORK_BRANCH)).toEqual({ kind: 'ownership', record: { action: 'release', issue: ISSUE, store: STORE_A } });
+    expect(calls).toHaveLength(2);
+    expect(run.stdout).toContain(`Released the claim on #7 (store ${STORE_A}) on ${WORK_BRANCH}: release commit ${tip ?? ''} pushed to origin.`);
+  });
+
+  it('control: the same branch under the default template is no claim, refused with no branch found', async () => {
+    const world = plantWorld('template-control');
+    const claim = claimBranch(world.a, STORE_A, WORK_BRANCH, TEMPLATE);
+    const { board, calls } = recordingBoard();
+
+    const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A) });
+
+    expect(run.exitCode).toBe(1);
+    expect(`${run.stdout}${run.stderr}`).toContain('origin has no feat/rafa-7-<slug> branch, so #7 carries no claim');
+    expect(remoteTip(world, WORK_BRANCH)).toBe(claim);
+    expect(calls).toEqual([]);
+  });
+
+  it('reads only the configured template: a feat/rafa-7 branch is no claim under work/{stub}', async () => {
+    const world = plantWorld('template-other');
+    const claim = claimBranch(world.a, STORE_A);
+    const { board, calls } = recordingBoard();
+
+    const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A), branchTemplate: TEMPLATE });
+
+    expect(run.exitCode).toBe(1);
+    expect(`${run.stdout}${run.stderr}`).toContain('origin has no work/rafa-7-<slug> branch, so #7 carries no claim');
+    expect(remoteTip(world)).toBe(claim);
+    expect(calls).toEqual([]);
   });
 });

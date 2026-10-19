@@ -8,6 +8,11 @@
  * write and also plants a stray `.tmp` to show the listing can see one,
  * and each staleness case that answers false sits beside one that answers
  * true.
+ *
+ * The cases of the record's shape, field by field, and of its four states
+ * moved with `asHopRecord` to `packages/rafa/src/core/loop/hop-record.test.ts`; the
+ * wrong-shape cases here keep three, to show a record `asHopRecord`
+ * refuses reads as a wrong shape with the file's detail.
  */
 import type { HopRecord } from './hop-record.js';
 import type { Place, Position } from '../project/position.js';
@@ -112,15 +117,6 @@ describe('readHopRecord', () => {
     expect(readHopRecord(root)).toEqual({ set: true, record: DRY_HOP });
   });
 
-  it.each(['away', 'waiting', 'merged', 'halted'])('reads the %s state as set', (state) => {
-    const root = freshRoot();
-    plant(root, withKey('state', state));
-    const reading = readHopRecord(root);
-    expect(reading.set).toBe(true);
-    if (!reading.set) return;
-    expect(reading.record.state).toBe(state as HopRecord['state']);
-  });
-
   it('reads invalid JSON as a wrong shape whose detail says it holds no JSON', () => {
     const root = freshRoot();
     plant(root, '{ "kind": ');
@@ -134,21 +130,8 @@ describe('readHopRecord', () => {
 
   it.each([
     ['an array', '[]'],
-    ['a number', '3'],
     ['an unknown kind', withKey('kind', 'sideways')],
-    ['an unknown state', withKey('state', 'closed')],
     ['no home', withoutKey('home')],
-    ['a malformed from', withKey('from', { board: 0, epic: null })],
-    ['a string blocked', withKey('blocked', '210')],
-    ['a missing target', withoutKey('target')],
-    ['a null target epic', withKey('targetEpic', null)],
-    ['a fractional target board', withKey('targetBoard', 1.5)],
-    ['a zero pull request', withKey('pullRequest', 0)],
-    ['a missing pull request', withoutKey('pullRequest')],
-    ['a startedAt that is no date', withKey('startedAt', 'yesterday')],
-    ['a numeric startedAt', withKey('startedAt', 1_790_000_000_000)],
-    ['a blocker hop with no target', withKey('target', null)],
-    ['a dry hop with a blocked issue', JSON.stringify({ ...DRY_HOP, blocked: 210 })],
   ])('reads %s as a wrong shape', (_label, text) => {
     const root = freshRoot();
     plant(root, text);

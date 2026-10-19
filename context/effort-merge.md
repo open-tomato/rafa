@@ -6,19 +6,20 @@ migrates from NDJSON storage to SQLite.
 
 ### Merge rules
 
-**A merge rule declares how each table's rows are identified, which
-columns can change, and what happens when they cannot.** The rules are
-in `src/effort/store/merge-rules.ts` in a `MERGE_RULES` registry, keyed
-by table name. A new table must declare its rule in the same commit as
-its migration entry, or `merge-rules.sweep.test.ts` will fail.
+**A merge rule declares how each table's rows are identified, which columns can
+change, and what happens when they cannot.** The rules are in
+`packages/rafa/src/effort/store/merge-rules.ts` in a `MERGE_RULES` registry,
+keyed by table name. A new table must declare its rule in the same commit as its
+migration entry, or `merge-rules.sweep.test.ts` will fail.
 
 **A table's scope is either `merged` or `local`.** Merged tables travel
 between stores and their rows combine; local tables stay on their
 machine and are not combined. The `sessions`, `commits`, `findings`,
 `blockers`, `out_of_scope_bugs`, `changes`, `skill_invocations`,
-`preflight`, `dispatches`, `plan_ci`, `report_absences`, and
-`task_reports` tables are merged. The `schema_migrations`, `store_meta`,
-`store_replaced`, `merges` and `merge_conflicts` tables are local.
+`preflight`, `dispatches`, `plan_ci`, `report_absences`, `task_reports`,
+`stale_docs` and `bug_routes` tables are merged. The `schema_migrations`,
+`store_meta`, `store_replaced`, `merges` and `merge_conflicts` tables
+are local.
 
 **A merged table's rule holds:** its identity columns (which match rows
 with NULL origin), the columns that can change after insert (each with
@@ -62,11 +63,11 @@ inserted reads as any other (with NULL origin fields).
 
 ### Rafa effort merge
 
-**`rafa effort merge <file> [--dry-run]` joins another device's store
-into the current one** (`src/commands/effort/merge.ts` over `mergeStore`,
-`src/effort/store/merge-store.ts`, whose module note holds the rules and
-refusals). This store is the one `effortStoreDir` answers (the project's
-own store, or one under `RAFA_EFFORT_DIR`). `<file>` is read from the
+**`rafa effort merge <file> [--dry-run]` joins another device's store into the
+current one** (`src/commands/effort/merge.ts` over `mergeStore`,
+`packages/rafa/src/effort/store/merge-store.ts`, whose module note holds the
+rules and refusals). This store is the one `effortStoreDir` answers (the
+project's own store, or one under `RAFA_EFFORT_DIR`). `<file>` is read from the
 directory the command runs from and is only read, never modified.
 
 **The merge reads the incoming store, deduplicates rows by their port
@@ -142,14 +143,13 @@ until they are taken over with `rafa claim take <n> --stale`.
 
 ### Rafa effort move
 
-**`rafa effort move --to=sqlite` is the step to migrate from NDJSON to
-SQLite storage** (`src/commands/effort/move.ts` over `moveToSqlite`,
-`src/effort/store/move.ts`). It reads the NDJSON sessions and commits
-with the NDJSON backend's `readRows` and appends them with the SQLite
-backend's `append`, both under `effortStoreDir`, so each row is
-deduplicated by its port key and the open's development-build refusal
-applies (the store cannot be the project's live store under a
-development build).
+**`rafa effort move --to=sqlite` is the step to migrate from NDJSON to SQLite
+storage** (`src/commands/effort/move.ts` over `moveToSqlite`,
+`packages/rafa/src/effort/store/move.ts`). It reads the NDJSON sessions and
+commits with the NDJSON backend's `readRows` and appends them with the SQLite
+backend's `append`, both under `effortStoreDir`, so each row is deduplicated by
+its port key and the open's development-build refusal applies (the store cannot
+be the project's live store under a development build).
 
 **It then checks, per kind, that the SQLite keys hold every key read and
 number the keys before plus the rows appended, and only then sets

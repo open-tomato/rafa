@@ -19,7 +19,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue, isMapping } from '../core/config/sections.js';
+import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
 /** A repository as `gh repo view` names it: `owner/name`, each part free of `/` and whitespace. */
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/u;

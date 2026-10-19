@@ -20,8 +20,8 @@
  * spawned command.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { SessionRecord } from '../core/loop/index.js';
-import type { EffortRow } from '../effort/store/types.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { EffortRow } from '@open-tomato/rafa/store/types';
 
 import {
   mkdirSync,
@@ -38,11 +38,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runsDir, sessionFilePath } from '../core/loop/index.js';
-import { bringForward } from '../effort/store/bring-forward.js';
-import { MOVE_TO_SQLITE } from '../effort/store/merge-store.js';
-import { openNdjsonStore } from '../effort/store/ndjson.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+import { bringForward } from '@open-tomato/rafa/store/bring-forward';
+import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
+import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

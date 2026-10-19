@@ -66,6 +66,15 @@
  * say whether a loop session could push and merge. It gates nothing; it
  * comes here so which permissions are write access is spelled once.
  *
+ * An EIGHTH is `rafa bug recheck` (`src/commands/bug/recheck.ts`), and
+ * it is the second caller that IGNORES rather than refuses, like the
+ * spec-review comment: it runs {@link readBoardTrust} over the bug's
+ * author once per login, only for a runnable reference and off the
+ * `local` tracker, which has no author. An untrusted author is a
+ * `skipped` row carrying {@link trustRefusalClause}'s reason, so a
+ * sweep over every open bug still runs the rest. No board text reaches
+ * a prompt or a shell through it.
+ *
  * `context/pull-requests.md` carries the roster.
  *
  * ## What a planted spec-review comment can take
@@ -148,7 +157,7 @@
  *
  * A login that is not shaped like a GitHub login is refused before
  * either answer is consulted, through `isGitHubLogin`
- * (`src/core/config/config-sections.ts`), and refused as
+ * (`packages/rafa/src/core/config/config-sections.ts`), and refused as
  * `lookup-failed`, since no
  * lookup can be made for it. The shape check is also what keeps the
  * login out of the path's structure: `../../x` or a leading `-` would
@@ -209,21 +218,15 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { CommandExit } from '../core/command/index.js';
-import { describeValue, isGitHubLogin, isMapping, messageOf } from '../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { describeValue, isGitHubLogin, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store/trusted-permissions';
+
+export type { TrustedPermission } from '@open-tomato/rafa/store/trusted-permissions';
+export { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store/trusted-permissions';
 
 /** The repository placeholders `gh api` expands from the directory it runs in. */
 const REPO_PATH = '{owner}/{repo}';
-
-/**
- * The permissions that mean the login may change the repository. The
- * `./store` subpath exports it too (`src/effort/store/index.ts`), so a
- * workspace package checking a login spells write access as core does.
- */
-export const TRUSTED_PERMISSIONS = ['admin', 'maintain', 'write'] as const;
-
-/** One of the three permissions that are trust. */
-export type TrustedPermission = (typeof TRUSTED_PERMISSIONS)[number];
 
 /** The exit code a refused read of board text ends with; the spec's own. */
 export const TRUST_REFUSAL_EXIT = 2;

@@ -1,207 +1,82 @@
 /**
- * Where the shared contract files go: the data behind the move of #905,
- * which puts the files every part of rafa depends on into `src/core/`
- * before any package is cut (epic #801).
+ * Where core is, and the barrels of each of its subjects. Core is the
+ * workspace package `packages/rafa/` (#1090): the files every part of
+ * rafa depends on, which #905 gathered into `src/core/` before any
+ * package was cut (epic #801), and which the move into the package put,
+ * with `src/effort/store/`, `src/ports/` and four named files, at the
+ * same paths under `packages/rafa/src/`.
  *
- * Three things are listed, and nothing here reads the tree:
+ * Where core is:
  *
- *   - {@link CORE_MOVES}: the nineteen files that change path, each with
- *     its path under `src/core/` and its subject folder. A file keeps its
- *     base name;
- *   - with each file, its colocated test files by their path today. A test
- *     file moves with its file into the same folder and keeps its base
- *     name too ({@link testTarget});
- *   - {@link CORE_BARRELS}: the barrel files of each subject, the only
- *     files under `src/core/` a file outside it may import.
+ *   - {@link CORE_FOLDERS} and {@link CORE_NAMED_FILES}: the folders and
+ *     the files outside them that are core, the one place a sweep, a
+ *     survey script or a spawned loader reads them from
+ *     ({@link isCoreFile}). Since the move they are `[CORE_SOURCE]` and
+ *     `[]`;
+ *   - {@link CORE_PACKAGE}, {@link CORE_SOURCE} and {@link CORE_FOLDER}:
+ *     the package's folder, its source folder and the `core/` folder
+ *     under it;
+ *   - {@link CORE_PARKED_TESTS}: where a test of core that imports a file
+ *     above core waits. A sweep reads such a test as it reads core's own
+ *     files ({@link isCoreRead}).
  *
- * A colocated test file is a test file in the moving file's folder whose
- * name opens with the file's stem and that has no source file of its own:
- * `src/loop/sessions-hop.test.ts` is one of `src/loop/sessions.ts`, while
- * `src/config-schema-hub.test.ts` belongs to `src/config-schema-hub.ts`,
- * which stays. `src/config-schema-board.test.ts` has no source file of its
- * own and reads `config-schema.ts` and `config.ts`; it is listed with
- * `src/config-schema.ts`, the file it is named after. A test under
- * `src/tests/` is not colocated and does not move.
+ * The barrels: {@link CORE_SUBJECTS} names the subject folders under
+ * {@link CORE_FOLDER}, and {@link CORE_BARRELS} the barrel files of each,
+ * the only files under {@link CORE_FOLDER} a file outside core may import
+ * ({@link isCoreBarrel}).
  *
- * A move task that splits a barrel adds the new barrel here in the same
- * task. A barrel is split, never widened, when it would close a runtime
- * cycle.
- *
- * {@link findCollisions} is the check the unit tests hold the lists to:
- * no two targets are one path, and no target is a path something else
- * moves away from.
+ * A task that splits a barrel adds the new barrel here in the same task.
+ * A barrel is split, never widened, when it would close a runtime cycle.
  */
 
-/** The folder the files move into, with its closing `/`. */
-export const CORE_FOLDER = 'src/core/';
+/** The folder of core's workspace package, with its closing `/`. */
+export const CORE_PACKAGE = 'packages/rafa/';
 
-/** The subject folders under `src/core/`, sorted. */
-export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan'] as const;
+/** The source folder of core's workspace package, with its closing `/`. */
+export const CORE_SOURCE: string = `${CORE_PACKAGE}src/`;
 
-/** One subject folder under `src/core/`. */
+/** The folder the files moved into, with its closing `/`. */
+export const CORE_FOLDER: string = `${CORE_SOURCE}core/`;
+
+/**
+ * Where a test of core that imports a file above core waits once core is
+ * its package, under its path below `src/`, with its closing `/`.
+ */
+export const CORE_PARKED_TESTS = 'src/tests/core-coupled/';
+
+/**
+ * The folders that are core, each with its closing `/`, sorted. Before
+ * the move into the package they were `src/core/`, the effort store and
+ * the ports; since it, the package's source folder alone.
+ */
+export const CORE_FOLDERS: readonly string[] = [CORE_SOURCE];
+
+/**
+ * The files outside {@link CORE_FOLDERS} that are core, sorted. The move
+ * into the package emptied it: the four it named are under
+ * {@link CORE_SOURCE} now.
+ */
+export const CORE_NAMED_FILES: readonly string[] = [];
+
+/** The subject folders under {@link CORE_FOLDER}, sorted. */
+export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime'] as const;
+
+/** One subject folder under {@link CORE_FOLDER}. */
 export type CoreSubject = (typeof CORE_SUBJECTS)[number];
-
-/** One file that changes path into `src/core/`. */
-export interface CoreMove {
-  /** The file's path today, repository-relative. */
-  readonly from: string;
-  /** The subject folder it moves into. */
-  readonly subject: CoreSubject;
-  /** Its colocated test files by their path today, sorted; empty when it has none. */
-  readonly tests: readonly string[];
-  /** Its path under `src/core/`, repository-relative. */
-  readonly to: string;
-}
-
-/** One path that changes: a moving file or one of its test files. */
-export interface MovedPath {
-  /** The path today. */
-  readonly from: string;
-  /** The path under `src/core/`. */
-  readonly to: string;
-}
-
-/** Two listed paths that cannot both hold. */
-export interface Collision {
-  /** The path claimed twice, repository-relative. */
-  readonly path: string;
-  /** What claims it, one phrase per claim, sorted. */
-  readonly claims: readonly string[];
-}
-
-/** The nineteen files that move, sorted by their path today. */
-export const CORE_MOVES: readonly CoreMove[] = [
-  {
-    from: 'src/adapters/output/active.ts',
-    subject: 'output',
-    tests: ['src/adapters/output/active.test.ts'],
-    to: 'src/core/output/active.ts',
-  },
-  {
-    from: 'src/adapters/registry.ts',
-    subject: 'adapters',
-    tests: ['src/adapters/registry.test.ts'],
-    to: 'src/core/adapters/registry.ts',
-  },
-  {
-    from: 'src/cli/command.ts',
-    subject: 'command',
-    tests: ['src/cli/command.test.ts'],
-    to: 'src/core/command/command.ts',
-  },
-  {
-    from: 'src/cli/prompt/confirm.ts',
-    subject: 'command',
-    tests: ['src/cli/prompt/confirm.test.ts'],
-    to: 'src/core/command/confirm.ts',
-  },
-  {
-    from: 'src/cli/version.ts',
-    subject: 'command',
-    tests: ['src/cli/version.test.ts'],
-    to: 'src/core/command/version.ts',
-  },
-  {
-    from: 'src/config-items.ts',
-    subject: 'config',
-    tests: ['src/config-items.test.ts'],
-    to: 'src/core/config/config-items.ts',
-  },
-  {
-    from: 'src/config-load.ts',
-    subject: 'config',
-    tests: ['src/config-load.test.ts'],
-    to: 'src/core/config/config-load.ts',
-  },
-  {
-    from: 'src/config-readers.ts',
-    subject: 'config',
-    tests: ['src/config-readers.test.ts'],
-    to: 'src/core/config/config-readers.ts',
-  },
-  {
-    from: 'src/config-schema.ts',
-    subject: 'config',
-    tests: ['src/config-schema-board.test.ts', 'src/config-schema.test.ts'],
-    to: 'src/core/config/config-schema.ts',
-  },
-  {
-    from: 'src/config-sections.ts',
-    subject: 'config',
-    tests: ['src/config-sections.test.ts'],
-    to: 'src/core/config/config-sections.ts',
-  },
-  {
-    from: 'src/config.ts',
-    subject: 'config',
-    tests: ['src/config.test.ts'],
-    to: 'src/core/config/config.ts',
-  },
-  {
-    from: 'src/loop/session-readings.ts',
-    subject: 'loop',
-    tests: [],
-    to: 'src/core/loop/session-readings.ts',
-  },
-  {
-    from: 'src/loop/sessions.ts',
-    subject: 'loop',
-    tests: [
-      'src/loop/sessions-decisions.test.ts',
-      'src/loop/sessions-hop.test.ts',
-      'src/loop/sessions-phase.test.ts',
-      'src/loop/sessions-steps.test.ts',
-      'src/loop/sessions-worktree.test.ts',
-      'src/loop/sessions.test.ts',
-    ],
-    to: 'src/core/loop/sessions.ts',
-  },
-  {
-    from: 'src/plan/blocks.ts',
-    subject: 'plan',
-    tests: ['src/plan/blocks.test.ts'],
-    to: 'src/core/plan/blocks.ts',
-  },
-  {
-    from: 'src/plan/parse.ts',
-    subject: 'plan',
-    tests: ['src/plan/parse.test.ts'],
-    to: 'src/core/plan/parse.ts',
-  },
-  {
-    from: 'src/plan/plan-files.ts',
-    subject: 'plan',
-    tests: [],
-    to: 'src/core/plan/plan-files.ts',
-  },
-  {
-    from: 'src/pr/git.ts',
-    subject: 'git',
-    tests: ['src/pr/git.test.ts'],
-    to: 'src/core/git/git.ts',
-  },
-  {
-    from: 'src/utils/claude.ts',
-    subject: 'loop',
-    tests: ['src/utils/claude.test.ts'],
-    to: 'src/core/loop/claude.ts',
-  },
-  {
-    from: 'src/utils/commit.ts',
-    subject: 'git',
-    tests: ['src/utils/commit.test.ts'],
-    to: 'src/core/git/commit.ts',
-  },
-];
 
 /**
  * The barrel files of each subject, sorted. `config` has three. The
  * leaf pair `config-sections.ts` and `config-readers.ts` sits behind
- * `sections.ts`, because `config-schema.ts` imports section files that
- * import that pair back, and one barrel over all of them would close a
- * cycle through every section file. `config-load.ts` sits alone behind
- * `load.ts`, because it imports `src/effort/store/settings.ts`, which
- * imports `index.ts` and `sections.ts` back.
+ * `sections.ts`; it was split off while `config-merged.ts` imported
+ * section files that import that pair back, when one barrel over all of
+ * them would have closed a cycle through every section file. That file
+ * is retired and nothing behind `index.ts` imports a section file, so
+ * the split stands as the move left it. `index.ts` holds
+ * `config-items.ts`, `config-schema.ts`, `core-section.ts`, `section.ts`
+ * and `config.ts`. `config-load.ts` sits alone behind `load.ts`,
+ * because it imports `src/effort/store/settings.ts`, which imports
+ * `src/config-registry.ts`, which imports `index.ts` back, and
+ * `sections.ts` directly.
  *
  * `plan` has two. The leaf `blocks.ts` sits alone behind
  * `block-reader.ts`, because `parse.ts` imports `src/utils/tracker.ts`,
@@ -209,22 +84,41 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * a cycle through the tracker. `index.ts` holds `parse.ts` and
  * `plan-files.ts`.
  *
- * `loop` has two. `session-readings.ts` sits alone behind
+ * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
+ * file under `src/` and so reaches nothing that imports it back.
+ *
+ * `loop` has three. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
- * that file imports `index.ts` back. `index.ts` holds `sessions.ts`
- * and `claude.ts`, which share it because neither reaches a file that
- * imports it back.
+ * that file imports `index.ts` back. `hop-record.ts` sits alone behind
+ * `hops.ts`, because `src/next/hop-record.ts` imports it by value and
+ * was reached by value from `sessions.ts`, through
+ * `src/loop/session-record-parse.ts`, when the split was made, so
+ * `index.ts` over it would have closed a cycle; that parser has since
+ * moved here as `session-record-parse.ts` and imports `hop-record.ts`
+ * by path. `index.ts` holds `sessions.ts`, `claude.ts`,
+ * `session-env.ts` and `suite-failure.ts`, which share it because none
+ * reaches a file that imports it back; the parser's names reach it
+ * through `sessions.ts`.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
-  adapters: ['src/core/adapters/index.ts'],
-  command: ['src/core/command/index.ts'],
-  config: ['src/core/config/index.ts', 'src/core/config/load.ts', 'src/core/config/sections.ts'],
-  git: ['src/core/git/index.ts'],
-  loop: ['src/core/loop/index.ts', 'src/core/loop/readings.ts'],
-  output: ['src/core/output/index.ts'],
-  plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
+  adapters: ['packages/rafa/src/core/adapters/index.ts'],
+  command: ['packages/rafa/src/core/command/index.ts'],
+  config: [
+    'packages/rafa/src/core/config/index.ts',
+    'packages/rafa/src/core/config/load.ts',
+    'packages/rafa/src/core/config/sections.ts',
+  ],
+  git: ['packages/rafa/src/core/git/index.ts'],
+  loop: [
+    'packages/rafa/src/core/loop/hops.ts',
+    'packages/rafa/src/core/loop/index.ts',
+    'packages/rafa/src/core/loop/readings.ts',
+  ],
+  output: ['packages/rafa/src/core/output/index.ts'],
+  plan: ['packages/rafa/src/core/plan/block-reader.ts', 'packages/rafa/src/core/plan/index.ts'],
+  runtime: ['packages/rafa/src/core/runtime/index.ts'],
 };
 
 /**
@@ -239,50 +133,13 @@ export function baseName(path: string): string {
 
 /**
  * The folder a subject's files move into, with its closing `/`:
- * `config` gives `src/core/config/`.
+ * `config` gives `packages/rafa/src/core/config/`.
  *
  * @param subject - The subject.
- * @returns Its folder under `src/core/`.
+ * @returns Its folder under {@link CORE_FOLDER}.
  */
 export function subjectFolder(subject: CoreSubject): string {
   return `${CORE_FOLDER}${subject}/`;
-}
-
-/**
- * Where a colocated test file goes: into its file's subject folder, under
- * its own base name.
- *
- * @param subject - The subject its file moves into.
- * @param test - The test file's path today.
- * @returns Its path under `src/core/`.
- */
-export function testTarget(subject: CoreSubject, test: string): string {
-  return `${subjectFolder(subject)}${baseName(test)}`;
-}
-
-/**
- * Every path that changes, a moving file first and its test files after
- * it, in the order of `moves`.
- *
- * @param moves - The moves to spread; {@link CORE_MOVES} unless a test plants its own.
- * @returns One entry per file and per test file.
- */
-export function movedPaths(moves: readonly CoreMove[] = CORE_MOVES): readonly MovedPath[] {
-  return moves.flatMap((move) => [
-    { from: move.from, to: move.to },
-    ...move.tests.map((test) => ({ from: test, to: testTarget(move.subject, test) })),
-  ]);
-}
-
-/**
- * The path under `src/core/` of a file or test file that moves.
- *
- * @param path - A repository-relative path as it is today.
- * @param moves - The moves to read; {@link CORE_MOVES} unless a test plants its own.
- * @returns Its path after the move, or `undefined` when it is not listed.
- */
-export function movedTo(path: string, moves: readonly CoreMove[] = CORE_MOVES): string | undefined {
-  return movedPaths(moves).find((moved) => moved.from === path)?.to;
 }
 
 /**
@@ -303,43 +160,42 @@ export function barrelPaths(
  * Whether a path is one of the listed barrels.
  *
  * @param path - A repository-relative path.
- * @returns `true` when a file outside `src/core/` may import it.
+ * @returns `true` when a file outside core may import it.
  */
 export function isCoreBarrel(path: string): boolean {
   return barrelPaths().includes(path);
 }
 
 /**
- * The paths claimed more than once across the moves and the barrels. A
- * target is claimed by each file, test file or barrel that lands on it,
- * and a path today is claimed by each entry that moves away from it. So
- * the check answers two targets on one path, one file listed twice, and a
- * target that is the old path of another entry. Pure: it reads the lists
- * handed in and never the tree.
+ * Whether a path is a core file: under one of the core folders, or one of
+ * the named files.
  *
- * @param moves - The moves to check.
- * @param barrels - The barrels by subject to check.
- * @returns One entry per path claimed twice or more, sorted by path; empty when none collide.
+ * @param path - A repository-relative path.
+ * @param folders - The core folders; {@link CORE_FOLDERS} unless a test plants its own.
+ * @param named - The named files; {@link CORE_NAMED_FILES} unless a test plants its own.
+ * @returns `true` when the path is core's.
  */
-export function findCollisions(
-  moves: readonly CoreMove[],
-  barrels: Readonly<Partial<Record<CoreSubject, readonly string[]>>>,
-): readonly Collision[] {
-  const claims = new Map<string, readonly string[]>();
-  const claim = (path: string, phrase: string): void => {
-    claims.set(path, [...(claims.get(path) ?? []), phrase]);
-  };
-  for (const moved of movedPaths(moves)) {
-    claim(moved.from, `moves to ${moved.to}`);
-    claim(moved.to, `target of ${moved.from}`);
-  }
-  for (const [subject, paths] of Object.entries(barrels)) {
-    for (const path of paths) {
-      claim(path, `barrel of ${subject}`);
-    }
-  }
-  return [...claims.entries()]
-    .filter(([, phrases]) => phrases.length > 1)
-    .map(([path, phrases]) => ({ claims: [...phrases].sort(), path }))
-    .sort((a, b) => a.path.localeCompare(b.path));
+export function isCoreFile(
+  path: string,
+  folders: readonly string[] = CORE_FOLDERS,
+  named: readonly string[] = CORE_NAMED_FILES,
+): boolean {
+  return folders.some((folder) => path.startsWith(folder)) || named.includes(path);
+}
+
+/**
+ * Whether a sweep reads a path as one of core's own files: a core file,
+ * or a test parked under {@link CORE_PARKED_TESTS}.
+ *
+ * @param path - A repository-relative path.
+ * @param folders - The core folders; {@link CORE_FOLDERS} unless a test plants its own.
+ * @param named - The named files; {@link CORE_NAMED_FILES} unless a test plants its own.
+ * @returns `true` when the path is core's or a parked test.
+ */
+export function isCoreRead(
+  path: string,
+  folders: readonly string[] = CORE_FOLDERS,
+  named: readonly string[] = CORE_NAMED_FILES,
+): boolean {
+  return isCoreFile(path, folders, named) || path.startsWith(CORE_PARKED_TESTS);
 }

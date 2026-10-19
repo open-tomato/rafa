@@ -27,12 +27,13 @@ import type { EpicState } from './epics.js';
 import type { BoardComment, IssueBoard } from './issue-board.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { RoadmapPullRequest } from './roadmap.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, test } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { CommandExit } from '../core/command/index.js';
 
 import {
   applyHorizonChange,
@@ -292,6 +293,35 @@ describe('readHorizonChange on an in-progress epic', () => {
     expect(reading.problems).toHaveLength(2);
     expect(reading.problems[0]).toStartWith('the branches on origin could not be read');
     expect(reading.problems[1]).toBe('the open pull requests could not be read, so none is named: gh: HTTP 502');
+  });
+});
+
+describe('readHorizonChange under the configured branch template', () => {
+  /** Epic 40 with open members 12 and 14, nothing closed, so only a claim makes it in-progress. */
+  const OPEN_ONLY = [epic40(), member(12), member(14)];
+  /** Member 12's only branch, under `work/{stub}`, held here and pushed. */
+  const WORK_BRANCH: GitFixture = { local: ['refs/heads/main', 'refs/heads/work/rafa-12-x'], pushed: ['refs/heads/work/rafa-12-x'] };
+
+  test('reads an epic whose member\'s only branch is work/rafa-12-x as in-progress under work/{stub}, naming the branch', async () => {
+    const { input } = seams({ issues: OPEN_ONLY, git: WORK_BRANCH });
+    const reading = await readHorizonChange({ ...input, branchTemplate: 'work/{stub}' });
+    expect(reading.state).toBe('in-progress');
+    expect(reading.work).toEqual({ branches: ['work/rafa-12-x'], pullRequests: [] });
+  });
+
+  test('reads the same epic as backlog with no work with the template left out (control)', async () => {
+    const { input, gitCalls } = seams({ issues: OPEN_ONLY, git: WORK_BRANCH });
+    const reading = await readHorizonChange(input);
+    // The scan read the same refs, so the backlog reading is the template's doing alone.
+    expect(gitCalls.map((call) => call[0])).toEqual(['for-each-ref', 'ls-remote']);
+    expect(reading.state).toBe('backlog');
+    expect(reading.work).toBeNull();
+  });
+
+  test('reads no claim from a feat/ branch under work/{stub}: only the configured template is read', async () => {
+    const { input } = seams({ issues: OPEN_ONLY, git: { local: ['refs/heads/feat/rafa-12-x'] } });
+    const reading = await readHorizonChange({ ...input, branchTemplate: 'work/{stub}' });
+    expect(reading.state).toBe('backlog');
   });
 });
 

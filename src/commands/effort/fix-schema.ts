@@ -2,7 +2,7 @@
  * `rafa effort fix-schema [--dry-run]`: the project's SQLite effort
  * store, when this rafa refuses it for a reason a rebuild repairs,
  * rebuilt at the migrations this rafa knows by `fixStoreSchema`
- * (`src/effort/store/fix-schema.ts`, whose note is the long form).
+ * (`packages/rafa/src/effort/store/fix-schema.ts`, whose note is the long form).
  * Starts no Claude session and declares no `spends`.
  *
  * The decision is `planSchema`'s. A store this rafa uses is left alone,
@@ -18,7 +18,7 @@
  * migrations can be installed, that comes first.
  *
  * The swap is refused while any loop session under the project reads
- * `running` or `paused` (`readSessions`, `src/core/loop/sessions.ts`), since
+ * `running` or `paused` (`readSessions`, `packages/rafa/src/core/loop/sessions.ts`), since
  * a loop writing the store while it is renamed would lose those writes,
  * and from a development build, whose migrations may be a branch's. A
  * dry run reads the store and writes only its own parallel file, which it
@@ -32,16 +32,17 @@
  * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
  * too; this file re-exports none of it.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
-import type { FixSchemaResult } from '../../effort/store/fix-schema.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { FixSchemaResult } from '@open-tomato/rafa/store/fix-schema';
 
-import { CommandExit } from '../../core/command/index.js';
-import { readSessions } from '../../core/loop/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { readSessions } from '@open-tomato/rafa/core/loop';
+import { fixStoreSchema, SchemaFixRefusal } from '@open-tomato/rafa/store/fix-schema';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { fileStamp } from '../../effort/file-stamp.js';
-import { fixStoreSchema, SchemaFixRefusal } from '../../effort/store/fix-schema.js';
-import { sqliteStorePath } from '../../effort/store/sqlite.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -66,7 +67,7 @@ export interface FixSchemaCommandSeams {
  * The done line's sentence on identity, shared by `effort fix-schema`,
  * `effort migrate` and `effort merge`: the file `swapped` names keeps the
  * store's id, and the backup, a copy, takes a new one once renamed back
- * (`carryStoreIdentity`, `src/effort/store/store-meta.ts`).
+ * (`carryStoreIdentity`, `packages/rafa/src/effort/store/store-meta.ts`).
  */
 export function keepsIdLine(swapped: string): string {
   return `The ${swapped} keeps the store's id; the backup is a copy, so renamed back it takes a new id on its`

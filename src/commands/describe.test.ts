@@ -28,12 +28,14 @@
  * which compares two refusals, and 8 more across the roster, help, entry
  * and builder suites.
  */
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { DescribeDocument } from '../cli/describe.js';
 import type { DispatchOptions, DispatchOutcome } from '../cli/dispatch.js';
 import type { ModuleImporter } from '../cli/modules.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { CliEvent } from '../ports/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../adapter-registry.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

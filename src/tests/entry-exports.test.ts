@@ -1,7 +1,15 @@
 /**
  * Pins the export names of the five entry barrels, as read before the
- * move of #905 put any file under `src/core/`. The move is paths only: a
+ * move of #905 put any file under `packages/rafa/src/core/`. The move is paths only: a
  * barrel that gains or loses a name, runtime value or type, fails here.
+ *
+ * It also pins `src/config-registry.ts`, the module the merged schema's
+ * names moved to from the core config barrel (`SETTINGS`,
+ * `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
+ * `knownKeysAbove`), with the list of sections it registers and the
+ * load hook it sets, `handConfigToLogger`, and the root that registers
+ * them, `registerCoreConfigSections`. It is no published entry;
+ * `src/index.ts` takes `CONFIG_DEFAULTS` and that root from it.
  *
  * Names are read with the TypeScript checker, so type-only exports count.
  * A deliberate change to a published name edits the list below in the
@@ -29,6 +37,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'CONFIG_DEFAULTS',
     'CONFIG_FILE',
     'CONFIG_VERSIONS',
+    'CORE_ADAPTERS',
     'CORE_ADAPTER_REGISTRY',
     'CheckOutcome',
     'ClaudeSettingSource',
@@ -177,6 +186,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'WirePayload',
     'WireRow',
     'WireValue',
+    'activeAdapterRegistry',
     'configFilePath',
     'createAdapterRegistry',
     'decodeWirePayload',
@@ -202,9 +212,13 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'prerequisitesPathForPlan',
     'readConfigFile',
     'readRafaBlocks',
+    'registerAdapters',
+    'registerCoreAdapters',
+    'registerCoreConfigSections',
     'renderInjection',
     'resolveConfig',
     'resolveScope',
+    'restoreAdapters',
     'runPreflight',
     'runShellProbe',
     'scopeAt',
@@ -212,6 +226,17 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'selfAndAncestors',
     'startCommand',
     'validateManifest',
+  ],
+  'src/config-registry.ts': [
+    'CONFIG_DEFAULTS',
+    'CONFIG_SECTIONS',
+    'SECTIONS',
+    'SETTINGS',
+    'SETTING_BY_KEY',
+    'SETTING_NAMES',
+    'handConfigToLogger',
+    'knownKeysAbove',
+    'registerCoreConfigSections',
   ],
   'src/plan/index.ts': [
     'CheckOutcome',
@@ -287,7 +312,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'runPreflight',
     'runShellProbe',
   ],
-  'src/effort/store/index.ts': [
+  'packages/rafa/src/effort/store/index.ts': [
     'AppendResult',
     'CommitEffortRow',
     'EFFORT_KEY_PROJECTIONS',
@@ -329,7 +354,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'openSqliteStore',
     'selectEffortStore',
   ],
-  'src/ports/index.ts': [
+  'packages/rafa/src/ports/index.ts': [
     'ApiExchange',
     'AppendResult',
     'BlessedBundle',
@@ -345,6 +370,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'EffortRow',
     'EffortRowByKind',
     'EffortRowKind',
+    'FiledIssue',
     'GeneratedPlan',
     'InstinctRecord',
     'Issue',

@@ -75,9 +75,10 @@ import type { RunDirs } from './checkout.js';
 import type { RunBranchRequest } from './run-setup.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { createGitRunner } from '../core/git/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { readCheckedOutBranch } from '../utils/git.js';
 
 import { resolveRunDirs } from './checkout.js';
@@ -99,6 +100,11 @@ export interface RunCheckoutRequest {
   readonly planStub: string | null;
   /** The words of the run's line. */
   readonly args: readonly string[];
+  /**
+   * `naming.branch`, the template the branch the run creates is named
+   * from; `feat/{stub}` when left out.
+   */
+  readonly branchTemplate?: string;
 }
 
 /** The run's two directories and the branch its checkout is on. */
@@ -180,7 +186,13 @@ export async function settleRunCheckout(
     const stands: Pick<RunBranchRequest, 'base' | 'standing'> = startedOn === null
       ? { base: runBase(), standing: 'no-branch' }
       : { base: startedOn };
-    const branch = await (seams.offer ?? resolveRunBranch)({ checkout: started.checkout, planStub, ...stands, args });
+    const branch = await (seams.offer ?? resolveRunBranch)({
+      checkout: started.checkout,
+      planStub,
+      ...stands,
+      args,
+      branchTemplate: request.branchTemplate,
+    });
     return Object.freeze({ projectRoot, checkout: started.checkout, branch });
   }
 
@@ -193,6 +205,7 @@ export async function settleRunCheckout(
     worktreeDir: request.worktreeDir,
     planStub,
     base,
+    branchTemplate: request.branchTemplate,
   });
   return Object.freeze({ projectRoot, checkout: worktree.path, branch: worktree.branch });
 }

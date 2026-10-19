@@ -27,11 +27,12 @@
  * such as one for an id no issue holds.
  */
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { Issue, TrackerKind } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Issue, TrackerKind } from '@open-tomato/rafa/ports';
 
 import { expectOneArgument } from '../plan/plan-files.js';
 
+import { ISSUE_SHOW_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueRef,
@@ -89,36 +90,7 @@ export async function showIssue(context: RafaContext, seams: IssueSeams): Promis
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueShowCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue show',
-    subject: 'issue',
-    action: 'show',
-    summary: 'show one issue on the tracker: its fields, then its body',
-    description: 'Reads one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
-      + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-      + ' The id is the issue number on that tracker, so on a tracker fallen back to it names a different'
-      + ' issue. Prints the tracker, the id, the URL when there is one, the title, state, type, module and'
-      + ' priority, then the body. With `--output=json` the tracker and the issue are the data of the'
-      + ' terminal result event.',
-    args: [
-      {
-        name: 'id',
-        description: 'The issue id on the tracker: a GitHub issue number, or the number of a file under `.rafa/issues/`.',
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa issue show 12',
-        note: 'Prints issue 12 on the tracker the chain lands on, its fields and then its body.',
-      },
-      {
-        cmd: 'rafa issue show 12 --output=json',
-        note: 'Writes a start event, then a result event whose data holds the tracker and the issue.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_SHOW_DECLARATION,
     run: async (context) => {
       const shown = await showIssue(context, seams);
       if (context.outputMode === 'json') {

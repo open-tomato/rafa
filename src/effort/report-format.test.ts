@@ -46,21 +46,25 @@
  * three.
  */
 import type { BudgetedSession } from './report-budgets.js';
+import type { PlanBugKinds } from './report-kinds.js';
 import type { EffortGroup, EffortReport, GroupKind } from './report.js';
-import type { PreflightHalt } from './store/preflight.js';
-import type { TaskReportTally } from './store/reports.js';
+import type { PreflightHalt } from '@open-tomato/rafa/store/preflight';
+import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
 
 import { describe, expect, it } from 'bun:test';
 
 import {
+  formatBugKinds,
   formatBudgets,
   formatCount,
+  formatDocOnlyBugs,
   formatHistogram,
   formatMinutes,
   formatPreflightHalts,
   formatReport,
   formatReportHeader,
   formatReportTable,
+  formatStoredSections,
   formatTaskReports,
 } from './report-format.js';
 import { emptyGroup } from './report.js';
@@ -85,6 +89,8 @@ function plantReport(fields: Partial<EffortReport> = {}): EffortReport {
     taskReports: [],
     preflightHalts: [],
     budgets: [],
+    docOnlyBugs: { bugs: 0, docOnly: 0 },
+    bugKinds: { plans: [], problem: null },
     ...fields,
   };
 }
@@ -470,5 +476,100 @@ describe('formatBudgets', () => {
     expect(filtered).toHaveLength(8);
     expect(formatBudgets(plantReport({ budgets: BUDGETS })).join('\n'))
       .not.toContain('narrow');
+  });
+});
+
+describe('formatDocOnlyBugs', () => {
+  it('writes the count beside the bugs it was taken over, on one line after a blank one', () => {
+    expect(formatDocOnlyBugs({ bugs: 1234, docOnly: 3 })).toEqual([
+      '',
+      'filed bugs naming only documentation: 3 of 1,234',
+    ]);
+  });
+
+  it('writes a count of zero when bugs are stored, and nothing when none is', () => {
+    expect(formatDocOnlyBugs({ bugs: 27, docOnly: 0 })).toEqual([
+      '',
+      'filed bugs naming only documentation: 0 of 27',
+    ]);
+    expect(formatDocOnlyBugs({ bugs: 0, docOnly: 0 })).toEqual([]);
+  });
+
+  it('ends the report and the stored sections, after the budgets', () => {
+    const full = { ...REPORT, taskReports: TALLIES, preflightHalts: HALTS, budgets: BUDGETS };
+    const counted = { ...full, docOnlyBugs: { bugs: 5, docOnly: 2 } };
+    const line = 'filed bugs naming only documentation: 2 of 5';
+
+    expect(formatStoredSections(counted)).toEqual([
+      ...formatTaskReports(full),
+      ...formatPreflightHalts(full),
+      ...formatBudgets(full),
+      '',
+      line,
+    ]);
+    expect(formatReport(counted)).toEqual([...formatReport(full), '', line]);
+
+    // The control: the same report with no bug stored holds no such line.
+    expect(formatReport(full).join('\n')).not.toContain('filed bugs');
+  });
+});
+
+/** One plan's counts, every kind at zero but those named. */
+function plantPlan(
+  planStub: string | null,
+  kinds: Partial<PlanBugKinds['kinds']>,
+  filed: number,
+): PlanBugKinds {
+  const counts = {
+    'bug': 0, 'own-fallout': 0, 'own-gap': 0, 'convention': 0, 'docs': 0, 'machine': 0, ...kinds,
+  };
+  const entries = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  return { planStub, entries, kinds: counts, filed, filedShare: filed / entries };
+}
+
+/** A plan with an entry of every kind, a wider one with two, and the rows under no plan. */
+const PLANS: readonly PlanBugKinds[] = [
+  plantPlan('rafa-1077-spec-what-plan-broke', {
+    'machine': 1, 'docs': 1, 'convention': 1, 'own-gap': 1, 'own-fallout': 1, 'bug': 2,
+  }, 1),
+  plantPlan('short', { 'own-fallout': 1200 }, 0),
+  plantPlan(null, { bug: 3 }, 2),
+];
+
+describe('formatBugKinds', () => {
+  it('writes one line per plan, the kinds in the order of BUG_KINDS, after a heading', () => {
+    expect(formatBugKinds({ plans: PLANS, problem: null })).toEqual([
+      '',
+      'out-of-scope entries by routed kind: 3 plans, and the share filed',
+      'plan                            entries  filed  share  kinds',
+      'rafa-1077-spec-what-plan-broke        7      1    14%  bug=2 own-fallout=1 own-gap=1 convention=1 docs=1 machine=1',
+      'short                             1,200      0     0%  own-fallout=1,200',
+      '(no plan)                             3      2    67%  bug=3',
+    ]);
+  });
+
+  it('counts one plan as a plan, and writes nothing when no entry was routed', () => {
+    expect(formatBugKinds({ plans: PLANS.slice(2), problem: null })[1])
+      .toBe('out-of-scope entries by routed kind: 1 plan, and the share filed');
+    expect(formatBugKinds({ plans: [], problem: null })).toEqual([]);
+  });
+
+  it('writes the problem in place of the table', () => {
+    expect(formatBugKinds({ plans: [], problem: 'cannot read the bug routes in x: boom' })).toEqual([
+      '',
+      'out-of-scope entries by routed kind: cannot read the bug routes in x: boom',
+    ]);
+  });
+
+  it('ends the report and the stored sections, after the doc-only bug line', () => {
+    const full = { ...REPORT, budgets: BUDGETS, docOnlyBugs: { bugs: 5, docOnly: 2 } };
+    const routed = { ...full, bugKinds: { plans: PLANS.slice(2), problem: null } };
+    const section = formatBugKinds(routed.bugKinds);
+
+    expect(formatStoredSections(routed)).toEqual([...formatStoredSections(full), ...section]);
+    expect(formatReport(routed)).toEqual([...formatReport(full), ...section]);
+
+    // The control: the same report with no route stored holds no such line.
+    expect(formatReport(full).join('\n')).not.toContain('routed kind');
   });
 });

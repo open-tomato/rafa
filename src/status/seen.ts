@@ -43,17 +43,18 @@
  * `.rafa/` is gitignored whole, so the file is never tracked.
  */
 import type { WorktreeSeams } from '../cleanup/index.js';
-import type { RafaConfig } from '../core/config/index.js';
-import type { PidProbe, SessionState } from '../core/loop/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PidProbe, SessionState } from '@open-tomato/rafa/core/loop';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readSessions, SESSION_STATES } from '@open-tomato/rafa/core/loop';
+import { readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
+
 import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
-import { messageOf } from '../core/config/sections.js';
-import { readSessions, SESSION_STATES } from '../core/loop/index.js';
-import { readSessionChecklist } from '../core/loop/readings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 import { scopeAt } from '../project/scope.js';
 

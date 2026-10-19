@@ -10,7 +10,7 @@
  */
 import type { ClaimRow } from './claims.js';
 import type { BlockedSession, PlaceReading, SectionUnread, StatusSections } from './sections.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
 import { describe, expect, it } from 'bun:test';
 

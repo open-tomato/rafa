@@ -63,12 +63,10 @@
  * action. A hidden `exec` action takes the actions typed through it out
  * with it.
  */
-import type { ArgSpec, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
-import type { CommandSpend } from './spends.js';
-import type { CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from '../core/command/index.js';
+import type { ArgSpec, FlagSpec , CommandSpend , CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { isTopLevel } from '../core/command/index.js';
+import { isTopLevel } from '@open-tomato/rafa/core/command';
 
 import { mountKey } from './registry.js';
 

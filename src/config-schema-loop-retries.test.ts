@@ -9,21 +9,26 @@
  * the module, so a module that renames the key or moves the default
  * fails rather than agreeing with itself.
  */
+import type { ConfigSetting } from '@open-tomato/rafa/core/config';
+
 import { describe, expect, it } from 'bun:test';
 
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import {
   LOOP_RETRIES_DEFAULTS,
   LOOP_RETRIES_MAX,
   LOOP_RETRIES_MIN,
+  LOOP_RETRIES_SECTION,
   loopRetries,
 } from './config-schema-loop-retries.js';
-import {
-  CONFIG_DEFAULTS,
-  ConfigError,
-  parseConfigText,
-  resolveConfig,
-  SETTINGS,
-} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
@@ -118,5 +123,38 @@ describe('through a file', () => {
     const error = refusal(() => parseConfigText(`loop:\n  retries: ${spelled}\n`, PATH));
 
     expect(error.message).toContain(`${KEY} is ${spelled}, ${EXPECTED}`);
+  });
+});
+
+describe('the section', () => {
+  it('is package loop-retries, defining its keys in this order with these defaults, with no check', () => {
+    expect(LOOP_RETRIES_SECTION.package).toBe('loop-retries');
+    expect(Object.entries(LOOP_RETRIES_SECTION.settings).map(([setting, spec]) => [setting, spec?.key])).toEqual([
+      ['loopRetries', 'loop.retries'],
+    ]);
+    expect(LOOP_RETRIES_SECTION.defaults).toEqual({
+      loopRetries: false,
+    });
+    expect(LOOP_RETRIES_SECTION.checks ?? []).toEqual([]);
+  });
+
+  it('hands in the very specs SETTINGS reads, frozen', () => {
+    const entries = Object.entries(LOOP_RETRIES_SECTION.settings);
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [setting, spec] of entries) {
+      expect([setting, SETTINGS[setting as ConfigSetting] === spec]).toEqual([setting, true]);
+    }
+    expect(Object.isFrozen(LOOP_RETRIES_SECTION)).toBe(true);
+    expect(Object.isFrozen(LOOP_RETRIES_SECTION.settings)).toBe(true);
+    expect(Object.isFrozen(LOOP_RETRIES_SECTION.defaults)).toBe(true);
+  });
+
+  it('registers alone, each of its settings paired with a default', () => {
+    const registry = mergeConfigSections(EMPTY_CONFIG_REGISTRY, [LOOP_RETRIES_SECTION]);
+
+    expect(registry.sections.map((section) => section.package)).toEqual(['loop-retries']);
+    expect(Object.keys(registry.settings)).toEqual(Object.keys(LOOP_RETRIES_SECTION.settings));
+    expect(Object.keys(registry.defaults).sort()).toEqual(Object.keys(LOOP_RETRIES_SECTION.settings).sort());
   });
 });

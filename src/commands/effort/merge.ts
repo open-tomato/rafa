@@ -1,7 +1,7 @@
 /**
  * `rafa effort merge <file> [--dry-run]`: another device's effort store
  * file unioned into this project's store by `mergeStore`
- * (`src/effort/store/merge-store.ts`, whose note is the long form).
+ * (`packages/rafa/src/effort/store/merge-store.ts`, whose note is the long form).
  * Starts no Claude session and declares no `spends`.
  *
  * This store is the one every other command would open: under
@@ -30,24 +30,25 @@
  * failed), each changing no byte of either file. Exit code 0 otherwise.
  * In json mode the `MergeResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { PidProbe } from '../../core/loop/index.js';
-import type { MergeOptions, MergeResult, TableMerge } from '../../effort/store/merge-store.js';
-import type { SqliteMigration } from '../../effort/store/migrations.js';
-import type { ProjectIdentity } from '../../effort/store/store-identity.js';
-import type { RuntimeIdentity } from '../../runtime/identity.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { PidProbe } from '@open-tomato/rafa/core/loop';
+import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
+import type { MergeOptions, MergeResult, TableMerge } from '@open-tomato/rafa/store/merge-store';
+import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
+import type { ProjectIdentity } from '@open-tomato/rafa/store/store-identity';
 
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../../core/command/index.js';
-import { messageOf } from '../../core/config/sections.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DevelopmentBuildRefusedError } from '@open-tomato/rafa/store/development-build';
+import { effortStoreDir } from '@open-tomato/rafa/store/location';
+import { MergeRefusal, mergeStore } from '@open-tomato/rafa/store/merge-store';
+import { UnionSchemaMismatch } from '@open-tomato/rafa/store/merge-union';
+import { RebuildRefusal } from '@open-tomato/rafa/store/rebuild-aside';
+import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
+
 import { fileStamp } from '../../effort/file-stamp.js';
-import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
-import { effortStoreDir } from '../../effort/store/location.js';
-import { MergeRefusal, mergeStore } from '../../effort/store/merge-store.js';
-import { UnionSchemaMismatch } from '../../effort/store/merge-union.js';
-import { RebuildRefusal } from '../../effort/store/rebuild-aside.js';
-import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
 import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { keepsIdLine } from './fix-schema.js';
@@ -196,12 +197,12 @@ function probeSeams(seams: MergeCommandSeams): Partial<MergeOptions> {
 }
 
 /** Runs one invocation. See the module note. */
-export function runMerge(context: RafaContext, seams: MergeCommandSeams): void {
+export async function runMerge(context: RafaContext, seams: MergeCommandSeams): Promise<void> {
   const file = expectOneArgument(context.args, MERGE_USAGE);
   const dryRun = readSwitch(DRY_RUN_FLAG, context.flags[DRY_RUN_FLAG], `Usage: ${MERGE_USAGE}`);
   const project = requireProject(context, COMMAND_NAME);
   const path = mergeTargetPath(context, project.root);
-  const backend = resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message)).store;
+  const backend = (await resolveProjectConfig(project, COMMAND_NAME, (message) => context.output.warn(message))).store;
   const now = seams.now ?? ((): Date => new Date());
   const otherPath = resolve((seams.cwd ?? ((): string => process.cwd()))(), file);
 
@@ -268,7 +269,7 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      runMerge(context, seams);
+      await runMerge(context, seams);
       await Promise.resolve();
     },
   };

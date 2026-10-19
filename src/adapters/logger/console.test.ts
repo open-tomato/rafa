@@ -4,7 +4,7 @@
  * colour on the level prefix alone, and a child's bindings. The rules
  * every logger shares are in the contract suite (`contract.ts`).
  */
-import type { LogEntry } from '../../ports/index.js';
+import type { LogEntry } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 

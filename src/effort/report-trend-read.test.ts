@@ -10,22 +10,25 @@
 import type { TrendInputs } from './report-trend-read.js';
 import type { TrendOptions, TrendSessionRow } from './report-trend.js';
 
+import '../adapter-registry.js';
+
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../core/config/index.js';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
+import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { plantProject, plantProjectConfig } from '../tests/cli-capture.js';
-import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
 import { readTrendInputs, trendReportOf } from './report-trend-read.js';
 import { summariseTrend } from './report-trend.js';
 import { emptyUsageTotals } from './session-log.js';
-import { writeDispatch } from './store/dispatches.js';
-import { writeTaskReport } from './store/reports.js';
-import { sqliteStorePath, withSqliteStore } from './store/sqlite.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-trend-read-')));
 
@@ -78,17 +81,17 @@ function storeAgent(root: string, sessionId: string, agent: string): void {
 }
 
 describe('readTrendInputs', () => {
-  it('answers no rows, outcomes or agents for a project with no store', () => {
+  it('answers no rows, outcomes or agents for a project with no store', async () => {
     const { root, home } = plant();
 
-    const inputs = readTrendInputs(root, home);
+    const inputs = await readTrendInputs(root, home);
 
     expect([...inputs.rows]).toEqual([]);
     expect(inputs.outcomes.size).toBe(0);
     expect(inputs.agents.size).toBe(0);
   });
 
-  it('reads the stored session rows, each session\'s reported outcome and its dispatched agent by session id', () => {
+  it('reads the stored session rows, each session\'s reported outcome and its dispatched agent by session id', async () => {
     const { root, home } = plant();
     storeRows(root, [row('s-1', 'demo'), row('s-2', 'demo')]);
     writeTaskReport(root, {
@@ -98,7 +101,7 @@ describe('readTrendInputs', () => {
     });
     storeAgent(root, 's-2', 'tdd-guide');
 
-    const inputs = readTrendInputs(root, home);
+    const inputs = await readTrendInputs(root, home);
 
     expect(inputs.rows.map((stored) => stored.sessionId)).toEqual(['s-1', 's-2']);
     expect(inputs.outcomes.get('s-1')).toBe('blocked');

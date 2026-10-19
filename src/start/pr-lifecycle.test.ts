@@ -99,7 +99,6 @@
 import type { PrLifecyclePhases, PrLifecycleSeams } from './pr-lifecycle.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type {
   ChecksReading,
   PrProviderReading,
@@ -108,6 +107,7 @@ import type {
   GitRunner,
   PushOutcome,
 } from '../pr/index.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -116,18 +116,19 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { runClaude } from '@open-tomato/rafa/core/loop';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { CommandExit } from '../core/command/index.js';
-import { runClaude } from '../core/loop/index.js';
-import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
-import { planStubFromPrompt } from '../utils/plan-stamp.js';
 
 import {
   CI_POLL_INTERVAL_MS,
@@ -1080,6 +1081,23 @@ describe('refusedPushReaderIn, over a bare remote and two clones', () => {
     expect(reading.outcome === 'not-lost' && reading.cause).toBe('not-a-claim-branch');
     expect(asked).toBe(0);
   });
+
+  it('reads a branch under the template it is given as a claim branch, and the same branch without it as none', () => {
+    let asked = 0;
+    const readStoreId = (): DeviceStoreId => {
+      asked += 1;
+      return STORE_A;
+    };
+
+    // `scope` is no repository, so the fetch fails: reaching it at all
+    // shows the branch was read as claim branch #7 under the template.
+    const underTemplate = refusedPushReaderIn(scope, readStoreId, 'work/{stub}')('work/rafa-7-x');
+    const withoutTemplate = refusedPushReaderIn(scope, readStoreId)('work/rafa-7-x');
+
+    expect(underTemplate).toMatchObject({ outcome: 'unknown', issue: 7, branch: 'work/rafa-7-x' });
+    expect(withoutTemplate).toMatchObject({ outcome: 'not-lost', cause: 'not-a-claim-branch' });
+    expect(asked).toBe(1);
+  });
 });
 
 describe('PR_LIFECYCLE_SEAMS', () => {
@@ -1200,7 +1218,7 @@ describe('the gate as start() calls it, through runWrapUp', () => {
   it('reads a refused push in the checkout, and the store id at the project root under the run\'s store', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
 
-    expect(gateCall(wrapUpRun())).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),');
+    expect(gateCall(wrapUpRun())).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings), settings.namingBranch),');
     // The `settings` read there is the run's own config, as `start()` hands it over.
     expect(start).toContain('settings: runConfig.config,');
   });

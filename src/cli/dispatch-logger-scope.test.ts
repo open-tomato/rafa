@@ -17,7 +17,7 @@
  *
  *   - **The settings.** One project is planted, whose config sets
  *     `logger.level: error`. A command that loads it inside its `run`
- *     (`loadConfig`, `src/core/config/config-load.ts`) reads `error`
+ *     (`loadConfig`, `packages/rafa/src/core/config/config-load.ts`) reads `error`
  *     from then on; a command that loads nothing stays at the default,
  *     `warn`.
  *   - **The logger.** The dispatcher makes each from the invocation's
@@ -58,9 +58,11 @@
  * case, so a file bun ran earlier in the process leaves nothing a case
  * could read as left behind.
  */
-import type { RafaCommand, RafaContext } from '../core/command/index.js';
-import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Logger } from '@open-tomato/rafa/ports';
+
+import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,10 +71,11 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+
 import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { CommandExit } from '../core/command/index.js';
-import { loadConfig } from '../core/config/load.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
 
@@ -136,9 +139,9 @@ function readOutside(): Left {
 }
 
 /** Loads the config of `context`'s project, as a command does inside its `run`. */
-function loadOwnConfig(context: RafaContext): void {
+async function loadOwnConfig(context: RafaContext): Promise<void> {
   if (context.project === null) throw new Error('the fixture runs inside a project');
-  loadConfig({ root: context.project.root, home: context.project.home }, {}, () => {});
+  await loadConfig({ root: context.project.root, home: context.project.home }, {}, () => {});
 }
 
 /** Writes `name`'s answer, a warning through its output and a `warn` entry through the active logger. */
@@ -207,7 +210,7 @@ describe('two commands dispatched at once', () => {
     const inside: Record<string, Reading> = {};
     const commands = [
       probe('quiet', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         await bothRunning.opened;
         inside['quiet'] = readInside();
         speak(context, 'quiet');
@@ -242,7 +245,7 @@ describe('two commands dispatched at once', () => {
     const inside: Record<string, Reading> = {};
     const commands = [
       probe('quiet', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         await mayEnd.opened;
         inside['quiet'] = readInside();
         speak(context, 'quiet');
@@ -283,7 +286,7 @@ describe('two commands dispatched at once', () => {
         speak(context, 'loud');
       }),
       probe('quiet', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         bothRunning.open();
         await firstEnded.opened;
         inside['quiet'] = readInside();
@@ -321,7 +324,7 @@ describe('two commands dispatched at once', () => {
     let inside: Reading | null = null;
     const commands = [
       probe('ending', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         await bothRunning.opened;
         await end();
       }),
@@ -355,7 +358,7 @@ describe('a command that loads its config inside its run', () => {
     const commands = [
       probe('loads', async (context) => {
         speak(context, 'before');
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         loaded.open();
         await besideSpoke.opened;
         speak(context, 'after');
@@ -397,7 +400,7 @@ describe('seven commands dispatched at once', () => {
     let running = 0;
     const commands = [probe('tagged', async (context) => {
       const tag = Number(context.flags['tag']);
-      if (loads(tag)) loadOwnConfig(context);
+      if (loads(tag)) await loadOwnConfig(context);
       running += 1;
       if (running === COUNT) allRunning.open();
       await (tag === 0
@@ -435,7 +438,7 @@ describe('a command dispatched inside another', () => {
     let inner: CapturedRun | null = null;
     const commands: RafaCommand[] = [
       probe('outer', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         read.push(readInside());
         inner = await ran(commands, ['inner', ...VERBOSE]);
         read.push(readInside());
@@ -466,7 +469,7 @@ describe('a command dispatched inside another', () => {
         speak(context, 'outer');
       }),
       probe('inner', async (context) => {
-        loadOwnConfig(context);
+        await loadOwnConfig(context);
         await Promise.resolve();
         read.push(readInside());
       }),

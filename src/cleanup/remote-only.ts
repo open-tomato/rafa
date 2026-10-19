@@ -28,8 +28,8 @@
  *   4. `origin/<base>` does not reach its tip. A branch the base reaches
  *      is merged, and is not listed here at all.
  *   5. It is not the head of an open pull request.
- *   6. It is not a claim branch (`feat/rafa-<n>`, `../claims/git.ts`)
- *      whose claim another store holds.
+ *   6. It is not a claim branch (the `naming.branch` template with the
+ *      stub, `feat/rafa-<n>-<slug>` by default, `../claims/git.ts`) whose claim another store holds.
  *
  * Every row starts UNticked: {@link RemoteOnlyRow.ticked} is the
  * literal `false`. Nothing here says a row's work is merged, so nothing
@@ -109,13 +109,14 @@
  */
 import type { BranchesUnread } from './branches.js';
 import type { DeviceStoreIds } from '../claims/device.js';
-import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { PullRequests } from '../pr/types.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { holdsClaim } from '../claims/device.js';
 import { claimBranchIssue, readClaimBranch } from '../claims/git.js';
-import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../core/git/index.js';
 
 import { isKept, readRemoteHead } from './branches.js';
 

@@ -28,7 +28,7 @@ of course, and never a reason to chase one issue down a rabbit hole.
 | Check | Line | What is wrong |
 |---|---|---|
 | Effort | `rafa effort dashboard` | cost per task drifting up against the baseline, not explained by the item's size |
-| Bugs | `rafa issue list --type=bug --limit=200` | the open count rising, or bugs filed during this loop that repeat an open one |
+| Bugs | the `Bugs:` and `Filed since` lines of the item's closing output | the open count rising, or a bug filed during this loop that repeats an open one |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
 | CI | `rafa ci status --branch=stretch/<n>` | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
@@ -36,6 +36,12 @@ of course, and never a reason to chase one issue down a rabbit hole.
 A CI failure already red in the local runs is inherited and noted in the pit-stop entry.
 A new failure is filed as one bug after a search for an existing one. A run still in progress
 is read at the next pit stop.
+
+The bugs come from the closing output of `rafa stretch item`: `Bugs: <n> open.`,
+then `Filed since <time>: <n>.` with one indented line per bug filed after the
+last item, open or closed since, as `#<n> <title>: <first line>`. `none` is a
+reading, not a failure. A line that says `not read` names its reason; read the
+bugs with `rafa issue list --type=bug --limit=200` when a reading is not read.
 
 A conflict goes to the resolve plans first:
 
@@ -58,8 +64,9 @@ only after reading the run's last `rafa·` lines.
    happens twice, when the hook rule fires, or when the fix would touch
    anything outside the integration branch.
 
-Anything else you find is filed, not fixed: one issue, after a search for
-an existing one, and the stretch goes on.
+A stale doc line you find is added to the release's stale-docs issue as one
+line, and no issue is filed for it. Every other finding is filed, not fixed:
+one issue, after a search for an existing one, and the stretch goes on.
 
 ## The entry
 

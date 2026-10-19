@@ -1,7 +1,7 @@
 /**
  * Tests for check 4 in its place on `rafa plan create`
- * (`src/commands/plan/refs-check.ts`): which runs the start-of-run pass
- * line is printed on, which specs the check covers, the acceptance read
+ * (`src/commands/plan/refs-check.ts`): the phrase `plan create`
+ * declares for `dangerous.acceptStaleRefs`, which specs the check covers, the acceptance read
  * off the line and the config, and the verifier the command builds.
  *
  * What each reference state does to a run is `src/board/refs-gate.ts`'s
@@ -26,8 +26,8 @@
  *
  * ## The controls
  *
- * Every line the pass line is NOT printed on is paired with the setting
- * on and a board route, where it is; the `--spec` spec that answers null
+ * The phrase's pass line is paired with the same resolution under no
+ * phrase, where it is bare; the `--spec` spec that answers null
  * is paired with the issue spec over the same copy that refuses, and
  * counts the verifiers made, so a check that ran and found nothing
  * cannot pass for one that never ran.
@@ -47,9 +47,9 @@
  */
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { DescribeDocument, DescribedAction } from '../../cli/describe.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,19 +58,20 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+
 import { version } from '../../../package.json';
 import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
-import { acceptStaleRefsPassLine } from '../../board/refs-gate.js';
 import { describeRegistry } from '../../cli/describe.js';
-import { CommandExit } from '../../core/command/index.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { CORE_REGISTRY } from '../index.js';
 
 import {
-  announceCreateRefs,
   checkCreateRefs,
   checkoutRosterWarning,
+  CREATE_DANGEROUS_PHRASES,
   createPlanRefsVerifier,
   planRoster,
   RAFA_PACKAGE_NAME,
@@ -83,6 +84,13 @@ const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-check-')));
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/**
+ * The words the start-of-run line printed for `dangerous.acceptStaleRefs`
+ * before it was folded into the loader's pass line, written out rather
+ * than read off the source.
+ */
+const ACCEPT_STALE_REFS_WORDS = 'check 4 re-stamps every reference of the spec as reviewed and refuses none on this run';
 
 /** The core roster every case hands in: the one a line routed through `CORE_REGISTRY` builds. */
 const CORE_ROSTER = registryRoster(CORE_REGISTRY);
@@ -151,48 +159,16 @@ async function refusal(run: Promise<unknown>): Promise<CommandExit> {
   throw new Error('expected check 4 to refuse');
 }
 
-describe('the dangerous.acceptStaleRefs pass line at the start of a plan create run', () => {
-  it('is printed once, at warn, on --issue and on --next with the setting on', () => {
-    for (const args of [['--issue=20'], ['--next'], ['--next=31', '--no-progress']]) {
-      const { lines, output } = capture();
+describe('the dangerous.acceptStaleRefs line of a plan create run', () => {
+  it('is one line, the loader\'s pass line ending with plan create\'s phrase, in the words the removed start-of-run line said', () => {
+    const resolved = resolveConfig();
+    const on = { ...resolved, config: { ...resolved.config, dangerousAcceptStaleRefs: true } };
 
-      announceCreateRefs(args, true, output);
+    const lines = runWithDangerousPhrases(CREATE_DANGEROUS_PHRASES, () => dangerousPassLines(on));
 
-      expect(lines).toEqual({ info: [], warn: [acceptStaleRefsPassLine()] });
-    }
-  });
-
-  it('is not printed with the setting off', () => {
-    const { lines, output } = capture();
-
-    announceCreateRefs(['--issue=20'], false, output);
-
-    expect(lines).toEqual({ info: [], warn: [] });
-  });
-
-  it('is not printed on --spec or under --dry-run, which check 4 does not cover', () => {
-    for (const args of [['--spec=spec.md'], ['--issue=20', '--dry-run'], ['--next', '--dry-run']]) {
-      const { lines, output } = capture();
-
-      announceCreateRefs(args, true, output);
-
-      expect(lines).toEqual({ info: [], warn: [] });
-    }
-  });
-
-  it('refuses a line naming two sources as the resolution would, before printing anything', () => {
-    const { lines, output } = capture();
-
-    let thrown: unknown = null;
-    try {
-      announceCreateRefs(['--spec=spec.md', '--issue=20'], true, output);
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toBeInstanceOf(CommandExit);
-    expect((thrown as CommandExit).exitCode).toBe(1);
-    expect(lines.warn).toEqual([]);
+    expect(Object.keys(CREATE_DANGEROUS_PHRASES)).toEqual(['dangerous.acceptStaleRefs']);
+    expect(lines).toEqual([`dangerous.acceptStaleRefs: true (command line); ${ACCEPT_STALE_REFS_WORDS}`]);
+    expect(runWithDangerousPhrases(undefined, () => dangerousPassLines(on))).toEqual(['dangerous.acceptStaleRefs: true (command line)']);
   });
 });
 

@@ -105,12 +105,14 @@ import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
-import type { ClaudeSettingSource, TierPin } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { TaskInfo } from '../utils/tracker.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config/sections';
+
+import '../adapter-registry.js';
 
 import {
   existsSync,
@@ -127,16 +129,19 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPrompt , trackerPathFor } from '@open-tomato/rafa/core/plan';
+import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { PORT_VERSIONS } from '../core/adapters/index.js';
-import { CommandExit } from '../core/command/index.js';
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
-import { setActiveOutput } from '../core/output/index.js';
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
-import { readPreflightHalts } from '../effort/store/preflight.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import {
   DEFAULT_GH_HOST,
@@ -146,8 +151,7 @@ import {
   ghUnauthenticatedMessage,
 } from '../pr/preflight-items.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { planStubFromPrompt } from '../utils/plan-stamp.js';
-import { findNextTask, trackerPathFor } from '../utils/tracker.js';
+import { findNextTask } from '../utils/tracker.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';

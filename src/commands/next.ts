@@ -255,7 +255,6 @@
  * whose `pr.provider` is not `gh`, and whatever an action threw for an
  * action that failed, or the native-mode repository read threw.
  */
-import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
@@ -264,9 +263,11 @@ import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { DryEpic, NextSources } from '../next/readings.js';
 import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
+import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
-import { CommandExit , createLinePrompter } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
@@ -294,7 +295,6 @@ import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
 import { REMOTE } from '../start/branch-decision.js';
 
-import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument } from './plan/plan-files.js';
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */
@@ -585,7 +585,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const dryRun = dryRunOf(flagged, ceiling, isTerminal());
   const relations = await openNextRelations(context, seams);
-  const sources = openNextSources(context, seams, {
+  const sources = await openNextSources(context, seams, {
     ...roadmap
       ? { roadmap }
       : {},

@@ -78,60 +78,19 @@
  * last line can be half-written, so an unparsed line is expected data
  * rather than a failure — it is COUNTED, never dropped silently.
  */
+import type {
+  SessionStats,
+  SessionUsageTotals,
+} from '@open-tomato/rafa/store/session-row-types';
+
 import { createReadStream } from 'node:fs';
 import { basename } from 'node:path';
 import { createInterface } from 'node:readline';
 
-/**
- * Every numeric counter under a record's `message.usage`, summed over
- * the whole session. Names are the camelCase of the wire spelling;
- * the two `ephemeral*` members are the `cache_creation` split and the
- * two `*Requests` members the `server_tool_use` one.
- */
-export interface SessionUsageTotals {
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-  ephemeral1hInputTokens: number;
-  ephemeral5mInputTokens: number;
-  webSearchRequests: number;
-  webFetchRequests: number;
-  thinkingTokens: number;
-}
-
-/** One accumulated stats row per session log. */
-export interface SessionStats {
-  /** Log basename without its extension, which is the session uuid. */
-  sessionId: string;
-  /** The path the row was accumulated from. */
-  filePath: string;
-  /** Non-empty lines read. */
-  lineCount: number;
-  /** Lines that parsed to a JSON object. */
-  recordCount: number;
-  /** Lines that did not — malformed JSON, or JSON that is not an object. */
-  unparsedLineCount: number;
-  /** Records by top-level `type`; an absent type is keyed as `unknown`. */
-  recordTypeCounts: Record<string, number>;
-  /** Records with `type: assistant`, which are the billable turns. */
-  assistantRecordCount: number;
-  /** Earliest and latest `timestamp` by instant, not by file order. */
-  firstTimestamp: string | null;
-  lastTimestamp: string | null;
-  /** Records per top-level `gitBranch`, the plan-attribution field. */
-  gitBranchCounts: Record<string, number>;
-  /** Records per `entrypoint`; separates loop from hand-driven traffic. */
-  entrypointCounts: Record<string, number>;
-  /** Records per top-level `effort`; what a session actually ran at. */
-  effortCounts: Record<string, number>;
-  /** Records carrying `isSidechain: true`, which are subagent turns. */
-  sidechainRecordCount: number;
-  /** Records per `message.model`. */
-  modelCounts: Record<string, number>;
-  /** Summed `message.usage` counters. */
-  usage: SessionUsageTotals;
-}
+export type {
+  SessionStats,
+  SessionUsageTotals,
+} from '@open-tomato/rafa/store/session-row-types';
 
 /** Where a row's identity comes from — never from the records themselves. */
 export interface SessionIdentity {

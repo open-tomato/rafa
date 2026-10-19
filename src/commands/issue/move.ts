@@ -47,12 +47,13 @@
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
 import type { MoveProjectOptions } from './move-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { IssueRef, IssueState } from '../../ports/index.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { IssueRef, IssueState } from '@open-tomato/rafa/ports';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES } from '../../adapters/tracker/issue-values.js';
 
+import { ISSUE_MOVE_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   expectTwoArguments,
@@ -91,11 +92,11 @@ export async function moveIssue(context: RafaContext, seams: IssueSeams): Promis
 }
 
 /** The refresh's options for the project the line runs in; its config warnings are dropped, as the chain's reading already printed them. */
-function moveProjectOptions(context: RafaContext, seams: IssueSeams): MoveProjectOptions {
+async function moveProjectOptions(context: RafaContext, seams: IssueSeams): Promise<MoveProjectOptions> {
   const project = issueProject(context);
   const { gh } = seams;
   return {
-    config: issueSubjectConfig(project, () => undefined),
+    config: await issueSubjectConfig(project, () => undefined),
     openGh: (): GhRunner => gh ?? createGhRunner({ cwd: project.root }),
   };
 }
@@ -103,46 +104,10 @@ function moveProjectOptions(context: RafaContext, seams: IssueSeams): MoveProjec
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueMoveCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
-    name: 'issue move',
-    subject: 'issue',
-    action: 'move',
-    summary: 'move one issue on the tracker to a state',
-    description: 'Moves one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
-      + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about,'
-      + ` to one of the states ${ISSUE_STATES.join(', ')}. The id is the issue number on that tracker, so on`
-      + ' a tracker fallen back to it names a different issue. The github tracker holds an issue open or'
-      + ' closed, so it warns for backlog, in-progress, in-review and released, which it cannot hold, and'
-      + ' still exits 0. With `--output=json` the tracker, the ref, the state and the warning are the data'
-      + ' of the terminal result event.',
-    args: [
-      {
-        name: 'id',
-        description: 'The issue id on the tracker: a GitHub issue number, or the number of a file under `.rafa/issues/`.',
-        type: 'string',
-        required: true,
-      },
-      {
-        name: 'state',
-        description: `The state to move the issue to: one of ${ISSUE_STATES.join(', ')}.`,
-        type: 'string',
-        required: true,
-      },
-    ],
-    flags: [],
-    examples: [
-      {
-        cmd: 'rafa issue move 12 done',
-        note: 'Moves issue 12 to done, which closes it on the github tracker.',
-      },
-      {
-        cmd: 'rafa issue move 12 in-progress --output=json',
-        note: 'Writes a start event, then a result event whose data holds the tracker, the ref, the state and any warning.',
-      },
-    ],
-    outputs: ['text', 'json'],
+    ...ISSUE_MOVE_DECLARATION,
     run: async (context) => {
       const moved = await moveIssue(context, seams);
-      const refreshed = await refreshMovedIssue(moved.tracker.kind, moved.ref.externalId, moveProjectOptions(context, seams));
+      const refreshed = await refreshMovedIssue(moved.tracker.kind, moved.ref.externalId, await moveProjectOptions(context, seams));
       const warn = (): void => {
         if (moved.warning !== null) context.output.warn(`${issueName(moved.ref)}: ${moved.warning}`);
         for (const line of refreshed) context.output.warn(line);

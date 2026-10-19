@@ -11,9 +11,9 @@
  *
  * ## What is spawned
  *
- * `bun test [--changed=<commit>] <paths...> --reporter=junit
- * --reporter-outfile=<junitFile>` in `cwd`, with `bun` looked up on the
- * environment's `PATH`. The
+ * `bun test [--changed=<commit>] <paths...> [-t <pattern>]
+ * --reporter=junit --reporter-outfile=<junitFile>` in `cwd`, with `bun`
+ * looked up on the environment's `PATH`. The
  * environment is the one handed in (`process.env` when left out) with
  * `CLAUDECODE` removed: with it set, Bun prints no per-test line, only
  * the counts. `FORCE_COLOR` is removed too ({@link suiteEnv}). Measured
@@ -58,6 +58,16 @@
  *     files, but no test files are affected`, `Ran 0 tests across 0
  *     files.`, exited 0 and wrote NO JUnit file, so such a run reads
  *     `junit: 'missing'` with exit code 0: green, with nothing run.
+ *   - **`-t <pattern>` is a regular expression over the full name with
+ *     its parts joined by a space**, not by ` > `; measured on bun 1.3.14.
+ *     `-t 'grp one \(x\) two'` ran `grp > one (x) two` and the JUnit file
+ *     held the file's other case as `skipped`; `-t 'grp one (x) two'`, the
+ *     parenthesis a group, and `-t 'grp > one \(x\) two'` each matched
+ *     none, printing `regex "..." matched 0 tests` with every case
+ *     `skipped` in the JUnit file (the first exited 1). The pattern is
+ *     handed as written, as its own argv word after `-t`, never through a
+ *     shell; escaping it is the caller's concern
+ *     ({@link SuiteRunOptions.testNamePattern}).
  *   - **The report, counts and summary go to stderr**; a test's own
  *     `console.log` goes to stdout. Reading stderr alone keeps a test
  *     printing ` 5 errors` from changing the counts read here.
@@ -164,9 +174,17 @@
  * field is a list of lists, one per `bun test` process: one for a run,
  * two for a run folded with a second (`start/task-always-run.ts`). A run
  * that wrote no JUnit file holds one empty list.
+ *
+ * ## Every case of the run
+ *
+ * {@link SuiteResult.cases} holds every testcase the JUnit file names,
+ * passed, failed or skipped, each file and name pair once, as
+ * {@link parseJunitCases} reads them; none when the file was not read
+ * (`missing` or `unreadable`). A case `-t` left out is in it as
+ * `skipped`, so a caller tells a case that ran from one that did not.
  */
 import type { UnhandledError } from './unhandled.js';
-import type { SpawnEnv } from '../utils/session-env.js';
+import type { SuiteFailure , SpawnEnv } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';
@@ -183,23 +201,7 @@ export const FORCE_COLOR_ENV = 'FORCE_COLOR';
 /** The variables removed from the environment `bun test` runs in. */
 export const SUITE_ENV_REMOVED: readonly string[] = [CLAUDE_CODE_ENV, FORCE_COLOR_ENV];
 
-/** One failing test: its file, relative to the run's directory, and its full name. */
-export interface SuiteFailure {
-  readonly file: string;
-  /** Its describe names, outermost first, and its own, joined by ` > `. */
-  readonly name: string;
-  /**
-   * The first line of its JUnit failure's message; absent when the
-   * report gave none. Compared by `src/triage/inherited.ts` when present to
-   * identify inherited failures.
-   */
-  readonly message?: string;
-  /**
-   * The first lines of the error Bun printed for it on stderr, trimmed;
-   * absent when it printed none. See the module note.
-   */
-  readonly errorLines?: readonly string[];
-}
+export type { SuiteFailure };
 
 /**
  * How the JUnit file read: `read`, `missing` when Bun wrote none (no
@@ -247,6 +249,18 @@ export interface SuiteResult {
    * note.
    */
   readonly fileOrder?: readonly (readonly string[])[];
+  /**
+   * Every testcase the JUnit file names, with its outcome; none when the
+   * file was not read, and absent from a result no run made. See the
+   * module note, "Every case of the run".
+   */
+  readonly cases?: readonly JunitCase[];
+  /**
+   * Whether the spawner killed the run at its deadline, as
+   * {@link SuiteSpawnResult.timedOut} answered it; absent when the
+   * spawner keeps no deadline, as {@link spawnSuite} does.
+   */
+  readonly timedOut?: boolean;
 }
 
 /** What one spawn of `bun test` answered. */
@@ -254,6 +268,12 @@ export interface SuiteSpawnResult {
   readonly exitCode: number;
   /** Everything the process wrote to stderr. */
   readonly stderr: string;
+  /**
+   * True when the spawner killed the process at its deadline
+   * (`createDeadlineSpawner`, `./deadline-spawn.ts`), false when it
+   * exited first; absent from a spawner with no deadline.
+   */
+  readonly timedOut?: boolean;
 }
 
 /** Where, and with what environment, `bun test` is spawned. */
@@ -281,6 +301,14 @@ export interface SuiteRunOptions {
    * selection is made.
    */
   readonly changedSince?: string;
+  /**
+   * A test name pattern: only the cases whose full name it matches run,
+   * as `-t <pattern>`, two argv words after the paths; the others read
+   * `skipped`. Bun reads it as a regular expression over the name's parts
+   * joined by a space (see the module note); it is handed on as written
+   * and never through a shell. Left out, every case runs.
+   */
+  readonly testNamePattern?: string;
   /**
    * Where Bun writes its JUnit report; its directory is created, and the
    * capped stderr text is written beside it ({@link outputFileFor}).
@@ -333,16 +361,21 @@ export function suitePathArgument(path: string): string {
 
 /**
  * The argv of one run over `paths`, or over the whole project when left
- * out, narrowed to what changed since `changedSince` when it is handed.
+ * out, narrowed to what changed since `changedSince` when it is handed,
+ * and to the cases `testNamePattern` matches as `-t` and the pattern, two
+ * words after the paths and before the reporter flags.
  */
-export function suiteCommand(junitFile: string, paths?: readonly string[], changedSince?: string): readonly string[] {
+export function suiteCommand(junitFile: string, paths?: readonly string[], changedSince?: string, testNamePattern?: string): readonly string[] {
   const pathArgs = paths === undefined
     ? []
     : paths.map(suitePathArgument);
   const changedArgs = changedSince === undefined
     ? []
     : [`--changed=${changedSince}`];
-  return ['bun', 'test', ...changedArgs, ...pathArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
+  const patternArgs = testNamePattern === undefined
+    ? []
+    : ['-t', testNamePattern];
+  return ['bun', 'test', ...changedArgs, ...pathArgs, ...patternArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
 }
 
 /** The suffix a JUnit file name ends in, which {@link outputFileFor} replaces. */
@@ -418,13 +451,26 @@ export function attributesOf(text: string): Readonly<Record<string, string>> {
 }
 
 /** A tag the parser reads: element name, whether it closes, whether it self-closes. */
-const TAG = /<(\/?)(testsuites|testsuite|testcase|failure|error)\b([^>]*?)(\/?)>/g;
+const TAG = /<(\/?)(testsuites|testsuite|testcase|failure|error|skipped)\b([^>]*?)(\/?)>/g;
+
+/** How one testcase of a JUnit report ended: it held a failure, a `<skipped>` element, or neither. */
+export type JunitOutcome = 'passed' | 'failed' | 'skipped';
+
+/** One testcase of a JUnit report: its file, its full name and how it ended. */
+export interface JunitCase {
+  readonly file: string;
+  /** Its describe names, outermost first, and its own, joined by ` > `. */
+  readonly name: string;
+  readonly outcome: JunitOutcome;
+}
 
 /** The testcase being read, until its closing tag. */
 interface OpenCase {
   readonly file: string;
   readonly name: string;
   failed: boolean;
+  /** True once a `<skipped>` element was read inside it. */
+  skipped: boolean;
   /** The first message line read from its failure elements, once one is. */
   message?: string;
 }
@@ -435,14 +481,27 @@ interface JunitWalk {
   readonly failures: SuiteFailure[];
   /** Each test file once, in the order its suite opened. */
   readonly files: string[];
+  /** Each test once, whatever its outcome, in the order its case closed. */
+  readonly cases: JunitCase[];
   open: OpenCase | null;
 }
 
-/** Records `open` as a failure when it failed and its pair is not yet held. */
+/** How `open` ended; a failure outranks a skip. */
+function outcomeOf(open: OpenCase): JunitOutcome {
+  if (open.failed) return 'failed';
+  return open.skipped
+    ? 'skipped'
+    : 'passed';
+}
+
+/** Records `open` as a case, and as a failure when it failed, each pair once. */
 function closeCase(walk: JunitWalk): void {
   const open = walk.open;
   walk.open = null;
-  if (open === null || !open.failed) return;
+  if (open === null) return;
+  const seen = walk.cases.some((testCase) => testCase.file === open.file && testCase.name === open.name);
+  if (!seen) walk.cases.push({ file: open.file, name: open.name, outcome: outcomeOf(open) });
+  if (!open.failed) return;
   const held = walk.failures.some((failure) => failure.file === open.file && failure.name === open.name);
   if (held) return;
   walk.failures.push(open.message === undefined
@@ -469,7 +528,7 @@ function openCase(walk: JunitWalk, attributes: Readonly<Record<string, string>>)
   const [fileSuite, ...describes] = walk.suites;
   const file = attributes['file'] ?? fileSuite?.file ?? '';
   const name = [...describes.map((suite) => suite.name), attributes['name'] ?? ''].join(' > ');
-  walk.open = { file, name, failed: false };
+  walk.open = { file, name, failed: false, skipped: false };
 }
 
 /** Opens a suite from its attributes; one opened under no other is a test file, held once. */
@@ -494,7 +553,9 @@ function takeTag(walk: JunitWalk, match: RegExpMatchArray): void {
     if (selfClosing === '/') closeCase(walk);
     return;
   }
-  if ((element === 'failure' || element === 'error') && closing !== '/' && walk.open !== null) failCase(walk.open, attributes);
+  if (closing === '/' || walk.open === null) return;
+  if (element === 'failure' || element === 'error') failCase(walk.open, attributes);
+  if (element === 'skipped') walk.open.skipped = true;
 }
 
 /**
@@ -515,36 +576,52 @@ export function parseJunitFiles(xml: string): readonly string[] | null {
   return walkJunit(xml)?.files ?? null;
 }
 
+/**
+ * Every test a Bun JUnit report names, passed, failed or skipped, each
+ * file and name pair once with the outcome of its first testcase, in the
+ * order it names them; or null when `xml` is not a whole `<testsuites>`
+ * document. A test is named as a failure is (see the module note), so a
+ * pair {@link parseJunitFailures} answers is here as `failed`. A
+ * testcase holding a `<skipped>` element, as Bun writes for `it.skip`
+ * and `it.todo`, is `skipped` unless it failed too.
+ * `src/triage/base-run.ts` reads it to tell a case that passed from one
+ * the run never held.
+ */
+export function parseJunitCases(xml: string): readonly JunitCase[] | null {
+  return walkJunit(xml)?.cases ?? null;
+}
+
 /** The walk over a whole `<testsuites>` document, or null when `xml` is none. */
 function walkJunit(xml: string): JunitWalk | null {
   if (!/<testsuites\b/.test(xml) || !xml.includes('</testsuites>')) return null;
-  const walk: JunitWalk = { suites: [], failures: [], files: [], open: null };
+  const walk: JunitWalk = { suites: [], failures: [], files: [], cases: [], open: null };
   for (const match of xml.matchAll(TAG)) {
     if (match[2] !== 'testsuites') takeTag(walk, match);
   }
   return walk;
 }
 
-/** What {@link readJunit} answers: how the file read, its failures and its test files in order. */
+/** What {@link readJunit} answers: how the file read, its failures, its test files in order and its cases. */
 interface JunitRead {
   readonly junit: JunitReading;
   readonly failures: readonly SuiteFailure[];
   readonly files: readonly string[];
+  readonly cases: readonly JunitCase[];
 }
 
 /** The JUnit file at `path`, read and parsed. */
 function readJunit(path: string): JunitRead {
-  if (!existsSync(path)) return { junit: 'missing', failures: [], files: [] };
+  if (!existsSync(path)) return { junit: 'missing', failures: [], files: [], cases: [] };
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
   } catch {
-    return { junit: 'unreadable', failures: [], files: [] };
+    return { junit: 'unreadable', failures: [], files: [], cases: [] };
   }
   const walk = walkJunit(text);
   return walk === null
-    ? { junit: 'unreadable', failures: [], files: [] }
-    : { junit: 'read', failures: walk.failures, files: walk.files };
+    ? { junit: 'unreadable', failures: [], files: [], cases: [] }
+    : { junit: 'read', failures: walk.failures, files: walk.files, cases: walk.cases };
 }
 
 /**
@@ -565,30 +642,33 @@ export async function spawnSuite(argv: readonly string[], options: SuiteSpawnOpt
 
 /**
  * Runs `bun test` over `options.paths`, or the whole project when they
- * are left out, narrowed by `options.changedSince` when it is handed,
- * and answers what it found. Throws a `RangeError` for an
+ * are left out, narrowed by `options.changedSince` and
+ * `options.testNamePattern` when they are handed, and answers what it found. Throws a `RangeError` for an
  * empty path list; a failing suite is an answer, never a throw.
  */
 export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   if (options.paths?.length === 0) {
     throw new RangeError('runSuite: an empty path list would run the whole project; leave paths out for that');
   }
-  const command = suiteCommand(options.junitFile, options.paths, options.changedSince);
+  const command = suiteCommand(options.junitFile, options.paths, options.changedSince, options.testNamePattern);
   const outputFile = outputFileFor(options.junitFile);
   mkdirSync(dirname(options.junitFile), { recursive: true });
   rmSync(options.junitFile, { force: true });
   rmSync(outputFile, { force: true });
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
-  const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
-  const { junit, failures: named, files } = readJunit(options.junitFile);
-  const cases = parseFailedCases(stderr, failingFilesOf(named));
-  writeFileSync(outputFile, suiteOutputText(stderr, cases));
+  const { exitCode, stderr, timedOut } = await spawn(command, { cwd: options.cwd, env });
+  const { junit, failures: named, files, cases } = readJunit(options.junitFile);
+  const failedCases = parseFailedCases(stderr, failingFilesOf(named));
+  writeFileSync(outputFile, suiteOutputText(stderr, failedCases));
   const { summary, errors } = readSummary(stderr);
-  const failures = withErrorLines(named, cases);
+  const failures = withErrorLines(named, failedCases);
   const unhandled = parseUnhandled(stderr);
   const outputTail = readOutputTail(stderr);
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files] };
+  const deadline = timedOut === undefined
+    ? {}
+    : { timedOut };
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files], cases, ...deadline };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

@@ -64,7 +64,7 @@
  * `pr.mergeMethod` out of the config. Measured in `types.test.ts`, which
  * holds that refusal (TS2322) and, as its control, the same port spelled
  * with method signatures accepting the same adapter. The store port
- * (`src/effort/store/types.ts`) is spelled this way for the same reason.
+ * (`packages/rafa/src/effort/store/types.ts`) is spelled this way for the same reason.
  */
 import type { CheckRow, ChecksVerdict } from './checks.js';
 

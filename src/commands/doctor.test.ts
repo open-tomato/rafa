@@ -140,16 +140,24 @@
  * runner and its timeout.
  */
 import type { DoctorResult, DoctorSeams } from './doctor.js';
-import type { OutputStream } from '../adapters/output/stream.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { PrerequisiteItem } from '../core/config/index.js';
 import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
+import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { versionLine } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
+import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
+import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 
 import { version } from '../../package.json';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
@@ -161,11 +169,6 @@ import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { versionLine } from '../core/command/index.js';
-import { configFilePath } from '../core/config/index.js';
-import { readLegacyStore } from '../effort/store/legacy.js';
-import { writePreflightChecks } from '../effort/store/preflight.js';
-import { sqliteStorePath } from '../effort/store/sqlite.js';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,

@@ -101,8 +101,8 @@
 import type { NextInvocation } from './actions.js';
 import type { NextSourceSeams } from './sources.js';
 import type { NextState } from './state.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { Output } from '../ports/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { Output } from '@open-tomato/rafa/ports';
 
 import { actionInvocation } from './actions.js';
 import { openNextRelations } from './relations-mode.js';
@@ -201,7 +201,7 @@ function silenced(): Output {
 /** The one state, read over sources opened in the configured relationships mode (`./relations-mode.ts`). */
 async function readOnce(context: RafaContext, seams: NextSourceSeams): Promise<NextState> {
   const relations = await openNextRelations(context, seams);
-  const sources = openNextSources({ ...context, output: silenced() }, seams, relations === undefined
+  const sources = await openNextSources({ ...context, output: silenced() }, seams, relations === undefined
     ? {}
     : { relations });
   return readNextState(sources);

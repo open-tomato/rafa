@@ -22,8 +22,9 @@
  * written through `gh` alone (`claims/labels.ts`): the board through
  * `createCachedBoardListing` (`board/board-cache.ts`), so a due run
  * spends one small incremental read once the cache is kept, and the
- * branches through `scanClaimBranches` (`board/roadmap.ts`), which the
- * check asks only when some issue carries a stage label. `roadmap.issue`
+ * branches through `scanClaimBranches` (`board/roadmap.ts`) under
+ * `naming.branch`, which the check asks only when some issue carries a
+ * stage label. `roadmap.issue`
  * is compared as a board beside the listing's `type:roadmap` rows. A run
  * that is not due resolves no provider and reads neither.
  *
@@ -37,18 +38,19 @@
  */
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { DriftBranches } from '../claims/drift.js';
-import type { RafaConfig } from '../core/config/index.js';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { readdirSync } from 'node:fs';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { errorCode, isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../core/git/index.js';
-import { errorCode, isSessionId, runsDir } from '../core/loop/index.js';
-import { activeOutput } from '../core/output/index.js';
 import { resolvePrProvider } from '../pr/provider.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */
@@ -97,7 +99,7 @@ export function isDriftRun(count: number): boolean {
  */
 export function createStartPreflightDrift(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'roadmapIssue'>,
+  config: Pick<RafaConfig, 'namingBranch' | 'prProvider' | 'roadmapIssue'>,
 ): StartPreflightDrift {
   return {
     runCount: () => countRunRecords(repoRoot),
@@ -107,7 +109,7 @@ export function createStartPreflightDrift(
     boards: config.roadmapIssue === null
       ? []
       : [config.roadmapIssue],
-    branches: () => scanClaimBranches(createGitRunner(repoRoot)),
+    branches: () => scanClaimBranches(createGitRunner(repoRoot), undefined, config.namingBranch),
   };
 }
 

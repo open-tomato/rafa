@@ -39,15 +39,22 @@
  * words and the root still reach `src/plan.ts` by the wrapper's rules.
  * `./refs-check.ts` holds why the roster is handed in rather than
  * imported there.
+ *
+ * ## The dangerous phrase
+ *
+ * `dangerous` is `./refs-check.ts`'s {@link CREATE_DANGEROUS_PHRASES}:
+ * the loader's pass line for `dangerous.acceptStaleRefs` ends with what
+ * check 4 does under it, and that line is the one a run with the
+ * setting on prints for it (`packages/rafa/src/core/config/dangerous.ts`).
  */
-import type { RafaCommand } from '../../core/command/index.js';
 import type { CommandDeclaration } from '../wrap.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-import { registryRoster } from './refs-check.js';
+import { CREATE_DANGEROUS_PHRASES, registryRoster } from './refs-check.js';
 
 const declaration: CommandDeclaration = {
   name: 'plan create',
@@ -185,6 +192,7 @@ const declaration: CommandDeclaration = {
   aliases: ['plan'],
   outputs: ['text', 'json'],
   spends: { when: 'always', what: 'one planning session' },
+  dangerous: CREATE_DANGEROUS_PHRASES,
 };
 
 /** The declaration over `src/plan.ts`, handed the roster of the registry each line was routed through; see the module note. */

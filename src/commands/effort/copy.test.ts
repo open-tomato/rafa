@@ -6,6 +6,8 @@
  */
 import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
 
+import '../../adapter-registry.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,7 +15,8 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
+import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createCopyCommand } from './copy.js';

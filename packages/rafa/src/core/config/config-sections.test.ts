@@ -1,0 +1,689 @@
+/**
+ * Tests for the value readers behind `config.ts`.
+ *
+ * Every reader is driven directly, with no file, so a case names the
+ * raw value it hands over. The item-shape readers of `config-items.ts`
+ * are driven in `config-items.test.ts`, where the three cases that
+ * parse YAML first now sit. The path from a file through `config.ts`
+ * is `config.test.ts`'s.
+ *
+ * Every refusal sits beside an accepting control of the same reader,
+ * so a reader refusing everything fails here as surely as one
+ * accepting everything.
+ *
+ * Twenty-five of the fifty mutations `config.test.ts` describes were
+ * aimed at this module, and on the last pass each reddened at least one
+ * case across the two files. One stayed green on the first two passes:
+ * an item refused on its kind key answering a value beside its problem.
+ * Every caller in `config.ts` discards a refused value, and no case read
+ * one. The case answering no value beside a problem was added for it,
+ * and is the one case that leg reddens; it moved to
+ * `config-items.test.ts` with the reader it drives.
+ */
+import type { Reader, ValueAt } from './config-sections.js';
+
+import { describe, expect, it } from 'bun:test';
+
+import { moduleSource } from './config-items.js';
+import {
+  busyTimeoutMs,
+  CLAIMS_AHEAD,
+  CLAIMS_STALE_DISABLED,
+  claimDurationHours,
+  claimsAhead,
+  claimsStaleAfter,
+  CLAUDE_SETTING_SOURCES,
+  confidence,
+  dayCount,
+  describeValue,
+  flag,
+  githubLogin,
+  isGitHubLogin,
+  isMapping,
+  LESSON_SWITCHES,
+  lessonSwitch,
+  listOf,
+  oneOf,
+  PR_PROVIDERS,
+  recurrenceCount,
+  RELEASE_AUTO,
+  releaseEnabled,
+  routeTarget,
+  SKILL_RESOLVERS,
+  skillResolverName,
+  STORE_BACKENDS,
+  subsetOf,
+  text,
+  TIER_SWITCHES,
+  tierPin,
+  tierSwitch,
+  usdAmount,
+} from './config-sections.js';
+
+/** Where every case reads its value. */
+const AT: ValueAt = { label: 'F: s', key: 's' };
+
+/** The problems `read` names for `raw`; empty when it accepts it. */
+function problemsOf<T>(read: Reader<T>, raw: unknown): readonly string[] {
+  return read(raw, AT).problems;
+}
+
+/** The value `read` accepts `raw` as. Fails the case on a refusal. */
+function valueOf<T>(read: Reader<T>, raw: unknown): T {
+  const reading = read(raw, AT);
+  expect(reading.problems).toEqual([]);
+  if (reading.value === undefined) throw new Error('accepted, with no value');
+  return reading.value;
+}
+
+describe('describeValue', () => {
+  it.each([
+    ['a string, quoted', 'x', '"x"'],
+    ['a string holding a quote, escaped', 'a"b', '"a\\"b"'],
+    ['null', null, 'null'],
+    ['a list, never serialised', [1, 2], 'a list'],
+    ['a mapping, never serialised', { a: 1 }, 'a mapping'],
+    ['a number', 3, '3'],
+    ['a boolean', true, 'true'],
+  ])('describes %s', (_label, value, described) => {
+    expect(describeValue(value)).toBe(described);
+  });
+});
+
+describe('isMapping', () => {
+  it('is true for a mapping and false for a list, null and a scalar', () => {
+    expect(isMapping({})).toBe(true);
+    expect([[], null, 'x', 1].map(isMapping)).toEqual([false, false, false, false]);
+  });
+});
+
+describe('oneOf', () => {
+  it('accepts each of its values as itself', () => {
+    const read = oneOf(STORE_BACKENDS);
+
+    expect(STORE_BACKENDS.map((value) => valueOf(read, value))).toEqual(['sqlite', 'ndjson']);
+  });
+
+  it.each([
+    ['a different case', 'SQLite', '"SQLite"'],
+    ['a number', 3, '3'],
+    ['a list', ['sqlite'], 'a list'],
+  ])('refuses %s, naming the label and the choices', (_label, raw, found) => {
+    expect(problemsOf(oneOf(STORE_BACKENDS), raw)).toEqual([
+      `F: s is ${found}, expected one of: sqlite, ndjson`,
+    ]);
+  });
+
+  it('compares with ===, so the number 1 is not the string "1"', () => {
+    expect(valueOf(oneOf([1]), 1)).toBe(1);
+    expect(problemsOf(oneOf([1]), '1')).toEqual(['F: s is "1", expected one of: 1']);
+  });
+});
+
+describe('text', () => {
+  it('accepts a string as written, never trimmed', () => {
+    expect(valueOf(text('a name'), ' linear ')).toBe(' linear ');
+  });
+
+  it.each([
+    ['an empty string', '', '""'],
+    ['a whitespace-only string', '  \t', '"  \\t"'],
+    ['a number', 3, '3'],
+    ['a list', ['a'], 'a list'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(text('a name'), raw)).toEqual([`F: s is ${found}, expected a name`]);
+  });
+});
+
+describe('flag', () => {
+  it('accepts true and false, false as a value rather than silence', () => {
+    expect(valueOf(flag, true)).toBe(true);
+    expect(flag(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+  });
+
+  it.each([
+    ['the string true', 'true', '"true"'],
+    ['yes', 'yes', '"yes"'],
+    ['the number 1', 1, '1'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(flag, raw)).toEqual([`F: s is ${found}, expected true or false`]);
+  });
+
+  it('reads dangerous.acceptStaleRefs as a file spells it, the boolean alone turning it on', () => {
+    const parsed = Bun.YAML.parse([
+      'on: true',
+      'off: false',
+      'yes: yes',
+      'quoted: "true"',
+      'one: 1',
+    ].join('\n')) as Record<string, unknown>;
+
+    expect([valueOf(flag, parsed.on), valueOf(flag, parsed.off)]).toEqual([true, false]);
+    expect([parsed.yes, parsed.quoted, parsed.one].map((raw) => problemsOf(flag, raw))).toEqual([
+      ['F: s is "yes", expected true or false'],
+      ['F: s is "true", expected true or false'],
+      ['F: s is 1, expected true or false'],
+    ]);
+  });
+});
+
+describe('listOf', () => {
+  const names = listOf(text('a name'), 'names');
+
+  it('accepts an empty list, frozen', () => {
+    const value = valueOf(names, []);
+
+    expect(value).toEqual([]);
+    expect(Object.isFrozen(value)).toBe(true);
+  });
+
+  it('accepts a list in its order, as a frozen copy of what it was handed', () => {
+    const raw = ['local', 'github'];
+    const value = valueOf(names, raw);
+
+    expect(value).toEqual(['local', 'github']);
+    expect(value).not.toBe(raw);
+    expect(Object.isFrozen(value)).toBe(true);
+    expect(Object.isFrozen(raw)).toBe(false);
+    expect(() => (value as string[]).push('x')).toThrow(TypeError);
+  });
+
+  it('refuses a value that is not a list, a lone name included', () => {
+    expect(problemsOf(names, 'local')).toEqual(['F: s is "local", expected a list of names']);
+  });
+
+  it('names every unusable entry by its index, and answers no value', () => {
+    const reading = names(['a', 3, ''], AT);
+
+    expect(reading.problems).toEqual([
+      'F: s[1] is 3, expected a name',
+      'F: s[2] is "", expected a name',
+    ]);
+    expect(reading.value).toBeUndefined();
+  });
+
+  it('keeps the unknown keys of its items under their indexed paths', () => {
+    const reading = listOf(moduleSource, 'sources')([{ npm: 'a' }, { npm: 'b', tag: 1 }], AT);
+
+    expect(reading.problems).toEqual([]);
+    expect(reading.extras).toEqual([{ key: 's[1].tag', value: 1 }]);
+  });
+});
+
+describe('subsetOf', () => {
+  const sources = subsetOf(CLAUDE_SETTING_SOURCES);
+
+  it.each([
+    ['project,local', ['project', 'local']],
+    ['local,project', ['local', 'project']],
+    ['user', ['user']],
+    ['user, project , local', ['user', 'project', 'local']],
+  ])('accepts %s, in the order written', (raw, expected) => {
+    const value = valueOf(sources, raw);
+
+    expect<readonly string[]>(value).toEqual(expected);
+    expect(Object.isFrozen(value)).toBe(true);
+  });
+
+  it.each([
+    ['an empty value', ''],
+    ['a trailing comma', 'project,'],
+    ['a leading comma', ',local'],
+    ['an empty entry', 'project,,local'],
+    ['an entry given twice', 'project,project'],
+    ['a different case', 'Project'],
+    ['a source Claude Code has not', 'global'],
+  ])('refuses %s', (_label, raw) => {
+    expect(problemsOf(sources, raw)).toEqual([
+      `F: s is ${JSON.stringify(raw)}, expected a comma-separated subset of: user, project, local`,
+    ]);
+  });
+
+  it('refuses a YAML list rather than joining it', () => {
+    expect(problemsOf(sources, ['project', 'local'])).toEqual([
+      'F: s is a list, expected a comma-separated subset of: user, project, local',
+    ]);
+  });
+});
+
+/** The refusal every unusable dollar amount is named with. */
+const USD_EXPECTED = 'a number of US dollars above zero, '
+  + 'at most six digits either side of the point';
+
+describe('the pr provider reader', () => {
+  const provider = oneOf(PR_PROVIDERS);
+
+  it('accepts each of the two providers as itself', () => {
+    expect(PR_PROVIDERS.map((value) => valueOf(provider, value))).toEqual(['gh', 'none']);
+  });
+
+  it.each([
+    ['a different case', 'GH', '"GH"'],
+    ['the host rather than the CLI', 'github', '"github"'],
+    ['a provider nothing implements', 'gitlab', '"gitlab"'],
+    ['a YAML null, which the layer reads as silence', null, 'null'],
+    ['a boolean', false, 'false'],
+  ])('refuses %s, naming both providers', (_label, raw, found) => {
+    expect(problemsOf(provider, raw)).toEqual([
+      `F: s is ${found}, expected one of: gh, none`,
+    ]);
+  });
+
+  it('reads a file spelling none as the provider, not as no value', () => {
+    // YAML spells null `~`, `null` or nothing at all, so `provider: none`
+    // is the plain string and reaches the reader as a value. Measured on
+    // bun 1.3.14.
+    const parsed = Bun.YAML.parse('provider: none\n') as { provider: unknown };
+
+    expect(parsed.provider).toBe('none');
+    expect(valueOf(provider, parsed.provider)).toBe('none');
+  });
+});
+
+describe('usdAmount', () => {
+  it.each([[2], [0.5], [0.01], [0.000001], [999999.999999]])('accepts %p dollars as itself', (raw) => {
+    expect(valueOf(usdAmount, raw)).toBe(raw);
+  });
+
+  it.each([
+    ['zero, which no session could run under', 0, '0'],
+    ['a negative amount', -1, '-1'],
+    ['more than six whole digits', 1000000, '1000000'],
+    ['more than six decimal places', 0.0000001, '1e-7'],
+    ['an amount String writes with an exponent', 1e21, '1e+21'],
+    ['a string spelled like a number', '2', '"2"'],
+    ['a string carrying the currency', '$2', '"$2"'],
+    ['a boolean', true, 'true'],
+    ['null', null, 'null'],
+    ['a list', [2], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(usdAmount, raw)).toEqual([`F: s is ${found}, expected ${USD_EXPECTED}`]);
+  });
+
+  it.each([
+    ['.inf', 'Infinity'],
+    ['-.inf', '-Infinity'],
+    ['.nan', 'NaN'],
+  ])('refuses %s, which the parser answers as a number', (written, found) => {
+    // The typeof check alone would accept each of these: `Bun.YAML.parse`
+    // answers a number for all three, measured on bun 1.3.14, and
+    // `String` writes each as something --max-budget-usd never takes.
+    const parsed = Bun.YAML.parse(`budget: ${written}\n`) as { budget: unknown };
+
+    expect(typeof parsed.budget).toBe('number');
+    expect(problemsOf(usdAmount, parsed.budget)).toEqual([
+      `F: s is ${found}, expected ${USD_EXPECTED}`,
+    ]);
+  });
+
+  it('accepts a number the parser read from a file, and refuses the same amount quoted', () => {
+    const parsed = Bun.YAML.parse('a: 1.50\nb: "1.50"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(usdAmount, parsed.a)).toBe(1.5);
+    expect(problemsOf(usdAmount, parsed.b)).toEqual([`F: s is "1.50", expected ${USD_EXPECTED}`]);
+  });
+});
+
+describe('dayCount', () => {
+  it('accepts a whole number of days above zero as itself', () => {
+    expect([valueOf(dayCount, 1), valueOf(dayCount, 30)]).toEqual([1, 30]);
+  });
+
+  it.each([
+    ['zero, which is not read as off', 0, '0'],
+    ['a negative count', -7, '-7'],
+    ['a fraction', 2.5, '2.5'],
+    ['a count quoted as a string', '30', '"30"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [30], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(dayCount, raw)).toEqual([
+      `F: s is ${found}, expected a number of days, a whole number above zero`,
+    ]);
+  });
+
+  it('accepts the count a file spells unquoted, and refuses the same count quoted', () => {
+    const parsed = Bun.YAML.parse('a: 30\nb: "30"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(dayCount, parsed.a)).toBe(30);
+    expect(problemsOf(dayCount, parsed.b)).toEqual([
+      'F: s is "30", expected a number of days, a whole number above zero',
+    ]);
+  });
+});
+
+/** What {@link busyTimeoutMs} names as expected when it refuses a value. */
+const BUSY_EXPECTED = 'a lock wait in milliseconds, a whole number from 1 to 60000';
+
+describe('busyTimeoutMs', () => {
+  it('accepts both bounds and the default as themselves', () => {
+    expect([1, 5000, 60_000].map((raw) => valueOf(busyTimeoutMs, raw))).toEqual([1, 5000, 60_000]);
+  });
+
+  it.each([
+    ['zero, which SQLite would read as no wait', 0, '0'],
+    ['a negative wait', -1, '-1'],
+    ['one past the minute', 60_001, '60001'],
+    ['a fraction', 1.5, '1.5'],
+    ['a wait quoted as a string', '5000', '"5000"'],
+    ['false, which is not read as off', false, 'false'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(busyTimeoutMs, raw)).toEqual([`F: s is ${found}, expected ${BUSY_EXPECTED}`]);
+  });
+
+  it('accepts the wait a file spells unquoted, and refuses the same wait quoted', () => {
+    const parsed = Bun.YAML.parse('a: 5000\nb: "5000"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(busyTimeoutMs, parsed.a)).toBe(5000);
+    expect(problemsOf(busyTimeoutMs, parsed.b)).toEqual([`F: s is "5000", expected ${BUSY_EXPECTED}`]);
+  });
+});
+
+/** What {@link confidence} names as expected when it refuses a value. */
+const CONFIDENCE_EXPECTED = 'a confidence from 0.3 to 0.9';
+
+describe('confidence', () => {
+  it('accepts both bounds and a value between them as itself', () => {
+    expect([valueOf(confidence, 0.3), valueOf(confidence, 0.5), valueOf(confidence, 0.9)])
+      .toEqual([0.3, 0.5, 0.9]);
+  });
+
+  it('compares a bound in hundredths, so float noise at it is accepted and kept as written', () => {
+    expect(valueOf(confidence, 0.9000000000000001)).toBe(0.9000000000000001);
+    expect(valueOf(confidence, 0.29999999999999993)).toBe(0.29999999999999993);
+  });
+
+  it.each([
+    ['a value below the range', 0.29, '0.29'],
+    ['a value above the range', 0.91, '0.91'],
+    ['zero', 0, '0'],
+    ['one', 1, '1'],
+    ['a negative value', -0.5, '-0.5'],
+    ['a percentage', 50, '50'],
+    ['not a number', Number.NaN, 'NaN'],
+    ['a confidence quoted as a string', '0.5', '"0.5"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [0.5], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(confidence, raw)).toEqual([`F: s is ${found}, expected ${CONFIDENCE_EXPECTED}`]);
+  });
+
+  it('accepts the confidence a file spells unquoted, and refuses the same one quoted', () => {
+    const parsed = Bun.YAML.parse('a: 0.70\nb: "0.70"\n') as { a: unknown; b: unknown };
+
+    expect(valueOf(confidence, parsed.a)).toBe(0.7);
+    expect(problemsOf(confidence, parsed.b)).toEqual([`F: s is "0.70", expected ${CONFIDENCE_EXPECTED}`]);
+  });
+});
+
+describe('recurrenceCount', () => {
+  it('accepts a whole number of 1 or more as itself', () => {
+    expect([valueOf(recurrenceCount, 1), valueOf(recurrenceCount, 3)]).toEqual([1, 3]);
+  });
+
+  it.each([
+    ['zero, which is not read as off', 0, '0'],
+    ['a negative count', -1, '-1'],
+    ['a fraction', 2.5, '2.5'],
+    ['a count quoted as a string', '3', '"3"'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [3], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(recurrenceCount, raw)).toEqual([
+      `F: s is ${found}, expected a count, a whole number of 1 or more`,
+    ]);
+  });
+});
+
+describe('releaseEnabled', () => {
+  it('accepts both booleans and auto, each as itself', () => {
+    expect(valueOf(releaseEnabled, true)).toBe(true);
+    expect(valueOf(releaseEnabled, RELEASE_AUTO)).toBe(RELEASE_AUTO);
+  });
+
+  it('reads false as a value rather than as silence, as flag does', () => {
+    expect(releaseEnabled(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+  });
+
+  it.each([
+    ['the string true, which nothing here coerces', 'true', '"true"'],
+    ['a different case of auto', 'Auto', '"Auto"'],
+    ['the number 1', 1, '1'],
+    ['null, which the layer reads as silence', null, 'null'],
+    ['a list', [true], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(releaseEnabled, raw)).toEqual([
+      `F: s is ${found}, expected true, false or auto`,
+    ]);
+  });
+
+  it.each([['on'], ['off'], ['yes'], ['no']])('refuses %s, which the parser answers as a string', (written) => {
+    // YAML 1.1 spelled these booleans; `Bun.YAML.parse` does not, so each
+    // reaches the reader as its own word. Measured on bun 1.3.14, beside
+    // `true`, which it does answer as the boolean.
+    const parsed = Bun.YAML.parse(`enabled: ${written}\n`) as { enabled: unknown };
+
+    expect(parsed.enabled).toBe(written);
+    expect(problemsOf(releaseEnabled, parsed.enabled)).toEqual([
+      `F: s is "${written}", expected true, false or auto`,
+    ]);
+  });
+
+  it('accepts the word auto a file spells unquoted, and the same word quoted', () => {
+    const parsed = Bun.YAML.parse('a: auto\nb: "auto"\nc: true\n') as Record<string, unknown>;
+
+    expect([parsed.a, parsed.b, parsed.c]).toEqual([RELEASE_AUTO, RELEASE_AUTO, true]);
+    expect([valueOf(releaseEnabled, parsed.a), valueOf(releaseEnabled, parsed.c)])
+      .toEqual([RELEASE_AUTO, true]);
+  });
+});
+
+describe('tierSwitch', () => {
+  it('accepts on and off, each as itself', () => {
+    expect(TIER_SWITCHES.map((word) => valueOf(tierSwitch, word))).toEqual(['on', 'off']);
+  });
+
+  it('accepts the words a file spells unquoted, which the parser answers as strings', () => {
+    // Measured on bun 1.3.14: `Bun.YAML.parse` answers `on` and `off` as
+    // the words, so an unquoted `rafa: off` reaches the reader as `off`.
+    const parsed = Bun.YAML.parse('a: on\nb: off\n') as Record<string, unknown>;
+
+    expect([parsed.a, parsed.b]).toEqual(['on', 'off']);
+    expect([valueOf(tierSwitch, parsed.a), valueOf(tierSwitch, parsed.b)]).toEqual(['on', 'off']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['a different case', 'Off', '"Off"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(tierSwitch, raw)).toEqual([`F: s is ${found}, expected one of: on, off`]);
+  });
+});
+
+describe('tierPin', () => {
+  it('accepts false and each of the three tiers, each as itself', () => {
+    expect(tierPin(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+    expect(['project', 'rafa', 'user'].map((tier) => valueOf(tierPin, tier)))
+      .toEqual(['project', 'rafa', 'user']);
+  });
+
+  it.each([
+    ['true, which would say nothing', true, 'true'],
+    ['null, a name that pins nothing', null, 'null'],
+    ['the string false, which nothing here coerces', 'false', '"false"'],
+    ['a different case of a tier', 'Rafa', '"Rafa"'],
+    ['a source outside the three tiers', 'plugin', '"plugin"'],
+    ['a list', ['user'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(tierPin, raw)).toEqual([
+      `F: s is ${found}, expected false or one of: project, rafa, user`,
+    ]);
+  });
+});
+
+describe('routeTarget', () => {
+  it('accepts false and an agent name, each as itself', () => {
+    expect(routeTarget(false, AT)).toEqual({ value: false, problems: [], extras: [] });
+    expect(['loop-implementer', 'refactor-cleaner'].map((name) => valueOf(routeTarget, name)))
+      .toEqual(['loop-implementer', 'refactor-cleaner']);
+  });
+
+  it('reads the string false as a name, not as false, since nothing here coerces', () => {
+    expect(valueOf(routeTarget, 'false')).toBe('false');
+  });
+
+  it.each([
+    ['true, which names no agent', true, 'true'],
+    ['null, a shape that routes nothing', null, 'null'],
+    ['an empty name', '', '""'],
+    ['a blank name', '  ', '"  "'],
+    ['a list of agents', ['tdd-guide'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(routeTarget, raw)).toEqual([
+      `F: s is ${found}, expected false or an agent name`,
+    ]);
+  });
+});
+
+describe('skillResolverName', () => {
+  it('accepts planner, tag and none, each as itself', () => {
+    expect(SKILL_RESOLVERS.map((name) => valueOf(skillResolverName, name)))
+      .toEqual(['planner', 'tag', 'none']);
+  });
+
+  it.each([
+    ['a resolver nobody defined', 'model', '"model"'],
+    ['a different case', 'Planner', '"Planner"'],
+    ['an empty name', '', '""'],
+    ['the boolean false', false, 'false'],
+    ['a list of resolvers', ['tag'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(skillResolverName, raw)).toEqual([
+      `F: s is ${found}, expected one of: planner, tag, none`,
+    ]);
+  });
+});
+
+describe('lessonSwitch', () => {
+  it('accepts on and off, each as itself, including as the parser answers them unquoted', () => {
+    const parsed = Bun.YAML.parse('a: on\nb: off\n') as Record<string, unknown>;
+
+    expect(LESSON_SWITCHES.map((word) => valueOf(lessonSwitch, word))).toEqual(['on', 'off']);
+    expect([valueOf(lessonSwitch, parsed.a), valueOf(lessonSwitch, parsed.b)]).toEqual(['on', 'off']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['a different case', 'On', '"On"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(lessonSwitch, raw)).toEqual([`F: s is ${found}, expected one of: on, off`]);
+  });
+});
+
+/** The expectation a `claims.staleAfter` refusal names. */
+const STALE_AFTER_EXPECTED = 'expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled';
+
+describe('claimsStaleAfter', () => {
+  it('accepts whole hours, whole days and disabled, each as written', () => {
+    const parsed = Bun.YAML.parse('a: 3d\nb: disabled\n') as Record<string, unknown>;
+
+    expect(['1h', '36h', '3d', '30d', CLAIMS_STALE_DISABLED].map((raw) => valueOf(claimsStaleAfter, raw)))
+      .toEqual(['1h', '36h', '3d', '30d', 'disabled']);
+    expect([valueOf(claimsStaleAfter, parsed.a), valueOf(claimsStaleAfter, parsed.b)]).toEqual(['3d', 'disabled']);
+  });
+
+  it.each([
+    ['zero days', '0d', '"0d"'],
+    ['zero hours', '0h', '"0h"'],
+    ['zero days spelled with two digits', '00d', '"00d"'],
+    ['a negative count of days', '-1d', '"-1d"'],
+    ['a negative count of hours', '-12h', '"-12h"'],
+    ['a fraction of a day', '1.5d', '"1.5d"'],
+    ['a unit outside hours and days', '3w', '"3w"'],
+    ['minutes', '90m', '"90m"'],
+    ['an upper-case unit', '3D', '"3D"'],
+    ['a count with no unit', '3', '"3"'],
+    ['a unit with no count', 'd', '"d"'],
+    ['a leading space', ' 3d', '" 3d"'],
+    ['a count too large to hold exactly', '9007199254740993d', '"9007199254740993d"'],
+    ['a different case of disabled', 'Disabled', '"Disabled"'],
+    ['off, which is not the word for disabled here', 'off', '"off"'],
+    ['the number 0', 0, '0'],
+    ['the number 3', 3, '3'],
+    ['the boolean false', false, 'false'],
+    ['null', null, 'null'],
+    ['a list', ['3d'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(claimsStaleAfter, raw)).toEqual([`F: s is ${found}, ${STALE_AFTER_EXPECTED}`]);
+  });
+});
+
+describe('claimDurationHours', () => {
+  it('answers the hours a duration spells', () => {
+    expect(['1h', '36h', '1d', '3d'].map(claimDurationHours)).toEqual([1, 36, 24, 72]);
+  });
+
+  it('answers null for disabled and for every refused spelling', () => {
+    expect([CLAIMS_STALE_DISABLED, '0d', '0h', '-1d', '1.5d', '3w', 3, null].map(claimDurationHours))
+      .toEqual([null, null, null, null, null, null, null, null]);
+  });
+});
+
+describe('claimsAhead', () => {
+  it('accepts off and allow, each as itself', () => {
+    expect(CLAIMS_AHEAD.map((word) => valueOf(claimsAhead, word))).toEqual(['off', 'allow']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['on, which is the tiers word and not this one', 'on', '"on"'],
+    ['a different case', 'Allow', '"Allow"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(claimsAhead, raw)).toEqual([`F: s is ${found}, expected one of: off, allow`]);
+  });
+});
+
+describe('githubLogin', () => {
+  it.each([
+    ['a plain login', 'octocat'],
+    ['one carrying a hyphen and digits', 'open-tomato-2'],
+    ['one in mixed case, kept as written', 'OctoCat'],
+    ['a bot account', 'dependabot[bot]'],
+    ['a single character', 'o'],
+  ])('accepts %s as itself', (_label, raw) => {
+    expect(valueOf(githubLogin, raw)).toBe(raw);
+  });
+
+  it.each([
+    ['a path that would move the permission path', '../../evil', '"../../evil"'],
+    ['a login carrying a slash, as gh renders an app account', 'app/dependabot', '"app/dependabot"'],
+    ['one opening with a hyphen, which gh would read as a flag', '-octocat', '"-octocat"'],
+    ['one carrying a space', 'octo cat', '"octo cat"'],
+    ['one carrying a percent escape', 'octo%2Fcat', '"octo%2Fcat"'],
+    ['one carrying a dot', 'octo.cat', '"octo.cat"'],
+    ['the empty string', '', '""'],
+    ['a number', 7, '7'],
+    ['null', null, 'null'],
+    ['a list of logins', ['octocat'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(githubLogin, raw)).toEqual([`F: s is ${found}, expected a GitHub login`]);
+  });
+
+  it('reads the same shape as the predicate the trust check narrows logins with', () => {
+    // The control pairs the two: a reader that accepted what the
+    // predicate refuses would put a login into the collaborators path
+    // that `src/board/trust.ts` would not.
+    expect(isGitHubLogin('octocat')).toBe(true);
+    expect(isGitHubLogin('dependabot[bot]')).toBe(true);
+    expect(isGitHubLogin('../../evil')).toBe(false);
+    expect(isGitHubLogin(7)).toBe(false);
+  });
+});

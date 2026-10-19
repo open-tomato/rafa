@@ -45,11 +45,19 @@
  * reading that could not be made leaves its part as `?` and says why on
  * an indented line under the row. Nothing here changes `doctor`'s exit
  * code, and nothing is written.
+ *
+ * ## The ladder row
+ *
+ * Right under the row and its problem lines goes the release ladder row
+ * (`./doctor-ladder.ts`): the level the three `release` keys read as and
+ * each of its missing preconditions, read with the rest of the reading
+ * and kept in it as `ladder`, so the json result carries it too.
  */
+import type { DoctorLadderConfig, DoctorLadderReading } from './doctor-ladder.js';
 import type { WaitingReading } from './release/status-fragments.js';
-import type { RafaContext } from '../core/command/index.js';
-import type { RafaConfig } from '../core/config/index.js';
 import type { GitRunner } from '../pr/index.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -58,6 +66,7 @@ import { createGitRunner } from '../pr/index.js';
 import { resolveReleaseEnabled } from '../release/enabled.js';
 import { changelogVersions, readTags } from '../release/status-readings.js';
 
+import { readDoctorLadder, writeDoctorLadder } from './doctor-ladder.js';
 import { forecastPhrase, readWaiting, waitingSettingsOf } from './release/status-fragments.js';
 
 /** The command the warning names. */
@@ -76,7 +85,7 @@ export type DoctorReleaseConfig = Pick<
   | 'releaseFragments'
   | 'releaseStrategy'
   | 'releaseHeading'
->;
+> & DoctorLadderConfig;
 
 /** How the row reaches git; left out, the system's own. */
 export interface DoctorReleaseSeams {
@@ -124,6 +133,8 @@ export type DoctorReleaseReading =
     readonly tagProblem: string | null;
     /** The version the changelog's top heading names. */
     readonly topHeading: TopHeadingReading;
+    /** The release ladder row's reading (`./doctor-ladder.ts`). */
+    readonly ladder: DoctorLadderReading;
   };
 
 /**
@@ -157,6 +168,7 @@ export function readDoctorRelease(input: DoctorReleaseInput, seams: DoctorReleas
     latestTag: tags.latest?.tag ?? null,
     tagProblem: tags.problem,
     topHeading: readTopHeading(input.root, input.config.releaseChangelog),
+    ladder: readDoctorLadder(input.root, input.config),
   };
 }
 
@@ -232,7 +244,8 @@ export function releaseProblemLines(reading: DoctorReleaseReading): readonly str
 /**
  * Writes the row: a warning in both modes when fragments wait, an
  * `info` line in text mode otherwise, and the problem lines at `info`
- * in text mode. Nothing for a project whose release is off.
+ * in text mode; then the release ladder row (`./doctor-ladder.ts`) in
+ * both modes. Nothing for a project whose release is off.
  */
 export function writeDoctorRelease(
   context: Pick<RafaContext, 'output' | 'outputMode'>,
@@ -243,6 +256,6 @@ export function writeDoctorRelease(
   const row = releaseRow(reading);
   if (releaseWaits(reading)) context.output.warn(row);
   else if (text) context.output.info(row);
-  if (!text) return;
-  for (const line of releaseProblemLines(reading)) context.output.info(line);
+  if (text) for (const line of releaseProblemLines(reading)) context.output.info(line);
+  writeDoctorLadder(context, reading.ladder);
 }

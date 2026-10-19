@@ -7,7 +7,7 @@
  *
  * A priority edit is one write: the new priority set, every other
  * priority removed, and the issue taken out of triage, as `IssueEdit`
- * words it in `src/ports/index.ts`. Each adapter's `edit` makes it so,
+ * words it in `packages/rafa/src/ports/index.ts`. Each adapter's `edit` makes it so,
  * the `github` one as a label swap in one `gh issue edit`
  * (`src/adapters/tracker/github-edit.ts`), the `local` one as the issue
  * file's `priority` field.
@@ -69,16 +69,15 @@
  * a priority alone, which adds no text to read.
  */
 import type { LineFlags } from './issue-tracker.js';
-import type { EditableIssue, IssueEdit, IssuePriority } from '../../ports/index.js';
+import type { EditableIssue, IssueEdit, IssuePriority } from '@open-tomato/rafa/ports';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
-import { CommandExit } from '../../core/command/index.js';
 
+import { PRIORITY_FLAG } from './declarations.js';
 import { lineRefusal, readChoiceFlag } from './issue-tracker.js';
-
-/** The flag, by name. */
-export const PRIORITY_FLAG = 'priority';
 
 /** The flags `--priority` is refused beside, in the order a refusal names the first one typed. */
 export const PRIORITY_RIVALS: readonly string[] = Object.freeze(['append-file', 'append', 'replace-file']);

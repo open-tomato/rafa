@@ -26,7 +26,7 @@ import type { PullRequests } from '../pr/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../core/plan/index.js';
+import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { homeAfterLoop } from './hop-rows.js';
 import { readHomeAfterLoop } from './state.js';

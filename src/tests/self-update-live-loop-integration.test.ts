@@ -19,7 +19,9 @@
  * `~/.rafa/bin/rafa`, the record itself untouched.
  */
 import type { PlantedProject } from './cli-capture.js';
-import type { SessionRecord } from '../core/loop/index.js';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+
+import '../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

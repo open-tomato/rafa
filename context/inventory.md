@@ -49,6 +49,12 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
    no longer open. The refused start still writes a run record under
    `.rafa/runs/` with state `stopped` and task `null`; that is not a crash.
 
+   A plan whose task edits an agent or a skill rafa bundles gets a note,
+   never a refusal, from `plan validate` and `plan create`. A clone whose
+   project copy differs from the installed rafa's would meet this collision
+   at `loop start`, so the command writes the pin as a `[human]` prerequisite,
+   once (`src/commands/plan/bundled-check.ts`).
+
 ### Collisions and the byte-identical rule
 
 Two or more loaded tiers holding the same kind and name with different contents
@@ -217,7 +223,8 @@ An item is visible to a loop session if and only if:
   - **user** and **plugin:\<name\>** items: visible only when
     `loop.settingSources` includes `user`
   - **addon:\<name\>** items: never visible, because `claudeArgs` in
-    `src/core/loop/claude.ts` passes no directory of theirs to a session
+    `packages/rafa/src/core/loop/claude.ts` passes no directory of theirs to a
+    session
 
 The inventory answers `visibleToLoop` as a boolean; `sourceVisibleToLoop` in
 `src/inventory/index.ts` computes it. The loop reads the inventory to decide

@@ -36,7 +36,7 @@
  * The output is made by rafa's `text` and `json` adapters in
  * `src/adapters/output/`, whose notes say where each renders differently
  * from the source. The stream defaults to `process.stdout` itself, as
- * `src/core/adapters/registry.ts` defaults it, where the source wraps its
+ * `src/adapter-registry.ts` defaults it, where the source wraps its
  * `write` in a stream of its own.
  *
  * `spec`, a command's `args` and `flags`, is handed to `parseArgs`, so
@@ -51,15 +51,16 @@
  * the spec declares.
  */
 import type { ParseArgsSpec } from './parseArgs.js';
-import type { CliContext, FlagSpec } from './types.js';
-import type { OutputStream } from '../../adapters/output/stream.js';
-import type { OutputMode } from '../../core/config/sections.js';
-import type { Output } from '../../ports/index.js';
+import type { CliContext, FlagSpec } from '@open-tomato/rafa/core/command';
+import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { Output } from '@open-tomato/rafa/ports';
+
+import { OUTPUT_MODES } from '@open-tomato/rafa/core/config/sections';
+import { createTextOutput } from '@open-tomato/rafa/core/output';
 
 import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
-import { createTextOutput } from '../../adapters/output/text.js';
-import { OUTPUT_MODES } from '../../core/config/sections.js';
 
 import { parseArgs } from './parseArgs.js';
 

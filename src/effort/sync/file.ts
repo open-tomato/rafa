@@ -5,7 +5,7 @@
  * ## Push
  *
  * Push copies this project's store into the directory the request's `to`
- * names, through `copyEffortStore` (`src/effort/store/copy.ts`), the copy
+ * names, through `copyEffortStore` (`packages/rafa/src/effort/store/copy.ts`), the copy
  * `rafa effort copy` makes: `effort.sqlite` written by a read-only
  * `VACUUM INTO`, so the store is never written and a loop running beside
  * it is not disturbed. It answers `pushed` with the path of the copy's
@@ -32,7 +32,7 @@
  * ## Pull
  *
  * Pull merges the `effort.sqlite` the request's `from` names into this
- * project's store through `mergeStore` (`src/effort/store/merge-store.ts`,
+ * project's store through `mergeStore` (`packages/rafa/src/effort/store/merge-store.ts`,
  * whose note is the long form), as `rafa effort merge` does, and answers
  * `pulled` with the merge's own `MergeResult`. `dryRun` is the merge's,
  * and so is `sessionId`, the run whose own live record the merge's
@@ -59,27 +59,29 @@
  * The project's resolved `store` is handed in, never read here, for the
  * reason `mergeStore` gives: resolution has one owner, the config. Core
  * registers the strategy as `sync/file` in `CORE_ADAPTER_REGISTRY`
- * (`src/core/adapters/registry.ts`), whose `create` reads it off the
+ * through its composition root (`src/adapter-registry.ts`), whose
+ * `create` reads it off the
  * context's `store` and refuses a context naming none: defaulting it to
  * `sqlite` would carry an NDJSON project's store without its sessions.
  *
  * Push and pull are async only to fill the port: each runs to its end
  * before it answers, and a throw is answered as a rejection.
  */
-import type { StoreBackend } from '../../core/config/sections.js';
-import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '../../ports/index.js';
-import type { DevelopmentProbe } from '../store/development-build.js';
-import type { MergeOptions } from '../store/merge-store.js';
+import type { StoreBackend } from '@open-tomato/rafa/core/config/sections';
+import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
+import type { DevelopmentProbe } from '@open-tomato/rafa/store/development-build';
+import type { MergeOptions } from '@open-tomato/rafa/store/merge-store';
 
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { describeValue } from '../../core/config/sections.js';
+import { describeValue } from '@open-tomato/rafa/core/config/sections';
+import { copyEffortStore } from '@open-tomato/rafa/store/copy';
+import { effortStoreDir } from '@open-tomato/rafa/store/location';
+import { MOVE_TO_SQLITE, mergeStore } from '@open-tomato/rafa/store/merge-store';
+import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
+
 import { fileStamp } from '../file-stamp.js';
-import { copyEffortStore } from '../store/copy.js';
-import { effortStoreDir } from '../store/location.js';
-import { MOVE_TO_SQLITE, mergeStore } from '../store/merge-store.js';
-import { SQLITE_STORE_FILE_NAME } from '../store/sqlite.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync (file)';

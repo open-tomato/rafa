@@ -20,7 +20,7 @@
  *
  * Regenerating is opt-in, read as `src/tests/report-ask-live.test.ts`
  * reads its recapture flag. With `RAFA_UPDATE_HELP_SNAPSHOTS=1` this file
- * writes all seven before any case reads them, so a run that regenerates
+ * writes all nine before any case reads them, so a run that regenerates
  * compares against what it just wrote and is green by construction: the
  * change is read in the diff. With the variable unset, or set to anything
  * else, nothing is written, and a snapshot that no longer matches is red.
@@ -64,8 +64,8 @@
  * run with it set to `1` passed and wrote the original bytes back.
  */
 import type { CommandRegistry } from './registry.js';
-import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand } from '../core/command/index.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,8 +74,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
-import { commandSpelling } from '../core/command/index.js';
+import { commandSpelling } from '@open-tomato/rafa/core/command';
+
+import { CORE_REGISTRY, createRosterRegistry, ROSTER_SUBJECTS } from '../commands/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -100,6 +101,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['next --help', 'rafa-next.txt'],
   ['issue ready --help', 'rafa-issue-ready.txt'],
   ['issue edit --help', 'rafa-issue-edit.txt'],
+  ['issue unblock --help', 'rafa-issue-unblock.txt'],
   ['release tag --help', 'rafa-release-tag.txt'],
 ];
 
@@ -263,8 +265,8 @@ describe('the frozen help snapshots', () => {
 
   it('differs from the root snapshot once one command leaves the roster, so the comparison can fail', () => {
     const lessDescribe = createCommandRegistry({
-      subjects: CORE_SUBJECTS,
-      commands: CORE_COMMANDS.filter((held) => commandSpelling(held) !== 'describe'),
+      subjects: ROSTER_SUBJECTS,
+      commands: CORE_REGISTRY.commands({ includeHidden: true }).filter((held) => commandSpelling(held) !== 'describe'),
     });
     const snapshot = readSnapshot('rafa.txt');
 
@@ -328,6 +330,24 @@ describe('the root help', () => {
     const bare = createCommandRegistry({ subjects: [{ name: 'loop', summary: 'the loop' }], commands: [command('loop', 'start')] });
 
     expect(headingsOf(helpFor(bare, ''))).toEqual(['Usage:', 'Quick start:', 'Subjects:', 'Global flags:']);
+  });
+});
+
+describe('the root help of a roster with a feature turned off', () => {
+  const text = helpFor(createRosterRegistry({ off: ['pr'] }), '');
+
+  it('lists no pr subject', () => {
+    const subjects = blockOf(text, 'Subjects').map((line) => line.trim().split(/\s+/)[0]);
+
+    expect(subjects).not.toContain('pr');
+    expect(subjects).toContain('plan');
+  });
+
+  it('has no rafa pr quick-start line', () => {
+    const quickStart = blockOf(text, 'Quick start');
+
+    expect(quickStart.filter((line) => line.startsWith('  rafa pr '))).toEqual([]);
+    expect(quickStart).toContain('  rafa plan create --spec=.rafa/specs/my-feature.md');
   });
 });
 

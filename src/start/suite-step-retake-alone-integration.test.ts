@@ -36,9 +36,9 @@
  * tracker file.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
+import type { SessionStep } from '@open-tomato/rafa/core/loop';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,8 +46,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan } from '../core/plan/index.js';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
 import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';

@@ -26,8 +26,10 @@
  * `--session-id` picking a record the branch does not name, with the
  * branch reader throwing to show it is never read then.
  */
-import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../core/loop/readings.js';
+import type { SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,9 +38,11 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SESSION_PHASES } from '../../core/loop/index.js';
-import { writeTaskReport } from '../../effort/store/reports.js';
-import { SQLITE_SCHEMA_VERSION, sqliteStorePath } from '../../effort/store/sqlite.js';
+import { SESSION_PHASES } from '@open-tomato/rafa/core/loop';
+import { blockerComment } from '@open-tomato/rafa/core/plan';
+import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { SQLITE_SCHEMA_VERSION, sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER,
@@ -51,7 +55,6 @@ import {
   resultEvent,
   sessionRecord,
 } from '../../tests/loop-session-fixtures.js';
-import { blockerComment } from '../../utils/tracker.js';
 
 import { createLoopStatusCommand } from './status.js';
 

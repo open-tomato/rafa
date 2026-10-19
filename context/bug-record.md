@@ -1,16 +1,45 @@
 ## The bug record
 
-Every bug filed through `rafa issue create --type=bug` has the same
-fields under the same headings, and a title rendered from them (#951).
-`src/bugs/` holds the record, `src/commands/issue/create-bug.ts` reads a
-line into it, and `context/error-codes.md` is the authority for the cause
-codes it carries.
+Every bug has the same fields under the same headings, and a title
+rendered from them (#951). Two writers build the record. `rafa issue
+create --type=bug` reads its flags into one (`src/bugs/`, and
+`src/commands/issue/create-bug.ts`) and refuses a record missing a
+required field, naming it. Triage builds the same record for a bug the
+loop files, from a session's report, in `src/triage/bug-filing.ts`
+(#991), and never refuses one over its fields: a value it cannot use is
+filed as `unknown` or `unknown:new-context`, and the session's own word
+is kept in the body. `context/error-codes.md` is the authority for the
+cause codes both carry, and `context/triage.md` for the body the loop
+writes.
 
-The loop's own filing (`context/triage.md`) does not build the record
-yet: triage titles a bug with its `what` and files it under module
-`unassigned`, until the loop-side spec (#991) lands. The two bodies
-already share their `What` and `Artifact` sections, so either is read by
-the other's code.
+Triage fills what the session does not give, or cannot give, from the
+dispatch and the checkout:
+
+- **Reproduce**, when the session gives none or `unknown`: "seen while
+  running task <line> of plan <stub>", or "seen while running `<the
+  command>`" for a dispatch with no plan stub.
+- **Cause**, by the cause rule (`src/bugs/cause-rule.ts`): a code of the
+  list is kept as written; a shaped code the list lacks is
+  `<family>:new-context` with the code as `proposed`, or
+  `unknown:new-context` when its family is unlisted; any other text is
+  `unknown:new-context` with the words as `suspected`. No cause at all
+  is `unknown:new-context`.
+- **Module and action**: the session's word when it is a checked name,
+  else `unknown`, with the word kept in `Reported module` or
+  `Reported action`.
+- **Environment**: `ci` when `CI` is set, else `local`.
+- **Summary, artifact, versions and rerun**: the summary from the reported
+  `what`; the artifact as reported, local paths taken out and not cut to 60
+  lines; versions from the artifact's file and the checkout. No error line
+  is written. A rerun is written only for a test failure naming its file
+  and case.
+
+Every free text is redacted, local paths then named secrets, before it
+is written. The record's sections follow the body's `Feedback`, and
+`Reported module` and `Reported action` come last; the record reads no
+field from them. A recurrence's comment gains the `Versions` it was
+seen again on and no other field. The two bodies share their `What` and
+`Artifact` sections, so either is read by the other's code.
 
 ### Three axes
 
@@ -27,22 +56,24 @@ them.
 
 ### The fields
 
-| Field | Flag | Section | Filled by | Required |
-|---|---|---|---|---|
-| summary | `--summary` | none, the title holds it | the filer | yes, one line, at most `issues.titles.summaryMax` |
-| description | `--body`, `--body-file` | `What` | the filer; the summary when left out | no |
-| reproduce | `--reproduce` | `Reproduce` | the filer | yes, never `unknown` |
-| rerun | `--rerun` | `Rerun` | the filer | no |
-| error line | none | `Error line` | rafa, from the artifact's first line | no |
-| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | no |
-| cause | `--cause` | `Cause` | the filer, from `rafa bug codes` | yes, `<family>:new-context` allowed |
-| proposed | `--proposed` | `Proposed cause` | the filer | no, read only beside a `new-context` cause |
-| suspected cause | none | `Suspected cause` | the filer | no |
-| module | `--module` | `Module` | the filer | yes, `unknown` allowed |
-| action | `--action` | `Action` | the filer | yes, `unknown` allowed |
-| project | `--project` | `Project` | the filer | no |
-| place | `--env` | `Environment` | rafa suggests, the filer corrects | yes, `unknown` allowed |
-| versions | `--path` names the file | `Versions` | rafa | always written |
+| Field | Flag | Section | Filled by | Filled by the loop | Required |
+|---|---|---|---|---|---|
+| summary | `--summary` | none, the title holds it | the filer | the reported `what`, redacted, on one line, cut to `issues.titles.summaryMax` | yes, one line, at most `issues.titles.summaryMax` |
+| description | `--body`, `--body-file` | `What` | the filer; the summary when left out | the reported `what`, redacted | no |
+| reproduce | `--reproduce` | `Reproduce` | the filer | the session's word, else "seen while running" its task line and plan, or the command that ran | yes, never `unknown` |
+| rerun | `--rerun` | `Rerun` | the filer | the test command that runs the case again, for a failure naming its file and case; none otherwise | no |
+| error line | none | `Error line` | rafa, from the artifact's first line | none; the loop's record leaves it out | no |
+| artifact | none | `Artifact` | the filer; rafa cuts it to 60 lines | the reported one, local paths taken out, not cut | no |
+| cause | `--cause` | `Cause` | the filer, from `rafa bug codes` | the cause rule's reading: a listed code, or `<family>:new-context`, or `unknown:new-context` | yes, `<family>:new-context` allowed |
+| proposed | `--proposed` | `Proposed cause` | the filer | the session's code, when shaped and no code of the list, beside a `new-context` cause | no, read only beside a `new-context` cause |
+| suspected cause | none | `Suspected cause` | the filer | the session's words, when they are no code | no |
+| module | `--module` | `Module` | the filer | the session's module when a checked name, else `unknown` | yes, `unknown` allowed |
+| action | `--action` | `Action` | the filer | the session's action when a checked name, else `unknown` | yes, `unknown` allowed |
+| reported module | none | `Reported module` | none; the command refuses instead | the session's word, when `Module` is `unknown` | no |
+| reported action | none | `Reported action` | none; the command refuses instead | the session's word, when `Action` is `unknown` | no |
+| project | `--project` | `Project` | the filer | none; the report names no project | no |
+| place | `--env` | `Environment` | rafa suggests, the filer corrects | `ci` when `CI` is set, else `local`, not corrected | yes, `unknown` allowed |
+| versions | `--path` names the file | `Versions` | rafa | the same | always written |
 
 A flag wins over its section. A `--title` is read back through the
 template: a field only the title gives is taken from it, the project
@@ -153,6 +184,86 @@ module, action and summary, the last three read back from each title
 (`renderBugList`, `src/commands/issue/list.ts`). A part a title lacks is
 `-`, so a bug filed before the template lists whole under summary. Json
 mode is unchanged.
+
+### Recheck
+
+`rafa bug recheck [<n>…] [--all] [--comment]` reruns the test a bug's
+`Rerun` section names and judges whether the bug still reproduces
+(`src/commands/bug/recheck.ts`). It reads `Rerun` strictly as a test
+reference, `bun test <file> [-t "<case>"]`, through
+`readTestReference` (`src/bugs/test-reference.ts`). Any other text is
+`manual`: a `rafa` line, a shell line, a command an issue body writes,
+and a bug with no `Rerun` at all. rafa prints the record's `Reproduce`
+text for it and runs nothing.
+
+The `-t` value is read as a POSIX shell reads a double-quoted string: a
+backslash before a backslash, a double quote, `$` or a backtick stands
+for that character, any other backslash is kept with the character
+after it, and the closing quote is the first double quote not escaped
+that way. So the value triage writes for a case holding a regular
+expression's special character runs as the pattern a shell would hand
+bun: `-t "a \\(case\\)"` runs as `a \(case\)` and matches the case
+`a (case)`. A value ending in an odd backslash before its closing quote
+is refused as an unterminated double quote. An unescaped `$` or backtick
+inside the value is `manual`, with the reason "a shell character $
+inside the -t value": a shell would expand it, so the value would not
+mean what it says.
+
+Two gates come before a run. The reference's shape and boundary: its
+file is resolved against the checkout's root, by real path, so a
+symlink out is outside too. Outside is `manual`; a file that is not
+there is `stale`. The author's trust: read for a runnable bug only,
+and never on the `local` tracker, which holds no accounts. The author
+is `editable(ref)`'s, weighed once per login by `readBoardTrust`. An
+untrusted author is `skipped`, with "opened by <login>, " and the
+reason from `trustRefusalClause`; nothing runs for it, and the rest of
+a sweep still runs.
+
+The argv is built by rafa and given to `runSuite` with no shell: the
+file as `./<path>`, the case as its own word after `-t`. The child's
+environment is `suiteEnv(process.env)` with every variable
+`namedSecrets` names removed, and the report lists the names it left
+out. A run passing its deadline is a failed run, and the report says
+it timed out.
+
+A run is judged by its JUnit cases of the file. A failed case, or a
+timed-out run, is `reproduces` when it is the first run. A first run
+that passes, then `runs` further runs, gives `gone` when every one of
+them passes and `flaky` when one fails: `flaky` is a judgement of its
+own, never "probably fixed". `stale` is a run that left no report, ran
+no test of the file, or named a case the file does not hold. The six
+verdicts are `reproduces`, `gone`, `flaky`, `stale`, `manual` and
+`skipped`.
+
+Runs go in the directory rafa runs in, so a machine-dependent test can
+read `gone` here and fail elsewhere. The report names where it ran, and
+`--comment` names the rafa version and the short commit, with
+`-dirty` when the checkout has changes.
+
+`--comment` writes only on `gone` and `flaky`, one line through the
+record's redaction, and never closes a bug. A `gone` comment reads
+"gone at rafa <version>, `<commit>`: `<reference>` passed <n> runs";
+a `flaky` one reads "flaky at rafa ..." with the failed count. A
+degraded issue chain (`resolveIssueTracker`) exits 1 before any issue
+is read.
+
+Exit code 0 with one row per bug as the terminal result's data,
+whatever the verdicts. Exit code 1 for a refused line, a config the
+reader refuses, a degraded chain and a listing that failed. The
+command starts no Claude session.
+
+With no `bugs` section, the defaults hold: 5 further runs after a pass,
+300 seconds a run. A set section looks like this:
+
+```yaml
+bugs:
+  recheck:
+    runs: 10              # 1..20, default 5: further runs after a pass
+    timeoutSeconds: 600   # 1..3600, default 300: one run's deadline
+```
+
+Both keys refuse `0`, a fraction, a quoted number and a boolean, and
+neither has an "off" spelling. The reader is `src/config-schema-bugs.ts`.
 
 ### `--dry-run`
 

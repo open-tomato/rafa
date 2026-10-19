@@ -2,21 +2,27 @@
  * The five limits of the `board.project` section: how a call to the
  * GitHub project is retried, how often a long refresh says where it is,
  * and how its field writes are batched and spaced. Each has its field,
- * its default, its reader and its spec here. `config-schema.ts`'s
- * `RafaConfig` extends {@link BoardProjectLimitSettings}, and its
- * `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right after
- * `board.project.number`, so the order settings are reported in holds the
- * `board.project` section together.
+ * its default, its reader and its spec here.
+ * {@link BOARD_PROJECT_SECTION} hands them to core as one
+ * `ConfigSection`, package `board-project`, and the `declare module`
+ * below adds {@link BoardProjectLimitSettings} to `RafaConfig`.
+ * {@link BoardProjectLimitsShape} holds its part of the shared
+ * `board.project` namespace, which `src/config/shape.ts` composes into
+ * `BoardProjectShape` of `ConfigShape`, the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below right after `board.project.number`, so the
+ * order settings are reported in holds the `board.project` section
+ * together.
  *
- * `board.project.template` and `board.project.number` stay in
- * `config-schema.ts`, whose readings note in `config-schema-readings.ts`
- * argues them. These five have their own module, as the `loop.wrapUp`
+ * `board.project.template` and `board.project.number` are core's, in
+ * `core/config/core-section.ts`; `config-schema-readings.ts` argues
+ * them. These five have their own module, as the `loop.wrapUp`
  * key does, because `config-schema.ts` stood at 617 lines and
  * `config-sections.ts` at 744, measured with `wc -l`, when they were
  * added: five more specs and five readers would have put the readers'
- * module within a page of the 800-line cap of `context/source.md`. Only
- * `config-schema.ts` imports this file; a caller reads each setting off
- * the resolved `RafaConfig`.
+ * module within a page of the 800-line cap of `context/source.md`.
+ * `config-registry.ts` imports this file to spread it; a caller reads each
+ * setting off the resolved `RafaConfig`.
  *
  * ## The keys
  *
@@ -63,10 +69,28 @@
  * gives in `config-schema-readings.ts`: every command that refreshes the
  * project must write it the same way, which one run's flag would split.
  */
-import type { SettingSpec } from './core/config/index.js';
-import type { Reader } from './core/config/sections.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { Reader } from '@open-tomato/rafa/core/config/sections';
 
-import { refused } from './core/config/sections.js';
+import { refused } from '@open-tomato/rafa/core/config/sections';
+
+declare module '@open-tomato/rafa/core/config/config-schema' {
+  /** The `board-project` section's fields, added to core's. */
+  interface RafaConfig extends BoardProjectLimitSettings {}
+}
+
+/**
+ * The `board.project` limits a file writes, the section's part of the
+ * shared `board.project` namespace; `src/config/shape.ts` composes it
+ * into `BoardProjectShape` beside core's two keys.
+ */
+export interface BoardProjectLimitsShape {
+  readonly retries: BoardProjectRetries;
+  readonly retryWaitSeconds: number;
+  readonly progressSeconds: BoardProjectProgressSeconds;
+  readonly writeBatchSize: number;
+  readonly writePauseMs: number;
+}
 
 /** The fewest tries after a failure `board.project.retries` accepts as a number. */
 export const BOARD_PROJECT_RETRIES_MIN = 1;
@@ -222,3 +246,10 @@ export const BOARD_PROJECT_LIMIT_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `board-project` section: the five `board.project` limits, with their defaults and no check. */
+export const BOARD_PROJECT_SECTION: ConfigSection = Object.freeze({
+  package: 'board-project',
+  settings: Object.freeze(BOARD_PROJECT_LIMIT_SETTINGS),
+  defaults: BOARD_PROJECT_LIMIT_DEFAULTS,
+});

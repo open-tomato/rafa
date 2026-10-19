@@ -31,7 +31,7 @@
  * Every check reads what `origin` itself holds, never a clone's own
  * refs, and the plan text and the `PLAN-<stub>.md` naming both devices
  * share are literals, not read back from either run: `planStubFromPath`
- * (`utils/plan-stamp.ts`) takes the stub from the file name alone, so
+ * (`core/plan/plan-stamp.ts`) takes the stub from the file name alone, so
  * `device-b`'s plan needs no `rafa:plan` block to be read by the claim
  * check that refuses before the plan is ever parsed for tasks.
  */
@@ -44,9 +44,10 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+
 import { branchName, planStub } from '../board/naming.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { REMOTE } from '../start/branch-decision.js';
 

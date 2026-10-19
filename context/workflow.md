@@ -22,11 +22,12 @@ the shape discriminates where the verb does not.
 <!-- routing-table:end -->
 
 **This table is generated from rafa's `routing` defaults**
-(`DEFAULT_ROUTES` in `src/tiers/routing.ts`) by `src/tiers/routing-table.ts`,
-and `routing-table.test.ts` fails when the page and the generator
-disagree, so change a row there and regenerate the table rather than
-editing it here. A project's own `.rafa/config.yaml` can add, re-point
-or remove a row under `routing`, and the planner reads the resolved map
+(`DEFAULT_ROUTES` in `packages/rafa/src/core/config/default-routing.ts`) by
+`src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
+the page and the generator disagree, so change a row there and
+regenerate the table rather than editing it here. A project's own config (`.rafa/config.yaml`, or a
+`rafa.config.ts` or `rafa.config.mjs`) can add, re-point or remove a row
+under `routing`, and the planner reads the resolved map
 from its `{ROUTING}` slot rather than from this page.
 
 Every agent the table names lives in `src/bundled/agents/`, the rafa
@@ -35,7 +36,8 @@ edit. This repository's `.claude/agents/<name>.md` for each is a
 symbolic link into it, and `dev-planner`, `git-workflow` and the
 `documentation` skill's `SKILL.md` under `.claude/skills/` are linked
 the same way into `src/bundled/skills/`. The five tracked rows
-travel with the package.
+travel with the package. A plan task that edits one of them gets the note
+and the `[human]` pin described in the preflight paragraph below.
 
 **The defaults carry no user-level agent.** `cleanup` →
 `refactor-cleaner` and a TypeScript review → `typescript-reviewer`
@@ -74,34 +76,105 @@ with different contents refuses the run too, naming both paths and its
 `tiers.skills` pin line, and so does one the resolution resolves to no
 winner, exactly as an agent does: one no tier holds, one `tiers.skills`
 switches off, or one only an unloaded tier holds.
-`rafa plan validate` runs the same check and exits 1 on the same plan.
+`rafa plan validate` runs the same check and exits 1 on the same plan. A
+task that edits a bundled agent or skill is no part of that check:
+`rafa plan validate` and `rafa plan create` note the edit and write its pin
+as a `[human]` prerequisite of the plan, and refuse nothing for it
+(`src/commands/plan/bundled-check.ts`).
 
-**`agent=` outranks `model` and `tools` because routing supplies
-both.** A declaration carrying an agent never passes `--model` or
-`--tools`: the agent file's own frontmatter names its model and tool
-set, and every tracked file the table names carries a `model:`.
-`effort` is the exception, being the cost lever a plan most needs to
-reach the session: `--effort` joins `--agent` unless the definition
-declares an `effort` of its own. `src/utils/agent-definition.ts`
-answers that from `.claude/agents/<name>.md` under the repo root, then
-under the home directory when `loop.settingSources` includes `user`,
-and takes a file only when its frontmatter
-`name` is the name asked for, because the CLI resolves `--agent` by
-that `name` and not by the file name. A name found in neither still
-passes `--effort`, leaving the CLI to refuse the name. `budget` is
-outranked by nothing, since a definition supplies no budget:
-`--max-budget-usd` joins whatever the block resolved to, ahead of
-`--tools`, whose variadic value has to end the argument list. Every key
-stays on the dispatch record whatever reached the CLI, and on the
-session's `dispatches` row beside the flags that did
-(`src/effort/store/dispatches.ts`), and the `Routed as:` line names the
-ones left to the agent.
+**`agent=` outranks `model` and `tools` because routing supplies both.** A
+declaration carrying an agent never passes `--model` or `--tools`: the agent
+file's own frontmatter names its model and tool set, and every tracked file the
+table names carries a `model:`. `effort` is the exception, being the cost lever
+a plan most needs to reach the session: `--effort` joins `--agent` unless the
+definition declares an `effort` of its own. `src/utils/agent-definition.ts`
+answers that from `.claude/agents/<name>.md` under the repo root, then under the
+home directory when `loop.settingSources` includes `user`, and takes a file only
+when its frontmatter `name` is the name asked for, because the CLI resolves
+`--agent` by that `name` and not by the file name. A name found in neither still
+passes `--effort`, leaving the CLI to refuse the name. `budget` is outranked by
+nothing, since a definition supplies no budget: `--max-budget-usd` joins
+whatever the block resolved to, ahead of `--tools`, whose variadic value has to
+end the argument list. Every key stays on the dispatch record whatever reached
+the CLI, and on the session's `dispatches` row beside the flags that did
+(`packages/rafa/src/effort/store/dispatches.ts`), and the `Routed as:` line
+names the ones left to the agent.
 
 **Routing also changes what a session can be read back from.** The
 prompt is untouched, byte-identical to what was piped in, but record 0
 becomes an agent-setting record and the enqueue moves to record 1, so
 every prompt-keyed reader has to key on the type/operation pair and
 never on position.
+
+### The closing doc task
+
+**A plan that changes code ends on one doc task.** A plan with one task not
+declared `agent=doc-updater` ends on one task declared
+`agent=doc-updater docs=repair`, its last task line, which repairs the docs of
+what the plan changed. A plan whose every task line is declared
+`agent=doc-updater` is prose only and gets no closing doc task. The planner
+writes this rule (`src/bundled/skills/dev-planner/SKILL.md`).
+`rafa plan validate` checks it and answers the warning `missing-doc-task`,
+which never refuses a plan, so a plan written before the rule still runs
+(`src/plan/doc-task.ts`).
+
+**What the doc task is handed.** Its prompt gets a section headed
+`## Documentation to repair` (`src/docs/task-reading.ts`, placed by
+`src/start/dispatch.ts`) with two parts. The first is the plan's `sighting`
+rows, one `<where>: <what>` line each, as its sessions reported them under
+`stale_docs`. The second is every file the plan's commits touched since the
+merge base with the run's base branch. A plan whose sessions reported no stale
+line is handed the files alone, under a line saying so. The task's own report
+then splits what it found: a line it could not settle goes into its
+`stale_docs` field and is stored as an `unsettled` row; a line about code goes
+into `out_of_scope_bugs` under its `kind`, and takes the route that kind has
+(`context/triage.md`).
+
+**The per-release issue.** Each unsettled row becomes one line in the release's
+stale-docs issue: a `chore` issue titled
+`Release <version>: update stale docs`, whose body opens with the marker
+`<!-- rafa:stale-docs -->`. A line is an
+unticked checklist item, `- [ ] <where>: <what>`. `<version>` is the settle
+forecast when the line is added (see `context/release.md`); when the forecast
+names none it is the patch bump of the version file, and when release is off it
+is the word `next`. A later run for the same version adds to the same issue. A
+forecast that shifts opens a second issue, and the readers take every open
+marked issue, so no line is lost. A person closes the issue.
+
+**No board, no issue.** A run whose tracker chain lands on no tracker that can
+both list and edit issues creates nothing. Its unsettled lines are kept and
+printed once, after the last task, under one heading. A failure at this step is
+warned about in one line and never stops the run.
+
+**`rafa docs plan` before a release.** Both moments are used: the doc task ends
+every code loop, and the lines the loops left open are settled in one run
+before a release, since a page that trails the code for days misleads the next
+agent that reads it. `rafa docs plan` starts no session and spends nothing. It
+writes `<plan.dir>/PLAN-rafa-<n>-doc-update.md`, titled `chore(doc-update)`,
+with one `agent=doc-updater` task per open line and no closing doc task; `<n>`
+is the oldest issue the lines came from. It refuses, writing nothing, when no
+line is open, when no tracker can be read, and when the plan file already
+exists. Run the plan like any other: a task that ends `done` ticks its line in
+its issue, and the issue stays open for a person to close.
+
+**Three use cases, lightest first.**
+
+- A solo project with no board. The `stale_docs` rows are stored, the doc task
+  repairs what it can, and what is left is printed at the end of the loop,
+  since there is no issue to add a line to.
+- A project with a board. One issue per release holds what the runs could not
+  settle, and `rafa docs plan` turns it into a plan before the release.
+- Two streams of loops on one repository. Neither files a documentation bug,
+  and both add to the same issue for the same version.
+
+**Two edge cases.**
+
+- A session on an older prompt writes seven fields. Its absent `stale_docs` key
+  reads as an empty list with no issue, so the session is neither failed nor
+  flagged for it.
+- A plan whose only task is a doc repair, declared `agent=doc-updater
+  docs=repair`, is prose only and gets no closing task. Its doc task is handed
+  the files its commits touched and no sighting rows.
 
 ### Task session scope and test configuration
 
@@ -192,6 +265,11 @@ automatically, and which tests always run:**
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
   — the test files a stage step with `Owns:` folders runs beside the
   folders it changed; a task step does not read this key
+- `tests.contract` (glob list; defaults to `**/*.contract.test.ts`) — the
+  contract tests: a contract test checks the promise a package makes to
+  others, with a fixture, and runs in that package's own `test` task in
+  ring 1 of CI, where a use-case test matching `tests.integration` runs in
+  ring 0's full run; no step reads this key yet
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
@@ -215,7 +293,7 @@ the repair got its session. The stage steps still due run before the first
 open task after it. The blocked task holds until its session completes or a
 human unblocks it by removing the `[BLOCKED]` mark on its line in the tracker.
 
-**A repair line names the task it repairs, and the repair is handed that
+**A suite repair line names the task it repairs, and the repair is handed that
 task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
 after its declaration and before its blocker comment, and `TaskInfo.repairs`
 reads the text back (`src/utils/tracker.ts`). A task-step repair names the
@@ -227,6 +305,8 @@ below the named task, and under `plan.inject: task` as the repair's line alone
 within that stage's context. A repair that names nothing is handed the whole
 plan with no warning. One that names a task the plan no longer holds is handed
 the whole plan too, with a warning that says the repair was looking for it.
+A leftover repair the triage adds (`context/triage.md`) carries no repairs
+comment, so it names no task.
 
 ### What reaches a loop session
 
@@ -301,22 +381,22 @@ lessons join the prompt.** Both are configuration settings: `task.skills`
 takes `planner`, `tag` or `none` and defaults to `planner`; `task.lessons`
 takes the words `on` and `off` and defaults to `on`. `task.skills` is a
 command-line setting (the `--skills-resolver=` flag), so it overrides
-the project's `.rafa/config.yaml` and any user-level `~/.rafa/config.yaml`.
+the project's config and any user-level config under `~/.rafa/`.
 `task.lessons` has no flag. Both are optional, so a config file spelling
 neither uses the defaults, and a file spelling one but not the other
 keeps the other at its default.
 
-**The dispatch record holds what skills and lessons reached the prompt.**
-The `dispatches` table in the store (`src/effort/store/dispatches.ts`)
-carries three new columns: `resolver` (the name that ran, one of
-`planner`, `tag` or `none`, or NULL when not recorded), `skills_offered`
-(a JSON array of the bare names, in order, or NULL), and `lessons_offered`
-(a JSON array of lesson ids, or NULL). A dispatch that ran no resolver or
-handed no handout writes NULL for the resolver and `[]` for both lists, so
-an empty offer and an unrecorded one stay apart. A session's use of a skill
-can be read against what it was handed by matching the names in
-`skills_offered` against the skill invocations in the `skill_invocations`
-table (`src/effort/store/skill-invocations.ts`).
+**The dispatch record holds what skills and lessons reached the prompt.** The
+`dispatches` table in the store (`packages/rafa/src/effort/store/dispatches.ts`)
+carries three new columns: `resolver` (the name that ran, one of `planner`,
+`tag` or `none`, or NULL when not recorded), `skills_offered` (a JSON array of
+the bare names, in order, or NULL), and `lessons_offered` (a JSON array of
+lesson ids, or NULL). A dispatch that ran no resolver or handed no handout
+writes NULL for the resolver and `[]` for both lists, so an empty offer and an
+unrecorded one stay apart. A session's use of a skill can be read against what
+it was handed by matching the names in `skills_offered` against the skill
+invocations in the `skill_invocations` table
+(`packages/rafa/src/effort/store/skill-invocations.ts`).
 
 ### Naming convention
 
@@ -362,12 +442,38 @@ base, and where the person stands when they start the run is no part of it.
 
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
-The branch is created as `feat/<stub>` from the latest `origin/<base>`,
-where `<base>` is the branch checked out, `main` or `master`. This feature
+The branch is created as `naming.branch` names it, `feat/{stub}` by default
+with the plan's stub for `{stub}`, from the latest `origin/<base>`, where
+`<base>` is the branch checked out, `main` or `master`. This feature
 requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
+
+**The claim readers match the `naming.branch` template and no other.** The
+claim commands (`rafa claim take`, `hand` and `accept` beside `release`),
+`rafa status`, `rafa next`, `rafa plan create --next`, the roadmap tables and
+the epic commands' claim readings, the drift report's line and the Roadmap
+issue `rafa init` opens each read the configured template, `feat/{stub}` by
+default, and never the default beside it: a branch under another template is
+no claim here. The lightest shape is a line in `.rafa/config.yaml`:
+
+```yaml
+naming:
+  branch: work/{stub}
+```
+
+The suffix shape is `{stub}-wip`, which names the branch for `rafa-49`
+`rafa-49-wip`.
+
+**`lost/<stub>` is fixed whatever the template.** Rafa makes that branch
+itself, and no loop creates it, so no template reaches it.
+
+**A branch made under an earlier template is no claim under the new one.**
+Changing `naming.branch` while claims are held is a move the person makes:
+they rename or re-cut the branches, and the readers carry none over. Reading
+both templates was rejected, because another layout's `feat/rafa-*` would then
+look held here.
 
 **On a detached HEAD, `--create-branch` cuts the branch from the base, and the
 refusal without it names the flag.** Without `--create-branch` the run is
@@ -407,9 +513,10 @@ when it names none), not scratch/notes`. A run started on the base prints
 nothing, and a run started on a detached HEAD says `not a detached HEAD`.
 
 **An existing branch under `--as-worktree` catches up with its base when it
-holds only claims.** `rafa plan create` claims a plan by pushing `feat/<stub>`
-at the base's tip, so a run started later finds a branch cut from a base that
-has moved since. When `--as-worktree` takes a branch that already exists
+holds only claims.** `rafa plan create` claims a plan by pushing its branch,
+the `naming.branch` template with the stub (`feat/<stub>` by default), at the
+base's tip, so a run started later finds a branch cut from a base that has
+moved since. When `--as-worktree` takes a branch that already exists
 (local, remote-only, or held by the worktree an earlier start left), it
 fetches `origin/<base>` (the base, read as above, never the branch) and reads
 the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding
@@ -499,11 +606,12 @@ Blocked specs are those marked `spec:blocked` with a `Blocked by:` line
 naming one or more open blockers. `plan create --next` skips them,
 offers the first unblocked spec instead, and asks whether to plan that
 one. Once a blocker closes, `rafa issue unblock [<n>]` checks the line,
-asks when every blocker is closed, and removes the label. `pr merge`
-runs that same `issue unblock` logic after a clean merge, so closing
-issue #24 automatically unblocks any issue naming it in a `Blocked by:`
-line, with no extra commands needed. An `owner/repo#<n>` token on the
-line is kept as written in `BlockedReading.foreign`
+asks when every blocker is closed, and removes the label. `--yes` removes
+it with no question, from a script or an agent, and every refusal stays.
+`pr merge` runs that same `issue unblock` logic after a clean merge, so
+closing issue #24 automatically unblocks any issue naming it in a
+`Blocked by:` line, with no extra commands needed. An `owner/repo#<n>`
+token on the line is kept as written in `BlockedReading.foreign`
 (`src/board/blocked.ts`) and never read as local `#<n>`; a line naming
 only such tokens reads as the `no-ids` fault, so `issue unblock` never
 takes a foreign-only line for "every blocker closed" and drops the label.
@@ -574,24 +682,23 @@ the planner's own review can keep a plan when assumptions are named.
 
 ### The interaction rule
 
-**A person fills in a form, rafa runs ONE fixed-template session, code
-validates the result, and the person accepts or rejects. No conversation
-inside rafa.** The command reads the form through the prompt kit in
-`src/cli/prompt/`, collects answers into a payload, passes them to a
-Claude session with a fixed prompt template and receives one response.
-A gate code checks the response against a schema — validating the
-structure, running any custom checks, and reporting every failure. If all
-checks pass, the person is offered the result: a yes confirms the action
-and the command ends successfully, a no discards it and the command exits
-with no state written, asking why only in a test. Commands that read a
-form declare their own `spends` on their `RafaCommand` (`src/cli/spends.ts`)
-for the one session they will start if the person reaches the form. No
-command spawns a second Claude session, no prompt asks the person to
-continue in Claude Code, and no runtime dependency enters the package:
-the prompt kit runs in raw mode on `stdio` and every session reads the
-API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
-loop's own machinery (`src/core/loop/claude.ts` for the session and
-`src/effort/store/` for the record) runs all the code.
+**A person fills in a form, rafa runs ONE fixed-template session, code validates
+the result, and the person accepts or rejects. No conversation inside rafa.**
+The command reads the form through the prompt kit in `src/cli/prompt/`, collects
+answers into a payload, passes them to a Claude session with a fixed prompt
+template and receives one response. A gate code checks the response against a
+schema — validating the structure, running any custom checks, and reporting
+every failure. If all checks pass, the person is offered the result: a yes
+confirms the action and the command ends successfully, a no discards it and the
+command exits with no state written, asking why only in a test. Commands that
+read a form declare their own `spends` on their `RafaCommand`
+(`packages/rafa/src/core/command/spends.ts`) for the one session they will start
+if the person reaches the form. No command spawns a second Claude session, no
+prompt asks the person to continue in Claude Code, and no runtime dependency
+enters the package: the prompt kit runs in raw mode on `stdio` and every session
+reads the API from the `RafaContext.env` values or the project's config, so the
+loop's own machinery (`packages/rafa/src/core/loop/claude.ts` for the session
+and `packages/rafa/src/effort/store/` for the record) runs all the code.
 
 ### Bug sweep convention
 

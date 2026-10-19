@@ -24,7 +24,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../core/plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
+
+import { insertLeftoverRepair, leftoverRepairText } from '../triage/leftover-repair.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
@@ -389,6 +391,24 @@ describe('writeRepairTask and the task a repair names', () => {
       blocker: 'red again',
       repairs: 'second task',
     });
+  });
+
+  it('blocks a ticked leftover repair again on its own line when its step is red, inserting nothing', () => {
+    writeFileSync(trackerPath, staged(), 'utf8');
+    const entry = { kind: 'own-fallout', what: 'src/a.test.ts went red', artifact: null } as const;
+    insertLeftoverRepair(trackerPath, entry, 1);
+    updateTrackerLine(trackerPath, FIRST_OPEN, 'done');
+    const sentence = parsePlan(read()).tasks.find((task) => task.lineNum === FIRST_OPEN)?.text ?? '';
+    const tasks = parsePlan(read()).tasks.length;
+
+    const written = writeRepairTask(trackerPath, 'red again', { kind: 'task', commit: COMMIT, task: sentence });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: false });
+    expect(parsePlan(read()).tasks).toHaveLength(tasks);
+    expect(lineAt(FIRST_OPEN)).toBe(`- [BLOCKED] ${leftoverRepairText(entry)}  <!-- blocked: red again -->`);
+    // The control: a plan task of the same words without the marker is no repair, and gets one inserted.
+    const plain = sentence.replace(' <!-- leftover -->', '');
+    expect(writeRepairTask(trackerPath, 'red', { kind: 'task', commit: COMMIT, task: plain })).toEqual({ line: FIRST_OPEN, inserted: true });
   });
 
   it('reads a repair written with no comment as naming nothing, blocked again or not', () => {

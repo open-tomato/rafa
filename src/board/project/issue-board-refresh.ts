@@ -8,7 +8,7 @@
  * It is applied where a `gh` issue board is built for a label write, so
  * every caller of those writes is covered without editing each. The
  * refresh's lines go to the `warn` the build site hands, or to the active
- * output's (`src/core/output/active.ts`) where it hands none, read at
+ * output's (`packages/rafa/src/core/output/active.ts`) where it hands none, read at
  * each line:
  *
  * | Built in | Covers |
@@ -70,8 +70,9 @@ import type { ProjectRefresh, RefreshConfig, RefreshOptions, RefreshWidening } f
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../issue-board.js';
 
-import { messageOf } from '../../core/config/sections.js';
-import { activeOutput } from '../../core/output/index.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+
 import { createGhIssueBoard } from '../issue-board.js';
 
 import { openProjectRunner } from './project-runner.js';

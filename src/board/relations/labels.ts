@@ -112,7 +112,8 @@ import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 import type { UnblockReport, UnblockStatus } from '../unblock.js';
 
-import { messageOf } from '../../core/config/sections.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../blocked.js';
 import { epicTickProblemLine, epicTickSentence, tickEpics } from '../epic-tick.js';
 import { epicLines } from '../epic-walk.js';

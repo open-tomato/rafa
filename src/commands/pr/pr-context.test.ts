@@ -23,10 +23,12 @@
  * no branch" are measured rather than assumed.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+
+import '../../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,8 +36,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../core/command/index.js';
-import { configFilePath } from '../../core/config/index.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
@@ -155,8 +158,8 @@ function probe(action: string, run: RafaCommand['run']): RafaCommand {
 
 /** A probe opening the context and giving what it read. */
 function contextProbe(seams: PrSeams): RafaCommand {
-  return probe('context', (context) => {
-    const pr = openPrContext(context, seams);
+  return probe('context', async (context) => {
+    const pr = await openPrContext(context, seams);
     context.output.result({
       provider: pr.reading.provider,
       source: pr.reading.source,
@@ -172,7 +175,7 @@ function contextProbe(seams: PrSeams): RafaCommand {
 function pickProbe(seams: PrSeams): RafaCommand {
   return probe('pick', async (context) => {
     const asked = readPullArgument(context.args, USAGE);
-    const pr = openPrContext(context, seams);
+    const pr = await openPrContext(context, seams);
     const pick = await pickPullRequest(pr, asked, USAGE);
     context.output.result({
       number: pick.number,
@@ -233,7 +236,7 @@ describe('the usage lines', () => {
 
   it('puts every flag after the number, so the usage line is the order that works', () => {
     expect(PR_USAGE.merge).toBe('rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]');
-    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]');
+    expect(PR_USAGE.triage).toBe('rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]');
     expect(PR_USAGE.wait).toBe('rafa pr wait [<n>] [--timeout=<minutes>]');
     expect(PR_USAGE.close).toBe('rafa pr close <n> --reason=<text> [--delete-branch] [--yes]');
   });

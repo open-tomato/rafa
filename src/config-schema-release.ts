@@ -1,13 +1,19 @@
 /**
  * The `pr` and `release` sections of the config schema, and the one
  * `dangerous` key the release plan adds: each setting's field, its
- * default and its spec. `config-schema.ts`'s `RafaConfig` extends
- * {@link PrSettings}, {@link ReleaseSettings} and
- * {@link DangerousReleaseSettings}, and its `CONFIG_DEFAULTS` and
- * `SETTINGS` spread the objects below at the places the two sections
- * always sat, and the `dangerous` key right after
- * `dangerous.acceptStaleRefs`, so the order settings are reported in,
- * and the order a warning lists keys in, holds each key's section.
+ * default and its spec. {@link RELEASE_SECTION} hands them to core as
+ * one `ConfigSection`, package `release`, and the `declare module` below
+ * adds {@link PrSettings}, {@link ReleaseSettings} and
+ * {@link DangerousReleaseSettings} to `RafaConfig`.
+ * {@link ReleaseShape} holds the keys a file writes and
+ * {@link ReleaseDangerousShape} its part of the shared `dangerous`
+ * namespace, which `src/config/shape.ts` composes into `ConfigShape`,
+ * the nested file shape.
+ * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
+ * spread the objects below at the places the two sections always sat,
+ * and the `dangerous` key right after `dangerous.acceptStaleRefs`, so
+ * the order settings are reported in, and the order a warning lists keys
+ * in, holds each key's section.
  *
  * They moved out of `config-schema.ts` when that module stood at 780
  * lines, measured with `wc -l`, before the release plan's six keys
@@ -15,8 +21,8 @@
  * the 800-line cap of `context/source.md` would be paid for by
  * rewrapping prose. The six keys then joined here. Every rule the schema module states about a KEY
  * still holds here, and `config-sections.ts` still holds every rule
- * about a VALUE. Only `config-schema.ts` imports this file; a caller
- * reads these settings off the resolved `RafaConfig`.
+ * about a VALUE. `config-registry.ts` imports this file to spread it; a
+ * caller reads these settings off the resolved `RafaConfig`.
  *
  * ## The `pr` section
  *
@@ -109,16 +115,34 @@
  *     one write of the tag, and `settle` has settle put it on the
  *     commit it pushes.
  *
- * One more `release` setting is text rafa prints and never runs:
+ * One more `release` setting is text `rafa release tag` prints and
+ * `rafa release publish` runs:
  *
  *   - `release.publishCommand` defaults to `npm publish`, the command
- *     `rafa release tag` names for the publish after the tag. It is free
+ *     `rafa release tag` names for the publish after the tag and
+ *     `rafa release publish` runs in each tagged unit's folder. It is free
  *     text, so a project that publishes with another tool, or with a
  *     flag such as `--tag next`, says so here. It was read off the
  *     manifest's `packageManager` field until 2026-09-30, which named
  *     `bun publish` for this repository while its releases are
  *     published with `npm publish`: the tool a project installs with is
  *     not the tool it publishes with.
+ *
+ * One more `release` setting says who publishes a tagged version:
+ *
+ *   - `release.publish` defaults to `manual`: a person runs the publish
+ *     after the tag. `ci` says the pushed tag publishes through the
+ *     project's CI workflow instead. It is the third key the release
+ *     ladder is read off, beside `release.settle` and `release.tag`.
+ *
+ * One more `release` setting is for the repository that releases rafa:
+ *
+ *   - `release.moveLock` defaults to `false`. When it is `true`, settle
+ *     also writes `rafa.lock` at the repository root to the version it
+ *     settles, in the same release commit as the version file and the
+ *     changelog, so the repository's own lock follows the rafa it
+ *     publishes. It is read through `flag`, so `"true"`, `yes` and `1`
+ *     are refused, and it is not a `CommandLineSetting`.
  *
  * ## The `dangerous` key
  *
@@ -131,33 +155,78 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { SettingSpec } from './core/config/index.js';
+import type { MergeMethod } from './pr/types.js';
+import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
 import type {
-  MergeMethod,
   PrProvider,
+  Reader,
   ReleaseEnabled,
+  ReleasePublishMode,
   ReleaseSettleMode,
   ReleaseStrategy,
   ReleaseTagMode,
   VersionCollisionMode,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
 
 import {
   flag,
   fragmentsDirectory,
-  mergeMethod,
   oneOf,
   PR_PROVIDERS,
   RELEASE_AUTO,
   releaseEnabled,
   releaseFile,
+  releasePublishMode,
   releaseSettleMode,
   releaseStrategy,
   releaseTagMode,
   text,
   usdAmount,
   versionCollisionMode,
-} from './core/config/sections.js';
+} from '@open-tomato/rafa/core/config/sections';
+
+import { MERGE_METHODS } from './pr/types.js';
+
+declare module '@open-tomato/rafa/core/config/config-schema' {
+  /** The `release` section's fields, added to core's. */
+  interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
+}
+
+/**
+ * The `pr` and `release` keys a file writes, both namespaces this
+ * section's alone; `src/config/shape.ts` composes them into `ConfigShape`.
+ */
+export interface ReleaseShape {
+  readonly pr: {
+    readonly provider: PrProvider;
+    readonly mergeMethod: MergeMethod;
+    readonly base: string;
+    readonly resolveBudget: number;
+    readonly versionCollision: VersionCollisionMode;
+  };
+  readonly release: {
+    readonly enabled: ReleaseEnabled;
+    readonly versionFile: string;
+    readonly changelog: string;
+    readonly heading: string;
+    readonly fragments: string;
+    readonly strategy: ReleaseStrategy;
+    readonly settle: ReleaseSettleMode;
+    readonly tag: ReleaseTagMode;
+    readonly publishCommand: string;
+    readonly publish: ReleasePublishMode;
+    readonly moveLock: boolean;
+  };
+}
+
+/**
+ * `dangerous.acceptVersionCollision`, the section's part of the shared
+ * `dangerous` namespace; `src/config/shape.ts` composes it into
+ * `DangerousShape` beside core's consents.
+ */
+export interface ReleaseDangerousShape {
+  readonly acceptVersionCollision: boolean;
+}
 
 /** The `pr` section's settings, resolved. */
 export interface PrSettings {
@@ -215,8 +284,15 @@ export interface ReleaseSettings {
   releaseSettle: ReleaseSettleMode;
   /** Who tags a settled version. `release.tag`. */
   releaseTag: ReleaseTagMode;
-  /** The command `rafa release tag` prints for the publish, which it never runs. `release.publishCommand`. */
+  /** The command `rafa release tag` prints for the publish and `rafa release publish` runs. `release.publishCommand`. */
   releasePublishCommand: string;
+  /** Who publishes a tagged version: a person, or CI on the pushed tag. `release.publish`. */
+  releasePublish: ReleasePublishMode;
+  /**
+   * Whether settle also writes `rafa.lock` to the version it settles,
+   * in the same release commit. `release.moveLock`.
+   */
+  releaseMoveLock: boolean;
 }
 
 /** The `dangerous` setting the release plan adds, resolved. */
@@ -248,12 +324,30 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  releasePublish: 'manual',
+  releaseMoveLock: false,
 });
 
 /** What the release plan's `dangerous` setting resolves to when no layer names it. */
 export const DANGEROUS_RELEASE_DEFAULTS: Readonly<DangerousReleaseSettings> = Object.freeze({
   dangerousAcceptVersionCollision: false,
 });
+
+/**
+ * Accepts one of the pull request port's three merge methods. The list
+ * is the port's (`pr/types.ts`), which spells them to match what
+ * `gh pr merge` takes, so a second spelling here could not disagree
+ * with it.
+ *
+ * It sits here, beside the one setting that reads it, and not among
+ * core's readers in `config-sections.ts`, so no core file imports
+ * `pr/types.ts`. The port is reached at `./pr/types.js` and not through
+ * the `./pr/index.js` barrel, because the barrel carries `pr/gh.ts`,
+ * which imports the config's sections barrel and the `gh` spawner:
+ * importing it here would put the CLI adapter behind every config read.
+ * `pr/types.ts` imports types alone, so this import reaches nothing back.
+ */
+export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
 
 /** The `pr` section's setting specs, in the order problems are reported. */
 export const PR_SETTINGS: {
@@ -299,6 +393,8 @@ export const RELEASE_SETTINGS: {
     read: text('a publish command'),
     cli: false,
   },
+  releasePublish: { key: 'release.publish', read: releasePublishMode, cli: false },
+  releaseMoveLock: { key: 'release.moveLock', read: flag, cli: false },
 };
 
 /** The release plan's `dangerous` setting spec. */
@@ -311,3 +407,10 @@ export const DANGEROUS_RELEASE_SETTINGS: {
     cli: false,
   },
 };
+
+/** The `release` section: the `pr` and `release` keys and `dangerous.acceptVersionCollision`, with their defaults and no check. */
+export const RELEASE_SECTION: ConfigSection = Object.freeze({
+  package: 'release',
+  settings: Object.freeze({ ...PR_SETTINGS, ...RELEASE_SETTINGS, ...DANGEROUS_RELEASE_SETTINGS }),
+  defaults: Object.freeze({ ...PR_DEFAULTS, ...RELEASE_DEFAULTS, ...DANGEROUS_RELEASE_DEFAULTS }),
+});

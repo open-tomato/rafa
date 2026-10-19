@@ -1,6 +1,6 @@
 /**
- * Tests for `rafa release status` (`status.ts`): the four readings, the
- * block they render to, the order the tags are put in, which plan the
+ * Tests for `rafa release status` (`status.ts`): the readings, the
+ * block they render to, the stale-docs row and its exit code, the order the tags are put in, which plan the
  * pending notes are read for, and the two refusals.
  *
  * Every pure function here — the version order, the tag reader, the
@@ -24,17 +24,23 @@
  *     known to have made none;
  *   - the notes seam records every `(root, stub)` it was asked, so
  *     "no plan means no store read" is a reading and not a claim;
+ *   - the stale-docs seam counts its calls, so a refused line is known
+ *     to have read no tracker, and no dispatched case runs `gh`;
  *   - the semver order is asserted against the sequence the semver
  *     specification itself prints, which a plain string sort fails;
  *   - the changelog fixture carries a fenced `## 9.9.9` heading, so
  *     the fence skip is known to be doing something.
  */
+import type { StaleDocsReading } from './status-stale-docs.js';
 import type { ReleaseSeams, ReleaseStatusReading, ReleaseStatusResult } from './status.js';
-import type { RafaCommand } from '../../core/command/index.js';
-import type { PlanChange } from '../../effort/store/changes.js';
-import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { ReleaseTag } from '../../release/status-readings.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PlanChange } from '@open-tomato/rafa/store/changes';
+
+import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,7 +48,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { writeChanges } from '../../effort/store/changes.js';
+import { writeChanges } from '@open-tomato/rafa/store/changes';
+
 import {
   changelogVersions,
   compareReleaseTags,
@@ -101,11 +108,13 @@ function version(raw: string): ReturnType<typeof parseSemanticVersion> {
 }
 
 /** A release tag, for an ordering case. */
-function tag(raw: string): { tag: string; version: string; parsed: ReturnType<typeof version> } {
+function tag(raw: string): ReleaseTag {
   const bare = raw.startsWith('v')
     ? raw.slice(1)
     : raw;
-  return { tag: raw, version: bare, parsed: version(bare) };
+  const parsed = version(bare);
+  if (parsed === null) throw new Error(`the case wrote no version: ${raw}`);
+  return { tag: raw, package: null, version: bare, parsed };
 }
 
 /** A git result git writes for a command that worked. */
@@ -147,7 +156,9 @@ function reading(over: Partial<ReleaseStatusReading> = {}): ReleaseStatusReading
     untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], missing: false, problem: null },
     plan: { stub: STUB, source: 'roster', branch: BRANCH, notes: [note()], level: 'minor', problem: null },
     waiting: { ref: 'origin/main', read: true, baseVersion: '0.5.0', fragments: [], malformed: 0, forecast: null, problems: [] },
+    packages: { read: true, packages: [], tagsRead: true, problem: null },
     audit: { path: 'CHANGELOG.md', read: true, sections: 2, findings: [] },
+    staleDocs: { count: 0, problem: null },
     ...over,
   };
 }
@@ -177,15 +188,28 @@ interface RecordedSeams {
   readonly roots: string[];
   /** Each `<root> <stub>` the notes seam was asked, in call order. */
   readonly asked: string[];
+  /** Each root the stale-docs seam was asked for, in call order. */
+  readonly staleDocsAsked: string[];
 }
 
-/** Seams over `table` and `notes`, recording every call; see the module note's controls. */
-function recorded(table: GitTable, notes: readonly PlanChange[] = []): RecordedSeams {
+/** A stale-docs seam answering `answer`, which a dispatch case passes so no case runs `gh`. */
+function staleDocsSeam(answer: StaleDocsReading = { count: 0, problem: null }): ReleaseSeams['readStaleDocs'] {
+  return async () => answer;
+}
+
+/** Seams over `table`, `notes` and `staleDocs`, recording every call; see the module note's controls. */
+function recorded(
+  table: GitTable,
+  notes: readonly PlanChange[] = [],
+  staleDocs: StaleDocsReading = { count: 0, problem: null },
+): RecordedSeams {
   const roots: string[] = [];
   const asked: string[] = [];
+  const staleDocsAsked: string[] = [];
   return {
     roots,
     asked,
+    staleDocsAsked,
     seams: {
       git: (root) => {
         roots.push(root);
@@ -194,6 +218,10 @@ function recorded(table: GitTable, notes: readonly PlanChange[] = []): RecordedS
       readNotes: (root, stub) => {
         asked.push(`${root} ${stub}`);
         return notes;
+      },
+      readStaleDocs: async (project) => {
+        staleDocsAsked.push(project.root);
+        return staleDocs;
       },
     },
   };
@@ -565,6 +593,61 @@ describe('the block', () => {
     expect(lines[4]).toBe('                - release: a line a user would understand');
   });
 
+  it('writes the whole block, the stale-docs row last, with no problem under it', () => {
+    expect(linesOf(renderStatus(reading()))).toEqual([
+      '  version file  package.json: 0.5.0',
+      '  latest tag    v0.4.0, of 1 release tags',
+      '  untagged      0.5.0',
+      `  pending       1 note for ${STUB}, worth a minor release`,
+      '                - release: a line a user would understand',
+      '  waiting       none on origin/main',
+      '  packages      none',
+      '  audit         clean, 2 sections of CHANGELOG.md',
+      '  stale docs    none',
+    ]);
+  });
+
+  it('writes a line per publishable package under the packages line, after the waiting fragments', () => {
+    const lines = linesOf(renderStatus(reading({
+      packages: {
+        read: true,
+        tagsRead: true,
+        problem: null,
+        packages: [
+          { name: '@scope/plugin', dir: 'packages/plugin', version: '0.1.0', waiting: 1, tag: '@scope/plugin@0.1.0' },
+          { name: '@scope/tool', dir: 'packages/tool', version: '2.0.0', waiting: 0, tag: null },
+        ],
+      },
+    })));
+
+    expect(lines.slice(5, 9)).toEqual([
+      '  waiting       none on origin/main',
+      '  packages      2 publishable',
+      '                @scope/plugin  0.1.0  1 waiting  @scope/plugin@0.1.0',
+      '                @scope/tool    2.0.0  0 waiting  untagged',
+    ]);
+    expect(lines[9]).toBe('  audit         clean, 2 sections of CHANGELOG.md');
+  });
+
+  it('marks an unread workspace in the packages cell, and says why under the block', () => {
+    const text = renderStatus(reading({
+      packages: { read: false, packages: [], tagsRead: true, problem: 'the workspace packages could not be read: x' },
+    }));
+
+    expect(cellOf(text, 'packages')).toBe(UNREADABLE);
+    expect(linesOf(text).at(-1)).toBe('  the workspace packages could not be read: x');
+  });
+
+  it('writes the block with an unreadable stale-docs count, and says why under it', () => {
+    const lines = linesOf(renderStatus(reading({ staleDocs: { count: null, problem: 'listing the open chore issues failed: HTTP 502' } })));
+
+    expect(lines.slice(-3)).toEqual([
+      `  stale docs    ${UNREADABLE}`,
+      '',
+      '  the stale-docs lines could not be read: listing the open chore issues failed: HTTP 502',
+    ]);
+  });
+
   it('marks a cell nothing could be read for, and says why under the block', () => {
     const text = renderStatus(reading({
       versionFile: { path: 'package.json', version: null, problem: 'the version file could not be read at /x' },
@@ -581,6 +664,15 @@ describe('the block', () => {
     const text = renderStatus(reading());
 
     expect(text).not.toContain('\n\n');
+  });
+
+  it('counts the root\'s tags only in the latest tag cell, a package\'s tag left to its own row', () => {
+    const tags = releaseTagsOf('v0.4.0\n@scope/plugin@0.9.0\n');
+    const text = renderStatus(reading({ tags: { tags, latest: tags[1] ?? null, problem: null } }));
+
+    // The control: the package tag IS in the reading, and is the highest.
+    expect(tags.map((each) => each.tag)).toEqual(['@scope/plugin@0.9.0', 'v0.4.0']);
+    expect(cellOf(text, 'latest tag')).toBe('v0.4.0, of 1 release tags');
   });
 
   it('says a repository with no release tag has none', () => {
@@ -618,7 +710,7 @@ describe('the block', () => {
     }));
 
     expect(cellOf(text, 'pending')).toBe(`${NOTHING}: no current plan`);
-    expect(linesOf(text)).toHaveLength(6);
+    expect(linesOf(text)).toHaveLength(8);
   });
 
   it('says a plan with no stored note has none pending', () => {
@@ -661,7 +753,7 @@ describe('the block', () => {
       },
     }));
 
-    const notes = linesOf(text).slice(4, -2);
+    const notes = linesOf(text).slice(4, -4);
 
     expect(notes.map((line) => line.trim()))
       .toEqual(['- release: one', '- release: three', '- two']);
@@ -701,6 +793,54 @@ describe('the dispatched action', () => {
     expect(data.reading.plan.stub).toBe(STUB);
     expect(data.reading.plan.notes).toHaveLength(1);
     expect(data.text).toContain('version file');
+  });
+
+  it('reads the untagged list and the audit against the root\'s tags, never a package\'s', async () => {
+    const project = freshProject();
+    writeFileSync(join(project.root, 'package.json'), '{"version": "0.5.0"}', 'utf8');
+    const changelog = '# Changelog\n\n## 0.5.0 — x\n\n<!-- rafa:fragments a1 -->\n\n## 0.4.0 — y\n';
+    writeFileSync(join(project.root, 'CHANGELOG.md'), changelog, 'utf8');
+
+    const packageOnly = dataOf((await ran(
+      recorded(gitTable('v0.4.0\n@scope/plugin@0.5.0\n')).seams,
+      project,
+      ['--output=json'],
+    )).events) as ReleaseStatusResult;
+    // The control: the same changelog with the root's own tag reads clean.
+    const rootTagged = dataOf((await ran(
+      recorded(gitTable('v0.4.0\nv0.5.0\n@scope/plugin@0.5.0\n')).seams,
+      project,
+      ['--output=json'],
+    )).events) as ReleaseStatusResult;
+
+    expect(packageOnly.reading.tags.tags).toHaveLength(2);
+    expect(packageOnly.reading.tags.latest?.tag).toBe('v0.4.0');
+    expect(packageOnly.reading.untagged.versions).toEqual(['0.5.0']);
+    expect(packageOnly.reading.audit.findings).toEqual([{ kind: 'untagged', version: '0.5.0' }]);
+    expect(rootTagged.reading.untagged.versions).toEqual([]);
+    expect(rootTagged.reading.audit.findings).toEqual([]);
+  });
+
+  it('reads the publishable workspace packages off the checkout, with the tags git lists', async () => {
+    const project = freshProject();
+    writeFileSync(join(project.root, 'package.json'), '{"version": "0.5.0", "workspaces": ["packages/*"]}', 'utf8');
+    mkdirSync(join(project.root, 'packages/plugin'), { recursive: true });
+    writeFileSync(join(project.root, 'packages/plugin/package.json'), '{"name": "@scope/plugin", "version": "0.1.0"}', 'utf8');
+    mkdirSync(join(project.root, 'packages/hub'), { recursive: true });
+    writeFileSync(join(project.root, 'packages/hub/package.json'), '{"name": "@scope/hub", "private": true}', 'utf8');
+    const seams = recorded(gitTable('v0.4.0\n@scope/plugin@0.1.0\n'));
+
+    const run = await ran(seams.seams, project);
+    const json = dataOf((await ran(recorded(gitTable('v0.4.0\n')).seams, project, ['--output=json'])).events) as ReleaseStatusResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(cellOf(run.stdout, 'packages')).toBe('1 publishable');
+    // The waiting tree the table does not answer leaves the count unknown, said under the waiting row.
+    expect(run.stdout).toContain(`                @scope/plugin  0.1.0  ${UNREADABLE} waiting  @scope/plugin@0.1.0`);
+    expect(run.stdout).not.toContain('@scope/hub');
+    expect(json.reading.packages.packages).toEqual([
+      { name: '@scope/plugin', dir: 'packages/plugin', version: '0.1.0', waiting: null, tag: null },
+    ]);
   });
 
   it('reads the pending notes for the stub --plan names', async () => {
@@ -743,6 +883,7 @@ describe('the dispatched action', () => {
     expect(run.stderr).toContain('Expected no arguments, got 1: 0.5.0');
     expect(run.stderr).toContain(RELEASE_STATUS_USAGE);
     expect(seams.roots).toEqual([]);
+    expect(seams.staleDocsAsked).toEqual([]);
   });
 
   it('refuses --plan with no stub, and makes no git runner', async () => {
@@ -766,6 +907,65 @@ describe('the dispatched action', () => {
   });
 });
 
+describe('the stale-docs row', () => {
+  it('prints none at zero, and a count of open lines above it', () => {
+    expect(cellOf(renderStatus(reading({ staleDocs: { count: 0, problem: null } })), 'stale docs')).toBe(NOTHING);
+    expect(cellOf(renderStatus(reading({ staleDocs: { count: 1, problem: null } })), 'stale docs')).toBe('1 open line');
+    expect(cellOf(renderStatus(reading({ staleDocs: { count: 2, problem: null } })), 'stale docs')).toBe('2 open lines');
+  });
+
+  it('prints the count the seam reads, asked once for the project root, exiting 0 with open lines', async () => {
+    const project = freshProject();
+    const seams = recorded(gitTable('v0.4.0\n'), [], { count: 2, problem: null });
+
+    const run = await ran(seams.seams, project);
+
+    expect(run.exitCode).toBe(0);
+    expect(cellOf(run.stdout, 'stale docs')).toBe('2 open lines');
+    expect(seams.staleDocsAsked).toEqual([project.root]);
+  });
+
+  it('prints the unreadable cell and the reason for a failed read, and still exits 0', async () => {
+    const project = freshProject();
+    const seams = recorded(gitTable('v0.4.0\n'), [], { count: null, problem: 'no tracker can be read: tracker chain: every kind failed' });
+
+    const run = await ran(seams.seams, project);
+
+    expect(run.exitCode).toBe(0);
+    expect(cellOf(run.stdout, 'stale docs')).toBe(UNREADABLE);
+    expect(run.stdout).toContain('the stale-docs lines could not be read: no tracker can be read: tracker chain: every kind failed');
+  });
+
+  it('keeps a seam that rejects as an unreadable cell, and still exits 0', async () => {
+    const project = freshProject();
+    const rejecting: ReleaseSeams = {
+      git: () => fakeGit(gitTable('v0.4.0\n')),
+      readNotes: () => [],
+      readStaleDocs: async () => {
+        throw new Error('the tracker went away');
+      },
+    };
+
+    const run = await ran(rejecting, project);
+
+    expect(run.exitCode).toBe(0);
+    expect(cellOf(run.stdout, 'stale docs')).toBe(UNREADABLE);
+    expect(run.stdout).toContain('the stale-docs lines could not be read: the tracker went away');
+  });
+
+  it('gives the count as the result event\'s data in json mode', async () => {
+    const project = freshProject();
+    const seams = recorded(gitTable('v0.4.0\n'), [], { count: 3, problem: null });
+
+    const run = await ran(seams.seams, project, ['--output=json']);
+    const data = dataOf(run.events) as ReleaseStatusResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(data.reading.staleDocs).toEqual({ count: 3, problem: null });
+    expect(data.text).toContain('stale docs    3 open lines');
+  });
+});
+
 describe('what the default seams reach', () => {
   it('reads the notes the store holds for the plan, through the real reader', async () => {
     // Arrange: a project whose store carries two notes for one plan.
@@ -779,7 +979,7 @@ describe('what the default seams reach', () => {
     });
 
     // Act: the git seam alone is replaced, so the notes come off the disk.
-    const run = await ran({ git: () => fakeGit(gitTable('')) }, project);
+    const run = await ran({ git: () => fakeGit(gitTable('')), readStaleDocs: staleDocsSeam() }, project);
 
     // Assert
     expect(run.exitCode).toBe(0);
@@ -795,7 +995,7 @@ describe('what the default seams reach', () => {
       changes: [{ level: 'minor', area: 'release', summary: 'another plan\'s note', extras: [] }],
     });
 
-    const run = await ran({ git: () => fakeGit(gitTable('')) }, project);
+    const run = await ran({ git: () => fakeGit(gitTable('')), readStaleDocs: staleDocsSeam() }, project);
 
     expect(cellOf(run.stdout, 'pending')).toBe(`${NOTHING} for ${STUB}`);
     expect(run.stdout).not.toContain('another plan\'s note');
