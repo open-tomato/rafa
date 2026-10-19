@@ -28,7 +28,6 @@
  * refusal, because `parseArgs` hands the flag the directory as its
  * value, exactly as it does for `rafa skill check --fix`.
  */
-import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

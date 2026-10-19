@@ -40,8 +40,6 @@ import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { PlanChange } from '@open-tomato/rafa/store/changes';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

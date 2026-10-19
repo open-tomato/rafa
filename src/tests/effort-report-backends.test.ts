@@ -28,8 +28,6 @@ import type { CollectOptions } from '../effort/collect.js';
 import type { CommitLogOptions, CommitLogParseResult } from '../effort/commits.js';
 import type { EffortReport } from '../effort/report.js';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

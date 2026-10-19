@@ -22,8 +22,6 @@ import type { GitRunner } from '../pr/index.js';
 import type { StatusSeams } from '../status/sections.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

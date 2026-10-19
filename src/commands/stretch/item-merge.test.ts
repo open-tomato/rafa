@@ -23,8 +23,6 @@ import type { FakeRun } from '../../ci/runs-fake.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

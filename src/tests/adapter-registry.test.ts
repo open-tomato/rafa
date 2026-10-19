@@ -1,8 +1,8 @@
 /**
  * The adapter registry, read the way a caller outside `src/adapters/`
  * reads it: through the adapters barrel's public exports alone, with
- * core's adapters registered by importing the composition root
- * `src/adapter-registry.ts`, one example apiece of three claims the
+ * core's adapters registered by the preload's `registerCoreAdapters()`
+ * call, not by importing the root, one example apiece of three claims the
  * registry stands on.
  *
  * `packages/rafa/src/core/adapters/registry.test.ts` and
@@ -27,8 +27,6 @@
  */
 import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { Tracker } from '@open-tomato/rafa/ports';
-
-import '../adapter-registry.js';
 
 import {
   mkdtempSync,

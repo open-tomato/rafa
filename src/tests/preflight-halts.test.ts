@@ -40,8 +40,6 @@ import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { PreflightTiers } from '../preflight/run.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 
-import '../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,

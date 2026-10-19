@@ -38,8 +38,6 @@
 import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { PreflightResult, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

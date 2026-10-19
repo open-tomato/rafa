@@ -22,8 +22,6 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { EditableIssue, IssueDraft, IssueEdit, IssuePriority, IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

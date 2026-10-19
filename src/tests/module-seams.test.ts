@@ -29,8 +29,6 @@ import type { ModuleListing } from '../commands/module/list.js';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventLog, CliEventResult } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -10,8 +10,6 @@
 import type { TrendInputs } from './report-trend-read.js';
 import type { TrendOptions, TrendSessionRow } from './report-trend.js';
 
-import '../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

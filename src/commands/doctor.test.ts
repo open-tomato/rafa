@@ -145,8 +145,6 @@ import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
