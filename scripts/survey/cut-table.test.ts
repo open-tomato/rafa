@@ -118,7 +118,7 @@ describe('CUT_RULES', () => {
 
 /** Each feature package's list of `cut-names.ts`, its length, and the file its rule names beside the list. */
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
-  ['rafa-inventory', INVENTORY_NAMED, 3, []],
+  ['rafa-inventory', INVENTORY_NAMED, 5, []],
   ['rafa-board', BOARD_NAMED, 23, []],
   ['rafa-pr', PR_NAMED, 17, ['src/pr/index.ts']],
   ['rafa-run', RUN_NAMED, 25, ['src/start/branch-decision.ts']],
@@ -143,8 +143,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 75 files across the six lists, the 60 of the plan and the fifteen of cluster c6', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(75);
+  it('names 77 files across the six lists, the 60 of the plan, the fifteen of cluster c6 and the two learning adapter files', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(77);
   });
 });
 

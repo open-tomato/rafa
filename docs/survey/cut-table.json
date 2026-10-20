@@ -14,26 +14,6 @@
     },
     {
       "kind": "test",
-      "path": "src/adapters/learning/held.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/adapters/learning/held.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/adapters/learning/local.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/adapters/learning/local.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
       "path": "src/adapters/output/json.test.ts",
       "upwardEdgesIn": 0
     },
@@ -2449,6 +2429,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/moved-paths.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/native-relations-spawn.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3590,13 +3575,6 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/report/lessons.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "type",
-          "to": "src/adapters/learning/local.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/schema/instinct.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
@@ -3612,11 +3590,15 @@
         }
       ],
       "fileCounts": {
-        "source": 54,
-        "test": 54,
+        "source": 56,
+        "test": 56,
         "testSupport": 0
       },
       "files": [
+        "src/adapters/learning/held.test.ts",
+        "src/adapters/learning/held.ts",
+        "src/adapters/learning/local.test.ts",
+        "src/adapters/learning/local.ts",
         "src/agents/roster.test.ts",
         "src/agents/roster.ts",
         "src/agents/vendorable.test.ts",
@@ -3752,13 +3734,15 @@
       ],
       "name": "rafa-inventory",
       "named": [
+        "src/adapters/learning/held.ts",
+        "src/adapters/learning/local.ts",
         "src/plan/risk/commands.ts",
         "src/plan/risk/long-runs.ts",
         "src/report/lessons.ts"
       ],
       "rank": 4,
-      "remaining": 23,
-      "upwardEdges": 23
+      "remaining": 22,
+      "upwardEdges": 22
     },
     {
       "clearedByIssue118": 0,
@@ -5953,17 +5937,13 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 177,
-        "test": 454,
+        "source": 175,
+        "test": 453,
         "testSupport": 26
       },
       "files": [
         "src/adapter-registry.test.ts",
         "src/adapter-registry.ts",
-        "src/adapters/learning/held.test.ts",
-        "src/adapters/learning/held.ts",
-        "src/adapters/learning/local.test.ts",
-        "src/adapters/learning/local.ts",
         "src/adapters/output/json.test.ts",
         "src/adapters/output/json.ts",
         "src/adapters/planner/claude.test.ts",
@@ -6487,6 +6467,7 @@
         "src/tests/loop-wrap-up-phase.test.ts",
         "src/tests/merged-stores.ts",
         "src/tests/module-seams.test.ts",
+        "src/tests/moved-paths.sweep.test.ts",
         "src/tests/native-relations-spawn.test.ts",
         "src/tests/next-beside-loop-cli.test.ts",
         "src/tests/next-chain-fixtures.ts",
@@ -6635,12 +6616,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2164,
-    "leftToPlace": 617,
+    "files": 2165,
+    "leftToPlace": 614,
     "nonTestEdges": 4803,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 142
+    "upwardEdges": 141
   },
   "unassigned": [
     {

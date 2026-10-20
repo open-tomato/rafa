@@ -1981,6 +1981,7 @@
     "src/tests/loop-wrap-up-phase.test.ts": 0,
     "src/tests/merged-stores.ts": 86.645238,
     "src/tests/module-seams.test.ts": 0,
+    "src/tests/moved-paths.sweep.test.ts": 0,
     "src/tests/native-relations-spawn.test.ts": 0,
     "src/tests/next-beside-loop-cli.test.ts": 0,
     "src/tests/next-chain-fixtures.ts": 291.630952,
@@ -2575,7 +2576,6 @@
         "src/docs": 5,
         "src/effort": 53,
         "src/effort/sync": 3,
-        "src/fixtures": 2,
         "src/inventory/search": 1,
         "src/start": 15,
         "src/tests": 14,
@@ -2802,8 +2802,6 @@
         "src/effort/sync/file.ts",
         "src/effort/trend-stats.test.ts",
         "src/effort/trend-stats.ts",
-        "src/fixtures/scrub.test.ts",
-        "src/fixtures/scrub.ts",
         "src/inventory/search/prompt.test.ts",
         "src/start/convention-body.ts",
         "src/start/follow-ups-integration.test.ts",
@@ -2890,7 +2888,7 @@
         "src/triage/triage.ts"
       ],
       "name": "c02-sqlite",
-      "size": 300
+      "size": 298
     },
     {
       "folders": {
@@ -4670,9 +4668,9 @@
     {
       "folders": {
         "src/commands": 1,
-        "src/fixtures": 3,
+        "src/fixtures": 5,
         "src/start": 1,
-        "src/tests": 18,
+        "src/tests": 19,
         "src/tests/core-coupled/effort/store": 1
       },
       "hub": "src/tests/sweep-timeout.ts",
@@ -4681,6 +4679,8 @@
         "src/fixtures/fixture-guard.sweep.test.ts",
         "src/fixtures/fixture-path.test.ts",
         "src/fixtures/fixture-path.ts",
+        "src/fixtures/scrub.test.ts",
+        "src/fixtures/scrub.ts",
         "src/start/base-prompts.sweep.test.ts",
         "src/tests/commands-direction.sweep.test.ts",
         "src/tests/config-layers-prose.sweep.test.ts",
@@ -4691,6 +4691,7 @@
         "src/tests/default-plan-dirs.sweep.test.ts",
         "src/tests/git-identity.sweep.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
+        "src/tests/moved-paths.sweep.test.ts",
         "src/tests/public-entries.sweep.test.ts",
         "src/tests/relations-import-boundary.sweep.test.ts",
         "src/tests/repo-hygiene.sweep.test.ts",
@@ -4703,7 +4704,7 @@
         "src/tests/workspace-graph.sweep.test.ts"
       ],
       "name": "c14-sweep-timeout",
-      "size": 24
+      "size": 27
     },
     {
       "folders": {
@@ -55974,6 +55975,16 @@
       "to": "src/commands/module/list.ts"
     },
     {
+      "from": "src/tests/moved-paths.sweep.test.ts",
+      "kind": "value",
+      "to": "src/fixtures/fixture-path.ts"
+    },
+    {
+      "from": "src/tests/moved-paths.sweep.test.ts",
+      "kind": "value",
+      "to": "src/tests/sweep-timeout.ts"
+    },
+    {
       "from": "src/tests/native-relations-spawn.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/project/position.ts"
@@ -66256,12 +66267,12 @@
       "path": "src/fixtures/fixture-path.ts"
     },
     {
-      "cluster": "c02-sqlite",
+      "cluster": "c14-sweep-timeout",
       "kind": "test",
       "path": "src/fixtures/scrub.test.ts"
     },
     {
-      "cluster": "c02-sqlite",
+      "cluster": "c14-sweep-timeout",
       "kind": "source",
       "path": "src/fixtures/scrub.ts"
     },
@@ -69834,6 +69845,11 @@
       "cluster": "c08-index",
       "kind": "test",
       "path": "src/tests/module-seams.test.ts"
+    },
+    {
+      "cluster": "c14-sweep-timeout",
+      "kind": "test",
+      "path": "src/tests/moved-paths.sweep.test.ts"
     },
     {
       "cluster": "c01-github",

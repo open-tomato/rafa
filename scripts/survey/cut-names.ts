@@ -106,6 +106,8 @@ export const EFFORT_NAMED: readonly string[] = [
 
 /** The files named for `rafa-inventory`, the root files that reach the inventory package. */
 export const INVENTORY_NAMED: readonly string[] = [
+  'src/adapters/learning/held.ts',
+  'src/adapters/learning/local.ts',
   'src/plan/risk/commands.ts',
   'src/plan/risk/long-runs.ts',
   'src/report/lessons.ts',
