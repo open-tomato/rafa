@@ -3,8 +3,8 @@ import type { FileMove } from './types';
 /**
  * Pass 1 of the monorepo migration (#808): the root files that reach no
  * feature, each moved to the same path below `packages/rafa/`. Sorted by
- * `from`; colocated tests move with the pass that runs it, except the integration
- * test of `src/modules/activate.ts`, which stays at the root as
+ * `from`; colocated tests move with the pass that runs it, except the
+ * integration test of `src/modules/activate.ts`, which stays at the root as
  * `src/modules/activate-integration.test.ts` (#1289).
  */
 export const PASS_1_MOVES: readonly FileMove[] = [

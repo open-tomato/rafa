@@ -5,10 +5,9 @@
  * and its folder's `testdata/` go with it; a moved test whose imports
  * reach a file outside the package and the move is parked instead. A
  * colocated test the project's `tests.integration` globs match is left in
- * place, until #913 places each integration test with the package entry
- * it drives. Every
- * function here is pure over its input; the rewrites of each moved and
- * importing file are `pass-moves.ts`'s.
+ * place, until #913 places each integration test with the package entry it
+ * drives. Every function here is pure over its input; the rewrites of each
+ * moved and importing file are `pass-moves.ts`'s.
  */
 import type { SiteNote } from './core-package-text';
 import type { FileMove } from './moves/types';
