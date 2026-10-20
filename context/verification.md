@@ -215,7 +215,7 @@ its change reaches:
 `related`, is this project's baseline. The epic's third criterion, per-change
 test time after the cut, is measured against the check-point table the
 project's config holds, not against the full run. That config
-(`.rafa/config.yaml`, gitignored, so not in the tree) adopts
+(`rafa.config.ts` at the repository root, tracked) adopts
 `templates: [escalation]` and holds `checks.task: [affected]`,
 `checks.stage: [related]`, `checks.loop: [related, contract, integration]`,
 `checks.pullRequest: [unit, contract, integration]`,

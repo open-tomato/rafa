@@ -635,8 +635,9 @@ existed:
 templates: [escalation]
 ```
 
-For this project, decision 0009's table is written in its own gitignored
-`.rafa/config.yaml`, not in the tree; `context/verification.md` records it.
+For this project, decision 0009's table is written in the tracked
+`rafa.config.ts` at the repository root; `context/verification.md`
+records it.
 
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
