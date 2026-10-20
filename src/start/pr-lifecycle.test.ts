@@ -120,6 +120,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
@@ -128,7 +129,6 @@ import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
 
 import {
   CI_POLL_INTERVAL_MS,

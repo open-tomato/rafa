@@ -31,9 +31,9 @@
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   mkdirSync,
@@ -59,6 +59,7 @@ import {
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
@@ -67,7 +68,6 @@ import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 

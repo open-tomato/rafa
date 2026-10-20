@@ -1,5 +1,5 @@
 /**
- * `loadModules` (`src/modules/load.ts`) and `selectSync`
+ * `loadModules` (`packages/rafa/src/modules/load.ts`) and `selectSync`
  * (`src/effort/sync/select.ts`) over the REAL
  * `packages/rafa-sync-service` package, not the `sync-fixture` stand-in
  * `select.test.ts` drives: a `.rafa/config.yaml` naming `effort.sync:
@@ -21,8 +21,8 @@
  * path without opening it (`openSqliteStore(repoRoot).path()` never
  * touches disk), so both cases hold `ROOT` absent throughout.
  */
-import type { LoadedModules } from '../modules/load.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { LoadedModules } from '@open-tomato/rafa/modules/load';
 
 import '../config-registry.js';
 
@@ -34,9 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import { SyncModuleMissing, selectSync } from '../effort/sync/select.js';
-import { loadModules, moduleSettings } from '../modules/load.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-sync-service-package-')));
 

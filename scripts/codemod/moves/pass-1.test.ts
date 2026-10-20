@@ -10,6 +10,16 @@ import { PASS_1_MOVES } from './pass-1';
 const ROOT = join(import.meta.dir, '..', '..', '..');
 const MOVE_COUNT = 36;
 
+/** Whether the move has run on this tree: every listed `to` exists. */
+const moved = PASS_1_MOVES.every((move) => existsSync(join(ROOT, move.to)));
+
+/** Where a listed file sits on this tree: its `to` once the move has run, its `from` before. */
+function sitting(move: (typeof PASS_1_MOVES)[number]): string {
+  return moved
+    ? move.to
+    : move.from;
+}
+
 function trackedFiles(): ReadonlySet<string> {
   const result = Bun.spawnSync(['git', 'ls-files', '-z'], { cwd: ROOT, stdout: 'pipe' });
   return new Set(result.stdout.toString().split('\0')
@@ -34,7 +44,7 @@ describe('PASS_1_MOVES', () => {
     }
   });
 
-  it('lists only tracked sources and no destination that exists', () => {
+  it.skipIf(moved)('lists only tracked sources and no destination that exists', () => {
     for (const move of PASS_1_MOVES) {
       expect(tracked.has(move.from)).toBe(true);
       expect(tracked.has(move.to)).toBe(false);
@@ -42,10 +52,18 @@ describe('PASS_1_MOVES', () => {
     }
   });
 
+  it.skipIf(!moved)('leaves each source gone and each destination tracked once the move has run', () => {
+    for (const move of PASS_1_MOVES) {
+      expect([move.from, tracked.has(move.from), existsSync(join(ROOT, move.from))]).toEqual([move.from, false, false]);
+      expect([move.to, tracked.has(move.to)]).toEqual([move.to, true]);
+    }
+  });
+
   it('has no relative import reaching outside the list and packages/rafa/', () => {
     const resolve = bunResolver(ROOT);
     const escapes: string[] = [];
-    for (const { from } of PASS_1_MOVES) {
+    for (const move of PASS_1_MOVES) {
+      const from = sitting(move);
       const specifiers = textImports(readFileSync(join(ROOT, from), 'utf8')).filter((s) => s.startsWith('.'));
       for (const specifier of specifiers) {
         const target = resolve(specifier, from);
@@ -62,7 +80,8 @@ describe('PASS_1_MOVES', () => {
   it('has no relative import resolving under src/cli/', () => {
     const resolve = bunResolver(ROOT);
     const reaches: string[] = [];
-    for (const { from } of PASS_1_MOVES) {
+    for (const move of PASS_1_MOVES) {
+      const from = sitting(move);
       const specifiers = textImports(readFileSync(join(ROOT, from), 'utf8')).filter((s) => s.startsWith('.'));
       for (const specifier of specifiers) {
         if (resolve(specifier, from)?.startsWith('src/cli/')) {

@@ -134,7 +134,7 @@ import type {
 } from './suite-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';

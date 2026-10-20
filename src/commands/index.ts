@@ -49,13 +49,13 @@
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
- * `src/project/position.ts`, nor `board list`, which lists the open
+ * `packages/rafa/src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
  * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
  * repository's GitHub project in step through
  * `src/board/project/sync.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
- * `module exec`, which read the modules `src/modules/load.ts` loads and
+ * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
  * definitions through `src/agents/roster.ts`, nor `agent list`, which
  * lists the agents `buildInventory` (`src/inventory/`) reads, nor

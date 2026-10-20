@@ -30,8 +30,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { parseBoardListing } from '../board/roadmap-board.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 
 import { gateBoards, nextOwnerGate } from './owner-gate.js';
 

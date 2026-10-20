@@ -19,9 +19,9 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { Place, Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +29,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
 import { readEpics } from '../board/epics.js';
-import { positionFilePath, readPositionFile, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
 import {

@@ -118,6 +118,7 @@ import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { IssueDraft, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
 
+import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -125,7 +126,6 @@ import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-valu
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
-import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import { BUG_FLAGS, readBugLine } from './create-bug.js';

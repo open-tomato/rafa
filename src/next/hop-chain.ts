@@ -88,7 +88,7 @@ import type { BoardView } from '../board/epic-board.js';
 import type { EpicRelations } from '../board/epics.js';
 import type { RelatedIssue } from '../board/relations/port.js';
 import type { RoadmapReadings } from '../board/roadmap.js';
-import type { Place, Position } from '../project/position.js';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { blockedLineOf } from '../board/blocked-line.js';
 import { locateBlockerEpic, noHopSentence } from '../board/blocker-epic.js';

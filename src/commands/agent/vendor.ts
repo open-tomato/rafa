@@ -95,8 +95,8 @@
  * failed, the message naming the file and what the error said.
  */
 import type { AgentDefinitionFile } from '../../agents/roster.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

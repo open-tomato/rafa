@@ -224,7 +224,7 @@
  * naming it, where the computed case above compares a bundle with a
  * source that could have lost it as well. The root bundle's
  * `PORT_VERSIONS` is held to the source's, its `RUNNING_MANIFEST_SEAMS`
- * to the manifest's `version`, which `src/modules/manifest.ts` takes as
+ * to the manifest's `version`, which `packages/rafa/src/modules/manifest.ts` takes as
  * `RAFA_VERSION` from `@open-tomato/rafa/core/command`, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
@@ -537,6 +537,11 @@ const EXPORTS = {
   './ports/log-level': { types: './dist/ports/log-level.d.ts' },
   './report/parse': { types: './dist/report/parse.d.ts' },
   './store/check-rows': { types: './dist/effort/store/check-rows.d.ts' },
+  './bugs/record': { types: './dist/bugs/record.d.ts' },
+  './config-schema-bugs': { types: './dist/config-schema-bugs.d.ts' },
+  './config-schema-errors': { types: './dist/config-schema-errors.d.ts' },
+  './config-schema-features': { types: './dist/config-schema-features.d.ts' },
+  './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
 };
 
 /** The prefix of a specifier that names one of the package's own subpaths. */
@@ -1120,7 +1125,7 @@ async function expectedPlanPrompt(scratch: PlanScratch, root: string): Promise<s
 /**
  * The root `rafa plan` runs on when spawned in the scratch repository:
  * the project the dispatcher resolved, a real path with every symlink
- * followed (`src/project/scope.ts`).
+ * followed (`packages/rafa/src/project/scope.ts`).
  */
 function dispatchedRoot(scratch: PlanScratch): string {
   return realpathSync(scratch.repo);
@@ -1234,7 +1239,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(16);
+    expect(targets).toHaveLength(21);
     expect(missing).toEqual([]);
   });
 

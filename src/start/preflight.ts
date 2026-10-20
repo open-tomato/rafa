@@ -361,6 +361,7 @@ import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
+import { listOpenTasks } from '@open-tomato/rafa/utils/tracker';
 
 import {
   collidingPlanSkills,
@@ -381,7 +382,6 @@ import {
   prerequisitesPathForPlan,
 } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
-import { listOpenTasks } from '../utils/tracker.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { reportStartDrift } from './preflight-drift.js';

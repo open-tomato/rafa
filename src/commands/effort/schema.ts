@@ -29,13 +29,12 @@ import type { SchemaReport, SchemaReportOptions } from '@open-tomato/rafa/store/
 
 import { join } from 'node:path';
 
+import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { gateMeaning, readSchemaReport } from '@open-tomato/rafa/store/schema-report';
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
-
-import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort schema';

@@ -60,6 +60,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import {
   activeChecks,
   activeConfigLoadHook,
@@ -80,7 +81,6 @@ import {
   setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { templateEntry } from './config/templates.js';
 import {
   CONFIG_DEFAULTS,

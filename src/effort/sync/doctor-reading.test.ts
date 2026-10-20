@@ -9,7 +9,7 @@
  *
  * Each reading sits beside its control: `git` with no module fails and
  * the same `git` with the `sync-fixture` module under
- * `src/modules/testdata/` passes as a module's; and the problem a failing
+ * `packages/rafa/src/modules/testdata/` passes as a module's; and the problem a failing
  * reading carries is compared with the message `selectSync` throws for
  * the same config, which opens with the row's name, so the name is seen
  * to be taken off rather than never there.
@@ -47,7 +47,7 @@ const ROOT = join(tempBase, 'project');
 const HOME = join(tempBase, 'home');
 
 /** The module whose `git` sync adapter the passing control loads. */
-const FIXTURE_MODULE = fileURLToPath(new URL('../../modules/testdata/sync-fixture', import.meta.url));
+const FIXTURE_MODULE = fileURLToPath(new URL('../../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 /** The manifest seams the fixture module is held to, as `select.test.ts` holds it. */
 const SEAMS = { syncModules: { manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } } };

@@ -228,7 +228,7 @@ start` today; any other command reads it as text. The named event is a fifth
 `CliEvent` kind, `{ type: 'event', name, summary, data, ts }`
 (`packages/rafa/src/ports/index.ts`): text drops it, json writes it whole, and
 the events adapter prints its `summary` after the prefix. Every kind is padded
-to one column of 17 (`padKind`, `src/adapters/output/events.ts`):
+to one column of 17 (`padKind`, `packages/rafa/src/adapters/output/events.ts`):
 
 ```text
 rafa· task 3/9 start   "Group duplicate bugs"

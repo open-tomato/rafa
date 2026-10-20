@@ -5,7 +5,7 @@
  * ## What is listed
  *
  * Each `modules:` source, in order, as `loadModules` reads it
- * (`src/modules/load.ts`): its name, version and types, whether
+ * (`packages/rafa/src/modules/load.ts`): its name, version and types, whether
  * `allowList:` names it, its state (`loaded`, `refused` or `disabled`),
  * the adapters it registered, its command entry, and every problem. A
  * disabled module is read and validated too, so its problems say why it
@@ -29,16 +29,15 @@
  * Exit code 1 for an argument, and for a config `loadConfig` refuses. The
  * command declares no flag.
  */
-import type { ConfiguredModule, ModuleLoadSeams } from '../../modules/load.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ModuleSource } from '@open-tomato/rafa/core/config';
+import type { ConfiguredModule, ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-
-import { loadModules, moduleSettings } from '../../modules/load.js';
-import { expectNoArgument } from '../plan/plan-files.js';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa module list';

@@ -72,6 +72,21 @@
     },
     "./store/check-rows": {
       "types": "./dist/effort/store/check-rows.d.ts"
+    },
+    "./bugs/record": {
+      "types": "./dist/bugs/record.d.ts"
+    },
+    "./config-schema-bugs": {
+      "types": "./dist/config-schema-bugs.d.ts"
+    },
+    "./config-schema-errors": {
+      "types": "./dist/config-schema-errors.d.ts"
+    },
+    "./config-schema-features": {
+      "types": "./dist/config-schema-features.d.ts"
+    },
+    "./config-schema-logger": {
+      "types": "./dist/config-schema-logger.d.ts"
     }
   },
   "files": [

@@ -18,7 +18,7 @@
  *
  * In its module mode it loads the modules of a scratch project, with
  * `loadInvocationModules` and `activateModuleAdapters`. With no module
- * configured nothing under `src/modules/testdata/` is loaded and
+ * configured nothing under `packages/rafa/src/modules/testdata/` is loaded and
  * `CORE_ADAPTER_REGISTRY` holds core's kinds alone; with `sync-fixture`
  * on `modules:` and `allowList:` its `sync.ts` is loaded and its `git`
  * kind resolves.
@@ -41,8 +41,8 @@ const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /** The probe, as a path the spawned `bun` is handed. */
 const PROBE = fileURLToPath(new URL('./feature-load-probe.ts', import.meta.url));
 
-/** The `sync-fixture` module's directory under `src/modules/testdata/`. */
-const FIXTURE_MODULE = fileURLToPath(new URL('../modules/testdata/sync-fixture', import.meta.url));
+/** The `sync-fixture` module's directory under `packages/rafa/src/modules/testdata/`. */
+const FIXTURE_MODULE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 /** How long one spawned probe may run. */
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -157,13 +157,13 @@ describe('the roster in a fresh process', () => {
 });
 
 describe('the modules of a scratch project in a fresh process', () => {
-  it('loads nothing under src/modules/testdata/ and leaves core\'s kinds alone when no module is configured', async () => {
+  it('loads nothing under packages/rafa/src/modules/testdata/ and leaves core\'s kinds alone when no module is configured', async () => {
     const { project, home } = plantProject('none', 'version: 1\n');
 
     const reading = await probe<ModulesReading>([`--project=${project}`, `--home=${home}`], home);
 
     expect(reading.warnings).toEqual([]);
-    expect(reading.loaded.filter((path) => path.startsWith('src/modules/testdata/'))).toEqual([]);
+    expect(reading.loaded.filter((path) => path.startsWith('packages/rafa/src/modules/testdata/'))).toEqual([]);
     expect(reading.kindsBefore['sync']?.length).toBeGreaterThan(0);
     expect(reading.kindsAfter).toEqual(reading.kindsBefore);
     expect(reading.kindsBefore['sync']).not.toContain('git');
@@ -177,7 +177,7 @@ describe('the modules of a scratch project in a fresh process', () => {
     const reading = await probe<ModulesReading>([`--project=${project}`, `--home=${home}`], home);
 
     expect(reading.warnings).toEqual([]);
-    expect(reading.loaded).toContain('src/modules/testdata/sync-fixture/sync.ts');
+    expect(reading.loaded).toContain('packages/rafa/src/modules/testdata/sync-fixture/sync.ts');
     expect(reading.syncGitResolves).toBe(true);
     expect(reading.kindsAfter['sync']).toEqual([...(reading.kindsBefore['sync'] ?? []), 'git']);
   }, RUN_TIMEOUT);

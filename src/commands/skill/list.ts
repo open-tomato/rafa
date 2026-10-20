@@ -107,22 +107,22 @@
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { InventoryRecord } from '../../inventory/record.js';
-import type { ModuleLoadSeams } from '../../modules/load.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
 import { pathDirectories } from '../../check/references.js';
 import { processTerminal, refuseWithoutTerminal } from '../../cli/prompt/terminal.js';
 import { browse } from '../../inventory/browse.js';
 import { buildInventory } from '../../inventory/index.js';
-import { loadModules, moduleSettings } from '../../modules/load.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 
 /** What neither the context nor the registry carries. */
 export interface SkillListSeams {

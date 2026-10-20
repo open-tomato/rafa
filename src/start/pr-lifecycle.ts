@@ -131,6 +131,7 @@ import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runClaude, spawnClaude } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
@@ -146,7 +147,6 @@ import {
   resolvePrProvider,
   waitForChecks,
 } from '../pr/index.js';
-import { readCheckedOutBranch } from '../utils/git.js';
 
 import { withStamp } from './stamp.js';
 

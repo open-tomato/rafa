@@ -138,13 +138,14 @@ import type { BundledEdit } from './bundled-check.js';
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
+import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
@@ -165,7 +166,6 @@ import { validatePlan } from '../../plan/validate.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 
 import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
-import { expectOneArgument } from './plan-files.js';
 import { checkStoreRules } from './store-check.js';
 
 /** The usage line a refusal names. */

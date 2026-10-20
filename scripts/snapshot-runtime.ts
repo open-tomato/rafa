@@ -24,7 +24,7 @@
  * Every line goes out after `[snapshot] `: progress to stdout, and a
  * refusal, a failure and a config warning to stderr. After an install it
  * warns, on stderr, when `~/.rafa/bin` is not on this process's `PATH`
- * ahead of `~/.bun/bin` (`src/project/bin-path.ts`), since a `rafa` found
+ * ahead of `~/.bun/bin` (`packages/rafa/src/project/bin-path.ts`), since a `rafa` found
  * first in `~/.bun/bin` would run instead; a warning never changes the
  * exit code.
  *
@@ -37,7 +37,7 @@
  * `PATH` it reads and the install options, so a test points every path
  * under a temporary directory of its own and never runs the real build.
  * The seams name no reading of the live loops, so the install reads the
- * session records under the checkout (`src/runtime/live-loops.ts`).
+ * session records under the checkout (`packages/rafa/src/runtime/live-loops.ts`).
  */
 import type { InstallOptions, InstallSeams } from '../src/runtime/install.js';
 
@@ -45,8 +45,8 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 
-import { readBinPath } from '../src/project/bin-path.js';
 import { EXIT_COULD_NOT_RUN, exitCodeFor, FORCE_FLAG, installRuntime, outcomeProblem, runBuild } from '../src/runtime/install.js';
 
 /** Prefix on every line this script writes. */

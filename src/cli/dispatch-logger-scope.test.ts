@@ -1,8 +1,8 @@
 /**
  * Tests for the logger part of the async scope the dispatcher runs a
  * command in (`src/cli/dispatch.ts`, "The logger"): the active logger
- * (`src/adapters/logger/active.ts`) and the logger settings
- * (`src/adapters/logger/settings.ts`) each invocation carries, read from
+ * (`packages/rafa/src/adapters/logger/active.ts`) and the logger settings
+ * (`packages/rafa/src/adapters/logger/settings.ts`) each invocation carries, read from
  * inside a command's `run`, and what is left once invocations that
  * overlap have ended. The running command and the active output of that
  * scope are `dispatch-scope.test.ts`'s, and what one invocation alone
@@ -69,11 +69,11 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { activeLogger, setActiveLogger } from '@open-tomato/rafa/adapters/logger/active';
+import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
-import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
-import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
 

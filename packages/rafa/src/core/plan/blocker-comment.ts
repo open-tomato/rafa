@@ -4,12 +4,12 @@
  * {@link repairsComment}, the escape pair they write with, and the
  * reader {@link splitBlockerComment}.
  *
- * The family moved here from `src/utils/tracker.ts`, which re-exports
+ * The family moved here from `packages/rafa/src/utils/tracker.ts`, which re-exports
  * its public names under the same names for the importers outside core.
  * `plan/parse.ts` reads a task's text through {@link splitBlockerComment},
  * so with the family in core the parser imports nothing above it.
  *
- * The tracker's line writers in `src/utils/tracker.ts` (marking a line
+ * The tracker's line writers in `packages/rafa/src/utils/tracker.ts` (marking a line
  * blocked, ticking it, inserting a repair) take a line's comments off
  * and put them back with {@link splitTrailingComments},
  * {@link commentText}, {@link keptRepairs} and {@link BLOCKER_GAP}, so

@@ -99,12 +99,12 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
+import { rootCandidates } from '@open-tomato/rafa/project/roots';
 
 import { BOARD_LABELS } from '../board/setup.js';
-import { readBinPath } from '../project/bin-path.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
-import { rootCandidates } from '../project/roots.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 import { dispatchCaptured, eventsOf, expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 

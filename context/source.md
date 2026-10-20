@@ -21,7 +21,7 @@ spells out, and the shapes the lint config forces.
   `../../release/version-tag.js` so two writers cannot spell one tag
   differently. Reach for the existing helper — a second spelling of a
   refusal is the real smell, as `release status`'s hand-rolled
-  `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
+  `Expected no arguments` is beside `packages/rafa/src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
   `src/commands/release/workflows.ts` takes `readLadderFiles` from
   `src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
@@ -154,7 +154,14 @@ also `packages/rafa/src/ports/`, the effort store under
 `packages/rafa/src/effort/store/`, `packages/rafa/src/report/record.ts` and
 the cause codes of `packages/rafa/src/errors/codes.ts` and
 `packages/rafa/src/errors/rafa-codes.ts`: core by assignment, kept where they
-are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
+are. Pass 1 of #808 moved in the 36 root files that reach no feature
+(`scripts/codemod/moves/pass-1.ts`), each at its old path below `src/`: the
+logger and events adapters, `bugs/`, `commands/plan/plan-files.ts`, four
+`config-schema-*.ts` section files, `modules/`, `next/hop-record.ts`,
+`plan/`, `project/`, `runtime/live-loops.ts` and `utils/`. They sit outside
+`core/`, so no barrel rule holds them: a file outside the package imports each
+by its own subpath, which core's `exports` names by a key or a folder
+wildcard. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
 `scripts/survey/core-moves.ts` list core's folders and named files, and
 `isCoreFile` reads them: the one place a sweep, a survey script or a spawned
 loader takes core's location from.
@@ -227,7 +234,9 @@ files it read at load, so an empty read cannot pass. A module augmentation is
 no import: a `declare module` naming
 `@open-tomato/rafa/core/config/config-schema`, which each
 `src/config-schema-*.ts` file writes to add its fields to `RafaConfig`, is
-answered under `augment` and passes. It has to name the declaring file:
+answered under `augment` and passes. The four section files inside the
+package (`packages/rafa/src/config-schema-*.ts`) name the same file by its
+relative path, `./core/config/config-schema.js`. It has to name the declaring file:
 spelled through the config barrel, two augmentations merged with each other
 and not with `RafaConfig`, whose `keyof` missed both. That file is one of
 core's `exports` entries until #808 retires them.
@@ -282,7 +291,9 @@ contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
 `checks`. Core names no section. The fourteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and thirteen `src/config-schema-*.ts` files. That
+own (`core-section.ts`) and thirteen `config-schema-*.ts` files, under
+`src/` and, for `bugs`, `errors`, `features` and `logger`, under
+`packages/rafa/src/`. That
 module registers nothing as it is imported: its `registerCoreConfigSections()`
 registers the fourteen with core and sets core's load hook, and `src/rafa.ts`,
 `src/index.ts` and `src/tests/preload.ts` call it ahead of
@@ -347,8 +358,8 @@ memory.
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under
-`packages/rafa/src/core/` and fails on any import of a `src/config-schema-*.ts`
-file, by any specifier `textImports` finds, so a dynamic `import()` or a
+`packages/rafa/src/core/` and fails on any import of a `config-schema-*.ts`
+section file, at the root or in the package, by any specifier `textImports` finds, so a dynamic `import()` or a
 `require()` counts as much as a static import. Like the barrel sweep, it does
 not see an argument that is not a string literal. A second `describe` holds
 `loadConfig` with no section registered to a refusal naming
@@ -368,12 +379,12 @@ stands alone, because `config-load.ts` reaches
 back. `loop/readings.ts` stands alone, because `session-readings.ts` reaches
 `packages/rafa/src/effort/store/task-finishes.ts`, from which
 `development-build.ts` imports `loop/index.ts` back. `loop/hops.ts` stands alone
-over `hop-record.ts`, split while `src/next/hop-record.ts` imported it back by
+over `hop-record.ts`, split while `packages/rafa/src/next/hop-record.ts` imported it back by
 value and the session record parser, which `sessions.ts` imports by value,
 imported that file by value; the parser now sits beside `sessions.ts` as
 `loop/session-record-parse.ts` and imports `hop-record.ts` by path, so the split
 stands as it was made. `plan/block-reader.ts` stands alone, split while
-`parse.ts` imported `src/utils/tracker.ts`, which imports `blocks.ts` back;
+`parse.ts` imported `packages/rafa/src/utils/tracker.ts`, which imports `blocks.ts` back;
 `parse.ts` now reads `plan/blocker-comment.ts` instead and no core file imports
 the tracker, so the split stands as it was made.
 
@@ -612,11 +623,13 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps eight `types`-only entries for core's
-  files (`./core/config`, `./core/config/config-schema`,
+  them. The root `exports` also keeps thirteen `types`-only entries for
+  core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
-  `./ports/log-level`, `./report/parse` and `./store/check-rows`), which
-  #808 retires.
+  `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since
+  pass 1 moved the section files in, `./bugs/record` and the four
+  `./config-schema-*` files), which #808 retires. The first pass's
+  `include` names each moved file the root's config files import.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a
@@ -722,7 +735,8 @@ the end of the template. This section replaces nothing.
   test titles without one` until 2026-09-22, which those 46 falsify.
 - **An interface whose one `extends` is its whole content is refused**
   (`@typescript-eslint/no-empty-object-type`) everywhere but
-  `src/config-schema-*.ts`, where `eslint.config.mjs` allows it: a
+  `src/config-schema-*.ts` and `packages/rafa/src/config-schema-*.ts`,
+  where `eslint.config.mjs` and the package's own leaf allow it: a
   section's `interface RafaConfig extends HubSettings {}` inside its
   `declare module` is that shape on purpose. This bullet replaces
   nothing.
@@ -804,7 +818,7 @@ names every non-test import edge and fails when a library file brings in
 the command half.
 
 **Edge case: a reader so widely used that it lives in the commands folder.**
-`src/commands/plan/plan-files.ts` is the command half of the plan readers: the
+`packages/rafa/src/commands/plan/plan-files.ts` is the command half of the plan readers: the
 first command that needed them (`rafa plan create`) wrote them there, and ten
 non-test files import it at this commit. Its library half, the readings that
 take no command context, is `packages/rafa/src/core/plan/plan-files.ts`, which

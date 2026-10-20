@@ -77,9 +77,9 @@ import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { readCheckedOutBranch } from '../utils/git.js';
 
 import { resolveRunDirs } from './checkout.js';
 import { AS_WORKTREE_FLAG, resolveRunBranch } from './run-setup.js';

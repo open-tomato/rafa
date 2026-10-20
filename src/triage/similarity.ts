@@ -68,16 +68,15 @@
  * nearest bugs, a rank of 0 is left out, and equal ranks keep the order
  * the tracker listed the bugs in.
  */
-import type { BugRecord } from '../bugs/record.js';
+import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename } from 'node:path';
 
+import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { familyOf, NEW_CONTEXT_LEAF } from '@open-tomato/rafa/errors/codes';
-
-import { parseBugRecord } from '../bugs/record.js';
-import { UNKNOWN_VALUE } from '../bugs/title.js';
 
 import { strippedText } from './bug-key.js';
 import { testFailureOf, testFilesIn } from './test-failure.js';

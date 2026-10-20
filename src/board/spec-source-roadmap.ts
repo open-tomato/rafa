@@ -81,7 +81,7 @@
  *
  * A request carrying {@link RoadmapPickOptions.followHop} (`plan create
  * --next --roadmap`, which `rafa next --roadmap` sends) first reads the
- * hop record (`.rafa/hop.json`, `src/next/hop-record.ts`) and the
+ * hop record (`.rafa/hop.json`, `packages/rafa/src/next/hop-record.ts`) and the
  * position file through {@link readAwayHop}. Where the record is a
  * `blocker` hop still `away`, and its home is still the position's, the
  * pick is the record's target C, whether `--next` or `--next=<n>` was
@@ -215,12 +215,12 @@ import type {
   RoadmapSearch,
   RoadmapSkip,
 } from './roadmap.js';
-import type { HopRecord } from '../next/hop-record.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Output } from '@open-tomato/rafa/ports';
 
-import { readHopRecord, staleAgainst } from '../next/hop-record.js';
-import { readPositionFile } from '../project/position.js';
+import { readHopRecord, staleAgainst } from '@open-tomato/rafa/next/hop-record';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 import {
   blockedLineSentence,

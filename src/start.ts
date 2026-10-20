@@ -376,6 +376,7 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { interruptClaudeSessions } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-tomato/rafa/core/plan';
+import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -439,7 +440,6 @@ import { createStartTriage, runStartFailures } from './start/triage.js';
 import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { deferUntil } from './utils/schedule.js';
-import { findNextTask, updateTrackerLine } from './utils/tracker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

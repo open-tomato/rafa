@@ -28,7 +28,7 @@
  *
  * `scope.ts` joined it with a scope's paths, `Scope`, the project the
  * dispatcher resolved, `ProjectFound`, and `scopeAt`, whose walk,
- * `resolveScope`, stays in `src/project/scope.ts`. It reads `config.ts`
+ * `resolveScope`, stays in `packages/rafa/src/project/scope.ts`. It reads `config.ts`
  * and `core-section.ts` by value and `config-load.ts` as a type, so it
  * is no leaf for `sections.ts`, and `load.ts` holds `config-load.ts`
  * alone.

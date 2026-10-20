@@ -23,7 +23,7 @@
 import type { TakenReadings } from './hop-chain.js';
 import type { BoardView } from '../board/epic-board.js';
 import type { BoardIssue, BoardIssueState } from '../board/roadmap-board.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

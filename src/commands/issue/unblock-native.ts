@@ -45,8 +45,8 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectWarn } from '../../board/project/issue-board-refresh.js';
 import type { ProjectRefresh, RefreshConfig, RefreshOptions } from '../../board/project/refresh.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { issueSubjectConfig } from './issue-tracker.js';
 

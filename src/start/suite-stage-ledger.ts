@@ -37,9 +37,9 @@ import { basename, dirname, join } from 'node:path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { BASELINE_FILE_PREFIX, baselinePathFor } from '../suite/baseline.js';
-import { findNextTask } from '../utils/tracker.js';
 
 /** The stage ledger's file name before its stub. */
 export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';

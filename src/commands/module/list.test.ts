@@ -4,14 +4,14 @@
  * Each case plants a project of its own under a temporary directory of
  * this file's own, beside an empty home, and modules as real directories
  * there. The invocation runs as `src/rafa.ts` runs it: the modules loaded
- * for the project first (`src/modules/load.ts`), then dispatched over the
+ * for the project first (`packages/rafa/src/modules/load.ts`), then dispatched over the
  * core registry with their command entries and warnings, so `mounted` is
  * read off the registry the dispatcher really mounted. The manifests are
  * held to rafa 0.1.0 through the manifest seams, handed to the loader and
  * to the command alike.
  */
-import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,10 +20,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
 
 import { dispatch } from '../../cli/dispatch.js';
 import { createCommandRegistry } from '../../cli/registry.js';
-import { loadInvocationModules } from '../../modules/load.js';
 import { eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { CORE_COMMANDS, CORE_SUBJECTS } from '../index.js';
 

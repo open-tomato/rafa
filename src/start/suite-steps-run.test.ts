@@ -26,8 +26,8 @@ import type { SuiteStepCalls } from './suite-steps-run.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,10 +36,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { baselineHaltLines, OUTSIDE_CASE_REASON } from './suite-outside-case.js';
 import { addToLedger, stageLedgerPathFor } from './suite-step.js';

@@ -94,6 +94,7 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -105,7 +106,6 @@ import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
-import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 import { DEFAULT_PR_SEAMS, onProvider, openPrContext } from '../pr/pr-context.js';
 
 import { stretchOfBase } from './item.js';

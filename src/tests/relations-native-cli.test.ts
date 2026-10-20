@@ -56,9 +56,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { positionFilePath } from '@open-tomato/rafa/project/position';
+
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
-import { positionFilePath } from '../project/position.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

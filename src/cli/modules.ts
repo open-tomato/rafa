@@ -14,7 +14,7 @@
  * ## The unit is the file
  *
  * Each entry (a `ModuleCommandEntry`, declared with its importer by
- * `src/modules/load.ts` and re-exported here) names a module and one
+ * `packages/rafa/src/modules/load.ts` and re-exported here) names a module and one
  * absolute file, whose default export is the module's `RafaCommand[]`
  * (from the modules and addons spec, under `commands.entry`). A file is
  * mounted whole or skipped whole, with one warning, and the entries
@@ -36,24 +36,23 @@
  * after its start event, so a json stream stays one event per line.
  *
  * Which modules to load is the caller's to say. `src/rafa.ts` passes the
- * command entries of the modules `src/modules/load.ts` loaded: those
+ * command entries of the modules `packages/rafa/src/modules/load.ts` loaded: those
  * `allowList:` names from a `path` source whose manifest checked out.
  */
 import type { CommandRegistry } from './registry.js';
-import type { ModuleCommandEntry, ModuleImporter } from '../modules/load.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { ModuleCommandEntry, ModuleImporter } from '@open-tomato/rafa/modules/load';
 
 import { isAbsolute } from 'node:path';
 
 import { describeValue } from '@open-tomato/rafa/core/config/sections';
-
-import { importModuleEntry } from '../modules/load.js';
+import { importModuleEntry } from '@open-tomato/rafa/modules/load';
 
 // The entry, the importer and the default import are the module loader's
-// (`src/modules/load.ts`), which owns an entry; they are re-exported here
+// (`packages/rafa/src/modules/load.ts`), which owns an entry; they are re-exported here
 // under the same names for this loader's own importers.
-export type { ModuleCommandEntry, ModuleImporter } from '../modules/load.js';
-export { importModuleEntry } from '../modules/load.js';
+export type { ModuleCommandEntry, ModuleImporter } from '@open-tomato/rafa/modules/load';
+export { importModuleEntry } from '@open-tomato/rafa/modules/load';
 
 /** The registry with every entry that loaded mounted, and a warning for each that did not. */
 export interface LoadedModuleCommands {

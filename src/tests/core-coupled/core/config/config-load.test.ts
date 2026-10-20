@@ -95,13 +95,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { ConfigError } from '@open-tomato/rafa/core/config/config';
 import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/config-load';
 import { activeConfigLoadHook, setConfigLoadHook } from '@open-tomato/rafa/core/config/section';
 import { setActiveOutput } from '@open-tomato/rafa/core/output/active';
 import { activeStoreSettings, setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from '../../../../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
 import { sinkOutput } from '../../../output-sinks.js';
 

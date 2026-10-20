@@ -10,7 +10,7 @@
  * same entry, loaded, beside the one that is skipped.
  *
  * `importModuleEntry`, the default importer, is the module loader's
- * (`src/modules/load.ts`), and its cases are in `src/modules/load.test.ts`;
+ * (`packages/rafa/src/modules/load.ts`), and its cases are in `src/tests/core-coupled/modules/load.test.ts`;
  * this file holds only that the name re-exported here is the same one.
  *
  * Each warning is spelled in full but for the part Bun writes, which is
@@ -33,7 +33,7 @@ import { pathToFileURL } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import * as load from '../modules/load.js';
+import * as load from '@open-tomato/rafa/modules/load';
 
 import { importModuleEntry, loadModuleCommands } from './modules.js';
 import { createCommandRegistry, mountKey } from './registry.js';

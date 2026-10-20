@@ -19,7 +19,7 @@
  */
 import type { PlaceLoss, PlaceOptions } from './place.js';
 import type { BoardIssue } from './roadmap-board.js';
-import type { Place, Position } from '../project/position.js';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,8 +27,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionAt, positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { positionAt, positionFilePath, writePositionFile } from '../project/position.js';
 
 import { fallbackPhrase, resolvePlace, samePlace } from './place.js';
 

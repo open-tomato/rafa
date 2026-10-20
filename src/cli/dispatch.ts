@@ -178,7 +178,7 @@
  * A command runs inside a project unless it declares
  * `needsProject: false` (`packages/rafa/src/core/command/command.ts`), as
  * `module exec`, `init` and `describe` do.
- * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
+ * Once its spec is read, `resolveScope` (`packages/rafa/src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
  * directory holding `.rafa/config.yaml`, passing over the home,
  * {@link DispatchOptions.home}. When the walk finds none, the main
@@ -246,25 +246,25 @@ import type { Ending } from './ending.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
-import type { LoggerResolver } from '../adapters/logger/active.js';
 import type { FailureBoundary } from '../errors/handler.js';
-import type { ProjectFound } from '../project/scope.js';
+import type { LoggerResolver } from '@open-tomato/rafa/adapters/logger/active';
 import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '@open-tomato/rafa/ports';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { homedir } from 'node:os';
 
+import { activeLogger, runWithActiveLogger } from '@open-tomato/rafa/adapters/logger/active';
+import { colourEnabled } from '@open-tomato/rafa/adapters/logger/colour';
+import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit , versionLine , runAsRunningCommand } from '@open-tomato/rafa/core/command';
 import { runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
 import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
+import { resolveScope, ScopeError } from '@open-tomato/rafa/project/scope';
 
-import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
-import { colourEnabled } from '../adapters/logger/colour.js';
-import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
 import { failureOf } from '../errors/handler.js';
-import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';
 import { endingError, failure, finish, messageOf, success } from './ending.js';
@@ -318,7 +318,7 @@ export interface DispatchOptions {
   readonly importModule?: ModuleImporter;
   /**
    * Warnings read before the invocation, such as those of loading the
-   * modules (`src/modules/load.ts`), written at warn level after the start
+   * modules (`packages/rafa/src/modules/load.ts`), written at warn level after the start
    * event and ahead of the module command warnings. Defaults to none.
    */
   readonly warnings?: readonly string[];

@@ -207,6 +207,8 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { Issue, IssueQuery, IssueType, TrackerKind } from '@open-tomato/rafa/ports';
 
+import { parseTitle } from '@open-tomato/rafa/bugs/title';
+import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -222,9 +224,7 @@ import { createGhBoardListing, keepListing } from '../../board/roadmap-board.js'
 import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
-import { parseTitle } from '../../bugs/title.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
-import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
 import { ISSUE_LIST_DECLARATION } from './declarations.js';

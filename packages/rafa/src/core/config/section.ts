@@ -97,7 +97,7 @@
  *
  * A setting core resolves can be read by a module outside `packages/rafa/src/core/`
  * that core must not import: the logger's settings are read through
- * `loggerSettingsOf` in `src/config-schema-logger.ts`. So the module that
+ * `loggerSettingsOf` in `packages/rafa/src/config-schema-logger.ts`. So the module that
  * lists the sections also hands core one {@link ConfigLoadHook} with
  * {@link setConfigLoadHook}, and `loadConfig` (`config-load.ts`) calls
  * {@link activeConfigLoadHook} with every config it resolves, before it

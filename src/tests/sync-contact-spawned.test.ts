@@ -21,7 +21,7 @@
  * action beyond a state that reads without throwing.
  *
  * The `service` strategy is the `hub-down-sync` module under
- * `src/modules/testdata/`, loaded through `modules:` and `allowList:`:
+ * `packages/rafa/src/modules/testdata/`, loaded through `modules:` and `allowList:`:
  * its push and pull each log their direction to `.rafa/sync-calls.log`
  * and reject as a hub that cannot be reached. So the log counts the
  * contacts a command made, and each case reads the unreachable line
@@ -59,7 +59,7 @@ afterAll(() => {
 });
 
 /** The module whose `service` strategy never reaches its hub. */
-const HUB_DOWN_MODULE = fileURLToPath(new URL('../modules/testdata/hub-down-sync', import.meta.url));
+const HUB_DOWN_MODULE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/hub-down-sync', import.meta.url));
 
 /** The hub the `service` configs name: a port nothing listens on, never dialled by the fixture. */
 const HUB_URL = 'http://127.0.0.1:9';

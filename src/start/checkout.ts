@@ -45,14 +45,13 @@
  * exit code 1 and the reading's own message, as every refusal before the
  * session record is thrown (`core/command/command.ts`).
  */
-import type { GitToplevelProbe } from '../project/roots.js';
+import type { GitToplevelProbe } from '@open-tomato/rafa/project/roots';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { gitToplevel } from '../project/roots.js';
-import { mainCheckoutOf } from '../project/worktree-root.js';
+import { gitToplevel } from '@open-tomato/rafa/project/roots';
+import { mainCheckoutOf } from '@open-tomato/rafa/project/worktree-root';
 
 /** The two directories of one run; see the module note. */
 export interface RunDirs {

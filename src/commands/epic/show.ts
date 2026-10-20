@@ -136,6 +136,7 @@ import type { TableStyle } from '../issue/roadmap-table.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
+import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -161,7 +162,6 @@ import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } fr
 import { roadmapBoard } from '../issue/list.js';
 import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
-import { readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
 import { EPIC_SHOW_DECLARATION } from './declarations.js';

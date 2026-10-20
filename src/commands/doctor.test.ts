@@ -153,6 +153,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { versionLine } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
 import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
@@ -173,8 +175,6 @@ import {
   ghMissingMessage,
   ghOnPathItem,
 } from '../pr/preflight-items.js';
-import { readBinPath } from '../project/bin-path.js';
-import { writePositionFile } from '../project/position.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';

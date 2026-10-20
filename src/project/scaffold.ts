@@ -77,6 +77,7 @@ import { join } from 'node:path';
 
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { scopeAt } from '@open-tomato/rafa/project/scope';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { CHECK_NAMES } from '../config-schema-checks.js';
@@ -86,8 +87,6 @@ import {
   RELEASE_FRAGMENT_LINES,
 } from '../release/scaffold.js';
 import { DEFAULT_ROUTES } from '../tiers/routing.js';
-
-import { scopeAt } from './scope.js';
 
 /** The directories of a project tree, under `<root>/.rafa/`, in the order they are written. */
 export const PROJECT_TREE: readonly ['specs', 'plans', 'runs', 'effort', 'instincts'] = Object.freeze(['specs', 'plans', 'runs', 'effort', 'instincts'] as const);

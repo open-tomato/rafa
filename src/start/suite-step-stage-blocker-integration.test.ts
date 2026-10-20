@@ -44,12 +44,12 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { BLOCKER_PROMPT_PREFIX } from './dispatch.js';
 

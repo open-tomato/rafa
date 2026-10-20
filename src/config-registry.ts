@@ -7,8 +7,8 @@
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
  * the fourteen are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the thirteen files `src/config-schema-*.ts` that
- * each export one.
+ * (`CORE_SECTION`) and the thirteen files `config-schema-*.ts` that
+ * each export one, under `src/` or, for four, under `packages/rafa/src/`.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -94,6 +94,16 @@ import type {
   SettingSpec,
 } from '@open-tomato/rafa/core/config';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from '@open-tomato/rafa/config-schema-bugs';
+import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from '@open-tomato/rafa/config-schema-errors';
+import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from '@open-tomato/rafa/config-schema-features';
+import {
+  LOGGER_DEFAULTS,
+  LOGGER_SECTION,
+  LOGGER_SETTINGS,
+  loggerSettingsOf,
+} from '@open-tomato/rafa/config-schema-logger';
 import {
   activeSettings,
   CORE_SECTION,
@@ -102,25 +112,15 @@ import {
   setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config';
 
-import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { templateEntry } from './config/templates.js';
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
   BOARD_PROJECT_SECTION,
 } from './config-schema-board-project.js';
-import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from './config-schema-bugs.js';
 import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from './config-schema-checks.js';
-import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
-import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from './config-schema-features.js';
 import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
 import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
-import {
-  LOGGER_DEFAULTS,
-  LOGGER_SECTION,
-  LOGGER_SETTINGS,
-  loggerSettingsOf,
-} from './config-schema-logger.js';
 import {
   LOOP_CONTINUE_DEFAULTS,
   LOOP_CONTINUE_SECTION,

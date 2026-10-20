@@ -117,7 +117,7 @@ what the plan changed. A plan whose every task line is declared
 writes this rule (`src/bundled/skills/dev-planner/SKILL.md`).
 `rafa plan validate` checks it and answers the warning `missing-doc-task`,
 which never refuses a plan, so a plan written before the rule still runs
-(`src/plan/doc-task.ts`).
+(`packages/rafa/src/plan/doc-task.ts`).
 
 **What the doc task is handed.** Its prompt gets a section headed
 `## Documentation to repair` (`src/docs/task-reading.ts`, placed by
@@ -333,7 +333,7 @@ removing the `[BLOCKED]` mark on its line in the tracker.
 **A suite repair line names the task it repairs, and the repair is handed that
 task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
 after its declaration and before its blocker comment, and `TaskInfo.repairs`
-reads the text back (`src/utils/tracker.ts`). A task-step repair names the
+reads the text back (`packages/rafa/src/utils/tracker.ts`). A task-step repair names the
 task whose step was red, and a stage-step repair names the last task of that
 stage. A pre-wrap-up repair names nothing and has no comment, since the whole
 suite is what it repairs. Under `plan.inject: stage` a repair that names a
@@ -775,7 +775,7 @@ file to a scratch path first, restore from the copy, and verify with
 `shasum -c`.
 
 **`progress.txt` is not tracked**, living only via `.gitignore`. It is
-derived: `src/utils/progress.ts` rewrites it whole from the store's `findings`
+derived: `packages/rafa/src/utils/progress.ts` rewrites it whole from the store's `findings`
 rows before every dispatch, so a render over an empty store blanks what a
 session wrote there by hand. The stray `@progress.txt` file has been
 deleted.

@@ -52,9 +52,9 @@ import type { DemotionAction, DemotionActionKind } from '../../demote/apply.js';
 import type { DemotionVerdict } from '../../demote/classify.js';
 import type { DemotionReport } from '../../demote/report.js';
 import type { DemotionScope } from '../../demote/select.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctScope } from '../../schema/instinct.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

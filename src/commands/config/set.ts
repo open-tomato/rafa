@@ -65,13 +65,13 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { expectOneArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
 import { AGENT_SHELL_ENV, isAgentShell } from '../../utils/agent-shell.js';
-import { expectOneArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa config set';

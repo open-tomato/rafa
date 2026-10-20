@@ -54,6 +54,7 @@ import type { SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '@open-tomato/rafa/core/loop/readings';
 import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { sessionPhase } from '@open-tomato/rafa/core/loop';
 import {
@@ -67,7 +68,6 @@ import {
 import { countTasks } from '@open-tomato/rafa/core/plan';
 
 import { blockedTasks } from '../../loop/blocked-tasks.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   etaLine,
