@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
@@ -8,6 +8,9 @@ import { templateEntry } from '../../src/config/templates';
 import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
 
 import { readTestKindGlobs, testKind } from './test-kinds';
+
+/** This repository's root, whose tracked `rafa.config.ts` the spec's case copies. */
+const REPO_ROOT = resolve(import.meta.dir, '../..');
 
 /** The defaults, as a project with no `tests` key and no template reads them: both empty. */
 const DEFAULTS = { contract: TESTS_DEFAULTS.testsContract, integration: TESTS_DEFAULTS.testsIntegration };
@@ -61,59 +64,101 @@ describe('readTestKindGlobs', () => {
     writeFileSync(join(root, '.rafa', 'config.yaml'), text);
   }
 
-  it('answers the defaults for a project with no config file', () => {
-    expect(readTestKindGlobs(root)).toEqual(DEFAULTS);
+  /** Writes `entries` as the project's `rafa.config.ts`, its default export. */
+  function plantModule(entries: readonly unknown[]): void {
+    writeFileSync(join(root, 'rafa.config.ts'), `export default ${JSON.stringify(entries)};\n`);
+  }
+
+  it('answers the defaults for a project with no config file', async () => {
+    expect(existsSync(join(root, 'rafa.config.ts'))).toBe(false);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+    expect(await readTestKindGlobs(root)).toEqual(DEFAULTS);
   });
 
-  it('answers the defaults for a config that sets no tests key', () => {
+  it('answers the defaults for a config that sets no tests key', async () => {
     plantConfig('cleanup:\n  keep: []\n');
-    expect(readTestKindGlobs(root)).toEqual(DEFAULTS);
+    expect(await readTestKindGlobs(root)).toEqual(DEFAULTS);
   });
 
-  it('answers the escalation template\'s lists for a config naming it and no tests key', () => {
+  it('answers the escalation template\'s lists for a project whose only config is a rafa.config.ts naming it', async () => {
+    plantModule([{ templates: ['escalation'] }]);
+    const globs = await readTestKindGlobs(root);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+    expect(globs).toEqual(ESCALATION);
+    expect(testKind('src/a/b.contract.test.ts', globs)).toBe('contract');
+    expect(testKind('src/a/b-integration.test.ts', globs)).toBe('use-case');
+  });
+
+  it('classifies the two paths as contract and use-case under a copy of this repository\'s rafa.config.ts and no .rafa folder', async () => {
+    copyFileSync(join(REPO_ROOT, 'rafa.config.ts'), join(root, 'rafa.config.ts'));
+    const globs = await readTestKindGlobs(root);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+    expect(testKind('src/a/b.contract.test.ts', globs)).toBe('contract');
+    expect(testKind('src/a/b-integration.test.ts', globs)).toBe('use-case');
+    // The control: the same two paths under the defaults read as unit tests.
+    expect(testKind('src/a/b.contract.test.ts', DEFAULTS)).toBe('unit');
+    expect(testKind('src/a/b-integration.test.ts', DEFAULTS)).toBe('unit');
+  });
+
+  it('reads the YAML file\'s tests.contract over its module file\'s', async () => {
+    plantModule([{ tests: { contract: ['**/*.module.test.ts'] } }]);
+    plantConfig('tests:\n  contract:\n    - \'**/*.local.test.ts\'\n');
+    const globs = await readTestKindGlobs(root);
+    expect(globs.contract).toEqual(['**/*.local.test.ts']);
+    expect(testKind('src/a/b.local.test.ts', globs)).toBe('contract');
+    expect(testKind('src/a/b.module.test.ts', globs)).toBe('unit');
+  });
+
+  it('reads the module file\'s tests.contract where the YAML file sets none', async () => {
+    plantModule([{ tests: { contract: ['**/*.module.test.ts'] } }]);
+    plantConfig('cleanup:\n  keep: []\n');
+    expect((await readTestKindGlobs(root)).contract).toEqual(['**/*.module.test.ts']);
+  });
+
+  it('answers the escalation template\'s lists for a YAML config naming it and no tests key', async () => {
     plantConfig('templates: [escalation]\n');
-    const globs = readTestKindGlobs(root);
+    const globs = await readTestKindGlobs(root);
     expect(globs).toEqual(ESCALATION);
     expect(globs.integration.length).toBeGreaterThan(0);
     expect(testKind('src/tests/references-gate-spawned.test.ts', globs)).toBe('use-case');
   });
 
-  it('lays the template under the file\'s own tests keys', () => {
+  it('lays the template under the file\'s own tests keys', async () => {
     plantConfig('templates: [escalation]\ntests:\n  integration: []\n');
-    const globs = readTestKindGlobs(root);
+    const globs = await readTestKindGlobs(root);
     expect(globs.integration).toEqual([]);
     expect(globs.contract).toEqual(ESCALATION.contract);
   });
 
-  it('refuses a template name no template holds, naming the file and the known names', () => {
+  it('refuses a template name no template holds, naming the file and the known names', async () => {
     plantConfig('templates: [nosuch]\n');
-    expect(() => readTestKindGlobs(root)).toThrow(/config\.yaml: templates names "nosuch".*escalation/);
+    await expect(readTestKindGlobs(root)).rejects.toThrow(/config\.yaml: templates names "nosuch".*escalation/);
   });
 
-  it('keeps tests.integration: [] empty and the contract list at its default', () => {
+  it('keeps tests.integration: [] empty and the contract list at its default', async () => {
     plantConfig('tests:\n  integration: []\n');
-    const globs = readTestKindGlobs(root);
+    const globs = await readTestKindGlobs(root);
     expect(globs.integration).toEqual([]);
     expect(globs.contract).toEqual(TESTS_DEFAULTS.testsContract);
     expect(testKind('src/tests/references-gate-spawned.test.ts', globs)).toBe('unit');
   });
 
-  it('reads a list the file sets in place of the default', () => {
+  it('reads a list the file sets in place of the default', async () => {
     plantConfig('tests:\n  contract:\n    - \'**/*.promise.test.ts\'\n');
-    const globs = readTestKindGlobs(root);
+    const globs = await readTestKindGlobs(root);
     expect(globs.contract).toEqual(['**/*.promise.test.ts']);
     expect(globs.integration).toEqual(TESTS_DEFAULTS.testsIntegration);
     expect(testKind('src/a/b.promise.test.ts', globs)).toBe('contract');
     expect(testKind('src/a/b.contract.test.ts', globs)).toBe('unit');
   });
 
-  it('refuses a tests key that is not a mapping', () => {
+  it('refuses a tests key that is not a mapping', async () => {
     plantConfig('tests: 3\n');
-    expect(() => readTestKindGlobs(root)).toThrow('tests');
+    await expect(readTestKindGlobs(root)).rejects.toThrow('tests');
   });
 
-  it('refuses a glob list that is not a list of strings', () => {
+  it('refuses a glob list that is not a list of strings', async () => {
     plantConfig('tests:\n  integration: 3\n');
-    expect(() => readTestKindGlobs(root)).toThrow('tests.integration');
+    await expect(readTestKindGlobs(root)).rejects.toThrow('tests.integration');
   });
 });
