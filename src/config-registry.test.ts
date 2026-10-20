@@ -30,6 +30,14 @@
  * core config barrel alone, so the probe can tell a registration from
  * its absence.
  *
+ * Core's whole-record readers, `registeredSettings()` and
+ * `registeredDefaults()`, which the feature files read in place of
+ * this module, are held to answer {@link SETTINGS} and
+ * {@link CONFIG_DEFAULTS} off the preload's registration, every name in
+ * schema order and each entry the same spec or value; over an emptied
+ * registry both refuse naming this module, the control that the
+ * readers answer the registration and not a record of their own.
+ *
  * The load hook the root sets is held to be {@link handConfigToLogger},
  * and that function to hand the logger the settings of the config it is
  * given, each away from its default so a hook that handed the defaults
@@ -65,6 +73,8 @@ import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   registerConfigSections,
+  registeredDefaults,
+  registeredSettings,
   restoreConfigSections,
   setConfigLoadHook,
   setConfigTemplateHook,
@@ -394,6 +404,35 @@ describe('the registration the preload made', () => {
         + ' a dangerous. key is a person\'s consent and one package defines it',
     );
     expect(activeSettings()).toBe(before);
+  });
+});
+
+describe('the whole-record readers core answers off the registration', () => {
+  it('answers SETTINGS from registeredSettings, every setting in schema order and each as the same spec', () => {
+    const registered = registeredSettings();
+    const differing = SETTING_NAMES.filter((setting) => registered[setting] !== SETTINGS[setting]);
+
+    expect(Object.keys(registered)).toEqual(KEYS.map(([setting]) => setting));
+    expect(differing).toEqual([]);
+  });
+
+  it('answers CONFIG_DEFAULTS from registeredDefaults, every default in schema order and each as the same value', () => {
+    const registered = registeredDefaults();
+    const differing = SETTING_NAMES.filter((setting) => registered[setting] !== CONFIG_DEFAULTS[setting]);
+
+    expect(Object.keys(registered)).toEqual(KEYS.map(([setting]) => setting));
+    expect(differing).toEqual([]);
+  });
+
+  it('refuses both over an empty registry, naming this module, the control', () => {
+    const held = registerConfigSections([]);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      expect(() => registeredSettings()).toThrow(ConfigSectionError);
+      expect(() => registeredDefaults()).toThrow('call registerCoreConfigSections from src/config-registry.ts before registeredDefaults');
+    } finally {
+      restoreConfigSections(held);
+    }
   });
 });
 

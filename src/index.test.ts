@@ -23,7 +23,7 @@
  * core's section, the item readers, the section registry with the
  * key indexes it answers, and the dangerous listing with the running
  * command's phrases, which the tree reads and the package does not
- * publish. Those thirty names are spelled under
+ * publish. Those thirty-seven names are spelled under
  * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
  * name added to the barrel still reds it until the name is added to the
  * root or to that list. The ten runtime names `config.ts` re-exports
@@ -440,6 +440,8 @@ const CONFIG_BARREL_ONLY: readonly string[] = [
   'parseConfigDocument',
   'readConfigDocument',
   'registerConfigSections',
+  'registeredDefaults',
+  'registeredSettings',
   'requiredPrerequisite',
   'restoreConfigSections',
   'restoreDangerousPhrases',

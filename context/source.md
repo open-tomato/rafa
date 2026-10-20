@@ -291,7 +291,13 @@ registers nothing. A file outside
 `packages/rafa/src/core/` takes the merged `SETTINGS`, `CONFIG_DEFAULTS`,
 `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and `knownKeysAbove` from the
 registry, never from the core barrel, which exports none of them; core reads the
-same through the `active*` functions of `section.ts`. A registration that breaks
+same through the `active*` functions of `section.ts`. A feature file that needs
+a default or a spec takes the whole record from the core barrel instead, through
+`registeredDefaults()` or `registeredSettings()` of `section.ts`, typed as
+`CONFIG_DEFAULTS` and `SETTINGS` are, so it imports no root file. Each refuses
+with a `ConfigSectionError` naming `src/config-registry.ts` while no section is
+registered, so a constant built as a module loads, before an entry registers,
+reads the section file that defines its value instead. A registration that breaks
 a rule throws from the call, naming what it refused: a setting name two sections
 define, a file key a second section defines under another setting name, which
 names both setting names too, or a `dangerous.*` key a second section defines

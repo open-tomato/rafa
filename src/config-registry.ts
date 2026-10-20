@@ -72,7 +72,11 @@
  *
  * This module is the one place the six names are built: the core barrel
  * `packages/rafa/src/core/config/index.ts` exports none of them, and a file outside
- * `packages/rafa/src/core/` imports them from here. Core reads the registered
+ * `packages/rafa/src/core/` imports them from here. A feature file reads
+ * the whole {@link SETTINGS} or {@link CONFIG_DEFAULTS} record off the
+ * registration instead, through core's `registeredSettings()` and
+ * `registeredDefaults()`, so it imports nothing of the root.
+ * Core reads the registered
  * settings and defaults through `activeSettings()` and
  * `activeDefaults()`, and the key indexes through `activeSettingByKey()`,
  * `activeSectionPaths()` and `activeKnownKeysAbove()`, all in

@@ -353,6 +353,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { trackerPathFor } from '@open-tomato/rafa/core/plan';
@@ -370,7 +371,6 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
@@ -517,11 +517,12 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   if (markdown === null) return;
 
   const agents = options.agents ?? {};
+  const defaults = registeredDefaults();
   const settings: TierSettings = {
-    settingSources: agents.settingSources ?? CONFIG_DEFAULTS.settingSources,
-    tiersRafa: agents.tiersRafa ?? CONFIG_DEFAULTS.tiersRafa,
-    tiersSkills: agents.tiersSkills ?? CONFIG_DEFAULTS.tiersSkills,
-    tiersAgents: agents.tiersAgents ?? CONFIG_DEFAULTS.tiersAgents,
+    settingSources: agents.settingSources ?? defaults.settingSources,
+    tiersRafa: agents.tiersRafa ?? defaults.tiersRafa,
+    tiersSkills: agents.tiersSkills ?? defaults.tiersSkills,
+    tiersAgents: agents.tiersAgents ?? defaults.tiersAgents,
   };
   const roots = {
     repoRoot: options.repoRoot,

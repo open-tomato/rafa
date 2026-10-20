@@ -127,6 +127,7 @@ import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runClaude, spawnClaude } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
@@ -134,7 +135,6 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 import {
   compareUrl,
   createGitRunner,
@@ -217,7 +217,7 @@ export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClau
     pushBranch: (branch) => Promise.resolve(pushBranch(dir, branch)),
     // `start()` replaces this with the project root's store under the
     // run's own `store`; see the module note.
-    readRefusedPush: refusedPushReaderIn(dir, () => readDeviceStoreId(dir, CONFIG_DEFAULTS)),
+    readRefusedPush: refusedPushReaderIn(dir, () => readDeviceStoreId(dir, registeredDefaults())),
     isGhUsable: () => ghAuthOkIn(dir),
     pulls: ghPullRequestsIn(dir),
     runClaude: (prompt, settingSources) => runClaude(prompt, settingSources, [], spawn, [], { cwd: dir }),

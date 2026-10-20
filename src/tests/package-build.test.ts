@@ -551,7 +551,11 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * of `config-load.ts` when each scope came to be read from two places, and
  * `core/config/merge-method.d.ts`, the merge methods moved out of
  * `pr/types.ts`, with `pr/types.d.ts` and `pr/checks.d.ts` no longer
- * reached.
+ * reached, and one more `index-<hash>.js` once nine feature files read
+ * the config through core's `registeredDefaults()` and
+ * `registeredSettings()`: `src/config-registry.ts` and the section files
+ * then sit in a chunk of their own, apart from the error codes and the
+ * logger settings they shared one with.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1245,7 +1249,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(164);
+    expect(before).toHaveLength(165);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
