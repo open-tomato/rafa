@@ -44,8 +44,8 @@ afterEach(() => {
 });
 
 describe('bun run lint from each workspace member', () => {
-  it('finds the ten workspace members', () => {
-    expect(memberDirs).toEqual(['eslint-config', 'rafa', 'rafa-board', 'rafa-effort', 'rafa-hub', 'rafa-inventory', 'rafa-pr', 'rafa-release', 'rafa-sync-service', 'typescript-config']);
+  it('finds the eleven workspace members', () => {
+    expect(memberDirs).toEqual(['eslint-config', 'rafa', 'rafa-board', 'rafa-effort', 'rafa-hub', 'rafa-inventory', 'rafa-pr', 'rafa-release', 'rafa-run', 'rafa-sync-service', 'typescript-config']);
   });
 
   for (const name of memberDirs) {

@@ -9,5 +9,6 @@
 /packages/rafa-inventory/ @open-tomato/maintainers
 /packages/rafa-pr/ @open-tomato/maintainers
 /packages/rafa-release/ @open-tomato/maintainers
+/packages/rafa-run/ @open-tomato/maintainers
 /packages/rafa-sync-service/ @open-tomato/maintainers
 /packages/typescript-config/ @open-tomato/maintainers

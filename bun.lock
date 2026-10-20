@@ -15,6 +15,7 @@
         "@open-tomato/rafa-inventory": "workspace:*",
         "@open-tomato/rafa-pr": "workspace:*",
         "@open-tomato/rafa-release": "workspace:*",
+        "@open-tomato/rafa-run": "workspace:*",
         "@open-tomato/rafa-typescript-config": "workspace:*",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/bun": "^1.4.0",
@@ -118,6 +119,14 @@
         "eslint": "^9.39.4",
       },
     },
+    "packages/rafa-run": {
+      "name": "@open-tomato/rafa-run",
+      "version": "0.46.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
+      },
+    },
     "packages/rafa-sync-service": {
       "name": "@open-tomato/rafa-sync-service",
       "version": "0.0.0",
@@ -196,6 +205,8 @@
     "@open-tomato/rafa-pr": ["@open-tomato/rafa-pr@workspace:packages/rafa-pr"],
 
     "@open-tomato/rafa-release": ["@open-tomato/rafa-release@workspace:packages/rafa-release"],
+
+    "@open-tomato/rafa-run": ["@open-tomato/rafa-run@workspace:packages/rafa-run"],
 
     "@open-tomato/rafa-sync-service": ["@open-tomato/rafa-sync-service@workspace:packages/rafa-sync-service"],
 
