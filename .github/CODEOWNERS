@@ -7,5 +7,6 @@
 /packages/rafa-effort/ @open-tomato/maintainers
 /packages/rafa-hub/ @open-tomato/maintainers
 /packages/rafa-inventory/ @open-tomato/maintainers
+/packages/rafa-release/ @open-tomato/maintainers
 /packages/rafa-sync-service/ @open-tomato/maintainers
 /packages/typescript-config/ @open-tomato/maintainers
