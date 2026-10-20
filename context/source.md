@@ -491,17 +491,49 @@ still counts as upward: the table's `remaining` column is the count less the
 cleared edges. A count is only as current as the graph it was read from. `tsc
 --build` with project references (#807) is the gate that certifies a cut.
 
+**The facade reader lists the names an outside file takes from a facade.**
+`scripts/survey/facade-names.ts --package=rafa-<name>` reads the root
+program's files that are not tests or test support and do not sit in the
+package, the universe its names come from, and prints each name they import
+from it, value or type, with its declaration. Three shapes it reports as
+problems rather than names: an anonymous default export (`anonymous-default`),
+a namespace import or `export *` (`namespace-import`), and two declarations
+under one name (`collision`). `--entry` prints the facade's `index.ts` as it
+would be written, and `--json` prints the whole reading.
+
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with five members, all `private`: `packages/rafa/`
-  (`@open-tomato/rafa-core`, core, the name for good), `packages/rafa-hub/`
-  (`@open-tomato/rafa-hub`), `packages/rafa-sync-service/`
-  (`@open-tomato/rafa-sync-service`), and the two config packages,
-  `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`) and
-  `packages/eslint-config/` (`@open-tomato/rafa-eslint-config`). Publishing
-  one is the manifest rule below, and the root `files` ships none of them.
+  `package.json`) with eleven members, all `private`: the five that
+  predate the facades, `packages/rafa/` (`@open-tomato/rafa-core`, core, the
+  name for good), `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
+  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and the
+  two config packages, `packages/typescript-config/`
+  (`@open-tomato/rafa-typescript-config`) and `packages/eslint-config/`
+  (`@open-tomato/rafa-eslint-config`); and the six facades that
+  `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
+  `packages/rafa-inventory/`, `packages/rafa-board/`,
+  `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
+  each under its final name, as the next bullet sets out. Publishing one is
+  the manifest rule below, and the root `files` ships none of them.
   The root publishes `@open-tomato/rafa` with core bundled.
+- **A feature package's name is a facade until its move.** Pass 2 gives each
+  of the six feature packages its final name as a facade: a private member at
+  `packages/rafa-<name>/` whose `package.json` maps `exports` `"."` to
+  `./index.ts`, has `lint` and `test` scripts and the eslint leaf's
+  devDependencies, and holds no `tsconfig.json`. The root declares it with
+  `workspace:*`. Its `index.ts` re-exports today's files from their `src/`
+  paths, with `.js` specifiers: `'../../src/effort/collect.js'`, never
+  `'.ts'`, since a `.ts` ending fails `tsc` with TS5097. The entry exports
+  exactly the names that non-test files outside the package import from it,
+  value and type alike, as `export type { … }` and `export { … }` lines and
+  nothing else. `scripts/survey/facade-names.ts --package=rafa-<name>` reads
+  that set with the checker, and `--entry` prints the entry it is written
+  from. eslint's `import/order` places a facade import in the `external`
+  group, with the other package imports, so a rewired importer (pass 3)
+  moves its line there. At its move (pass 4) the package's folder joins
+  `CUT_RULES` and the facade becomes the package's own `index`. Pass 2 moves
+  no file under `src/` and changes no importer.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
@@ -607,7 +639,9 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
   `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
   several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
-  every run prints `Multiple projects found` to stderr.
+  every run prints `Multiple projects found` to stderr. A facade holds no
+  `tsconfig.json`, so the graph check asks it no `check-types` script and
+  the references build skips it, as it skips the config packages.
 - **The composite recipe builds the three code packages' declarations.** The
   `tsconfig.json` of `packages/rafa`, `packages/rafa-hub` and
   `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
@@ -662,15 +696,17 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   import.** A member's own `node_modules/` holds only what its manifest
   declares, so a bare import resolves from its manifest and not from the
   root's. Each member but the eslint-config package declares
-  `@open-tomato/rafa-eslint-config` (`workspace:*`), `eslint` and `typescript`
-  in its `devDependencies`, the last two at the root's ranges, so one install
-  serves its scripts; the two services also declare `@open-tomato/rafa-core`
-  (`workspace:*`). The graph check's fourth refusal holds the `@open-tomato/*`
-  imports to those declarations and reads no `eslint` or `typescript` import,
-  which the scripts name. The eslint-config package lists `eslint` in its
-  `dependencies`, declares `typescript` as a `devDependency`, and imports
-  itself by name through its own `exports`. After a manifest edit, `bun
-  install` refreshes `bun.lock` and the links.
+  `@open-tomato/rafa-eslint-config` (`workspace:*`) and `eslint` in its
+  `devDependencies`, the last at the root's range, so one install serves its
+  scripts; the three with a `check-types` script and the typescript-config
+  package also declare `typescript` at the root's range, and the two services
+  also declare `@open-tomato/rafa-core` (`workspace:*`). The graph check's
+  fourth refusal holds the `@open-tomato/*` imports to those declarations and
+  reads no `eslint` or `typescript` import, which the scripts name. The
+  eslint-config package lists `eslint` in its `dependencies`, declares
+  `typescript` as a `devDependency`, and imports itself by name through its
+  own `exports`. After a manifest edit, `bun install` refreshes `bun.lock` and
+  the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
   `src/rafa.ts` and six library entries with every publishable member as

@@ -116,6 +116,11 @@ repository.
   packages with their counts, what each holds by rule, the upward edges by pair of packages, the 20 files most upward
   edges end on, the edges #118 clears, the files left to place by folder, the unassigned folders.
 
+- **`facade-pile.md`**: The ordered pile pass 3 of #808 reads for the six feature-package facades in move order: each
+  one's names and the files its entry re-exports from, with the failing ones at the bottom, none at this commit. Made by
+  `scripts/survey/facade-names.ts`, run as `--package=rafa-<name>` for each facade, at commit fb2acc8, the base of this
+  task; a facade's import check and its own test are read at the same commit.
+
 ### Cluster contract traces
 
 One markdown file per cluster, showing the cluster's scope, its boundary with the rest of the graph, and the entry points

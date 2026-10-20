@@ -3,7 +3,8 @@
 The agent task loop for ralph, packaged and ready to ship. A single-package
 implementation of the loop from `agentic-research`, with all the pieces
 running under bun and ready for publishing to npm as `@open-tomato/rafa`.
-Core and the hub's two packages are bun workspaces beside it, in `packages/`.
+Core, the hub, the two config packages and the six facades are bun workspaces
+in `packages/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.
@@ -76,5 +77,4 @@ back into every turn and the split would save nothing.
 **80 lines.** `CLAUDE.md` imports it into every turn of every session, so
 it carries the project context and the pointers above and nothing else.
 A finding promoted out of `progress.txt` therefore goes to the `context/`
-page that owns its subject, or to a new page listed above; never inline
-here.
+page that owns its subject, or to a new page listed above; never inline here.
