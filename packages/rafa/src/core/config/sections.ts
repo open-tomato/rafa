@@ -1,12 +1,12 @@
 /**
  * The barrel over the config's value readers: every name
- * `config-sections.ts`, `config-readers.ts` and `branch-template.ts`
- * export, and nothing else.
+ * `config-sections.ts`, `config-readers.ts`, `branch-template.ts` and
+ * `merge-method.ts` export, and nothing else.
  *
- * A file outside `packages/rafa/src/core/` imports this file and never the three behind
+ * A file outside `packages/rafa/src/core/` imports this file and never the four behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `packages/rafa/src/core/` imports the three directly and never this file.
+ * file inside `packages/rafa/src/core/` imports the four directly and never this file.
  *
  * ## Why the pair has a barrel of its own
  *
@@ -29,12 +29,18 @@
  * It imports `config-readers.ts` alone, so it is a leaf as the pair is,
  * and it sits beside `branchFromTemplate`, the writer it reads back.
  *
+ * `merge-method.ts` joined with the words `pr.mergeMethod` takes, its
+ * list and its guard, moved out of `src/pr/types.ts` so the release
+ * section reads them without reaching the pull request port. It imports
+ * nothing, so it is a leaf too, and `src/pr/types.ts` re-exports its
+ * names from here.
+ *
  * ## What it exports
  *
  * Each name is spelled, types apart from values, as the entries
  * `src/index.ts` and `src/plan/index.ts` spell theirs.
  *
- * `sections.test.ts` holds the list to the three files: every name any
+ * `sections.test.ts` holds the list to the four files: every name any
  * of them exports is here once, as the same binding, and no name is here
  * that none of them exports.
  */
@@ -69,6 +75,7 @@ export type {
   TierSwitch,
   ValueAt,
 } from './config-sections.js';
+export type { MergeMethod } from './merge-method.js';
 
 export { branchGlob, stubOfBranch } from './branch-template.js';
 export {
@@ -150,3 +157,4 @@ export {
   tierSwitch,
   usdAmount,
 } from './config-sections.js';
+export { isMergeMethod, MERGE_METHODS } from './merge-method.js';

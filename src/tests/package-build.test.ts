@@ -548,7 +548,10 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`),
  * `config-schema-bugs.d.ts` from the `bugs` section (#953), and
  * `core/config/config-load-module.d.ts`, the module-file helpers moved out
- * of `config-load.ts` when each scope came to be read from two places.
+ * of `config-load.ts` when each scope came to be read from two places, and
+ * `core/config/merge-method.d.ts`, the merge methods moved out of
+ * `pr/types.ts`, with `pr/types.d.ts` and `pr/checks.d.ts` no longer
+ * reached.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1242,7 +1245,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(165);
+    expect(before).toHaveLength(164);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
