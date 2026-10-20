@@ -26,7 +26,7 @@
  * `rafa plan validate` ends with exit code 1 on. Its line is the plan's
  * last task line, counting from one as an issue's line does.
  */
-import type { PlanModel, PlanTask } from './index.js';
+import type { PlanModel, PlanTask } from '@open-tomato/rafa/core/plan';
 
 import { readDocsRole } from '@open-tomato/rafa/core/plan';
 

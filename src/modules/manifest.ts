@@ -80,8 +80,9 @@
  *
  * ## Seams
  *
- * The running version is `package.json`'s `version`, imported by name as
- * `src/commands/describe.ts` imports it, and the served port versions
+ * The running version is `RAFA_VERSION` from
+ * `packages/rafa/src/core/command/version.ts`, the root `package.json`'s
+ * `version` as core reads it, and the served port versions
  * are `PORT_VERSIONS` from `packages/rafa/src/core/adapters/registry.ts`. Both reach
  * {@link validateManifest} through {@link ManifestSeams}, so a case holds
  * a module against a version core does not run.
@@ -91,10 +92,9 @@ import type { Reading, ValueAt } from '@open-tomato/rafa/core/config/sections';
 import type { PortType, PortVersions } from '@open-tomato/rafa/ports';
 
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { optionalPrerequisite, requiredPrerequisite } from '@open-tomato/rafa/core/config';
 import { describeValue, isMapping, listOf } from '@open-tomato/rafa/core/config/sections';
-
-import { version as RUNNING_VERSION } from '../../package.json';
 
 /** The manifest version this module reads. */
 export const MANIFEST_VERSION = 1;
@@ -189,7 +189,7 @@ export type ManifestValidation =
 
 /** The running rafa and the port versions it serves. */
 export const RUNNING_MANIFEST_SEAMS: ManifestSeams = Object.freeze({
-  rafaVersion: RUNNING_VERSION,
+  rafaVersion: RAFA_VERSION,
   portVersions: PORT_VERSIONS,
 });
 

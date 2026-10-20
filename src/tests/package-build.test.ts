@@ -224,8 +224,8 @@
  * naming it, where the computed case above compares a bundle with a
  * source that could have lost it as well. The root bundle's
  * `PORT_VERSIONS` is held to the source's, its `RUNNING_MANIFEST_SEAMS`
- * to the manifest's `version`, which `src/modules/manifest.ts` imports
- * from `package.json` as `describe` does, and its built `resolveScope`
+ * to the manifest's `version`, which `src/modules/manifest.ts` takes as
+ * `RAFA_VERSION` from `@open-tomato/rafa/core/command`, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
  * `README.md` says only `./plan`, `./ports`, `./learning` and `./config`

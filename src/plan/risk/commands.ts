@@ -58,14 +58,15 @@
  * Nothing here reads a file, the environment or a process: the text
  * and the two directories in {@link PathSeams} are all it is handed.
  */
+import type { RiskLevel } from './patterns.js';
+
 import { posix } from 'node:path';
 
 import { commandOf, continuesLine, heredocTerminator, isForeignCodeLine, isShellFence } from '../../check/shell-lines.js';
 
 import { COMMAND_WRAPPERS, destructiveMatches } from './patterns.js';
 
-/** How much a finding weighs: `high` is what `--strict` refuses on. */
-export type RiskLevel = 'high' | 'note';
+export type { RiskLevel } from './patterns.js';
 
 /** The two finding kinds this module reports. */
 export type CommandFindingKind = 'destructive' | 'outside-path';

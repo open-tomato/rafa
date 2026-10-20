@@ -32,7 +32,15 @@
  *
  * A pattern's flags are read up to the next separator only, so the
  * `-f` of `git push origin main && rm -f x` is not taken as a force push.
+ *
+ * {@link RiskLevel}, the weight every finding of `rafa plan risk` carries,
+ * is declared here, beside the list, so the module needs nothing outside
+ * itself; `./commands.ts` re-exports it under the same name for the
+ * readers that take it from there.
  */
+
+/** How much a finding weighs: `high` is what `--strict` refuses on. */
+export type RiskLevel = 'high' | 'note';
 
 /** One entry of the fixed destructive-command list. */
 export interface DestructivePattern {
