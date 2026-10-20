@@ -21,10 +21,10 @@
  *
  * ## The old value
  *
- * The old value is what the project file itself set the key to, or
- * `(not set)` when the file names no value for it: the user scope and
- * the default are not read, since the edit writes the project file
- * alone. A file already reading the value is left byte-identical, and
+ * The old value is what the project's `.rafa/config.yaml` itself set
+ * the key to, or `(not set)` when the file names no value for it: the
+ * module file, the user scope and the default are not read, since the
+ * edit writes the YAML file alone. A file already reading the value is left byte-identical, and
  * the line says so.
  *
  * ## The `dangerous` section under an agent
@@ -40,23 +40,22 @@
  * config key passes it. Every other key is written under an agent as it
  * is anywhere, and a shell without the variable is not gated.
  *
- * ## A scope whose config is a module
+ * ## The local layer beside a module file
  *
- * The project's lookup reads `rafa.config.ts`, then `rafa.config.mjs`,
- * then `.rafa/config.yaml`, and the first that is a file wins. When one
- * of the two module files wins, the YAML file this command edits is not
- * the config the project reads, and a module is code this command does
- * not rewrite: the command is refused with exit 1, naming the file and
- * #893, the issue that gives it a file to write. The refusal is read
- * first, before the argument is split, so a malformed argument in such a
- * scope still meets this refusal and nothing is read or written.
+ * A project scope is read from two layers: the module file
+ * (`rafa.config.ts` or `rafa.config.mjs`), the person's file, and
+ * `.rafa/config.yaml` over it key by key, the local layer (#893's local
+ * layer in its interim form). rafa never writes the module file, so this
+ * command edits the YAML file whether or not a module file sits beside
+ * it: the key it sets is read over the module file's, and the module
+ * file is left byte-identical.
  *
  * ## Exit codes
  *
  * 0 for a value written and for a file already reading it. 1 for every
  * refusal, each naming why and that nothing was written: a malformed
- * argument, a scope whose config is a module file, a key of the `dangerous` section under an agent, a file that
- * cannot be read or written, and each `ConfigSetRefusal` (an unknown
+ * argument, a key of the `dangerous` section under an agent, a file
+ * that cannot be read or written, and each `ConfigSetRefusal` (an unknown
  * key, a value its reader refuses, a key written twice or in flow style,
  * an edit that does not read back). With `--output=json` the
  * {@link ConfigSetResult} is the data of the terminal result event, and
@@ -64,8 +63,7 @@
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
@@ -154,45 +152,9 @@ function readText(path: string): string {
   }
 }
 
-/** The module files a scope's lookup reads ahead of its YAML file, in lookup order. */
-const MODULE_CONFIG_FILES: readonly string[] = ['rafa.config.ts', 'rafa.config.mjs'];
-
-/** The issue that gives `config set` a file to write in a module scope. */
-const MODULE_WRITE_ISSUE = '#893';
-
-/** True when `path` is a file; false for nothing there, or a directory. */
-function isFile(path: string): boolean {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-}
-
-/** The module file `root`'s lookup reads, or null when it reads its YAML file; see the module note. */
-export function moduleConfigOf(root: string): string | null {
-  for (const name of MODULE_CONFIG_FILES) {
-    const path = join(root, name);
-    if (isFile(path)) return path;
-  }
-  return null;
-}
-
-/** The refusal of a scope whose config is the module file `path`. */
-function moduleRefusal(path: string): CommandExit {
-  return new CommandExit(
-    REFUSED_EXIT,
-    `❌ ${COMMAND_NAME}: this project's config is ${path}, a module this command does not edit;`
-    + ` ${MODULE_WRITE_ISSUE} is the issue that gives it a file to write. Nothing was written.\n`
-    + `Set the key in ${path} by hand.`,
-  );
-}
-
 /** Sets the key one line names in the project's config; see the module note. */
 export function setConfig(context: RafaContext): ConfigSetResult {
   const project = requireProject(context, COMMAND_NAME);
-  const moduleFile = moduleConfigOf(project.root);
-  if (moduleFile !== null) throw moduleRefusal(moduleFile);
   const word = expectOneArgument(context.args, CONFIG_SET_USAGE);
   const { key, value } = splitAssignment(word);
   if (isDangerousKey(key) && isAgentShell(context.env)) throw agentRefusal(key, value);
@@ -247,8 +209,9 @@ export function createConfigSetCommand(): RafaCommand {
       + ' read, in a shell an agent runs (`CLAUDECODE` set): the refusal prints the line to run in a'
       + ' terminal of your own, and no flag passes it. With `--output=json`'
       + ' the key, the file, the old and new values and whether it changed are the data of the terminal'
-      + ' result event. A project whose config is `rafa.config.ts` or `rafa.config.mjs` is refused'
-      + ' with exit code 1, naming the file, until #893 gives the command a file to write. Starts no session.',
+      + ' result event. The YAML file is the project\'s local layer, read over `rafa.config.ts` or'
+      + ' `rafa.config.mjs` key by key, so beside a module file the command still edits the YAML file and'
+      + ' never writes the module file. Starts no session.',
     args: [
       {
         name: 'assignment',

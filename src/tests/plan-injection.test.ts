@@ -249,7 +249,7 @@ describe('the injection mode a run resolves', () => {
     const resolved = await loadRunConfig(scopesOf(rootWith(FILE_CONFIG)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(FILE_MODE);
-    expect(resolved.sources.inject).toBe('file');
+    expect(resolved.sources.inject).toBe('local');
   });
 
   it('lets --inject= outrank the file', async () => {
@@ -262,7 +262,7 @@ describe('the injection mode a run resolves', () => {
 
     // The same root without the flag: the file is read and answers.
     expect(unflagged.config.inject).toBe(FILE_MODE);
-    expect(unflagged.sources.inject).toBe('file');
+    expect(unflagged.sources.inject).toBe('local');
   });
 
   it('leaves the store to the file when the flag names the mode', async () => {
@@ -270,7 +270,7 @@ describe('the injection mode a run resolves', () => {
     const resolved = await loadRunConfig(scopesOf(root), [`--inject=${FLAG_MODE}`]);
 
     expect(resolved.config.store).toBe('ndjson');
-    expect(resolved.sources.store).toBe('file');
+    expect(resolved.sources.store).toBe('local');
     expect(resolved.sources.inject).toBe('cli');
   });
 
@@ -285,7 +285,7 @@ describe('the injection mode a run resolves', () => {
     expect(fromUser.config.inject).toBe(FILE_MODE);
     expect(fromUser.sources.inject).toBe('user');
     expect(injectSourceLabel(fromUser)).toBe(join(home, '.rafa', 'config.yaml'));
-    expect(fromFile.sources.inject).toBe('file');
+    expect(fromFile.sources.inject).toBe('local');
     expect(injectSourceLabel(fromFile)).toBe(join(projectRoot, '.rafa', 'config.yaml'));
     expect(injectSourceLabel(fromFlag)).toBe('--inject');
     expect(injectSourceLabel(fromDefault)).toBe('the default');

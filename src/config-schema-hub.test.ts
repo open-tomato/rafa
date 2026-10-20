@@ -51,6 +51,12 @@ const PROJECT = '/repo/.rafa/config.yaml';
 /** The user scope's file path, as a refusal names it. */
 const USER = '/home/someone/.rafa/config.yaml';
 
+/** The project's module file path, the file beneath its YAML file. */
+const PROJECT_MODULE = '/repo/rafa.config.ts';
+
+/** The user scope's module file path, the file beneath its YAML file. */
+const USER_MODULE = '/home/someone/.rafa/rafa.config.ts';
+
 /** What the timeout reader says it expected. */
 const TIMEOUT_EXPECTED = 'expected a duration of whole seconds from 1s to 30s, such as 3s';
 
@@ -159,6 +165,34 @@ describe('effort.sync: service with no hub.url', () => {
     expect([config.effortSync, config.hubUrl]).toEqual(['service', 'https://hub.example.org']);
   });
 
+  it('names the project YAML file, the local layer, rather than the word local', () => {
+    const local = parseConfigText('effort:\n  sync: service\n', PROJECT);
+    const file = parseConfigText('hub:\n  timeout: 5s\n', PROJECT_MODULE);
+
+    expect(refusal(() => resolveConfig({ local, file })).problems).toEqual([missingUrl(PROJECT)]);
+  });
+
+  it('names the project module file when it chose service beneath the YAML file, the control', () => {
+    const local = parseConfigText('hub:\n  timeout: 5s\n', PROJECT);
+    const file = parseConfigText('effort:\n  sync: service\n', PROJECT_MODULE);
+
+    expect(refusal(() => resolveConfig({ local, file })).problems).toEqual([missingUrl(PROJECT_MODULE)]);
+  });
+
+  it('names the user YAML file rather than the user module file or the word user', () => {
+    const userLocal = parseConfigText('effort:\n  sync: service\n', USER);
+    const user = parseConfigText('hub:\n  timeout: 5s\n', USER_MODULE);
+
+    expect(refusal(() => resolveConfig({ userLocal, user })).problems).toEqual([missingUrl(USER)]);
+  });
+
+  it('names the user module file when it chose service beneath the user YAML file, the control', () => {
+    const userLocal = parseConfigText('hub:\n  timeout: 5s\n', USER);
+    const user = parseConfigText('effort:\n  sync: service\n', USER_MODULE);
+
+    expect(refusal(() => resolveConfig({ userLocal, user })).problems).toEqual([missingUrl(USER_MODULE)]);
+  });
+
   it('names the user file when that is the layer choosing service', () => {
     const user = parseConfigText('effort:\n  sync: service\n', USER);
     const file = parseConfigText('hub:\n  timeout: 5s\n', PROJECT);
@@ -189,29 +223,41 @@ describe('effort.sync: service with no hub.url', () => {
 });
 
 describe('hubUrlProblems, the section check', () => {
-  /** A check input over the defaults: `effort.sync` and `hub.url` as given, both files named. */
+  /**
+   * A check input over the defaults: `effort.sync` and `hub.url` as
+   * given, `effort.sync` answered by `source` from the file `answeredBy`
+   * names, or by no file when it is null.
+   */
   function checkInput(
     effortSync: SyncStrategy,
     url: string | null,
     source: ConfigSource,
-    path: string | null = PROJECT,
+    answeredBy: string | null = PROJECT,
   ): ConfigCheckInput {
     const resolved = resolveConfig();
     return {
       config: { ...resolved.config, effortSync, hubUrl: url },
       sources: { ...resolved.sources, effortSync: source },
-      path,
-      userPath: USER,
+      path: PROJECT_MODULE,
+      userPath: USER_MODULE,
+      provenance: {
+        ...resolved.provenance,
+        effortSync: answeredBy === null
+          ? null
+          : { file: answeredBy, entry: 0 },
+      },
     };
   }
 
-  it('refuses service with no url, naming the file of the layer that chose it', () => {
-    expect(hubUrlProblems(checkInput('service', null, 'file'))).toEqual([missingUrl(PROJECT)]);
-    expect(hubUrlProblems(checkInput('service', null, 'user'))).toEqual([missingUrl(USER)]);
+  it('refuses service with no url, naming the file that answered effort.sync', () => {
+    expect(hubUrlProblems(checkInput('service', null, 'local', PROJECT))).toEqual([missingUrl(PROJECT)]);
+    expect(hubUrlProblems(checkInput('service', null, 'file', PROJECT_MODULE))).toEqual([missingUrl(PROJECT_MODULE)]);
+    expect(hubUrlProblems(checkInput('service', null, 'user', USER))).toEqual([missingUrl(USER)]);
+    expect(hubUrlProblems(checkInput('service', null, 'user', USER_MODULE))).toEqual([missingUrl(USER_MODULE)]);
   });
 
-  it('names the layer itself when no file of it was read', () => {
-    expect(hubUrlProblems(checkInput('service', null, 'file', null))).toEqual([missingUrl('file')]);
+  it('names the layer itself when no file answered effort.sync', () => {
+    expect(hubUrlProblems(checkInput('service', null, 'cli', null))).toEqual([missingUrl('cli')]);
     expect(hubUrlProblems(checkInput('service', null, 'default', null))).toEqual([missingUrl('default')]);
   });
 

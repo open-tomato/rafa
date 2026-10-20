@@ -1,16 +1,16 @@
 /**
- * Tests for the templates `loadConfig` lays under a scope's file: each
- * name a file's `templates` key gives is read through the active
+ * Tests for the templates `loadConfig` lays under each file of a scope:
+ * each name a file's `templates` key gives is read through the active
  * template hook as an entry ahead of the file's own, so the file's keys
- * outrank the template's and a project's template outranks the user's
- * file, a setting the template answered reporting source `template`.
+ * outrank the template's, a project's template outranks the user's
+ * files, and a scope's YAML file's template outranks its module file, a
+ * setting the template answered reporting source `template`.
  *
- * Until the next task of the plan empties them, the defaults of
- * `tests.integration` and its two neighbours ARE the `escalation`
- * template's values, so a value read alone could not tell a template
- * laid from one dropped. Every case therefore reads the source beside
- * the value, and reads a `checks.*` key too, whose default is empty
- * and whose template value is not.
+ * The defaults of `tests.integration` and its two neighbours are empty
+ * (`CONFIG_DEFAULTS`), so the `escalation` template's values, which are
+ * not, tell a template laid from one dropped by the value alone. Every
+ * case still reads the source beside the value, and reads a `checks.*`
+ * key too, whose default is empty and whose template value is not.
  *
  * Every refusal is paired with the acceptance that makes it a reading:
  * the unknown name beside the known one loading, the load with no hook
@@ -127,7 +127,7 @@ describe('loadConfig laying a YAML file\'s templates under its keys', () => {
     expect(resolved.config.checksTask).toEqual(['affected']);
     expect(resolved.sources.checksTask).toBe('template');
     expect(resolved.config.templates).toEqual(['escalation']);
-    expect(resolved.sources.templates).toBe('file');
+    expect(resolved.sources.templates).toBe('local');
   });
 
   it('leaves every key to its default with source default for the same project naming no template', async () => {
@@ -142,13 +142,13 @@ describe('loadConfig laying a YAML file\'s templates under its keys', () => {
     expect(resolved.provenance.checksTask).toBeNull();
   });
 
-  it('lets the file\'s own tests.integration: [] outrank the template, resolving empty with source file', async () => {
+  it('lets the file\'s own tests.integration: [] outrank the template, resolving empty with source local', async () => {
     const { root, home, projectFile } = scopes('templates: [escalation]\ntests:\n  integration: []\n');
 
     const resolved = await loadConfig({ root, home }, {}, quiet);
 
     expect(resolved.config.testsIntegration).toEqual([]);
-    expect(resolved.sources.testsIntegration).toBe('file');
+    expect(resolved.sources.testsIntegration).toBe('local');
     expect(resolved.provenance.testsIntegration).toEqual({ file: projectFile, entry: 0 });
     expect(resolved.config.testsContract).toEqual(['**/*.contract.test.ts']);
     expect(resolved.sources.testsContract).toBe('template');
@@ -163,7 +163,7 @@ describe('loadConfig laying a YAML file\'s templates under its keys', () => {
     const resolved = await loadConfig({ root, home }, {}, quiet);
 
     expect(resolved.config.testsIntegration).toEqual(['e2e/**/*.test.ts']);
-    expect(resolved.sources.testsIntegration).toBe('file');
+    expect(resolved.sources.testsIntegration).toBe('local');
     expect(resolved.provenance.testsIntegration).toEqual({ file: projectFile, entry: 0 });
     expect(resolved.config.checksLoop).toEqual(['related']);
     expect(resolved.sources.checksLoop).toBe('user');
@@ -195,7 +195,7 @@ describe('loadConfig laying a YAML file\'s templates under its keys', () => {
     const resolved = await withHook(hook, () => loadConfig({ root, home }, {}, quiet));
 
     expect([resolved.config.prBase, resolved.config.store, resolved.config.prMergeMethod]).toEqual(['second', 'ndjson', 'merge']);
-    expect([resolved.sources.prBase, resolved.sources.store, resolved.sources.prMergeMethod]).toEqual(['template', 'template', 'file']);
+    expect([resolved.sources.prBase, resolved.sources.store, resolved.sources.prMergeMethod]).toEqual(['template', 'template', 'local']);
     expect([resolved.provenance.prBase, resolved.provenance.store]).toEqual([
       { file: projectFile, entry: 0, template: 'second' },
       { file: projectFile, entry: 0, template: 'first' },
@@ -286,5 +286,30 @@ describe('loadConfig laying a module file\'s templates under its entries', () =>
     expect(resolved.config.testsIntegration).toEqual(INTEGRATION);
     expect(resolved.sources.testsIntegration).toBe('template');
     expect(resolved.provenance.testsIntegration).toEqual({ file: path, entry: 1, template: 'escalation' });
+  });
+});
+
+describe('loadConfig laying each file\'s templates under that file alone', () => {
+  it('lets a YAML file\'s template outrank its scope\'s module file, whose keys the template leaves out still answer', async () => {
+    const { root, home, projectFile } = scopes('templates: [escalation]\n');
+    const ts = write(join(root, 'rafa.config.ts'), 'export default [{ checks: { task: [\'full\'], publish: [\'unit\'] } }];\n');
+
+    const resolved = await loadConfig({ root, home }, {}, quiet);
+
+    expect([resolved.config.checksTask, resolved.sources.checksTask, resolved.provenance.checksTask])
+      .toEqual([['affected'], 'template', { file: projectFile, entry: 0, template: 'escalation' }]);
+    // The escalation template names no checks.publish, so the module
+    // file's own key still answers it beneath the YAML file.
+    expect([resolved.config.checksPublish, resolved.sources.checksPublish, resolved.provenance.checksPublish])
+      .toEqual([['unit'], 'file', { file: ts, entry: 0 }]);
+
+    // The control: the same module file with no YAML file beside it
+    // answers both keys itself.
+    const alone = freshDir('ts-alone');
+    write(join(alone, 'rafa.config.ts'), 'export default [{ checks: { task: [\'full\'], publish: [\'unit\'] } }];\n');
+    const fromModule = await loadConfig({ root: alone, home }, {}, quiet);
+    expect([fromModule.config.checksTask, fromModule.sources.checksTask, fromModule.config.checksPublish])
+      .toEqual([['full'], 'file', ['unit']]);
+    expect(fromModule.provenance.checksTask).toEqual({ file: join(alone, 'rafa.config.ts'), entry: 0 });
   });
 });

@@ -545,8 +545,10 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
 /**
  * The `dist/` file list a build at `c920603`, before core moved into its package, wrote: one path a line.
  * It follows the build since: six lines from `7306b06` (`config-schema-features.d.ts`,
- * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`), and
- * `config-schema-bugs.d.ts` from the `bugs` section (#953).
+ * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`),
+ * `config-schema-bugs.d.ts` from the `bugs` section (#953), and
+ * `core/config/config-load-module.d.ts`, the module-file helpers moved out
+ * of `config-load.ts` when each scope came to be read from two places.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1240,7 +1242,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(164);
+    expect(before).toHaveLength(165);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

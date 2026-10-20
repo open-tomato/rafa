@@ -118,6 +118,7 @@
  * as it was, and a case that sets one puts the previous hook back in a
  * `finally`.
  */
+import type { SettingOrigin } from './config-origins.js';
 import type {
   ConfigSetting,
   RafaConfig,
@@ -139,6 +140,13 @@ export interface ConfigCheckInput {
   readonly path: string | null;
   /** The user scope's file consulted, or null when there was none. */
   readonly userPath: string | null;
+  /**
+   * The file and entry that answered each setting, null where the
+   * command line or a default did: the one reading that tells a scope's
+   * local file from its module file, and the user scope's two files,
+   * which both report `user`, apart.
+   */
+  readonly provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
 }
 
 /**

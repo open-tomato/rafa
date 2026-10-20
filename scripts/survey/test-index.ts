@@ -622,7 +622,7 @@ interface PackageReading {
  */
 async function readPackages(root: string, files: readonly string[], mapPath: string): Promise<PackageReading> {
   const map = readCutMap(root, mapPath);
-  const globs = readTestKindGlobs(root);
+  const globs = await readTestKindGlobs(root);
   const members = readMembers(root);
   const tree = await readTree(root, files);
   const rules = packageRules(map, tree.graph);

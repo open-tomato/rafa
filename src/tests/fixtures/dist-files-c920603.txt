@@ -59,6 +59,7 @@ core/command/types.d.ts
 core/command/version.d.ts
 core/config/branch-template.d.ts
 core/config/config-items.d.ts
+core/config/config-load-module.d.ts
 core/config/config-load.d.ts
 core/config/config-origins.d.ts
 core/config/config-readers.d.ts
