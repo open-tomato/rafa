@@ -1576,9 +1576,11 @@ describe('resolveConfig', () => {
       path: null,
       localPath: null,
       userPath: null,
+      userLocalPath: null,
       extras: [],
       localExtras: [],
       userExtras: [],
+      userLocalExtras: [],
       warnings: [],
       provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
       shadowed: [],
@@ -1818,7 +1820,8 @@ describe('resolveConfig over four files, two per scope', () => {
 
     expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'project-plans', specsDir: 'local-specs' });
     expect(resolved.sources).toEqual(sourcesWith({ specsDir: 'local', planDir: 'file', inject: 'user' }, 'user'));
-    expect([resolved.path, resolved.localPath, resolved.userPath]).toEqual([MODULE_PATH, PATH, USER_MODULE_PATH]);
+    expect([resolved.path, resolved.localPath, resolved.userPath, resolved.userLocalPath])
+      .toEqual([MODULE_PATH, PATH, USER_MODULE_PATH, USER_PATH]);
   });
 
   it('names the file that answered each setting, telling the two user files apart', () => {
@@ -1842,7 +1845,7 @@ describe('resolveConfig over four files, two per scope', () => {
 
     expect(resolved.config).toEqual(FULL_RESOLVED);
     expect(resolved.sources).toEqual(sourcesWith({}, 'local'));
-    expect([resolved.path, resolved.localPath, resolved.userPath]).toEqual([null, PATH, null]);
+    expect([resolved.path, resolved.localPath, resolved.userPath, resolved.userLocalPath]).toEqual([null, PATH, null, null]);
   });
 
   it('lets the user local file alone outrank the default, reporting user and naming its own path', () => {
@@ -1850,7 +1853,7 @@ describe('resolveConfig over four files, two per scope', () => {
 
     expect([resolved.config.planDir, resolved.sources.planDir]).toEqual(['user-local-plans', 'user']);
     expect(resolved.provenance.planDir).toEqual({ file: USER_PATH, entry: 0 });
-    expect(resolved.userPath).toBeNull();
+    expect([resolved.userPath, resolved.userLocalPath]).toEqual([null, USER_PATH]);
   });
 
   it('lets the command line outrank the local file', () => {
@@ -1916,9 +1919,10 @@ describe('resolveConfig over four files, two per scope', () => {
       warning('projectKey', MODULE_PATH),
       warning('localKey', PATH),
     ]);
-    expect([resolved.localExtras, resolved.extras, resolved.userExtras]).toEqual([
+    expect([resolved.localExtras, resolved.extras, resolved.userLocalExtras, resolved.userExtras]).toEqual([
       [{ key: 'localKey', value: 4 }],
       [{ key: 'projectKey', value: 3 }],
+      [{ key: 'userLocalKey', value: 2 }],
       [{ key: 'userKey', value: 1 }],
     ]);
   });

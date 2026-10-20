@@ -361,12 +361,16 @@ export interface ResolvedConfig {
   localPath: string | null;
   /** The user scope's file consulted, or null when there was none. */
   userPath: string | null;
+  /** The user scope's local file consulted, its `~/.rafa/config.yaml`, or null when there was none. */
+  userLocalPath: string | null;
   /** The project file's unknown keys, retained. Empty with no file. */
   extras: readonly ConfigExtra[];
   /** The project's local file's unknown keys, retained. Empty with no file. */
   localExtras: readonly ConfigExtra[];
   /** The user file's unknown keys, retained. Empty with no file. */
   userExtras: readonly ConfigExtra[];
+  /** The user scope's local file's unknown keys, retained. Empty with no file. */
+  userLocalExtras: readonly ConfigExtra[];
   /**
    * One sentence per retained unknown key, in layer order from the
    * bottom: the user file's, the user's local file's, the project
@@ -772,9 +776,11 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     path,
     localPath: local?.path ?? null,
     userPath,
+    userLocalPath: userLocal?.path ?? null,
     extras: file?.extras ?? [],
     localExtras: local?.extras ?? [],
     userExtras: user?.extras ?? [],
+    userLocalExtras: userLocal?.extras ?? [],
     warnings,
     provenance,
     shadowed: [],
