@@ -696,15 +696,17 @@ would be written, and `--json` prints the whole reading.
   import.** A member's own `node_modules/` holds only what its manifest
   declares, so a bare import resolves from its manifest and not from the
   root's. Each member but the eslint-config package declares
-  `@open-tomato/rafa-eslint-config` (`workspace:*`), `eslint` and `typescript`
-  in its `devDependencies`, the last two at the root's ranges, so one install
-  serves its scripts; the two services also declare `@open-tomato/rafa-core`
-  (`workspace:*`). The graph check's fourth refusal holds the `@open-tomato/*`
-  imports to those declarations and reads no `eslint` or `typescript` import,
-  which the scripts name. The eslint-config package lists `eslint` in its
-  `dependencies`, declares `typescript` as a `devDependency`, and imports
-  itself by name through its own `exports`. After a manifest edit, `bun
-  install` refreshes `bun.lock` and the links.
+  `@open-tomato/rafa-eslint-config` (`workspace:*`) and `eslint` in its
+  `devDependencies`, the last at the root's range, so one install serves its
+  scripts; the three with a `check-types` script and the typescript-config
+  package also declare `typescript` at the root's range, and the two services
+  also declare `@open-tomato/rafa-core` (`workspace:*`). The graph check's
+  fourth refusal holds the `@open-tomato/*` imports to those declarations and
+  reads no `eslint` or `typescript` import, which the scripts name. The
+  eslint-config package lists `eslint` in its `dependencies`, declares
+  `typescript` as a `devDependency`, and imports itself by name through its
+  own `exports`. After a manifest edit, `bun install` refreshes `bun.lock` and
+  the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
   `src/rafa.ts` and six library entries with every publishable member as
