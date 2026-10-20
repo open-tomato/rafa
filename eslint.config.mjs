@@ -16,6 +16,9 @@ export default [
       '.rafa/**',
       '.tmp/**',
       '.docs/**',
+      // The S.O.R.E.T.E.S. add-on: a proof of concept with its own package.json
+      // and React/three stack, not a workspace and never published.
+      'addons/soretes/**',
       // The declarations each code package's `tsc --build` writes, which
       // `eslint .` from the root otherwise lints after a `check-types` run.
       '**/.tsbuild/**',

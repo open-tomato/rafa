@@ -1,0 +1,3 @@
+node_modules
+# snapshot.json holds store text (paths, hosts); it is built locally and never committed
+data/
