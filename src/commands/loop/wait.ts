@@ -87,6 +87,8 @@ import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 
 import { relative } from 'node:path';
 
+import { EVENT_PREFIX, oneLine, padKind } from '@open-tomato/rafa/adapters/output/events';
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSession, SessionRecordError } from '@open-tomato/rafa/core/loop';
@@ -96,7 +98,6 @@ import {
 } from '@open-tomato/rafa/core/loop/readings';
 import { plural } from '@open-tomato/rafa/core/plan';
 
-import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import {
@@ -111,7 +112,6 @@ import {
   waitExitCode,
   WaitUntilError,
 } from '../../loop/wait-reasons.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   lineRefusal,

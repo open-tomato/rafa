@@ -125,11 +125,11 @@ import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousP
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
+import { initHint } from '@open-tomato/rafa/project/scope';
 
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';

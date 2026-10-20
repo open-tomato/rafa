@@ -35,8 +35,9 @@
  *     for.
  *   - `MergeMethod` widened to `string`: the adapter probe and the
  *     `ff` refusal. NOT the runtime guard, which reads
- *     {@link MERGE_METHODS} and not the type — the type claim and the
- *     guard are separate readings, and each is held here.
+ *     `MERGE_METHODS` and not the type — the type claim and the
+ *     guard are separate readings. The guard's cases moved with it to
+ *     `packages/rafa/src/core/config/merge-method.test.ts`.
  *   - `PullRequestState` widened to `string`: the adapter probe and the
  *     draft-state refusal.
  *   - `readonly` dropped from `PullRequestSummary.number`: the
@@ -69,8 +70,6 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
-
-import { MERGE_METHODS, isMergeMethod } from './types.js';
 
 /** The `src/` directory the probes import from. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -487,33 +486,4 @@ describe('the pull request port, compiled', () => {
       expect(readings[0]?.message).toContain(refusal.names);
     });
   }
-});
-
-describe('MERGE_METHODS', () => {
-  it('holds GitHub three merge flags, in the order a refusal lists them', () => {
-    expect(MERGE_METHODS).toEqual(['squash', 'merge', 'rebase']);
-  });
-
-  it('is frozen, so a caller cannot change what is accepted', () => {
-    expect(Object.isFrozen(MERGE_METHODS)).toBe(true);
-  });
-});
-
-describe('isMergeMethod', () => {
-  it.each([...MERGE_METHODS])('accepts %s', (method) => {
-    expect(isMergeMethod(method)).toBe(true);
-  });
-
-  it.each([
-    ['a method GitHub has no flag for', 'ff'],
-    ['another case of one it has', 'Squash'],
-    ['an empty string', ''],
-    ['a string with space around a method', ' squash '],
-    ['a number', 1],
-    ['null', null],
-    ['undefined', undefined],
-    ['an array holding a method', ['squash']],
-  ])('refuses %s', (_label, value) => {
-    expect(isMergeMethod(value)).toBe(false);
-  });
 });

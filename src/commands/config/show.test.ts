@@ -23,9 +23,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { setActiveLoggerSettings } from '../../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../../config-registry.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

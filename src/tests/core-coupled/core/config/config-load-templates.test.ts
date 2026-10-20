@@ -30,12 +30,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { ConfigError } from '@open-tomato/rafa/core/config/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/config-load';
 import { setConfigTemplateHook } from '@open-tomato/rafa/core/config/section';
 import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { setActiveLoggerSettings } from '../../../../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
 
 /** The four spellings of an integration test the `escalation` template names. */

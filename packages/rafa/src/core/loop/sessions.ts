@@ -38,7 +38,7 @@
  *   - `hop`: only on a run started with `loop start --roadmap` while a
  *     `rafa next --roadmap` hop is away, the hop record as
  *     `.rafa/hop.json` held it when the run began
- *     (`src/next/hop-record.ts`, `start/session.ts`). A record of any
+ *     (`packages/rafa/src/next/hop-record.ts`, `start/session.ts`). A record of any
  *     other run carries no `hop` key at all, never one set to null, so
  *     such a record is written byte for byte as it was before the field.
  *     Once written, every later write of the record keeps it as it is.

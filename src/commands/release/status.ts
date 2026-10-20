@@ -77,11 +77,11 @@ import type { WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { PackagesReading } from './status-packages.js';
 import type { StaleDocsReader, StaleDocsReading, StaleDocsSettings } from './status-stale-docs.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { AuditReading } from '../../release/audit.js';
 import type { TagReading, UntaggedReading } from '../../release/status-readings.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { PlanChange } from '@open-tomato/rafa/store/changes';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

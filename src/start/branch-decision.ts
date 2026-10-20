@@ -146,7 +146,7 @@
  * branch is checked out (measured on git 2.53.0 under Linux, 2026-10-01,
  * in a repository after `git switch --detach`: stdout `HEAD`, exit 0),
  * which is also a name a ref can carry, so `src/start/run-checkout.ts`
- * reads the run's branch with `readCheckedOutBranch` (`src/utils/git.ts`),
+ * reads the run's branch with `readCheckedOutBranch` (`packages/rafa/src/utils/git.ts`),
  * which answers null there, and hands this standing on in its place.
  *
  * ## Being ahead is not being diverged

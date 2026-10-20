@@ -12,6 +12,7 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
+import { templateProblem } from '@open-tomato/rafa/bugs/title';
 import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -20,7 +21,6 @@ import {
 } from '@open-tomato/rafa/core/config';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
-import { templateProblem } from './bugs/title.js';
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
 import { projectConfigText } from './project/scaffold.js';

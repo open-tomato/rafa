@@ -27,6 +27,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { BOARDS_LIST_ARGS } from '../board/boards.js';
 import { EPIC_GUARD_PATH } from '../board/epic-guard.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
@@ -35,7 +37,6 @@ import { NATIVE_MODE, nativeParentLine } from '../commands/epic/move-native.js';
 import { EPIC_GUARD_NATIVE_REFUSAL } from '../commands/init-board.js';
 import { NATIVE_UNBLOCK_LINE } from '../commands/issue/unblock-native.js';
 import { freedHeaderLine, freedIssueLine } from '../commands/pr/merge-freed.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

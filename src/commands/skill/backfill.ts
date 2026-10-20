@@ -69,10 +69,10 @@ import type { DerivationAction, DerivationKind, DerivationOptions, DerivationPla
 import type { ProposalFile } from '../../backfill/proposal-file.js';
 import type { ProposalAction, ProposalActionKind } from '../../backfill/propose.js';
 import type { DemotionScope } from '../../demote/select.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctScope } from '../../schema/instinct.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';

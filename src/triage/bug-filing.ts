@@ -71,23 +71,23 @@
  * the caller built from them.
  */
 import type { BugValues, ReportedWords } from './issue-text.js';
-import type { BugRecord, BugRules } from '../bugs/record.js';
+import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
+import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
+import { EMPTY_BUG_RECORD } from '@open-tomato/rafa/bugs/record';
+import { firstProjectPath } from '@open-tomato/rafa/bugs/stack-path';
+import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
+import { ERRORS_DEFAULTS } from '@open-tomato/rafa/config-schema-errors';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
 
 import { causeOf } from '../bugs/cause-rule.js';
 import { boundaryValueOf, summaryOf } from '../bugs/filed-values.js';
-import { suggestedEnvironment } from '../bugs/places.js';
-import { EMPTY_BUG_RECORD } from '../bugs/record.js';
-import { firstProjectPath } from '../bugs/stack-path.js';
-import { UNKNOWN_VALUE } from '../bugs/title.js';
 import { codeVersionOf, versionsText } from '../bugs/versions.js';
-import { ERRORS_DEFAULTS } from '../config-schema-errors.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { packageOf, rootPackageOf } from '../project/package-of.js';
 
 import { artifactOf, hasText } from './bug-key.js';
 import { testFailureOf } from './test-failure.js';

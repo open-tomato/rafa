@@ -71,6 +71,7 @@ import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
@@ -80,7 +81,6 @@ import { readFragmentTree } from '../../release/fragment-tree.js';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { packageNamed, readWorkspacePackages } from '../../release/workspace-packages.js';
-import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { RELEASE_FRAGMENT_DECLARATION, RELEASE_FRAGMENT_LEVEL_FLAG, RELEASE_FRAGMENT_NOTE_FLAG, RELEASE_FRAGMENT_PACKAGE_FLAG, RELEASE_FRAGMENT_PLAN_FLAG, RELEASE_FRAGMENT_TITLE_FLAG } from './declarations.js';
 

@@ -44,10 +44,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
+import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { createAdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../logger/settings.js';
 
 import { draftFixture } from './contract.js';
 import { createFakeGh } from './github-fake.js';

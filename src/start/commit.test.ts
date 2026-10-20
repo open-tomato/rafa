@@ -58,9 +58,9 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import * as backgroundWait from './background-wait.js';
 import {

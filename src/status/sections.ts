@@ -174,9 +174,9 @@ import type { NextBoardOptions } from '../next/sources.js';
 import type { PlanListing } from '../plan/list.js';
 import type { GitRunner, PrProviderReading, PullRequests } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { Place } from '../project/position.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { existsSync } from 'node:fs';
 
@@ -184,6 +184,7 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
+import { positionFilePath } from '@open-tomato/rafa/project/position';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { readBlockedIssues } from '../board/blocked-issues.js';
@@ -199,7 +200,6 @@ import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
-import { positionFilePath } from '../project/position.js';
 
 import { readBlockedCount } from './blocked-count.js';
 import { readClaimBranches, readClaims } from './claims.js';

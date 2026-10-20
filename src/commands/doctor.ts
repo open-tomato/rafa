@@ -264,12 +264,12 @@ import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
 import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
-import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 
 import { basename, resolve } from 'node:path';

@@ -68,7 +68,7 @@
  * repeats each of them.
  */
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
 

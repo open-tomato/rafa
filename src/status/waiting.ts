@@ -11,9 +11,8 @@ import type { PullRequests } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { readHopRecord, staleAgainst } from '../next/hop-record.js';
-import { readPositionFile } from '../project/position.js';
+import { readHopRecord, staleAgainst } from '@open-tomato/rafa/next/hop-record';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 /** The owner gate states that let no merge through, and so leave a pull request waiting. */
 export type WaitingGate = Exclude<OwnerApproval['state'], 'approved' | 'not-gated'>;

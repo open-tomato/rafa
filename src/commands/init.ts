@@ -14,7 +14,7 @@
  *   - `--root=<path>` names the root, absolute or relative to the working
  *     directory, and nothing is asked or listed.
  *   - `--yes` takes the first candidate `rootCandidates` answers for the
- *     working directory (`src/project/roots.ts`): the git toplevel, or the
+ *     working directory (`packages/rafa/src/project/roots.ts`): the git toplevel, or the
  *     working directory itself outside a repository.
  *   - Neither: on a terminal it lists the candidates and reads a
  *     candidate's number or a path typed freely
@@ -133,7 +133,7 @@
  *
  * ## The `PATH` check
  *
- * Once the scopes are written, `readBinPath` (`src/project/bin-path.ts`)
+ * Once the scopes are written, `readBinPath` (`packages/rafa/src/project/bin-path.ts`)
  * reads the `PATH` of the context's environment, the one this invocation
  * was handed, never a shell profile, and a warning is written when
  * `~/.rafa/bin` is not on it ahead of `~/.bun/bin`. It warns and never
@@ -191,13 +191,13 @@ import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } fr
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
-import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
-import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '../project/roots.js';
 import type { ScopeWrite, ScopeWriteChange } from '../project/scaffold.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '@open-tomato/rafa/project/roots';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -207,6 +207,8 @@ import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command
 import { ConfigError, configFilePath } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
+import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '@open-tomato/rafa/project/roots';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
@@ -214,7 +216,6 @@ import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.
 import { commandProgressFeed } from '../board/project/progress.js';
 import { commandRetrySeams } from '../board/project/project-runner.js';
 import { resolvePrProvider } from '../pr/provider.js';
-import { readBinPath } from '../project/bin-path.js';
 import {
   applyTracking,
   GITIGNORE_FILE,
@@ -223,7 +224,6 @@ import {
   withTrackingBlock,
 } from '../project/gitignore.js';
 import { candidateLines, firstCandidate, namedRoot, promptForRoot } from '../project/root-choice.js';
-import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/roots.js';
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
 
 import { projectStepChanged, renderProjectStep, runProjectStep } from './init-board-project.js';

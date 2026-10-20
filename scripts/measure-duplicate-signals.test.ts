@@ -1,9 +1,9 @@
-import type { BugRecord } from '../src/bugs/record.js';
 import type { BoardIssue, CauseJudgement } from '../src/triage/scoring-fixture.js';
+import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_BUG_RECORD, renderBugBody } from '../src/bugs/record.js';
+import { EMPTY_BUG_RECORD, renderBugBody } from '@open-tomato/rafa/bugs/record';
 
 import {
   MEANINGFUL_CARRIERS,

@@ -23,7 +23,6 @@
  * line is left for the `unblock` row of `./state.ts`.
  */
 import type { HopDecision, TakenReadings } from './hop-chain.js';
-import type { HopRecord } from './hop-record.js';
 import type { DryEpic, HopTarget, NextBoard, NextHopReading, TakenBlocker, WaitingLine } from './readings.js';
 import type { BlockedLine, BlockerWaiting } from '../board/blocked-line.js';
 import type { BoardView } from '../board/epic-board.js';
@@ -32,9 +31,12 @@ import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
-import type { Place, Position } from '../project/position.js';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readHopRecord, staleAgainst } from '@open-tomato/rafa/next/hop-record';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 import { blockingOf } from '../board/blocked-line.js';
 import { descendRoadmap, epicLines, nextNowEpic } from '../board/epic-walk.js';
@@ -42,10 +44,8 @@ import { readEpics } from '../board/epics.js';
 import { samePlace } from '../board/place.js';
 import { hasSpecReadyLabel } from '../board/readiness.js';
 import { parseRoadmapBody, pickNextRoadmapLine } from '../board/roadmap.js';
-import { readPositionFile } from '../project/position.js';
 
 import { decideHop, takenBy } from './hop-chain.js';
-import { readHopRecord, staleAgainst } from './hop-record.js';
 
 /** What a defect here names, being `rafa next`'s own walk. */
 const PREFIX = 'rafa next';

@@ -62,12 +62,12 @@
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ConfigSetting, ConfigSource, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
+import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { SETTING_BY_KEY, SETTING_NAMES, SETTINGS } from '../../config-registry.js';
-import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa config show';

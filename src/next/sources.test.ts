@@ -96,8 +96,8 @@
 import type { NextRoadmapReading, NextSources } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
-import type { Place } from '../project/position.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -106,11 +106,11 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { resolveScope } from '@open-tomato/rafa/project/scope';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { positionAt, writePositionFile } from '../project/position.js';
-import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DEFAULT_BASE_BRANCH, ghNextBoard, openNextSources } from './sources.js';

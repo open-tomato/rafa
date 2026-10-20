@@ -210,7 +210,7 @@ export type {
   ModuleManifest,
   OutputChannel,
   OutputProvision,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export type {
   CheckOutcome,
   FindingKind,
@@ -271,7 +271,7 @@ export type {
   ScopeFileSystem,
   ScopeResolution,
   ScopeSeams,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 
 export {
   activeAdapterRegistry,
@@ -329,7 +329,7 @@ export {
   OUTPUT_CHANNELS,
   RUNNING_MANIFEST_SEAMS,
   validateManifest,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export { default as planCommand } from './plan.js';
 export {
   FINDING_KINDS,
@@ -361,7 +361,7 @@ export {
   scopeAt,
   ScopeError,
   selfAndAncestors,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 export { default as startCommand } from './start.js';
 
 registerCoreConfigSections();

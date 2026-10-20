@@ -56,10 +56,10 @@ import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { Output } from '@open-tomato/rafa/ports';
 
+import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
 import { OUTPUT_MODES } from '@open-tomato/rafa/core/config/sections';
 import { createTextOutput } from '@open-tomato/rafa/core/output';
 
-import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
 
 import { parseArgs } from './parseArgs.js';

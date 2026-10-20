@@ -34,10 +34,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { createNativeRelations } from '../board/relations/native.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { writePositionFile } from '../project/position.js';
 
 import { ghNextBoard } from './sources.js';
 import { readNextState } from './state.js';

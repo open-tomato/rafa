@@ -20,7 +20,7 @@
  * | `path` | `git ls-files`, then `git rev-parse HEAD:<path>` | its blob sha, `present` or `absent` |
  * | `symbol` | `git grep` for a line declaring `<name>` over tracked `.ts`, confirmed by `ts-symbols outline` where it can | `present` or `absent` |
  * | `command`, `flag` | the `describe` roster | `present` or `absent` |
- * | `key` | `SETTINGS` | `present` or `absent` |
+ * | `key` | `registeredSettings()` | `present` or `absent` |
  *
  * ## Issues
  *
@@ -166,8 +166,9 @@
  *
  * ## Keys
  *
- * A key is `present` when some entry of `SETTINGS` in
- * `src/config-registry.ts` has it as its `key`.
+ * A key is `present` when some registered setting has it as its `key`:
+ * an entry of `registeredSettings()`, core's reading of the record
+ * `src/config-registry.ts` registers as `SETTINGS`.
  */
 import type { Ref } from './extract.js';
 import type { IssueState, LiveReading } from './stamp.js';
@@ -175,12 +176,12 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument } from '../cli/describe.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
+import { registeredSettings } from '@open-tomato/rafa/core/config';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { GLOBAL_FLAGS } from '../cli/help.js';
 import { pluralOf } from '../cli/registry.js';
-import { SETTINGS } from '../config-registry.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 
@@ -516,7 +517,7 @@ function isRosterFlag(text: string, roster: DescribeDocument): boolean {
 
 /** True when some setting is written as `text`. */
 function isSettingKey(text: string): boolean {
-  return Object.values(SETTINGS).some((setting) => setting.key === text);
+  return Object.values(registeredSettings()).some((setting) => setting.key === text);
 }
 
 /** `PRESENT` when `holds`, `ABSENT` otherwise. */

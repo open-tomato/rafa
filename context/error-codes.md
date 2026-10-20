@@ -69,7 +69,7 @@ commit.
 
 `errors.codes` in the project's config is a list of entries with the keys
 `code`, `description`, `hint`, `level` and, optionally, `since`, read by
-`src/config-schema-errors.ts`. `legacy` is rafa's alone: on a project
+`packages/rafa/src/config-schema-errors.ts`. `legacy` is rafa's alone: on a project
 entry it is an unknown key.
 
 ```yaml
@@ -205,7 +205,7 @@ throw new LoopError({
 
 The tree has two levels: `RafaError` at the root and one class per module
 below it. There is no class for each action, since the action is a field
-the thrower gives. `ScopeError` (`src/project/scope.ts`) is the worked
+the thrower gives. `ScopeError` (`packages/rafa/src/project/scope.ts`) is the worked
 example. It sets `static readonly module = 'project'` and has one
 constructor, which takes the code, the message unprefixed and the cause,
 prefixes the message with `rafa scope: `, and hands the rest to

@@ -20,8 +20,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 
 import { resolvePlace } from './place.js';
 

@@ -28,8 +28,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../../adapters/tracker/github.js';
-import { writePositionFile } from '../../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

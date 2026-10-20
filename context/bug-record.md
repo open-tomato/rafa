@@ -87,7 +87,7 @@ sections: that text beside a `What` section, a section that is no field
 
 A record with a problem is refused before any tracker is resolved, every
 problem on a line of its own, each opening with the field it names
-(`bugProblems`, `src/bugs/record.ts`).
+(`bugProblems`, `packages/rafa/src/bugs/record.ts`).
 
 ### The body
 
@@ -112,7 +112,7 @@ module named `module`.
 ### The title template
 
 `issues.titles.bug` is one string that renders a title and reads it back
-(`src/bugs/title.ts`):
+(`packages/rafa/src/bugs/title.ts`):
 
 - `${name}` prints a variable: `type`, `project`, `projectType`,
   `module`, `action` or `summary`.
@@ -141,18 +141,18 @@ for the module or another wording.
 ### What rafa fills
 
 - **The place** is `ci` when the `CI` variable is set to anything but
-  nothing, `0` or `false`, and `local` otherwise (`src/bugs/places.ts`).
+  nothing, `0` or `false`, and `local` otherwise (`packages/rafa/src/bugs/places.ts`).
   A place names where a bug was seen; what was running belongs in the
   action and in reproduce.
 - **The versions** are the rafa version, the short commit with `-dirty`
   when a tracked file has changes, and the package as `name@version`
   (`src/bugs/versions.ts`).
 - **The package** is the nearest manifest above the file the error
-  points at (`packageOf`, `src/project/package-of.ts`): from the file's
+  points at (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
   directory up to the checkout's root, the first `package.json` holding a
   `name`. The `workspaces` globs are never read. The file is `--path`,
   else the first file of the checkout the artifact names
-  (`src/bugs/stack-path.ts`); with none, the checkout's own package. A
+  (`packages/rafa/src/bugs/stack-path.ts`); with none, the checkout's own package. A
   relative `--path` is read from the directory rafa runs in, and one
   outside the checkout, or naming no file, is refused.
 - **The checkout** is the one the command runs in. A project's root is
@@ -263,7 +263,7 @@ bugs:
 ```
 
 Both keys refuse `0`, a fraction, a quoted number and a boolean, and
-neither has an "off" spelling. The reader is `src/config-schema-bugs.ts`.
+neither has an "off" spelling. The reader is `packages/rafa/src/config-schema-bugs.ts`.
 
 ### `--dry-run`
 

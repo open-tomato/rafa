@@ -115,10 +115,11 @@ import type {
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { PullRequests } from '../pr/types.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
+import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import {
@@ -143,7 +144,6 @@ import {
   runRowLine,
   worktreeRowLine,
 } from './cleanup-render.js';
-import { expectNoArgument, readSwitch, resolveProjectConfig } from './plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa cleanup';

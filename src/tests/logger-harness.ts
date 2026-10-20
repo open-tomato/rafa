@@ -3,12 +3,12 @@
  * it, and a console logger made over one. It holds no test of its own,
  * and no production module imports it.
  */
-import type { LoggerHarness } from '../adapters/logger/contract.js';
-import type { LoggerSettings } from '../adapters/logger/settings.js';
+import type { LoggerHarness } from '@open-tomato/rafa/adapters/logger/contract';
+import type { LoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
 import type { CliEvent, Logger, Output } from '@open-tomato/rafa/ports';
 
-import { createConsoleLogger } from '../adapters/logger/console.js';
+import { createConsoleLogger } from '@open-tomato/rafa/adapters/logger/console';
 
 /** An output keeping every line and event handed to it. */
 export interface KeptOutput {

@@ -107,8 +107,8 @@
  * reads its one `gh auth status` call.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { execFileSync } from 'node:child_process';
 import {

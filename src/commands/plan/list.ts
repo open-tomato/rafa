@@ -51,16 +51,15 @@
 import type { PlanList, PlanListing } from '../../plan/list.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { formatCounts, plural } from '@open-tomato/rafa/core/plan';
-
-import { listPlans } from '../../plan/list.js';
-
 import {
   expectNoArgument,
   readSwitch,
   requireProject,
   resolvePlansDir,
-} from './plan-files.js';
+} from '@open-tomato/rafa/commands/plan/plan-files';
+import { formatCounts, plural } from '@open-tomato/rafa/core/plan';
+
+import { listPlans } from '../../plan/list.js';
 
 /** The usage line a refusal names, which is also how a refusal names the command. */
 const USAGE = 'rafa plan list';

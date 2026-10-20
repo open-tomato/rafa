@@ -91,8 +91,9 @@
  * `engines.node` in a `package.json`, `message.model` in a session
  * log, the placeholder `section.key` itself — every one of which
  * `./verify.ts` would call dangling. The sections are read off
- * `SETTINGS` rather than listed here, so a section added there is read
- * here with no second edit.
+ * `SETTINGS`, as core's `registeredSettings()` answers it, rather than
+ * listed here, so a section added there is read here with no second
+ * edit.
  *
  * Of the multi-word spans holding a flag, 63 opened with `rafa`, 37
  * with a subject written without it (`plan create --issue`), and 23
@@ -133,8 +134,9 @@
  */
 import type { BlockersReading } from '../board/relations/port.js';
 
+import { registeredSettings } from '@open-tomato/rafa/core/config';
+
 import { labelsLineBlockersOf } from '../board/relations/labels.js';
-import { SETTINGS } from '../config-registry.js';
 
 /** What a reference points at. */
 export type RefKind =
@@ -171,13 +173,29 @@ export const FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   'mjs', 'sh', 'sql', 'sqlite', 'toml', 'ts', 'tsx', 'txt', 'yaml', 'yml',
 ]);
 
-/** Every config section `SETTINGS` holds a dotted key under. */
-const CONFIG_SECTIONS: ReadonlySet<string> = new Set(
-  Object.values(SETTINGS)
-    .map((setting) => setting.key)
-    .filter((key) => key.includes('.'))
-    .map((key) => key.slice(0, key.indexOf('.'))),
-);
+/** The sections read off each registered settings record, by that record. */
+const SECTIONS_BY_RECORD = new WeakMap<object, ReadonlySet<string>>();
+
+/**
+ * Every config section `SETTINGS` holds a dotted key under, read off
+ * `registeredSettings()` at the first token that asks rather than as
+ * this module loads, which is before an entry registers the sections,
+ * and kept for the record it was read off.
+ */
+function configSections(): ReadonlySet<string> {
+  const settings = registeredSettings();
+  const known = SECTIONS_BY_RECORD.get(settings);
+  if (known !== undefined) return known;
+
+  const sections: ReadonlySet<string> = new Set(
+    Object.values(settings)
+      .map((setting) => setting.key)
+      .filter((key) => key.includes('.'))
+      .map((key) => key.slice(0, key.indexOf('.'))),
+  );
+  SECTIONS_BY_RECORD.set(settings, sections);
+  return sections;
+}
 
 /** A fenced block's opening or closing line: its fence run and what follows. */
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/u;
@@ -310,7 +328,7 @@ function isPath(token: string): boolean {
 
 /** True when `token` is `section.key` under a section `SETTINGS` holds. */
 function isKey(token: string): boolean {
-  return KEY_SHAPE.test(token) && CONFIG_SECTIONS.has(token.slice(0, token.indexOf('.')));
+  return KEY_SHAPE.test(token) && configSections().has(token.slice(0, token.indexOf('.')));
 }
 
 /** The symbol `token` names, or null when it is not code-shaped. */

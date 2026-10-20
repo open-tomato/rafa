@@ -46,11 +46,10 @@
  * other two modules export for a caller to import rather than reaching
  * into a sibling; however, most
  * callers import `config-sections.ts`'s names directly,
- * through its barrel `core/config/sections.js`. The pull request port
- * owns `MergeMethod`: a caller reading {@link RafaConfig.prMergeMethod}
- * imports it from `./pr/index.js`, and neither this module nor
- * `config-sections.ts` re-exports it, which would make the config a
- * second place to learn it from.
+ * through its barrel `core/config/sections.js`. `MergeMethod`, the type
+ * of {@link RafaConfig.prMergeMethod}, is `merge-method.ts`'s, exported
+ * by that barrel and re-exported by the pull request port
+ * (`src/pr/types.ts`); this module does not re-export it.
  *
  *   - `config-sections.ts` holds every rule about a VALUE: the readers,
  *     the closed lists of values, and why nothing is coerced.

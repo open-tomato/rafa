@@ -100,9 +100,9 @@ import type { SourceItem, TreeListing } from './trees.js';
 import type { Resolution, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 
+import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { isSkillTier } from '@open-tomato/rafa/schema/tiers';
 
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { pinKey, readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveVerdict } from '../tiers/serve.js';
 
@@ -119,7 +119,7 @@ const KIND_ORDER: readonly InventoryKind[] = ['skill', 'agent'];
 /**
  * What the inventory is built against: the {@link TierSettings}
  * `resolveTiers` reads, which a `RafaConfig` supplies. `tiersRafa`,
- * `tiersSkills` and `tiersAgents` fall back to `CONFIG_DEFAULTS` when
+ * `tiersSkills` and `tiersAgents` fall back to `registeredDefaults()` when
  * absent, as `entry` falls back to `Bun.main`; a command reading a
  * project's config passes all three.
  */
@@ -164,11 +164,12 @@ export function sourceRank(source: InventorySource): number {
 
 /** The {@link TierSettings} of `seams`, each absent one at its config default. */
 export function tierSettings(seams: InventorySeams): TierSettings {
+  const defaults = registeredDefaults();
   return {
     settingSources: seams.settingSources,
-    tiersRafa: seams.tiersRafa ?? CONFIG_DEFAULTS.tiersRafa,
-    tiersSkills: seams.tiersSkills ?? CONFIG_DEFAULTS.tiersSkills,
-    tiersAgents: seams.tiersAgents ?? CONFIG_DEFAULTS.tiersAgents,
+    tiersRafa: seams.tiersRafa ?? defaults.tiersRafa,
+    tiersSkills: seams.tiersSkills ?? defaults.tiersSkills,
+    tiersAgents: seams.tiersAgents ?? defaults.tiersAgents,
   };
 }
 

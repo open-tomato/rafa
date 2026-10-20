@@ -33,9 +33,9 @@ import type { RankedFields } from '../src/triage/similarity.js';
 
 import { resolve } from 'node:path';
 
+import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { parseBugRecord } from '../src/bugs/record.js';
 import { FIXTURE_REPO, causeOf } from '../src/triage/scoring-fixture.js';
 import { causeSignalOf, issueWordsOf, jaccard, sharesBoundary } from '../src/triage/similarity.js';
 

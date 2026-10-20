@@ -30,11 +30,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { renderEpicBody } from '../../board/epic-template.js';
 import { createGhProjectPort } from '../../board/project/gh.js';
 import { createFakeProjectGh, fakeProjectId } from '../../board/project/project-fake.js';
-import { writePositionFile } from '../../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { DEFAULT_HORIZON } from './declarations.js';

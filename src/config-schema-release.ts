@@ -155,9 +155,9 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { MergeMethod } from './pr/types.js';
 import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
 import type {
+  MergeMethod,
   PrProvider,
   Reader,
   ReleaseEnabled,
@@ -171,6 +171,7 @@ import type {
 import {
   flag,
   fragmentsDirectory,
+  MERGE_METHODS,
   oneOf,
   PR_PROVIDERS,
   RELEASE_AUTO,
@@ -184,8 +185,6 @@ import {
   usdAmount,
   versionCollisionMode,
 } from '@open-tomato/rafa/core/config/sections';
-
-import { MERGE_METHODS } from './pr/types.js';
 
 declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `release` section's fields, added to core's. */
@@ -334,18 +333,18 @@ export const DANGEROUS_RELEASE_DEFAULTS: Readonly<DangerousReleaseSettings> = Ob
 });
 
 /**
- * Accepts one of the pull request port's three merge methods. The list
- * is the port's (`pr/types.ts`), which spells them to match what
- * `gh pr merge` takes, so a second spelling here could not disagree
- * with it.
+ * Accepts one of the three merge methods. The list is core's
+ * (`core/config/merge-method.ts`, read through the sections barrel),
+ * which spells them to match what `gh pr merge` takes, and the pull
+ * request port re-exports the same list, so a second spelling here
+ * could not disagree with either.
  *
  * It sits here, beside the one setting that reads it, and not among
- * core's readers in `config-sections.ts`, so no core file imports
- * `pr/types.ts`. The port is reached at `./pr/types.js` and not through
- * the `./pr/index.js` barrel, because the barrel carries `pr/gh.ts`,
- * which imports the config's sections barrel and the `gh` spawner:
- * importing it here would put the CLI adapter behind every config read.
- * `pr/types.ts` imports types alone, so this import reaches nothing back.
+ * core's readers in `config-sections.ts`: the reader is the release
+ * section's, and the list alone is core's. Nothing under `src/pr/` is
+ * imported here, so the section reaches neither the port nor the
+ * `./pr/index.js` barrel, which carries `pr/gh.ts` and the `gh`
+ * spawner.
  */
 export const mergeMethod: Reader<MergeMethod> = oneOf(MERGE_METHODS);
 

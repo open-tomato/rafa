@@ -9,7 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
-  BOARD_FILES_OF_C6,
+  BOARD_NAMED,
+  EFFORT_NAMED,
+  INVENTORY_NAMED,
+  PR_NAMED,
+  RELEASE_NAMED,
+  RUN_NAMED,
+} from './cut-names';
+import {
   buildCutTable,
   CLI_PACKAGE,
   CORE_PACKAGE,
@@ -24,7 +31,7 @@ import {
   renderCutTableMarkdown,
   SECTIONS_ISSUE,
 } from './cut-table';
-import { classifyFile } from './files';
+import { classifyFile, listTrackedFiles } from './files';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -104,8 +111,40 @@ describe('CUT_RULES', () => {
       .sort();
 
     expect(inC6).toHaveLength(15);
-    expect([...BOARD_FILES_OF_C6]).toEqual(inC6);
-    expect(CUT_RULES.packages.find((rule) => rule.name === 'rafa-board')?.named).toEqual(inC6);
+    expect(BOARD_NAMED.filter((path) => path.startsWith('src/board/'))).toEqual(inC6);
+    expect(CUT_RULES.packages.find((rule) => rule.name === 'rafa-board')?.named).toEqual(BOARD_NAMED);
+  });
+});
+
+/** Each feature package's list of `cut-names.ts`, its length, and the file its rule names beside the list. */
+const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
+  ['rafa-inventory', INVENTORY_NAMED, 5, []],
+  ['rafa-board', BOARD_NAMED, 23, []],
+  ['rafa-pr', PR_NAMED, 17, ['src/pr/index.ts']],
+  ['rafa-run', RUN_NAMED, 25, ['src/start/branch-decision.ts']],
+  ['rafa-release', RELEASE_NAMED, 5, []],
+  ['rafa-effort', EFFORT_NAMED, 2, ['src/schema/frontmatter.ts']],
+];
+
+/**
+ * The named lists of `cut-names.ts` against the tracked tree: each list
+ * holds the count the plan names, sorted, every file in it tracked, and
+ * its package's rule names it with the file the rule named before.
+ */
+describe('the named lists against the tracked tree', () => {
+  const tracked = new Set(listTrackedFiles(REPO_ROOT).all);
+
+  for (const [name, list, length, kept] of NAMED_LISTS) {
+    it(`names ${length} tracked files for ${name}, sorted, and its rule holds them`, () => {
+      expect(list).toHaveLength(length);
+      expect([...list].sort()).toEqual([...list]);
+      expect(list.map((path) => [path, tracked.has(path)])).toEqual(list.map((path) => [path, true]));
+      expect(CUT_RULES.packages.find((rule) => rule.name === name)?.named).toEqual([...list, ...kept]);
+    });
+  }
+
+  it('names 77 files across the six lists, the 60 of the plan, the fifteen of cluster c6 and the two learning adapter files', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(77);
   });
 });
 
@@ -198,10 +237,10 @@ describe('placeFile', () => {
     expect(placeFile('src/schema/skill.ts')).toEqual({ by: 'folder', folder: 'src/schema/', package: 'rafa-inventory' });
   });
 
-  it('places the two report files in core and leaves the third to place', () => {
+  it('places the two report files in core and names the third for rafa-inventory', () => {
     expect(placeFile('packages/rafa/src/report/parse.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa/src/report/record.ts').package).toBe(CORE_PACKAGE);
-    expect(placeFile('src/report/lessons.ts')).toEqual({ by: 'rest', folder: undefined, package: CLI_PACKAGE });
+    expect(placeFile('src/report/lessons.ts')).toEqual({ by: 'named', folder: undefined, package: 'rafa-inventory' });
   });
 
   it('sends the test file of a named file where the named file goes', () => {
@@ -224,7 +263,7 @@ describe('placeFile', () => {
   it('counts a file no rule holds as the CLI\'s, left to place', () => {
     expect(placeFile('src/utils/tracker.ts')).toEqual({ by: 'rest', folder: undefined, package: CLI_PACKAGE });
     expect(placeFile('src/commands/doctor.ts').by).toBe('rest');
-    expect(placeFile('src/config-schema-hub.ts').by).toBe('rest');
+    expect(placeFile('src/config-schema-planted.ts').by).toBe('rest');
   });
 
   it('places a file under an unassigned folder in no package', () => {
@@ -242,10 +281,10 @@ describe('isClearedBySections', () => {
   it('holds for a section file imported from packages/rafa/src/core/config/ and for nothing else', () => {
     const cleared = (from: string, to: string): boolean => isClearedBySections({ from, kind: 'value', to });
 
-    expect(cleared('packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-hub.ts')).toBe(true);
+    expect(cleared('packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts')).toBe(true);
     expect(cleared('packages/rafa/src/core/config/config-schema.ts', 'src/config-set.ts')).toBe(false);
     expect(cleared('packages/rafa/src/core/config/config-schema.ts', 'src/board/config-schema-hub.ts')).toBe(false);
-    expect(cleared('packages/rafa/src/core/command/command.ts', 'src/config-schema-hub.ts')).toBe(false);
+    expect(cleared('packages/rafa/src/core/command/command.ts', 'src/config-schema-planted.ts')).toBe(false);
   });
 });
 
@@ -359,12 +398,12 @@ describe('buildCutTable: upward edges', () => {
 describe('buildCutTable: the edges issue 118 clears', () => {
   const table = buildCutTable(
     plant([
-      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-hub.ts'],
+      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
       ['packages/rafa/src/core/config/config.ts', 'src/config-set.ts'],
-      ['packages/rafa/src/core/command/command.ts', 'src/config-schema-hub.ts'],
-      ['src/board/place.ts', 'src/config-schema-hub.ts'],
-      ['src/tests/core-coupled/core/config/config.test.ts', 'src/config-schema-hub.ts'],
-      ['src/config-schema-hub.ts', 'packages/rafa/src/core/config/sections.ts'],
+      ['packages/rafa/src/core/command/command.ts', 'src/config-schema-planted.ts'],
+      ['src/board/place.ts', 'src/config-schema-planted.ts'],
+      ['src/tests/core-coupled/core/config/config.test.ts', 'src/config-schema-planted.ts'],
+      ['src/config-schema-planted.ts', 'packages/rafa/src/core/config/sections.ts'],
     ]),
   );
 
@@ -375,7 +414,7 @@ describe('buildCutTable: the edges issue 118 clears', () => {
         from: 'packages/rafa/src/core/config/config-schema.ts',
         fromPackage: CORE_PACKAGE,
         kind: 'value',
-        to: 'src/config-schema-hub.ts',
+        to: 'src/config-schema-planted.ts',
         toPackage: CLI_PACKAGE,
       },
     ]);
@@ -419,7 +458,7 @@ describe('buildCutTable: files', () => {
       files: ['src/pr/gh-fake.ts', 'src/pr/gh.ts', 'src/pr/index.ts'],
       filesByFolder: { 'src/commands/pr/': 0, 'src/pr/': 2, 'src/triage/': 0 },
       folders: ['src/commands/pr/', 'src/pr/', 'src/triage/'],
-      named: ['src/pr/index.ts'],
+      named: [...PR_NAMED, 'src/pr/index.ts'],
       rank: 6,
     });
     expect(rowOf(table, CORE_PACKAGE).files).toEqual(['packages/rafa/src/report/parse.test.ts', 'packages/rafa/src/report/parse.ts']);
@@ -539,7 +578,7 @@ describe('parseCutGraph', () => {
 describe('the two outputs', () => {
   const table = buildCutTable(
     plant([
-      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-hub.ts'],
+      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
       ['src/board/place.ts', 'src/utils/tracker.ts'],
       ['src/board/place.ts', 'src/start/session.ts', 'type'],
       ['src/stretch/run.ts', 'src/board/place.ts'],
@@ -592,7 +631,7 @@ describe('the two outputs', () => {
 
     expect(lines).toContain('| `rafa-board` | `rafa-run` | 1 |');
     expect(lines).toContain('| `rafa-board` | `@open-tomato/rafa` | 1 |');
-    expect(lines).toContain('- `packages/rafa/src/core/config/config-schema.ts` imports `src/config-schema-hub.ts` (value)');
+    expect(lines).toContain('- `packages/rafa/src/core/config/config-schema.ts` imports `src/config-schema-planted.ts` (value)');
     expect(lines).toContain('| `src/utils/tracker.ts` | 1 | `@open-tomato/rafa` | left to place |');
     expect(lines).toContain('| `src/start/session.ts` | 1 | `rafa-run` | by rule |');
     expect(lines).toContain('| `src/utils/` | 1 | 1 | 1 |');
@@ -629,7 +668,7 @@ describe('main', () => {
 
   it('reads docs/survey/import-graph.json under the root and writes both outputs beside it', async () => {
     const graph = plant([
-      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-hub.ts'],
+      ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
       ['src/board/place.ts', 'src/start/session.ts'],
     ]);
     mkdirSync(join(root, 'docs/survey'), { recursive: true });

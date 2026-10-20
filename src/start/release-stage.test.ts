@@ -43,6 +43,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
 
 import { assumptionsHeading } from '../board/review-stamp.js';
 import { verifyRelease } from '../release/verify.js';
@@ -81,7 +82,6 @@ import {
   unreached,
   VERIFIED,
 } from '../tests/release-stage-fixtures.js';
-import { getCurrentBranch } from '../utils/git.js';
 
 import { bodyWithSentence, finishRelease, planTitleIn, prepareReleaseStage, RELEASE_STAGE_SEAMS } from './release-stage.js';
 

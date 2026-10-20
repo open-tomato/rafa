@@ -38,12 +38,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { SCOPE_DIR } from '@open-tomato/rafa/project/scope';
 
 import { listBoardLabels, missingBoardLabels, setUpLabels } from '../board/setup.js';
 
 import { writeProjectLock } from './lock.js';
 import { PROJECT_TREE, writeProjectScope } from './scaffold.js';
-import { SCOPE_DIR } from './scope.js';
 
 /** A deprecation a project is moved off on update (#718). None is registered yet. */
 export interface Deprecation {

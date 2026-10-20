@@ -52,11 +52,11 @@ import { dirname, join } from 'node:path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions, SESSION_STATES } from '@open-tomato/rafa/core/loop';
 import { readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
+import { scopeAt } from '@open-tomato/rafa/project/scope';
 
 import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { scopeAt } from '../project/scope.js';
 
 import { isIdleWorktree } from './sections.js';
 

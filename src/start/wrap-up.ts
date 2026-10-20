@@ -68,11 +68,11 @@ import { posix } from 'node:path';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
 
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';
-import { getCurrentBranch } from '../utils/git.js';
 
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';
 import { serveSession } from './serving.js';

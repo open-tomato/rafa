@@ -224,8 +224,8 @@
  * naming it, where the computed case above compares a bundle with a
  * source that could have lost it as well. The root bundle's
  * `PORT_VERSIONS` is held to the source's, its `RUNNING_MANIFEST_SEAMS`
- * to the manifest's `version`, which `src/modules/manifest.ts` imports
- * from `package.json` as `describe` does, and its built `resolveScope`
+ * to the manifest's `version`, which `packages/rafa/src/modules/manifest.ts` takes as
+ * `RAFA_VERSION` from `@open-tomato/rafa/core/command`, and its built `resolveScope`
  * and `validateManifest` are run once each.
  *
  * `README.md` says only `./plan`, `./ports`, `./learning` and `./config`
@@ -537,6 +537,11 @@ const EXPORTS = {
   './ports/log-level': { types: './dist/ports/log-level.d.ts' },
   './report/parse': { types: './dist/report/parse.d.ts' },
   './store/check-rows': { types: './dist/effort/store/check-rows.d.ts' },
+  './bugs/record': { types: './dist/bugs/record.d.ts' },
+  './config-schema-bugs': { types: './dist/config-schema-bugs.d.ts' },
+  './config-schema-errors': { types: './dist/config-schema-errors.d.ts' },
+  './config-schema-features': { types: './dist/config-schema-features.d.ts' },
+  './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
 };
 
 /** The prefix of a specifier that names one of the package's own subpaths. */
@@ -548,7 +553,14 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * `core/command/lazy.d.ts`, three `index-<hash>.js` and `ready-<hash>.js`),
  * `config-schema-bugs.d.ts` from the `bugs` section (#953), and
  * `core/config/config-load-module.d.ts`, the module-file helpers moved out
- * of `config-load.ts` when each scope came to be read from two places.
+ * of `config-load.ts` when each scope came to be read from two places, and
+ * `core/config/merge-method.d.ts`, the merge methods moved out of
+ * `pr/types.ts`, with `pr/types.d.ts` and `pr/checks.d.ts` no longer
+ * reached, and one more `index-<hash>.js` once nine feature files read
+ * the config through core's `registeredDefaults()` and
+ * `registeredSettings()`: `src/config-registry.ts` and the section files
+ * then sit in a chunk of their own, apart from the error codes and the
+ * logger settings they shared one with.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1113,7 +1125,7 @@ async function expectedPlanPrompt(scratch: PlanScratch, root: string): Promise<s
 /**
  * The root `rafa plan` runs on when spawned in the scratch repository:
  * the project the dispatcher resolved, a real path with every symlink
- * followed (`src/project/scope.ts`).
+ * followed (`packages/rafa/src/project/scope.ts`).
  */
 function dispatchedRoot(scratch: PlanScratch): string {
   return realpathSync(scratch.repo);
@@ -1227,7 +1239,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(16);
+    expect(targets).toHaveLength(21);
     expect(missing).toEqual([]);
   });
 

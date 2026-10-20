@@ -48,7 +48,7 @@ const MODULE_NOTE_FILES = [
   'packages/rafa/src/core/config/config.ts',
   'packages/rafa/src/core/config/config-origins.ts',
   'packages/rafa/src/core/config/scope.ts',
-  'src/project/scope.ts',
+  'packages/rafa/src/project/scope.ts',
   'src/commands/config/show.ts',
   'src/commands/config/set.ts',
   'src/commands/doctor-config.ts',

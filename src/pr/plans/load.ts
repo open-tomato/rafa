@@ -136,7 +136,7 @@
  *   - It is capped AGAIN, at {@link FAILING_LOG_EXCERPT_LINES}, the
  *     same count and for the same reason `../triage/follow-up.ts` gives
  *     for re-capping: this text goes in the plan's `rafa:context` block,
- *     which `src/plan/inject.ts` renders into EVERY task session of the
+ *     which `packages/rafa/src/plan/inject.ts` renders into EVERY task session of the
  *     resolve run, so an uncapped excerpt is paid for once per TASK
  *     rather than once per resolve. The two omission counts are added,
  *     as they are there.

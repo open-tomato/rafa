@@ -42,8 +42,8 @@ import type { SpecIssue } from './issue.js';
 import type { BoardIssue, BoardIssueLink } from './roadmap-board.js';
 import type { RoadmapOutcome, RoadmapPickOptions, RoadmapSeams } from './spec-source-roadmap.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { Place } from '../project/position.js';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,9 +51,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { writeHopRecord } from '../next/hop-record.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { noAlternativeMessage, notOnListingMessage, unaskedMessage } from './blocked-line.js';

@@ -137,6 +137,7 @@ import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import { randomUUID } from 'node:crypto';
 
+import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -156,7 +157,6 @@ import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, sp
 import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
-import { readSwitch } from '../plan/plan-files.js';
 
 import { isDocsOnlyCriterion } from './close-docs.js';
 import { fileFailures } from './close-triage.js';

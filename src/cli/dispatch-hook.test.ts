@@ -29,9 +29,9 @@
  */
 import type { CommandHook, DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { CommandRoute } from './route.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,10 +39,10 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { CommandExit, restoreRunningCommand } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
-import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';

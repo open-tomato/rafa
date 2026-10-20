@@ -41,8 +41,9 @@ import type { MergeResult } from '@open-tomato/rafa/store/merge-store';
 
 import { resolve } from 'node:path';
 
+import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+
 import { createFileSync } from '../../effort/sync/file.js';
-import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { mergeRefusalExit, mergeTargetPath, renderMerge } from './merge.js';
 

@@ -59,6 +59,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
 import { CORE_PACKAGE as CORE_PACKAGE_FOLDER, subjectFolder } from './core-moves';
+import {
+  BOARD_NAMED,
+  EFFORT_NAMED,
+  INVENTORY_NAMED,
+  PR_NAMED,
+  RELEASE_NAMED,
+  RUN_NAMED,
+} from './cut-names';
 import { OUTPUT_DIR, stableJson } from './import-graph';
 
 /** The files and folders one future package holds by rule. */
@@ -238,28 +246,6 @@ export const CORE_PACKAGE = '@open-tomato/rafa-core';
 export const CLI_PACKAGE = '@open-tomato/rafa';
 
 /**
- * The fifteen `src/board/` files `docs/survey/cluster-map.json` puts in
- * cluster c6, named as assigned to `rafa-board`. They keep their path.
- */
-export const BOARD_FILES_OF_C6: readonly string[] = [
-  'src/board/flags.ts',
-  'src/board/gate.ts',
-  'src/board/issue.ts',
-  'src/board/leak.ts',
-  'src/board/naming.ts',
-  'src/board/plan-field.ts',
-  'src/board/plan-spec.ts',
-  'src/board/previous-copy.ts',
-  'src/board/readiness.ts',
-  'src/board/review-comment.ts',
-  'src/board/review-stamp.ts',
-  'src/board/snapshot-settle.ts',
-  'src/board/spec-review.ts',
-  'src/board/spec-source.ts',
-  'src/board/trust.ts',
-];
-
-/**
  * The twelve packages, lowest first, seeded from the survey's cluster
  * order, with the three folders left for the second architect pass. The
  * two shared-config packages sit lowest, since nothing in the graph
@@ -267,7 +253,9 @@ export const BOARD_FILES_OF_C6: readonly string[] = [
  * whose manifest takes it as a dev dependency. Core is its workspace
  * package, `CORE_PACKAGE` of `core-moves.ts`, which spells where core is:
  * one folder and no named file, as each service's rule and each
- * shared-config package's rule.
+ * shared-config package's rule. The six feature packages' named files
+ * are the lists of `cut-names.ts`, each with the file its rule named
+ * before them.
  */
 export const CUT_RULES: CutRules = {
   packages: [
@@ -300,7 +288,7 @@ export const CUT_RULES: CutRules = {
         'src/tiers/',
       ],
       name: 'rafa-inventory',
-      named: [],
+      named: INVENTORY_NAMED,
     },
     {
       folders: [
@@ -313,27 +301,27 @@ export const CUT_RULES: CutRules = {
         'src/refs/',
       ],
       name: 'rafa-board',
-      named: BOARD_FILES_OF_C6,
+      named: BOARD_NAMED,
     },
     {
       folders: ['src/commands/pr/', 'src/pr/', 'src/triage/'],
       name: 'rafa-pr',
-      named: ['src/pr/index.ts'],
+      named: [...PR_NAMED, 'src/pr/index.ts'],
     },
     {
       folders: ['src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
       name: 'rafa-run',
-      named: ['src/start/branch-decision.ts'],
+      named: [...RUN_NAMED, 'src/start/branch-decision.ts'],
     },
     {
       folders: ['src/commands/release/', 'src/release/'],
       name: 'rafa-release',
-      named: [],
+      named: RELEASE_NAMED,
     },
     {
       folders: ['src/effort/'],
       name: 'rafa-effort',
-      named: ['src/schema/frontmatter.ts'],
+      named: [...EFFORT_NAMED, 'src/schema/frontmatter.ts'],
     },
     {
       folders: ['packages/rafa-hub/'],

@@ -29,9 +29,9 @@
  * cannot be read at all is still reachable by the name it is filed
  * under.
  */
-import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 /** The local Learning adapter's own files, which are no records. */
 export const LEARNING_STORE_FILES: readonly string[] = ['instincts.ndjson', 'flags.ndjson'];

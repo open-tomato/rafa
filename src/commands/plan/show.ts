@@ -49,6 +49,7 @@ import type { PlansDir, TaskCounts } from '@open-tomato/rafa/core/plan';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { expectOneArgument, requireProject, resolvePlansDir } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import {
   checkbox,
@@ -61,8 +62,6 @@ import {
 } from '@open-tomato/rafa/core/plan';
 
 import { parsePlan } from '../../plan/index.js';
-
-import { expectOneArgument, requireProject, resolvePlansDir } from './plan-files.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa plan show <stub> [--tracker]';

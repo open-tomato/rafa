@@ -63,7 +63,7 @@
  * never loads it. `shared-flags.ts` imports nothing by value either: it
  * names `command.ts` with `import type` alone.
  *
- * `command.ts` also names `src/project/scope.ts` with `import type`,
+ * `command.ts` also names `packages/rafa/src/project/scope.ts` with `import type`,
  * which is erased before anything loads; it named `src/cli/registry.ts`
  * the same way until the registry's contract moved into
  * `registry-types.ts`. `src/cli/registry.ts` imports this barrel by

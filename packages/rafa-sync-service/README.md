@@ -24,7 +24,7 @@ allowList:
 ```
 
 Once enabled, the module is discovered on startup and registered by
-`src/modules/load.ts`. Commands that touch the store will refuse to run
+`packages/rafa/src/modules/load.ts`. Commands that touch the store will refuse to run
 without both lines when the project is set to `service` sync but the module
 is not enabled or not trusted.
 

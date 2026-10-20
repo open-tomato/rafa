@@ -29,7 +29,7 @@
  * selected, since core's own strategies read nothing they do not use,
  * and a config naming `service` with no `hub.url` never resolves. A caller
  * that loaded modules hands the registry `loadModules` answers
- * (`src/modules/load.ts`), since only that one holds a module's `sync`
+ * (`packages/rafa/src/modules/load.ts`), since only that one holds a module's `sync`
  * adapter.
  *
  * A kind the registry does not hold is refused in one of two ways:

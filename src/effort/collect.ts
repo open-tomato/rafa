@@ -183,12 +183,10 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-import { ConfigError } from '@open-tomato/rafa/core/config';
+import { ConfigError, registeredDefaults } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { selectEffortStore } from '@open-tomato/rafa/store';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
@@ -573,7 +571,7 @@ async function resolveSources(
 ): Promise<Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string }> {
   const { repoRoot: root, store, plansDir } = options;
   if (store !== undefined && plansDir !== undefined) {
-    return { store, plansDir, worktreeDir: options.worktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir };
+    return { store, plansDir, worktreeDir: options.worktreeDir ?? registeredDefaults().loopWorktreeDir };
   }
 
   const { config } = await loadConfig({ root, home: options.home }, {}, log);

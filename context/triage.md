@@ -180,7 +180,7 @@ other record sections.
 ### The repair task and its cap
 
 `src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
-`own-gap` entry through `insertTrackerTask` (`src/utils/tracker.ts`),
+`own-gap` entry through `insertTrackerTask` (`packages/rafa/src/utils/tracker.ts`),
 directly above the plan's first open task, `[ ]` or `[BLOCKED]`, or after the
 last task when none is open:
 

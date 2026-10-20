@@ -28,7 +28,7 @@
  *
  * `scope.ts` joined it with a scope's paths, `Scope`, the project the
  * dispatcher resolved, `ProjectFound`, and `scopeAt`, whose walk,
- * `resolveScope`, stays in `src/project/scope.ts`. It reads `config.ts`
+ * `resolveScope`, stays in `packages/rafa/src/project/scope.ts`. It reads `config.ts`
  * and `core-section.ts` by value and `config-load.ts` as a type, so it
  * is no leaf for `sections.ts`, and `load.ts` holds `config-load.ts`
  * alone.
@@ -108,6 +108,10 @@
  * `SECTIONS` and `knownKeysAbove`) is not here: a file outside
  * `packages/rafa/src/core/` imports it from `src/config-registry.ts`, and core reads
  * the registered settings, defaults and key indexes off `section.ts`.
+ * A feature file that reads the whole `CONFIG_DEFAULTS` or `SETTINGS`
+ * record without importing the registry takes `registeredDefaults()`
+ * or `registeredSettings()` from here, which answer the registered
+ * records typed whole.
  * Neither are the hub's `HubContext` and `HubTimeout`, which a file
  * imports from `src/config-schema-hub.ts`.
  *
@@ -116,7 +120,7 @@
  * section, the routing defaults, the item readers, `config.ts`'s two
  * document readers the loader reads a scope through, and the section
  * registry with its key indexes (`CORE_SECTION`, `moduleSource`, `registerConfigSections`,
- * `activeSettingByKey` and thirty more), which `src/index.test.ts`
+ * `activeSettingByKey` and thirty-three more), which `src/index.test.ts`
  * spells under `CONFIG_BARREL_ONLY`. Its `CONFIG_DEFAULTS` is
  * `src/config-registry.ts`'s.
  *
@@ -186,6 +190,8 @@ export {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   registerConfigSections,
+  registeredDefaults,
+  registeredSettings,
   restoreConfigSections,
   setConfigLoadHook,
   setConfigTemplateHook,

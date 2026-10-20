@@ -42,7 +42,7 @@
  * or the pull request's own number on a record naming no C.
  */
 import type { Horizon } from '../board/roadmap-epic-rows.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { samePlace } from '../board/place.js';
 

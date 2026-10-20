@@ -5,7 +5,7 @@
  * `dangerous.selfUpdateDuringLoop`, a tracker with a task left with and
  * without a live loop, and its refusals with their exit codes. The
  * install itself is held in `src/runtime/install.test.ts`, and the
- * reading of the live loops in `src/runtime/live-loops.test.ts`.
+ * reading of the live loops in `packages/rafa/src/runtime/live-loops.test.ts`.
  *
  * Each case dispatches a command made over a build seam of its own, in a
  * project planted under this file's temporary directory beside a home of

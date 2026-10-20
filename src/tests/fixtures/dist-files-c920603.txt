@@ -70,6 +70,7 @@ core/config/core-section.d.ts
 core/config/dangerous.d.ts
 core/config/default-routing.d.ts
 core/config/index.d.ts
+core/config/merge-method.d.ts
 core/config/scope.d.ts
 core/config/section.d.ts
 core/config/sections.d.ts
@@ -137,6 +138,7 @@ index-<hash>.js
 index-<hash>.js
 index-<hash>.js
 index-<hash>.js
+index-<hash>.js
 index.js
 learning/index.js
 plan-prompt.md
@@ -150,8 +152,6 @@ ports/index.js
 ports/learning.d.ts
 ports/log-level.d.ts
 ports/spec-review.d.ts
-pr/checks.d.ts
-pr/types.d.ts
 ready-<hash>.js
 release-templates/release-bot-fragment.yml
 release-templates/release-publish.yml

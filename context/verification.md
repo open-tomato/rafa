@@ -203,13 +203,26 @@ its change reaches:
   `src/tests/workspace-graph.sweep.test.ts`, is one of them: it runs the
   graph check over the live tree, beside the turbo-config sweep
   (`src/tests/turbo-config.sweep.test.ts`), which holds `turbo.json`'s
-  `agentGuidance` key and its three tasks
+  `agentGuidance` key and its three tasks. The stale-path sweep,
+  `src/tests/moved-paths.sweep.test.ts`, is another, and the default pattern
+  takes it with no config: it reads each `.md` file under `context/`, `docs/`
+  (less `docs/survey/`), `.claude/`, `README.md` and `AGENTS.md`, and each code
+  file under `src/`, `scripts/` and `packages/`, and it fails on any `from` path
+  of a move list under `scripts/codemod/moves/` that a scanned file still names.
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a
   test file the step's own change touches ran before it; `false`
   switches that retake off and nothing else; read "A newly red file is
   run alone once" below
+
+**The coupling reading is a survey reading, not a gate.**
+`bun scripts/survey/coupling.ts --max=20` reads `docs/survey/import-graph.json`
+and `docs/survey/cut-table.json` and prints the back edges between the feature
+packages; with `--max` it exits 1 above that percent. No `checks.*` entry,
+script or workflow runs it: a session runs it by hand, and
+`scripts/survey/coupling.test.ts` holds its reading. Its order and the
+left-to-place test it reads are set out in `context/source.md`, "The cut table".
 
 **This project's own table.** Decision 0009's table, with the stage at
 `related`, is this project's baseline. The epic's third criterion, per-change

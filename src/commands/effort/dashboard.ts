@@ -17,13 +17,13 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { homedir } from 'node:os';
 
+import { expectNoArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 
 import { formatDashboard } from '../../effort/dashboard-format.js';
 import { readDashboard } from '../../effort/dashboard.js';
 import { parseReportArgs } from '../../effort/report-args.js';
-import { expectNoArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort dashboard';

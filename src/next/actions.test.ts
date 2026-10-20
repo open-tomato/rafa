@@ -10,7 +10,7 @@
  * only read the table call `actionInvocation` and build no registry at
  * all. No case spawns a process, reaches git or reaches GitHub, and the
  * caller's project is resolved over an in-memory filesystem seam
- * (`src/project/scope.ts`) rather than a directory planted on disk.
+ * (`packages/rafa/src/project/scope.ts`) rather than a directory planted on disk.
  *
  * One case reads a flag the caller never typed: `hint`, which the
  * action context sets to false for every action, since `rafa next`
@@ -62,14 +62,15 @@
  * the case that reads no command ran.
  */
 import type { NextState } from './state.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CommandExit, HINT_FLAG } from '@open-tomato/rafa/core/command';
+import { resolveScope } from '@open-tomato/rafa/project/scope';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
@@ -80,7 +81,6 @@ import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
 import releaseSettle from '../commands/release/settle.js';
-import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

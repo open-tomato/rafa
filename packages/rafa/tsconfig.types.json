@@ -17,7 +17,15 @@
     "src/errors/rafa-codes.ts",
     "src/effort/store/findings.ts",
     "src/ports/log-level.ts",
-    "src/report/parse.ts"
+    "src/report/parse.ts",
+    "src/adapters/logger/settings.ts",
+    "src/bugs/places.ts",
+    "src/bugs/record.ts",
+    "src/bugs/title.ts",
+    "src/config-schema-bugs.ts",
+    "src/config-schema-errors.ts",
+    "src/config-schema-features.ts",
+    "src/config-schema-logger.ts"
   ],
   "references": []
 }
