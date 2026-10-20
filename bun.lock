@@ -8,6 +8,7 @@
         "@eslint/js": "^9.39.4",
         "@eslint/markdown": "^8.0.3",
         "@open-tomato/define-config": "0.5.0",
+        "@open-tomato/rafa-board": "workspace:*",
         "@open-tomato/rafa-core": "workspace:*",
         "@open-tomato/rafa-effort": "workspace:*",
         "@open-tomato/rafa-eslint-config": "workspace:*",
@@ -58,6 +59,14 @@
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
+      },
+    },
+    "packages/rafa-board": {
+      "name": "@open-tomato/rafa-board",
+      "version": "0.46.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
       },
     },
     "packages/rafa-effort": {
@@ -153,6 +162,8 @@
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
 
     "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
+
+    "@open-tomato/rafa-board": ["@open-tomato/rafa-board@workspace:packages/rafa-board"],
 
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
 
