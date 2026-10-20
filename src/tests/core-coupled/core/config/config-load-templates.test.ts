@@ -6,12 +6,11 @@
  * files, and a scope's YAML file's template outranks its module file, a
  * setting the template answered reporting source `template`.
  *
- * Until the next task of the plan empties them, the defaults of
- * `tests.integration` and its two neighbours ARE the `escalation`
- * template's values, so a value read alone could not tell a template
- * laid from one dropped. Every case therefore reads the source beside
- * the value, and reads a `checks.*` key too, whose default is empty
- * and whose template value is not.
+ * The defaults of `tests.integration` and its two neighbours are empty
+ * (`CONFIG_DEFAULTS`), so the `escalation` template's values, which are
+ * not, tell a template laid from one dropped by the value alone. Every
+ * case still reads the source beside the value, and reads a `checks.*`
+ * key too, whose default is empty and whose template value is not.
  *
  * Every refusal is paired with the acceptance that makes it a reading:
  * the unknown name beside the known one loading, the load with no hook
