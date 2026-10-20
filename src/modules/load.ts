@@ -43,7 +43,7 @@
  *      earlier module holds, and a port version core does not serve,
  *      naming both numbers.
  *   2. The `commands` entry, resolved the same way, becomes a
- *      `ModuleCommandEntry`. It is not imported here: the dispatcher's
+ *      {@link ModuleCommandEntry}. It is not imported here: the dispatcher's
  *      loader imports it (`src/cli/modules.ts`) and skips it with a
  *      warning naming the file when it fails, a syntax error included.
  *
@@ -102,25 +102,42 @@
  * as data (`manifest.ts`).
  */
 import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
-import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
 import type { FeaturesSettings } from '../config-schema-features.js';
 import type { AdapterRegistry, AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { ModuleSource, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { importModuleEntry } from '../cli/modules.js';
 import { FEATURES_SETTINGS } from '../config-schema-features.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { baseAdapterRegistry } from './activate.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
+
+/**
+ * One module's command entry: the name its commands mount under, and the
+ * file exporting them. The dispatcher's loader (`src/cli/modules.ts`)
+ * imports and mounts it, and re-exports this type under the same name.
+ */
+export interface ModuleCommandEntry {
+  /** The word typed after an `exec` action. */
+  readonly name: string;
+  /** The absolute path of the file whose default export is the module's commands. */
+  readonly entry: string;
+}
+
+/** Imports one entry file, answering its module namespace. */
+export type ModuleImporter = (entry: string) => Promise<unknown>;
+
+/** Imports an entry file by its absolute path, through a file URL. */
+export const importModuleEntry: ModuleImporter = (entry) => import(pathToFileURL(entry).href);
 
 /** What a configured module came to. */
 export type ModuleState = 'loaded' | 'refused' | 'disabled';

@@ -26,7 +26,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
-import { disabledFeatures, loadInvocationModules, loadModules, moduleSettings } from './load.js';
+import { disabledFeatures, importModuleEntry, loadInvocationModules, loadModules, moduleSettings } from './load.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-module-load-')));
 
@@ -84,6 +84,40 @@ function load(sources: readonly ModuleSource[], allowList: readonly string[]) {
   const settings: ModuleSettings = { modules: sources, allowList, base: tempBase };
   return loadModules(settings, { manifest: MANIFEST_SEAMS });
 }
+
+describe('importModuleEntry', () => {
+  it('imports an entry by its absolute path and answers its module namespace', async () => {
+    const dir = mkdtempSync(join(tempBase, 'entry-'));
+    const entry = join(dir, 'commands.ts');
+    writeFileSync(entry, 'export default [{ name: "issue next" }];\nexport const marker = 7;\n');
+
+    const loaded = await importModuleEntry(entry) as { default: unknown; marker: unknown };
+
+    expect(entry.startsWith(tempBase)).toBe(true);
+    expect(loaded.default).toEqual([{ name: 'issue next' }]);
+    expect(loaded.marker).toBe(7);
+  });
+
+  it('rejects for an absolute path no file is at, beside a planted file that imports', async () => {
+    const dir = mkdtempSync(join(tempBase, 'entry-'));
+    const planted = join(dir, 'commands.ts');
+    writeFileSync(planted, 'export default [];\n');
+
+    expect(await importModuleEntry(planted)).toHaveProperty('default', []);
+    await expect(importModuleEntry(join(dir, 'missing.ts'))).rejects.toThrow();
+  });
+
+  it('rejects for an entry with a syntax error, its own file with the bracket put back importing', async () => {
+    const dir = mkdtempSync(join(tempBase, 'entry-'));
+    const broken = join(dir, 'broken.ts');
+    const working = join(dir, 'working.ts');
+    writeFileSync(broken, 'export default [\n');
+    writeFileSync(working, 'export default [\n];\n');
+
+    expect(await importModuleEntry(working)).toHaveProperty('default', []);
+    await expect(importModuleEntry(broken)).rejects.toThrow();
+  });
+});
 
 describe('a path source allowList names', () => {
   it('registers its adapters, hands on its command entry and warns about nothing', async () => {

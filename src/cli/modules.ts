@@ -13,10 +13,12 @@
  *
  * ## The unit is the file
  *
- * Each entry names a module and one absolute file, whose default export
- * is the module's `RafaCommand[]` (from the modules and addons spec, under
- * `commands.entry`). A file is mounted whole or skipped whole, with one
- * warning, and the entries after it still load. It is skipped when:
+ * Each entry (a `ModuleCommandEntry`, declared with its importer by
+ * `src/modules/load.ts` and re-exported here) names a module and one
+ * absolute file, whose default export is the module's `RafaCommand[]`
+ * (from the modules and addons spec, under `commands.entry`). A file is
+ * mounted whole or skipped whole, with one warning, and the entries
+ * after it still load. It is skipped when:
  *
  *   - the path is not absolute, since a relative one would resolve
  *     against this module rather than against anything the caller
@@ -38,32 +40,26 @@
  * `allowList:` names from a `path` source whose manifest checked out.
  */
 import type { CommandRegistry } from './registry.js';
+import type { ModuleCommandEntry, ModuleImporter } from '../modules/load.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { isAbsolute } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { describeValue } from '@open-tomato/rafa/core/config/sections';
 
-/** One module's command entry: the name its commands mount under, and the file exporting them. */
-export interface ModuleCommandEntry {
-  /** The word typed after an `exec` action. */
-  readonly name: string;
-  /** The absolute path of the file whose default export is the module's commands. */
-  readonly entry: string;
-}
+import { importModuleEntry } from '../modules/load.js';
 
-/** Imports one entry file, answering its module namespace. */
-export type ModuleImporter = (entry: string) => Promise<unknown>;
+// The entry, the importer and the default import are the module loader's
+// (`src/modules/load.ts`), which owns an entry; they are re-exported here
+// under the same names for this loader's own importers.
+export type { ModuleCommandEntry, ModuleImporter } from '../modules/load.js';
+export { importModuleEntry } from '../modules/load.js';
 
 /** The registry with every entry that loaded mounted, and a warning for each that did not. */
 export interface LoadedModuleCommands {
   readonly registry: CommandRegistry;
   readonly warnings: readonly string[];
 }
-
-/** Imports an entry file by its absolute path, through a file URL. */
-export const importModuleEntry: ModuleImporter = (entry) => import(pathToFileURL(entry).href);
 
 /** The first line of what was thrown that holds anything. */
 function firstLine(error: unknown): string {
