@@ -2,17 +2,18 @@
  * Tests for making the loaded modules' adapters the active registry
  * (`packages/rafa/src/modules/activate.ts`).
  *
- * Each case loads the `sync-fixture` module under `testdata/`, whose
- * `git` sync strategy core does not register, through `loadModules` from
- * a config naming it, as `src/rafa.ts` does before it dispatches. The
- * manifest is held to rafa 0.1.0 and the port versions core serves, so a
- * release moving the version turns no case red.
+ * Each case loads the `sync-fixture` module under core's
+ * `packages/rafa/src/modules/testdata/`, whose `git` sync strategy core
+ * does not register, through `loadModules` from a config naming it, as
+ * `src/rafa.ts` does before it dispatches. The manifest is held to rafa
+ * 0.1.0 and the port versions core serves, so a release moving the
+ * version turns no case red.
  *
  * Every activation is undone after its case, and the registry active
  * before the case is put back, so no file bun runs later reads the
  * fixture's adapter.
  */
-import type { AdapterRegistry } from '../core/adapters/index.js';
+import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,14 +25,13 @@ import {
   CORE_ADAPTER_REGISTRY,
   PORT_VERSIONS,
   restoreAdapters,
-} from '../core/adapters/index.js';
-import { parseConfigText, resolveConfig } from '../core/config/index.js';
-
-import { activateModuleAdapters, baseAdapterRegistry } from './activate.js';
-import { loadModules, moduleSettings } from './load.js';
+} from '@open-tomato/rafa/core/adapters';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { activateModuleAdapters, baseAdapterRegistry } from '@open-tomato/rafa/modules/activate';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 /** The module whose `git` sync strategy each case activates. */
-const FIXTURE_MODULE = fileURLToPath(new URL('./testdata/sync-fixture', import.meta.url));
+const FIXTURE_MODULE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 /** What every manifest is held to. */
 const MANIFEST_SEAMS = { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS };
