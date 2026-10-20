@@ -197,7 +197,7 @@
  *     boolean. So a `tracking` flag spelled `yes` is refused rather
  *     than read as true.
  */
-import type { SettingOrigin, ShadowedFile } from './config-origins.js';
+import type { SettingOrigin } from './config-origins.js';
 import type {
   CommandLineSetting,
   ConfigSetting,
@@ -382,8 +382,6 @@ export interface ResolvedConfig {
    * command line or a default did (`config-origins.ts`).
    */
   provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
-  /** The YAML files a module file of their scope left unread. Empty here; `config-load.ts` fills it. */
-  shadowed: readonly ShadowedFile[];
 }
 
 /**
@@ -783,6 +781,5 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     userLocalExtras: userLocal?.extras ?? [],
     warnings,
     provenance,
-    shadowed: [],
   };
 }

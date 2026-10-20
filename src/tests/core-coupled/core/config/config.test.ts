@@ -1557,7 +1557,6 @@ describe('resolveConfig', () => {
       resolved.provenance.specsDir,
       resolved.provenance.trackingAll,
     ]).toEqual([{ file: PATH, entry: 0 }, { file: PATH, entry: 3 }, { file: USER_PATH, entry: 0 }, null, null]);
-    expect(resolved.shadowed).toEqual([]);
   });
 
   it('merges a file\'s routing rows by key over the five defaults', () => {
@@ -1583,7 +1582,6 @@ describe('resolveConfig', () => {
       userLocalExtras: [],
       warnings: [],
       provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
-      shadowed: [],
     });
   });
 

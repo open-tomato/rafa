@@ -36,8 +36,9 @@
  *     and the user scope's under a home and ranks the
  *     command line over both, the pure {@link parseConfigText} and
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
- *     {@link ConfigError}, and the names and defaults every setting
- *     takes.
+ *     {@link readProjectScope}, which reads the project's two files
+ *     alone, {@link ConfigError}, and the names and defaults every
+ *     setting takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
  *     which walks up from a directory to the nearest one holding a
  *     project config, or else to the main checkout of the
@@ -141,7 +142,7 @@ export type {
   AnyAdapter,
   PortImplementations,
 } from '@open-tomato/rafa/core/adapters';
-export type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+export type { ConfigRoots, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -280,7 +281,7 @@ export {
   registerAdapters,
   restoreAdapters,
 } from '@open-tomato/rafa/core/adapters';
-export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+export { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 export {

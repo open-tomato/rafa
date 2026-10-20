@@ -154,7 +154,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 import * as configBarrel from '@open-tomato/rafa/core/config';
-import { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
 import * as configLoadModule from '@open-tomato/rafa/core/config/load';
 import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
@@ -304,6 +304,7 @@ const RUNTIME_EXPORTS = [
   'planPrerequisites',
   'prerequisitesPathForPlan',
   'readConfigFile',
+  'readProjectScope',
   'readRafaBlocks',
   'registerAdapters',
   'registerCoreAdapters',
@@ -387,6 +388,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
   ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
+  ['readProjectScope', entry.readProjectScope, readProjectScope],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],

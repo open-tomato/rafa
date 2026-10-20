@@ -1,7 +1,6 @@
 /**
- * Where a resolved setting came from, and which file a scope left
- * unread: the two records `ResolvedConfig` carries beside its values,
- * `provenance` and `shadowed` (`config.ts`).
+ * Where a resolved setting came from: the record `ResolvedConfig`
+ * carries beside its values, `provenance` (`config.ts`).
  *
  * ## An origin
  *
@@ -26,13 +25,9 @@
  * file that last set `templates`, and carries the template's name as
  * `template`. An origin a file's own key gave carries no `template`.
  *
- * ## A shadowed file
- *
- * A scope is read from one file, the first of `rafa.config.ts`,
- * `rafa.config.mjs` and its `.rafa/config.yaml` that is a file
- * (`config-load.ts`). A {@link ShadowedFile} is a YAML file a module
- * file of its scope left unread, named so the warning and `rafa doctor`
- * can say which keys stopped applying.
+ * No file of a scope shadows another: each scope is read from its
+ * module file and its YAML file over it (`config-load.ts`), so no
+ * record here names a file left unread.
  */
 import type { ConfigFile, ConfigSetting, ConfigSource } from './config.js';
 
@@ -50,16 +45,6 @@ export interface SettingOrigin {
   readonly entry: number;
   /** The template that answered the setting, by name; absent for a file's own key. */
   readonly template?: string;
-}
-
-/** A YAML file left unread because a module file holds its scope. */
-export interface ShadowedFile {
-  /** The scope both files sit in. */
-  readonly layer: ConfigScopeName;
-  /** The YAML file left unread. */
-  readonly path: string;
-  /** The module file read in its place. */
-  readonly by: string;
 }
 
 /**

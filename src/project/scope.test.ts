@@ -207,7 +207,11 @@ describe('resolveScope over the three lookup names', () => {
       const root = realpathSync(project);
       expect(resolution.root).toBe(root);
       expect(resolution.project.configFile).toBe(join(root, name));
-      expect([loaded.path, loaded.config.store]).toEqual([resolution.project.configFile, 'ndjson']);
+      // The YAML file is the project's local layer, its module file the other.
+      const read = name.endsWith('.yaml')
+        ? loaded.localPath
+        : loaded.path;
+      expect([read, loaded.config.store]).toEqual([resolution.project.configFile, 'ndjson']);
     },
   );
 
@@ -430,11 +434,11 @@ describe('resolveScope on disk', () => {
     const loaded = await loadConfig(resolution, {}, () => {});
 
     expect(loaded.config.store).toBe('ndjson');
-    expect(loaded.sources.store).toBe('file');
+    expect(loaded.sources.store).toBe('local');
     expect(loaded.config.inject).toBe('task');
     expect(loaded.sources.inject).toBe('user');
-    expect(loaded.path).toBe(join(realpathSync(project), '.rafa', 'config.yaml'));
-    expect(loaded.userPath).toBe(userFile);
+    expect(loaded.localPath).toBe(join(realpathSync(project), '.rafa', 'config.yaml'));
+    expect(loaded.userLocalPath).toBe(userFile);
   });
 });
 

@@ -104,7 +104,7 @@ module's note is the long form.
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`. When `board.relationships` is set it runs the relationships move step: it reads the board listing in the configured mode and finds the other mode's marks (in `labels` mode every `parent` and `blockedBy` list, in `native` mode every `epic:` label on a non-epic and every `spec:blocked` label), prints every write that would move them (from `labels` to `native` each epic's members become sub-issues and each `Blocked by:` line becomes blocked-by, the reverse moves back), asks once whether to run them, writes nothing on a no, and removes the old mode's marks on a second question asked only after every write succeeded, finding nothing on a rerun. Then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts`; under `board.relationships: native` the guard step reads, asks and writes nothing (`native` status), and `--epic-guard` is refused with the warning `EPIC_GUARD_NATIVE_REFUSAL` naming the mode, exit 0 |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the config rows over `src/commands/doctor-config.ts` once the config is loaded, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the project rows over `src/commands/doctor-project.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
-| `src/commands/doctor-config.ts` | the config rows of `rafa doctor`, written as soon as the config is loaded: one `warn` line per config warning in the load's words, first one per YAML file a `rafa.config.ts` or `rafa.config.mjs` of its scope leaves unread, naming the fix (move its keys, remove the file), then in text mode one `note` row under `Config:` per `dangerous.*` key set off its default, read off the load's sink so a pass is never also a warning; json mode keeps every line a `warn` event, so a YAML project reads `doctor` as before (`src/tests/fixtures/config-parity/doctor.txt`) |
+| `src/commands/doctor-config.ts` | the config rows of `rafa doctor`, written as soon as the config is loaded: one `warn` line per config warning in the load's words (a YAML file beside a `rafa.config.ts` or `rafa.config.mjs` is read as its scope's local layer and is no row), then in text mode one `note` row under `Config:` per `dangerous.*` key set off its default, read off the load's sink so a pass is never also a warning; json mode keeps every line a `warn` event, so a YAML project reads `doctor` as before (`src/tests/fixtures/config-parity/doctor.txt`) |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
 | `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `packages/rafa/src/core/loop/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
 | `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
@@ -176,19 +176,23 @@ module's note is the long form.
 
 ### Project scope and configuration discovery
 
-Each scope is read from one file, the first of three names that is a file.
-The project scope looks up `rafa.config.ts`, then `rafa.config.mjs`, then
-`.rafa/config.yaml`, under the project root. The user scope looks up the same
-two module names, then `config.yaml`, under `~/.rafa/`. The others are not
-read: a `rafa.config.ts` beside a `.rafa/config.yaml` leaves the YAML file
-unread, `rafa doctor` lists it until its keys move, and every load warns
-about it.
+Each scope is read from two files (`config-load.ts`). Its module file is the
+first of `rafa.config.ts` and `rafa.config.mjs` that is a file, under the
+project root for the project scope and under `~/.rafa/` for the user scope:
+the person's file, which rafa never writes. Its YAML file, `.rafa/config.yaml`
+under the project root and `config.yaml` under `~/.rafa/`, is the scope's
+local layer, read over the module file key by key: the file rafa writes, the
+interim form of #893's local layer. No file shadows another, so nothing is
+warned about for a scope holding both.
 
-The layers are `defaults` under `user` under `project`. A setting takes the
-project file's value when that file sets it, else the user file's, else its
-default. A file's `templates` key names config templates whose entries
-`loadConfig` lays under that file's own keys (`config-load.ts`): the
-project's file over its templates over the user's file over its templates.
+The layers are `defaults` under `user` under `project`, each scope's YAML
+file over its module file. A setting takes the project's YAML file's value
+when that file sets it, else the project's module file's, else the user
+scope's YAML file's, else its module file's, else its default; `resolveConfig`
+reports the first `local`, the second `file`, and either user file `user`.
+A file's `templates` key names config templates whose entries `loadConfig`
+lays under that file's own keys: each of the four files over its own
+templates over the next file down.
 `rafa config show --sources` prints the layer and the file each setting
 came from (`config-origins.ts`, `src/commands/config/show.ts`), and
 `template:<name>` for a setting a template answered.
