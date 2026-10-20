@@ -400,7 +400,8 @@ barrel back by value closes a cycle. The cycle fails with a `ReferenceError` at
 load, in one import order only, so a green `tsc` proves nothing about it. The
 five barrels beyond the subject indexes are the splits made so far.
 `config/sections.ts` holds the leaf pair `config-sections.ts` and
-`config-readers.ts`, split while `config-merged.ts` imported section files that
+`config-readers.ts`, with `branch-template.ts` and `merge-method.ts` as leaves
+beside them, split while `config-merged.ts` imported section files that
 import the pair back; that file is retired and nothing behind `config/index.ts`
 imports a section file now, so the split stands as it was made. `config/load.ts`
 stands alone, because `config-load.ts` reaches

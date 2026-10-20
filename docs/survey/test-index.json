@@ -173626,9 +173626,10 @@
       "tests": [
         "src/fixtures/fixture-guard.sweep.test.ts",
         "src/fixtures/fixture-path.test.ts",
-        "src/tests/default-plan-dirs.sweep.test.ts"
+        "src/tests/default-plan-dirs.sweep.test.ts",
+        "src/tests/moved-paths.sweep.test.ts"
       ],
-      "testsFromOtherFolders": 1
+      "testsFromOtherFolders": 2
     },
     "src/fixtures/scrub.ts": {
       "folder": "src/fixtures",
@@ -242282,6 +242283,22 @@
       "spawns": false,
       "spawnsVia": [],
       "support": [],
+      "supportFolders": []
+    },
+    "src/tests/moved-paths.sweep.test.ts": {
+      "folder": "src/tests",
+      "folders": [
+        "src/fixtures"
+      ],
+      "index": 2,
+      "sourceFiles": 1,
+      "spawns": true,
+      "spawnsVia": [
+        "src/tests/moved-paths.sweep.test.ts"
+      ],
+      "support": [
+        "src/tests/sweep-timeout.ts"
+      ],
       "supportFolders": []
     },
     "src/tests/native-relations-spawn.test.ts": {

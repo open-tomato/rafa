@@ -1,6 +1,7 @@
 /**
  * The core-config-sections sweep: no code file under `packages/rafa/src/core/` imports a
- * `src/config-schema-*.ts` file, by any specifier `textImports` finds, and
+ * `config-schema-*.ts` file, at the root under `src/` or in the package under
+ * `packages/rafa/src/`, by any specifier `textImports` finds, and
  * `loadConfig` with no section registered refuses naming the registry.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -39,7 +40,7 @@ describe('core imports no config-schema section', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('has no import of a src/config-schema-*.ts file', () => {
+  it('has no import of a config-schema-*.ts file, at the root or in the package', () => {
     const offending = files.flatMap((file) => textImports(readFileSync(file, 'utf8'))
       .filter((specifier) => SCHEMA_SPECIFIER.test(specifier))
       .map((specifier) => `${file.slice(CORE_DIR.length)} imports ${specifier}`));

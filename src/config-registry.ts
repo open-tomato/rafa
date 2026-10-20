@@ -1,14 +1,14 @@
 /**
- * The registry: the fourteen sections of the config schema, handed to
+ * The registry: the fifteen sections of the config schema, handed to
  * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
- * the fourteen are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the thirteen files `config-schema-*.ts` that
- * each export one, under `src/` or, for four, under `packages/rafa/src/`.
+ * the fifteen are listed, {@link CONFIG_SECTIONS}: core's own
+ * (`CORE_SECTION`) and the fourteen files `config-schema-*.ts` that
+ * each export one, under `src/` (ten) or, for four, under `packages/rafa/src/`.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -144,7 +144,7 @@ import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-t
 import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 
-/** The fourteen sections, core's first, in the order they are registered. */
+/** The fifteen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CORE_SECTION,
   HUB_SECTION,
