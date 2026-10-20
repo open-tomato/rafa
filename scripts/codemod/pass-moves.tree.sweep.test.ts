@@ -10,7 +10,9 @@
  * `config-schema-features-integration.test.ts`,
  * `hop-record.integration.test.ts`, `position.integration.test.ts`,
  * `scope-fallback.test.ts`), and step 2 reads them the same way, so
- * twenty-two park.
+ * twenty-two park. Those readings predate the integration rule (#1289):
+ * on that base the codemod would now leave the three colocated tests the
+ * `tests.integration` globs match at the root, and park nineteen.
  *
  * Once the move has run, every listed `to` exists and the codemod refuses
  * the tree: the case then holds that refusal instead.

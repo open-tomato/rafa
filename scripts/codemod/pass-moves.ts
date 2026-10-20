@@ -29,7 +29,11 @@
  *     own (`record-composition.test.ts` goes with `record.ts`,
  *     `position.integration.test.ts` with `position.ts`); the longest stem
  *     wins. The `testdata/` folder goes when every source file of the
- *     folder is listed.
+ *     folder is listed. A colocated test the project's `tests.integration`
+ *     globs match (`readTestKindGlobs` of `scripts/survey/test-kinds.ts`)
+ *     is left in place with its imports rewritten by step 3, and listed,
+ *     until #913 places each integration test with the package entry it
+ *     drives.
  *  2. Parks each moved test file whose imports, resolved, reach a file of
  *     the repository outside the package and outside the move (a root
  *     file, a `src/tests/` helper, the root `package.json`) at
@@ -89,6 +93,7 @@ import { isCodeFile } from '../survey/core-barrels';
 import { CORE_PARKED_TESTS, CORE_SOURCE } from '../survey/core-moves';
 import { classifyFile } from '../survey/files';
 import { bunResolver } from '../survey/import-graph';
+import { readTestKindGlobs } from '../survey/test-kinds';
 
 import {
   applyEdits,
@@ -171,6 +176,8 @@ export interface PassMovesPlan {
   readonly moves: readonly PathMove[];
   /** Step 1: the colocated tests that move into the package, sorted. */
   readonly colocated: readonly PathMove[];
+  /** Step 1: the colocated integration tests left at the root, imports rewritten, sorted. */
+  readonly left: readonly string[];
   /** Step 1: the `testdata/` files that move with their folder, sorted. */
   readonly testdata: readonly PathMove[];
   /** Step 2, sorted. */
@@ -531,6 +538,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
     colocated: set.colocated,
     escapes: escapes.sort(byFileAndLine),
     importers: new Set(specifiers.filter((item) => !parkedFrom.has(item.file)).map((item) => item.file)).size,
+    left: set.left,
     mentions: mentions.sort((a, b) => a.file.localeCompare(b.file)),
     movedPathReads: movedPathReads.sort(byFileAndLine),
     moves: set.moves,
@@ -577,10 +585,11 @@ function indexFiles(root: string): ReadonlySet<string> {
  *
  * @param root - The repository root.
  * @param moves - The move list.
+ * @param integrationGlobs - The project's `tests.integration` patterns.
  * @returns The plan.
  * @throws {TreeError} When `git ls-files` fails.
  */
-export function readPassMoves(root: string, moves: readonly FileMove[]): PassMovesPlan {
+export function readPassMoves(root: string, moves: readonly FileMove[], integrationGlobs: readonly string[]): PassMovesPlan {
   const files = committableFiles(root);
   const sources = new Map<string, string>();
   for (const file of files) {
@@ -590,6 +599,7 @@ export function readPassMoves(root: string, moves: readonly FileMove[]): PassMov
   }
   return planPassMoves({
     files,
+    integrationGlobs,
     moves,
     present: (path) => existsSync(join(root, path)),
     resolve: bunResolver(root),
@@ -647,6 +657,7 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
   return [
     ...section('1. moved into the package', plan.moves.map(move)),
     ...section('1. colocated tests moved with them', plan.colocated.map(move)),
+    ...section('1. integration tests left at the root, imports rewritten', plan.left),
     ...section('1. testdata files moved with their folder', plan.testdata.map(move)),
     ...section('2. parked tests', plan.parked.map(move)),
     ...section('2. parked tests as README rows', plan.parked.map(readmeRow)),
@@ -702,7 +713,8 @@ export async function main(argv: readonly string[], cwd: string, streams: PassMo
     return 2;
   }
   try {
-    const plan = readPassMoves(args.root, await loadMoveList(args.list));
+    const moves = await loadMoveList(args.list);
+    const plan = readPassMoves(args.root, moves, (await readTestKindGlobs(args.root)).integration);
     if (!args.dryRun && plan.refusals.length === 0) {
       applyPassMoves(args.root, plan);
     }

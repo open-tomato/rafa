@@ -3,7 +3,10 @@
  * and 2, reading which files move where from a move list and the files a
  * commit would hold. A listed file moves to its `to`; its colocated tests
  * and its folder's `testdata/` go with it; a moved test whose imports
- * reach a file outside the package and the move is parked instead. Every
+ * reach a file outside the package and the move is parked instead. A
+ * colocated test the project's `tests.integration` globs match is left in
+ * place, until #913 places each integration test with the package entry
+ * it drives. Every
  * function here is pure over its input; the rewrites of each moved and
  * importing file are `pass-moves.ts`'s.
  */
@@ -45,6 +48,12 @@ export interface PassMovesInput {
   readonly resolve: ResolveImport;
   /** The move list. */
   readonly moves: readonly FileMove[];
+  /**
+   * The project's `tests.integration` patterns, matched against a
+   * repository-relative path with `Bun.Glob` as `testKind` of
+   * `scripts/survey/test-kinds.ts` matches them.
+   */
+  readonly integrationGlobs: readonly string[];
   /** Whether a path exists on disk; the committable files unless handed in. */
   readonly present?: (path: string) => boolean;
 }
@@ -180,6 +189,8 @@ function reachesOf(input: PassMovesInput, inPackage: ReadonlyMap<string, string>
 export interface MoveSet {
   readonly moves: readonly PathMove[];
   readonly colocated: readonly PathMove[];
+  /** The colocated tests an integration glob matches, left in place, sorted. */
+  readonly left: readonly string[];
   readonly testdata: readonly PathMove[];
   readonly folders: readonly PathMove[];
   readonly parked: readonly ParkedTest[];
@@ -187,9 +198,15 @@ export interface MoveSet {
   readonly refusals: readonly SiteNote[];
 }
 
+/** Whether one of the integration globs matches a repository-relative path. */
+function isIntegrationTest(path: string, globs: readonly string[]): boolean {
+  return globs.some((pattern) => new Bun.Glob(pattern).match(path));
+}
+
 /**
  * Reads steps 1 and 2 over the input, with the refusals of the list and
- * of the paths the moves land on.
+ * of the paths the moves land on. A colocated test an integration glob
+ * matches is left: it is in neither `colocated` nor `finals`.
  *
  * @param input - The run's input.
  * @param present - Whether a path exists on disk.
@@ -198,7 +215,9 @@ export interface MoveSet {
 export function readMoveSet(input: PassMovesInput, present: (path: string) => boolean): MoveSet {
   const refusals = listRefusals(input, present);
   const moves = [...input.moves].map((move) => ({ from: move.from, to: move.to })).sort(byFrom);
-  const tests = colocatedTests(input.files, moves);
+  const found = colocatedTests(input.files, moves);
+  const left = found.filter((test) => isIntegrationTest(test.from, input.integrationGlobs)).map((test) => test.from);
+  const tests = found.filter((test) => !left.includes(test.from));
   const data = testdataMoves(input.files, moves);
   const inPackage = new Map([...moves, ...tests, ...data.files].map((move) => [move.from, move.to]));
   const parked: ParkedTest[] = [];
@@ -217,5 +236,5 @@ export function readMoveSet(input: PassMovesInput, present: (path: string) => bo
     if (input.tracked.has(move.to) || present(move.to)) refusals.push({ file: move.from, line: 0, text: `moves to ${move.to}, which exists` });
   }
   const finals = new Map([...moves, ...colocated, ...data.files, ...parked].map((move) => [move.from, move.to]));
-  return { colocated, finals, folders: data.folders, moves, parked, refusals, testdata: data.files };
+  return { colocated, finals, folders: data.folders, left, moves, parked, refusals, testdata: data.files };
 }

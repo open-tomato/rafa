@@ -318,7 +318,7 @@ describe('the codemod under --dry-run, over a planted tree', () => {
 
 describe('the codemod over a planted tree', () => {
   const root = plant();
-  const plan: PassMovesPlan = readPassMoves(root, MOVES);
+  const plan: PassMovesPlan = readPassMoves(root, MOVES, []);
   applyPassMoves(root, plan);
   const tracked = git(root, ['ls-files']).split('\n');
 
@@ -497,6 +497,100 @@ describe('the codemod over a planted tree', () => {
     expect(result.out).toContain('  src/utils/git.ts:0 is not tracked');
     expect(result.out).toContain('  src/utils/git.ts:0 moves to packages/rafa/src/utils/git.ts, which exists');
     expect(result.out.at(-1)).toBe('refused, nothing written.');
+  });
+});
+
+/** A planted `rafa.config.ts` whose default export is `entries`, as `scripts/survey/test-kinds.test.ts` plants one. */
+function configText(entries: readonly unknown[]): string {
+  return `export default ${JSON.stringify(entries)};\n`;
+}
+
+/** A colocated integration test of `src/utils/git.ts`, by the `-integration` name. */
+const INTEGRATION_TEST = 'src/utils/git-integration.test.ts';
+
+const INTEGRATION_TEXT = lines('import { git } from \'./git.js\';', '', 'export const read = git;');
+
+/** The section the left tests print under, before its count. */
+const LEFT_SECTION = '1. integration tests left at the root, imports rewritten';
+
+describe('the codemod over a tree whose rafa.config.ts names integration globs', () => {
+  it('leaves a colocated -integration test at its path, its import on the subpath, and lists it', async () => {
+    // Arrange
+    const root = plant({
+      [INTEGRATION_TEST]: INTEGRATION_TEXT,
+      'rafa.config.ts': configText([{ tests: { integration: ['**/*-integration.test.ts'] } }]),
+    });
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+
+    // Act
+    const result = await run([`--list=${LIST_PATH}`], root);
+
+    // Assert
+    expect(result.err).toEqual([]);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain(`${LEFT_SECTION} (1)`);
+    expect(result.out).toContain(`  ${INTEGRATION_TEST}`);
+    expect(read(root, INTEGRATION_TEST)).toBe(lines('import { git } from \'@open-tomato/rafa/utils/git\';', '', 'export const read = git;'));
+    expect(git(root, ['ls-files'])).toContain(INTEGRATION_TEST);
+    expect(existsSync(join(root, 'packages/rafa/src/utils/git-integration.test.ts'))).toBe(false);
+  });
+
+  it('still moves a unit test with its listed file, and a .integration name the glob does not match', async () => {
+    // Arrange
+    const root = plant({
+      [INTEGRATION_TEST]: INTEGRATION_TEXT,
+      'rafa.config.ts': configText([{ tests: { integration: ['**/*-integration.test.ts'] } }]),
+    });
+
+    // Act
+    const result = await run([`--list=${LIST_PATH}`], root);
+
+    // Assert
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('1. colocated tests moved with them (3)');
+    expect(result.out).toContain('  src/utils/tracker-open.test.ts -> packages/rafa/src/utils/tracker-open.test.ts');
+    expect(result.out).toContain('  src/utils/git.integration.test.ts -> packages/rafa/src/utils/git.integration.test.ts');
+    expect(existsSync(join(root, 'packages/rafa/src/utils/tracker-open.test.ts'))).toBe(true);
+    expect(existsSync(join(root, 'src/utils/tracker-open.test.ts'))).toBe(false);
+  });
+
+  it('reads the globs from the rafa.config.ts alone: without it the -integration test moves', async () => {
+    // Arrange
+    const withFile = plant({
+      [INTEGRATION_TEST]: INTEGRATION_TEXT,
+      'rafa.config.ts': configText([{ tests: { integration: ['**/*-integration.test.ts'] } }]),
+    });
+    const without = plant({ [INTEGRATION_TEST]: INTEGRATION_TEXT });
+    expect(existsSync(join(without, 'rafa.config.ts'))).toBe(false);
+    expect(existsSync(join(without, '.rafa'))).toBe(false);
+
+    // Act
+    const listed = await run([`--list=${LIST_PATH}`, '--dry-run'], withFile);
+    const moved = await run([`--list=${LIST_PATH}`, '--dry-run'], without);
+
+    // Assert
+    expect(listed.code).toBe(0);
+    expect(listed.out).toContain(`${LEFT_SECTION} (1)`);
+    expect(listed.out).toContain(`  ${INTEGRATION_TEST}`);
+    expect(moved.code).toBe(0);
+    expect(moved.out).toContain(`${LEFT_SECTION} (0)`);
+    expect(moved.out).toContain('1. colocated tests moved with them (4)');
+    expect(moved.out).toContain(`  ${INTEGRATION_TEST} -> packages/rafa/src/utils/git-integration.test.ts`);
+  });
+
+  it('reads the escalation template a rafa.config.ts names, leaving both integration names', async () => {
+    // Arrange
+    const root = plant({ [INTEGRATION_TEST]: INTEGRATION_TEXT, 'rafa.config.ts': configText([{ templates: ['escalation'] }]) });
+
+    // Act
+    const result = await run([`--list=${LIST_PATH}`, '--dry-run'], root);
+
+    // Assert
+    expect(result.code).toBe(0);
+    expect(result.out).toContain(`${LEFT_SECTION} (2)`);
+    expect(result.out).toContain(`  ${INTEGRATION_TEST}`);
+    expect(result.out).toContain('  src/utils/git.integration.test.ts');
+    expect(result.out).toContain('1. colocated tests moved with them (2)');
   });
 });
 
