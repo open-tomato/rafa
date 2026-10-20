@@ -2016,8 +2016,8 @@ describe('the registered sections', () => {
       package: 'probe',
       settings: {},
       defaults: {},
-      checks: [({ config, sources, path, userPath }) => {
-        seen.push([config.store, sources.store, sources.effortSync, path, userPath]);
+      checks: [({ config, sources, path, userPath, provenance }) => {
+        seen.push([config.store, sources.store, sources.effortSync, path, userPath, provenance.effortSync?.file]);
         return [`probe refuses store ${config.store}`];
       }],
     }]);
@@ -2027,7 +2027,7 @@ describe('the registered sections', () => {
           + ' expected hub.url, the address of the hub, such as https://hub.example.org',
         'probe refuses store ndjson',
       ]);
-      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH]]);
+      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH, USER_PATH]]);
     } finally {
       restoreConfigSections(previous);
     }

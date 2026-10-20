@@ -758,7 +758,7 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
   ) as Record<ConfigSetting, SettingOrigin | null>;
   const path = file?.path ?? null;
   const userPath = user?.path ?? null;
-  const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath }));
+  const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath, provenance }));
   if (checkProblems.length > 0) throw new ConfigError(checkProblems);
   const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
   const warnings = [...files].reverse().flatMap(({ layer }) => [
