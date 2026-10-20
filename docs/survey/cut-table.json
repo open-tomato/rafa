@@ -30,7 +30,7 @@
     {
       "kind": "source",
       "path": "src/adapters/learning/local.ts",
-      "upwardEdgesIn": 0
+      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -54,36 +54,6 @@
     },
     {
       "kind": "test",
-      "path": "src/bugs/cause-rule.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/bugs/cause-rule.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/bugs/filed-values.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/bugs/filed-values.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/bugs/fill.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/bugs/fill.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
       "path": "src/bugs/recheck-verdict.test.ts",
       "upwardEdgesIn": 0
     },
@@ -104,82 +74,12 @@
     },
     {
       "kind": "test",
-      "path": "src/bugs/versions.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/bugs/versions.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/branches.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/branches.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/groups.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/groups.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/cleanup/held-stale-branch.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "test",
-      "path": "src/cleanup/index.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/index.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/past-head.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/past-head.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/cleanup/remote-only-integration.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/remote-only.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/remote-only.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/runs.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/runs.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -201,26 +101,6 @@
       "kind": "source",
       "path": "src/cleanup/settings.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/steps.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/steps.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/cleanup/worktrees.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/cleanup/worktrees.ts",
-      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -569,16 +449,6 @@
     },
     {
       "kind": "test",
-      "path": "src/commands/doctor-ladder.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/commands/doctor-ladder.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
       "path": "src/commands/doctor-marks.test.ts",
       "upwardEdgesIn": 0
     },
@@ -611,16 +481,6 @@
       "kind": "test",
       "path": "src/commands/doctor-refs-roadmap.test.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/commands/doctor-refs.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/commands/doctor-refs.ts",
-      "upwardEdgesIn": 3
     },
     {
       "kind": "test",
@@ -1114,16 +974,6 @@
     },
     {
       "kind": "test",
-      "path": "src/commands/plan/refs-check.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/commands/plan/refs-check.ts",
-      "upwardEdgesIn": 3
-    },
-    {
-      "kind": "test",
       "path": "src/commands/plan/review-gate.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1279,16 +1129,6 @@
     },
     {
       "kind": "test",
-      "path": "src/commands/switch.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/commands/switch.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
       "path": "src/commands/tiers-scratch.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1374,111 +1214,6 @@
     },
     {
       "kind": "test",
-      "path": "src/config-schema-board-project.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-board-project.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-checks.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-checks.ts",
-      "upwardEdgesIn": 4
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-hub.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-hub.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-issues.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-issues.ts",
-      "upwardEdgesIn": 4
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-loop-continue.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-loop-continue.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-loop-retries.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-loop-retries.ts",
-      "upwardEdgesIn": 6
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-readings.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-release.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-release.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-tests.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-tests.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-triage.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-triage.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/config-schema-wrap-up.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/config-schema-wrap-up.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
       "path": "src/config-set.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1526,56 +1261,6 @@
       "kind": "source",
       "path": "src/config/templates.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/docs/open-lines.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/docs/open-lines.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/docs/release-issue.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/docs/release-issue.ts",
-      "upwardEdgesIn": 2
-    },
-    {
-      "kind": "test",
-      "path": "src/docs/task-reading.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/docs/task-reading.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/epic/verify-plan.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/epic/verify-plan.ts",
-      "upwardEdgesIn": 4
-    },
-    {
-      "kind": "test",
-      "path": "src/epic/verify-run.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/epic/verify-run.ts",
-      "upwardEdgesIn": 2
     },
     {
       "kind": "test",
@@ -1664,16 +1349,6 @@
     },
     {
       "kind": "test",
-      "path": "src/loop/events-file.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/loop/events-file.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
       "path": "src/loop/wait-reasons.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1689,62 +1364,12 @@
     },
     {
       "kind": "test",
-      "path": "src/next/actions.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/actions.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/next/ceiling.test.ts",
       "upwardEdgesIn": 0
     },
     {
       "kind": "source",
       "path": "src/next/ceiling.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/ending.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/ending.ts",
-      "upwardEdgesIn": 4
-    },
-    {
-      "kind": "test",
-      "path": "src/next/epic-end.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/epic-end.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/hint.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/hint.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/hop-action.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/hop-action.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -1764,26 +1389,6 @@
     },
     {
       "kind": "test",
-      "path": "src/next/hop-chain.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/hop-chain.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/hop-rows.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/hop-rows.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/next/lines.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1799,62 +1404,7 @@
     },
     {
       "kind": "test",
-      "path": "src/next/owner-gate.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/owner-gate.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/preconditions.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/readings.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/readings.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/next/relation-readings-native.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/relation-readings.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/relation-readings.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/relations-mode.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/relations-mode.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/settle-step.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/settle-step.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -1879,16 +1429,6 @@
     },
     {
       "kind": "test",
-      "path": "src/next/sources.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/sources.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/next/state-live-run.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1900,16 +1440,6 @@
     {
       "kind": "test",
       "path": "src/next/state-no-checks.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/next/state.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/next/state.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -1949,21 +1479,6 @@
     },
     {
       "kind": "test",
-      "path": "src/plan/index.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/index.ts",
-      "upwardEdgesIn": 5
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/list.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/plan/needs.test.ts",
       "upwardEdgesIn": 0
     },
@@ -1971,61 +1486,6 @@
       "kind": "source",
       "path": "src/plan/needs.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/plan/risk.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/risk.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/plan/risk/accounts.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/risk/accounts.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/plan/risk/commands.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/risk/commands.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/plan/risk/long-runs.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/risk/long-runs.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/plan/store-rules.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/store-rules.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "source",
-      "path": "src/plan/validate.ts",
-      "upwardEdgesIn": 1
     },
     {
       "kind": "source",
@@ -2041,16 +1501,6 @@
       "kind": "source",
       "path": "src/project/gitignore.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/project/lock.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/project/lock.ts",
-      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -2096,26 +1546,6 @@
       "kind": "source",
       "path": "src/project/update-range.ts",
       "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/report/lessons.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/report/lessons.ts",
-      "upwardEdgesIn": 1
-    },
-    {
-      "kind": "test",
-      "path": "src/runtime/install.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/runtime/install.ts",
-      "upwardEdgesIn": 1
     },
     {
       "kind": "test",
@@ -3644,16 +3074,6 @@
     },
     {
       "kind": "test",
-      "path": "src/utils/agent-definition.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "source",
-      "path": "src/utils/agent-definition.ts",
-      "upwardEdgesIn": 3
-    },
-    {
-      "kind": "test",
       "path": "src/utils/agent-shell.test.ts",
       "upwardEdgesIn": 0
     },
@@ -4041,7 +3461,7 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-effort"
         },
         {
           "from": "src/backfill/derive.ts",
@@ -4167,6 +3587,13 @@
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
+          "toPackage": "rafa-effort"
+        },
+        {
+          "from": "src/report/lessons.ts",
+          "fromPackage": "rafa-inventory",
+          "kind": "type",
+          "to": "src/adapters/learning/local.ts",
           "toPackage": "@open-tomato/rafa"
         },
         {
@@ -4185,8 +3612,8 @@
         }
       ],
       "fileCounts": {
-        "source": 51,
-        "test": 51,
+        "source": 54,
+        "test": 54,
         "testSupport": 0
       },
       "files": [
@@ -4260,6 +3687,12 @@
         "src/learning/merge.test.ts",
         "src/learning/merge.ts",
         "src/learning/types.ts",
+        "src/plan/risk/commands.test.ts",
+        "src/plan/risk/commands.ts",
+        "src/plan/risk/long-runs.test.ts",
+        "src/plan/risk/long-runs.ts",
+        "src/report/lessons.test.ts",
+        "src/report/lessons.ts",
         "src/schema/failure-strings.ts",
         "src/schema/instinct.test.ts",
         "src/schema/instinct.ts",
@@ -4318,10 +3751,14 @@
         "src/tiers/"
       ],
       "name": "rafa-inventory",
-      "named": [],
+      "named": [
+        "src/plan/risk/commands.ts",
+        "src/plan/risk/long-runs.ts",
+        "src/report/lessons.ts"
+      ],
       "rank": 4,
-      "remaining": 22,
-      "upwardEdges": 22
+      "remaining": 23,
+      "upwardEdges": 23
     },
     {
       "clearedByIssue118": 0,
@@ -4331,7 +3768,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/plan/validate.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/board/issue-edit-state.ts",
@@ -4360,20 +3797,6 @@
           "kind": "value",
           "to": "src/release/fragment.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/board/project/progress.ts",
-          "fromPackage": "rafa-board",
-          "kind": "type",
-          "to": "src/config-schema-board-project.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/board/project/retry.ts",
-          "fromPackage": "rafa-board",
-          "kind": "type",
-          "to": "src/config-schema-board-project.ts",
-          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/board/project/rules.ts",
@@ -4422,6 +3845,13 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/switch.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/doctor-refs.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/cli/describe.ts",
           "toPackage": "@open-tomato/rafa"
         },
         {
@@ -4429,14 +3859,7 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/docs/release-issue.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/close-docs.ts",
-          "fromPackage": "rafa-board",
-          "kind": "type",
-          "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-pr"
         },
         {
           "from": "src/commands/epic/close-docs.ts",
@@ -4448,23 +3871,9 @@
         {
           "from": "src/commands/epic/close-triage.ts",
           "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/close-triage.ts",
-          "fromPackage": "rafa-board",
-          "kind": "type",
-          "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/close-triage.ts",
-          "fromPackage": "rafa-board",
           "kind": "type",
           "to": "src/epic/verify-run.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/epic/close-triage.ts",
@@ -4505,15 +3914,8 @@
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
-          "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/close.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
           "to": "src/epic/verify-run.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/epic/close.ts",
@@ -4534,49 +3936,21 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/commands/switch.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/show.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/epic/show.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/issue/check.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/fill.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-pr"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/versions.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/issue/create-bug.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-pr"
         },
         {
           "from": "src/commands/issue/create-bug.ts",
@@ -4607,32 +3981,32 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/commands/issue/issue-tracker.ts",
-          "fromPackage": "rafa-board",
-          "kind": "type",
-          "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/issue/list.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/commands/doctor-refs.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/commands/issue/list.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/commands/plan/refs-check.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/commands/issue/ready.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/next/ending.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/commands/plan/refs-check.ts",
+          "fromPackage": "rafa-board",
+          "kind": "value",
+          "to": "src/cli/describe.ts",
           "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/commands/plan/refs-check.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/cli/registry.ts",
+          "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/next/relation-readings.ts",
+          "fromPackage": "rafa-board",
+          "kind": "type",
+          "to": "src/next/readings.ts",
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/refs/verify.ts",
@@ -4657,8 +4031,8 @@
         }
       ],
       "fileCounts": {
-        "source": 148,
-        "test": 172,
+        "source": 156,
+        "test": 180,
         "testSupport": 7
       },
       "files": [
@@ -4889,6 +4263,8 @@
         "src/board/unblock-after-merge.test.ts",
         "src/board/unblock-after-merge.ts",
         "src/board/unblock.ts",
+        "src/bugs/cause-rule.test.ts",
+        "src/bugs/cause-rule.ts",
         "src/commands/board/declarations.ts",
         "src/commands/board/index-integration.test.ts",
         "src/commands/board/index.test.ts",
@@ -4897,6 +4273,8 @@
         "src/commands/board/list.ts",
         "src/commands/board/sync.test.ts",
         "src/commands/board/sync.ts",
+        "src/commands/doctor-refs.test.ts",
+        "src/commands/doctor-refs.ts",
         "src/commands/epic/cancel-native.test.ts",
         "src/commands/epic/cancel-unblock.test.ts",
         "src/commands/epic/cancel-unblock.ts",
@@ -4976,6 +4354,18 @@
         "src/commands/issue/unblock-native.ts",
         "src/commands/issue/unblock.test.ts",
         "src/commands/issue/unblock.ts",
+        "src/commands/plan/refs-check.test.ts",
+        "src/commands/plan/refs-check.ts",
+        "src/config-schema-board-project.test.ts",
+        "src/config-schema-board-project.ts",
+        "src/config-schema-issues.test.ts",
+        "src/config-schema-issues.ts",
+        "src/epic/verify-plan.test.ts",
+        "src/epic/verify-plan.ts",
+        "src/next/hop-chain.test.ts",
+        "src/next/hop-chain.ts",
+        "src/next/relation-readings.test.ts",
+        "src/next/relation-readings.ts",
         "src/refs/check-command.test.ts",
         "src/refs/check-command.ts",
         "src/refs/extract-relations.test.ts",
@@ -5024,15 +4414,72 @@
         "src/board/snapshot-settle.ts",
         "src/board/spec-review.ts",
         "src/board/spec-source.ts",
-        "src/board/trust.ts"
+        "src/board/trust.ts",
+        "src/bugs/cause-rule.ts",
+        "src/commands/doctor-refs.ts",
+        "src/commands/plan/refs-check.ts",
+        "src/config-schema-board-project.ts",
+        "src/config-schema-issues.ts",
+        "src/epic/verify-plan.ts",
+        "src/next/hop-chain.ts",
+        "src/next/relation-readings.ts"
       ],
       "rank": 5,
-      "remaining": 47,
-      "upwardEdges": 47
+      "remaining": 38,
+      "upwardEdges": 38
     },
     {
       "clearedByIssue118": 0,
       "edges": [
+        {
+          "from": "src/cleanup/groups.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/cleanup/past-head.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/cleanup/groups.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/cleanup/worktrees.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/cleanup/groups.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/config-schema-release.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/cleanup/steps.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/cleanup/past-head.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/cleanup/steps.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/cleanup/remote-only.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/cleanup/steps.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/cleanup/runs.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/cleanup/steps.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/cleanup/worktrees.ts",
+          "toPackage": "rafa-run"
+        },
         {
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
@@ -5080,7 +4527,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/runtime/install.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/merge-guard.ts",
@@ -5115,7 +4562,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/cleanup/worktrees.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/merge-loop-worktree.ts",
@@ -5129,7 +4576,7 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/pr-context.ts",
@@ -5199,14 +4646,14 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/wait.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/next/ending.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/wait.ts",
@@ -5214,6 +4661,69 @@
           "kind": "value",
           "to": "src/start/pr-lifecycle.ts",
           "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/docs/release-issue.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/release/forecast.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/docs/release-issue.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/release/version.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/owner-gate.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/next/readings.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/next/settle-step.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/next/state.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/next/settle-step.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/release/guard-merge.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/sources.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/next/epic-end.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/sources.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/next/readings.ts",
+          "toPackage": "rafa-run"
+        },
+        {
+          "from": "src/next/sources.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "type",
+          "to": "src/release/guard-merge.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/plan/risk.ts",
+          "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "src/utils/agent-definition.ts",
+          "toPackage": "rafa-effort"
         },
         {
           "from": "src/pr/settle-waiting.ts",
@@ -5300,34 +4810,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/triage/bug-filing.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/bugs/cause-rule.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/triage/bug-filing.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/bugs/filed-values.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/triage/bug-filing.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/bugs/versions.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/triage/bug-filing.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/triage/inherited.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
@@ -5339,14 +4821,14 @@
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/triage/leftover-repair.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-run"
         },
         {
           "from": "src/triage/refs-section.ts",
@@ -5357,11 +4839,23 @@
         }
       ],
       "fileCounts": {
-        "source": 78,
-        "test": 106,
+        "source": 95,
+        "test": 122,
         "testSupport": 2
       },
       "files": [
+        "src/bugs/filed-values.test.ts",
+        "src/bugs/filed-values.ts",
+        "src/bugs/fill.test.ts",
+        "src/bugs/fill.ts",
+        "src/bugs/versions.test.ts",
+        "src/bugs/versions.ts",
+        "src/cleanup/branches.test.ts",
+        "src/cleanup/branches.ts",
+        "src/cleanup/groups.test.ts",
+        "src/cleanup/groups.ts",
+        "src/cleanup/steps.test.ts",
+        "src/cleanup/steps.ts",
         "src/commands/pr/close.test.ts",
         "src/commands/pr/close.ts",
         "src/commands/pr/current.test.ts",
@@ -5441,6 +4935,27 @@
         "src/commands/pr/wait-grace-driven.test.ts",
         "src/commands/pr/wait.test.ts",
         "src/commands/pr/wait.ts",
+        "src/config-schema-readings.ts",
+        "src/config-schema-triage.test.ts",
+        "src/config-schema-triage.ts",
+        "src/docs/open-lines.test.ts",
+        "src/docs/open-lines.ts",
+        "src/docs/release-issue.test.ts",
+        "src/docs/release-issue.ts",
+        "src/docs/task-reading.test.ts",
+        "src/docs/task-reading.ts",
+        "src/next/owner-gate.test.ts",
+        "src/next/owner-gate.ts",
+        "src/next/relations-mode.test.ts",
+        "src/next/relations-mode.ts",
+        "src/next/settle-step.test.ts",
+        "src/next/settle-step.ts",
+        "src/next/sources.test.ts",
+        "src/next/sources.ts",
+        "src/plan/risk.test.ts",
+        "src/plan/risk.ts",
+        "src/plan/risk/accounts.test.ts",
+        "src/plan/risk/accounts.ts",
         "src/pr/checks.test.ts",
         "src/pr/checks.ts",
         "src/pr/conflict-sentence.sweep.test.ts",
@@ -5561,48 +5076,44 @@
       ],
       "name": "rafa-pr",
       "named": [
+        "src/bugs/filed-values.ts",
+        "src/bugs/fill.ts",
+        "src/bugs/versions.ts",
+        "src/cleanup/branches.ts",
+        "src/cleanup/groups.ts",
+        "src/cleanup/steps.ts",
+        "src/config-schema-readings.ts",
+        "src/config-schema-triage.ts",
+        "src/docs/open-lines.ts",
+        "src/docs/release-issue.ts",
+        "src/docs/task-reading.ts",
+        "src/next/owner-gate.ts",
+        "src/next/relations-mode.ts",
+        "src/next/settle-step.ts",
+        "src/next/sources.ts",
+        "src/plan/risk.ts",
+        "src/plan/risk/accounts.ts",
         "src/pr/index.ts"
       ],
       "rank": 6,
-      "remaining": 46,
-      "upwardEdges": 46
+      "remaining": 58,
+      "upwardEdges": 58
     },
     {
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/start/continue-args.ts",
+          "from": "src/cleanup/index.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
-          "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
+          "to": "src/cleanup/past-head.ts",
+          "toPackage": "rafa-release"
         },
         {
-          "from": "src/start/decision-prompt.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-loop-continue.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/decision-prompt.ts",
+          "from": "src/next/actions.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/epic/verify-plan.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/dispatch.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/dispatch.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/report/lessons.ts",
+          "to": "src/cli/core/parseArgs.ts",
           "toPackage": "@open-tomato/rafa"
         },
         {
@@ -5610,28 +5121,7 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/utils/agent-definition.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/doc-task.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/cleanup/branches.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/doc-task.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/docs/task-reading.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/handout.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa"
+          "toPackage": "rafa-effort"
         },
         {
           "from": "src/start/loop-events.ts",
@@ -5648,25 +5138,11 @@
           "toPackage": "rafa-effort"
         },
         {
-          "from": "src/start/loop-events.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/start/preflight-sync.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/effort/sync/doctor-reading.ts",
           "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/start/preflight.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/store-rules.ts",
-          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/release-body.ts",
@@ -5718,67 +5194,11 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/start/retry-budget.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/risk-total.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/risk.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/risk-total.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/plan/risk/accounts.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/run-checkout.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/cleanup/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/run-config.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/run-setup.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/start/runner-pr.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/release/fragment.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/start/session.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/loop/events-file.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/stale-docs.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/docs/release-issue.ts",
-          "toPackage": "@open-tomato/rafa"
         },
         {
           "from": "src/start/stale-docs.ts",
@@ -5823,55 +5243,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/start/suite-stage-step.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-checks.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/suite-step.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-checks.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/suite-step.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-tests.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/suite-task-step.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-checks.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/triage-kinds.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/cleanup/branches.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/triage-kinds.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-loop-retries.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/triage.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/config-schema-issues.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/start/wrap-up-retry.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
@@ -5879,44 +5250,16 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/start/wrap-up-run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/cleanup/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/wrap-up-run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-wrap-up.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/wrap-up-run.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/plan/index.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/start/wrap-up.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
           "to": "src/release/prepare.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/suite/checks.ts",
-          "fromPackage": "rafa-run",
-          "kind": "type",
-          "to": "src/config-schema-checks.ts",
-          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
-        "source": 98,
-        "test": 143,
+        "source": 123,
+        "test": 165,
         "testSupport": 0
       },
       "files": [
@@ -5939,6 +5282,14 @@
         "src/claims/record.ts",
         "src/claims/stale.test.ts",
         "src/claims/stale.ts",
+        "src/cleanup/index.test.ts",
+        "src/cleanup/index.ts",
+        "src/cleanup/remote-only.test.ts",
+        "src/cleanup/remote-only.ts",
+        "src/cleanup/runs.test.ts",
+        "src/cleanup/runs.ts",
+        "src/cleanup/worktrees.test.ts",
+        "src/cleanup/worktrees.ts",
         "src/commands/claim/accept.test.ts",
         "src/commands/claim/accept.ts",
         "src/commands/claim/declarations-integration.test.ts",
@@ -5954,6 +5305,43 @@
         "src/commands/claim/release.ts",
         "src/commands/claim/take.test.ts",
         "src/commands/claim/take.ts",
+        "src/commands/switch.test.ts",
+        "src/commands/switch.ts",
+        "src/config-schema-checks.test.ts",
+        "src/config-schema-checks.ts",
+        "src/config-schema-loop-continue.test.ts",
+        "src/config-schema-loop-continue.ts",
+        "src/config-schema-loop-retries.test.ts",
+        "src/config-schema-loop-retries.ts",
+        "src/config-schema-tests.test.ts",
+        "src/config-schema-tests.ts",
+        "src/config-schema-wrap-up.test.ts",
+        "src/config-schema-wrap-up.ts",
+        "src/epic/verify-run.test.ts",
+        "src/epic/verify-run.ts",
+        "src/loop/events-file.test.ts",
+        "src/loop/events-file.ts",
+        "src/next/actions.test.ts",
+        "src/next/actions.ts",
+        "src/next/ending.test.ts",
+        "src/next/ending.ts",
+        "src/next/hint.test.ts",
+        "src/next/hint.ts",
+        "src/next/hop-action.test.ts",
+        "src/next/hop-action.ts",
+        "src/next/hop-rows.test.ts",
+        "src/next/hop-rows.ts",
+        "src/next/preconditions.ts",
+        "src/next/readings.test.ts",
+        "src/next/readings.ts",
+        "src/next/state.test.ts",
+        "src/next/state.ts",
+        "src/plan/index.test.ts",
+        "src/plan/index.ts",
+        "src/plan/list.ts",
+        "src/plan/store-rules.test.ts",
+        "src/plan/store-rules.ts",
+        "src/plan/validate.ts",
         "src/preflight/first-dispatch.test.ts",
         "src/preflight/first-dispatch.ts",
         "src/preflight/fork.test.ts",
@@ -5962,6 +5350,8 @@
         "src/preflight/prerequisites-md.ts",
         "src/preflight/run.test.ts",
         "src/preflight/run.ts",
+        "src/runtime/install.test.ts",
+        "src/runtime/install.ts",
         "src/start/background-wait.test.ts",
         "src/start/background-wait.ts",
         "src/start/base-prompts.sweep.test.ts",
@@ -6178,57 +5568,58 @@
       ],
       "name": "rafa-run",
       "named": [
+        "src/cleanup/index.ts",
+        "src/cleanup/remote-only.ts",
+        "src/cleanup/runs.ts",
+        "src/cleanup/worktrees.ts",
+        "src/commands/switch.ts",
+        "src/config-schema-checks.ts",
+        "src/config-schema-loop-continue.ts",
+        "src/config-schema-loop-retries.ts",
+        "src/config-schema-tests.ts",
+        "src/config-schema-wrap-up.ts",
+        "src/epic/verify-run.ts",
+        "src/loop/events-file.ts",
+        "src/next/actions.ts",
+        "src/next/ending.ts",
+        "src/next/hint.ts",
+        "src/next/hop-action.ts",
+        "src/next/hop-rows.ts",
+        "src/next/preconditions.ts",
+        "src/next/readings.ts",
+        "src/next/state.ts",
+        "src/plan/index.ts",
+        "src/plan/list.ts",
+        "src/plan/store-rules.ts",
+        "src/plan/validate.ts",
+        "src/runtime/install.ts",
         "src/start/branch-decision.ts"
       ],
       "rank": 7,
-      "remaining": 49,
-      "upwardEdges": 49
+      "remaining": 22,
+      "upwardEdges": 22
     },
     {
       "clearedByIssue118": 0,
       "edges": [
-        {
-          "from": "src/commands/release/status-stale-docs.ts",
-          "fromPackage": "rafa-release",
-          "kind": "value",
-          "to": "src/docs/open-lines.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
         {
           "from": "src/commands/release/status.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "src/effort/attribution.ts",
           "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/commands/release/workflows.ts",
-          "fromPackage": "rafa-release",
-          "kind": "value",
-          "to": "src/commands/doctor-ladder.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/release/scaffold.ts",
-          "fromPackage": "rafa-release",
-          "kind": "value",
-          "to": "src/config-schema-release.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/release/settle-lock.ts",
-          "fromPackage": "rafa-release",
-          "kind": "value",
-          "to": "src/project/lock.ts",
-          "toPackage": "@open-tomato/rafa"
         }
       ],
       "fileCounts": {
-        "source": 51,
-        "test": 66,
+        "source": 56,
+        "test": 71,
         "testSupport": 0
       },
       "files": [
+        "src/cleanup/past-head.test.ts",
+        "src/cleanup/past-head.ts",
+        "src/commands/doctor-ladder.test.ts",
+        "src/commands/doctor-ladder.ts",
         "src/commands/release/declarations-integration.test.ts",
         "src/commands/release/declarations.test.ts",
         "src/commands/release/declarations.ts",
@@ -6271,6 +5662,12 @@
         "src/commands/release/workflows.levels.test.ts",
         "src/commands/release/workflows.test.ts",
         "src/commands/release/workflows.ts",
+        "src/config-schema-release.test.ts",
+        "src/config-schema-release.ts",
+        "src/next/epic-end.test.ts",
+        "src/next/epic-end.ts",
+        "src/project/lock.test.ts",
+        "src/project/lock.ts",
         "src/release/audit.test.ts",
         "src/release/audit.ts",
         "src/release/body-forecast.test.ts",
@@ -6356,28 +5753,28 @@
         "src/release/"
       ],
       "name": "rafa-release",
-      "named": [],
+      "named": [
+        "src/cleanup/past-head.ts",
+        "src/commands/doctor-ladder.ts",
+        "src/config-schema-release.ts",
+        "src/next/epic-end.ts",
+        "src/project/lock.ts"
+      ],
       "rank": 8,
-      "remaining": 5,
-      "upwardEdges": 5
+      "remaining": 1,
+      "upwardEdges": 1
     },
     {
       "clearedByIssue118": 0,
-      "edges": [
-        {
-          "from": "src/effort/sync/select.ts",
-          "fromPackage": "rafa-effort",
-          "kind": "value",
-          "to": "src/config-schema-hub.ts",
-          "toPackage": "@open-tomato/rafa"
-        }
-      ],
+      "edges": [],
       "fileCounts": {
-        "source": 36,
-        "test": 34,
+        "source": 38,
+        "test": 36,
         "testSupport": 0
       },
       "files": [
+        "src/config-schema-hub.test.ts",
+        "src/config-schema-hub.ts",
         "src/effort/attribution.test.ts",
         "src/effort/attribution.ts",
         "src/effort/classify.test.ts",
@@ -6447,7 +5844,9 @@
         "src/effort/trend-stats.test.ts",
         "src/effort/trend-stats.ts",
         "src/schema/frontmatter.test.ts",
-        "src/schema/frontmatter.ts"
+        "src/schema/frontmatter.ts",
+        "src/utils/agent-definition.test.ts",
+        "src/utils/agent-definition.ts"
       ],
       "filesByFolder": {
         "src/effort/": 68
@@ -6457,11 +5856,13 @@
       ],
       "name": "rafa-effort",
       "named": [
+        "src/config-schema-hub.ts",
+        "src/utils/agent-definition.ts",
         "src/schema/frontmatter.ts"
       ],
       "rank": 9,
-      "remaining": 1,
-      "upwardEdges": 1
+      "remaining": 0,
+      "upwardEdges": 0
     },
     {
       "clearedByIssue118": 0,
@@ -6552,8 +5953,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 237,
-        "test": 510,
+        "source": 177,
+        "test": 454,
         "testSupport": 26
       },
       "files": [
@@ -6567,40 +5968,16 @@
         "src/adapters/output/json.ts",
         "src/adapters/planner/claude.test.ts",
         "src/adapters/planner/claude.ts",
-        "src/bugs/cause-rule.test.ts",
-        "src/bugs/cause-rule.ts",
-        "src/bugs/filed-values.test.ts",
-        "src/bugs/filed-values.ts",
-        "src/bugs/fill.test.ts",
-        "src/bugs/fill.ts",
         "src/bugs/recheck-verdict.test.ts",
         "src/bugs/recheck-verdict.ts",
         "src/bugs/test-reference.test.ts",
         "src/bugs/test-reference.ts",
-        "src/bugs/versions.test.ts",
-        "src/bugs/versions.ts",
-        "src/cleanup/branches.test.ts",
-        "src/cleanup/branches.ts",
-        "src/cleanup/groups.test.ts",
-        "src/cleanup/groups.ts",
         "src/cleanup/held-stale-branch.test.ts",
-        "src/cleanup/index.test.ts",
-        "src/cleanup/index.ts",
-        "src/cleanup/past-head.test.ts",
-        "src/cleanup/past-head.ts",
         "src/cleanup/remote-only-integration.test.ts",
-        "src/cleanup/remote-only.test.ts",
-        "src/cleanup/remote-only.ts",
-        "src/cleanup/runs.test.ts",
-        "src/cleanup/runs.ts",
         "src/cleanup/scratch-repository.test.ts",
         "src/cleanup/scratch-repository.ts",
         "src/cleanup/settings.test.ts",
         "src/cleanup/settings.ts",
-        "src/cleanup/steps.test.ts",
-        "src/cleanup/steps.ts",
-        "src/cleanup/worktrees.test.ts",
-        "src/cleanup/worktrees.ts",
         "src/cli/core/assembleContext.test.ts",
         "src/cli/core/assembleContext.ts",
         "src/cli/core/parseArgs.test.ts",
@@ -6705,8 +6082,6 @@
         "src/commands/doctor-install.test.ts",
         "src/commands/doctor-install.ts",
         "src/commands/doctor-ladder.command.test.ts",
-        "src/commands/doctor-ladder.test.ts",
-        "src/commands/doctor-ladder.ts",
         "src/commands/doctor-marks.test.ts",
         "src/commands/doctor-marks.ts",
         "src/commands/doctor-previous.test.ts",
@@ -6714,8 +6089,6 @@
         "src/commands/doctor-project.test.ts",
         "src/commands/doctor-project.ts",
         "src/commands/doctor-refs-roadmap.test.ts",
-        "src/commands/doctor-refs.test.ts",
-        "src/commands/doctor-refs.ts",
         "src/commands/doctor-relations.test.ts",
         "src/commands/doctor-relations.ts",
         "src/commands/doctor-release.test.ts",
@@ -6816,8 +6189,6 @@
         "src/commands/plan/ready-offer.ts",
         "src/commands/plan/refresh-offer.test.ts",
         "src/commands/plan/refresh-offer.ts",
-        "src/commands/plan/refs-check.test.ts",
-        "src/commands/plan/refs-check.ts",
         "src/commands/plan/review-gate.test.ts",
         "src/commands/plan/review-gate.ts",
         "src/commands/plan/risk.test.ts",
@@ -6849,8 +6220,6 @@
         "src/commands/status.test.ts",
         "src/commands/status.ts",
         "src/commands/switch-native.test.ts",
-        "src/commands/switch.test.ts",
-        "src/commands/switch.ts",
         "src/commands/tiers-scratch.test.ts",
         "src/commands/update/board.ts",
         "src/commands/update/current.test.ts",
@@ -6868,27 +6237,6 @@
         "src/config-locked.ts",
         "src/config-registry.test.ts",
         "src/config-registry.ts",
-        "src/config-schema-board-project.test.ts",
-        "src/config-schema-board-project.ts",
-        "src/config-schema-checks.test.ts",
-        "src/config-schema-checks.ts",
-        "src/config-schema-hub.test.ts",
-        "src/config-schema-hub.ts",
-        "src/config-schema-issues.test.ts",
-        "src/config-schema-issues.ts",
-        "src/config-schema-loop-continue.test.ts",
-        "src/config-schema-loop-continue.ts",
-        "src/config-schema-loop-retries.test.ts",
-        "src/config-schema-loop-retries.ts",
-        "src/config-schema-readings.ts",
-        "src/config-schema-release.test.ts",
-        "src/config-schema-release.ts",
-        "src/config-schema-tests.test.ts",
-        "src/config-schema-tests.ts",
-        "src/config-schema-triage.test.ts",
-        "src/config-schema-triage.ts",
-        "src/config-schema-wrap-up.test.ts",
-        "src/config-schema-wrap-up.ts",
         "src/config-set.test.ts",
         "src/config-set.ts",
         "src/config/entry.test.ts",
@@ -6899,16 +6247,6 @@
         "src/config/shape.ts",
         "src/config/templates.test.ts",
         "src/config/templates.ts",
-        "src/docs/open-lines.test.ts",
-        "src/docs/open-lines.ts",
-        "src/docs/release-issue.test.ts",
-        "src/docs/release-issue.ts",
-        "src/docs/task-reading.test.ts",
-        "src/docs/task-reading.ts",
-        "src/epic/verify-plan.test.ts",
-        "src/epic/verify-plan.ts",
-        "src/epic/verify-run.test.ts",
-        "src/epic/verify-run.ts",
         "src/errors/bug-fields.test.ts",
         "src/errors/bug-fields.ts",
         "src/errors/handler.test.ts",
@@ -6926,56 +6264,25 @@
         "src/loop/awake-clock.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/blocked-tasks.ts",
-        "src/loop/events-file.test.ts",
-        "src/loop/events-file.ts",
         "src/loop/wait-reasons.test.ts",
         "src/loop/wait-reasons.ts",
         "src/modules/testdata/pull-merge-sync/sync.ts",
-        "src/next/actions.test.ts",
-        "src/next/actions.ts",
         "src/next/ceiling.test.ts",
         "src/next/ceiling.ts",
-        "src/next/ending.test.ts",
-        "src/next/ending.ts",
-        "src/next/epic-end.test.ts",
-        "src/next/epic-end.ts",
-        "src/next/hint.test.ts",
-        "src/next/hint.ts",
-        "src/next/hop-action.test.ts",
-        "src/next/hop-action.ts",
         "src/next/hop-after-loop.test.ts",
         "src/next/hop-chain-native.test.ts",
         "src/next/hop-chain.integration.test.ts",
-        "src/next/hop-chain.test.ts",
-        "src/next/hop-chain.ts",
-        "src/next/hop-rows.test.ts",
-        "src/next/hop-rows.ts",
         "src/next/lines.test.ts",
         "src/next/lines.ts",
         "src/next/loop-worktree-tree-driven.test.ts",
-        "src/next/owner-gate.test.ts",
-        "src/next/owner-gate.ts",
-        "src/next/preconditions.ts",
-        "src/next/readings.test.ts",
-        "src/next/readings.ts",
         "src/next/relation-readings-native.test.ts",
-        "src/next/relation-readings.test.ts",
-        "src/next/relation-readings.ts",
-        "src/next/relations-mode.test.ts",
-        "src/next/relations-mode.ts",
-        "src/next/settle-step.test.ts",
-        "src/next/settle-step.ts",
         "src/next/sources-cancelled.test.ts",
         "src/next/sources-hop.test.ts",
         "src/next/sources-native.test.ts",
         "src/next/sources-roadmap-open.test.ts",
-        "src/next/sources.test.ts",
-        "src/next/sources.ts",
         "src/next/state-live-run.test.ts",
         "src/next/state-native.test.ts",
         "src/next/state-no-checks.test.ts",
-        "src/next/state.test.ts",
-        "src/next/state.ts",
         "src/next/sync.test.ts",
         "src/next/sync.ts",
         "src/notices/notices.test.ts",
@@ -6983,27 +6290,11 @@
         "src/notices/run.ts",
         "src/plan.test.ts",
         "src/plan.ts",
-        "src/plan/index.test.ts",
-        "src/plan/index.ts",
-        "src/plan/list.ts",
         "src/plan/needs.test.ts",
         "src/plan/needs.ts",
-        "src/plan/risk.test.ts",
-        "src/plan/risk.ts",
-        "src/plan/risk/accounts.test.ts",
-        "src/plan/risk/accounts.ts",
-        "src/plan/risk/commands.test.ts",
-        "src/plan/risk/commands.ts",
-        "src/plan/risk/long-runs.test.ts",
-        "src/plan/risk/long-runs.ts",
-        "src/plan/store-rules.test.ts",
-        "src/plan/store-rules.ts",
-        "src/plan/validate.ts",
         "src/ports/index.ts",
         "src/project/gitignore.test.ts",
         "src/project/gitignore.ts",
-        "src/project/lock.test.ts",
-        "src/project/lock.ts",
         "src/project/pre-init-dirs.test.ts",
         "src/project/pre-init-dirs.ts",
         "src/project/root-choice.test.ts",
@@ -7014,10 +6305,6 @@
         "src/project/update-range.test.ts",
         "src/project/update-range.ts",
         "src/rafa.ts",
-        "src/report/lessons.test.ts",
-        "src/report/lessons.ts",
-        "src/runtime/install.test.ts",
-        "src/runtime/install.ts",
         "src/schema/agent.test.ts",
         "src/schema/agent.ts",
         "src/start.test.ts",
@@ -7325,8 +6612,6 @@
         "src/tools/ts-symbols/cli.ts",
         "src/tools/ts-symbols/fixtures/proj/src/main.ts",
         "src/tools/ts-symbols/fixtures/proj/src/util.ts",
-        "src/utils/agent-definition.test.ts",
-        "src/utils/agent-definition.ts",
         "src/utils/agent-shell.test.ts",
         "src/utils/agent-shell.ts",
         "src/utils/schedule.ts"
@@ -7351,11 +6636,11 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2164,
-    "leftToPlace": 733,
+    "leftToPlace": 617,
     "nonTestEdges": 4803,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 170
+    "upwardEdges": 142
   },
   "unassigned": [
     {
@@ -7396,10 +6681,11 @@
         "@open-tomato/rafa": 5
       },
       "importsFrom": {
-        "@open-tomato/rafa": 7,
+        "@open-tomato/rafa": 2,
         "@open-tomato/rafa-core": 19,
         "rafa-board": 5,
-        "rafa-pr": 3,
+        "rafa-pr": 7,
+        "rafa-run": 1,
         "src/ci/": 1,
         "src/stretch/": 12
       }

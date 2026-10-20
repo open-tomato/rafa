@@ -49,16 +49,20 @@ describe('the survey readers over the live tree', () => {
     expect(map.unplaced([...STRETCH_10_RELEASE_TESTS, stray])).toEqual([stray]);
   });
 
-  it('places a test in a new subfolder by the walk and a mixed subtree by its own directory', () => {
+  it('places a test in a new subfolder by the walk and one by its own directory, and leaves a mixed directory unplaced', () => {
     const map = readCutMap(ROOT, 'docs/survey/cut-table.json');
     const errors = 'src/tests/core-coupled/errors/rafa-codes.test.ts';
+    const board = 'src/commands/board/new-file.test.ts';
+    // The files of `scripts/survey/cut-names.ts` put `src/commands/`'s own
+    // files in four units, and no row names the folder.
     const commands = 'src/commands/new-file.test.ts';
     const nowhere = 'src/nowhere/x.test.ts';
 
     expect(map.unitOf(errors)).toBe('@open-tomato/rafa');
-    expect(map.unitOf(commands)).toBe('@open-tomato/rafa');
+    expect(map.unitOf(board)).toBe('rafa-board');
+    expect(map.unitOf(commands)).toBeUndefined();
     expect(map.unitOf(nowhere)).toBeUndefined();
-    expect(map.unplaced([errors, commands, nowhere])).toEqual([nowhere]);
+    expect(map.unplaced([errors, board, commands, nowhere])).toEqual([commands, nowhere]);
   });
 
   it('classifies the tracked test files, with at least one use-case and one unit test', () => {
