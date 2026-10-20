@@ -92,4 +92,13 @@ describe('PASS_1_MOVES', () => {
 
     expect(reaches).toEqual([]);
   });
+
+  it('leaves the activate integration test at the root (#1289)', () => {
+    const root = 'src/modules/activate-integration.test.ts';
+    const parked = 'packages/rafa/src/modules/activate-integration.test.ts';
+
+    expect(tracked.has(root)).toBe(true);
+    expect(tracked.has(parked)).toBe(false);
+    expect(existsSync(join(ROOT, parked))).toBe(false);
+  });
 });

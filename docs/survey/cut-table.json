@@ -1338,6 +1338,11 @@
       "upwardEdgesIn": 0
     },
     {
+      "kind": "test",
+      "path": "src/modules/activate-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
       "kind": "test-support",
       "path": "src/modules/testdata/pull-merge-sync/sync.ts",
       "upwardEdgesIn": 0
@@ -2519,6 +2524,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/package-integration-tests.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/package-lint-spawned.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3135,7 +3145,7 @@
       "edges": [],
       "fileCounts": {
         "source": 159,
-        "test": 114,
+        "test": 113,
         "testSupport": 6
       },
       "files": [
@@ -3376,7 +3386,6 @@
         "packages/rafa/src/errors/rafa-error.contract.test.ts",
         "packages/rafa/src/errors/rafa-error.test.ts",
         "packages/rafa/src/errors/rafa-error.ts",
-        "packages/rafa/src/modules/activate-integration.test.ts",
         "packages/rafa/src/modules/activate.ts",
         "packages/rafa/src/modules/load.ts",
         "packages/rafa/src/modules/manifest.test.ts",
@@ -3420,7 +3429,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 279
+        "packages/rafa/": 278
       },
       "folders": [
         "packages/rafa/"
@@ -5938,7 +5947,7 @@
       "edges": [],
       "fileCounts": {
         "source": 175,
-        "test": 453,
+        "test": 455,
         "testSupport": 26
       },
       "files": [
@@ -6246,6 +6255,7 @@
         "src/loop/blocked-tasks.ts",
         "src/loop/wait-reasons.test.ts",
         "src/loop/wait-reasons.ts",
+        "src/modules/activate-integration.test.ts",
         "src/modules/testdata/pull-merge-sync/sync.ts",
         "src/next/ceiling.test.ts",
         "src/next/ceiling.ts",
@@ -6485,6 +6495,7 @@
         "src/tests/output-sinks.test.ts",
         "src/tests/output-sinks.ts",
         "src/tests/package-build.test.ts",
+        "src/tests/package-integration-tests.sweep.test.ts",
         "src/tests/package-lint-spawned.test.ts",
         "src/tests/package-tree.ts",
         "src/tests/parity-differential.test.ts",
@@ -6616,8 +6627,8 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2165,
-    "leftToPlace": 614,
+    "files": 2166,
+    "leftToPlace": 616,
     "nonTestEdges": 4803,
     "unassignedFiles": 28,
     "unrankedEdges": 77,

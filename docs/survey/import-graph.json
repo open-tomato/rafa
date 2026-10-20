@@ -278,7 +278,6 @@
     "packages/rafa/src/errors/rafa-error.contract.test.ts": 0,
     "packages/rafa/src/errors/rafa-error.test.ts": 0,
     "packages/rafa/src/errors/rafa-error.ts": 1030.260714,
-    "packages/rafa/src/modules/activate-integration.test.ts": 0,
     "packages/rafa/src/modules/activate.ts": 0.647619,
     "packages/rafa/src/modules/load.ts": 2229.918501,
     "packages/rafa/src/modules/manifest.test.ts": 0,
@@ -1315,6 +1314,7 @@
     "src/loop/events-file.ts": 5426.016053,
     "src/loop/wait-reasons.test.ts": 0,
     "src/loop/wait-reasons.ts": 410.242857,
+    "src/modules/activate-integration.test.ts": 0,
     "src/modules/testdata/pull-merge-sync/sync.ts": 0,
     "src/next/actions.test.ts": 0,
     "src/next/actions.ts": 781.208887,
@@ -1999,6 +1999,7 @@
     "src/tests/output-sinks.test.ts": 0,
     "src/tests/output-sinks.ts": 2187.959987,
     "src/tests/package-build.test.ts": 0,
+    "src/tests/package-integration-tests.sweep.test.ts": 0,
     "src/tests/package-lint-spawned.test.ts": 0,
     "src/tests/package-tree.ts": 43.5,
     "src/tests/parity-differential.test.ts": 0,
@@ -3452,7 +3453,7 @@
         "packages/rafa/src/core/git": 1,
         "packages/rafa/src/core/output": 4,
         "packages/rafa/src/effort/store": 1,
-        "packages/rafa/src/modules": 5,
+        "packages/rafa/src/modules": 4,
         "packages/rafa/src/modules/testdata/hub-down-sync": 1,
         "packages/rafa/src/modules/testdata/sync-fixture": 1,
         "packages/rafa/src/ports": 3,
@@ -3469,6 +3470,7 @@
         "src/config": 8,
         "src/effort/sync": 6,
         "src/learning": 10,
+        "src/modules": 1,
         "src/modules/testdata/pull-merge-sync": 1,
         "src/ports": 1,
         "src/preflight": 1,
@@ -3536,7 +3538,6 @@
         "packages/rafa/src/core/output/text.test.ts",
         "packages/rafa/src/core/output/text.ts",
         "packages/rafa/src/effort/store/settings.ts",
-        "packages/rafa/src/modules/activate-integration.test.ts",
         "packages/rafa/src/modules/activate.ts",
         "packages/rafa/src/modules/load.ts",
         "packages/rafa/src/modules/manifest.test.ts",
@@ -3636,6 +3637,7 @@
         "src/learning/merge.test.ts",
         "src/learning/merge.ts",
         "src/learning/types.ts",
+        "src/modules/activate-integration.test.ts",
         "src/modules/testdata/pull-merge-sync/sync.ts",
         "src/ports/index.ts",
         "src/preflight/prerequisites-md.test.ts",
@@ -4670,7 +4672,7 @@
         "src/commands": 1,
         "src/fixtures": 5,
         "src/start": 1,
-        "src/tests": 19,
+        "src/tests": 20,
         "src/tests/core-coupled/effort/store": 1
       },
       "hub": "src/tests/sweep-timeout.ts",
@@ -4692,6 +4694,7 @@
         "src/tests/git-identity.sweep.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
         "src/tests/moved-paths.sweep.test.ts",
+        "src/tests/package-integration-tests.sweep.test.ts",
         "src/tests/public-entries.sweep.test.ts",
         "src/tests/relations-import-boundary.sweep.test.ts",
         "src/tests/repo-hygiene.sweep.test.ts",
@@ -4704,7 +4707,7 @@
         "src/tests/workspace-graph.sweep.test.ts"
       ],
       "name": "c14-sweep-timeout",
-      "size": 27
+      "size": 28
     },
     {
       "folders": {
@@ -9083,26 +9086,6 @@
       "from": "packages/rafa/src/errors/rafa-error.ts",
       "kind": "value",
       "to": "packages/rafa/src/errors/rafa-codes.ts"
-    },
-    {
-      "from": "packages/rafa/src/modules/activate-integration.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/adapters/index.ts"
-    },
-    {
-      "from": "packages/rafa/src/modules/activate-integration.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "packages/rafa/src/modules/activate-integration.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/modules/activate.ts"
-    },
-    {
-      "from": "packages/rafa/src/modules/activate-integration.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/modules/load.ts"
     },
     {
       "from": "packages/rafa/src/modules/activate.ts",
@@ -38620,6 +38603,26 @@
       "to": "src/loop/events-file.ts"
     },
     {
+      "from": "src/modules/activate-integration.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/adapters/index.ts"
+    },
+    {
+      "from": "src/modules/activate-integration.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/modules/activate-integration.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/modules/activate.ts"
+    },
+    {
+      "from": "src/modules/activate-integration.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/modules/load.ts"
+    },
+    {
       "from": "src/modules/testdata/pull-merge-sync/sync.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/adapters/index.ts"
@@ -56535,6 +56538,11 @@
       "to": "src/tests/stand-in-gh.ts"
     },
     {
+      "from": "src/tests/package-integration-tests.sweep.test.ts",
+      "kind": "value",
+      "to": "src/tests/sweep-timeout.ts"
+    },
+    {
       "from": "src/tests/package-tree.ts",
       "kind": "type",
       "to": "packages/rafa/src/project/package-of.ts"
@@ -61330,11 +61338,6 @@
       "cluster": "c08-index",
       "kind": "source",
       "path": "packages/rafa/src/errors/rafa-error.ts"
-    },
-    {
-      "cluster": "c05-index",
-      "kind": "test",
-      "path": "packages/rafa/src/modules/activate-integration.test.ts"
     },
     {
       "cluster": "c05-index",
@@ -66518,6 +66521,11 @@
     },
     {
       "cluster": "c05-index",
+      "kind": "test",
+      "path": "src/modules/activate-integration.test.ts"
+    },
+    {
+      "cluster": "c05-index",
       "kind": "test-support",
       "path": "src/modules/testdata/pull-merge-sync/sync.ts"
     },
@@ -69935,6 +69943,11 @@
       "cluster": "c05-index",
       "kind": "test",
       "path": "src/tests/package-build.test.ts"
+    },
+    {
+      "cluster": "c14-sweep-timeout",
+      "kind": "test",
+      "path": "src/tests/package-integration-tests.sweep.test.ts"
     },
     {
       "cluster": "c37-package-lint-spawned.test",

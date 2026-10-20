@@ -168,7 +168,12 @@ the project readers (`project/`); the live-loops reading
 (`runtime/live-loops.ts`); and the git, progress and tracker utilities
 (`utils/`). They sit outside `core/`, so no barrel rule holds them: a file
 outside the package imports each by its own subpath, which core's `exports`
-names by a key or a folder wildcard.
+names by a key or a folder wildcard. The move tool,
+`scripts/codemod/pass-moves.ts`, leaves a colocated test the project's
+`tests.integration` globs match at the root, with its imports rewritten to
+subpaths, and lists it in its output, until #913 places integration tests;
+`src/modules/activate-integration.test.ts` is the one pass 1 moved and #1289
+moved back.
 
 Since the move, `CORE_FOLDERS` of `scripts/survey/core-moves.ts` is
 `[CORE_SOURCE]`, the package's source folder, and `CORE_NAMED_FILES` is empty,
