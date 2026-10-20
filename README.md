@@ -717,11 +717,10 @@ same data for a script. The two views are refused together.
 ### Changing a key with `config set`
 
 `rafa config set <key>=<value>` edits the project's `.rafa/config.yaml`
-in place and keeps its comments. In a project whose config is
-`rafa.config.ts` or `rafa.config.mjs`, it refuses with exit 1, naming
-that file and writing nothing, because a module is code the command does
-not rewrite. Edit the module by hand until #893 gives the command a file
-to write.
+in place and keeps its comments. That file is the local layer, read over
+`rafa.config.ts` or `rafa.config.mjs` key by key, so in a project with a
+module file the command still edits the YAML file, and the key it sets
+wins over the module's. rafa never writes the module file.
 
 ### `dangerous.*` settings
 

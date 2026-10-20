@@ -4,9 +4,10 @@
  * hold the three edits and every refusal reason, so these hold what the
  * command adds: the argument it splits, the file it reads and writes,
  * the old and new values it prints, json mode, that a refusal writes
- * nothing, the `dangerous` section refused under an agent, and a scope
- * whose config is a module file refused before the argument is split. `pr.base`
- * is the first key, the one a stretch points at its integration branch.
+ * nothing, the `dangerous` section refused under an agent, and the YAML
+ * file written as the local layer beside a module file the command
+ * leaves byte-identical. `pr.base` is the first key, the one a stretch
+ * points at its integration branch.
  *
  * A refusal reads the config's bytes before and after and finds them
  * equal; the first case finds them changed, so a reading that could not
@@ -243,35 +244,22 @@ describe('rafa config set: the dangerous section under an agent', () => {
   });
 });
 
-describe('rafa config set: a scope whose config is a module', () => {
-  /** A module config the refusal must leave byte-identical. */
-  const MODULE_TEXT = 'export default [];\n';
+describe('rafa config set: the local layer beside a module file', () => {
+  /** A module file setting `pr.base`, which the command must leave byte-identical. */
+  const MODULE_TEXT = 'export default [{ templates: [\'escalation\'], pr: { base: \'main\' } }];\n';
 
-  it.each(['rafa.config.ts', 'rafa.config.mjs'])('refuses in a project whose config is %s, naming it and #893, before the argument is split', async (name) => {
+  it('writes pr.base into .rafa/config.yaml and leaves rafa.config.ts byte-identical', async () => {
     const project = plant(BASE_CONFIG);
-    const modulePath = join(project.root, name);
+    const modulePath = join(project.root, 'rafa.config.ts');
     writeFileSync(modulePath, MODULE_TEXT, 'utf8');
-
-    // A word with no "=" would be refused by the split; the module refusal must come first.
-    const outcome = await run(project, ['no-equals-sign']);
-
-    expect(outcome.exitCode).toBe(1);
-    const message = `${outcome.stdout}${outcome.stderr}`;
-    expect(message).toContain(modulePath);
-    expect(message).toContain('#893');
-    expect(message).not.toContain('no "="');
-    expect(textOf(project)).toBe(BASE_CONFIG);
-    expect(readFileSync(modulePath, 'utf8')).toBe(MODULE_TEXT);
-  });
-
-  it('still writes the YAML file when a module name is a directory, not a file', async () => {
-    const project = plant(BASE_CONFIG);
-    mkdirSync(join(project.root, 'rafa.config.ts'));
 
     const outcome = await run(project, ['pr.base=stretch/9']);
 
     expect(outcome.exitCode).toBe(0);
-    expect(textOf(project)).toContain('stretch/9');
+    expect(outcome.stdout).toContain(`✅ Set pr.base in ${configOf(project)}.`);
+    expect(textOf(project)).toBe(BASE_CONFIG.replace('base: main', 'base: stretch/9'));
+    expect(parseConfigText(textOf(project), 'config.yaml').values.prBase).toBe('stretch/9');
+    expect(readFileSync(modulePath, 'utf8')).toBe(MODULE_TEXT);
   });
 });
 
