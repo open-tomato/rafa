@@ -494,12 +494,14 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with six members, all `private`: `packages/rafa/`
+  `package.json`) with seven members, all `private`: `packages/rafa/`
   (`@open-tomato/rafa-core`, core, the name for good), `packages/rafa-hub/`
   (`@open-tomato/rafa-hub`), `packages/rafa-sync-service/`
-  (`@open-tomato/rafa-sync-service`), the facade `packages/rafa-effort/`
-  (`@open-tomato/rafa-effort`, #808 pass 2: an `index.ts` re-exporting
-  today's `src/` files under the package's final name), and the two config
+  (`@open-tomato/rafa-sync-service`), the facades `packages/rafa-effort/`
+  and `packages/rafa-inventory/` (`@open-tomato/rafa-effort` and
+  `@open-tomato/rafa-inventory`, #808 pass 2: each an `index.ts`
+  re-exporting today's `src/` files under the package's final name), and
+  the two config
   packages, `packages/typescript-config/`
   (`@open-tomato/rafa-typescript-config`) and `packages/eslint-config/`
   (`@open-tomato/rafa-eslint-config`). Publishing

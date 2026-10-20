@@ -116,6 +116,7 @@
     "@open-tomato/rafa-core": "workspace:*",
     "@open-tomato/rafa-effort": "workspace:*",
     "@open-tomato/rafa-eslint-config": "workspace:*",
+    "@open-tomato/rafa-inventory": "workspace:*",
     "@open-tomato/rafa-typescript-config": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "^1.4.0",
