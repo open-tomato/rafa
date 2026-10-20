@@ -30,6 +30,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `config-schema-features-integration.test.ts` | `src/config-registry.ts` |
 | `config-schema-logger.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
 | `core/command/version.test.ts` | `package.json`, the root manifest |
+| `core/config/config-load-templates.test.ts` | `src/config-registry.ts` |
 | `core/config/config-load.test.ts` | `src/config-registry.ts`, `src/tests/output-sinks.ts` |
 | `core/config/config-schema-board.test.ts` | `src/config-registry.ts` |
 | `core/config/config.test.ts` | `src/config-registry.ts` |

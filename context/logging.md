@@ -4,6 +4,16 @@
 and `api` exchanges, each with its module, cause code and hint when known.
 It sits beside `Output`, and the two never share a job.
 
+The logger's files are core's. The port is in `packages/rafa/src/ports/`. The
+console adapter, the level rule (`settings.ts`), the active logger, the `api`
+filter, the colour rule and the contract are under
+`packages/rafa/src/adapters/logger/`, the events output is
+`packages/rafa/src/adapters/output/events.ts`, and the `logger` section is
+`packages/rafa/src/config-schema-logger.ts`. A file outside the package imports
+the logger by its subpath, `@open-tomato/rafa/adapters/logger/<file>`, and the
+port through `@open-tomato/rafa/ports` (`context/source.md`, "Core and its
+barrels").
+
 ### What goes where
 
 - **`Output.info` and `Output.result` are a command's own answer.** A
@@ -217,7 +227,7 @@ logger, whatever that invocation loaded. No signal or abort listener
 under `src/` writes through an output or a logger (`context/cli.md` lists
 them).
 
-### Moving a module
+### Moving a module onto the logger
 
 `src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
 issue` actions reach it (`resolveIssueTracker` names no sink of its own).
@@ -231,7 +241,8 @@ activeLogger().child({ module: 'tracker', action: 'chain' })
 
 A caller that passes its own `log` sink still gets the plain string, so
 the `PREFIX` stays for that path and for the thrown error. The other
-modules move when a change touches them.
+modules move onto the child logger when a change touches them. A file moved
+into the package is a different move, which `context/source.md` names.
 
 ### Config
 
