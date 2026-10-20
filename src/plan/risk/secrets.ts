@@ -13,7 +13,7 @@
  * as an argument: this module never reaches `process.env` itself.
  */
 
-import type { RiskLevel } from './commands.js';
+import type { RiskLevel } from './patterns.js';
 
 /** One shape a credential-bearing variable name takes. */
 export interface SecretNameShape {
