@@ -59,8 +59,8 @@ repository.
 - **`test-index.baseline.json`**: The baseline the move of #905 is held to for the fourth criterion of epic #801, in the
   unit `packages`. A file's unit is the `name` of the `packages` row of the map `docs/survey/cut-table.json` that lists
   it, or the `unassigned` folder that lists it (`src/ci/`), else the unit of its folder as `cut-table.{json,md}` below
-  says. The record names that map by path and sha256 (`bbb8a36c7a7d…`, in full under `map`) and the commit it reads,
-  `d70b783`, in full under `commit`. Written by `bun scripts/survey/test-index.ts --baseline
+  says. The record names that map by path and sha256 (`d7188c8ed6ff…`, in full under `map`) and the commit it reads,
+  `9f07f3d`, in full under `commit`. Written by `bun scripts/survey/test-index.ts --baseline
   --map=docs/survey/cut-table.json` through `scripts/survey/test-index-record.ts`, which reads `src/` and
   `packages/*/src/` at that commit and refuses when a tracked file in scope differs from `HEAD`; it writes nothing and
   exits 1 naming each file the map holds no unit for. Read by `bun scripts/survey/test-index.ts
@@ -70,9 +70,9 @@ repository.
   contract test reaching a unit beyond its own, a use-case test entering another unit through no public entry), when a
   test the record holds has no imports read now, or when the map holds no unit for a file. The three flags are read by
   `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, either mode without
-  `--map=<file>`, and `--map=<file>` alone. The record holds 1145 test files (1009 unit, 136 use-case, none contract;
-  418 spawning a process): 180 meet their kind's rule, 965 are on `unsorted`, none are unindexed. Read at d70b783
-  against itself it prints 0 risen, 965 unsorted and 180 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and
+  `--map=<file>`, and `--map=<file>` alone. The record holds 1230 test files (1073 unit, 156 use-case, 1 contract;
+  443 spawning a process): 228 meet their kind's rule, 1002 are on `unsorted`, none are unindexed. Read at 9f07f3d
+  against itself it prints 0 risen, 1002 unsorted and 228 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and
   exits 0. The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space
   indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`,
   `unindexed`.
