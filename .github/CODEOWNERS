@@ -3,6 +3,7 @@
 / @open-tomato/maintainers
 /packages/eslint-config/ @open-tomato/maintainers
 /packages/rafa/ @open-tomato/maintainers
+/packages/rafa-effort/ @open-tomato/maintainers
 /packages/rafa-hub/ @open-tomato/maintainers
 /packages/rafa-sync-service/ @open-tomato/maintainers
 /packages/typescript-config/ @open-tomato/maintainers

@@ -9,6 +9,7 @@
         "@eslint/markdown": "^8.0.3",
         "@open-tomato/define-config": "0.5.0",
         "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-effort": "workspace:*",
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "@open-tomato/rafa-typescript-config": "workspace:*",
         "@stylistic/eslint-plugin": "^5.10.0",
@@ -56,6 +57,14 @@
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
+      },
+    },
+    "packages/rafa-effort": {
+      "name": "@open-tomato/rafa-effort",
+      "version": "0.46.0",
+      "devDependencies": {
+        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "eslint": "^9.39.4",
       },
     },
     "packages/rafa-hub": {
@@ -137,6 +146,8 @@
     "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
 
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
+
+    "@open-tomato/rafa-effort": ["@open-tomato/rafa-effort@workspace:packages/rafa-effort"],
 
     "@open-tomato/rafa-eslint-config": ["@open-tomato/rafa-eslint-config@workspace:packages/eslint-config"],
 
