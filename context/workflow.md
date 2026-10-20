@@ -25,10 +25,11 @@ the shape discriminates where the verb does not.
 (`DEFAULT_ROUTES` in `packages/rafa/src/core/config/default-routing.ts`) by
 `src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
 the page and the generator disagree, so change a row there and
-regenerate the table rather than editing it here. A project's own config (`.rafa/config.yaml`, or a
-`rafa.config.ts` or `rafa.config.mjs`) can add, re-point or remove a row
-under `routing`, and the planner reads the resolved map
-from its `{ROUTING}` slot rather than from this page.
+regenerate the table rather than editing it here. A project's own config
+can add, re-point or remove a row under `routing`: its module file
+(`rafa.config.ts` or `rafa.config.mjs`, the person's file) and its
+`.rafa/config.yaml` over it, key by key. The planner reads the resolved
+map from its `{ROUTING}` slot rather than from this page.
 
 Every agent the table names lives in `src/bundled/agents/`, the rafa
 tier that ships with the package, so the bundled file is the one to

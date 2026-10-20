@@ -195,8 +195,9 @@ lays under that file's own keys: each of the four files over its own
 templates over the next file down.
 `rafa config show --sources` prints the layer and the file each setting
 came from (`config-origins.ts`, `src/commands/config/show.ts`): `local` for
-the project's YAML file, `project` for its module file, and
-`template:<name>` for a setting a template answered.
+the project's YAML file, `project` for its module file, `user` for either
+of the user scope's two files, `default` for a setting no file names, and
+`template:<name>` for a setting a template answered, each key with its file.
 
 The dispatcher's `resolveProjectConfig` (`src/project/scope.ts`) walks upward
 from the start folder. In each directory it probes the three project names in
@@ -2947,7 +2948,9 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   working directory, `process.cwd()` unless the `cwd` option names
   another, to the nearest directory holding `rafa.config.ts`,
   `rafa.config.mjs` or `.rafa/config.yaml` (the project scope's
-  `configFile` names the first of the three found), passing over the home,
+  `configFile` names the first of the three found there; the scope is then
+  read from its module file, the first of the two module names that is a
+  file, and its YAML file over it, key by key), passing over the home,
   `homedir()` unless `home` names another. The walk stops at the top
   level of the git working tree holding the working directory, the first
   directory with a `.git`. When it finds none up to there, the main

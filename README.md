@@ -635,9 +635,10 @@ existed:
 templates: [escalation]
 ```
 
-For this project, decision 0009's table is written in the tracked
-`rafa.config.ts` at the repository root; `context/verification.md`
-records it.
+This repository's own `rafa.config.ts` is its person's file: it carries
+the `templates` key and decision 0009's `checks` table, which
+`context/verification.md` records. The `.rafa/config.yaml` of a checkout
+keeps only what rafa writes there.
 
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
@@ -710,18 +711,22 @@ generates under `.rafa/` replaces it.
 
 `rafa config show` prints every setting with its merged value, nested
 as a config file spells it. `rafa config show --sources` prints one line
-per setting instead: its value, the layer that answered (`project`,
-`user` or `default`) and, for a file, the file and the zero-based entry
-that last set it; a YAML file is entry 0. `--output=json` carries the
-same data for a script. The two views are refused together.
+per setting instead, with the layer that answered it and the file each
+key came from. The layer is `local` for the project's YAML file,
+`project` for its module file, `user` for either of the user scope's two
+files, `default` for a setting no file names, and `template:<name>` for a
+setting a config template answered. For a file, the line names the file
+and the zero-based entry that last set the setting; a YAML file is
+entry 0. `--output=json` carries the same data for a script. The two
+views are refused together.
 
 ### Changing a key with `config set`
 
-`rafa config set <key>=<value>` edits the project's `.rafa/config.yaml`
-in place and keeps its comments. That file is the local layer, read over
-`rafa.config.ts` or `rafa.config.mjs` key by key, so in a project with a
-module file the command still edits the YAML file, and the key it sets
-wins over the module's. rafa never writes the module file.
+`rafa config set <key>=<value>` edits the local layer, the project's
+`.rafa/config.yaml`, in place and keeps its comments. Beside a
+`rafa.config.ts` or `rafa.config.mjs` it still edits that YAML file, and
+the key it sets wins over the module file's value, key by key. rafa never
+writes the module file.
 
 ### `dangerous.*` settings
 
