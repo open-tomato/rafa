@@ -14,7 +14,7 @@
  * an issue and the stand-in `gh` answers its epic, whose `Owns:` line
  * names `alpha` and `beta`; the task's commit touches `alpha` alone.
  *
- * Three projects, each driven through the baseline and the three steps:
+ * Four projects, each driven through the baseline and the three steps:
  *
  *   1. No `templates` and no `checks` key: every entry is empty, so the
  *      baseline is not taken, and each step spawns nothing, is recorded
@@ -28,6 +28,9 @@
  *      full suite.
  *   3. The same template with `checks.stage: [related]` in the file: the
  *      stage step runs the `Owns:` folders' files alone.
+ *   4. A `rafa.config.ts` alone naming the template, over a task diff that
+ *      leaves `bunfig.toml` alone: the task step runs at scope `affected`
+ *      with `--changed=` in its command and prints no no-check line.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
@@ -130,6 +133,15 @@ function noCheckLine(step: string, entry: string): string {
 /** The line `ensureBaseline` prints when no entry names a check. */
 const NO_BASELINE_LINE = '📏 No check-point entry names a check; no suite baseline is taken.';
 
+/** The files the task's commit touches by default; `bunfig.toml` is a full-suite trigger. */
+const TASK_TOUCHED: readonly string[] = ['alpha/mod.ts', 'bunfig.toml'];
+
+/** The local layer's file, the default `takeSteps` plants. */
+const YAML_CONFIG_FILE = '.rafa/config.yaml';
+
+/** The person's file of a project whose only config is a module file. */
+const MODULE_CONFIG_FILE = 'rafa.config.ts';
+
 /** What one project's baseline and three steps left behind. */
 interface Taken {
   /** The options `runSuite` was handed, in order. */
@@ -178,12 +190,13 @@ function greenResult(options: SuiteRunOptions): SuiteResult {
 }
 
 /**
- * Plants a scratch repository holding `config` as its `.rafa/config.yaml`,
+ * Plants a scratch repository holding `config` as `file` (by default its
+ * `.rafa/config.yaml`),
  * the baseline and the first commit's tracker, then takes the baseline
  * and the task, stage and pre-wrap-up steps over a task commit that
  * touches `alpha/mod.ts` and `bunfig.toml`.
  */
-async function takeSteps(config: string): Promise<Taken> {
+async function takeSteps(config: string, file: string = YAML_CONFIG_FILE, touched: readonly string[] = TASK_TOUCHED): Promise<Taken> {
   planted += 1;
   const root = join(tempRoot, `run-${String(planted)}`);
   const repo = join(root, 'repo');
@@ -202,7 +215,8 @@ async function takeSteps(config: string): Promise<Taken> {
 
   const trackerPath = join(repo, TRACKER_RELATIVE);
   writeFileSync(trackerPath, PLAN, 'utf8');
-  plantProjectConfig(repo, config);
+  if (file === YAML_CONFIG_FILE) plantProjectConfig(repo, config);
+  else writeFileSync(join(repo, file), config, 'utf8');
   const settings = (await loadConfig({ root: repo, home }, {}, () => {})).config;
 
   const runs: SuiteRunOptions[] = [];
@@ -233,8 +247,9 @@ async function takeSteps(config: string): Promise<Taken> {
   }));
   try {
     const { baseline } = await ensureBaseline(context);
-    appendFileSync(join(repo, 'alpha/mod.ts'), '// touched by the task\n');
-    appendFileSync(join(repo, 'bunfig.toml'), '# touched by the task\n');
+    for (const name of touched) appendFileSync(join(repo, name), `${name.endsWith('.toml')
+      ? '#'
+      : '//'} touched by the task\n`);
     git(repo, home, 'add', '-A');
     git(repo, home, 'commit', '-q', '--no-verify', '-m', 'task');
 
@@ -338,5 +353,26 @@ describe('a project adopting the template with checks.stage: [related]', () => {
   it('leaves the task and pre-wrap-up steps as the template sets them', () => {
     expect(stepOf(taken, 'task')).toMatchObject({ scope: 'full', reason: 'trigger' });
     expect(stepOf(taken, 'pre-wrap-up')).toMatchObject({ scope: 'full', reason: 'declared' });
+  });
+});
+
+describe('a project whose only config is a rafa.config.ts naming the template', () => {
+  let taken: Taken;
+  beforeAll(async () => {
+    taken = await takeSteps(
+      'export default { templates: [\'escalation\'], pr: { provider: \'none\' } };\n',
+      MODULE_CONFIG_FILE,
+      ['alpha/mod.ts'],
+    );
+  });
+
+  it('records the task step at scope affected with --changed= in its command', () => {
+    const task = stepOf(taken, 'task');
+    expect(task.scope).toBe('affected');
+    expect(task.command.some((word) => word.startsWith('--changed='))).toBe(true);
+  });
+
+  it('prints no no-check line', () => {
+    expect(taken.lines.some((line) => line.includes('no check configured'))).toBe(false);
   });
 });
