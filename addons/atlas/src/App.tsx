@@ -1,6 +1,7 @@
 /** The page: header, three columns, footer; loads the snapshot and owns the keyboard. */
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 
+import { Board } from './board/Board.tsx';
 import { configFor } from './configs/index.ts';
 import { indexSnapshot } from './graph/index.ts';
 import { GraphScene } from './scene/GraphScene.tsx';
@@ -67,7 +68,7 @@ function Shell({ snapshot, onRefresh, onDataset }: ShellProps) {
         <Header snapshot={snapshot} onRefresh={onRefresh} onDataset={onDataset} />
         <LeftNav />
         <main className="center">
-          <GraphScene index={view.index} />
+          {state.renderer === '2d' ? <Board index={view.index} /> : <GraphScene index={view.index} />}
         </main>
         <RightPanel />
         <Footer />
@@ -116,6 +117,7 @@ export function App() {
       selected={params.get('node')}
       lens={lensId}
       heat={lensId ? config.lenses?.[lensId]?.heat : undefined}
+      renderer={params.get('render') === '2d' ? '2d' : '3d'}
     >
       <Shell snapshot={snapshot} onRefresh={() => void load(dataset, true)} onDataset={switchDataset} />
     </StoreProvider>

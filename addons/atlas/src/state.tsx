@@ -10,6 +10,8 @@ export type HeatKey = string;
 /** `front` fits the graph looking straight down the z axis, for a flat lens. */
 export type CameraKind = 'fit' | 'front' | 'zoom-in' | 'zoom-out' | 'reset';
 
+export type Renderer = '3d' | '2d';
+
 export type DepthDirection = 'both' | 'upstream' | 'downstream';
 
 export type Hover =
@@ -62,6 +64,8 @@ export interface UiState {
   readonly lens: string;
   /** Which of the six strict cameras is on. */
   readonly view: ViewState;
+  /** The 3D scene, or the flat 2D board. */
+  readonly renderer: Renderer;
   /** The scenario the sequence view replays. */
   readonly scenario: string | null;
   readonly highlight: Highlight | null;
@@ -93,6 +97,7 @@ export type Action =
   | { readonly type: 'scenario'; readonly id: string | null }
   | { readonly type: 'view-mode'; readonly mode: ViewMode }
   | { readonly type: 'view-turn'; readonly by: 1 | -1 }
+  | { readonly type: 'renderer'; readonly renderer: Renderer }
   | { readonly type: 'highlight'; readonly highlight: Highlight | null }
   | { readonly type: 'drawer'; readonly open: boolean; readonly tab?: 'help' | 'content' }
   | { readonly type: 'show'; readonly content: DrawerContent }
@@ -119,6 +124,7 @@ export const INITIAL_STATE: UiState = {
   lens: '',
   scenario: null,
   view: { mode: 'iso', turn: 0 },
+  renderer: '3d',
   highlight: null,
   drawer: { open: false, tab: 'help', content: null },
   faceOverrides: {},
@@ -164,6 +170,8 @@ function reduce(state: UiState, action: Action): UiState {
       return { ...state, view: { ...state.view, mode: action.mode } };
     case 'view-turn':
       return { ...state, view: { mode: 'iso', turn: (state.view.turn + action.by + 4) % 4 } };
+    case 'renderer':
+      return { ...state, renderer: action.renderer, expanded: null, unfolded: false, collapsing: false, radial: null };
     case 'scenario':
       return { ...state, scenario: action.id };
     case 'lens':
@@ -203,9 +211,10 @@ interface StoreProviderProps {
   readonly selected?: string | null;
   readonly lens?: string;
   readonly heat?: HeatKey;
+  readonly renderer?: Renderer;
 }
 
-export function StoreProvider({ children, pinned, minWeight, selected, lens, heat }: StoreProviderProps) {
+export function StoreProvider({ children, pinned, minWeight, selected, lens, heat, renderer }: StoreProviderProps) {
   const [state, dispatch] = useReducer(reduce, {
     ...INITIAL_STATE,
     pinned: pinned ?? [],
@@ -213,6 +222,7 @@ export function StoreProvider({ children, pinned, minWeight, selected, lens, hea
     selected: selected ?? null,
     lens: lens ?? '',
     heat: heat ?? 'none',
+    renderer: renderer ?? '3d',
   });
   return <StoreContext.Provider value={{ state, dispatch }}>{children}</StoreContext.Provider>;
 }

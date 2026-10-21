@@ -20,7 +20,7 @@ const DESIGN_EDGE_PX = 150;
 const RADIAL_LIMIT = 12;
 export const WIDGET_MIME = 'application/x-atlas-widget';
 
-function useBoxSize<T extends Element>(): [React.RefObject<T | null>, { width: number; height: number }] {
+export function useBoxSize<T extends Element>(): [React.RefObject<T | null>, { width: number; height: number }] {
   const ref = useRef<T>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   useEffect(() => {

@@ -98,6 +98,21 @@ fixed 2D layout:
 | Roadmap | `timeline`: a column per week under month boxes, one lane per epic; a bar for its worked weeks, ✓ for merges, open work in Planned |
 | Time warp | `sequence` (services demo): a use case replayed request by request, forks included |
 
+## 2D board
+
+A rough draft of a flat renderer (`src/board/`), switched with the 3D / 2D
+buttons on the canvas or `?render=2d`. It reads the same graph model as the
+3D scene (`src/scene/model.ts`), so lenses, filters, depth, selection and
+the right pane behave the same. The sheet is a drafting grid; each die is
+its wireframe front elevation, hidden edges dashed. One camera: the wheel
+zooms at the pointer, a drag on the sheet pans, `F` fits. Double click or
+Enter opens a die: its outline morphs into the flat net (a d12 spreads its
+faces, the cylinder unrolls), then the same net overlay as 3D shows the
+widgets. Names keep one screen size and hide when zoomed far out.
+
+Not drawn on the board yet: PM orbits and bubbles, QA fog, the Time warp
+player, dragging a node, and the d12's members inside.
+
 ## Known quirks, for the follow-up
 
 - Architecture is dense at 166 import lines; the weight slider thins it.
