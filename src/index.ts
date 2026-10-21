@@ -305,8 +305,10 @@ export {
   STORE_BACKENDS,
   SYNC_STRATEGIES,
 } from '@open-tomato/rafa/core/config/sections';
-export { default as effortCollectCommand } from './effort/collect.js';
-export { default as effortReportCommand } from './effort/report.js';
+export {
+  collect as effortCollectCommand,
+  report as effortReportCommand,
+} from '@open-tomato/rafa-effort';
 export {
   decodeWirePayload,
   EFFORT_KEY_PROJECTIONS,

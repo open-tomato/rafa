@@ -370,6 +370,8 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { createHubContact } from '@open-tomato/rafa-effort';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -378,7 +380,6 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-tomato/rafa/core/plan';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
-import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';

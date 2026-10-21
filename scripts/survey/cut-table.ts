@@ -275,7 +275,7 @@ export const CUT_RULES: CutRules = {
       named: [],
     },
     {
-      folders: [
+      folders: ['packages/rafa-inventory/', 
         'src/agents/',
         'src/backfill/',
         'src/bundled/',
@@ -291,7 +291,7 @@ export const CUT_RULES: CutRules = {
       named: INVENTORY_NAMED,
     },
     {
-      folders: [
+      folders: ['packages/rafa-board/', 
         'src/adapters/tracker/',
         'src/board/',
         'src/board/project/',
@@ -304,22 +304,22 @@ export const CUT_RULES: CutRules = {
       named: BOARD_NAMED,
     },
     {
-      folders: ['src/commands/pr/', 'src/pr/', 'src/triage/'],
+      folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
       name: 'rafa-pr',
       named: [...PR_NAMED, 'src/pr/index.ts'],
     },
     {
-      folders: ['src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
+      folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
       name: 'rafa-run',
       named: [...RUN_NAMED, 'src/start/branch-decision.ts'],
     },
     {
-      folders: ['src/commands/release/', 'src/release/'],
+      folders: ['packages/rafa-release/', 'src/commands/release/', 'src/release/'],
       name: 'rafa-release',
       named: RELEASE_NAMED,
     },
     {
-      folders: ['src/effort/'],
+      folders: ['packages/rafa-effort/', 'src/effort/'],
       name: 'rafa-effort',
       named: [...EFFORT_NAMED, 'src/schema/frontmatter.ts'],
     },

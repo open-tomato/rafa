@@ -123,7 +123,6 @@ import type { EpicBody } from '../../board/epic-body.js';
 import type { UncheckedCriterion } from '../../board/epic-trail.js';
 import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { EpicCost } from '../../effort/epic-cost.js';
 import type { CriterionUncheckable, CriterionVerdict, EpicCriterion, VerifyPlanIssue } from '../../epic/verify-plan.js';
 import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/verify-run.js';
 import type { TriageOptions, TriageResult } from '../../triage/triage.js';
@@ -134,8 +133,11 @@ import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
+import type { EpicCost } from '@open-tomato/rafa-effort';
 
 import { randomUUID } from 'node:crypto';
+
+import { readEpicCost, renderEpicCost } from '@open-tomato/rafa-effort';
 
 import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -152,7 +154,6 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/ep
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { readEpicCost, renderEpicCost } from '../../effort/epic-cost.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
 import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';

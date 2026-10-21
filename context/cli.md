@@ -445,9 +445,13 @@ New; it replaces no earlier text. What a row or an action added to
   command module is therefore a two-file change, the module and that
   roster — the sibling of the declared-flag roster
   `src/commands/index.test.ts` holds. Both edits land in that same task.
-  Its `IMPORT_PATTERN` matches RELATIVE specifiers only, those opening
-  `./` or `../`, so a module's `node:fs` and `node:path` imports are
-  spelled nowhere in the roster and adding one reddens nothing. Only the
+  Its `IMPORT_PATTERN` matches PROJECT specifiers only: those opening
+  `./` or `../`, core's subpaths (`@open-tomato/rafa/<subpath>`) and a
+  feature package's facade by its name (`@open-tomato/rafa-<name>`), so
+  a module's `node:fs` and `node:path` imports are spelled nowhere in the
+  roster and adding one reddens nothing. A wrapping module's phase 0
+  command is its one default import or the one binding it takes from a
+  facade, and either is held to be a root export. Only the
   core command modules are listed, not the helpers they import nor a
   feature's command modules, whose lazy commands `FEATURE_COMMANDS` in the
   same file spells by feature and spelling: an

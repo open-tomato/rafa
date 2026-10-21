@@ -487,7 +487,9 @@ counted.
 and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub,
 the sync service and the two shared-config packages
 (`packages/eslint-config/`, `packages/typescript-config/`) follow the same
-one-folder rule.
+one-folder rule. A facade folder is its package's too: `packages/rafa-effort/`
+sits in the `rafa-effort` row beside `src/effort/`, and the table lists none of
+its files, since the graph holds no facade entry.
 
 **The counts rank options and do not certify a cut.** An upward edge from
 `packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is
@@ -504,7 +506,14 @@ from it, value or type, with its declaration. Three shapes it reports as
 problems rather than names: an anonymous default export (`anonymous-default`),
 a namespace import or `export *` (`namespace-import`), and two declarations
 under one name (`collision`). `--entry` prints the facade's `index.ts` as it
-would be written, and `--json` prints the whole reading.
+would be written, and `--json` prints the whole reading. An import by the
+facade's name is read through the entry's table (`facade-tables.ts`): each
+name counts as taken from the file the entry re-exports it from, so a
+rewired importer reads as its relative form did and `--entry` prints the
+tracked entry unchanged. The import graph reads an import of
+`@open-tomato/rafa-<name>` the same way: an edge of the import's kind, `type`
+when the binding or the entry's row is one, from the importer to each file its
+names come from, and the facade entry is no node.
 
 ### Packages under `packages/`
 
@@ -536,9 +545,40 @@ would be written, and `--json` prints the whole reading.
   that set with the checker, and `--entry` prints the entry it is written
   from. eslint's `import/order` places a facade import in the `external`
   group, with the other package imports, so a rewired importer (pass 3)
-  moves its line there. At its move (pass 4) the package's folder joins
-  `CUT_RULES` and the facade becomes the package's own `index`. Pass 2 moves
-  no file under `src/` and changes no importer.
+  moves its line there. Pass 2 added the package's folder to `CUT_RULES`
+  with its facade, and at its move (pass 4) the facade becomes the package's
+  own `index`. Pass 2 moved no file under `src/` and changed no importer.
+- **The rewire moves effort's importers onto its facade and keeps eight files
+  on their paths.** `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>
+  [--dry-run]` takes each importer of a feature package that can take it by
+  name and rewrites it to import `@open-tomato/rafa-<name>`.
+  `scripts/codemod/rewire-groups.ts` puts each importer in the first of four
+  groups that holds it. The codemod rewrites the fourth, `rewire`, and leaves
+  the other three byte for byte:
+  - `loadCycle`: the package's own non-test files reach the importer over value
+    edges, so taking the package by name would load it inside that cycle.
+    Effort has six: `src/agents/roster.ts`, `src/check/run.ts`,
+    `src/inventory/record.ts`, `src/inventory/trees.ts`,
+    `src/schema/instinct.ts` and `src/tiers/serve.ts`.
+  - `backEdge`: the importer sits in a package earlier in the move order than
+    the one it imports, so taking the package by name would make that earlier
+    package import a later one, which the decouple step before pass 4 cuts.
+    Effort has none.
+  - `declarationGraph`: the importer is reached from the `include` of a
+    declaration build whose `.d.ts` files ship, so a published type would name
+    a private package, which pass 4 settles. Effort has two:
+    `src/config/shape.ts` and `src/config-registry.ts`.
+
+  Tests move or rewire in pass 4 with the files they test, so the test files
+  that import effort by path stay on their paths in pass 3. The rewire guard,
+  `scripts/survey/facade-rewire.sweep.test.ts`, holds each rewired package to
+  its row of `REWIRED`: no non-test file outside the package imports one of its
+  files by relative path unless the row names it with its group, and each named
+  file still does. Effort's row names the eight, and a planted control reds on
+  one relative import. The published-types case in
+  `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
+  scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
+  `-release`, `-pr` or `-run`, with a planted-text control.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
@@ -852,7 +892,8 @@ the end of the template. This section replaces nothing.
 **The sweep `src/tests/import-cycle.sweep.test.ts` fails on any non-test
 runtime import cycle that spans two clusters.** It reads the import graph
 the way `scripts/survey/import-graph.ts` does: `readMetafile` and
-`buildImportGraph` from there, and the file set from
+`buildImportGraph` from there, handed the facade tables `readFacadeTables`
+of `scripts/survey/facade-tables.ts` reads, and the file set from
 `scripts/survey/files.ts`. Type-only imports are erased in the graph, so
 a type-level cycle passes; `tsc --build tsconfig.references.json`, over
 the composite packages' project references, is the gate for those.

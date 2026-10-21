@@ -73,7 +73,8 @@ import type { InventoryRecord } from '../record.js';
 
 import { readFileSync } from 'node:fs';
 
-import { readFrontmatterDocument } from '../../schema/frontmatter.js';
+import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+
 import { readInventoryFrontmatter } from '../record.js';
 
 /** How many candidates the ranking keeps: the files a search session may read. */

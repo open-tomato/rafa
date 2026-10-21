@@ -664,6 +664,17 @@ const CORE_PACKAGE_DIR = 'packages/rafa';
 /** The workspace package holding the tsconfig base every tsconfig extends: its directory and its name. */
 const TYPESCRIPT_CONFIG = ['packages/typescript-config', '@open-tomato/rafa-typescript-config'] as const;
 
+/** The facade packages beside core, by folder under `packages/`: each is copied into the scratch package and linked under its package name. */
+const FACADE_NAMES = ['effort', 'inventory', 'board', 'release', 'pr', 'run'] as const;
+
+/** The package name of the facade `name`. */
+function facadePackageName(name: string): string {
+  return `@open-tomato/rafa-${name}`;
+}
+
+/** What no published declaration may name: the facade packages, which are private and inlined. */
+const FACADE_SPECIFIER = /@open-tomato\/rafa-(?:effort|inventory|board|release|pr|run)(?![\w-])/;
+
 /** The installed packages the declaration step reads, linked into the scratch package; see the module note. */
 const TYPESCRIPT_PACKAGES = ['typescript', '@types/bun', '@types/node'];
 
@@ -815,6 +826,7 @@ beforeAll(() => {
   cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
   cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), { recursive: true });
   linkTypeScriptConfig(PACKAGE_DIR);
+  linkFacades(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
   const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
@@ -867,6 +879,24 @@ function linkTypeScriptConfig(dir: string): void {
   const link = join(dir, 'node_modules', name);
   mkdirSync(dirname(link), { recursive: true });
   symlinkSync(relative(dirname(link), join(dir, packageDir)), link, 'dir');
+}
+
+/** Copies each facade folder into `dir` beside `packages/rafa/` and links it under its package name, as {@link linkTypeScriptConfig} does. */
+function linkFacades(dir: string): void {
+  for (const name of FACADE_NAMES) {
+    const packageDir = join('packages', `rafa-${name}`);
+    cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), { recursive: true });
+    const link = join(dir, 'node_modules', facadePackageName(name));
+    mkdirSync(dirname(link), { recursive: true });
+    symlinkSync(relative(dirname(link), join(dir, packageDir)), link, 'dir');
+  }
+}
+
+/** Each line of `text` naming a facade package, as `<file>:<line>: <text>`. */
+function facadeNamings(file: string, text: string): string[] {
+  return text.split('\n').flatMap((line, index) => FACADE_SPECIFIER.test(line)
+    ? [`${file}:${index + 1}: ${line.trim()}`]
+    : []);
 }
 
 /** Links {@link TYPESCRIPT_PACKAGES} into `dir`'s `node_modules`, and `tsc` into its `.bin`. */
@@ -1889,5 +1919,60 @@ describe('the asset trees in the build', () => {
     const source = readFileSync(join(PACKAGE_DIR, 'src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
 
     expect(readReleaseTemplate(RELEASE_PUBLISH_FILE, DIST)).toBe(source);
+  });
+});
+
+describe('the facade packages in the scratch copy', () => {
+  it.each(FACADE_NAMES)('carries packages/rafa-%s beside packages/rafa', (name) => {
+    expect(existsSync(join(PACKAGE_DIR, 'packages', `rafa-${name}`, 'index.ts'))).toBe(true);
+    expect(existsSync(join(PACKAGE_DIR, CORE_PACKAGE_DIR, 'package.json'))).toBe(true);
+  });
+
+  it.each(FACADE_NAMES)('resolves node_modules/@open-tomato/rafa-%s/index.ts to the copy', (name) => {
+    const linked = join(PACKAGE_DIR, 'node_modules', facadePackageName(name), 'index.ts');
+
+    expect(existsSync(linked)).toBe(true);
+    expect(realpathSync(linked)).toBe(realpathSync(join(PACKAGE_DIR, 'packages', `rafa-${name}`, 'index.ts')));
+  });
+
+  it('resolves @open-tomato/rafa-effort from the copy to its index.ts', () => {
+    const resolved = Bun.resolveSync(facadePackageName('effort'), PACKAGE_DIR);
+
+    expect(realpathSync(resolved)).toBe(realpathSync(join(PACKAGE_DIR, 'packages/rafa-effort/index.ts')));
+  });
+});
+
+describe('the published declarations name no facade package', () => {
+  it('has no dist/**/*.d.ts naming @open-tomato/rafa-effort, -inventory, -board, -release, -pr or -run', () => {
+    const declarations = readdirSync(DIST, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.d.ts'))
+      .sort();
+    const naming = declarations.flatMap(
+      (file) => facadeNamings(`dist/${file}`, readFileSync(join(DIST, file), 'utf8')),
+    );
+
+    expect(declarations.length).toBeGreaterThan(0);
+    expect(naming).toEqual([]);
+  });
+
+  it('finds a planted declaration naming a facade package, by file and line', () => {
+    const planted = [
+      'export type A = string;',
+      `import type { X } from '${facadePackageName('inventory')}';`,
+      '',
+    ].join('\n');
+
+    expect(facadeNamings('dist/planted.d.ts', planted)).toEqual([
+      'dist/planted.d.ts:2: import type { X } from \'@open-tomato/rafa-inventory\';',
+    ]);
+  });
+
+  it('does not read @open-tomato/rafa-typescript-config or the core subpaths as a facade', () => {
+    const text = [
+      'import \'@open-tomato/rafa-typescript-config/base\';',
+      'import type { Y } from \'@open-tomato/rafa/ports/log-level\';',
+    ].join('\n');
+
+    expect(facadeNamings('dist/x.d.ts', text)).toEqual([]);
   });
 });

@@ -66,11 +66,11 @@ import type { PlanTask , TaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import { findAgentDefinition } from '@open-tomato/rafa-effort';
+
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { scanSecretNames } from '@open-tomato/rafa/plan/risk/secrets';
 import { resolveSkillTiers } from '@open-tomato/rafa/schema/tiers';
-
-import { findAgentDefinition } from '../utils/agent-definition.js';
 
 import { readAccounts } from './risk/accounts.js';
 import { readBodyCommands, readTaskLineCommands } from './risk/commands.js';

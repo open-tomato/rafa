@@ -52,7 +52,8 @@ import type { SkillSignal } from '../schema/skill.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { renderFrontmatter } from '../schema/frontmatter.js';
+import { renderFrontmatter } from '@open-tomato/rafa-effort';
+
 import { SKILL_SIGNALS } from '../schema/skill.js';
 
 /** The directory under `<base>/.rafa/` the proposal files are written into. */

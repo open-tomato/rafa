@@ -611,36 +611,34 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./loop-sessions.js', ['lineRefusal', 'NoSessionRefusal', 'pickSession', 'sessionIdFlag']],
   ]],
   ['./commands/effort/collect.js', [
-    ['../../effort/collect.js', ['default']],
+    ['@open-tomato/rafa-effort', ['collect']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/effort/report.js', [
-    ['../../effort/report.js', ['default']],
+    ['@open-tomato/rafa-effort', ['report']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/effort/dashboard.js', [
+    ['@open-tomato/rafa-effort', ['formatDashboard', 'parseReportArgs', 'readDashboard']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
-    ['../../effort/dashboard-format.js', ['formatDashboard']],
-    ['../../effort/dashboard.js', ['readDashboard']],
-    ['../../effort/report-args.js', ['parseReportArgs']],
   ]],
   ['./commands/effort/fix-schema.js', [
+    ['@open-tomato/rafa-effort', ['fileStamp']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/loop', ['readSessions']],
     ['@open-tomato/rafa/store/fix-schema', ['fixStoreSchema', 'SchemaFixRefusal']],
     ['@open-tomato/rafa/store/sqlite', ['sqliteStorePath']],
-    ['../../effort/file-stamp.js', ['fileStamp']],
   ]],
   ['./commands/effort/copy.js', [
+    ['@open-tomato/rafa-effort', ['fileStamp']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/store/copy', ['copyEffortStore', 'EffortCopyFailure', 'EffortCopyRefusal']],
     ['@open-tomato/rafa/store/location', ['EFFORT_DIR_VARIABLE']],
     ['@open-tomato/rafa/store/ndjson-files', ['EFFORT_STORE_DIR']],
-    ['../../effort/file-stamp.js', ['fileStamp']],
   ]],
   ['./commands/effort/schema.js', [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject']],
@@ -651,6 +649,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/store/sqlite', ['SQLITE_STORE_FILE_NAME']],
   ]],
   ['./commands/effort/migrate.js', [
+    ['@open-tomato/rafa-effort', ['fileStamp']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
@@ -658,10 +657,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/store/location', ['effortStoreDir']],
     ['@open-tomato/rafa/store/migrate', ['migrateStore', 'MigrateRefusal']],
     ['@open-tomato/rafa/store/sqlite', ['SQLITE_STORE_FILE_NAME']],
-    ['../../effort/file-stamp.js', ['fileStamp']],
     ['./fix-schema.js', ['keepsIdLine']],
   ]],
   ['./commands/effort/merge.js', [
+    ['@open-tomato/rafa-effort', ['fileStamp']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
@@ -671,12 +670,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/store/merge-union', ['UnionSchemaMismatch']],
     ['@open-tomato/rafa/store/rebuild-aside', ['RebuildRefusal']],
     ['@open-tomato/rafa/store/sqlite', ['SQLITE_STORE_FILE_NAME']],
-    ['../../effort/file-stamp.js', ['fileStamp']],
     ['./fix-schema.js', ['keepsIdLine']],
   ]],
   ['./commands/effort/import.js', [
+    ['@open-tomato/rafa-effort', ['createFileSync']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['../../effort/sync/file.js', ['createFileSync']],
     ['./merge.js', ['mergeRefusalExit', 'mergeTargetPath', 'renderMerge']],
   ]],
   ['./commands/effort/move.js', [
@@ -701,10 +699,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/registry.js', ['mountKey']],
   ]],
   ['./commands/agent/vendor.js', [
+    ['@open-tomato/rafa-effort', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['../../agents/roster.js', ['readAgentDirectory']],
     ['../../inventory/trees.js', ['bundledAgentsDirectory']],
-    ['../../utils/agent-definition.js', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
   ]],
   ['./commands/agent/list.js', [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
@@ -960,17 +958,17 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
   ]],
   ['./commands/status.js', [
+    ['@open-tomato/rafa-effort', ['pullBeforeRead']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
   ]],
   ['./commands/next.js', [
+    ['@open-tomato/rafa-effort', ['pullBeforeRead']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
     ['../next/ceiling.js', ['ALWAYS_ASKED', 'allowedUnasked', 'BARE_YES_ACTIONS', 'readYesCeiling', 'YES_ACTIONS', 'YES_FLAG']],
     ['../next/ending.js', ['actionOutput']],
@@ -1027,13 +1025,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [
+    ['@open-tomato/rafa-effort', ['readDoctorEffortSync']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'versionLine']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/plan', ['isFile', 'trackerPathFor']],
     ['../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../effort/sync/doctor-reading.js', ['readDoctorEffortSync']],
     ['../pr/preflight-items.js', ['ghPreflightItems']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/first-dispatch.js', ['isFirstDispatch']],
@@ -1102,14 +1100,18 @@ const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, command
 ];
 
 /**
- * A static import of a project file, relative or by one of core's
- * subpaths (`@open-tomato/rafa/<subpath>`, #1090), possibly spanning
+ * A static import of a project file, relative, by one of core's
+ * subpaths (`@open-tomato/rafa/<subpath>`, #1090) or by a feature
+ * package's facade (`@open-tomato/rafa-<name>`, #808), possibly spanning
  * lines, type-only or not, or one taken for its effect alone, with no
  * clause. Its clause holds no `;`, so a match never runs on from an
  * import of another bare module above it, such as `node:fs`, to the next
  * project one.
  */
-const IMPORT_PATTERN = /^import\s+(?:(type\s+)?([^;]+?)\s+from\s+)?'((?:\.\.?\/|@open-tomato\/rafa\/)[^']+)';$/gm;
+const IMPORT_PATTERN = /^import\s+(?:(type\s+)?([^;]+?)\s+from\s+)?'((?:\.\.?\/|@open-tomato\/rafa\/)[^']+|@open-tomato\/rafa-[a-z]+)';$/gm;
+
+/** A feature package's facade, imported by its name alone (#808). */
+const FACADE_PATTERN = /^@open-tomato\/rafa-[a-z]+$/;
 
 /** One import's clause read as the bindings it takes. */
 function bindingsOf(clause: string): string[] {
@@ -1263,19 +1265,24 @@ describe('what the CLI reaches, through the entry', () => {
     expect(spelledCommands).toHaveLength(COMMAND_MODULES.length + FEATURE_COMMANDS.flatMap(([, , spellings]) => spellings).length);
   });
 
-  it('reaches the phase 0 command each wrapping core command module runs, its one default import, as a root export', async () => {
+  it('reaches the phase 0 command each wrapping core command module runs, its one default import or facade binding, as a root export', async () => {
     const rootValues = new Set<unknown>(Object.values(entry));
     const wrapping = COMMAND_MODULES.filter(([, imports]) => imports.some(([, names]) => names.includes('wrapPhaseZeroCommand')));
-    const defaultImports: number[] = [];
+    const runImports: number[] = [];
     const unreached: string[] = [];
 
     for (const [path] of wrapping) {
       const modulePath = join(SRC_DIR, path);
-      const runs = readImports(modulePath).filter(([, names]) => names.includes('default'));
-      defaultImports.push(runs.length);
-      for (const [from] of runs) {
-        const module = await import(join(modulePath, '..', from)) as { default: unknown };
-        if (!rootValues.has(module.default)) unreached.push(`the default of ${from}, run by ${path}`);
+      const runs = readImports(modulePath).flatMap(([from, names]) => names
+        .filter((name) => name === 'default' || FACADE_PATTERN.test(from))
+        .map((name) => [from, name] as const));
+      runImports.push(runs.length);
+      for (const [from, name] of runs) {
+        const specifier = FACADE_PATTERN.test(from)
+          ? from
+          : join(modulePath, '..', from);
+        const module = await import(specifier) as Record<string, unknown>;
+        if (!rootValues.has(module[name])) unreached.push(`the ${name} of ${from}, run by ${path}`);
       }
     }
 
@@ -1343,7 +1350,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/self-update.js',
       './commands/describe.js',
     ]);
-    expect(defaultImports).toEqual(wrapping.map(() => 1));
+    expect(runImports).toEqual(wrapping.map(() => 1));
     expect(unreached).toEqual([]);
   });
 });

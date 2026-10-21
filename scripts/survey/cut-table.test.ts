@@ -229,6 +229,21 @@ describe('placeFile', () => {
     });
   });
 
+  it('places each feature package\'s facade folder in its package, beside core\'s and the hub\'s', () => {
+    expect(placeFile('packages/rafa-effort/index.ts')).toEqual({
+      by: 'folder',
+      folder: 'packages/rafa-effort/',
+      package: 'rafa-effort',
+    });
+    expect(placeFile('packages/rafa-run/index.ts')).toEqual({ by: 'folder', folder: 'packages/rafa-run/', package: 'rafa-run' });
+    for (const name of ['inventory', 'board', 'pr', 'release']) {
+      expect(placeFile(`packages/rafa-${name}/package.json`).package).toBe(`rafa-${name}`);
+    }
+    expect(placeFile('packages/rafa/src/index.ts').package).toBe(CORE_PACKAGE);
+    expect(placeFile('packages/rafa-hub/src/bin.ts').package).toBe('rafa-hub');
+    expect(findRuleProblems(CUT_RULES)).toEqual([]);
+  });
+
   it('places a named file by name, against its folder: src/schema/ is split per file', () => {
     expect(placeFile('packages/rafa/src/schema/tiers.ts')).toEqual({ by: 'folder', folder: 'packages/rafa/', package: CORE_PACKAGE });
     expect(placeFile('packages/rafa/src/schema/project-id.ts').package).toBe(CORE_PACKAGE);
@@ -456,8 +471,8 @@ describe('buildCutTable: files', () => {
     expect(rowOf(table, 'rafa-pr')).toMatchObject({
       fileCounts: { source: 2, test: 0, testSupport: 1 },
       files: ['src/pr/gh-fake.ts', 'src/pr/gh.ts', 'src/pr/index.ts'],
-      filesByFolder: { 'src/commands/pr/': 0, 'src/pr/': 2, 'src/triage/': 0 },
-      folders: ['src/commands/pr/', 'src/pr/', 'src/triage/'],
+      filesByFolder: { 'packages/rafa-pr/': 0, 'src/commands/pr/': 0, 'src/pr/': 2, 'src/triage/': 0 },
+      folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
       named: [...PR_NAMED, 'src/pr/index.ts'],
       rank: 6,
     });

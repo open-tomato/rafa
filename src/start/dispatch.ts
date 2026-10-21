@@ -113,6 +113,8 @@ import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { randomUUID } from 'crypto';
 
+import { agentEffortLookup } from '@open-tomato/rafa-effort';
+
 import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, resolveDeclarationFlags , escapeBlockerText } from '@open-tomato/rafa/core/plan';
@@ -123,7 +125,6 @@ import { PROGRESS_CAP_BYTES, writeProgress } from '@open-tomato/rafa/utils/progr
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
-import { agentEffortLookup } from '../utils/agent-definition.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
 import { docTaskPrompt } from './doc-task.js';
