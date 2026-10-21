@@ -93,6 +93,39 @@ fixed 2D layout:
 - A background tab runs frames at about one a second, so camera moves
   crawl there; the open overlay shows after a short grace period anyway.
 
+## Ideas to check
+
+Suggested during the PoC sessions and not built yet, ranked by value.
+
+Asked for, not built:
+
+1. QA checks whether a bug already exists before filing it: a text search
+   over the bugs, with the modules each one names.
+2. A DevOps lens: consumers, replicas, req/s against an SLA, and a hint to
+   scale out.
+3. Small dice as radial-menu items that pop out, then travel to the node
+   they stand for.
+4. Epics linked to each other through the modules they share (crossing
+   the border), drawn as a derived link.
+5. Granularity by zoom (semantic zoom): epics, then issues, then bugs as
+   the camera comes closer.
+
+Built partly:
+
+1. Board cards that show whether work is moving or a plan is running.
+2. A lens that swaps a node's small icon to suit its view.
+3. A D4 that opens base up, down, left or right; D10 drawers and floating
+   notes in the gaps; D6 text blocks and tiny charts.
+4. The cylinder's alternative: three circles with radial gauges or
+   spiderweb stats.
+5. Time warp: click the moving request for its payload, and fork by a
+   payload property (a simulated trigger) instead of a fixed choice.
+
+Smaller: bug tendrils as an alternative to fog; a true orthographic camera
+for the 2D views; rotating the whole graph while locked; an "open on
+GitHub" link for issues; the organisation scale (one die per project when
+one rafa serves many).
+
 ## Stack
 
 React 19, React Three Fiber over three.js (WebGL, nothing to install in the
