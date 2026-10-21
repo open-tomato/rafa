@@ -42,7 +42,7 @@
  * old one, so a command reading while another writes reads a whole file.
  * `.rafa/` is gitignored whole, so the file is never tracked.
  */
-import type { WorktreeSeams } from '../cleanup/index.js';
+import type { WorktreeSeams } from '../cleanup/worktrees.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionState } from '@open-tomato/rafa/core/loop';
 
@@ -54,8 +54,9 @@ import { readSessions, SESSION_STATES } from '@open-tomato/rafa/core/loop';
 import { readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 import { scopeAt } from '@open-tomato/rafa/project/scope';
 
-import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
+import { readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
+import { defaultWorktreeSeams } from '../cleanup/worktrees.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 
 import { isIdleWorktree } from './sections.js';

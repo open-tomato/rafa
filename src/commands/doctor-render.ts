@@ -14,7 +14,8 @@
  * words them.
  */
 import type { DoctorPreflight, DoctorStartTier } from './doctor.js';
-import type { PreflightCheck, PreflightReport } from '../preflight/run.js';
+import type { PreflightCheck } from '../plan/index.js';
+import type { PreflightReport } from '../preflight/run.js';
 import type { BoardRow, BoardStatus } from '@open-tomato/rafa-board';
 
 import { basename, relative, sep } from 'node:path';

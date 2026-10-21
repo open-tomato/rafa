@@ -85,12 +85,11 @@ import type {
   MergedBy,
   MergedRow,
   NotPushedRow,
-  RemoteOnlyRow,
-  RunRow,
   StaleRow,
-  WorktreeBlockKind,
-  WorktreeRow,
 } from '../cleanup/index.js';
+import type { RemoteOnlyRow } from '../cleanup/remote-only.js';
+import type { RunRow } from '../cleanup/runs.js';
+import type { WorktreeBlockKind, WorktreeRow } from '../cleanup/worktrees.js';
 
 import { shellQuote } from '@open-tomato/rafa-pr';
 

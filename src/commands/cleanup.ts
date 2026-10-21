@@ -107,11 +107,11 @@ import type {
   CleanupStepKind,
   MergedRow,
   NotPushedRow,
-  RemoteOnlyRow,
-  RunRow,
   StaleRow,
-  WorktreeRow,
 } from '../cleanup/index.js';
+import type { RemoteOnlyRow } from '../cleanup/remote-only.js';
+import type { RunRow } from '../cleanup/runs.js';
+import type { WorktreeRow } from '../cleanup/worktrees.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
