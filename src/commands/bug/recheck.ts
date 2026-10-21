@@ -72,18 +72,37 @@
  */
 import type { RecheckReport, RecheckRow } from './recheck-report.js';
 import type { RecheckBugOptions, RecheckRun } from './recheck-run.js';
-import type { BoardTrust, TrustReading } from '../../board/trust.js';
 import type { NamedSecret } from '../../triage/triage.js';
-import type { IssueSeams, IssueTrackerData, LineFlags } from '../issue/issue-tracker.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type {
+  BoardTrust,
+  IssueSeams,
+  IssueTrackerData,
+  LineFlags,
+  TrustReading,
+} from '@open-tomato/rafa-board';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import {
+  DEFAULT_ISSUE_SEAMS,
+  boardRepoLabel,
+  createGhRunner,
+  ghBoardTrust,
+  issueName,
+  issueRef,
+  lineRefusal,
+  onTracker,
+  readBoardTrust,
+  resolveIssueTracker,
+  trustRefusalClause,
+} from '@open-tomato/rafa-board';
 
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -91,16 +110,12 @@ import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { boardRepoLabel } from '../../board/plan-spec.js';
-import { ghBoardTrust, readBoardTrust, trustRefusalClause } from '../../board/trust.js';
 import { checkoutOf } from '../../bugs/fill.js';
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';
 import { codeVersionOf, DIRTY_MARK, NO_COMMIT } from '../../bugs/versions.js';
 import { suiteEnv } from '../../suite/run.js';
 import { localPathRedactor } from '../../triage/local-paths.js';
 import { namedSecrets, redactSecrets } from '../../triage/triage.js';
-import { DEFAULT_ISSUE_SEAMS, issueName, issueRef, lineRefusal, onTracker, resolveIssueTracker } from '../issue/issue-tracker.js';
 
 import { recheckComment, referenceText, renderRecheck } from './recheck-report.js';
 import { recheckBug } from './recheck-run.js';

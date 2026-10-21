@@ -292,7 +292,6 @@ import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairSite, RepairStepKind, StepVerdict } from './suite-blocker.js';
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { CheckName, ChecksSettings } from '../config-schema-checks.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { GitRunner } from '../pr/index.js';
@@ -300,6 +299,7 @@ import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { PreloadReading } from '../suite/scope.js';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
 import { constants } from 'node:os';

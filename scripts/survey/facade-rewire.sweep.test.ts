@@ -19,7 +19,7 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Why a rewired package's file is still imported by path. */
-type KeptGroup = 'backEdge' | 'declarationGraph' | 'loadCycle';
+type KeptGroup = 'backEdge' | 'declarationGraph' | 'libraryChunks' | 'loadCycle';
 
 /** One rewired package and the files allowed to import it by path. */
 interface RewiredRow {
@@ -36,6 +36,14 @@ interface RewiredRow {
  * declarations ship as `dist/config/*.d.ts`. Inventory's five load-cycle
  * files would do the same through inventory, and its two back-edge files
  * are effort files, and effort comes before inventory in the move order.
+ * Board's 25 load-cycle files are mostly run and pr files that board's files
+ * reach through `src/claims/`, `src/next/` and `src/start/`, and its one
+ * effort importer, `src/effort/epic-cost.ts`, is a back edge the load-cycle
+ * group takes first; its two declaration-graph files are effort's two. Its
+ * 21 library-chunk files are reached statically from a library entry, and
+ * through the facade that graph would reach board's lazy command modules, so
+ * the splitting build would write each as a chunk of its own (one of them
+ * rewired alone writes 58 more chunks than the build at `c920603`).
  */
 const REWIRED: readonly RewiredRow[] = [
   {
@@ -62,6 +70,59 @@ const REWIRED: readonly RewiredRow[] = [
       'src/start/serving.ts': 'loadCycle',
     },
     packageName: 'rafa-inventory',
+  },
+  {
+    allowed: {
+      'src/adapter-registry.ts': 'libraryChunks',
+      'src/adapters/planner/claude.ts': 'libraryChunks',
+      'src/bugs/filed-values.ts': 'loadCycle',
+      'src/claims/ahead.ts': 'loadCycle',
+      'src/claims/drift.ts': 'loadCycle',
+      'src/claims/labels.ts': 'loadCycle',
+      'src/claims/plan-claim.ts': 'libraryChunks',
+      'src/commands/plan/blocked-offer.ts': 'libraryChunks',
+      'src/commands/plan/claim-route.ts': 'libraryChunks',
+      'src/commands/plan/plan-record.ts': 'libraryChunks',
+      'src/commands/plan/ready-offer.ts': 'libraryChunks',
+      'src/commands/plan/refresh-offer.ts': 'libraryChunks',
+      'src/commands/plan/review-gate.ts': 'libraryChunks',
+      'src/commands/plan/spec-route.ts': 'libraryChunks',
+      'src/commands/switch.ts': 'loadCycle',
+      'src/config-registry.ts': 'declarationGraph',
+      'src/config/shape.ts': 'declarationGraph',
+      'src/effort/epic-cost.ts': 'loadCycle',
+      'src/epic/verify-run.ts': 'loadCycle',
+      'src/next/hop-action.ts': 'loadCycle',
+      'src/next/hop-rows.ts': 'loadCycle',
+      'src/next/owner-gate.ts': 'loadCycle',
+      'src/next/readings.ts': 'loadCycle',
+      'src/next/relations-mode.ts': 'loadCycle',
+      'src/next/sources.ts': 'loadCycle',
+      'src/next/state.ts': 'loadCycle',
+      'src/plan.ts': 'libraryChunks',
+      'src/plan/store-rules.ts': 'loadCycle',
+      'src/pr/gh-close.ts': 'loadCycle',
+      'src/pr/gh.ts': 'loadCycle',
+      'src/pr/owner-approval.ts': 'loadCycle',
+      'src/start/decision-prompt.ts': 'libraryChunks',
+      'src/start/follow-ups.ts': 'libraryChunks',
+      'src/start/forced-draft.ts': 'libraryChunks',
+      'src/start/preflight-claim.ts': 'loadCycle',
+      'src/start/preflight-drift.ts': 'loadCycle',
+      'src/start/release-stage.ts': 'libraryChunks',
+      'src/start/risk-total.ts': 'libraryChunks',
+      'src/start/runner-pr.ts': 'libraryChunks',
+      'src/start/stale-docs.ts': 'loadCycle',
+      'src/start/suite-steps-run.ts': 'libraryChunks',
+      'src/start/triage.ts': 'loadCycle',
+      'src/suite/checks.ts': 'libraryChunks',
+      'src/suite/owns.ts': 'libraryChunks',
+      'src/suite/scope.ts': 'libraryChunks',
+      'src/triage/bug-filing.ts': 'loadCycle',
+      'src/triage/refs-section.ts': 'loadCycle',
+      'src/triage/triage.ts': 'loadCycle',
+    },
+    packageName: 'rafa-board',
   },
 ];
 

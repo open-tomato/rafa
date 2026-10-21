@@ -94,6 +94,8 @@ import type { PidProbe } from '@open-tomato/rafa/core/loop';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { lineRefusal, readChoiceFlag, readTextFlag } from '@open-tomato/rafa-board';
+
 import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
@@ -134,7 +136,6 @@ import {
   operatorsCopyPath,
 } from '../../stretch/operators.js';
 import { defaultPromptSeams, engineerPrompt } from '../../stretch/prompt.js';
-import { lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa stretch start';

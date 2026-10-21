@@ -81,6 +81,8 @@ import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import { boardId, createGhRunner, createGithubTracker } from '@open-tomato/rafa-board';
+
 import {
   expectOneArgument,
   readSwitch,
@@ -92,8 +94,6 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
 import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
 
-import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
-import { boardId } from '../../board/naming.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 

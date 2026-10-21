@@ -256,7 +256,6 @@ import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorProjectReading } from './doctor-project.js';
-import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
@@ -270,10 +269,17 @@ import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
+import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
 
 import { basename, resolve } from 'node:path';
 
+import {
+  commandRetrySeams,
+  readDoctorRefs,
+  registryRoster,
+  renderDoctorRefs,
+} from '@open-tomato/rafa-board';
 import { readDoctorEffortSync } from '@open-tomato/rafa-effort';
 
 import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
@@ -282,7 +288,6 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
 
-import { commandRetrySeams } from '../board/project/project-runner.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
@@ -305,12 +310,10 @@ import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } 
 import { effortSyncRefusal, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorProject, renderDoctorProject } from './doctor-project.js';
-import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
-import { registryRoster } from './plan/refs-check.js';
 
 /**
  * How the checks run; see the module note. Each left out is the

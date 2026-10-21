@@ -162,10 +162,6 @@ import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
 import type { ClaimBranches, ClaimLabels, ClaimsReading } from './claims.js';
 import type { EpicView, PlaceView } from './place-line.js';
 import type { WaitingReading, WaitingSources } from './waiting.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { Epic } from '../board/epics.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
 import type { BlockedTask } from '../loop/blocked-tasks.js';
 import type { NextOwnerGateOptions } from '../next/owner-gate.js';
@@ -177,8 +173,26 @@ import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { Place } from '@open-tomato/rafa/project/position';
+import type {
+  BlockedIssuesReport,
+  BoardIssue,
+  BoardListing,
+  Epic,
+  GhResult,
+  GhRunner,
+} from '@open-tomato/rafa-board';
 
 import { existsSync } from 'node:fs';
+
+import {
+  ROADMAP_LABEL,
+  createGhBoardListing,
+  createGhRunner,
+  horizonOf,
+  readBlockedIssues,
+  readEpics,
+  resolvePlace,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
@@ -186,13 +200,6 @@ import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readin
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBlockedIssues } from '../board/blocked-issues.js';
-import { readEpics } from '../board/epics.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { horizonOf } from '../board/roadmap-epic-rows.js';
-import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';

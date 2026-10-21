@@ -453,8 +453,9 @@ export {
   resolveIssueTracker,
 } from '../../src/commands/issue/issue-tracker.js';
 
-export type { ReadyReport } from '../../src/commands/issue/ready.js';
-export { runIssueReady } from '../../src/commands/issue/ready.js';
+// Type-only on purpose: a value export would load the issue-ready command
+// module with the facade, and the roster keeps feature command modules lazy.
+export type { ReadyReport, runIssueReady } from '../../src/commands/issue/ready.js';
 
 export {
   CREATE_DANGEROUS_PHRASES,

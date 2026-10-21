@@ -64,18 +64,19 @@
  * case in `./triage-trust.test.ts` hands over a recorded fake or a
  * literal answer, and none of them reaches GitHub.
  */
-import type { Permissions, TrustReading } from '../../board/trust.js';
 import type { PullRequestComment, PullRequestDetail } from '../../pr/index.js';
+import type { Permissions, TrustReading } from '@open-tomato/rafa-board';
 
-import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
-
-import { createGhRunner } from '../../adapters/tracker/github.js';
 import {
   createGhPermissions,
+  createGhRunner,
   readAuthorTrust,
   requireTrustedAuthor,
   trustRefusalClause,
-} from '../../board/trust.js';
+} from '@open-tomato/rafa-board';
+
+import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
+
 import { DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
 import { triageComments } from '../../pr/triage/comment.js';
 

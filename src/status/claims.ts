@@ -50,11 +50,11 @@
  * as `rafa claim take` does: a label that could not be read never makes
  * a claim a takeover candidate.
  */
-import type { BoardIssue } from '../board/roadmap-board.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimOwnership, ClaimStateName } from '../claims/stale.js';
 import type { GitRunner } from '../pr/index.js';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { BoardIssue } from '@open-tomato/rafa-board';
 
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 

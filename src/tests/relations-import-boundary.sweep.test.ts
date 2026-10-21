@@ -34,7 +34,10 @@
  * files reads these four names. {@link ALLOWED_IMPORTERS} is that set,
  * one entry per file with the reason it is there; every file under
  * `src/board/relations/` is exempt without being listed, since the plan
- * names the whole directory. A file added to this list without a reason
+ * names the whole directory. A file reads a name by a path to
+ * `epics.ts` or `blocked.ts`, or by the board facade,
+ * `@open-tomato/rafa-board`, for a name the facade's entry re-exports
+ * from either (#808). A file added to this list without a reason
  * is the thing this test exists to make a reviewer notice; a file
  * REMOVED from the codebase's actual imports without the list being
  * trimmed to match fails just as loudly, so the list stays honest in
@@ -123,6 +126,15 @@ function listSourceFiles(dir: string): string[] {
   return found;
 }
 
+/** The board package's facade, which a file outside the package imports board's names by (#808). */
+const BOARD_FACADE = '@open-tomato/rafa-board';
+
+/** The facade's entry, whose `export { … } from '…'` statements name each re-exported name's file. */
+const BOARD_FACADE_ENTRY = join(REPO_ROOT, 'packages', 'rafa-board', 'index.ts');
+
+/** The pattern the facade's entry is read with: its `export { … } from '…'` statements. */
+const NAMED_STATEMENT = /export\s+(?:type\s+)?\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/gs;
+
 /** `dir/../board/epics.js` resolved against `fromFile`'s directory, with its extension dropped. */
 function resolvedImportTarget(fromFile: string, specifier: string): string | null {
   if (!specifier.startsWith('.')) return null;
@@ -130,18 +142,45 @@ function resolvedImportTarget(fromFile: string, specifier: string): string | nul
   return `${join(fromFile, '..', withoutExt)}.ts`;
 }
 
-/** Every tracked name a `named { ... } from '...'` import statement in `text` pulls from `epics.ts` or `blocked.ts`. */
+/** The names of a `{ … }` clause, each as its file exports it, ahead of any `as`. */
+function clauseNames(clause: string): string[] {
+  return clause
+    .split(',')
+    .map((piece) => piece.trim().split(/\s+as\s+/)[0]?.trim() ?? '')
+    .filter((name) => name.length > 0);
+}
+
+/** Each name the board facade re-exports, keyed to the source file it re-exports it from. */
+function facadeOrigins(): Map<string, string | null> {
+  const origins = new Map<string, string | null>();
+  for (const match of readFileSync(BOARD_FACADE_ENTRY, 'utf8').matchAll(NAMED_STATEMENT)) {
+    const target = resolvedImportTarget(BOARD_FACADE_ENTRY, match[2] ?? '');
+    for (const name of clauseNames(match[1] ?? '')) origins.set(name, target);
+  }
+  return origins;
+}
+
+const FACADE_ORIGINS = facadeOrigins();
+
+/**
+ * Every tracked name a `named { ... } from '...'` import statement in
+ * `text` pulls from `epics.ts` or `blocked.ts`: by a path to either, or
+ * by the board facade, for a name the facade re-exports from either.
+ */
 function trackedImportsOf(filePath: string, text: string): string[] {
   const found: string[] = [];
   const pattern = /import\s+(?:type\s+)?\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/gs;
   for (const match of text.matchAll(pattern)) {
     const specifier = match[2] ?? '';
-    const target = resolvedImportTarget(filePath, specifier);
-    if (target !== EPICS_MODULE && target !== BLOCKED_MODULE) continue;
-    const names = (match[1] ?? '')
-      .split(',')
-      .map((piece) => piece.trim().split(/\s+as\s+/)[0]?.trim() ?? '')
-      .filter((name) => (TRACKED_NAMES as readonly string[]).includes(name));
+    const reachesTracked = (name: string): boolean => {
+      const target = specifier === BOARD_FACADE
+        ? FACADE_ORIGINS.get(name)
+        : resolvedImportTarget(filePath, specifier);
+      return target === EPICS_MODULE || target === BLOCKED_MODULE;
+    };
+    const names = clauseNames(match[1] ?? '')
+      .filter((name) => (TRACKED_NAMES as readonly string[]).includes(name))
+      .filter(reachesTracked);
     found.push(...names);
   }
   return found;
@@ -165,6 +204,14 @@ describe('the board relationship symbols stay behind the port', () => {
   it('finds every current importer, proving the scan is not vacuous', () => {
     expect(importers.size).toBeGreaterThan(0);
     expect(importers.get('board/relations/labels.ts')).toBeDefined();
+  });
+
+  it('reads the facade\'s three tracked names as re-exported from epics.ts or blocked.ts, so a facade import is read and not skipped', () => {
+    expect(TRACKED_NAMES.filter((name) => FACADE_ORIGINS.has(name)).map((name) => [name, srcRelative(FACADE_ORIGINS.get(name) ?? '')])).toEqual([
+      ['EPIC_LABEL_PREFIX', 'board/epics.ts'],
+      ['SPEC_BLOCKED_LABEL', 'board/blocked.ts'],
+      ['readBlockedBy', 'board/blocked.ts'],
+    ]);
   });
 
   it('imports EPIC_LABEL_PREFIX, SPEC_BLOCKED_LABEL, groupByEpicLabel or readBlockedBy from no file outside src/board/relations/, the move module, the doctor rows and the documented labels-mode branches', () => {

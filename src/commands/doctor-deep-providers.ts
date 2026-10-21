@@ -68,16 +68,15 @@
  * and the loop opens and merges its pull request.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
-import type { TrustReading } from '../board/trust.js';
 import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/provider.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
+import type { GhResult, GhRunner, GhRunnerOptions, TrustReading } from '@open-tomato/rafa-board';
+
+import { createGhPermissions, createGhRunner, readAuthorTrust } from '@open-tomato/rafa-board';
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhPermissions, readAuthorTrust } from '../board/trust.js';
 import { ghHostOf, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 

@@ -14,8 +14,10 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name from the `index.ts` of its folder: `board` (the `issue`, `board`
- * and `epic` subjects), `pr`, `run` (the `claim` subject) and `release`.
+ * name: `board` (the `issue`, `board` and `epic` subjects) from its
+ * package's facade, `@open-tomato/rafa-board`, with its three subjects,
+ * and `pr`, `run` (the `claim` subject) and `release` from the
+ * `index.ts` of their folder.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -467,14 +469,14 @@
 import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
+
 import { createCommandRegistry } from '../cli/registry.js';
 
 import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
-import { BOARD_SUBJECT } from './board/declarations.js';
-import { BOARD_FEATURE } from './board/index.js';
 import bugCodes from './bug/codes.js';
 import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
@@ -496,14 +498,12 @@ import effortMigrate from './effort/migrate.js';
 import effortMove from './effort/move.js';
 import effortReport from './effort/report.js';
 import effortSchema from './effort/schema.js';
-import { EPIC_SUBJECT } from './epic/declarations.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
 import instinctList from './instinct/list.js';
 import instinctPromote from './instinct/promote.js';
 import instinctShow from './instinct/show.js';
-import { ISSUE_SUBJECT } from './issue/declarations.js';
 import loopList from './loop/list.js';
 import loopPause from './loop/pause.js';
 import loopResume from './loop/resume.js';

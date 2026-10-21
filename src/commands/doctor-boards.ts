@@ -67,21 +67,27 @@
  * recorded fake runner and a planted position file under `tmpdir`, so
  * none of them reaches GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { DefaultBoard } from '../board/boards.js';
-import type { OwnerResolution } from '../board/owner-resolve.js';
-import type { PlaceNotice } from '../board/place.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type {
+  BoardIssue,
+  BoardListing,
+  DefaultBoard,
+  GhRunner,
+  OwnerResolution,
+  PlaceNotice,
+} from '@open-tomato/rafa-board';
+
+import {
+  createGhRoadmapSearch,
+  createOwnerResolver,
+  openBoards,
+  readBoardBody,
+  resolveDefaultBoard,
+  resolvePlace,
+  unlabelledRoadmapMessage,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readPositionFile } from '@open-tomato/rafa/project/position';
-
-import { readBoardBody } from '../board/board-body.js';
-import { resolveDefaultBoard, unlabelledRoadmapMessage } from '../board/boards.js';
-import { openBoards } from '../board/epic-board.js';
-import { createOwnerResolver } from '../board/owner-resolve.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhRoadmapSearch } from '../board/roadmap.js';
 
 /** The heading the board lines sit under, as `Epic labels:` heads its own. */
 export const BOARDS_HEADING = 'Boards:';

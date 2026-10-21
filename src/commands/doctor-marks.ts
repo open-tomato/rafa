@@ -66,16 +66,19 @@
  * `./doctor-marks.test.ts` drives in-process fakes, so none reaches
  * GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardIssue, BoardIssueLink, BoardListing } from '../board/roadmap-board.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { BoardIssue, BoardIssueLink, BoardListing, GhRunner } from '@open-tomato/rafa-board';
+
+import {
+  EPIC_LABEL_PREFIX,
+  SPEC_BLOCKED_LABEL,
+  hasSpecBlockedLabel,
+  readBlockedBy,
+  readBoardRepository,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { EPIC_LABEL_PREFIX } from '../board/epics.js';
-import { readBoardRepository } from '../board/repository.js';
 
 import { MOVE_FIX } from './init-board.js';
 

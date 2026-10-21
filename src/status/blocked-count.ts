@@ -22,15 +22,16 @@
  * rejection, and `readBlockedIssues` answers its own failure as the
  * report's `problem` rather than rejecting.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BoardRelations } from '../board/relations/port.js';
-import type { BoardListing } from '../board/roadmap-board.js';
+import type {
+  BlockedIssuesReport,
+  BoardListing,
+  BoardRelations,
+  GhRunner,
+} from '@open-tomato/rafa-board';
+
+import { SPEC_BLOCKED_LABEL, isWaiting } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { isWaiting } from '../board/relations/port.js';
 
 /** The half of the port the count reads: its mode, and its reads over one listing. */
 export type BlockedCountRelations = Pick<BoardRelations, 'mode' | 'read'>;

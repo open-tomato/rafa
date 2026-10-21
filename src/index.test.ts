@@ -47,9 +47,13 @@
  * hold exactly the commands of the core command modules spelled here,
  * followed by the lazy commands of the bundled features spelled in
  * `FEATURE_COMMANDS`, so a command registered and not spelled goes red. Each of those modules
- * wrapping a phase 0 command takes it as its one default import, and
- * that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. The command
+ * wrapping a phase 0 command takes it as its one default import, or,
+ * when it takes no default, as its one binding from a feature
+ * package's facade, and that binding is held to be a root export's
+ * value, so a command the terminal runs and a service cannot import
+ * goes red. A module taking a default and facade bindings both, as
+ * `plan create` takes `plan` and two of the board's values, runs its
+ * default, and its facade bindings are values it reads. The command
  * modules wrapping none are held too: the case that reaches the phase 0
  * commands spells them path by path, every module of `COMMAND_MODULES`
  * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths
@@ -503,11 +507,11 @@ const CLI_IMPORTS: ImportList = [
  */
 const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/plan/create.js', [
+    ['@open-tomato/rafa-board', ['CREATE_DANGEROUS_PHRASES', 'registryRoster']],
     ['@open-tomato/rafa/core/command', ['HINT_FLAG_SPEC']],
     ['../../next/ending.js', ['endingWith']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
-    ['./refs-check.js', ['CREATE_DANGEROUS_PHRASES', 'registryRoster']],
   ]],
   ['./commands/plan/list.js', [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolvePlansDir']],
@@ -535,11 +539,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./store-check.js', ['checkStoreRules']],
   ]],
   ['./commands/plan/risk.js', [
+    ['@open-tomato/rafa-board', ['createGhRunner']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectAtMostOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
     ['@open-tomato/rafa/core/plan', ['isFile', 'plural']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../plan/risk.js', ['assessPlanRisk', 'renderRiskText']],
     ['../../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
   ]],
@@ -778,11 +782,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./instinct-records.js', ['findRecords', 'instinctProject']],
   ]],
   ['./commands/instinct/flag.js', [
+    ['@open-tomato/rafa-board', ['expectTwoArguments']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/adapters', ['CORE_ADAPTER_REGISTRY']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../issue/issue-tracker.js', ['expectTwoArguments']],
   ]],
   ['./commands/instinct/promote.js', [
     ['@open-tomato/rafa-inventory', ['promotable']],
@@ -792,13 +796,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
   ]],
   ['./commands/update/current.js', [
+    ['@open-tomato/rafa-board', ['createGhRunner']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'RAFA_VERSION']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/project/worktree-root', ['mainCheckoutOf']],
     ['@open-tomato/rafa/schema/project-id', ['gitRemoteUrl']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../pr/provider.js', ['resolvePrProvider']],
     ['../../project/lock.js', ['LOCK_FILE', 'readProjectLock']],
     ['../../project/scaffold.js', ['scaffoldConflicts']],
@@ -842,16 +846,16 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-registry.js', ['SETTING_BY_KEY', 'SETTING_NAMES', 'SETTINGS']],
   ]],
   ['./commands/ci/status.js', [
+    ['@open-tomato/rafa-board', ['createGhRunner', 'readNonBlankFlag', 'readRequiredFlag']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../ci/failed-cases.js', ['readFailedCases']],
     ['../../ci/runs.js', ['readNewestRun']],
     ['../../ci/status-reading.js', ['CI_STATUS_EXIT', 'readFailedLog', 'renderCiStatus', 'verdictOf']],
-    ['../issue/issue-tracker.js', ['readNonBlankFlag', 'readRequiredFlag']],
   ]],
   ['./commands/stretch/start.js', [
+    ['@open-tomato/rafa-board', ['lineRefusal', 'readChoiceFlag', 'readTextFlag']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config', ['configFilePath']],
@@ -865,16 +869,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/launch.js', ['besideEngineerPrompt', 'claudeLine', 'DEFAULT_RAFA_COMMAND', 'lineText', 'OPERATOR_ROLES', 'roleCommand', 'tmuxLines']],
     ['../../stretch/operators.js', ['copyOperators', 'defaultOperatorsSeams', 'findOperators', 'linkedOperatorLines', 'linkedOperators', 'missingOperatorsLine', 'operatorsCopyPath']],
     ['../../stretch/prompt.js', ['defaultPromptSeams', 'engineerPrompt']],
-    ['../issue/issue-tracker.js', ['lineRefusal', 'readChoiceFlag', 'readTextFlag']],
   ]],
   ['./commands/stretch/item.js', [
+    ['@open-tomato/rafa-board', ['boardId', 'createGhRunner', 'createGithubTracker']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/loop', ['isPidAlive', 'readSessions']],
     ['@open-tomato/rafa/core/plan', ['plansDirAt', 'stubOfPlanFile']],
-    ['../../adapters/tracker/github.js', ['createGhRunner', 'createGithubTracker']],
-    ['../../board/naming.js', ['boardId']],
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
     ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
@@ -897,6 +899,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
   ]],
   ['./commands/bug/codes.js', [
+    ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'createGhRunner', 'issueName', 'lineRefusal', 'readNonBlankFlag', 'resolveTracker']],
     ['@open-tomato/rafa/adapters/logger/active', ['activeLogger']],
     ['@open-tomato/rafa/bugs/record', ['parseBugRecord']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
@@ -904,39 +907,32 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/errors/codes', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
     ['@open-tomato/rafa/errors/rafa-codes', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../adapters/tracker/resolve.js', ['resolveTracker']],
     ['../../errors/match.js', ['nearDuplicates', 'suggestWithProposals']],
-    ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'lineRefusal', 'readNonBlankFlag']],
   ]],
   ['./commands/bug/recheck.js', [
+    ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'boardRepoLabel', 'createGhRunner', 'ghBoardTrust', 'issueName', 'issueRef', 'lineRefusal', 'onTracker', 'readBoardTrust', 'resolveIssueTracker', 'trustRefusalClause']],
     ['@open-tomato/rafa/bugs/record', ['parseBugRecord']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'RAFA_VERSION']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
-    ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/plan-spec.js', ['boardRepoLabel']],
-    ['../../board/trust.js', ['ghBoardTrust', 'readBoardTrust', 'trustRefusalClause']],
     ['../../bugs/fill.js', ['checkoutOf']],
     ['../../bugs/test-reference.js', ['readTestReference', 'resolveTestReference']],
     ['../../bugs/versions.js', ['codeVersionOf', 'DIRTY_MARK', 'NO_COMMIT']],
     ['../../suite/run.js', ['suiteEnv']],
     ['../../triage/local-paths.js', ['localPathRedactor']],
     ['../../triage/triage.js', ['namedSecrets', 'redactSecrets']],
-    ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'lineRefusal', 'onTracker', 'resolveIssueTracker']],
     ['./recheck-report.js', ['recheckComment', 'referenceText', 'renderRecheck']],
     ['./recheck-run.js', ['recheckBug']],
   ]],
   ['./commands/docs/plan.js', [
+    ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'resolveTracker']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/plan', ['plansDirAt', 'isStampableStub', 'planStampLine', 'escapeBlockerText']],
-    ['../../adapters/tracker/resolve.js', ['resolveTracker']],
     ['../../docs/open-lines.js', ['readOpenStaleDocLines']],
     ['../../docs/release-issue.js', ['DOC_UPDATE_TASK_PREFIX', 'DOC_UPDATE_TITLE']],
-    ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
   ]],
   ['./commands/status.js', [
     ['@open-tomato/rafa-effort', ['pullBeforeRead']],
@@ -964,8 +960,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/branch-decision.js', ['REMOTE']],
   ]],
   ['./commands/roadmap.js', [
-    ['./issue/declarations.js', ['ISSUE_LIST_FLAGS']],
-    ['./issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS']],
+    ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'ISSUE_LIST_FLAGS']],
   ]],
   ['./commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -986,6 +981,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/init.js', [
+    ['@open-tomato/rafa-board', ['commandProgressFeed', 'commandRetrySeams', 'createGhRunner']],
     ['@open-tomato/rafa-inventory', ['vendorableAgentWarnings', 'vendorableAgents']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter']],
     ['@open-tomato/rafa/core/config', ['ConfigError', 'configFilePath']],
@@ -994,9 +990,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/project/bin-path', ['readBinPath']],
     ['@open-tomato/rafa/project/roots', ['DISK_ROOTS_FILE_SYSTEM', 'gitToplevel', 'rootCandidates']],
     ['@open-tomato/rafa/schema/project-id', ['gitRemoteUrl']],
-    ['../adapters/tracker/github.js', ['createGhRunner']],
-    ['../board/project/progress.js', ['commandProgressFeed']],
-    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../project/gitignore.js', ['applyTracking', 'GITIGNORE_FILE', 'GitignoreError', 'TRACKING_DIGEST_FILE', 'withTrackingBlock']],
     ['../project/root-choice.js', ['candidateLines', 'firstCandidate', 'namedRoot', 'promptForRoot']],
@@ -1006,13 +999,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [
+    ['@open-tomato/rafa-board', ['commandRetrySeams', 'readDoctorRefs', 'registryRoster', 'renderDoctorRefs']],
     ['@open-tomato/rafa-effort', ['readDoctorEffortSync']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'versionLine']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/plan', ['isFile', 'trackerPathFor']],
-    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../pr/preflight-items.js', ['ghPreflightItems']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/first-dispatch.js', ['isFirstDispatch']],
@@ -1029,12 +1022,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-effort-sync.js', ['effortSyncRefusal', 'renderDoctorEffortSync']],
     ['./doctor-install.js', ['readInstall', 'writeInstall']],
     ['./doctor-project.js', ['readDoctorProject', 'renderDoctorProject']],
-    ['./doctor-refs.js', ['readDoctorRefs', 'renderDoctorRefs']],
     ['./doctor-release.js', ['readDoctorRelease', 'writeDoctorRelease']],
     ['./doctor-render.js', ['renderDoctor']],
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
-    ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
@@ -1246,7 +1237,7 @@ describe('what the CLI reaches, through the entry', () => {
     expect(spelledCommands).toHaveLength(COMMAND_MODULES.length + FEATURE_COMMANDS.flatMap(([, , spellings]) => spellings).length);
   });
 
-  it('reaches the phase 0 command each wrapping core command module runs, its one default import or facade binding, as a root export', async () => {
+  it('reaches the phase 0 command each wrapping core command module runs, its one default import, or its facade binding when it has none, as a root export', async () => {
     const rootValues = new Set<unknown>(Object.values(entry));
     const wrapping = COMMAND_MODULES.filter(([, imports]) => imports.some(([, names]) => names.includes('wrapPhaseZeroCommand')));
     const runImports: number[] = [];
@@ -1254,9 +1245,19 @@ describe('what the CLI reaches, through the entry', () => {
 
     for (const [path] of wrapping) {
       const modulePath = join(SRC_DIR, path);
-      const runs = readImports(modulePath).flatMap(([from, names]) => names
-        .filter((name) => name === 'default' || FACADE_PATTERN.test(from))
+      const imports = readImports(modulePath);
+      // The run is the module's default import when it takes one: a
+      // module that also takes facade bindings, as `plan create` takes
+      // the board's, takes them as values. Only a module with no
+      // default takes its phase 0 command from a facade.
+      const defaults = imports.flatMap(([from, names]) => names
+        .filter((name) => name === 'default')
         .map((name) => [from, name] as const));
+      const runs = defaults.length > 0
+        ? defaults
+        : imports
+          .filter(([from]) => FACADE_PATTERN.test(from))
+          .flatMap(([from, names]) => names.map((name) => [from, name] as const));
       runImports.push(runs.length);
       for (const [from, name] of runs) {
         const specifier = FACADE_PATTERN.test(from)

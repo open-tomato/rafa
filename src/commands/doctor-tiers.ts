@@ -123,6 +123,7 @@ import type {
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
+import { createGhRunner } from '@open-tomato/rafa-board';
 import { SKILL_USE_CLI_VERSION, readFrontmatter } from '@open-tomato/rafa-effort';
 import {
   PROVENANCE_FIELD,
@@ -133,8 +134,6 @@ import {
 } from '@open-tomato/rafa-inventory';
 
 import { CLAUDE_BIN } from '@open-tomato/rafa/core/loop';
-
-import { createGhRunner } from '../adapters/tracker/github.js';
 
 import { PATH_KEY, readSessionEnv } from './doctor-deep-env.js';
 import { renderDeepSection } from './doctor-deep-row.js';

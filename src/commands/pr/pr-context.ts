@@ -89,13 +89,13 @@
  * that cannot be read, a detached HEAD, a branch with no open pull
  * request, and a provider call that rejected.
  */
-import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { RefreshConfig } from '@open-tomato/rafa-board';
 
 import { execFileSync } from 'node:child_process';
 

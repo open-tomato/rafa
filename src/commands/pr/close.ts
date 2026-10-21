@@ -68,9 +68,9 @@ import type { LineFlags, PrSeams } from './pr-context.js';
 import type { ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter, RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit, createLinePrompter } from '@open-tomato/rafa/core/command';
+import { readRequiredFlag } from '@open-tomato/rafa-board';
 
-import { readRequiredFlag } from '../issue/issue-tracker.js';
+import { CommandExit, createLinePrompter } from '@open-tomato/rafa/core/command';
 
 import { PR_CLOSE_DECLARATION } from './declarations.js';
 import {

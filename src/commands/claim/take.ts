@@ -100,13 +100,12 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
+import { createGhRunner, createGhSpecIssueReader, idleText } from '@open-tomato/rafa-board';
+
 import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { createGhSpecIssueReader } from '../../board/issue.js';
-import { idleText } from '../../board/roadmap-claims.js';
 import { holdsClaim } from '../../claims/device.js';
 import { readClaimState } from '../../claims/stale.js';
 import { REMOTE } from '../../start/branch-decision.js';

@@ -105,15 +105,15 @@ import type { DoctorBoardsReport } from './doctor-boards.js';
 import type { DoctorEpicsReport } from './doctor-epics.js';
 import type { DoctorMarksReport } from './doctor-marks.js';
 import type { DoctorRelationsReport } from './doctor-relations.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BoardStatus } from '../board/status.js';
 import type { BoardRelationshipMode, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { BlockedIssuesReport, BoardStatus, GhRunner } from '@open-tomato/rafa-board';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBlockedIssues } from '../board/blocked-issues.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { readBoardStatus } from '../board/status.js';
+import {
+  createGhBoardListing,
+  createGhRunner,
+  readBlockedIssues,
+  readBoardStatus,
+} from '@open-tomato/rafa-board';
 
 import { renderBlockedIssues } from './doctor-blocked.js';
 import { readDoctorBoards, renderDoctorBoards } from './doctor-boards.js';

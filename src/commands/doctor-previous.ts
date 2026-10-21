@@ -17,7 +17,11 @@
  */
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
-import { countPreviousCopies, PREVIOUS_COPY_WARN_ABOVE, previousDir } from '../board/previous-copy.js';
+import {
+  PREVIOUS_COPY_WARN_ABOVE,
+  countPreviousCopies,
+  previousDir,
+} from '@open-tomato/rafa-board';
 
 /** What `rafa doctor` learns about `previous/` under `specs.dir`. */
 export interface PreviousCopiesReading {
