@@ -33,6 +33,14 @@
  * A side-effect import (`import './x.js'`) and a type-position
  * `import('./x.js').T` record nothing.
  *
+ * A specifier that resolves to a facade entry (`packages/rafa-<name>/index.ts`,
+ * placed in the package by its folder) is read through the entry's table
+ * of `facade-tables.ts`: each name taken is recorded as if taken from the
+ * file the entry re-exports it from, under the name it has there
+ * (`default` for `default as d`), so an importer rewired to the facade
+ * reads the same as one by relative path and the entry is never a name's
+ * `exportedBy`. A name the table lacks records nothing.
+ *
  * Each name's `exportedBy` is the file the entry re-exports it from: the
  * package's own index, `src/<name>/index.ts`, when its exports hold the
  * name for the same declaration; else the declaring file, when it is in
@@ -49,6 +57,7 @@
  */
 
 import type { CutRules } from './cut-table';
+import type { FacadeTables } from './facade-tables';
 
 import { realpathSync } from 'node:fs';
 import { join, posix, relative, sep } from 'node:path';
@@ -56,6 +65,7 @@ import { join, posix, relative, sep } from 'node:path';
 import ts from 'typescript';
 
 import { CUT_RULES, placeFile } from './cut-table';
+import { readFacadeTables } from './facade-tables';
 import { classifyFile } from './files';
 import { stableJson } from './import-graph';
 
@@ -137,6 +147,11 @@ export interface FacadeOptions {
   readonly rules?: CutRules;
   /** The tsconfig, relative to the root; `tsconfig.json` by default. */
   readonly tsconfig?: string;
+  /**
+   * The facade tables, keyed by entry path; `readFacadeTables(root)`
+   * unless a test hands its own.
+   */
+  readonly facades?: FacadeTables;
 }
 
 /** The lines and exit code of one CLI run. */
@@ -173,6 +188,7 @@ interface ReadContext {
   readonly program: ts.Program;
   readonly checker: ts.TypeChecker;
   readonly options: ts.CompilerOptions;
+  readonly facades: FacadeTables;
 }
 
 /**
@@ -338,10 +354,40 @@ function recordElement(
   });
 }
 
+/**
+ * Where one name taken from a target is taken from: through the target's
+ * facade table when the target is a facade entry, else the target itself.
+ *
+ * @returns The file and the name there, or `undefined` for a name the
+ *   entry's table lacks.
+ */
+function throughFacade(context: ReadContext, target: string, exportName: string): { target: string; exportName: string } | undefined {
+  const rows = context.facades.get(target);
+  if (rows === undefined) {
+    return { exportName, target };
+  }
+  const row = rows.find((candidate) => candidate.name === exportName);
+  return row === undefined
+    ? undefined
+    : { exportName: row.sourceName, target: row.source };
+}
+
+/** Records one element, read through a facade when its target is one. */
+function recordTaken(
+  context: ReadContext,
+  collected: Collected,
+  site: { importer: string; target: string; exportName: string; location: ts.Node },
+): void {
+  const taken = throughFacade(context, site.target, site.exportName);
+  if (taken !== undefined) {
+    recordElement(context, collected, { ...site, ...taken });
+  }
+}
+
 /** Records the bindings of one `import … from` landing in the package. */
 function recordImport(context: ReadContext, collected: Collected, clause: ts.ImportClause, importer: string, target: string): void {
   if (clause.name !== undefined) {
-    recordElement(context, collected, { exportName: 'default', importer, location: clause.name, target });
+    recordTaken(context, collected, { exportName: 'default', importer, location: clause.name, target });
   }
   const bindings = clause.namedBindings;
   if (bindings === undefined) {
@@ -353,7 +399,7 @@ function recordImport(context: ReadContext, collected: Collected, clause: ts.Imp
   }
   for (const element of bindings.elements) {
     const exportName = (element.propertyName ?? element.name).text;
-    recordElement(context, collected, { exportName, importer, location: element.name, target });
+    recordTaken(context, collected, { exportName, importer, location: element.name, target });
   }
 }
 
@@ -365,7 +411,7 @@ function recordReExport(context: ReadContext, collected: Collected, clause: ts.N
   }
   for (const element of clause.elements) {
     const property = element.propertyName ?? element.name;
-    recordElement(context, collected, { exportName: property.text, importer, location: property, target });
+    recordTaken(context, collected, { exportName: property.text, importer, location: property, target });
   }
 }
 
@@ -534,12 +580,14 @@ function isRulePackage(rules: CutRules, pkg: string): boolean {
  *
  * @param root - The repository root; the tsconfig is read relative to it.
  * @param pkg - The package to read, as `rules` names it (`rafa-effort`).
- * @param options - The rules and the tsconfig; {@link CUT_RULES} and
- *   `tsconfig.json` by default.
+ * @param options - The rules, the tsconfig and the facade tables;
+ *   {@link CUT_RULES}, `tsconfig.json` and `readFacadeTables(root)` by
+ *   default.
  * @returns The reading: names sorted by UTF-16 code unit, problems and
  *   dynamic imports sorted, every path repository-relative with `/`.
- * @throws When the rules hold no package of that name, or the tsconfig
- *   cannot be read or reports an error.
+ * @throws When the rules hold no package of that name, the tsconfig
+ *   cannot be read or reports an error, or a facade entry is not of the
+ *   facade form.
  */
 export function readFacadeNames(root: string, pkg: string, options: FacadeOptions = {}): FacadeReading {
   const rules = options.rules ?? CUT_RULES;
@@ -550,6 +598,7 @@ export function readFacadeNames(root: string, pkg: string, options: FacadeOption
   const { fileNames, options: compilerOptions, program } = buildProgram(realRoot, options.tsconfig ?? 'tsconfig.json');
   const context: ReadContext = {
     checker: program.getTypeChecker(),
+    facades: options.facades ?? readFacadeTables(realRoot),
     options: compilerOptions,
     pkg,
     program,
@@ -678,7 +727,8 @@ function parseFacadeArgs(args: readonly string[]): FacadeArgs {
  *
  * @param root - The repository root.
  * @param args - The arguments after the script's path.
- * @param options - The rules and tsconfig, as {@link readFacadeNames} takes them.
+ * @param options - The rules, tsconfig and facade tables, as
+ *   {@link readFacadeNames} takes them.
  * @returns The lines and exit code. With no flag: one tab-separated line
  *   per name (`name`, `kind`, `declaredIn`, `exportedBy`) on stdout, one
  *   line per problem and dynamic import on stderr, exit 0. `--json`: the

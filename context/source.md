@@ -504,7 +504,11 @@ from it, value or type, with its declaration. Three shapes it reports as
 problems rather than names: an anonymous default export (`anonymous-default`),
 a namespace import or `export *` (`namespace-import`), and two declarations
 under one name (`collision`). `--entry` prints the facade's `index.ts` as it
-would be written, and `--json` prints the whole reading.
+would be written, and `--json` prints the whole reading. An import by the
+facade's name is read through the entry's table (`facade-tables.ts`): each
+name counts as taken from the file the entry re-exports it from, so a
+rewired importer reads as its relative form did and `--entry` prints the
+tracked entry unchanged.
 
 ### Packages under `packages/`
 
