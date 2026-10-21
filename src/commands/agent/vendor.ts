@@ -102,11 +102,12 @@ import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
+import { AGENT_DEFINITION_DIR, readFrontmatter } from '@open-tomato/rafa-effort';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { readAgentDirectory } from '../../agents/roster.js';
 import { bundledAgentsDirectory } from '../../inventory/trees.js';
-import { AGENT_DEFINITION_DIR, readFrontmatter } from '../../utils/agent-definition.js';
 
 /** The usage line a refusal names. */
 export const USAGE = 'rafa agent vendor <name>... [--force]';

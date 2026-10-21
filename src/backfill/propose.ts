@@ -112,11 +112,16 @@ import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/l
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import {
+  mergeFrontmatter,
+  readFrontmatterDocument,
+  writeFrontmatter,
+} from '@open-tomato/rafa-effort';
+
 import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
 
 import { checkFile } from '../check/run.js';
 import { sourceHash } from '../demote/report.js';
-import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT, SKILL_SIGNALS } from '../schema/skill.js';
 
 import { addedFailures, failureLines } from './derive.js';

@@ -105,8 +105,9 @@ import type {
   InstinctSource,
 } from '../schema/instinct.js';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+
 import { collectReferences } from '../check/references.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { actionHash, parseInstinct, writeInstinct } from '../schema/instinct.js';
 
 /** The directory `/learn` writes a single-file skill into. */

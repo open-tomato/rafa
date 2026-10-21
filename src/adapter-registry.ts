@@ -56,6 +56,8 @@ import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 
 import { homedir } from 'node:os';
 
+import { createFileSync, createLocalSync } from '@open-tomato/rafa-effort';
+
 import { createConsoleLogger } from '@open-tomato/rafa/adapters/logger/console';
 import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
 import { activeAdapterRegistry, PORT_VERSIONS, registerAdapters } from '@open-tomato/rafa/core/adapters';
@@ -70,8 +72,6 @@ import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
 import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from './adapters/tracker/local.js';
-import { createFileSync } from './effort/sync/file.js';
-import { createLocalSync } from './effort/sync/select.js';
 
 /** What every refusal opens with: the registry's own opening. */
 const REFUSAL = 'adapter registry';

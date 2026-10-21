@@ -87,13 +87,14 @@ import type { PlanChange } from '@open-tomato/rafa/store/changes';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { planStubsFromFileNames, resolvePlanStub } from '@open-tomato/rafa-effort';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 
-import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
 import { createGitRunner } from '../../pr/index.js';
 import { auditCell, auditLines, readAudit } from '../../release/audit.js';
 import { groupChangeNotes, renderNoteLines } from '../../release/changelog.js';

@@ -130,6 +130,8 @@ import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
@@ -139,7 +141,6 @@ import { toolOf } from '../check/shell-lines.js';
 import { buildInventory } from '../inventory/index.js';
 import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
 import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 
 /** What a need is for. */
 export type NeedKind = InventoryKind | 'mcp' | 'program';
