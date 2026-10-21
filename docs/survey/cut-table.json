@@ -3559,6 +3559,13 @@
           "from": "src/inventory/search/index.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
+          "to": "src/effort/session-log-dirs.ts",
+          "toPackage": "rafa-effort"
+        },
+        {
+          "from": "src/inventory/search/index.ts",
+          "fromPackage": "rafa-inventory",
+          "kind": "value",
           "to": "src/start/dispatch.ts",
           "toPackage": "rafa-run"
         },
@@ -3752,8 +3759,8 @@
         "src/report/lessons.ts"
       ],
       "rank": 4,
-      "remaining": 22,
-      "upwardEdges": 22
+      "remaining": 23,
+      "upwardEdges": 23
     },
     {
       "clearedByIssue118": 0,
@@ -5126,7 +5133,7 @@
           "from": "src/start/loop-events.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/effort/collect.ts",
+          "to": "src/effort/session-log-dirs.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -6641,10 +6648,10 @@
     "clearedByIssue118": 0,
     "files": 2166,
     "leftToPlace": 616,
-    "nonTestEdges": 4803,
+    "nonTestEdges": 4805,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 141
+    "upwardEdges": 142
   },
   "unassigned": [
     {

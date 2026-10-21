@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2166 files, 2138 of them in 12 packages (616 left to place) and 28 in 3 unassigned folders. Of the 4803 edges between two files neither of which is a test, value and type alike, 141 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2166 files, 2138 of them in 12 packages (616 left to place) and 28 in 3 unassigned folders. Of the 4805 edges between two files neither of which is a test, value and type alike, 142 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -13,7 +13,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 1 | `rafa-eslint-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 3 | `@open-tomato/rafa-core` | 278 | 159 | 113 | 6 | 0 | 0 | 0 |
-| 4 | `rafa-inventory` | 112 | 56 | 56 | 0 | 22 | 0 | 22 |
+| 4 | `rafa-inventory` | 112 | 56 | 56 | 0 | 23 | 0 | 23 |
 | 5 | `rafa-board` | 343 | 156 | 180 | 7 | 38 | 0 | 38 |
 | 6 | `rafa-pr` | 219 | 95 | 122 | 2 | 58 | 0 | 58 |
 | 7 | `rafa-run` | 288 | 123 | 165 | 0 | 22 | 0 | 22 |
@@ -47,7 +47,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | From | Into | Edges |
 | --- | --- | --- |
 | `rafa-inventory` | `rafa-run` | 1 |
-| `rafa-inventory` | `rafa-effort` | 18 |
+| `rafa-inventory` | `rafa-effort` | 19 |
 | `rafa-inventory` | `@open-tomato/rafa` | 3 |
 | `rafa-board` | `rafa-pr` | 11 |
 | `rafa-board` | `rafa-run` | 17 |

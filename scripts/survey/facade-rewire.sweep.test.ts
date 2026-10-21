@@ -2,8 +2,8 @@
  * The rewire guard (#808, pass 3): once a package is rewired, no non-test
  * file outside it imports one of its files by relative path except the
  * files its {@link REWIRED} row names, and each named file still does. A
- * sweep, since it lists the tracked files with `git ls-files`. The table is
- * empty when the guard lands; the rewire stage adds a row per package.
+ * sweep, since it lists the tracked files with `git ls-files`. The rewire
+ * stage of each package adds its row; effort's is the first.
  */
 import { spawnSync } from 'node:child_process';
 import { posix } from 'node:path';
@@ -29,8 +29,27 @@ interface RewiredRow {
   readonly allowed: Readonly<Record<string, KeptGroup>>;
 }
 
-/** One row per rewired package; effort's row lands with the rewire stage. */
-const REWIRED: readonly RewiredRow[] = [];
+/**
+ * One row per rewired package. Effort's six load-cycle files would put the
+ * facade on a cycle through effort if they imported it by name, and its two
+ * declaration-graph files are reached from `src/config/index.ts`, whose
+ * declarations ship as `dist/config/*.d.ts`.
+ */
+const REWIRED: readonly RewiredRow[] = [
+  {
+    allowed: {
+      'src/agents/roster.ts': 'loadCycle',
+      'src/check/run.ts': 'loadCycle',
+      'src/config-registry.ts': 'declarationGraph',
+      'src/config/shape.ts': 'declarationGraph',
+      'src/inventory/record.ts': 'loadCycle',
+      'src/inventory/trees.ts': 'loadCycle',
+      'src/schema/instinct.ts': 'loadCycle',
+      'src/tiers/serve.ts': 'loadCycle',
+    },
+    packageName: 'rafa-effort',
+  },
+];
 
 /** A file's path with the relative specifiers it holds that name a package file. */
 interface ImportedBy {
