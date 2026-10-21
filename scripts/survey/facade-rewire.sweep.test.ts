@@ -33,7 +33,9 @@ interface RewiredRow {
  * One row per rewired package. Effort's six load-cycle files would put the
  * facade on a cycle through effort if they imported it by name, and its two
  * declaration-graph files are reached from `src/config/index.ts`, whose
- * declarations ship as `dist/config/*.d.ts`.
+ * declarations ship as `dist/config/*.d.ts`. Inventory's five load-cycle
+ * files would do the same through inventory, and its two back-edge files
+ * are effort files, and effort comes before inventory in the move order.
  */
 const REWIRED: readonly RewiredRow[] = [
   {
@@ -48,6 +50,18 @@ const REWIRED: readonly RewiredRow[] = [
       'src/tiers/serve.ts': 'loadCycle',
     },
     packageName: 'rafa-effort',
+  },
+  {
+    allowed: {
+      'src/effort/report-skills.ts': 'backEdge',
+      'src/effort/skill-facts.ts': 'backEdge',
+      'src/effort/skill-use.ts': 'loadCycle',
+      'src/start/dispatch.ts': 'loadCycle',
+      'src/start/handout.ts': 'loadCycle',
+      'src/start/preflight.ts': 'loadCycle',
+      'src/start/serving.ts': 'loadCycle',
+    },
+    packageName: 'rafa-inventory',
   },
 ];
 
