@@ -47,6 +47,7 @@ import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
 import { LOCK_FILE, readProjectLock } from '@open-tomato/rafa-release';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -56,7 +57,6 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { mainCheckoutOf } from '@open-tomato/rafa/project/worktree-root';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
-import { resolvePrProvider } from '../../pr/index.js';
 import { scaffoldConflicts } from '../../project/scaffold.js';
 import { applyUpdatePlan, planChanges, readUpdatePlan, UpdateStepError } from '../../project/update-current.js';
 import { readCurrentRange } from '../../project/update-range.js';

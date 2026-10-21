@@ -46,23 +46,22 @@
  * the plan as its value, and the line is refused with exit code 1 rather
  * than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
-import type { AccountSeams } from '../../plan/risk/accounts.js';
-import type { RiskFinding, RiskReport } from '../../plan/risk.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { AccountSeams, RiskFinding, RiskReport } from '@open-tomato/rafa-pr';
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
+import { assessPlanRisk, renderRiskText } from '@open-tomato/rafa-pr';
 
 import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isFile, plural } from '@open-tomato/rafa/core/plan';
 
-import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 
 /** The command as a refusal names it. */

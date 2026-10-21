@@ -109,7 +109,7 @@
  */
 import type { BranchesUnread } from './branches.js';
 import type { DeviceStoreIds } from '../claims/device.js';
-import type { PullRequests } from '../pr/index.js';
+import type { PullRequests } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

@@ -72,7 +72,6 @@
  */
 import type { RecheckReport, RecheckRow } from './recheck-report.js';
 import type { RecheckBugOptions, RecheckRun } from './recheck-run.js';
-import type { NamedSecret } from '../../triage/triage.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
@@ -85,6 +84,7 @@ import type {
   LineFlags,
   TrustReading,
 } from '@open-tomato/rafa-board';
+import type { NamedSecret } from '@open-tomato/rafa-pr';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -103,6 +103,15 @@ import {
   resolveIssueTracker,
   trustRefusalClause,
 } from '@open-tomato/rafa-board';
+import {
+  DIRTY_MARK,
+  NO_COMMIT,
+  checkoutOf,
+  codeVersionOf,
+  localPathRedactor,
+  namedSecrets,
+  redactSecrets,
+} from '@open-tomato/rafa-pr';
 
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -110,12 +119,8 @@ import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { checkoutOf } from '../../bugs/fill.js';
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';
-import { codeVersionOf, DIRTY_MARK, NO_COMMIT } from '../../bugs/versions.js';
 import { suiteEnv } from '../../suite/run.js';
-import { localPathRedactor } from '../../triage/local-paths.js';
-import { namedSecrets, redactSecrets } from '../../triage/triage.js';
 
 import { recheckComment, referenceText, renderRecheck } from './recheck-report.js';
 import { recheckBug } from './recheck-run.js';

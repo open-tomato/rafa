@@ -205,6 +205,7 @@ import { join, relative, sep } from 'node:path';
 
 import { commandProgressFeed, commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
 import { vendorableAgentWarnings, vendorableAgents } from '@open-tomato/rafa-inventory';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 import { ConfigError, configFilePath } from '@open-tomato/rafa/core/config';
@@ -214,7 +215,6 @@ import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '@open-tomato/rafa/project/roots';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
-import { resolvePrProvider } from '../pr/index.js';
 import {
   applyTracking,
   GITIGNORE_FILE,

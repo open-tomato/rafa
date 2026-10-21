@@ -260,12 +260,18 @@ import type { NextCeiling } from '../next/ceiling.js';
 import type { NextHopStep } from '../next/hop-rows.js';
 import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { DryEpic, NextSources } from '../next/readings.js';
-import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
+import type { NextSourceSeams, OpenedNextSources } from '@open-tomato/rafa-pr';
 
 import { pullBeforeRead } from '@open-tomato/rafa-effort';
+import {
+  followsMerge,
+  openNextRelations,
+  openNextSources,
+  readSettleAfterMerge,
+} from '@open-tomato/rafa-pr';
 import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -290,9 +296,6 @@ import {
   stateLine,
   stopLine,
 } from '../next/lines.js';
-import { openNextRelations } from '../next/relations-mode.js';
-import { followsMerge, readSettleAfterMerge } from '../next/settle-step.js';
-import { openNextSources } from '../next/sources.js';
 import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
 import { REMOTE } from '../start/branch-decision.js';

@@ -23,9 +23,9 @@
 import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 
-import { familyOf } from '@open-tomato/rafa/errors/codes';
+import { jaccard, wordSetOf } from '@open-tomato/rafa-pr';
 
-import { jaccard, wordSetOf } from '../triage/similarity.js';
+import { familyOf } from '@open-tomato/rafa/errors/codes';
 
 /** How many suggestions `rafa bug codes --suggest` prints by default. */
 export const SUGGESTION_LIMIT = 5;

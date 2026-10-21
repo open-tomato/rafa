@@ -335,7 +335,7 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
-import type { ResolvePrProviderOptions } from '../pr/index.js';
+import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
   PreflightItems,
   PrerequisiteReminder,
@@ -373,7 +373,8 @@ import {
   unresolvedSkillLine,
 } from '../agents/roster.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
-import { ghPreflightItems, resolvePrProvider } from '../pr/index.js';
+import { ghPreflightItems } from '../pr/preflight-items.js';
+import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import {
   loadPlanPrerequisites,
