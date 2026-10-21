@@ -852,7 +852,8 @@ the end of the template. This section replaces nothing.
 **The sweep `src/tests/import-cycle.sweep.test.ts` fails on any non-test
 runtime import cycle that spans two clusters.** It reads the import graph
 the way `scripts/survey/import-graph.ts` does: `readMetafile` and
-`buildImportGraph` from there, and the file set from
+`buildImportGraph` from there, handed the facade tables `readFacadeTables`
+of `scripts/survey/facade-tables.ts` reads, and the file set from
 `scripts/survey/files.ts`. Type-only imports are erased in the graph, so
 a type-level cycle passes; `tsc --build tsconfig.references.json`, over
 the composite packages' project references, is the gate for those.

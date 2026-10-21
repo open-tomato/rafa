@@ -29,6 +29,20 @@
  * script) adds no edge. A specifier that resolves to nothing is named under
  * `unresolved`.
  *
+ * A text import whose specifier resolves to a facade entry, a key of the
+ * `facades` input (`readFacadeTables` of `facade-tables.ts`), is read
+ * through the entry: each name the importer takes adds one edge to the file
+ * the entry re-exports that name from, and none to the entry, which is
+ * outside the scope. The metafile records such an import as `external` and
+ * nothing more, so the edge's kind is read from the text: `type` when the
+ * statement is `import type` or `export type … from`, when the binding
+ * carries `type`, or when the entry re-exports the name by `export type`
+ * (bun drops such a binding, as it drops one used only as a type), else
+ * `value`. A namespace import or `export * from` takes every name; a
+ * side-effect or dynamic `import()` of the entry, which loads it whole,
+ * takes every name too. A name the entry does not export is named under
+ * `unresolved` with the specifier.
+ *
  * Clusters come from `louvainClusters` over every edge of either kind;
  * folders play no part. A cluster is named `c<NN>-<stem>`: `NN` its rank by
  * file count, largest first, from `01`, and `<stem>` the file name, less
@@ -37,6 +51,7 @@
  * same edges, rounded to six decimals.
  */
 
+import type { FacadeBinding, FacadeRow, FacadeTables } from './facade-tables';
 import type { FileKind } from './files';
 import type { DirectedGraph } from './graph-algorithms';
 
@@ -46,6 +61,7 @@ import { dirname, join, posix } from 'node:path';
 
 import ts from 'typescript';
 
+import { readFacadeBindings, readFacadeTables } from './facade-tables';
 import { classifyFile, coverageLine, listTrackedFiles } from './files';
 import { betweenness, louvainClusters } from './graph-algorithms';
 
@@ -91,6 +107,13 @@ export interface ImportGraphInput {
   readonly sources: ReadonlyMap<string, string>;
   /** The resolver for specifiers bun left unresolved and for type imports. */
   readonly resolve: ResolveImport;
+  /**
+   * The rows of each facade entry, keyed by its repository-relative path,
+   * as `readFacadeTables` reads them. A text import whose specifier
+   * resolves to one of these entries is read through it. Absent, no import
+   * is, and an import of a facade adds no edge.
+   */
+  readonly facades?: FacadeTables;
 }
 
 /** One edge of the graph, from the importing file to the imported one. */
@@ -100,10 +123,12 @@ export interface ImportEdge {
   readonly to: string;
 }
 
-/** A specifier that resolved to nothing. */
+/** A specifier that resolved to nothing, or a name its facade entry does not export. */
 export interface UnresolvedImport {
   readonly from: string;
   readonly specifier: string;
+  /** The name taken from a facade entry that does not export it; absent when the specifier itself resolves to nothing. */
+  readonly name?: string;
 }
 
 /** The graph before clustering. */
@@ -116,7 +141,7 @@ export interface ImportGraph {
   readonly read: readonly string[];
   /** The files the metafile does not list, sorted. */
   readonly unreached: readonly string[];
-  /** The specifiers that resolved to nothing, sorted. */
+  /** The specifiers that resolved to nothing and the facade names no entry exports, sorted. */
   readonly unresolved: readonly UnresolvedImport[];
 }
 
@@ -231,6 +256,58 @@ function resolveOrRecord(input: ImportGraphInput, sink: EdgeSink, specifier: str
 }
 
 /**
+ * The kind of a facade edge: `type` when the binding or the entry's row
+ * is, else `value`.
+ *
+ * @param binding - The kind of the importer's binding.
+ * @param row - The kind of the entry's re-export.
+ * @returns The edge's kind.
+ */
+function facadeKind(binding: EdgeKind, row: EdgeKind): EdgeKind {
+  return binding === 'type' || row === 'type'
+    ? 'type'
+    : 'value';
+}
+
+/**
+ * Adds the edges an importer's bindings from one facade entry give: one
+ * per name taken, to the file the entry re-exports it from. A name the
+ * entry does not export is named under `unresolved`. No binding (a
+ * side-effect or dynamic import) and a namespace or star binding take
+ * every row.
+ *
+ * @param sink - Where edges and unresolved names are collected; changed in place.
+ * @param from - The importing file.
+ * @param specifier - The specifier as written, which resolves to the entry.
+ * @param rows - The entry's rows.
+ * @param bindings - What the importer's text takes from `specifier`.
+ */
+function addFacadeEdges(
+  sink: EdgeSink,
+  from: string,
+  specifier: string,
+  rows: readonly FacadeRow[],
+  bindings: readonly FacadeBinding[],
+): void {
+  const whole: readonly FacadeBinding[] = bindings.length === 0
+    ? [{ kind: 'value', shape: 'star' }]
+    : bindings;
+  const byName = new Map(rows.map((row) => [row.name, row]));
+  for (const binding of whole) {
+    if (binding.shape !== 'named') {
+      rows.forEach((row) => addEdge(sink, { from, kind: facadeKind(binding.kind, row.kind), to: row.source }));
+      continue;
+    }
+    const row = byName.get(binding.name);
+    if (row === undefined) {
+      sink.unresolved.set(`${from}\0${specifier}\0${binding.name}`, { from, name: binding.name, specifier });
+      continue;
+    }
+    addEdge(sink, { from, kind: facadeKind(binding.kind, row.kind), to: row.source });
+  }
+}
+
+/**
  * Builds the import graph from a metafile and the source texts. Pure: the
  * caller runs `bun build` and reads the files (see `main`).
  *
@@ -264,18 +341,29 @@ export function buildImportGraph(input: ImportGraphInput): ImportGraph {
       continue;
     }
     read.push(from);
+    const throughFacade = new Map<string, readonly FacadeRow[]>();
     for (const specifier of textImports(text)) {
       const target = resolveOrRecord(input, sink, specifier, from);
-      if (target !== undefined) {
+      const rows = target === undefined
+        ? undefined
+        : input.facades?.get(target);
+      if (rows !== undefined) {
+        throughFacade.set(specifier, rows);
+      } else if (target !== undefined) {
         addEdge(sink, { from, kind: 'type', to: target });
       }
+    }
+    for (const [specifier, rows] of throughFacade) {
+      addFacadeEdges(sink, from, specifier, rows, readFacadeBindings(text, specifier));
     }
   }
   const edges = [...sink.edges.values()].sort(
     (left, right) => compareText(left.from, right.from) || compareText(left.to, right.to),
   );
   const unresolved = [...sink.unresolved.values()].sort(
-    (left, right) => compareText(left.from, right.from) || compareText(left.specifier, right.specifier),
+    (left, right) => compareText(left.from, right.from)
+      || compareText(left.specifier, right.specifier)
+      || compareText(left.name ?? '', right.name ?? ''),
   );
   return { edges, nodes, read, unreached, unresolved };
 }
@@ -455,7 +543,9 @@ export function renderImportGraphMarkdown(survey: ImportGraphSurvey, tracked: re
   }
   if (survey.unresolved.length > 0) {
     lines.push('', '## Unresolved imports', '');
-    lines.push(...survey.unresolved.map((item) => `- \`${item.from}\`: \`${item.specifier}\``));
+    lines.push(...survey.unresolved.map((item) => (item.name === undefined
+      ? `- \`${item.from}\`: \`${item.specifier}\``
+      : `- \`${item.from}\`: \`${item.name}\` from \`${item.specifier}\`, which the entry does not export`)));
   }
   return `${lines.join('\n')}\n`;
 }
@@ -522,8 +612,8 @@ export function bunResolver(root: string): ResolveImport {
 }
 
 /**
- * Reads the repository at `root` and writes both outputs under
- * `docs/survey/`.
+ * Reads the repository at `root`, its facade entries through
+ * `readFacadeTables`, and writes both outputs under `docs/survey/`.
  *
  * @param root - The repository root.
  * @returns The paths written, relative to `root`.
@@ -535,7 +625,14 @@ export async function main(root: string): Promise<string[]> {
   for (const path of tracked.all) {
     sources.set(path, await Bun.file(join(root, path)).text());
   }
-  const graph = buildImportGraph({ files: tracked.all, metafile, resolve: bunResolver(root), root, sources });
+  const graph = buildImportGraph({
+    facades: readFacadeTables(root),
+    files: tracked.all,
+    metafile,
+    resolve: bunResolver(root),
+    root,
+    sources,
+  });
   const survey = surveyImportGraph(graph);
   mkdirSync(join(root, OUTPUT_DIR), { recursive: true });
   const jsonPath = `${OUTPUT_DIR}/import-graph.json`;
