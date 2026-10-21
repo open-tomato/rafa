@@ -548,8 +548,8 @@ names come from, and the facade entry is no node.
   moves its line there. Pass 2 added the package's folder to `CUT_RULES`
   with its facade, and at its move (pass 4) the facade becomes the package's
   own `index`. Pass 2 moved no file under `src/` and changed no importer.
-- **The rewire moves effort's and inventory's importers onto their facades and
-  keeps the files each one's groups name on their paths.**
+- **The rewire moves effort's, inventory's and board's importers onto their
+  facades and keeps the files each one's groups name on their paths.**
   `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>` `[--dry-run]`
   takes each importer of a feature package that can take it by name and
   rewrites it to import `@open-tomato/rafa-<name>`.
@@ -562,18 +562,34 @@ names come from, and the facade entry is no node.
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
     `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has five:
     `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`,
-    `src/start/preflight.ts` and `src/start/serving.ts`.
+    `src/start/preflight.ts` and `src/start/serving.ts`. Board has twenty-five:
+    `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
+    `src/claims/labels.ts`, `src/commands/switch.ts`, `src/effort/epic-cost.ts`,
+    `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
+    `src/next/owner-gate.ts`, `src/next/readings.ts`,
+    `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
+    `src/plan/store-rules.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
+    `src/pr/owner-approval.ts`, `src/start/preflight-claim.ts`,
+    `src/start/preflight-drift.ts`, `src/start/stale-docs.ts`,
+    `src/start/triage.ts`, `src/triage/bug-filing.ts`,
+    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/effort/epic-cost.ts` is among them, though it is an effort file that
+    imports board, because the load-cycle group comes first. Its edge to board
+    is the back edge the decouple step before pass 4 cuts with inventory's two.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
     Inventory has two, `src/effort/report-skills.ts` and
     `src/effort/skill-facts.ts`, both effort files: effort comes before
     inventory in the move order, so they import it backwards, and the decouple
-    step before pass 4 cuts them.
+    step before pass 4 cuts them. Board has none in the codemod's grouping,
+    because its one effort importer, `src/effort/epic-cost.ts`, is taken first
+    by the load-cycle group.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. Effort has two:
     `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
+    Board has the same two as effort.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
   that import effort or inventory by path stay on their paths in pass 3. The
@@ -592,9 +608,12 @@ names come from, and the facade entry is no node.
   `-release`, `-pr` or `-run`, with a planted-text control.
 
   A binding taken through a re-exporting module of the package, such as
-  `src/learning/index.ts`, is refused by the codemod and is pointed at its
-  origin file by hand before the run: pass 3a did that three times, and
-  inventory's rewire did it six.
+  `src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
+  refused by the codemod and is pointed at its origin file by hand before the
+  run: pass 3a did that three times, inventory's rewire six, and board's eight.
+  A file whose stem names a fake is read as a test by the codemod and the
+  guard, so the three fakes `src/ci/runs-fake.ts`, `src/pr/gh-fake.ts` and
+  `src/pr/gh-fake-shapes.ts` keep their paths until pass 4.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
