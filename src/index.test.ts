@@ -52,18 +52,18 @@
  * package's facade, and that binding is held to be a root export's
  * value, so a command the terminal runs and a service cannot import
  * goes red. A module taking a default and facade bindings both, as
- * `plan create` takes `plan` and two of the board's values, runs its
- * default, and its facade bindings are values it reads. The command
- * modules wrapping none are held too: the case that reaches the phase 0
- * commands spells them path by path, every module of `COMMAND_MODULES`
- * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths
- * is the one to read, where a list kept in this note fell behind it.
+ * `plan create` takes `plan`, two of the board's values and `endingWith`
+ * of run's, runs its default, and its facade bindings are values it reads.
+ * The command modules wrapping none are held too: the case that reaches the
+ * phase 0 commands spells them path by path, every module of `COMMAND_MODULES`
+ * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths is
+ * the one to read, where a list kept in this note fell behind it.
  * `describe` runs the roster builder of `src/cli/describe.ts`, which is
- * no root export. `plan show` imports `parsePlan` from the `./plan`
- * entry, which is one, where `plan list`, `plan validate`, `plan risk`
- * and `plan needs` import their readings from `src/plan/list.ts`,
- * `src/plan/validate.ts`, `src/plan/risk.ts` and `src/plan/needs.ts`,
- * which are not. A binding a module takes by name, as `loop start`
+ * no root export. `plan show` takes `parsePlan` from the
+ * `@open-tomato/rafa-run` facade, as `plan list`, `plan validate` and
+ * `plan risk` take `listPlans`, `validatePlan` and `resolvePlanPath` from
+ * it, and `plan needs` takes its readings from `src/plan/needs.ts`, which
+ * is no facade name. A binding a module takes by name, as `loop start`
  * takes the CI defaults its flags show, is a value and not a command,
  * and is not held. Every parsed import list is also held to the spelled
  * one, which is what keeps a parser that matched nothing from passing
