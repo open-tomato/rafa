@@ -45,6 +45,8 @@ export function D20({ node, at, heat, dim, hidden }: D20Props) {
   const justDragged = useRef(false);
   const view = useView();
   const shape = view.shape(node);
+  const lensSpec = view.lens(state.lens);
+  const flatLens = Boolean(lensSpec.flat || lensSpec.arrange);
   const geometry = shapeGeometry(shape);
   const radius = view.radius(node);
   const stroke = view.type(node.type).stroke;
@@ -72,6 +74,9 @@ export function D20({ node, at, heat, dim, hidden }: D20Props) {
     g.position.copy(position);
     if (expandedSelf && shared.frozenQuat) {
       g.quaternion.copy(shared.frozenQuat);
+    } else if (flatLens) {
+      // A 2D lens: every die faces the camera axis, so the layout is arranged once and holds.
+      g.quaternion.copy(shared.modeQuat);
     } else {
       const t = clock.elapsedTime * 0.6 + phase;
       wobble.setFromAxisAngle(new Vector3(Math.sin(t * 0.7), Math.cos(t), 0.2).normalize(), Math.sin(t) * WOBBLE);
@@ -101,6 +106,7 @@ export function D20({ node, at, heat, dim, hidden }: D20Props) {
       (event.target as Element | null)?.releasePointerCapture?.(event.pointerId);
     }
     if (controls) controls.enabled = true;
+    shared.pressingNode = false;
     press.current = null;
   };
 
@@ -132,6 +138,7 @@ export function D20({ node, at, heat, dim, hidden }: D20Props) {
       e.stopPropagation();
       justDragged.current = false;
       press.current = { x: e.clientX, y: e.clientY, timer: null, dragging: false, plane: null, last: null };
+      shared.pressingNode = true;
       (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
       if (e.shiftKey) {
         startDrag(e.ray);

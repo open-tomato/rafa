@@ -1,8 +1,7 @@
 /** The centre column: the WebGL canvas with the graph, plus the net overlay once a node is unfolded. */
-import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useState } from 'react';
-import { Vector3 } from 'three';
+import { Quaternion, Vector3 } from 'three';
 
 import type { GraphIndex } from '../graph/index.ts';
 import { readItems, readNumber } from '../contract/bind.ts';
@@ -16,6 +15,7 @@ import { NetOverlay } from '../ui/NetOverlay.tsx';
 import { Toolbar } from '../ui/Toolbar.tsx';
 import { CameraRig, type NetView } from './CameraRig.tsx';
 import { Clouds } from './Clouds.tsx';
+import { Navigator } from './Navigator.tsx';
 import { Orbits } from './Orbits.tsx';
 import { BoxLayer, BoxProjector, Routes } from './Plots.tsx';
 import { SequencePlayer, SequenceStage } from './Sequence.tsx';
@@ -125,14 +125,15 @@ export function GraphScene({ index }: { readonly index: GraphIndex }) {
   const parts = useMemo(() => lensParts(view, lens), [view, lens]);
   const shared = useMemo<SceneShared>(() => {
     const layout = createLayout(index.nodes, parts.springs, parts.active);
-    return { layout, display: new Float32Array(layout.positions), offset: new Vector3(), dragging: false, frozenQuat: null, unfoldT: 0, cameraSettled: false, labels: new Map(), targets: null, targetOn: null };
+    return { layout, display: new Float32Array(layout.positions), offset: new Vector3(), dragging: false, frozenQuat: null, unfoldT: 0, cameraSettled: false, labels: new Map(), targets: null, targetOn: null, modeQuat: new Quaternion(), pressingNode: false };
     // Built once per snapshot; a lens switch re-activates it below instead of starting over.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, view]);
   const flat = Boolean(lens.flat || lens.arrange);
   useEffect(() => {
     activate(shared.layout, parts.springs, parts.active);
-    const timer = setTimeout(() => dispatch({ type: 'camera', kind: flat ? 'front' : 'fit' }), 900);
+    if (flat) dispatch({ type: 'view-mode', mode: 'front' });
+    const timer = setTimeout(() => dispatch({ type: 'camera', kind: 'fit' }), 900);
     return () => clearTimeout(timer);
   }, [shared, parts, flat, dispatch]);
 
@@ -167,7 +168,8 @@ export function GraphScene({ index }: { readonly index: GraphIndex }) {
       shared.targets = targets;
       shared.targetOn = on;
       setArrangement(laid);
-      dispatch({ type: 'camera', kind: 'front' });
+      dispatch({ type: 'view-mode', mode: 'front' });
+      dispatch({ type: 'camera', kind: 'fit' });
     }).catch((error: unknown) => {
       if (alive) dispatch({ type: 'hover', hover: { kind: 'ui', text: `The layout failed: ${error instanceof Error ? error.message : String(error)}` } });
     });
@@ -222,7 +224,7 @@ export function GraphScene({ index }: { readonly index: GraphIndex }) {
               dim={highlightIds !== null && !highlightIds.has(node.id)}
             />
           ))}
-          <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={1.5} maxDistance={2400} />
+          <Navigator flat={flat} />
           <CameraRig visible={visible} onNetView={setNetView} flat={flat} />
           <LabelProjector visible={visible} />
         </Canvas>

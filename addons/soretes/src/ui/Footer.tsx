@@ -24,9 +24,12 @@ interface Line {
 
 const TUTORIAL: readonly [string, string][] = [
   ['click a die', 'select it and bring it to the front; its details open on the right'],
-  ['double-click / Enter / ＋', 'unfold it into its net of twenty faces'],
+  ['double-click / Enter / ＋', 'unfold it into its net'],
   ['shift + drag, or long press', 'move a node; with the lock on, move the whole graph'],
-  ['drag empty space', 'turn the graph · wheel zooms · right-drag pans'],
+  ['I · T · V', 'isometric, top or front camera'],
+  ['Q · E', 'turn the isometric camera a quarter'],
+  ['W A S D · middle drag', 'move over the view\'s plane (left drag on empty space too)'],
+  ['wheel', 'iso: zoom; top and front: scroll, shift for sideways; ctrl/⌘ + wheel zooms'],
   ['L · F · 0 · + · −', 'lock, fit, reset view, zoom'],
   ['P', 'pin the selected node to the left column'],
   ['Esc', 'close the drawer, fold back, clear the highlight, deselect'],

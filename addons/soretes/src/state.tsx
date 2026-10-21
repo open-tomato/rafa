@@ -1,6 +1,7 @@
 /** UI state for the PoC: one reducer, read through context. Positions live in the layout, not here. */
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
 
+import type { ViewMode, ViewState } from './scene/views.ts';
 import type { EdgeKind, EntityType } from './types.ts';
 
 /** `none`, or the id of a config widget whose value lights the dice. */
@@ -59,6 +60,8 @@ export interface UiState {
   readonly heat: HeatKey;
   /** The lens id; the view falls back to the config's first lens. */
   readonly lens: string;
+  /** Which of the six strict cameras is on. */
+  readonly view: ViewState;
   /** The scenario the sequence view replays. */
   readonly scenario: string | null;
   readonly highlight: Highlight | null;
@@ -88,6 +91,8 @@ export type Action =
   | { readonly type: 'heat'; readonly heat: HeatKey }
   | { readonly type: 'lens'; readonly lens: string; readonly heat?: HeatKey }
   | { readonly type: 'scenario'; readonly id: string | null }
+  | { readonly type: 'view-mode'; readonly mode: ViewMode }
+  | { readonly type: 'view-turn'; readonly by: 1 | -1 }
   | { readonly type: 'highlight'; readonly highlight: Highlight | null }
   | { readonly type: 'drawer'; readonly open: boolean; readonly tab?: 'help' | 'content' }
   | { readonly type: 'show'; readonly content: DrawerContent }
@@ -113,6 +118,7 @@ export const INITIAL_STATE: UiState = {
   heat: 'none',
   lens: '',
   scenario: null,
+  view: { mode: 'iso', turn: 0 },
   highlight: null,
   drawer: { open: false, tab: 'help', content: null },
   faceOverrides: {},
@@ -154,6 +160,10 @@ function reduce(state: UiState, action: Action): UiState {
       return { ...state, depthDirection: action.direction };
     case 'heat':
       return { ...state, heat: action.heat };
+    case 'view-mode':
+      return { ...state, view: { ...state.view, mode: action.mode } };
+    case 'view-turn':
+      return { ...state, view: { mode: 'iso', turn: (state.view.turn + action.by + 4) % 4 } };
     case 'scenario':
       return { ...state, scenario: action.id };
     case 'lens':

@@ -25,6 +25,25 @@ pins and filters on the left; the graph; the selected node or an overview
 on the right) and a thin footer line that says what the pointer is over,
 with `?` opening a help and content drawer from the bottom.
 
+## Camera and navigation
+
+Six strict cameras, video-game style (`src/scene/views.ts`,
+`src/scene/Navigator.tsx`): four isometric angles, one top, one front.
+
+| Input | Does |
+|---|---|
+| `Q` / `E` | turn the isometric view a quarter, counter-clockwise / clockwise |
+| `I` / `T` / `V` | isometric, top, front |
+| `W` `A` `S` `D` | move over the view's plane: the ground for iso and top, upright for front |
+| middle drag | the same move with the mouse; left drag on empty space too |
+| wheel | iso: zoom; top and front: scroll, shift for sideways |
+| ctrl/⌘ + wheel | zoom in any view |
+
+Zooming an iso view right in drops to front; zooming far out rises to
+top. The 2D lenses hold the front view, and their dice, like an opened
+net, face the camera's axis, so they stay flat on screen anywhere in the
+view.
+
 ## The contracts
 
 Three declarations, all plain data (`src/contract/types.ts`), each piece

@@ -77,7 +77,8 @@ export function CameraRig({ visible, onNetView, flat }: CameraRigProps) {
     shared.cameraSettled = false;
     if (state.expanded && !state.collapsing) {
       const node = index.byId.get(state.expanded);
-      shared.frozenQuat = camera.quaternion.clone();
+      // The net faces the current camera's axis, not wherever the camera is mid-move.
+      shared.frozenQuat = shared.modeQuat.clone();
       const radius = node ? radiusOf(node) : 1;
       const shape = node ? shapeOf(node) : undefined;
       if (!shape) return;
@@ -105,7 +106,7 @@ export function CameraRig({ visible, onNetView, flat }: CameraRigProps) {
       return;
     }
     if (command.kind === 'reset') {
-      goal.current = { follow: null, target: new Vector3(), distance: HOME_DISTANCE, dir: new Vector3(0, 0.18, 1).normalize(), net: false };
+      goal.current = { follow: null, target: new Vector3(), distance: HOME_DISTANCE, dir: null, net: false };
       return;
     }
     const ids = [...visible];
@@ -118,7 +119,7 @@ export function CameraRig({ visible, onNetView, flat }: CameraRigProps) {
     // The 85th percentile, so a few loose packages at the rim do not shrink the rest to dots.
     const spread = points.map((p) => p.distanceTo(center)).sort((a, b) => a - b);
     const reach = Math.max(1, spread[Math.floor(spread.length * 0.85)] ?? 1);
-    const head = command.kind === 'front' ? new Vector3(0, 0, 1) : null;
+    const head = null;
     goal.current = { follow: null, target: center, distance: (reach * 1.15) / Math.sin(MathUtils.degToRad(camera.fov / 2)), dir: head, net: false };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.cameraCommand]);

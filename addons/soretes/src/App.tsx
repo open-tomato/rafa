@@ -22,7 +22,7 @@ function useKeyboard(): void {
       const key = e.key.toLowerCase();
       if (key === '?' || key === 'h') dispatch({ type: 'drawer', open: !state.drawer.open, tab: 'help' });
       else if (key === 'escape') dispatch({ type: 'escape' });
-      else if ((key === 'enter' || key === 'e') && state.selected) dispatch(state.expanded ? { type: 'collapse' } : { type: 'expand', id: state.selected });
+      else if (key === 'enter' && state.selected) dispatch(state.expanded ? { type: 'collapse' } : { type: 'expand', id: state.selected });
       else if (key === 'l') dispatch({ type: 'toggle-lock' });
       else if (key === 'f') dispatch({ type: 'camera', kind: 'fit' });
       else if (key === '0') dispatch({ type: 'camera', kind: 'reset' });

@@ -24,6 +24,10 @@ export interface SceneShared {
   targets: Float32Array | null;
   /** 1 where `targets` holds a place for the node. */
   targetOn: Uint8Array | null;
+  /** The current camera's arrived turn: what 2D dice and open nets face. */
+  modeQuat: Quaternion;
+  /** True while a pointer is down on a node, so the navigator leaves that drag alone. */
+  pressingNode: boolean;
 }
 
 export const ACTIONS_KEY = '__actions';
