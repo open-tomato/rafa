@@ -6,7 +6,7 @@
 import { createContext, useContext } from 'react';
 
 import { readNumber } from './contract/bind.ts';
-import type { DiceTemplate, EdgeKindSpec, EntityTypeSpec, FaceWidgetSpec, GraphNode, LensSpec, RelationRole, SoretesConfig } from './contract/types.ts';
+import type { DiceTemplate, EdgeKindSpec, EntityTypeSpec, FaceWidgetSpec, GraphNode, LensSpec, RelationRole, AtlasConfig } from './contract/types.ts';
 import { templateFor } from './configs/index.ts';
 import { SHAPES, type DieShape } from './geometry/dice.ts';
 import type { GraphIndex } from './graph/index.ts';
@@ -19,7 +19,7 @@ const GROUP_RADIUS = 1.5;
 const UNSIZED_RADIUS = 1.15;
 
 export interface View {
-  readonly config: SoretesConfig;
+  readonly config: AtlasConfig;
   readonly index: GraphIndex;
   readonly entityTypes: readonly string[];
   readonly edgeKinds: readonly string[];
@@ -48,7 +48,7 @@ function hashedColor(key: string): string {
   return `hsl(${h}, 55%, 52%)`;
 }
 
-export function makeView(config: SoretesConfig, index: GraphIndex): View {
+export function makeView(config: AtlasConfig, index: GraphIndex): View {
   const holders = new Set(index.nodes.filter((n) => n.group === n.id).map((n) => n.id));
   const sizeOf = (node: GraphNode): number | null => (config.size ? readNumber(config.size, { node, index }) : null);
   const largest = Math.max(1, ...index.nodes.map((n) => sizeOf(n) ?? 0));

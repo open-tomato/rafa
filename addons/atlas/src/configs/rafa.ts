@@ -1,9 +1,9 @@
 /** The view config for a rafa repo snapshot: `scripts/snapshot.ts` produces the fields these bindings read. */
-import type { SoretesConfig } from '../contract/types.ts';
+import type { AtlasConfig } from '../contract/types.ts';
 
 const count = { kind: 'number', compact: true } as const;
 
-export const RAFA_CONFIG: SoretesConfig = {
+export const RAFA_CONFIG: AtlasConfig = {
   id: 'rafa',
   title: 'rafa repo and effort store',
   entityTypes: {

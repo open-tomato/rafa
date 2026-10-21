@@ -1,11 +1,11 @@
 /**
- * The S.O.R.E.T.E.S. contracts, in the shape of a command-metadata contract
+ * The Atlas contracts, in the shape of a command-metadata contract
  * (an argument spec with a `ui` hint, mapped to a widget): every piece is
  * declared once, as data, and a small registry turns the `ui` hint into a renderer.
  *
  *   data contract    Snapshot: what a producer hands over (nodes, edges, any fields)
  *   widget contract  FaceWidgetSpec: what a dice face reads, shows and does
- *   view contract    SoretesConfig: types, links and the templates that place widgets on dice
+ *   view contract    AtlasConfig: types, links and the templates that place widgets on dice
  *
  * Nothing here is validated; a binding that finds nothing shows "—".
  */
@@ -18,7 +18,7 @@ import type { ValueFormat } from './format.ts';
 export interface GraphNode {
   readonly id: string;
   readonly label: string;
-  /** A key of `SoretesConfig.entityTypes`. */
+  /** A key of `AtlasConfig.entityTypes`. */
   readonly type: string;
   /** Another node's id (its parent, region A) or a free group name. */
   readonly group: string;
@@ -30,7 +30,7 @@ export interface GraphNode {
 export interface GraphEdge {
   readonly source: string;
   readonly target: string;
-  /** A key of `SoretesConfig.edgeKinds`. */
+  /** A key of `AtlasConfig.edgeKinds`. */
   readonly kind: string;
   readonly weight: number;
 }
@@ -304,7 +304,7 @@ export interface LensSpec {
   readonly labels?: Readonly<Record<string, 'full' | 'name' | 'none'>>;
 }
 
-export interface SoretesConfig {
+export interface AtlasConfig {
   readonly id: string;
   readonly title: string;
   readonly entityTypes: Readonly<Record<string, EntityTypeSpec>>;

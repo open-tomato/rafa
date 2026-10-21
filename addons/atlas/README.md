@@ -1,13 +1,12 @@
-# S.O.R.E.T.E.S. — proof of concept
+# Atlas — proof of concept
 
-Single Origin Related Typified Entities: the effort bucket drawn as a 3D
-graph of dice, one view of the same nodes for every role. A working name,
-and a proof of concept: **private, unpublished, not wired into rafa.** It
+A map of the codebase: the effort bucket drawn as a 3D graph of dice, one
+view of the same nodes for every role. A proof of concept: **private, unpublished, not wired into rafa.** It
 has visual quirks to fix before it can count as a finished PoC (listed at
 the end).
 
 ```bash
-cd addons/soretes && bun install && bun run dev
+cd addons/atlas && bun install && bun run dev
 ```
 
 Open the printed URL. `bun run snapshot` rebuilds `data/snapshot.json` from
@@ -53,7 +52,7 @@ declared once and a `ui` hint mapped to a renderer (`src/contract/registry.tsx`)
 |---|---|---|
 | data | `Snapshot`: nodes with five known keys and any fields, edges, scenarios | the producer: `scripts/snapshot.ts`, `src/configs/services-demo.ts` |
 | widget | `FaceWidgetSpec`: title, icon, `value` binding, `format`, `ui` (counter, label, combo), `background`, `action` | the config |
-| view | `SoretesConfig`: entity types (with their die), edge kinds, widgets, `DiceTemplate`s, lenses | `src/configs/<dataset>.ts` |
+| view | `AtlasConfig`: entity types (with their die), edge kinds, widgets, `DiceTemplate`s, lenses | `src/configs/<dataset>.ts` |
 
 A binding is a dot path into a node (`metrics.p95`) or a relation
 (`@callers`, `@callees`, `@children`); an array reads as its length.

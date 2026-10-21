@@ -12,8 +12,8 @@ export function Header({ snapshot, onRefresh, onDataset }: HeaderProps) {
   const { project, summary } = snapshot;
   return (
     <header className="header">
-      <div className="brand" data-help="S.O.R.E.T.E.S.: Single Origin Related Typified Entities — the working name of this view.">
-        <span className="mark">◆</span> S.O.R.E.T.E.S.
+      <div className="brand" data-help="Atlas: a map of the codebase, one view of the same nodes for every role.">
+        <span className="mark">◆</span> Atlas
       </div>
       <div className="crumbs" data-help={`The organisation and project as the snapshot names them. Scope: ${project.scope}.`}>
         <span>{project.org}</span>

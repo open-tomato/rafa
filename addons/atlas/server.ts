@@ -71,4 +71,4 @@ const server = Bun.serve({
   development: { hmr: true, console: true },
 });
 
-process.stdout.write(`S.O.R.E.T.E.S. PoC on ${server.url}\n`);
+process.stdout.write(`Atlas PoC on ${server.url}\n`);

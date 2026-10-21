@@ -1,7 +1,7 @@
 /** The view config for the services demo: same dice, other entity types, other widgets. */
-import type { SoretesConfig } from '../contract/types.ts';
+import type { AtlasConfig } from '../contract/types.ts';
 
-export const SERVICES_CONFIG: SoretesConfig = {
+export const SERVICES_CONFIG: AtlasConfig = {
   id: 'services',
   title: 'services of an organisation (demo data)',
   entityTypes: {

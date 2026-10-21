@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "soretes-poc",
+      "name": "@open-tomato/atlas",
       "dependencies": {
         "@react-three/drei": "^10.7.9",
         "@react-three/fiber": "^9.8.2",

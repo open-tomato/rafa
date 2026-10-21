@@ -18,7 +18,7 @@ import { useView, type View } from '../view.tsx';
 /** The triangle edge, in px, that the face text sizes are drawn for. */
 const DESIGN_EDGE_PX = 150;
 const RADIAL_LIMIT = 12;
-export const WIDGET_MIME = 'application/x-soretes-widget';
+export const WIDGET_MIME = 'application/x-atlas-widget';
 
 function useBoxSize<T extends Element>(): [React.RefObject<T | null>, { width: number; height: number }] {
   const ref = useRef<T>(null);
