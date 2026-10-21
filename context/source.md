@@ -581,8 +581,12 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight and inventory's seven, and a planted control reds on
-  one relative import. The published-types case in
+  files, effort's eight, inventory's seven and board's 48, and a planted
+  control reds on one relative import. Board's row adds a fourth group the
+  codemod does not print, `libraryChunks`: 21 files a library entry reaches
+  statically, put back on their paths after the rewire, since through the
+  facade that graph reaches board's lazy command modules and the splitting
+  build writes each as a chunk of its own. The published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
   `-release`, `-pr` or `-run`, with a planted-text control.
