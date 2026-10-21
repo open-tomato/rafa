@@ -3718,6 +3718,7 @@
         "src/tiers/skill-names.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-inventory/": 0,
         "src/agents/": 4,
         "src/backfill/": 10,
         "src/bundled/": 0,
@@ -3730,6 +3731,7 @@
         "src/tiers/": 13
       },
       "folders": [
+        "packages/rafa-inventory/",
         "src/agents/",
         "src/backfill/",
         "src/bundled/",
@@ -4374,6 +4376,7 @@
         "src/refs/verify.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-board/": 0,
         "src/adapters/tracker/": 19,
         "src/board/": 136,
         "src/board/project/": 43,
@@ -4383,6 +4386,7 @@
         "src/refs/": 13
       },
       "folders": [
+        "packages/rafa-board/",
         "src/adapters/tracker/",
         "src/board/",
         "src/board/project/",
@@ -5058,11 +5062,13 @@
         "src/triage/triage.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-pr/": 0,
         "src/commands/pr/": 79,
         "src/pr/": 65,
         "src/triage/": 40
       },
       "folders": [
+        "packages/rafa-pr/",
         "src/commands/pr/",
         "src/pr/",
         "src/triage/"
@@ -5546,6 +5552,7 @@
         "src/suite/unhandled.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-run/": 0,
         "src/claims/": 19,
         "src/commands/claim/": 15,
         "src/preflight/": 8,
@@ -5553,6 +5560,7 @@
         "src/suite/": 18
       },
       "folders": [
+        "packages/rafa-run/",
         "src/claims/",
         "src/commands/claim/",
         "src/preflight/",
@@ -5738,10 +5746,12 @@
         "src/release/workspace-packages.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-release/": 0,
         "src/commands/release/": 42,
         "src/release/": 75
       },
       "folders": [
+        "packages/rafa-release/",
         "src/commands/release/",
         "src/release/"
       ],
@@ -5842,9 +5852,11 @@
         "src/utils/agent-definition.ts"
       ],
       "filesByFolder": {
+        "packages/rafa-effort/": 0,
         "src/effort/": 68
       },
       "folders": [
+        "packages/rafa-effort/",
         "src/effort/"
       ],
       "name": "rafa-effort",

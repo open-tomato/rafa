@@ -102,11 +102,13 @@ repository.
   two shared-config packages, `rafa-eslint-config` and `rafa-typescript-config`, sit lowest, since nothing in the graph
   imports them; core is `@open-tomato/rafa-core` above them and the root `@open-tomato/rafa` at the top, #808's names.
   Written by `bun scripts/survey/cut-table.ts`, which reads `docs/survey/import-graph.json` and never a build of its
-  own, so the table and the graph cannot disagree; the files as tracked were written on top of commit 4232ffa, by the
-  task that added the named lists of `scripts/survey/cut-names.ts` (pass 1 of #808), from the graph written at commit
-  83da91c: 2165 files, 2137 of them in 12 packages (614 left to place and counted in `@open-tomato/rafa`) and 28 in the
-  three unassigned folders `src/ci/`, `src/commands/stretch/` and `src/stretch/`. Of 4803 edges between non-test files
-  141 point upward, none cleared by #118, and 77 touch an unassigned folder and have no rank. Read by
+  own, so the table and the graph cannot disagree; the files as tracked were written on top of commit f090bbb, by the
+  task that regenerated the maps after each facade folder `packages/rafa-<name>/` joined its package's `folders`
+  (pass 3 of #808), from the graph as tracked at commit 856bc1e: 2166 files, 2138 of them in 12 packages (616 left to
+  place and counted in `@open-tomato/rafa`) and 28 in the three unassigned folders `src/ci/`, `src/commands/stretch/`
+  and `src/stretch/`; each facade folder lists 0 files, since the graph's scope holds no facade entry. Of 4803 edges
+  between non-test files 141 point upward, none cleared by #118, and 77 touch an unassigned folder and have no rank.
+  Read by
   `bun scripts/survey/test-index.ts --baseline --map=docs/survey/cut-table.json` and by its guard with `--against=`; any
   run that reads the map prints the unplaced files and exits 1 when there is one. The counts rank options and do not
   certify a cut: `tsc --build` with project references is that gate (#807). It is not one of the four maps, so
