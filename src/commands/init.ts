@@ -214,7 +214,7 @@ import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '@open-tomato/rafa/project/roots';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
-import { resolvePrProvider } from '../pr/provider.js';
+import { resolvePrProvider } from '../pr/index.js';
 import {
   applyTracking,
   GITIGNORE_FILE,

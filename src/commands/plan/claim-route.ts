@@ -84,7 +84,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
-import { resolvePrProvider } from '../../pr/provider.js';
+import { resolvePrProvider } from '../../pr/index.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */
 export const CLAIM_REFUSAL_EXIT = 1;

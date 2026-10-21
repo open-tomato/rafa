@@ -205,7 +205,7 @@ import {
 } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { resolvePrProvider } from '../pr/provider.js';
+import { resolvePrProvider } from '../pr/index.js';
 
 import { branchNameFor, REMOTE } from './branch-decision.js';
 

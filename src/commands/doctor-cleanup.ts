@@ -48,7 +48,7 @@
  */
 import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { DoctorCleanupInput } from '../cleanup/settings.js';
-import type { PullRequests } from '../pr/types.js';
+import type { PullRequests } from '../pr/index.js';
 
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';

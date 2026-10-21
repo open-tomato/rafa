@@ -68,7 +68,7 @@
  * and the loop opens and merges its pull request.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/provider.js';
+import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/index.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 import type { GhResult, GhRunner, GhRunnerOptions, TrustReading } from '@open-tomato/rafa-board';
@@ -77,8 +77,8 @@ import { createGhPermissions, createGhRunner, readAuthorTrust } from '@open-toma
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
 
-import { ghHostOf, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
-import { resolvePrProvider } from '../pr/provider.js';
+import { ghHostOf, resolvePrProvider } from '../pr/index.js';
+import { ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 
 /** The section's title. */
 export const PROVIDERS_SECTION_TITLE = 'Providers';

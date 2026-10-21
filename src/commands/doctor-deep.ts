@@ -62,7 +62,7 @@
 import type { EnvDifference, EnvLayer, PathDifference, SessionEnvReading } from './doctor-deep-env.js';
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { NeedsSeams, NeedsWarning } from '../plan/needs.js';
-import type { ResolvePrProviderOptions } from '../pr/provider.js';
+import type { ResolvePrProviderOptions } from '../pr/index.js';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';

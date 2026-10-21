@@ -74,8 +74,7 @@ import type {
   Section,
   StatusSections,
 } from './sections.js';
-import type { ChecksVerdict } from '../pr/checks.js';
-import type { Mergeability } from '../pr/index.js';
+import type { ChecksVerdict, Mergeability } from '../pr/index.js';
 
 import { SPEC_BLOCKED_LABEL, blockedLineSentence, idleText } from '@open-tomato/rafa-board';
 

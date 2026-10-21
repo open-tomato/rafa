@@ -51,7 +51,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { resolvePrProvider } from '../pr/provider.js';
+import { resolvePrProvider } from '../pr/index.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */
 export const DRIFT_EVERY = 2;

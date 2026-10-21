@@ -114,7 +114,7 @@ import type {
 } from '../cleanup/index.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { PullRequests } from '../pr/types.js';
+import type { PullRequests } from '../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';

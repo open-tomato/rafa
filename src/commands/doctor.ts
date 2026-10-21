@@ -259,7 +259,7 @@ import type { DoctorProjectReading } from './doctor-project.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
-import type { ResolvePrProviderOptions } from '../pr/provider.js';
+import type { ResolvePrProviderOptions } from '../pr/index.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
 import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
@@ -288,8 +288,7 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
 
-import { ghPreflightItems } from '../pr/preflight-items.js';
-import { resolvePrProvider } from '../pr/provider.js';
+import { ghPreflightItems, resolvePrProvider } from '../pr/index.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import {
   loadPlanPrerequisites,
