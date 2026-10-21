@@ -14,7 +14,7 @@ export type Point2 = readonly [number, number];
 
 export interface Box {
   readonly id: string;
-  readonly kind: 'plot' | 'entity' | 'column' | 'lane' | 'lifeline';
+  readonly kind: 'plot' | 'entity' | 'column' | 'lane' | 'lifeline' | 'month' | 'cell' | 'span';
   readonly title: string;
   readonly subtitle?: string;
   /** Top-left corner, world units, y up. */
@@ -53,6 +53,15 @@ const CARD = 2.6;
 const CARDS_PER_ROW = 4;
 const LANE_PAD = 2.2;
 const COLUMN_HEADER = 4;
+// Timeline sizes.
+const WEEK_W = 7;
+const PLANNED_W = 18;
+const MONTH_BAND = 2.6;
+const WEEK_HEADER = 3.2;
+const TIME_CARD = 2.3;
+const CELL_H = 1.6;
+const LANE_MIN_H = 5;
+const SPAN_H = 0.8;
 // Sequence sizes.
 const LIFELINE_GAP = 13;
 const LIFELINE_H = 36;
@@ -192,6 +201,112 @@ function board(spec: Extract<ArrangeSpec, { kind: 'board' }>, view: View, nodes:
   return centred(positions, boxes, []);
 }
 
+const DAY_MS = 86_400_000;
+const mondayOf = (iso: string): string => {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+const addWeeks = (monday: string, n: number): string => new Date(Date.parse(monday) + n * 7 * DAY_MS).toISOString().slice(0, 10);
+const weekLabel = (monday: string): string => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(monday));
+const monthLabel = (monday: string): string => new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(monday));
+
+/** A roadmap: weeks left to right under month boxes, a lane per group, undated cards in a Planned column. */
+function timeline(spec: Extract<ArrangeSpec, { kind: 'timeline' }>, view: View, nodes: readonly GraphNode[], now: Date): Arrangement {
+  const pick = (node: GraphNode, binding: string): unknown => binding.split('.').reduce<unknown>((acc, k) => (acc !== null && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined), node);
+  const heads = nodes.filter((n) => view.matches(spec.laneHeads, n));
+  const cards = nodes.filter((n) => !view.matches(spec.laneHeads, n));
+  const dateOf = (n: GraphNode): string | null => {
+    const v = pick(n, spec.date);
+    return typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null;
+  };
+  const laneOf = (n: GraphNode): string => String(pick(n, spec.lane) ?? '');
+  const cellsOf = (h: GraphNode): Record<string, { done: number; active: number }> => {
+    const v = spec.cells ? pick(h, spec.cells) : null;
+    return v !== null && typeof v === 'object' ? (v as Record<string, { done: number; active: number }>) : {};
+  };
+  const spanOf = (h: GraphNode): { first: string; last: string } | null => {
+    const v = spec.span ? pick(h, spec.span) : null;
+    return v !== null && typeof v === 'object' && 'first' in v ? (v as { first: string; last: string }) : null;
+  };
+  // The weeks run from the earliest date anything carries to the current week.
+  const mondays = [
+    mondayOf(now.toISOString()),
+    ...cards.map(dateOf).filter((d): d is string => !!d).map(mondayOf),
+    ...heads.flatMap((h) => Object.keys(cellsOf(h))),
+    ...heads.flatMap((h) => {
+      const s = spanOf(h);
+      return s ? [mondayOf(s.first), mondayOf(s.last)] : [];
+    }),
+  ].sort();
+  const firstWeek = mondays[0] ?? mondayOf(now.toISOString());
+  const thisWeek = mondayOf(now.toISOString());
+  const weeks: string[] = [];
+  for (let w = firstWeek; w <= thisWeek; w = addWeeks(w, 1)) weeks.push(w);
+  const xOf = (monday: string): number => LANE_HEAD_W + weeks.indexOf(monday) * WEEK_W;
+  const plannedX = LANE_HEAD_W + weeks.length * WEEK_W;
+  const top = MONTH_BAND + WEEK_HEADER;
+
+  const laneIds = [...new Set([...heads.map((h) => h.id), ...cards.map(laneOf)])];
+  const startOf = (lane: string): string => {
+    const head = view.index.byId.get(lane);
+    return (head && spanOf(head)?.first) ?? '9999';
+  };
+  laneIds.sort((a, b) => startOf(a).localeCompare(startOf(b)) || a.localeCompare(b));
+
+  const positions = new Map<string, Point2>();
+  const boxes: Box[] = [];
+  let y = top;
+  const perPlannedRow = Math.floor((PLANNED_W - 1) / TIME_CARD);
+  for (const lane of laneIds) {
+    const head = view.index.byId.get(lane);
+    const inLane = cards.filter((c) => laneOf(c) === lane);
+    const byWeek = new Map<string, GraphNode[]>();
+    const planned: GraphNode[] = [];
+    for (const card of inLane) {
+      const d = dateOf(card);
+      if (d && weeks.includes(mondayOf(d))) byWeek.set(mondayOf(d), [...(byWeek.get(mondayOf(d)) ?? []), card]);
+      else planned.push(card);
+    }
+    const perWeekRow = Math.max(1, Math.floor((WEEK_W - 1) / TIME_CARD));
+    const rows = Math.max(1, Math.ceil(planned.length / perPlannedRow), ...[...byWeek.values()].map((cs) => Math.ceil(cs.length / perWeekRow)));
+    const h = Math.max(LANE_MIN_H, SPAN_H + 1 + rows * TIME_CARD + CELL_H + 0.6);
+    const color = head ? view.color(head) : '#6b7280';
+    boxes.push({ id: `lane:${lane}`, kind: 'lane', title: head?.label ?? (lane === 'epic:none' ? 'no epic' : lane), subtitle: `${planned.length} planned`, x: 0, y, w: plannedX + PLANNED_W, h, color });
+    if (head) {
+      positions.set(head.id, [LANE_HEAD_W / 2, y + h / 2 + 0.6]);
+      const span = spanOf(head);
+      if (span) {
+        const from = xOf(mondayOf(span.first));
+        const to = xOf(mondayOf(span.last)) + WEEK_W;
+        boxes.push({ id: `span:${lane}`, kind: 'span', title: '', x: from + 0.3, y: y + 0.5, w: to - from - 0.6, h: SPAN_H, color });
+      }
+      for (const [monday, counts] of Object.entries(cellsOf(head))) {
+        if (!weeks.includes(monday) || (counts.done === 0 && counts.active === 0)) continue;
+        const parts = [counts.done > 0 ? `✓ ${counts.done}` : '', counts.active > 0 ? `● ${counts.active}` : ''].filter(Boolean);
+        boxes.push({ id: `cell:${lane}:${monday}`, kind: 'cell', title: parts.join('  '), x: xOf(monday) + 0.4, y: y + h - CELL_H - 0.3, w: WEEK_W - 0.8, h: CELL_H, color });
+      }
+    }
+    for (const [monday, cs] of byWeek) {
+      cs.forEach((card, i) => positions.set(card.id, [xOf(monday) + TIME_CARD * 0.75 + (i % perWeekRow) * TIME_CARD, y + SPAN_H + 1 + TIME_CARD / 2 + Math.floor(i / perWeekRow) * TIME_CARD]));
+    }
+    planned.forEach((card, i) => positions.set(card.id, [plannedX + TIME_CARD * 0.75 + (i % perPlannedRow) * TIME_CARD, y + SPAN_H + 1 + TIME_CARD / 2 + Math.floor(i / perPlannedRow) * TIME_CARD]));
+    y += h;
+  }
+  // Week columns, month boxes over them, and the Planned column.
+  weeks.forEach((monday) => {
+    boxes.push({ id: `week:${monday}`, kind: 'column', title: weekLabel(monday), subtitle: monday === thisWeek ? 'now' : undefined, x: xOf(monday), y: MONTH_BAND, w: WEEK_W, h: y - MONTH_BAND, color: monday === thisWeek ? '#ff6b4a' : '#8892a6' });
+  });
+  const months = [...new Set(weeks.map((w) => w.slice(0, 7)))];
+  for (const month of months) {
+    const inMonth = weeks.filter((w) => w.startsWith(month));
+    const x = xOf(inMonth[0]!);
+    boxes.push({ id: `month:${month}`, kind: 'month', title: monthLabel(inMonth[0]!), x, y: 0, w: inMonth.length * WEEK_W, h: y, color: '#c0c9d8' });
+  }
+  boxes.push({ id: 'week:planned', kind: 'column', title: 'Planned', subtitle: `${cards.filter((c) => !dateOf(c)).length}`, x: plannedX, y: MONTH_BAND, w: PLANNED_W, h: y - MONTH_BAND, color: '#8892a6' });
+  return centred(positions, boxes, []);
+}
+
 /** The ids a scenario passes through, in the order they first appear. */
 export function participants(scenario: Scenario): string[] {
   return [...new Set(scenario.steps.flatMap((s) => [s.from, s.to]))];
@@ -214,5 +329,6 @@ export async function arrange(spec: ArrangeSpec, view: View, nodes: readonly Gra
     case 'plots': return plots(spec, view, nodes, keep);
     case 'board': return board(spec, view, nodes);
     case 'sequence': return sequence(view, scenario);
+    case 'timeline': return timeline(spec, view, nodes, new Date());
   }
 }

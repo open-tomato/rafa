@@ -390,6 +390,14 @@ export const RAFA_CONFIG: SoretesConfig = {
       arrange: { kind: 'plots', rows: 'columns', rowShape: { text: 'name', tag: 'key' }, routed: ['references'], direction: 'DOWN' },
       labels: { table: 'none' },
     },
+    roadmap: {
+      title: 'Roadmap', icon: '📅',
+      description: 'Time left to right: a column per week under month boxes, one lane per epic. A bar marks the weeks an epic was worked on, ✓ counts its issues merged that week; open issues with no dated work wait in Planned.',
+      types: ['epic', 'issue'],
+      arrange: { kind: 'timeline', date: 'activity.last', lane: 'group', laneHeads: ['epic'], cells: 'weeks', span: 'span' },
+      relations: { member: 'hidden', targets: 'hidden', scopes: 'hidden' },
+      labels: { issue: 'none', epic: 'none' },
+    },
     board: {
       title: 'Board', icon: '🗂️',
       description: 'A kanban: open issues and bugs in columns by status, one lane per epic with the epic at its head. Bugs with no epic share the last lane.',

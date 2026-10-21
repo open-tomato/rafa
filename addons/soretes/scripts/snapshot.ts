@@ -12,6 +12,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 import type { EdgeKind, FindingRef, GraphEdge, NodeStats, RafaNode, Snapshot } from '../src/types.ts';
 import { boardGraph } from './board.ts';
+import { issueDates } from './dates.ts';
 import { schemaGraph } from './schema.ts';
 
 const REPO_ROOT = resolve(import.meta.dir, '../../..');
@@ -262,6 +263,7 @@ export function buildSnapshot(storePath = mainCheckoutStore()): Snapshot {
   const planStubs = (db.query('select distinct plan_stub as p from task_reports where plan_stub is not null').all() as { p: string }[]).map((r) => r.p);
   const reportsByPlan = new Map((db.query('select plan_stub as p, count(*) as n from task_reports where plan_stub is not null group by plan_stub').all() as { p: string; n: number }[]).map((r) => [r.p, r.n]));
   const schema = schemaGraph(db);
+  const datesByIssue = issueDates(db, REPO_ROOT);
   const bugOutcomes = db.query('select coalesce(outcome, \'\') as outcome, security from out_of_scope_bugs').all() as { outcome: string; security: number }[];
   db.close();
 
@@ -368,7 +370,7 @@ export function buildSnapshot(storePath = mainCheckoutStore()): Snapshot {
     return { source, target, kind: kind as EdgeKind, weight };
   });
   const rootManifest = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as { name: string; version: string };
-  const board = boardGraph(join(mainCheckout(), '.rafa/cache/board.json'), moduleNodes, edges.filter((e) => e.kind === 'imports'), reportsByPlan);
+  const board = boardGraph(join(mainCheckout(), '.rafa/cache/board.json'), moduleNodes, edges.filter((e) => e.kind === 'imports'), reportsByPlan, datesByIssue);
   // The QA lens's fog: bugs the store names plus open board bugs labelled for the module.
   const withBugLoad = moduleNodes.map((m) => {
     const openBugs = board?.openBugsByModule.get(m.id) ?? 0;

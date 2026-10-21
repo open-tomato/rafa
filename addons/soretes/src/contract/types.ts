@@ -248,6 +248,9 @@ export interface WellSpec {
  *   board     a kanban grid: columns by a status field, swim lanes by a group,
  *             the lane's holder at the start of its row
  *   sequence  the scenario's participants on one line, a request replayed between them
+ *   timeline  a roadmap: one column per week under month boxes, one lane per group;
+ *             cards stand in the week of their `date`, undated ones in a Planned column,
+ *             and each lane head's `cells` (week → done/active) and `span` mark its weeks
  */
 export type ArrangeSpec =
   | {
@@ -266,7 +269,15 @@ export type ArrangeSpec =
     /** Node types that head a lane; a lane with no head gets a plain title. */
     readonly laneHeads: readonly string[];
   }
-  | { readonly kind: 'sequence' };
+  | { readonly kind: 'sequence' }
+  | {
+    readonly kind: 'timeline';
+    readonly date: Binding;
+    readonly lane: Binding;
+    readonly laneHeads: readonly string[];
+    readonly cells?: Binding;
+    readonly span?: Binding;
+  };
 
 /**
  * A lens: the same nodes for a different eye. It never changes a node, only

@@ -9,6 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import type { GraphEdge, GraphNode, RafaNode } from '../src/types.ts';
+import { weekOf, type IssueDates } from './dates.ts';
 
 interface BoardRow {
   readonly number: number;
@@ -44,7 +45,7 @@ export interface BoardGraph {
   readonly openIssues: number;
 }
 
-export function boardGraph(path: string, modules: readonly RafaNode[], importEdges: readonly GraphEdge[], reportsByPlan: ReadonlyMap<string, number>): BoardGraph | null {
+export function boardGraph(path: string, modules: readonly RafaNode[], importEdges: readonly GraphEdge[], reportsByPlan: ReadonlyMap<string, number>, dates: ReadonlyMap<number, IssueDates>): BoardGraph | null {
   if (!existsSync(path)) return null;
   const rows = (JSON.parse(readFileSync(path, 'utf8')) as { rows: BoardRow[] }).rows;
   const moduleIds = new Set(modules.map((m) => m.id));
@@ -71,6 +72,19 @@ export function boardGraph(path: string, modules: readonly RafaNode[], importEdg
     const has = (r: BoardRow, label: string): boolean => labelsOf(r).includes(label);
     const touched = new Set(all.flatMap(modulesOf));
     const members = open.map((r) => `issue:${r.number}`);
+    // Per week: members merged (done) and open members worked on (active), for the roadmap's cells.
+    const weeks: Record<string, { done: number; active: number }> = {};
+    const tally = (iso: string | undefined, key: 'done' | 'active'): void => {
+      if (!iso) return;
+      const w = weekOf(iso);
+      weeks[w] = { done: weeks[w]?.done ?? 0, active: weeks[w]?.active ?? 0, [key]: (weeks[w]?.[key] ?? 0) + 1 };
+    };
+    for (const r of all) {
+      const d = dates.get(r.number);
+      if (r.state === 'CLOSED') tally(d?.done ?? d?.last, 'done');
+      else tally(d?.last, 'active');
+    }
+    const spanDates = all.flatMap((r) => [dates.get(r.number)?.first, dates.get(r.number)?.done ?? dates.get(r.number)?.last]).filter((d): d is string => !!d).sort();
     nodes.push({
       id,
       label: slug,
@@ -97,6 +111,8 @@ export function boardGraph(path: string, modules: readonly RafaNode[], importEdg
       blast: callersOf(touched),
       moduleBugs: modules.filter((m) => touched.has(m.id)).reduce((acc, m) => acc + m.stats.bugs, 0),
       plansRun: all.filter((r) => plansOf(r.number).length > 0).length,
+      weeks,
+      span: spanDates.length > 0 ? { first: spanDates[0], last: spanDates[spanDates.length - 1] } : null,
     });
     for (const m of touched) edges.push({ source: id, target: m, kind: 'scopes', weight: all.filter((r) => modulesOf(r).includes(m)).length });
     for (const row of open) {
@@ -121,6 +137,7 @@ export function boardGraph(path: string, modules: readonly RafaNode[], importEdg
         modules: targets,
         plans,
         reports: plans.reduce((acc, p) => acc + (reportsByPlan.get(p) ?? 0), 0),
+        activity: dates.get(row.number) ?? null,
       });
       edges.push({ source: id, target: issueId, kind: 'member', weight: 1 });
       for (const m of targets) edges.push({ source: issueId, target: m, kind: 'targets', weight: 1 });

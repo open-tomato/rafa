@@ -213,3 +213,9 @@ section { margin-bottom: 18px; }
 .region-band .chip-inline { font-size: 0.85em; background: rgba(0, 0, 0, 0.32); border-radius: 0.6em; padding: 0 0.45em; }
 .combo-title { opacity: 0.85; }
 .explode-hint { text-anchor: middle; fill: var(--muted); font-size: 12px; }
+.plot-box.month { background: transparent; border: 0; border-left: 1px solid var(--line); border-radius: 0; }
+.plot-box.month header { background: transparent; border: 0; padding: 0.25em 0.6em; font-size: 1.2em; }
+.plot-box.cell { border-radius: 0.4em; background: color-mix(in srgb, var(--tint) 22%, transparent); display: flex; align-items: center; justify-content: center; }
+.plot-box.cell header { background: transparent; border: 0; padding: 0; justify-content: center; }
+.plot-box.span { border: 0; border-radius: 1em; background: color-mix(in srgb, var(--tint) 70%, transparent); }
+.plot-box.column header span { color: var(--accent); }

@@ -12,7 +12,8 @@ cd addons/soretes && bun install && bun run dev
 
 Open the printed URL. `bun run snapshot` rebuilds `data/snapshot.json` from
 the source tree, the main checkout's effort store (read-only; `--store
-<path>` names another) and its board cache. The snapshot holds store and
+<path>` names another), its board cache, and the repo's git log (the
+roadmap's dates: task reports per plan, and `rafa-<n>:` merge commits). The snapshot holds store and
 board text, so `data/` is gitignored and never committed. URL parameters:
 `?dataset=rafa|services`, `?lens=<id>`, `?node=<id>`, and `?timerloop`,
 which drives frames from a timer for checking animations in a background tab.
@@ -76,6 +77,7 @@ fixed 2D layout:
 | Architecture | `plots`: one box per package, imports routed at right angles (elkjs) |
 | Schema | `plots` with `rows`: the effort store's tables as an ERM |
 | Board | `board`: status columns, one lane per epic |
+| Roadmap | `timeline`: a column per week under month boxes, one lane per epic; a bar for its worked weeks, ✓ for merges, open work in Planned |
 | Time warp | `sequence` (services demo): a use case replayed request by request, forks included |
 
 ## Known quirks, for the follow-up
