@@ -600,7 +600,7 @@ names come from, and the facade entry is no node.
     Board has the same two as effort. Release has the same two.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
-  that import effort or inventory by path stay on their paths in pass 3. The
+  that import a rewired package by path stay on their paths in pass 3. The
   rewire guard, `scripts/survey/facade-rewire.sweep.test.ts`, holds each
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
