@@ -75,17 +75,18 @@
  * Every process goes through {@link ItemMergeSeams}, so no test runs
  * `rafa`, reaches GitHub or sleeps.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BranchRun } from '../../ci/runs.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Tracker } from '@open-tomato/rafa/ports';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
+
+import { closedIssuesIn } from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';

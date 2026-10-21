@@ -67,9 +67,9 @@
  * none, and a failure is never shown as a green run, a zero count or
  * none filed.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { CiStatusReading } from '../ci/status-reading.js';
 import type { FiledIssue, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 

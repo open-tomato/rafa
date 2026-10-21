@@ -45,9 +45,9 @@
  * {@link ReleaseWorkflowsResult}: the level, the rows, and with `--write`
  * the part each write answered.
  */
-import type { BoardPart } from '../../board/setup.js';
 import type { LadderLevelReading, LadderWorkflow, LadderWorkflowReading } from '../../release/ladder.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { BoardPart } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

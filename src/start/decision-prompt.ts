@@ -69,7 +69,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { fenceFor } from '../epic/verify-plan.js';
+import { fenceFor } from '@open-tomato/rafa-board';
 
 /** This module's own directory, where the bundled lookup starts. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));

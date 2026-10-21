@@ -216,14 +216,12 @@
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
-import type { GhRunner } from './adapters/tracker/github.js';
-import type { EpicContext } from './board/epic-context.js';
-import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';
+import type { EpicContext, GhRunner, ResolvedSpec } from '@open-tomato/rafa-board';
 import type { TierSettings } from '@open-tomato/rafa-inventory';
 
 import fs from 'fs';
@@ -231,6 +229,12 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import {
+  checkCreateRefs,
+  createGhRunner,
+  readEpicContext,
+  readGateFlags,
+} from '@open-tomato/rafa-board';
 import { DEFAULT_ROUTING, renderSkillIndex } from '@open-tomato/rafa-inventory';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
@@ -242,14 +246,10 @@ import { planStubFromPath } from '@open-tomato/rafa/core/plan';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
 import { planFilePath } from './adapters/planner/claude.js';
-import { createGhRunner } from './adapters/tracker/github.js';
-import { readEpicContext } from './board/epic-context.js';
-import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
 import { notePlanBundledEdits } from './commands/plan/bundled-check.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
-import { checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';

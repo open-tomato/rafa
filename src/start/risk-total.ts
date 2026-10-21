@@ -25,10 +25,11 @@ import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 
+import { createGhRunner } from '@open-tomato/rafa-board';
+
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
 import { assessPlanRisk, riskTotalLine } from '../plan/risk.js';
 
 /** What the reading is taken over. */

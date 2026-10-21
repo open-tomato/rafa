@@ -55,12 +55,13 @@ import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { createGhRunner } from '@open-tomato/rafa-board';
+
 import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isFile, plural } from '@open-tomato/rafa/core/plan';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
 import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 

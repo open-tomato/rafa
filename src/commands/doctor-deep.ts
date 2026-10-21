@@ -61,13 +61,13 @@
  */
 import type { EnvDifference, EnvLayer, PathDifference, SessionEnvReading } from './doctor-deep-env.js';
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
 import type { NeedsSeams, NeedsWarning } from '../plan/needs.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { GhRunner, GhRunnerOptions } from '@open-tomato/rafa-board';
 
 import { pathDirectories } from '@open-tomato/rafa-inventory';
 

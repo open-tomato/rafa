@@ -51,17 +51,12 @@
  * in `./doctor-relations.test.ts` drives a recorded fake runner, so none
  * of them reaches GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { RelationsReading } from '../board/relations/port.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardListing, GhRunner, RelationsReading } from '@open-tomato/rafa-board';
+
+import { NATIVE_MODE, readBoardRepository, selectBoardRelations } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { selectBoardRelations } from '../board/relations/select.js';
-import { readBoardRepository } from '../board/repository.js';
-
-import { NATIVE_MODE } from './epic/move-native.js';
 
 /** The heading the relationship lines sit under. */
 export const RELATIONS_HEADING = 'Relationships:';

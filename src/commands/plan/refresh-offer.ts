@@ -41,12 +41,12 @@
  * so every case in `./refresh-offer.test.ts` drives a fake and none of
  * them reads standard input or waits on an answer.
  */
-import type { RefreshOffer, RefreshOfferRequest } from '../../board/snapshot-settle.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { RefreshOffer, RefreshOfferRequest } from '@open-tomato/rafa-board';
+
+import { refreshQuestion } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
-
-import { refreshQuestion } from '../../board/snapshot-settle.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface RefreshOfferSeams {

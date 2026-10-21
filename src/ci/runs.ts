@@ -60,7 +60,7 @@
  * set of conclusions is wider and what each one means is the caller's
  * decision.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 

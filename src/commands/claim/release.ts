@@ -85,13 +85,13 @@
  * default `feat/{stub}` when left out; a release passes its seams'
  * `branchTemplate`.
  */
-import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueBoard } from '@open-tomato/rafa-board';
 
 import { expectOneArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';

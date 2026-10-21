@@ -62,16 +62,19 @@
  * changes the exit code. Every case in `./doctor-epics.test.ts` drives a
  * recorded fake runner, so none of them reaches GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { EpicProblem } from '../board/epic-problems.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardListing, EpicProblem, GhRunner } from '@open-tomato/rafa-board';
+
+import {
+  BOARD_LISTING_LIMIT,
+  EPIC_LABEL_PREFIX,
+  createGhBoardListing,
+  epicProblemMessage,
+  epicSlugsOf,
+  readEpicProblems,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js';
-import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
-import { BOARD_LISTING_LIMIT, createGhBoardListing } from '../board/roadmap-board.js';
 
 /** The heading the epic label lines sit under, as `Blocked issues:` heads its own. */
 export const EPICS_HEADING = 'Epic labels:';

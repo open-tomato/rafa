@@ -72,25 +72,25 @@
  * a {@link DocsPlanResult}.
  */
 import type { OpenStaleDocLine } from '../../docs/open-lines.js';
-import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { IssueSeams } from '@open-tomato/rafa-board';
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { DEFAULT_ISSUE_SEAMS, resolveTracker } from '@open-tomato/rafa-board';
 
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plansDirAt , isStampableStub, planStampLine , escapeBlockerText } from '@open-tomato/rafa/core/plan';
 
-import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { readOpenStaleDocLines } from '../../docs/open-lines.js';
 import { DOC_UPDATE_TASK_PREFIX, DOC_UPDATE_TITLE } from '../../docs/release-issue.js';
-import { DEFAULT_ISSUE_SEAMS } from '../issue/issue-tracker.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa docs plan';
