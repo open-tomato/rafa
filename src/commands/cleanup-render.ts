@@ -92,8 +92,9 @@ import type {
   WorktreeRow,
 } from '../cleanup/index.js';
 
+import { shellQuote } from '@open-tomato/rafa-pr';
+
 import { cleanupCounts } from '../cleanup/index.js';
-import { shellQuote } from '../pr/preflight-items.js';
 
 /** The six group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES: Readonly<{

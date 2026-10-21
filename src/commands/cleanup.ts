@@ -114,10 +114,12 @@ import type {
 } from '../cleanup/index.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { PullRequests } from '../pr/types.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { PullRequests } from '@open-tomato/rafa-pr';
+
+import { ghPullRequestsIn, resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
@@ -132,7 +134,6 @@ import {
 } from '../cleanup/index.js';
 import { multiSelect } from '../cli/prompt/multi-select.js';
 import { processTerminal } from '../cli/prompt/terminal.js';
-import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import {
   branchRowLine,

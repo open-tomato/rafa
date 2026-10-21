@@ -85,14 +85,21 @@
  * GitHub.
  */
 import type { StretchRecord } from './start.js';
-import type { MergedPullRequest } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
-import type { PrSeams } from '../pr/pr-context.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { MergedPullRequest, PrSeams } from '@open-tomato/rafa-pr';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+
+import {
+  DEFAULT_BASE_BRANCH,
+  DEFAULT_PR_SEAMS,
+  onProvider,
+  openPrContext,
+  readRemoteHead,
+} from '@open-tomato/rafa-pr';
 
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -100,13 +107,10 @@ import { configFilePath } from '@open-tomato/rafa/core/config';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
-import { DEFAULT_PR_SEAMS, onProvider, openPrContext } from '../pr/pr-context.js';
 
 import { stretchOfBase } from './item.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX, stretchBranch, stretchRecordPath } from './start.js';

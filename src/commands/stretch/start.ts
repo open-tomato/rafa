@@ -95,6 +95,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { lineRefusal, readChoiceFlag, readTextFlag } from '@open-tomato/rafa-board';
+import { DEFAULT_BASE_BRANCH, readRemoteHead } from '@open-tomato/rafa-pr';
 
 import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -103,9 +104,7 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 
-import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import {
   agentFilePath,
   defaultSeams,
