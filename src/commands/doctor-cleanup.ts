@@ -46,13 +46,13 @@
  * result's `cleanup`. Neither changes `doctor`'s exit code, and nothing
  * here deletes, prints or writes anything.
  */
-import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { DoctorCleanupInput } from '../cleanup/settings.js';
 import type { PullRequests } from '@open-tomato/rafa-pr';
+import type { CleanupCounts, CleanupSeams } from '@open-tomato/rafa-run';
 
 import { createGhPullRequests } from '@open-tomato/rafa-pr';
+import { cleanupCounts, defaultCleanupSeams, readCleanup } from '@open-tomato/rafa-run';
 
-import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 
 /** The command the row points at. */

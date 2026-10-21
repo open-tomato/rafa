@@ -39,15 +39,22 @@
  * The seams name no reading of the live loops, so the install reads the
  * session records under the checkout (`packages/rafa/src/runtime/live-loops.ts`).
  */
-import type { InstallOptions, InstallSeams } from '../src/runtime/install.js';
+import type { InstallOptions, InstallSeams } from '@open-tomato/rafa-run';
 
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
+import {
+  EXIT_COULD_NOT_RUN,
+  FORCE_FLAG,
+  exitCodeFor,
+  installRuntime,
+  outcomeProblem,
+  runBuild,
+} from '@open-tomato/rafa-run';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readBinPath } from '@open-tomato/rafa/project/bin-path';
-
-import { EXIT_COULD_NOT_RUN, exitCodeFor, FORCE_FLAG, installRuntime, outcomeProblem, runBuild } from '../src/runtime/install.js';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[snapshot]';

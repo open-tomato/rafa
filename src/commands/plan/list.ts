@@ -48,8 +48,10 @@
  * The command declares no argument and the one flag `open`, and refuses
  * a line handing it an argument with exit code 1.
  */
-import type { PlanList, PlanListing } from '../../plan/list.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PlanList, PlanListing } from '@open-tomato/rafa-run';
+
+import { listPlans } from '@open-tomato/rafa-run';
 
 import {
   expectNoArgument,
@@ -58,8 +60,6 @@ import {
   resolvePlansDir,
 } from '@open-tomato/rafa/commands/plan/plan-files';
 import { formatCounts, plural } from '@open-tomato/rafa/core/plan';
-
-import { listPlans } from '../../plan/list.js';
 
 /** The usage line a refusal names, which is also how a refusal names the command. */
 const USAGE = 'rafa plan list';

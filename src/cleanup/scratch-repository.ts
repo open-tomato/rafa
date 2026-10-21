@@ -98,9 +98,9 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-run';
 
-import { ADMIN_FILES, GIT_DIR } from './worktrees.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 /** The moment every commit is dated, except `stale`'s. */
 export const SCRATCH_NOW: Date = new Date('2026-09-24T12:00:00Z');

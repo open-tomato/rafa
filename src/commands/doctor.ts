@@ -258,9 +258,6 @@ import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorProjectReading } from './doctor-project.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { PreflightCheck } from '../plan/index.js';
-import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
-import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
@@ -271,6 +268,14 @@ import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
 import type { AccountSeams, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
+import type {
+  PreflightCheck,
+  PreflightItems,
+  PreflightOptions,
+  PreflightReport,
+  PreflightTiers,
+  PrerequisiteReminder,
+} from '@open-tomato/rafa-run';
 
 import { basename, resolve } from 'node:path';
 
@@ -282,23 +287,23 @@ import {
 } from '@open-tomato/rafa-board';
 import { readDoctorEffortSync } from '@open-tomato/rafa-effort';
 import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
+import {
+  DEFAULT_PLAN_FILE,
+  announceRiskTotal,
+  isFirstDispatch,
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  mergePlanPrerequisites,
+  prerequisitesPathForPlan,
+  resolvePlanPath,
+  runPreflight,
+} from '@open-tomato/rafa-run';
 
 import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
-
-import { isFirstDispatch } from '../preflight/first-dispatch.js';
-import {
-  loadPlanPrerequisites,
-  malformedPrerequisiteLines,
-  mergePlanPrerequisites,
-  prerequisitesPathForPlan,
-} from '../preflight/prerequisites-md.js';
-import { runPreflight } from '../preflight/run.js';
-import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
-import { announceRiskTotal } from '../start/risk-total.js';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';

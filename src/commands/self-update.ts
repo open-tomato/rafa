@@ -106,11 +106,13 @@
  * Whether a record's pid is alive is its `isAlive`, `isPidAlive` when left
  * out, so a case plants a live loop without a process of its own.
  */
-import type { BuildLines } from '../runtime/install.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { BuildLines } from '@open-tomato/rafa-run';
+
+import { exitCodeFor, installRuntime, outcomeProblem, runBuild } from '@open-tomato/rafa-run';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -121,7 +123,6 @@ import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 import { liveLoopsOf } from '@open-tomato/rafa/runtime/live-loops';
 
 import { SETTINGS } from '../config-registry.js';
-import { exitCodeFor, installRuntime, outcomeProblem, runBuild } from '../runtime/install.js';
 
 /** How the build runs; see the module note. */
 export interface SelfUpdateSeams {

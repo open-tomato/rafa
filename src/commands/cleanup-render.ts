@@ -85,15 +85,15 @@ import type {
   MergedBy,
   MergedRow,
   NotPushedRow,
+  RemoteOnlyRow,
+  RunRow,
   StaleRow,
-} from '../cleanup/index.js';
-import type { RemoteOnlyRow } from '../cleanup/remote-only.js';
-import type { RunRow } from '../cleanup/runs.js';
-import type { WorktreeBlockKind, WorktreeRow } from '../cleanup/worktrees.js';
+  WorktreeBlockKind,
+  WorktreeRow,
+} from '@open-tomato/rafa-run';
 
 import { shellQuote } from '@open-tomato/rafa-pr';
-
-import { cleanupCounts } from '../cleanup/index.js';
+import { cleanupCounts } from '@open-tomato/rafa-run';
 
 /** The six group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES: Readonly<{

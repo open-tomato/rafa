@@ -162,11 +162,7 @@ import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
 import type { ClaimBranches, ClaimLabels, ClaimsReading } from './claims.js';
 import type { EpicView, PlaceView } from './place-line.js';
 import type { WaitingReading, WaitingSources } from './waiting.js';
-import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
-import type { WorktreeRow } from '../cleanup/worktrees.js';
 import type { BlockedTask } from '../loop/blocked-tasks.js';
-import type { NextBoard, NextRoadmapReading, NextSources, OpenPull, PickedLine } from '../next/readings.js';
-import type { PlanListing } from '../plan/list.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { Place } from '@open-tomato/rafa/project/position';
@@ -186,6 +182,17 @@ import type {
   PrProviderReading,
   PullRequests,
 } from '@open-tomato/rafa-pr';
+import type {
+  CleanupCounts,
+  CleanupSeams,
+  NextBoard,
+  NextRoadmapReading,
+  NextSources,
+  OpenPull,
+  PickedLine,
+  PlanListing,
+  WorktreeRow,
+} from '@open-tomato/rafa-run';
 
 import { existsSync } from 'node:fs';
 
@@ -206,6 +213,15 @@ import {
   nextOwnerGate,
   resolvePrProvider,
 } from '@open-tomato/rafa-pr';
+import {
+  cleanupCounts,
+  defaultCleanupSeams,
+  readBranch,
+  readBranchPlan,
+  readCleanup,
+  readOpenPull,
+  readPlans,
+} from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
@@ -213,10 +229,8 @@ import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readin
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
 
-import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 
 import { readBlockedCount } from './blocked-count.js';
 import { readClaimBranches, readClaims } from './claims.js';

@@ -32,9 +32,9 @@
  * Nothing here runs git, reads the disk, prints or writes: the one
  * function answers a new settings object from what it is handed.
  */
-import type { CleanupSettings } from './index.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GhRunner } from '@open-tomato/rafa-board';
+import type { CleanupSettings } from '@open-tomato/rafa-run';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
