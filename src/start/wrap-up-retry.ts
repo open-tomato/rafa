@@ -63,10 +63,10 @@
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
-import type { ReleasePreparation } from '../release/prepare.js';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory';
+import type { ReleasePreparation } from '@open-tomato/rafa-release';
 
 import { buildWrapUpPrompt, runWrapUpSession } from './wrap-up.js';
 

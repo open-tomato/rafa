@@ -189,8 +189,8 @@ import type { TriageAssessment } from '../../pr/triage/classify.js';
 import type { TriageBlock } from '../../pr/triage/comment.js';
 import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
-import type { SettleSettings } from '../../release/settle.js';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { SettleSettings } from '@open-tomato/rafa-release';
 
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

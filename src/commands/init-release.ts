@@ -73,22 +73,22 @@
  * is the project config under the root it is handed, which every case
  * in `./init-release.test.ts` points at its own temporary directory.
  */
-import type { ReleaseFileSettings } from '../release/enabled.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { ReleaseEnabled } from '@open-tomato/rafa/core/config/sections';
+import type { ReleaseFileSettings } from '@open-tomato/rafa-release';
 
 import { writeFileSync } from 'node:fs';
 
+import {
+  RELEASE_ENABLED_SETTING,
+  readReleaseSetting,
+  releaseEnabledIn,
+  resolveReleaseEnabled,
+  withReleaseEnabled,
+} from '@open-tomato/rafa-release';
+
 import { CONFIG_FILE, configFilePath } from '@open-tomato/rafa/core/config';
 import { describeValue, messageOf, RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
-
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import {
-  readReleaseSetting,
-  RELEASE_ENABLED_SETTING,
-  releaseEnabledIn,
-  withReleaseEnabled,
-} from '../release/setting.js';
 
 /** The answers that mean no to the question, which is spelled `[Y/n]`. */
 const NO_ANSWERS: readonly string[] = ['n', 'no'];

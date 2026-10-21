@@ -548,8 +548,9 @@ names come from, and the facade entry is no node.
   moves its line there. Pass 2 added the package's folder to `CUT_RULES`
   with its facade, and at its move (pass 4) the facade becomes the package's
   own `index`. Pass 2 moved no file under `src/` and changed no importer.
-- **The rewire moves effort's, inventory's and board's importers onto their
-  facades and keeps the files each one's groups name on their paths.**
+- **The rewire moves effort's, inventory's, board's and release's importers
+  onto their facades and keeps the files each one's groups name on their
+  paths.**
   `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>` `[--dry-run]`
   takes each importer of a feature package that can take it by name and
   rewrites it to import `@open-tomato/rafa-<name>`.
@@ -576,6 +577,11 @@ names come from, and the facade entry is no node.
     `src/effort/epic-cost.ts` is among them, though it is an effort file that
     imports board, because the load-cycle group comes first. Its edge to board
     is the back edge the decouple step before pass 4 cuts with inventory's two.
+    Release has two: `src/board/project/facts.ts` and
+    `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
+    though it is a board file that imports release, because the load-cycle
+    group comes first; its edge to release is a back edge the decouple step
+    before pass 4 cuts.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
@@ -584,25 +590,29 @@ names come from, and the facade entry is no node.
     inventory in the move order, so they import it backwards, and the decouple
     step before pass 4 cuts them. Board has none in the codemod's grouping,
     because its one effort importer, `src/effort/epic-cost.ts`, is taken first
-    by the load-cycle group.
+    by the load-cycle group. Release has none in the codemod's grouping,
+    because its one board importer, `src/board/project/facts.ts`, is taken
+    first by the load-cycle group.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. Effort has two:
     `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
-    Board has the same two as effort.
+    Board has the same two as effort. Release has the same two.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
-  that import effort or inventory by path stay on their paths in pass 3. The
+  that import a rewired package by path stay on their paths in pass 3. The
   rewire guard, `scripts/survey/facade-rewire.sweep.test.ts`, holds each
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight, inventory's seven and board's 48, and a planted
-  control reds on one relative import. Board's row adds a fourth group the
-  codemod does not print, `libraryChunks`: 21 files a library entry reaches
-  statically, put back on their paths after the rewire, since through the
-  facade that graph reaches board's lazy command modules and the splitting
-  build writes each as a chunk of its own. The published-types case in
+  files, effort's eight, inventory's seven, board's 48 and release's twelve,
+  and a planted control reds on one relative import. Board's row adds a
+  fourth group the codemod does not print, `libraryChunks`: 21 files a library
+  entry reaches statically, and release's row has eight, put back on their
+  paths after the rewire, since through the facade that graph reaches the
+  package's lazy command modules (`RELEASE_FEATURE` re-exports
+  `src/commands/release/index.ts`) and the splitting build writes each as a
+  chunk of its own. The published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
   `-release`, `-pr` or `-run`, with a planted-text control.
@@ -610,7 +620,8 @@ names come from, and the facade entry is no node.
   A binding taken through a re-exporting module of the package, such as
   `src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
   refused by the codemod and is pointed at its origin file by hand before the
-  run: pass 3a did that three times, inventory's rewire six, and board's eight.
+  run: pass 3a did that three times, inventory's rewire six, and board's eight;
+  release's rewire refused no statement.
   A file whose stem names a fake is read as a test by the codemod and the
   guard, so the three fakes `src/ci/runs-fake.ts`, `src/pr/gh-fake.ts` and
   `src/pr/gh-fake-shapes.ts` keep their paths until pass 4.

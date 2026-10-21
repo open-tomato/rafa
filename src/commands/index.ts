@@ -14,10 +14,10 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name: `board` (the `issue`, `board` and `epic` subjects) from its
- * package's facade, `@open-tomato/rafa-board`, with its three subjects,
- * and `pr`, `run` (the `claim` subject) and `release` from the
- * `index.ts` of their folder.
+ * name: `board` (the `issue`, `board` and `epic` subjects) and `release`
+ * from their packages' facades, `@open-tomato/rafa-board` with its three
+ * subjects and `@open-tomato/rafa-release` with its one, and `pr` and
+ * `run` (the `claim` subject) from the `index.ts` of their folder.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -470,6 +470,7 @@ import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
+import { RELEASE_FEATURE, RELEASE_SUBJECT } from '@open-tomato/rafa-release';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
@@ -522,8 +523,6 @@ import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
 import { PR_SUBJECT } from './pr/declarations.js';
 import { PR_FEATURE } from './pr/index.js';
-import { RELEASE_SUBJECT } from './release/declarations.js';
-import { RELEASE_FEATURE } from './release/index.js';
 import roadmap from './roadmap.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';

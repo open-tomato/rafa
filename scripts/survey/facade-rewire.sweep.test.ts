@@ -44,6 +44,12 @@ interface RewiredRow {
  * through the facade that graph would reach board's lazy command modules, so
  * the splitting build would write each as a chunk of its own (one of them
  * rewired alone writes 58 more chunks than the build at `c920603`).
+ * Release's one board importer, `src/board/project/facts.ts`, is a back edge
+ * the load-cycle group takes first, and its two declaration-graph files are
+ * effort's two. Its eight library-chunk files are reached statically from a
+ * library entry, and through the facade that graph would reach release's lazy
+ * command modules (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`),
+ * one of them rewired alone writing 95 more chunks than the build at `c920603`.
  */
 const REWIRED: readonly RewiredRow[] = [
   {
@@ -123,6 +129,23 @@ const REWIRED: readonly RewiredRow[] = [
       'src/triage/triage.ts': 'loadCycle',
     },
     packageName: 'rafa-board',
+  },
+  {
+    allowed: {
+      'src/board/project/facts.ts': 'loadCycle',
+      'src/cleanup/groups.ts': 'libraryChunks',
+      'src/config-registry.ts': 'declarationGraph',
+      'src/config/shape.ts': 'declarationGraph',
+      'src/docs/release-issue.ts': 'loadCycle',
+      'src/next/settle-step.ts': 'libraryChunks',
+      'src/next/sources.ts': 'libraryChunks',
+      'src/pr/settle-waiting.ts': 'libraryChunks',
+      'src/start/release-body.ts': 'libraryChunks',
+      'src/start/release-stage.ts': 'libraryChunks',
+      'src/start/runner-pr.ts': 'libraryChunks',
+      'src/start/stale-docs.ts': 'libraryChunks',
+    },
+    packageName: 'rafa-release',
   },
 ];
 

@@ -29,8 +29,8 @@
  * about.
  */
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
-import type { SettleSettings } from '../../release/settle.js';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { SettleSettings } from '@open-tomato/rafa-release';
 
 import { conversionLines, convertStampedVersion } from '../../pr/triage/version-convert.js';
 import { pushResolved } from '../../pr/worktree.js';

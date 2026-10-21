@@ -50,12 +50,15 @@
  * (`resolveReleaseEnabled`), since no body there carries a forecast.
  */
 import type { GitRunner } from '../../pr/index.js';
-import type { ForecastBasis } from '../../release/forecast.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ForecastBasis } from '@open-tomato/rafa-release';
 
-import { forecastMoved, readBodyForecast } from '../../release/body-forecast.js';
-import { RELEASE_REMOTE } from '../../release/version.js';
-import { readWaiting } from '../release/status-fragments.js';
+import {
+  RELEASE_REMOTE,
+  forecastMoved,
+  readBodyForecast,
+  readWaiting,
+} from '@open-tomato/rafa-release';
 
 import { SEPARATOR } from './current.js';
 
