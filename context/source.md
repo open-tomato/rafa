@@ -628,10 +628,11 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight, inventory's seven, board's 48, release's twelve and
-  pr's seventy, and a planted control reds on one relative import. Board's,
-  release's and pr's rows add a fourth group the codemod does not print,
-  `libraryChunks`: board's row has 21 such files, release's eight and pr's 33,
+  files, effort's eight, inventory's seven, board's 48, release's twelve,
+  pr's seventy and run's forty, and a planted control reds on one relative
+  import. Board's, release's, pr's and run's rows add a fourth group the
+  codemod does not print, `libraryChunks`: board's row has 21 such files,
+  release's eight, pr's 33 and run's six,
   files a library entry reaches statically and that stay on their paths after
   the rewire, since through the facade that graph reaches the package's lazy
   command modules (`RELEASE_FEATURE` re-exports

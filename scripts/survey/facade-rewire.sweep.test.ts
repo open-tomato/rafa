@@ -59,6 +59,15 @@ interface RewiredRow {
  * would reach pr's lazy command modules (`PR_FEATURE` re-exports
  * `src/commands/pr/index.ts`), one of them rewired alone writing 127 more
  * chunks than the build at `c920603`.
+ * Run's 15 load-cycle files are board, pr and release files run's files
+ * reach, every one a back edge the load-cycle group takes first, since run
+ * moves last. Its 17 back-edge files are board, pr, effort and inventory
+ * files, every one earlier in the move order, and its two declaration-graph
+ * files are effort's two. Its six library-chunk files are the library entry
+ * `src/index.ts` and the five files it reaches statically, through which
+ * the facade would reach run's lazy command modules (`RUN_FEATURE`
+ * re-exports `src/commands/claim/index.ts`), one of them rewired alone
+ * writing 133 more chunks than the build at `c920603`.
  */
 const REWIRED: readonly RewiredRow[] = [
   {
@@ -230,6 +239,51 @@ const REWIRED: readonly RewiredRow[] = [
       'src/start/wrap-up.ts': 'libraryChunks',
     },
     packageName: 'rafa-pr',
+  },
+  {
+    allowed: {
+      'src/board/gate.ts': 'loadCycle',
+      'src/board/issue-edit-state.ts': 'backEdge',
+      'src/board/project/rules.ts': 'loadCycle',
+      'src/board/roadmap-claims.ts': 'loadCycle',
+      'src/board/setup.ts': 'loadCycle',
+      'src/board/spec-source.ts': 'backEdge',
+      'src/cleanup/groups.ts': 'loadCycle',
+      'src/cleanup/steps.ts': 'loadCycle',
+      'src/commands/board/list.ts': 'backEdge',
+      'src/commands/epic/close-triage.ts': 'backEdge',
+      'src/commands/epic/close.ts': 'backEdge',
+      'src/commands/epic/new.ts': 'backEdge',
+      'src/commands/issue/ready.ts': 'backEdge',
+      'src/commands/plan/bundled-check.ts': 'libraryChunks',
+      'src/commands/plan/claim-route.ts': 'libraryChunks',
+      'src/commands/plan/store-check.ts': 'libraryChunks',
+      'src/commands/pr/merge-cleanup.ts': 'backEdge',
+      'src/commands/pr/merge-followups.ts': 'backEdge',
+      'src/commands/pr/merge-loop-worktree.ts': 'backEdge',
+      'src/commands/pr/merge.ts': 'backEdge',
+      'src/commands/pr/retarget.ts': 'backEdge',
+      'src/commands/pr/triage-resolve.ts': 'backEdge',
+      'src/commands/pr/triage.ts': 'backEdge',
+      'src/commands/pr/wait.ts': 'backEdge',
+      'src/config-registry.ts': 'declarationGraph',
+      'src/config/shape.ts': 'declarationGraph',
+      'src/effort/report-skills-read.ts': 'backEdge',
+      'src/index.ts': 'libraryChunks',
+      'src/inventory/search/index.ts': 'backEdge',
+      'src/next/epic-end.ts': 'loadCycle',
+      'src/next/owner-gate.ts': 'loadCycle',
+      'src/next/relation-readings.ts': 'loadCycle',
+      'src/next/settle-step.ts': 'loadCycle',
+      'src/next/sources.ts': 'loadCycle',
+      'src/plan.ts': 'libraryChunks',
+      'src/start.ts': 'libraryChunks',
+      'src/triage/base-run.ts': 'loadCycle',
+      'src/triage/inherited.ts': 'loadCycle',
+      'src/triage/kind-route.ts': 'loadCycle',
+      'src/triage/leftover-repair.ts': 'loadCycle',
+    },
+    packageName: 'rafa-run',
   },
 ];
 
