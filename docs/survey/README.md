@@ -122,7 +122,8 @@ repository.
 - **`facade-pile.md`**: The ordered pile pass 3 of #808 reads for the six feature-package facades in move order: each
   one's names and the files its entry re-exports from, with the failing ones at the bottom, none at this commit. Made by
   `scripts/survey/facade-names.ts`, run as `--package=rafa-<name>` for each facade, at commit fb2acc8, the base of this
-  task; a facade's import check and its own test are read at the same commit.
+  task; a facade's import check and its own test are read at the same commit. Its rewired column gives each facade's
+  rewire, effort's first: 36 importers rewired at commit 87a7f60, with 8 files kept on their paths.
 
 ### Cluster contract traces
 
