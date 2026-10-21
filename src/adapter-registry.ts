@@ -57,6 +57,7 @@ import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 import { homedir } from 'node:os';
 
 import { createFileSync, createLocalSync } from '@open-tomato/rafa-effort';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory';
 
 import { createConsoleLogger } from '@open-tomato/rafa/adapters/logger/console';
 import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
@@ -67,7 +68,6 @@ import { createTextOutput } from '@open-tomato/rafa/core/output';
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { createLocalLearning, localInstinctsDir } from './adapters/learning/local.js';
 import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
 import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';

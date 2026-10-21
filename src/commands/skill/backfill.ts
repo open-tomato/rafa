@@ -64,33 +64,47 @@
  * `--project`, a `<dir>` that is no `.claude/skills`, a `<dir>` that is
  * not there, and a proposal file that does not parse.
  */
-import type { BackupResult } from '../../backfill/backup.js';
-import type { DerivationAction, DerivationKind, DerivationOptions, DerivationPlan } from '../../backfill/derive.js';
-import type { ProposalFile } from '../../backfill/proposal-file.js';
-import type { ProposalAction, ProposalActionKind } from '../../backfill/propose.js';
-import type { DemotionScope } from '../../demote/select.js';
-import type { InstinctScope } from '../../schema/instinct.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type {
+  BackupResult,
+  DemotionScope,
+  DerivationAction,
+  DerivationKind,
+  DerivationOptions,
+  DerivationPlan,
+  InstinctScope,
+  ProposalAction,
+  ProposalActionKind,
+  ProposalFile,
+} from '@open-tomato/rafa-inventory';
 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import {
+  ANSWERED_ROW,
+  BACKFILL_PATH,
+  DERIVATION_KINDS,
+  PROPOSAL_ACTION_KINDS,
+  REVIEWED_FILE,
+  applyDerivation,
+  applyProposals,
+  backupDirectory,
+  backupFiles,
+  countBackups,
+  countDerivations,
+  pathDirectories,
+  planDerivation,
+  readProposalFiles,
+  resolveDemotionScope,
+  runProposalPass,
+  selectProposals,
+} from '@open-tomato/rafa-inventory';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-
-import { backupDirectory, backupFiles, countBackups } from '../../backfill/backup.js';
-import { applyDerivation, countDerivations, DERIVATION_KINDS, planDerivation } from '../../backfill/derive.js';
-import { selectProposals } from '../../backfill/proposal-batch.js';
-import { ANSWERED_ROW, BACKFILL_PATH, readProposalFiles, REVIEWED_FILE } from '../../backfill/proposal-file.js';
-import {
-  applyProposals,
-  PROPOSAL_ACTION_KINDS,
-  runProposalPass,
-} from '../../backfill/propose.js';
-import { pathDirectories } from '../../check/references.js';
-import { resolveDemotionScope } from '../../demote/select.js';
 
 /** The two things neither the context nor the registry carries. */
 export interface SkillBackfillSeams {

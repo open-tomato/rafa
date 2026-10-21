@@ -111,22 +111,30 @@
  */
 import type { DeepRow, DeepRowStatus } from './doctor-deep-row.js';
 import type { DeepDoctorSeams, DeepInput } from './doctor-deep.js';
-import type { Inventory, InventorySeams } from '../inventory/index.js';
-import type { InventoryRecord } from '../inventory/record.js';
-import type { ServedItem, TierCollision, TierRow } from '../tiers/resolve.js';
+import type {
+  Inventory,
+  InventoryRecord,
+  InventorySeams,
+  ServedItem,
+  TierCollision,
+  TierRow,
+} from '@open-tomato/rafa-inventory';
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { SKILL_USE_CLI_VERSION, readFrontmatter } from '@open-tomato/rafa-effort';
+import {
+  PROVENANCE_FIELD,
+  SERVE_CLI_VERSION,
+  SKILL_FILE,
+  buildInventory,
+  provenanceBlock,
+} from '@open-tomato/rafa-inventory';
 
 import { CLAUDE_BIN } from '@open-tomato/rafa/core/loop';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { buildInventory } from '../inventory/index.js';
-import { PROVENANCE_FIELD } from '../schema/provenance.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
-import { provenanceBlock, SKILL_FILE } from '../tiers/serve.js';
 
 import { PATH_KEY, readSessionEnv } from './doctor-deep-env.js';
 import { renderDeepSection } from './doctor-deep-row.js';

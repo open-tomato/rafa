@@ -123,23 +123,33 @@
  * Nothing here reads the real home or `PATH` unless it is handed them:
  * every location comes from {@link NeedsSeams}.
  */
-import type { InventorySeams } from '../inventory/index.js';
-import type { McpReading, McpScope } from '../inventory/mcp.js';
-import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } from '../inventory/record.js';
+import type {
+  InventoryKind,
+  InventoryRecord,
+  InventorySeams,
+  InventorySource,
+  InventoryState,
+  McpReading,
+  McpScope,
+} from '@open-tomato/rafa-inventory';
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+import {
+  buildInventory,
+  checkReferences,
+  mcpDeclarationsOf,
+  mcpServerFor,
+  readMcpServers,
+  toolOf,
+} from '@open-tomato/rafa-inventory';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
 
-import { checkReferences } from '../check/references.js';
-import { toolOf } from '../check/shell-lines.js';
-import { buildInventory } from '../inventory/index.js';
-import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
 import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
 
 /** What a need is for. */

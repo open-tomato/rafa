@@ -71,19 +71,21 @@
  * value.
  */
 import type { InstinctPromoteSeams } from './promote.js';
-import type { Instinct, InstinctScope } from '../../schema/instinct.js';
-import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { InstinctRecord } from '@open-tomato/rafa/ports';
+import type {
+  Instinct,
+  InstinctRecordEntry,
+  InstinctScope,
+  ScopeListing,
+} from '@open-tomato/rafa-inventory';
+
+import { readScopes, toHeldRecords, triggerKey } from '@open-tomato/rafa-inventory';
 
 import { expectNoArgument, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { toHeldRecords } from '../../adapters/learning/held.js';
-import { triggerKey } from '../../learning/index.js';
-import { readScopes } from '../../schema/scope-records.js';
 
 import { allRecords, instinctProject } from './instinct-records.js';
 import { makeLearningAdapter, refusedPullMessage } from './promote.js';

@@ -83,6 +83,8 @@ import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { isAbsolute, relative, resolve } from 'node:path';
 
+import { pathDirectories } from '@open-tomato/rafa-inventory';
+
 import { expectAtMostOneArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
@@ -90,7 +92,6 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { isFile, plural } from '@open-tomato/rafa/core/plan';
 import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
-import { pathDirectories } from '../../check/references.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 import { isSourceShape } from '../skill/list.js';

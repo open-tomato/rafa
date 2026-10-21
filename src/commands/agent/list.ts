@@ -79,12 +79,13 @@
  * naming nothing it can take, a config that cannot be used, and a `-i`
  * that cannot browse. `ctrl-c` inside a browse is exit code 130.
  */
-import type { Inventory } from '../../inventory/index.js';
-import type { InventoryRecord } from '../../inventory/record.js';
 import type { SkillListFilters, SkillListSeams, SkillTreeListing, StateFilter } from '../skill/list.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { Inventory, InventoryRecord } from '@open-tomato/rafa-inventory';
+
+import { VENDOR_COMMAND, buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -93,9 +94,6 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
-import { VENDOR_COMMAND } from '../../agents/roster.js';
-import { pathDirectories } from '../../check/references.js';
-import { buildInventory } from '../../inventory/index.js';
 import {
   browseListing,
   HIDDEN_MARK,
