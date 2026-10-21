@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import ts from 'typescript';
 
 import { readFacadeTables } from './facade-tables';
 import {
@@ -144,6 +145,32 @@ describe('helpers', () => {
   it('reads every kind of import from a source text', () => {
     const text = 'import type { A } from \'./a.js\';\nexport { b } from \'./b.js\';\nconst c = await import(\'./c.js\');\n';
     expect(textImports(text)).toEqual(['./a.js', './b.js', './c.js']);
+  });
+
+  it('takes no specifier from the text of an import inside a template literal, after a regex that throws the scan off', () => {
+    const text = [
+      'import { a } from \'./a.js\';',
+      'const c = await import(\'./c.js\');',
+      'const LOADS = [',
+      '  /from[\'"`]x[^\'"`][\'"`]/g,',
+      '];',
+      'const NAME = \'x\';',
+      'const plain = `import { w } from \'./w.js\';`;',
+      'const fixture = `import type { X } from \'${name(\'b\')}\';`;',
+      'const other = `import { y } from \'${NAME}\';\\nimport \'${NAME}/z\';`;',
+      '',
+    ].join('\n');
+
+    // The control: after the regex holding a quote and a backtick, the token
+    // scan alone takes the template text for imports.
+    expect(ts.preProcessFile(text, true, true).importedFiles.map((file) => file.fileName))
+      .toEqual(expect.arrayContaining(['${NAME}', './w.js']));
+    expect(textImports(text)).toEqual(['./a.js', './c.js']);
+  });
+
+  it('keeps an import() written inside a template substitution', () => {
+    const text = 'const s = `${await import(\'./d.js\')}`;\n';
+    expect(textImports(text)).toEqual(['./d.js']);
   });
 
   it('takes a stem by the code extension alone', () => {

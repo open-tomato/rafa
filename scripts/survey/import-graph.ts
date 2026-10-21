@@ -186,14 +186,53 @@ export function fileStem(path: string): string {
 }
 
 /**
+ * The spans of a source text's template literal parts, read from its
+ * syntax tree: each no-substitution template and each head, middle and
+ * tail of a template with substitutions. The substitutions themselves are no part of a span,
+ * so an `import()` written inside `${…}` stays code.
+ *
+ * @param text - A TypeScript or JavaScript source text.
+ * @returns Each span as its start and end offset, end exclusive.
+ */
+function templateLiteralSpans(text: string): Array<readonly [number, number]> {
+  const source = ts.createSourceFile('text.ts', text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  const spans: Array<readonly [number, number]> = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node)) {
+      spans.push([node.getStart(source), node.end]);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return spans;
+}
+
+/**
  * The specifiers a source text imports, read by `ts.preProcessFile`:
  * static imports and re-exports of either kind, `import()` and `require`.
+ *
+ * `preProcessFile` scans tokens without parsing, and a regex literal
+ * holding a quote or a backtick (`/['"`]x/`) throws the scan out of step
+ * with the text: measured on `src/tests/package-build.test.ts`, the text
+ * of an import a test writes inside a template literal after such a regex,
+ * `` `import { x } from '${NAME}';` ``, came back as a specifier
+ * (`${NAME}`). Such a specifier imports nothing, so one whose offset falls
+ * inside a template literal part of the parsed text is dropped; a text
+ * holding no backtick is not parsed.
  *
  * @param text - A TypeScript or JavaScript source text.
  * @returns Each specifier, in source order, duplicates kept.
  */
 export function textImports(text: string): string[] {
-  return ts.preProcessFile(text, true, true).importedFiles.map((file) => file.fileName);
+  const files = ts.preProcessFile(text, true, true).importedFiles;
+  if (!text.includes('`')) {
+    return files.map((file) => file.fileName);
+  }
+  const spans = templateLiteralSpans(text);
+  return files
+    .filter((file) => !spans.some(([start, end]) => file.pos >= start && file.pos < end))
+    .map((file) => file.fileName);
 }
 
 /**

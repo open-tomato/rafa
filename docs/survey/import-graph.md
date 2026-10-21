@@ -87,9 +87,3 @@ Coverage: 2166 of 2166 tracked files read (src/ and packages/*/src/).
 | 28 | `src/board/issue.ts` | 8037.025483 | `c01-github` |
 | 29 | `src/start/loop-events.ts` | 7953.197687 | `c03-index` |
 | 30 | `src/start/suite-step.ts` | 7855.883045 | `c03-index` |
-
-## Unresolved imports
-
-- `src/tests/package-build.test.ts`: `${DEFINE_CONFIG}`
-- `src/tests/package-build.test.ts`: `${OWN_SUBPATH}core/absent`
-- `src/tests/package-build.test.ts`: `${facadePackageName(`

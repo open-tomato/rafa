@@ -70793,18 +70793,5 @@
     }
   ],
   "unreached": [],
-  "unresolved": [
-    {
-      "from": "src/tests/package-build.test.ts",
-      "specifier": "${DEFINE_CONFIG}"
-    },
-    {
-      "from": "src/tests/package-build.test.ts",
-      "specifier": "${OWN_SUBPATH}core/absent"
-    },
-    {
-      "from": "src/tests/package-build.test.ts",
-      "specifier": "${facadePackageName("
-    }
-  ]
+  "unresolved": []
 }
