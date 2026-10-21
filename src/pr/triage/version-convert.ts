@@ -106,22 +106,29 @@
  * the fetch, `rev-parse`, `merge-base`, `show`, `ls-tree`, `add` and
  * `commit`. The guard's own readings are `readGuard`'s, over `HEAD`.
  */
-import type { GuardAnswer, GuardStamp } from '../../release/guard.js';
-import type { SettleSettings } from '../../release/settle.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { GuardAnswer, GuardStamp, SettleSettings } from '@open-tomato/rafa-release';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import {
+  FRAGMENT_PLAN_ID_PATTERN,
+  RELEASE_REMOTE,
+  allocateFragmentName,
+  compareVersions,
+  directoryPrefix,
+  gitPathOf,
+  parseSemanticVersion,
+  readGuard,
+  readManifestVersion,
+  replaceManifestVersion,
+  serializeFragment,
+} from '@open-tomato/rafa-release';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
-
-import { directoryPrefix } from '../../release/fragment-tree.js';
-import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
-import { readGuard } from '../../release/guard.js';
-import { compareVersions } from '../../release/status-readings.js';
-import { gitPathOf, parseSemanticVersion, readManifestVersion, RELEASE_REMOTE, replaceManifestVersion } from '../../release/version.js';
 
 /** What one conversion reads. */
 export interface VersionConvertInput {

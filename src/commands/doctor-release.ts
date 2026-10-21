@@ -53,21 +53,30 @@
  * each of its missing preconditions, read with the rest of the reading
  * and kept in it as `ladder`, so the json result carries it too.
  */
-import type { DoctorLadderConfig, DoctorLadderReading } from './doctor-ladder.js';
-import type { WaitingReading } from './release/status-fragments.js';
 import type { GitRunner } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type {
+  DoctorLadderConfig,
+  DoctorLadderReading,
+  WaitingReading,
+} from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createGitRunner } from '../pr/index.js';
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import { changelogVersions, readTags } from '../release/status-readings.js';
+import {
+  changelogVersions,
+  forecastPhrase,
+  readDoctorLadder,
+  readTags,
+  readWaiting,
+  resolveReleaseEnabled,
+  waitingSettingsOf,
+  writeDoctorLadder,
+} from '@open-tomato/rafa-release';
 
-import { readDoctorLadder, writeDoctorLadder } from './doctor-ladder.js';
-import { forecastPhrase, readWaiting, waitingSettingsOf } from './release/status-fragments.js';
+import { createGitRunner } from '../pr/index.js';
 
 /** The command the warning names. */
 export const SETTLE_COMMAND = 'rafa release settle';

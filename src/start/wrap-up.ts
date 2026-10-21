@@ -57,11 +57,15 @@ import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { PullRequests } from '../pr/index.js';
-import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory';
+import type {
+  ReleasePreparation,
+  ReleasePrepared,
+  ReleaseSkipped,
+} from '@open-tomato/rafa-release';
 
 import { posix } from 'node:path';
 

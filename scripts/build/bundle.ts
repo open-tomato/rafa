@@ -43,13 +43,13 @@
  *   4. prints one line per bundle naming the externals it was built
  *      with ({@link externalsLine}), and exits 0.
  */
-import type { WorkspacePackage } from '../../src/release/workspace-packages.js';
+import type { WorkspacePackage } from '@open-tomato/rafa-release';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 
-import { publishableOf, readWorkspacePackages } from '../../src/release/workspace-packages.js';
+import { publishableOf, readWorkspacePackages } from '@open-tomato/rafa-release';
 
 /** Where the bundles are written, relative to the root, when `--out` names nothing. */
 export const DEFAULT_OUT = 'dist';

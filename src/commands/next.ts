@@ -266,6 +266,7 @@ import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tom
 import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
 
 import { pullBeforeRead } from '@open-tomato/rafa-effort';
+import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
@@ -274,7 +275,6 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
-import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
 import {
   CLAIM_AHEAD_FLAG,
