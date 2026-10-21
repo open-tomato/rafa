@@ -123,7 +123,8 @@ repository.
   one's names and the files its entry re-exports from, with the failing ones at the bottom, none at this commit. Made by
   `scripts/survey/facade-names.ts`, run as `--package=rafa-<name>` for each facade, at commit fb2acc8, the base of this
   task; a facade's import check and its own test are read at the same commit. Its rewired column gives each facade's
-  rewire, effort's first: 36 importers rewired at commit 87a7f60, with 8 files kept on their paths.
+  rewire, effort's first: 36 importers rewired at commit 87a7f60, with 8 files kept on their paths,
+  and inventory's after it: 31 importers rewired at commit b4cdfd4, with 7 files kept on their paths.
 
 ### Cluster contract traces
 
