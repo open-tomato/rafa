@@ -58,11 +58,10 @@
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
+import { DEFAULT_CI_ATTEMPTS, endingWith, refuseMisplacedRuntime } from '@open-tomato/rafa-run';
+
 import { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
-import { endingWith } from '../../next/ending.js';
-import { DEFAULT_CI_ATTEMPTS } from '../../start/pr-lifecycle.js';
-import { refuseMisplacedRuntime } from '../../start/runtime.js';
 import start from '../../start.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 

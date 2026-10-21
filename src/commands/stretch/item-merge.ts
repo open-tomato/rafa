@@ -83,12 +83,12 @@ import type { GhRunner } from '@open-tomato/rafa-board';
 import { readFileSync } from 'node:fs';
 
 import { closedIssuesIn } from '@open-tomato/rafa-board';
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
-import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { readPitReadings, renderPitReadings } from '../../stretch/pit-readings.js';

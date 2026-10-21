@@ -14,11 +14,12 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name: `board` (the `issue`, `board` and `epic` subjects), `pr` and
- * `release` from their packages' facades, `@open-tomato/rafa-board` with
- * its three subjects and `@open-tomato/rafa-pr` and
- * `@open-tomato/rafa-release` with one each, and `run` (the `claim`
- * subject) from the `index.ts` of its folder.
+ * name from its package's facade: `board` (the `issue`, `board` and
+ * `epic` subjects) from `@open-tomato/rafa-board`, and `pr`, `run` (the
+ * `claim` subject) and `release` from `@open-tomato/rafa-pr`,
+ * `@open-tomato/rafa-run` and `@open-tomato/rafa-release`, one subject
+ * each. The `switch` command comes from run's facade too, under its
+ * `command` name.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -473,6 +474,7 @@ import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command
 import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
 import { PR_FEATURE, PR_SUBJECT } from '@open-tomato/rafa-pr';
 import { RELEASE_FEATURE, RELEASE_SUBJECT } from '@open-tomato/rafa-release';
+import { CLAIM_SUBJECT, RUN_FEATURE, command as switchCommand } from '@open-tomato/rafa-run';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
@@ -483,8 +485,6 @@ import agentVendor from './agent/vendor.js';
 import bugCodes from './bug/codes.js';
 import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
-import { CLAIM_SUBJECT } from './claim/declarations.js';
-import { RUN_FEATURE } from './claim/index.js';
 import cleanup from './cleanup.js';
 import configSet from './config/set.js';
 import configShow from './config/show.js';
@@ -535,7 +535,6 @@ import status from './status.js';
 import stretchEnd from './stretch/end.js';
 import stretchItem from './stretch/item.js';
 import stretchStart from './stretch/start.js';
-import switchCommand from './switch.js';
 import updateBoard from './update/board.js';
 import updateCurrent from './update/current.js';
 import updateLatest from './update/latest.js';

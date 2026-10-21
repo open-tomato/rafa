@@ -56,10 +56,9 @@
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
+import { hasDiverged, parseBaseStanding } from '@open-tomato/rafa-run';
 
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { hasDiverged, parseBaseStanding } from '../start/branch-decision.js';
 
 /** The indent a refusal's following lines carry, as `src/start/branch-decision.ts` indents its own. */
 const INDENT = '   ';

@@ -548,7 +548,7 @@ names come from, and the facade entry is no node.
   moves its line there. Pass 2 added the package's folder to `CUT_RULES`
   with its facade, and at its move (pass 4) the facade becomes the package's
   own `index`. Pass 2 moved no file under `src/` and changed no importer.
-- **The rewire moves effort's, inventory's, board's, release's and pr's
+- **The rewire moves effort's, inventory's, board's, release's, pr's and run's
   importers onto their facades and keeps the files each one's groups name on
   their paths.**
   `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>` `[--dry-run]`
@@ -596,6 +596,17 @@ names come from, and the facade entry is no node.
     import pr from a package earlier in the move order; their edges are back
     edges the decouple step before pass 4 cuts, and they sit in this group
     because the load-cycle group comes first.
+    Run has fifteen: five board files (`src/board/gate.ts`,
+    `src/board/project/rules.ts`, `src/board/roadmap-claims.ts`,
+    `src/board/setup.ts` and `src/next/relation-readings.ts`), nine pr files
+    (`src/cleanup/groups.ts`, `src/cleanup/steps.ts`,
+    `src/next/owner-gate.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`
+    and the four `src/triage/` files) and one release file
+    (`src/next/epic-end.ts`). All fifteen are files of packages earlier in
+    `MOVE_ORDER` of `scripts/survey/coupling.ts`, by the cut table's unit, and
+    they sit in this group because the load-cycle group comes first. Their
+    edges to run are back edges the decouple step before pass 4 cuts, since
+    run moves last and no package imports it forward.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
@@ -615,12 +626,22 @@ names come from, and the facade entry is no node.
     `src/effort/report-doc-bugs.ts`. Each sits earlier in the move order than
     pr, so each imports it backwards, and the decouple step before pass 4 cuts
     them.
+    Run has seventeen: seven board files (`src/board/issue-edit-state.ts`,
+    `src/board/spec-source.ts`, `src/commands/board/list.ts`, the three
+    `src/commands/epic/` files `close-triage.ts`, `close.ts` and `new.ts`, and
+    `src/commands/issue/ready.ts`), the eight `src/commands/pr/` files
+    (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
+    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`),
+    one effort file (`src/effort/report-skills-read.ts`) and one inventory file
+    (`src/inventory/search/index.ts`). Each sits earlier in the move order than
+    run, so each imports it backwards, and the decouple step before pass 4 cuts
+    them.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. Effort has two:
     `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
     Board has the same two as effort. Release has the same two. Pr has the
-    same two.
+    same two. Run has the same two.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
   that import a rewired package by path stay on their paths in pass 3. The
@@ -628,16 +649,20 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight, inventory's seven, board's 48, release's twelve and
-  pr's seventy, and a planted control reds on one relative import. Board's,
-  release's and pr's rows add a fourth group the codemod does not print,
-  `libraryChunks`: board's row has 21 such files, release's eight and pr's 33,
-  files a library entry reaches statically and that stay on their paths after
-  the rewire, since through the facade that graph reaches the package's lazy
-  command modules (`RELEASE_FEATURE` re-exports
-  `src/commands/release/index.ts`, `PR_FEATURE` re-exports
-  `src/commands/pr/index.ts`) and the splitting build writes each as a chunk of
-  its own. The published-types case in
+  files, effort's eight, inventory's seven, board's 48, release's twelve,
+  pr's seventy and run's forty, and a planted control reds on one relative
+  import. Board's, release's, pr's and run's rows add a fourth group the
+  codemod does not print, `libraryChunks`: board's row has 21 such files,
+  release's eight, pr's 33 and run's six: files a library entry reaches
+  statically and that stay on their paths after the rewire, since through the
+  facade that graph reaches the package's lazy command modules
+  (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`, `PR_FEATURE`
+  re-exports `src/commands/pr/index.ts` and `RUN_FEATURE` re-exports
+  `src/commands/claim/index.ts`) and the splitting build writes each as a chunk
+  of its own. Run's six are the library entry `src/index.ts` itself, with
+  `src/plan.ts`, `src/start.ts` and the three `src/commands/plan/` files
+  (`bundled-check.ts`, `claim-route.ts` and `store-check.ts`) it reaches. The
+  published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
   `-release`, `-pr` or `-run`, with a planted-text control.
@@ -653,7 +678,14 @@ names come from, and the facade entry is no node.
   `ResolvePrProviderOptions`, `PrProviderReading`, `ghPreflightItems`,
   `ghHostOf` and `ChecksVerdict` from their defining files while the facade
   lists them under `src/pr/index.ts`, and each was pointed at the barrel by
-  hand before the run.
+  hand before the run. Run's rewire refused 36 bindings on 9 statements in 7
+  files, 34 of them taken through the barrels `src/plan/index.ts` and
+  `src/cleanup/index.ts` while the facade lists them under the preflight and
+  cleanup files that define them, and `PreflightCheck` taken from
+  `src/preflight/run.ts` while the facade lists it under `src/plan/index.ts`,
+  so one rewire met both directions of the refusal; each statement was split
+  by hand before the run so every binding names the file the facade lists it
+  under.
   A file whose stem names a fake is read as a test by the codemod and the
   guard, so the three fakes `src/ci/runs-fake.ts`, `src/pr/gh-fake.ts` and
   `src/pr/gh-fake-shapes.ts` keep their paths until pass 4.

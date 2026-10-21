@@ -56,13 +56,12 @@ import { resolve } from 'node:path';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
 import { assessPlanRisk, renderRiskText } from '@open-tomato/rafa-pr';
+import { DEFAULT_PLAN_FILE, resolvePlanPath } from '@open-tomato/rafa-run';
 
 import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isFile, plural } from '@open-tomato/rafa/core/plan';
-
-import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 
 /** The command as a refusal names it. */
 const COMMAND = 'rafa plan risk';

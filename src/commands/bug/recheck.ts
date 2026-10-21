@@ -112,6 +112,7 @@ import {
   namedSecrets,
   redactSecrets,
 } from '@open-tomato/rafa-pr';
+import { suiteEnv } from '@open-tomato/rafa-run';
 
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -120,7 +121,6 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';
-import { suiteEnv } from '../../suite/run.js';
 
 import { recheckComment, referenceText, renderRecheck } from './recheck-report.js';
 import { recheckBug } from './recheck-run.js';
