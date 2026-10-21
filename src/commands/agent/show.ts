@@ -53,16 +53,16 @@
  * without it.
  */
 import type { AgentListSeams } from './list.js';
-import type { Inventory } from '../../inventory/index.js';
-import type { ShowView } from '../../inventory/show.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { Inventory, ShowView } from '@open-tomato/rafa-inventory';
+
+import { findShown, readShowView, renderShowView } from '@open-tomato/rafa-inventory';
 
 import { expectOneArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
-import { findShown, readShowView, renderShowView } from '../../inventory/show.js';
 import { projectInventory, warningLines } from '../skill/list.js';
 
 import { DEFAULT_AGENT_LIST_SEAMS } from './list.js';

@@ -135,22 +135,15 @@
  * are refused with exit code 1 before anything is parsed.
  */
 import type { BundledEdit } from './bundled-check.js';
-import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { MissingAgent, SkillCollision, UnresolvedSkill } from '@open-tomato/rafa-inventory';
 
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-
-import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
-import { CommandExit } from '@open-tomato/rafa/core/command';
-import { ConfigError } from '@open-tomato/rafa/core/config';
-import { loadConfig } from '@open-tomato/rafa/core/config/load';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
 
 import {
   collidingPlanSkills,
@@ -160,7 +153,15 @@ import {
   skillCollisionLine,
   unresolvedPlanSkills,
   unresolvedSkillLine,
-} from '../../agents/roster.js';
+} from '@open-tomato/rafa-inventory';
+
+import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
+
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';

@@ -548,10 +548,11 @@ names come from, and the facade entry is no node.
   moves its line there. Pass 2 added the package's folder to `CUT_RULES`
   with its facade, and at its move (pass 4) the facade becomes the package's
   own `index`. Pass 2 moved no file under `src/` and changed no importer.
-- **The rewire moves effort's importers onto its facade and keeps eight files
-  on their paths.** `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>
-  [--dry-run]` takes each importer of a feature package that can take it by
-  name and rewrites it to import `@open-tomato/rafa-<name>`.
+- **The rewire moves effort's and inventory's importers onto their facades and
+  keeps the files each one's groups name on their paths.**
+  `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>` `[--dry-run]`
+  takes each importer of a feature package that can take it by name and
+  rewrites it to import `@open-tomato/rafa-<name>`.
   `scripts/codemod/rewire-groups.ts` puts each importer in the first of four
   groups that holds it. The codemod rewrites the fourth, `rewire`, and leaves
   the other three byte for byte:
@@ -559,26 +560,37 @@ names come from, and the facade entry is no node.
     edges, so taking the package by name would load it inside that cycle.
     Effort has six: `src/agents/roster.ts`, `src/check/run.ts`,
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
-    `src/schema/instinct.ts` and `src/tiers/serve.ts`.
+    `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has five:
+    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`,
+    `src/start/preflight.ts` and `src/start/serving.ts`.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
-    Effort has none.
+    Inventory has two, `src/effort/report-skills.ts` and
+    `src/effort/skill-facts.ts`, both effort files: effort comes before
+    inventory in the move order, so they import it backwards, and the decouple
+    step before pass 4 cuts them.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. Effort has two:
-    `src/config/shape.ts` and `src/config-registry.ts`.
+    `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
-  that import effort by path stay on their paths in pass 3. The rewire guard,
-  `scripts/survey/facade-rewire.sweep.test.ts`, holds each rewired package to
-  its row of `REWIRED`: no non-test file outside the package imports one of its
-  files by relative path unless the row names it with its group, and each named
-  file still does. Effort's row names the eight, and a planted control reds on
+  that import effort or inventory by path stay on their paths in pass 3. The
+  rewire guard, `scripts/survey/facade-rewire.sweep.test.ts`, holds each
+  rewired package to its row of `REWIRED`: no non-test file outside the
+  package imports one of its files by relative path unless the row names it
+  with its group, and each named file still does. Each row names its kept
+  files, effort's eight and inventory's seven, and a planted control reds on
   one relative import. The published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
   `-release`, `-pr` or `-run`, with a planted-text control.
+
+  A binding taken through a re-exporting module of the package, such as
+  `src/learning/index.ts`, is refused by the codemod and is pointed at its
+  origin file by hand before the run: pass 3a did that three times, and
+  inventory's rewire did it six.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in

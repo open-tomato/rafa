@@ -47,12 +47,12 @@ import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { InstinctRecord, Learning } from '@open-tomato/rafa/ports';
 
+import { promotable } from '@open-tomato/rafa-inventory';
+
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { promotable } from '../../learning/index.js';
 
 /** The command's name, as a refusal opens with it. */
 const NAME = 'rafa instinct promote';

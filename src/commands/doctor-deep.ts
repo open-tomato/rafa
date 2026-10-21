@@ -69,9 +69,9 @@ import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections
 import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
-import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
+import { pathDirectories } from '@open-tomato/rafa-inventory';
 
-import { pathDirectories } from '../check/references.js';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import { PATH_KEY, readSessionEnv, SETTINGS_ENV_KEY } from './doctor-deep-env.js';
 import { planNeedsSection, readDeepPlanNeeds, readDeepStackTools, stackToolsSection } from './doctor-deep-needs.js';

@@ -190,7 +190,6 @@ import type { ProjectStepResult } from './init-board-project.js';
 import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } from './init-board.js';
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { VendorableAgent } from '../agents/vendorable.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
 import type { ScopeWrite, ScopeWriteChange } from '../project/scaffold.js';
@@ -198,10 +197,13 @@ import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core
 import type { RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
 import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '@open-tomato/rafa/project/roots';
+import type { VendorableAgent } from '@open-tomato/rafa-inventory';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
+
+import { vendorableAgentWarnings, vendorableAgents } from '@open-tomato/rafa-inventory';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 import { ConfigError, configFilePath } from '@open-tomato/rafa/core/config';
@@ -212,7 +214,6 @@ import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '@open-tomat
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { commandProgressFeed } from '../board/project/progress.js';
 import { commandRetrySeams } from '../board/project/project-runner.js';
 import { resolvePrProvider } from '../pr/provider.js';
