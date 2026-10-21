@@ -65821,6 +65821,7 @@
         "src/commands/doctor-cleanup-row.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -66286,7 +66287,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 588
+      "testsFromOtherFolders": 589
     },
     "packages/rafa/src/effort/store/commit-stats.ts": {
       "folder": "packages/rafa",
@@ -178794,6 +178795,7 @@
         "src/commands/doctor-cleanup-row.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -179235,7 +179237,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 549
+      "testsFromOtherFolders": 550
     },
     "src/pr/conflict-sentence.ts": {
       "folder": "src/pr",
@@ -179422,6 +179424,7 @@
         "src/commands/doctor-boards.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -179854,7 +179857,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 544
+      "testsFromOtherFolders": 545
     },
     "src/pr/gh-closing-issues.ts": {
       "folder": "src/pr",
@@ -179988,6 +179991,7 @@
         "src/commands/doctor-boards.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -180421,7 +180425,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 544
+      "testsFromOtherFolders": 545
     },
     "src/pr/gh.ts": {
       "folder": "src/pr",
@@ -180555,6 +180559,7 @@
         "src/commands/doctor-boards.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -180987,7 +180992,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 544
+      "testsFromOtherFolders": 545
     },
     "src/pr/index.ts": {
       "folder": "src/pr",
@@ -181121,6 +181126,7 @@
         "src/commands/doctor-boards.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -181549,7 +181555,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 544
+      "testsFromOtherFolders": 545
     },
     "src/pr/merge.ts": {
       "folder": "src/pr",
@@ -181685,6 +181691,7 @@
         "src/commands/doctor-cleanup-row.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -182117,7 +182124,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 547
+      "testsFromOtherFolders": 548
     },
     "src/pr/none.ts": {
       "folder": "src/pr",
@@ -182251,6 +182258,7 @@
         "src/commands/doctor-boards.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -182680,7 +182688,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 544
+      "testsFromOtherFolders": 545
     },
     "src/pr/owner-approval.ts": {
       "folder": "src/pr",
@@ -185029,6 +185037,7 @@
         "src/commands/doctor-cleanup-row.test.ts",
         "src/commands/doctor-cleanup.test.ts",
         "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-providers.test.ts",
         "src/commands/doctor-deep-sections.test.ts",
         "src/commands/doctor-deep.test.ts",
         "src/commands/doctor-epics.test.ts",
@@ -185469,7 +185478,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 549
+      "testsFromOtherFolders": 550
     },
     "src/pr/unchecked.ts": {
       "folder": "src/pr",
@@ -218615,7 +218624,7 @@
         "src/pr"
       ],
       "index": 5,
-      "sourceFiles": 92,
+      "sourceFiles": 101,
       "spawns": false,
       "spawnsVia": [],
       "support": [

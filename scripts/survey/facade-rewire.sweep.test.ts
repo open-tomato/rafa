@@ -50,6 +50,15 @@ interface RewiredRow {
  * library entry, and through the facade that graph would reach release's lazy
  * command modules (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`),
  * one of them rewired alone writing 95 more chunks than the build at `c920603`.
+ * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
+ * pr's files reach, six of them release files that are back edges the
+ * load-cycle group takes first. Its 19 back-edge files are board, release and
+ * effort files, every one earlier in the move order, and its two
+ * declaration-graph files are effort's two. Its 33 library-chunk files are
+ * reached statically from a library entry, and through the facade that graph
+ * would reach pr's lazy command modules (`PR_FEATURE` re-exports
+ * `src/commands/pr/index.ts`), one of them rewired alone writing 127 more
+ * chunks than the build at `c920603`.
  */
 const REWIRED: readonly RewiredRow[] = [
   {
@@ -146,6 +155,81 @@ const REWIRED: readonly RewiredRow[] = [
       'src/start/stale-docs.ts': 'libraryChunks',
     },
     packageName: 'rafa-release',
+  },
+  {
+    allowed: {
+      'src/board/project/add-filed.ts': 'backEdge',
+      'src/claims/ahead.ts': 'libraryChunks',
+      'src/claims/git.ts': 'loadCycle',
+      'src/claims/lost.ts': 'loadCycle',
+      'src/claims/plan-claim.ts': 'libraryChunks',
+      'src/cleanup/index.ts': 'libraryChunks',
+      'src/cleanup/past-head.ts': 'loadCycle',
+      'src/cleanup/remote-only.ts': 'libraryChunks',
+      'src/cleanup/worktrees.ts': 'loadCycle',
+      'src/commands/epic/close-docs.ts': 'backEdge',
+      'src/commands/epic/close-triage.ts': 'backEdge',
+      'src/commands/epic/close.ts': 'backEdge',
+      'src/commands/issue/create-bug.ts': 'backEdge',
+      'src/commands/issue/create.ts': 'backEdge',
+      'src/commands/plan/claim-route.ts': 'libraryChunks',
+      'src/commands/release/fragment.ts': 'backEdge',
+      'src/commands/release/list.ts': 'backEdge',
+      'src/commands/release/publish.ts': 'backEdge',
+      'src/commands/release/release-commit.ts': 'backEdge',
+      'src/commands/release/settle.ts': 'backEdge',
+      'src/commands/release/status-fragments.ts': 'loadCycle',
+      'src/commands/release/status-packages.ts': 'backEdge',
+      'src/commands/release/status-stale-docs.ts': 'backEdge',
+      'src/commands/release/status.ts': 'backEdge',
+      'src/commands/release/tag-units.ts': 'backEdge',
+      'src/commands/release/tag.ts': 'backEdge',
+      'src/config-registry.ts': 'declarationGraph',
+      'src/config/shape.ts': 'declarationGraph',
+      'src/effort/report-doc-bugs.ts': 'backEdge',
+      'src/next/epic-end.ts': 'loadCycle',
+      'src/next/hint.ts': 'loadCycle',
+      'src/next/hop-rows.ts': 'loadCycle',
+      'src/next/readings.ts': 'loadCycle',
+      'src/release/branch-forecast.ts': 'loadCycle',
+      'src/release/fragment-tree.ts': 'loadCycle',
+      'src/release/prepare.ts': 'backEdge',
+      'src/release/settle-pr.ts': 'loadCycle',
+      'src/release/verify.ts': 'backEdge',
+      'src/start.ts': 'libraryChunks',
+      'src/start/branch-decision.ts': 'loadCycle',
+      'src/start/branch.ts': 'libraryChunks',
+      'src/start/checkout-guard.ts': 'libraryChunks',
+      'src/start/claim-catch-up.ts': 'libraryChunks',
+      'src/start/convention-body.ts': 'libraryChunks',
+      'src/start/doc-task.ts': 'libraryChunks',
+      'src/start/follow-ups.ts': 'libraryChunks',
+      'src/start/forced-draft.ts': 'libraryChunks',
+      'src/start/lint-step.ts': 'libraryChunks',
+      'src/start/pr-lifecycle.ts': 'loadCycle',
+      'src/start/pr-retarget.ts': 'loadCycle',
+      'src/start/preflight-claim.ts': 'libraryChunks',
+      'src/start/preflight-drift.ts': 'libraryChunks',
+      'src/start/preflight.ts': 'libraryChunks',
+      'src/start/promoted-check.ts': 'libraryChunks',
+      'src/start/release-body.ts': 'libraryChunks',
+      'src/start/release-stage.ts': 'libraryChunks',
+      'src/start/risk-total.ts': 'libraryChunks',
+      'src/start/runner-pr.ts': 'libraryChunks',
+      'src/start/stale-docs.ts': 'libraryChunks',
+      'src/start/suite-blocker.ts': 'loadCycle',
+      'src/start/suite-step.ts': 'libraryChunks',
+      'src/start/task-always-run.ts': 'libraryChunks',
+      'src/start/task-gate-lines.ts': 'libraryChunks',
+      'src/start/triage-kinds.ts': 'libraryChunks',
+      'src/start/triage.ts': 'libraryChunks',
+      'src/start/type-step.ts': 'libraryChunks',
+      'src/start/worktree-upstream.ts': 'libraryChunks',
+      'src/start/worktree.ts': 'libraryChunks',
+      'src/start/wrap-up-run.ts': 'libraryChunks',
+      'src/start/wrap-up.ts': 'libraryChunks',
+    },
+    packageName: 'rafa-pr',
   },
 ];
 
