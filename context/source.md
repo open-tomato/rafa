@@ -545,9 +545,9 @@ names come from, and the facade entry is no node.
   that set with the checker, and `--entry` prints the entry it is written
   from. eslint's `import/order` places a facade import in the `external`
   group, with the other package imports, so a rewired importer (pass 3)
-  moves its line there. At its move (pass 4) the package's folder joins
-  `CUT_RULES` and the facade becomes the package's own `index`. Pass 2 moves
-  no file under `src/` and changes no importer.
+  moves its line there. Pass 2 added the package's folder to `CUT_RULES`
+  with its facade, and at its move (pass 4) the facade becomes the package's
+  own `index`. Pass 2 moved no file under `src/` and changed no importer.
 - **The rewire moves effort's importers onto its facade and keeps eight files
   on their paths.** `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>
   [--dry-run]` takes each importer of a feature package that can take it by
