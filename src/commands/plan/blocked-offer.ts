@@ -44,12 +44,12 @@
  * ({@link BlockedOfferSeams}), so every case in `./blocked-offer.test.ts`
  * drives a fake and none of them opens a terminal or waits on an answer.
  */
+import type { AlternativeOffer, AlternativeOfferRequest } from '../../board/blocked-line.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-import type { AlternativeOffer, AlternativeOfferRequest } from '@open-tomato/rafa-board';
-
-import { alternativeQuestion } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
+
+import { alternativeQuestion } from '../../board/blocked-line.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface BlockedOfferSeams {

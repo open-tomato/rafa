@@ -24,7 +24,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
-import { normaliseFolder } from '@open-tomato/rafa-board';
+import { normaliseFolder } from '../board/board-body.js';
 
 /** The file whose `[test] preload` names preload files, at the root. */
 export const BUNFIG_FILE = 'bunfig.toml';

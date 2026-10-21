@@ -144,19 +144,19 @@
  * answered stay relative, since `rafa plan` prints them and
  * `rafa loop start --plan=` takes them against the root.
  */
+import type { SpecReviewReading } from '../../board/spec-review.js';
 import type { PlanPromptBuilder } from '@open-tomato/rafa/core/adapters';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { GeneratedPlan, Planner, PlanRequest } from '@open-tomato/rafa/ports';
-import type { SpecReviewReading } from '@open-tomato/rafa-board';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
-import { parseSpecReview } from '@open-tomato/rafa-board';
-
 import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+
+import { parseSpecReview } from '../../board/spec-review.js';
 
 export type { PlanPromptBuilder } from '@open-tomato/rafa/core/adapters';
 

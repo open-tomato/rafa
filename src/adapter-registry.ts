@@ -56,12 +56,6 @@ import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 
 import { homedir } from 'node:os';
 
-import {
-  createGhRunner,
-  createGithubTracker,
-  createLocalTracker,
-  localIssuesDir,
-} from '@open-tomato/rafa-board';
 import { createFileSync, createLocalSync } from '@open-tomato/rafa-effort';
 import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory';
 
@@ -76,6 +70,8 @@ import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
+import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';
+import { createLocalTracker, localIssuesDir } from './adapters/tracker/local.js';
 
 /** What every refusal opens with: the registry's own opening. */
 const REFUSAL = 'adapter registry';

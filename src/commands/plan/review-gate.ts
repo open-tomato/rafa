@@ -61,15 +61,15 @@
  * planner's own, which are the files it saw, so {@link settleReview}
  * puts those over the base before the gate weighs them.
  */
+import type { SpecReviewGateOptions } from '../../board/gate.js';
+import type { SpecReviewReading } from '../../board/spec-review.js';
 import type { GeneratedPlan, Planner, PlanRequest } from '@open-tomato/rafa/ports';
-import type { SpecReviewGateOptions, SpecReviewReading } from '@open-tomato/rafa-board';
-
-import { enforceSpecReview } from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { ClaudePlannerError } from '../../adapters/planner/claude.js';
+import { enforceSpecReview } from '../../board/gate.js';
 
 import { recordMissingReview, recordSkippedReview } from './plan-record.js';
 

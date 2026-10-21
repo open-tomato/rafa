@@ -142,13 +142,12 @@ import type {
 } from '../release/prepare.js';
 import type { ReleaseVerification, ReleaseVerificationContext } from '../release/verify.js';
 
-import { ASSUMPTIONS_HEADING } from '@open-tomato/rafa-board';
-
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 
+import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
 import { createGitRunner, gitSaid, pushBranch } from '../pr/index.js';
 import {
   forecastLine,

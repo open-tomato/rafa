@@ -71,21 +71,19 @@
  * step's failure with no git, no network and no `gh`;
  * {@link runnerPrSeamsIn} holds the real ones over a checkout.
  */
+import type { GhRunner } from '../adapters/tracker/github.js';
+import type { RefreshItems } from '../board/project/add-issue.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
 import type { PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
-import type { GhRunner, RefreshConfig, RefreshItems } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import {
-  createGhRunner,
-  pullRequestTitle,
-  refreshFailedWarning,
-  refreshIssueItems,
-} from '@open-tomato/rafa-board';
-
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
+import { pullRequestTitle } from '../board/naming.js';
+import { refreshFailedWarning, refreshIssueItems } from '../board/project/issue-board-refresh.js';
 import { createGitRunner, ghPullRequestsIn, gitSaid, parseWorkingTree, pushBranch } from '../pr/index.js';
 import { parseFragment } from '../release/fragment.js';
 

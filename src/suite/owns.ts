@@ -40,18 +40,15 @@
  * Nothing here spawns: `gh` arrives through the {@link GhRunner} seam,
  * and `./owns.test.ts` plants every answer.
  */
-import type { GhRunner } from '@open-tomato/rafa-board';
-
-import {
-  EPIC_LABEL_PREFIX,
-  createGhSpecIssueReader,
-  epicContextArgs,
-  epicSlugsOf,
-  ownedBoard,
-  parseBoardListing,
-} from '@open-tomato/rafa-board';
+import type { GhRunner } from '../adapters/tracker/github.js';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+
+import { ownedBoard } from '../board/board-owns.js';
+import { epicContextArgs } from '../board/epic-context.js';
+import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
+import { createGhSpecIssueReader } from '../board/issue.js';
+import { parseBoardListing } from '../board/roadmap-board.js';
 
 /** Why a plan has no `Owns:` folders; the module note lists each. */
 export type PlanOwnsReason = 'no-issue' | 'no-epic' | 'no-owns-line' | 'gh-failed';

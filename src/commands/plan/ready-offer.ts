@@ -60,17 +60,13 @@
  * drives a fake and none of them reaches GitHub, opens a terminal or
  * waits on an answer.
  */
+import type { ReadyOffer, ReadyOfferRequest } from '../../board/plan-spec.js';
+import type { ReadyReport, runIssueReady } from '../issue/ready.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-import type {
-  ReadyOffer,
-  ReadyOfferRequest,
-  ReadyReport,
-  runIssueReady,
-} from '@open-tomato/rafa-board';
-
-import { SPEC_READY_LABEL } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
+
+import { SPEC_READY_LABEL } from '../../board/readiness.js';
 
 /** What the offer is: one run of `rafa issue ready` over an issue already read. */
 export type ReadyRun = typeof runIssueReady;

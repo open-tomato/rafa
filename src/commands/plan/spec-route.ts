@@ -87,27 +87,19 @@
  * {@link createPlanRefreshOffer} read
  * `process.stdin.isTTY` and open a prompter only to ask.
  */
+import type { AlternativeOffer } from '../../board/blocked-line.js';
+import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
+import type { RefreshConfig } from '../../board/project/refresh.js';
+import type { RefreshOffer } from '../../board/snapshot-settle.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
-import type {
-  AlternativeOffer,
-  PlanSpecOptions,
-  PlanSpecResolution,
-  ReadyOffer,
-  RefreshConfig,
-  RefreshOffer,
-} from '@open-tomato/rafa-board';
 
 import fs from 'fs';
 import path from 'path';
 
-import {
-  SOURCE_REFUSAL_EXIT,
-  noSourceMessage,
-  readSpecSourceFlags,
-  resolvePlanSpec,
-} from '@open-tomato/rafa-board';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
+
+import { resolvePlanSpec } from '../../board/plan-spec.js';
+import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 import { createPlanReadyOffer } from './ready-offer.js';

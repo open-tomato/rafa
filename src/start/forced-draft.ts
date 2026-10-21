@@ -33,14 +33,13 @@
  * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { PassedOverTask } from './loop-events.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { PullRequests } from '../pr/index.js';
-import type { GhRunner } from '@open-tomato/rafa-board';
-
-import { createGhRunner } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';

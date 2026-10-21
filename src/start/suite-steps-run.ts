@@ -132,15 +132,15 @@ import type {
   SuiteStepSeams,
   TaskStepInput,
 } from './suite-step.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
-import type { GhRunner } from '@open-tomato/rafa-board';
-
-import { createGhRunner } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+
+import { createGhRunner } from '../adapters/tracker/github.js';
 
 import { baselineHaltLines } from './suite-outside-case.js';
 import {
