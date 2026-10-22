@@ -90,8 +90,6 @@ export {
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
-export { RUN_FEATURE } from '../../src/commands/claim/index.js';
-
 export {
   default as command,
   defaultBoardOnce,

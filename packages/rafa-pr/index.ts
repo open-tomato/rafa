@@ -76,8 +76,6 @@ export {
 
 export { PR_SUBJECT } from '../../src/commands/pr/declarations.js';
 
-export { PR_FEATURE } from '../../src/commands/pr/index.js';
-
 export type { PrSeams } from '../../src/commands/pr/pr-context.js';
 export {
   DEFAULT_PR_SEAMS,

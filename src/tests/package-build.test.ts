@@ -1967,6 +1967,17 @@ describe('the published declarations name no facade package', () => {
     ]);
   });
 
+  it('finds a planted declaration naming a facade package\'s commands entry, by file and line', () => {
+    const planted = [
+      `import type { PR_FEATURE } from '${facadePackageName('pr')}/commands';`,
+      'export type B = typeof PR_FEATURE;',
+    ].join('\n');
+
+    expect(facadeNamings('dist/planted.d.ts', planted)).toEqual([
+      'dist/planted.d.ts:1: import type { PR_FEATURE } from \'@open-tomato/rafa-pr/commands\';',
+    ]);
+  });
+
   it('does not read @open-tomato/rafa-typescript-config or the core subpaths as a facade', () => {
     const text = [
       'import \'@open-tomato/rafa-typescript-config/base\';',

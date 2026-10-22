@@ -23,8 +23,6 @@ export {
 
 export { RELEASE_SUBJECT } from '../../src/commands/release/declarations.js';
 
-export { RELEASE_FEATURE } from '../../src/commands/release/index.js';
-
 export type { WaitingReading } from '../../src/commands/release/status-fragments.js';
 export {
   forecastPhrase,

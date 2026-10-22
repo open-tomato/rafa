@@ -548,11 +548,20 @@ names come from, and the facade entry is no node.
   value and type alike, as `export type { … }` and `export { … }` lines and
   nothing else. `scripts/survey/facade-names.ts --package=rafa-<name>` reads
   that set with the checker, and `--entry` prints the entry it is written
-  from. eslint's `import/order` places a facade import in the `external`
-  group, with the other package imports, so a rewired importer (pass 3)
-  moves its line there. Pass 2 added the package's folder to `CUT_RULES`
-  with its facade, and at its move (pass 4) the facade becomes the package's
-  own `index`. Pass 2 moved no file under `src/` and changed no importer.
+  from. Board, release, pr and run hold a second entry, `commands.ts`,
+  mapped as `"./commands"` beside `"."` and imported as
+  `@open-tomato/rafa-<name>/commands`: it re-exports the feature object
+  (`BOARD_FEATURE`, `RELEASE_FEATURE`, `PR_FEATURE`, `RUN_FEATURE`) alone,
+  which the facade's `index.ts` does not, since a feature's index holds the
+  loaders of its lazy command modules and every library entry reaching the
+  facade would reach them. The roster, `src/commands/index.ts`, is its one
+  importer, which `src/tests/commands-entry.sweep.test.ts` holds, and
+  `--commands` prints it. eslint's `import/order` places a facade import in
+  the `external` group, with the other package imports, so a rewired
+  importer (pass 3) moves its line there. Pass 2 added the package's folder
+  to `CUT_RULES` with its facade, and at its move (pass 4) the facade
+  becomes the package's own `index`. Pass 2 moved no file under `src/` and
+  changed no importer.
 - **The rewire moves effort's, inventory's, board's, release's, pr's and run's
   importers onto their facades and keeps the files each one's groups name on
   their paths.**
@@ -660,13 +669,15 @@ names come from, and the facade entry is no node.
   codemod does not print, `libraryChunks`: board's row has 21 such files,
   release's eight, pr's 33 and run's six: files a library entry reaches
   statically and that stay on their paths after the rewire, since through the
-  facade that graph reaches the package's lazy command modules
-  (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`, `PR_FEATURE`
-  re-exports `src/commands/pr/index.ts` and `RUN_FEATURE` re-exports
-  `src/commands/claim/index.ts`) and the splitting build writes each as a chunk
-  of its own. Run's six are the library entry `src/index.ts` itself, with
-  `src/plan.ts`, `src/start.ts` and the three `src/commands/plan/` files
-  (`bundled-check.ts`, `claim-route.ts` and `store-check.ts`) it reaches. The
+  facade that graph reached the package's lazy command modules while the
+  facade carried the feature (`RELEASE_FEATURE` re-exports
+  `src/commands/release/index.ts`, `PR_FEATURE` re-exports
+  `src/commands/pr/index.ts` and `RUN_FEATURE` re-exports
+  `src/commands/claim/index.ts`, each now through its commands entry alone)
+  and the splitting build wrote each as a chunk of its own. Run's six are the
+  library entry `src/index.ts` itself, with `src/plan.ts`, `src/start.ts` and
+  the three `src/commands/plan/` files (`bundled-check.ts`, `claim-route.ts`
+  and `store-check.ts`) it reaches. The
   published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,

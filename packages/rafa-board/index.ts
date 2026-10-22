@@ -412,8 +412,6 @@ export { causeOf } from '../../src/bugs/cause-rule.js';
 
 export { BOARD_SUBJECT } from '../../src/commands/board/declarations.js';
 
-export { BOARD_FEATURE } from '../../src/commands/board/index.js';
-
 export type {
   DoctorRefsReading,
   DoctorRefsSeams,
