@@ -360,7 +360,6 @@ export { createRunDecisions } from '../../src/start/continue-run.js';
 
 export type { TaskLearning } from '../../src/start/dispatch.js';
 export {
-  SESSION_ID_FLAG,
   dispatchTask,
   renderProgressForDispatch,
   storeTaskReport,

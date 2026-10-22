@@ -22,10 +22,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-import { claudeArgs } from '@open-tomato/rafa/core/loop';
+import { claudeArgs, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
-import { SESSION_ID_FLAG } from '../start/dispatch.js';
 
 import { splitCriteria } from './verify-plan.js';
 import {

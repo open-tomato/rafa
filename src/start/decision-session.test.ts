@@ -8,10 +8,9 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { SETTING_SOURCES_FLAG } from '@open-tomato/rafa/core/loop';
+import { SESSION_ID_FLAG, SETTING_SOURCES_FLAG } from '@open-tomato/rafa/core/loop';
 
 import { DECISION_TOOLS, decisionFlags, runDecisionSession } from './decision-session.js';
-import { SESSION_ID_FLAG } from './dispatch.js';
 
 describe('decisionFlags', () => {
   it('names the session id, then the read-only tools last', () => {

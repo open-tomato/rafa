@@ -115,7 +115,7 @@ import { randomUUID } from 'crypto';
 
 import { agentEffortLookup } from '@open-tomato/rafa-effort';
 
-import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { runClaudeCaptured, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, resolveDeclarationFlags , escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { describeTaskReportRecord, recordTaskReport } from '@open-tomato/rafa/report/record';
@@ -134,9 +134,6 @@ import { knownMissingNotice } from './preflight.js';
 import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 import { alwaysRunLines, baseLines, typeCheckLines } from './task-gate-lines.js';
-
-/** The flag a task session is spawned with to run under the loop's id. */
-export const SESSION_ID_FLAG = '--session-id';
 
 /**
  * How one task's Claude session is spawned: `prompt` on stdin, the

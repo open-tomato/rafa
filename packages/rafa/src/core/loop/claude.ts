@@ -218,6 +218,13 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
 export const SETTING_SOURCES_FLAG = '--setting-sources';
 
 /**
+ * The flag a session is spawned with to run under the id the loop
+ * picked for it. A task session's id goes ahead of its declaration's
+ * flags; see the module note.
+ */
+export const SESSION_ID_FLAG = '--session-id';
+
+/**
  * Builds the argument list for one session: the base arguments, the
  * setting sources, the served flags, then the flags.
  *

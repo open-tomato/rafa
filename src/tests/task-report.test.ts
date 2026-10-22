@@ -135,7 +135,7 @@ import {
   it,
 } from 'bun:test';
 
-import { CLAUDE_BASE_ARGS } from '@open-tomato/rafa/core/loop';
+import { CLAUDE_BASE_ARGS, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
@@ -145,7 +145,6 @@ import {
   dispatchTask,
   renderProgressForDispatch,
   runTaskSession,
-  SESSION_ID_FLAG,
   storeTaskReport,
 } from '../start/dispatch.js';
 

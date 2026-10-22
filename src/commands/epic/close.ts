@@ -143,7 +143,7 @@ import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { claudeArgs, SESSION_ID_FLAG, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { selectEffortStore } from '@open-tomato/rafa/store';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -156,7 +156,6 @@ import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
 import { runVerification } from '../../epic/verify-run.js';
-import { SESSION_ID_FLAG } from '../../start/dispatch.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 
 import { isDocsOnlyCriterion } from './close-docs.js';

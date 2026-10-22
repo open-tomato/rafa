@@ -195,7 +195,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/config-registry.ts': 'declarationGraph',
       'src/config/shape.ts': 'declarationGraph',
       'src/effort/report-skills-read.ts': 'backEdge',
-      'src/inventory/search/index.ts': 'backEdge',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/relation-readings.ts': 'loadCycle',

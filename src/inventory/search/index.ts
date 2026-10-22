@@ -97,9 +97,7 @@ import { join, relative } from 'node:path';
 
 import { collectSessionRow, sessionLogDir } from '@open-tomato/rafa-effort';
 
-import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
-
-import { SESSION_ID_FLAG } from '../../start/dispatch.js';
+import { claudeArgs, SESSION_ID_FLAG, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 
 import { parseSearchBlock } from './block.js';
 import { renderSearchPrompt } from './prompt.js';
