@@ -56,6 +56,11 @@ import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 
 import { homedir } from 'node:os';
 
+import { createFileSync, createLocalSync } from '@open-tomato/rafa-effort';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory';
+
+import { createConsoleLogger } from '@open-tomato/rafa/adapters/logger/console';
+import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
 import { activeAdapterRegistry, PORT_VERSIONS, registerAdapters } from '@open-tomato/rafa/core/adapters';
 import { activeDefaults } from '@open-tomato/rafa/core/config';
 import { describeValue, STORE_BACKENDS } from '@open-tomato/rafa/core/config/sections';
@@ -63,15 +68,10 @@ import { createTextOutput } from '@open-tomato/rafa/core/output';
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { createLocalLearning, localInstinctsDir } from './adapters/learning/local.js';
-import { createConsoleLogger } from './adapters/logger/console.js';
-import { createEventsOutput } from './adapters/output/events.js';
 import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
 import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from './adapters/tracker/local.js';
-import { createFileSync } from './effort/sync/file.js';
-import { createLocalSync } from './effort/sync/select.js';
 
 /** What every refusal opens with: the registry's own opening. */
 const REFUSAL = 'adapter registry';

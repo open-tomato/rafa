@@ -30,7 +30,7 @@ import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { Issue, TrackerKind } from '@open-tomato/rafa/ports';
 
-import { expectOneArgument } from '../plan/plan-files.js';
+import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 
 import { ISSUE_SHOW_DECLARATION } from './declarations.js';
 import {

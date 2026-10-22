@@ -6,6 +6,15 @@
  * with `src/effort/store/`, `src/ports/` and four named files, at the
  * same paths under `packages/rafa/src/`.
  *
+ * Beside `core/`, the package holds the effort store, the ports, and
+ * the folders pass 1 of #808 moved in, the root files that reach no
+ * feature (`scripts/codemod/moves/pass-1.ts`): the logger and events
+ * adapters, `bugs/`, `commands/plan/plan-files.ts`, the
+ * `config-schema-*.ts` section files, `modules/`, `next/hop-record.ts`,
+ * `plan/`, `project/`, `runtime/live-loops.ts` and `utils/`. Each sits
+ * at its old path below `src/`; outside `core/` no barrel rule applies,
+ * so a file outside the package imports one by its own subpath.
+ *
  * Where core is:
  *
  *   - {@link CORE_FOLDERS} and {@link CORE_NAMED_FILES}: the folders and
@@ -79,7 +88,7 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  * `sections.ts` directly.
  *
  * `plan` has two. The leaf `blocks.ts` sits alone behind
- * `block-reader.ts`, because `parse.ts` imports `src/utils/tracker.ts`,
+ * `block-reader.ts`, because `parse.ts` imports `packages/rafa/src/utils/tracker.ts`,
  * which imports `blocks.ts` back, and one barrel over both would close
  * a cycle through the tracker. `index.ts` holds `parse.ts` and
  * `plan-files.ts`.
@@ -92,7 +101,7 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
  * that file imports `index.ts` back. `hop-record.ts` sits alone behind
- * `hops.ts`, because `src/next/hop-record.ts` imports it by value and
+ * `hops.ts`, because `packages/rafa/src/next/hop-record.ts` imports it by value and
  * was reached by value from `sessions.ts`, through
  * `src/loop/session-record-parse.ts`, when the split was made, so
  * `index.ts` over it would have closed a cycle; that parser has since

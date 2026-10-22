@@ -94,8 +94,8 @@
  * somewhere else reads exactly like a module nothing guards.
  */
 import type { TaskCommitRunner } from '../start/commit.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -119,9 +119,9 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 

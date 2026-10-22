@@ -35,8 +35,6 @@ import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

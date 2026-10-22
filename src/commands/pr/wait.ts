@@ -8,8 +8,10 @@
  * The poll is `src/pr/checks.ts`'s `waitForChecks` over
  * `PullRequests.checks`, the same pair the loop's own CI gate
  * (`src/start/pr-lifecycle.ts`) and `pr triage --resolve` poll with, and
- * the deadline and the interval are that gate's own constants, so one
- * wait and the other agree about what green means and about how often a
+ * the deadline and the interval are that gate's own: the default
+ * deadline is core's `DEFAULT_CI_TIMEOUT_MIN`, which the loop's
+ * `--ci-timeout` defaults to, and the interval the gate's
+ * `CI_POLL_INTERVAL_MS`, so one wait and the other agree about what green means and about how often a
  * pull request is asked.
  *
  * What it does NOT do is the rest of that gate: no repair session, no
@@ -147,14 +149,14 @@ import type { NextEndingSeams } from '../../next/ending.js';
 import type { CheckRow, ChecksVerdict, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 
 import { endWithNextStep } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 
 import { SEPARATOR } from './current.js';
-import { DEFAULT_WAIT_TIMEOUT_MIN, PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';
+import { PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';
 import {
   lineRefusal,
   onProvider,
@@ -233,7 +235,7 @@ export interface PrWaitResult extends PrWaitReading {
  */
 export function readTimeoutMinutes(flags: RafaContext['flags'], usage: string): number {
   const value = flags[WAIT_TIMEOUT_FLAG];
-  if (value === undefined) return DEFAULT_WAIT_TIMEOUT_MIN;
+  if (value === undefined) return DEFAULT_CI_TIMEOUT_MIN;
   const spelled = typeof value === 'boolean'
     ? `--${WAIT_TIMEOUT_FLAG} with no value`
     : `"${value}"`;

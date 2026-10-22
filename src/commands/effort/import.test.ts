@@ -22,8 +22,6 @@ import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 import type { SyncPullRequest } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

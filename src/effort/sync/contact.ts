@@ -13,7 +13,7 @@
  * the directory and the file (`rafa effort copy` and `rafa effort
  * import`), which a command syncing on its own never has. Every other
  * kind is selected by `selectSync` (`select.ts`) through the registry
- * `loadModules` (`src/modules/load.ts`) answers for the config's
+ * `loadModules` (`packages/rafa/src/modules/load.ts`) answers for the config's
  * `modules:` and `allowList:`, as `rafa doctor`'s `effort sync` row
  * selects it. The loader's own warnings are not written here: the
  * dispatcher writes them once for every command already.
@@ -81,18 +81,17 @@
  * reading it is a fault, and is rethrown as the command's own read
  * would throw it.
  */
-import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { baseAdapterRegistry } from '../../modules/activate.js';
-import { loadModules, moduleSettings } from '../../modules/load.js';
+import { baseAdapterRegistry } from '@open-tomato/rafa/modules/activate';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import { selectSync } from './select.js';
 

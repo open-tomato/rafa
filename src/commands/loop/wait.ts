@@ -79,14 +79,18 @@
  */
 import type { PickedSession } from './loop-sessions.js';
 import type { AwakeClock, AwakeMark, AwakeReading } from '../../loop/awake-clock.js';
-import type { EventLine } from '../../loop/events-file.js';
 import type { WaitReason, WaitReasonRow, WaitUntil } from '../../loop/wait-reasons.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PidProbe, SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
+import type { EventLine } from '@open-tomato/rafa-run';
 
 import { relative } from 'node:path';
 
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run';
+
+import { EVENT_PREFIX, oneLine, padKind } from '@open-tomato/rafa/adapters/output/events';
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSession, SessionRecordError } from '@open-tomato/rafa/core/loop';
@@ -96,9 +100,7 @@ import {
 } from '@open-tomato/rafa/core/loop/readings';
 import { plural } from '@open-tomato/rafa/core/plan';
 
-import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
-import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import {
   DEFAULT_WAIT_UNTIL,
   matchEvent,
@@ -111,7 +113,6 @@ import {
   waitExitCode,
   WaitUntilError,
 } from '../../loop/wait-reasons.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   lineRefusal,

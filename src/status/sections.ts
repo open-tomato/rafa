@@ -162,44 +162,75 @@ import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
 import type { ClaimBranches, ClaimLabels, ClaimsReading } from './claims.js';
 import type { EpicView, PlaceView } from './place-line.js';
 import type { WaitingReading, WaitingSources } from './waiting.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { Epic } from '../board/epics.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
-import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
 import type { BlockedTask } from '../loop/blocked-tasks.js';
-import type { NextOwnerGateOptions } from '../next/owner-gate.js';
-import type { NextBoard, NextRoadmapReading, NextSources, OpenPull, PickedLine } from '../next/readings.js';
-import type { NextBoardOptions } from '../next/sources.js';
-import type { PlanListing } from '../plan/list.js';
-import type { GitRunner, PrProviderReading, PullRequests } from '../pr/index.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { Place } from '../project/position.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { Place } from '@open-tomato/rafa/project/position';
+import type {
+  BlockedIssuesReport,
+  BoardIssue,
+  BoardListing,
+  Epic,
+  GhResult,
+  GhRunner,
+} from '@open-tomato/rafa-board';
+import type {
+  GitRunner,
+  NextBoardOptions,
+  NextOwnerGateOptions,
+  OwnerApproval,
+  PrProviderReading,
+  PullRequests,
+} from '@open-tomato/rafa-pr';
+import type {
+  CleanupCounts,
+  CleanupSeams,
+  NextBoard,
+  NextRoadmapReading,
+  NextSources,
+  OpenPull,
+  PickedLine,
+  PlanListing,
+  WorktreeRow,
+} from '@open-tomato/rafa-run';
 
 import { existsSync } from 'node:fs';
+
+import {
+  ROADMAP_LABEL,
+  createGhBoardListing,
+  createGhRunner,
+  horizonOf,
+  readBlockedIssues,
+  readEpics,
+  resolvePlace,
+} from '@open-tomato/rafa-board';
+import {
+  DEFAULT_BASE_BRANCH,
+  createGhPullRequests,
+  createGitRunner,
+  ghNextBoard,
+  nextOwnerGate,
+  resolvePrProvider,
+} from '@open-tomato/rafa-pr';
+import {
+  cleanupCounts,
+  defaultCleanupSeams,
+  readBranch,
+  readBranchPlan,
+  readCleanup,
+  readOpenPull,
+  readPlans,
+} from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
+import { positionFilePath } from '@open-tomato/rafa/project/position';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBlockedIssues } from '../board/blocked-issues.js';
-import { readEpics } from '../board/epics.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { horizonOf } from '../board/roadmap-epic-rows.js';
-import { ROADMAP_LABEL } from '../board/setup.js';
-import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { nextOwnerGate } from '../next/owner-gate.js';
-import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
-import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
-import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
-import { positionFilePath } from '../project/position.js';
 
 import { readBlockedCount } from './blocked-count.js';
 import { readClaimBranches, readClaims } from './claims.js';

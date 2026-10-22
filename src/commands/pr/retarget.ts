@@ -40,8 +40,9 @@
 import type { LineFlags, PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
+import { readRequiredFlag } from '@open-tomato/rafa-board';
+
 import { retargetedLine } from '../../start/pr-retarget.js';
-import { readRequiredFlag } from '../issue/issue-tracker.js';
 
 import { PR_RETARGET_DECLARATION } from './declarations.js';
 import { DEFAULT_PR_SEAMS, lineRefusal, onProvider, openPrContext, PR_USAGE, readPullArgument } from './pr-context.js';

@@ -89,10 +89,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { liveLoopsOf } from '@open-tomato/rafa/runtime/live-loops';
 
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
-import { liveLoopsOf } from '../../runtime/live-loops.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import { readFollowUps, readPackageFacts } from './merge-followups.js';

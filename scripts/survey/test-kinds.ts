@@ -6,27 +6,28 @@
  *
  * {@link testKind} is the pure core: it takes the globs and matches each
  * with `Bun.Glob` against a path relative to the repository root, as
- * `integrationFiles` of `src/suite/scope.ts` does. {@link readTestKindGlobs}
- * reads the two lists from the project's `.rafa/config.yaml` through
- * `readConfigFile`, each falling back to `TESTS_DEFAULTS` of
- * `src/config-schema-tests.ts` when the file sets no such key. A list the
- * file sets empty stays empty, since a list written `[]` has been said.
- * No pattern is copied here.
+ * `integrationFiles` of `src/suite/checks.ts` does. {@link readTestKindGlobs}
+ * reads the two lists from the project scope through `readProjectScope`
+ * of `@open-tomato/rafa/core/config/load`, after `registerCoreConfigSections`
+ * of `src/config-registry.ts` has registered the sections and the template
+ * hook. The scope holds two files: the module file, `rafa.config.ts` or
+ * `rafa.config.mjs` at the root, and `.rafa/config.yaml`, the local layer.
+ * Each arrives with the templates its `templates` key names already laid
+ * under its own keys. A key the local file sets comes first, then the
+ * module file's, then `TESTS_DEFAULTS` of `src/config-schema-tests.ts`,
+ * whose two lists are empty. A list a file sets empty stays empty, since
+ * a list written `[]` has been said. No pattern is copied here.
  *
- * `readConfigFile` reads the file without the config registry. Measured on
- * bun 1.3.14: with the registry unloaded the `tests` mapping arrives in the
- * file's `extras`; with it loaded, as `testsIntegration` and `testsContract`
- * in its `values`. The reader takes `values` first and `extras` after, so
- * it answers the same whichever module loaded first. It refuses a key the
- * file sets to anything but a list of strings, and a `tests` key that is
- * not a mapping, naming the file and the key.
+ * Every refusal is the load's own: a template name no template holds, a
+ * `tests` key that is not a mapping and a list that is not one of strings
+ * are refused by `readProjectScope`, naming the file.
  */
 
-import type { ConfigFile } from '@open-tomato/rafa/core/config';
+import { TESTS_DEFAULTS } from '@open-tomato/rafa-run';
 
-import { readConfigFile } from '@open-tomato/rafa/core/config/load';
+import { readProjectScope } from '@open-tomato/rafa/core/config/load';
 
-import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
+import { registerCoreConfigSections } from '../../src/config-registry';
 
 /** The kind of a test file: a unit, contract or use-case test. */
 export type TestKind = 'unit' | 'contract' | 'use-case';
@@ -59,57 +60,25 @@ export function testKind(path: string, globs: TestKindGlobs): TestKind {
   return 'unit';
 }
 
-/** Whether `value` is a plain object, not an array and not `null`. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** The `tests` mapping of the file's extras, or an empty one. */
-function testsExtra(file: ConfigFile): Record<string, unknown> {
-  const extra = file.extras.find((entry) => entry.key === 'tests');
-  if (extra === undefined) return {};
-  if (!isRecord(extra.value)) {
-    throw new Error(`${file.path}: tests is not a mapping`);
-  }
-  return extra.value;
-}
-
-/** `value` as a list of strings, refused naming `key` when it is not one. */
-function globList(file: ConfigFile, key: string, value: unknown): readonly string[] {
-  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
-    throw new Error(`${file.path}: tests.${key} is not a list of strings`);
-  }
-  return value;
-}
-
-/** The list the file sets at `key`, or undefined where it sets none. */
-function fileList(
-  file: ConfigFile,
-  key: 'contract' | 'integration',
-  resolved: readonly string[] | undefined,
-): readonly string[] | undefined {
-  if (resolved !== undefined) return resolved;
-  const value = testsExtra(file)[key];
-  return value === undefined
-    ? undefined
-    : globList(file, key, value);
-}
-
 /**
- * The two glob lists of the project at `root`, read from its
- * `.rafa/config.yaml`, each falling back to `TESTS_DEFAULTS` where the
- * file sets no such key or there is no file. An empty list stays empty.
+ * The two glob lists of the project at `root`: its `.rafa/config.yaml`'s
+ * key, else its module file's, else `TESTS_DEFAULTS`. Each file's
+ * templates are already laid under its own keys, and an empty list
+ * stays empty.
  *
- * @param root - the repository root whose `.rafa/config.yaml` is read.
+ * @param root - the repository root whose project scope is read.
  * @returns the `tests.contract` and `tests.integration` lists.
+ * @throws What `readProjectScope` throws for a file the load refuses.
  */
-export function readTestKindGlobs(root: string): TestKindGlobs {
-  const file = readConfigFile(root);
-  if (file === null) {
-    return { contract: TESTS_DEFAULTS.testsContract, integration: TESTS_DEFAULTS.testsIntegration };
-  }
+export async function readTestKindGlobs(root: string): Promise<TestKindGlobs> {
+  registerCoreConfigSections();
+  const { local, file } = await readProjectScope(root);
   return {
-    contract: fileList(file, 'contract', file.values.testsContract) ?? TESTS_DEFAULTS.testsContract,
-    integration: fileList(file, 'integration', file.values.testsIntegration) ?? TESTS_DEFAULTS.testsIntegration,
+    contract: local?.values.testsContract
+      ?? file?.values.testsContract
+      ?? TESTS_DEFAULTS.testsContract,
+    integration: local?.values.testsIntegration
+      ?? file?.values.testsIntegration
+      ?? TESTS_DEFAULTS.testsIntegration,
   };
 }

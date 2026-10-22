@@ -99,10 +99,15 @@ import type { StackName } from '../schema/stack.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
+import {
+  mergeFrontmatter,
+  readFrontmatterDocument,
+  writeFrontmatter,
+} from '@open-tomato/rafa-effort';
+
 import { SKILL_FILE, scanLayout } from '../check/layout.js';
 import { checkFile } from '../check/run.js';
 import { bodySections, firstSentence, WHEN_TO_USE_HEADING } from '../demote/classify.js';
-import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, LISTING_LIMIT } from '../schema/skill.js';
 import { isStackList, stackPaths, stacksFromEccSkillName } from '../schema/stack.js';
 

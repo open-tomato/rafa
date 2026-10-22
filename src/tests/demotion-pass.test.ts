@@ -37,7 +37,6 @@
  *     would pass either way, so the tree is asserted to already hold
  *     the moved and written files from the first apply.
  */
-import '../adapter-registry.js';
 
 import {
   existsSync,

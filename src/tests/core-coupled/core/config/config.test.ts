@@ -86,6 +86,7 @@ import {
   CONFIG_FILE,
   ConfigError,
   configFilePath,
+  layTemplatesUnder,
   parseConfigDocument,
   parseConfigText,
   readConfigDocument,
@@ -108,10 +109,16 @@ const PATH = '/repo/.rafa/config.yaml';
 /** The label a user scope file parses under. No file is read at it. */
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
+/** The label a project's module file parses under in the four-file cases, with {@link PATH} its local file. */
+const MODULE_PATH = '/repo/rafa.config.ts';
+
+/** The label a user scope's module file parses under, with {@link USER_PATH} its local file. */
+const USER_MODULE_PATH = '/home/someone/.rafa/rafa.config.ts';
+
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, tests, features)';
+  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -209,11 +216,19 @@ const SETTINGS: readonly ConfigSetting[] = [
   'taskLessons',
   'mergeDuplicates',
   'namingBranch',
+  'templates',
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsContract',
   'testsAlwaysRun',
   'testsRetakeRedAlone',
+  'checksTask',
+  'checksStage',
+  'checksLoop',
+  'checksPullRequest',
+  'checksStretch',
+  'checksReleasePullRequest',
+  'checksPublish',
   'featuresBoard',
   'featuresPr',
   'featuresRun',
@@ -322,16 +337,19 @@ const DEFAULTS: RafaConfig = {
   taskLessons: 'on',
   mergeDuplicates: 'warn',
   namingBranch: 'feat/{stub}',
-  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
-  testsIntegration: [
-    '**/*-integration.test.ts',
-    '**/*.integration.test.ts',
-    '**/*-spawned*.test.ts',
-    '**/*-cli.test.ts',
-  ],
-  testsContract: ['**/*.contract.test.ts'],
+  templates: [],
+  testsFullSuiteTriggers: [],
+  testsIntegration: [],
+  testsContract: [],
   testsAlwaysRun: ['src/**/*.sweep.test.ts'],
   testsRetakeRedAlone: true,
+  checksTask: [],
+  checksStage: [],
+  checksLoop: [],
+  checksPullRequest: [],
+  checksStretch: [],
+  checksReleasePullRequest: [],
+  checksPublish: [],
   featuresBoard: true,
   featuresPr: true,
   featuresRun: true,
@@ -490,12 +508,21 @@ const FULL = [
   '  duplicates: allow',
   'naming:',
   '  branch: "work/{stub}"',
+  'templates: [escalation]',
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
-  '  integration: []',
+  '  integration: [e2e/*.flow.test.ts]',
   '  contract: [packages/*/src/*.contract.test.ts]',
   '  alwaysRun: [src/sweeps/*.test.ts]',
   '  retakeRedAlone: false',
+  'checks:',
+  '  task: [affected]',
+  '  stage: [related, integration]',
+  '  loop: [full]',
+  '  pullRequest: [unit, contract, integration]',
+  '  stretch: [related, contract, integration]',
+  '  releasePullRequest: [integration]',
+  '  publish: [full]',
   'features:',
   '  board: false',
   '  pr: false',
@@ -617,11 +644,19 @@ const FULL_VALUES: RafaConfig = {
   taskLessons: 'off',
   mergeDuplicates: 'allow',
   namingBranch: 'work/{stub}',
+  templates: ['escalation'],
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
-  testsIntegration: [],
+  testsIntegration: ['e2e/*.flow.test.ts'],
   testsContract: ['packages/*/src/*.contract.test.ts'],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
   testsRetakeRedAlone: false,
+  checksTask: ['affected'],
+  checksStage: ['related', 'integration'],
+  checksLoop: ['full'],
+  checksPullRequest: ['unit', 'contract', 'integration'],
+  checksStretch: ['related', 'contract', 'integration'],
+  checksReleasePullRequest: ['integration'],
+  checksPublish: ['full'],
   featuresBoard: false,
   featuresPr: false,
   featuresRun: false,
@@ -694,7 +729,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(16);
+    expect(lists).toHaveLength(24);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1331,6 +1366,11 @@ describe('parseConfigText', () => {
         'naming:\n  branch: "rafa/{stub}"', 'namingBranch', 'rafa/{stub}',
       ],
       [
+        'templates', 'templates: escalation',
+        'templates is "escalation", expected a list of template names',
+        'templates: [escalation]', 'templates', ['escalation'],
+      ],
+      [
         'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
         'tests.fullSuiteTriggers is "package.json", expected a list of glob patterns',
         'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1354,6 +1394,41 @@ describe('parseConfigText', () => {
         'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: off',
         'tests.retakeRedAlone is "off", expected true or false',
         'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+      ],
+      [
+        'checks.task', 'checks:\n  task: [unit, unit]',
+        'checks.task is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "unit" is written twice',
+        'checks:\n  task: [affected]', 'checksTask', ['affected'],
+      ],
+      [
+        'checks.stage', 'checks:\n  stage: [lint]',
+        'checks.stage[0] is "lint", expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  stage: [related]', 'checksStage', ['related'],
+      ],
+      [
+        'checks.loop', 'checks:\n  loop: full',
+        'checks.loop is "full", expected a list of check names from: affected, related, unit, contract, integration, full',
+        'checks:\n  loop: [full]', 'checksLoop', ['full'],
+      ],
+      [
+        'checks.pullRequest', 'checks:\n  pullRequest: [7]',
+        'checks.pullRequest[0] is 7, expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  pullRequest: [unit]', 'checksPullRequest', ['unit'],
+      ],
+      [
+        'checks.stretch', 'checks:\n  stretch: { related: true }',
+        'checks.stretch is a mapping, expected a list of check names from: affected, related, unit, contract, integration, full',
+        'checks:\n  stretch: [related, contract]', 'checksStretch', ['related', 'contract'],
+      ],
+      [
+        'checks.releasePullRequest', 'checks:\n  releasePullRequest: [full, integration, full]',
+        'checks.releasePullRequest is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "full" is written twice',
+        'checks:\n  releasePullRequest: [integration]', 'checksReleasePullRequest', ['integration'],
+      ],
+      [
+        'checks.publish', 'checks:\n  publish: ["bun test"]',
+        'checks.publish[0] is "bun test", expected one of: affected, related, unit, contract, integration, full',
+        'checks:\n  publish: [full]', 'checksPublish', ['full'],
       ],
       [
         'features.board', 'features:\n  board: "false"',
@@ -1482,7 +1557,6 @@ describe('resolveConfig', () => {
       resolved.provenance.specsDir,
       resolved.provenance.trackingAll,
     ]).toEqual([{ file: PATH, entry: 0 }, { file: PATH, entry: 3 }, { file: USER_PATH, entry: 0 }, null, null]);
-    expect(resolved.shadowed).toEqual([]);
   });
 
   it('merges a file\'s routing rows by key over the five defaults', () => {
@@ -1499,12 +1573,15 @@ describe('resolveConfig', () => {
       config: DEFAULTS,
       sources: sourcesWith({}),
       path: null,
+      localPath: null,
       userPath: null,
+      userLocalPath: null,
       extras: [],
+      localExtras: [],
       userExtras: [],
+      userLocalExtras: [],
       warnings: [],
       provenance: Object.fromEntries(Object.keys(DEFAULTS).map((setting) => [setting, null])) as Record<ConfigSetting, null>,
-      shadowed: [],
     });
   });
 
@@ -1731,6 +1808,124 @@ describe('resolveConfig', () => {
   });
 });
 
+describe('resolveConfig over four files, two per scope', () => {
+  it('ranks the local file over the file over the user local file over the user file, setting by setting', () => {
+    const user = fileOf(FULL, USER_MODULE_PATH);
+    const userLocal = fileOf('plan:\n  inject: task\n  dir: user-local-plans\nspecs:\n  dir: user-local-specs\n', USER_PATH);
+    const file = fileOf('plan:\n  dir: project-plans\nspecs:\n  dir: project-specs\n', MODULE_PATH);
+    const local = fileOf('specs:\n  dir: local-specs\n');
+    const resolved = resolveConfig({ local, file, userLocal, user });
+
+    expect(resolved.config).toEqual({ ...FULL_RESOLVED, inject: 'task', planDir: 'project-plans', specsDir: 'local-specs' });
+    expect(resolved.sources).toEqual(sourcesWith({ specsDir: 'local', planDir: 'file', inject: 'user' }, 'user'));
+    expect([resolved.path, resolved.localPath, resolved.userPath, resolved.userLocalPath])
+      .toEqual([MODULE_PATH, PATH, USER_MODULE_PATH, USER_PATH]);
+  });
+
+  it('names the file that answered each setting, telling the two user files apart', () => {
+    const user = fileOf(FULL, USER_MODULE_PATH);
+    const userLocal = fileOf('plan:\n  inject: task\n', USER_PATH);
+    const file = fileOf('plan:\n  dir: project-plans\n', MODULE_PATH);
+    const local = fileOf('specs:\n  dir: local-specs\n');
+    const { provenance } = resolveConfig({ local, file, userLocal, user, cli: { store: 'sqlite' } });
+
+    expect([provenance.specsDir, provenance.planDir, provenance.inject, provenance.trackerDefault, provenance.store]).toEqual([
+      { file: PATH, entry: 0 },
+      { file: MODULE_PATH, entry: 0 },
+      { file: USER_PATH, entry: 0 },
+      { file: USER_MODULE_PATH, entry: 0 },
+      null,
+    ]);
+  });
+
+  it('lets the local file alone outrank the default, for every setting', () => {
+    const resolved = resolveConfig({ local: fileOf(FULL) });
+
+    expect(resolved.config).toEqual(FULL_RESOLVED);
+    expect(resolved.sources).toEqual(sourcesWith({}, 'local'));
+    expect([resolved.path, resolved.localPath, resolved.userPath, resolved.userLocalPath]).toEqual([null, PATH, null, null]);
+  });
+
+  it('lets the user local file alone outrank the default, reporting user and naming its own path', () => {
+    const resolved = resolveConfig({ userLocal: fileOf('plan:\n  dir: user-local-plans\n', USER_PATH) });
+
+    expect([resolved.config.planDir, resolved.sources.planDir]).toEqual(['user-local-plans', 'user']);
+    expect(resolved.provenance.planDir).toEqual({ file: USER_PATH, entry: 0 });
+    expect([resolved.userPath, resolved.userLocalPath]).toEqual([null, USER_PATH]);
+  });
+
+  it('lets the command line outrank the local file', () => {
+    const resolved = resolveConfig({ local: fileOf('plan:\n  dir: local-plans\n'), cli: { planDir: 'cli-plans' } });
+
+    expect([resolved.config.planDir, resolved.sources.planDir, resolved.provenance.planDir]).toEqual(['cli-plans', 'cli', null]);
+  });
+
+  it('merges a map setting by key from the default up through all four files, naming the highest file', () => {
+    const user = fileOf(FULL, USER_MODULE_PATH);
+    const userLocal = fileOf('routing: { cleanup: user-local-cleaner, prose: user-local-prose }\n', USER_PATH);
+    const file = fileOf('routing: { prose: project-prose, tests: project-tests }\n', MODULE_PATH);
+    const local = fileOf('routing: { tests: local-tests }\n');
+    const all = resolveConfig({ local, file, userLocal, user });
+    const noLocal = resolveConfig({ file, userLocal, user });
+
+    expect(all.config.routing).toEqual(new Map<string, RouteTarget>([
+      ['prose', 'project-prose'],
+      ['tests', 'local-tests'],
+      ['repair', 'build-error-resolver'],
+      ['review', false],
+      ['implementation', 'loop-implementer'],
+      ['cleanup', 'user-local-cleaner'],
+    ]));
+    expect([all.sources.routing, all.provenance.routing]).toEqual(['local', { file: PATH, entry: 0 }]);
+    expect(noLocal.config.routing.get('tests')).toBe('project-tests');
+    expect([noLocal.sources.routing, noLocal.provenance.routing]).toEqual(['file', { file: MODULE_PATH, entry: 0 }]);
+  });
+
+  it('names the user local file for a map setting only the user files answer, over the user file', () => {
+    const user = fileOf(FULL, USER_MODULE_PATH);
+    const userLocal = fileOf('routing: { cleanup: user-local-cleaner }\n', USER_PATH);
+    const resolved = resolveConfig({ userLocal, user });
+
+    expect(resolved.config.routing.get('cleanup')).toBe('user-local-cleaner');
+    expect(resolved.config.routing.get('review')).toBe(false);
+    expect([resolved.sources.routing, resolved.provenance.routing]).toEqual(['user', { file: USER_PATH, entry: 0 }]);
+  });
+
+  it('lets a template the local file names outrank the file\'s own key, naming the local file and the template', () => {
+    const template = { name: 'local-template', values: fileOf('plan:\n  dir: template-plans\n').values };
+    const local = layTemplatesUnder(fileOf('store: ndjson\n'), [template]);
+    const file = fileOf('plan:\n  dir: project-plans\n', MODULE_PATH);
+    const resolved = resolveConfig({ local, file });
+
+    expect([resolved.config.planDir, resolved.sources.planDir]).toEqual(['template-plans', 'template']);
+    expect(resolved.provenance.planDir).toEqual({ file: PATH, entry: 0, template: 'local-template' });
+    expect([resolved.sources.store, resolved.provenance.store]).toEqual(['local', { file: PATH, entry: 0 }]);
+  });
+
+  it('retains each file\'s unknown keys and warns about them from the bottom layer up', () => {
+    const user = fileOf('userKey: 1\n', USER_MODULE_PATH);
+    const userLocal = fileOf('userLocalKey: 2\n', USER_PATH);
+    const file = fileOf('projectKey: 3\n', MODULE_PATH);
+    const local = fileOf('localKey: 4\n');
+    const resolved = resolveConfig({ local, file, userLocal, user });
+    const warning = (key: string, path: string): string => `rafa config: unknown key "${key}" `
+      + `in ${path} has no effect in this version ${KNOWN}`;
+
+    expect(resolved.warnings).toEqual([
+      warning('userKey', USER_MODULE_PATH),
+      warning('userLocalKey', USER_PATH),
+      warning('projectKey', MODULE_PATH),
+      warning('localKey', PATH),
+    ]);
+    expect([resolved.localExtras, resolved.extras, resolved.userLocalExtras, resolved.userExtras]).toEqual([
+      [{ key: 'localKey', value: 4 }],
+      [{ key: 'projectKey', value: 3 }],
+      [{ key: 'userLocalKey', value: 2 }],
+      [{ key: 'userKey', value: 1 }],
+    ]);
+  });
+});
+
 describe('effort.sync', () => {
   it('refuses a strategy outside the five, naming each it accepts', () => {
     const accepted = ['local', 'file', 'git', 'service', 'p2p'].map(
@@ -1821,8 +2016,8 @@ describe('the registered sections', () => {
       package: 'probe',
       settings: {},
       defaults: {},
-      checks: [({ config, sources, path, userPath }) => {
-        seen.push([config.store, sources.store, sources.effortSync, path, userPath]);
+      checks: [({ config, sources, path, userPath, provenance }) => {
+        seen.push([config.store, sources.store, sources.effortSync, path, userPath, provenance.effortSync?.file]);
         return [`probe refuses store ${config.store}`];
       }],
     }]);
@@ -1832,7 +2027,7 @@ describe('the registered sections', () => {
           + ' expected hub.url, the address of the hub, such as https://hub.example.org',
         'probe refuses store ndjson',
       ]);
-      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH]]);
+      expect(seen).toEqual([['ndjson', 'file', 'user', PATH, USER_PATH, USER_PATH]]);
     } finally {
       restoreConfigSections(previous);
     }

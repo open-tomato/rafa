@@ -100,17 +100,17 @@
  */
 import type { InventoryKind, InventorySource } from './record.js';
 import type { SourceItem, TreeSeams } from './trees.js';
-import type { ModuleState } from '../modules/load.js';
-import type { ManifestProvides, ManifestSeams } from '../modules/manifest.js';
+import type { ModuleState } from '@open-tomato/rafa/modules/load';
+import type { ManifestProvides, ManifestSeams } from '@open-tomato/rafa/modules/manifest';
 
 import { readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { RUNNING_MANIFEST_SEAMS, validateManifest } from '@open-tomato/rafa/modules/manifest';
 
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { RUNNING_MANIFEST_SEAMS, validateManifest } from '../modules/manifest.js';
 
 import { byName, skillItem, sourceItem } from './trees.js';
 

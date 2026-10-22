@@ -13,7 +13,7 @@
  * other: every line a run would still dispatch, `- [ ] ` and
  * `- [BLOCKED] ` alike, the tasks a never-closed `rafa:*` block hides
  * included. A blocked line counts because `findNextTask`
- * (`src/utils/tracker.ts`) resumes it AHEAD of every unchecked one; a
+ * (`packages/rafa/src/utils/tracker.ts`) resumes it AHEAD of every unchecked one; a
  * ticked line has run. Each open task's declaration is the one
  * `parseTaskDeclaration` answered for the line, which `parsePlan` keeps
  * on `PlanTask.declaration`. For each open task:
@@ -59,24 +59,23 @@
  * every one of them.
  */
 import type { AccountSeams, AccountSettings } from './risk/accounts.js';
-import type { CommandFinding, PathSeams, RiskLevel } from './risk/commands.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { PlanTask , TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { CommandFinding, PathSeams, RiskLevel } from '@open-tomato/rafa-inventory';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import { findAgentDefinition } from '@open-tomato/rafa-effort';
+import { readBodyCommands, readLongRuns, readTaskLineCommands } from '@open-tomato/rafa-inventory';
+
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { scanSecretNames } from '@open-tomato/rafa/plan/risk/secrets';
 import { resolveSkillTiers } from '@open-tomato/rafa/schema/tiers';
 
-import { findAgentDefinition } from '../utils/agent-definition.js';
-
 import { readAccounts } from './risk/accounts.js';
-import { readBodyCommands, readTaskLineCommands } from './risk/commands.js';
-import { readLongRuns } from './risk/long-runs.js';
-import { scanSecretNames } from './risk/secrets.js';
 
-export type { RiskLevel } from './risk/commands.js';
+export type { RiskLevel } from '@open-tomato/rafa-inventory';
 
 /** The six kinds of finding, in the order a report reads them. */
 export const RISK_KINDS = ['tools', 'destructive', 'outside-path', 'long-run', 'account', 'secret'] as const;

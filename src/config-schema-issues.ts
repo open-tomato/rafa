@@ -42,16 +42,15 @@
  * the fields of one bug, and the rules they are held to are the
  * project's.
  */
-import type { BugRules } from './bugs/record.js';
-import type { ErrorsSettings } from './config-schema-errors.js';
+import type { BugRules } from '@open-tomato/rafa/bugs/record';
+import type { ErrorsSettings } from '@open-tomato/rafa/config-schema-errors';
 import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
 import type { Reader, Reading } from '@open-tomato/rafa/core/config/sections';
 
+import { BUILT_IN_ENVIRONMENTS } from '@open-tomato/rafa/bugs/places';
+import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { listOf, refused } from '@open-tomato/rafa/core/config/sections';
 import { listedCodes } from '@open-tomato/rafa/errors/rafa-codes';
-
-import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';
-import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from './bugs/title.js';
 
 declare module '@open-tomato/rafa/core/config/config-schema' {
   /** The `issues` section's fields, added to core's. */

@@ -18,7 +18,7 @@
  * added here by the change that fixes it.
  *
  * A project's own codes come from `errors.codes`
- * (`src/config-schema-errors.ts`), and {@link listedCodes} puts the two
+ * (`packages/rafa/src/config-schema-errors.ts`), and {@link listedCodes} puts the two
  * side by side.
  */
 

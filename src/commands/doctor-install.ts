@@ -13,17 +13,17 @@
  * a null, never a failure, and none changes the exit code.
  */
 import type { PreviousCopiesReading } from './doctor-previous.js';
-import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
 
-import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 
 import { readPreviousCopies } from './doctor-previous.js';

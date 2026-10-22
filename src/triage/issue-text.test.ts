@@ -9,12 +9,12 @@
  */
 import type { BugValues } from './issue-text.js';
 import type { MatchedSignal, RankedIssue } from './similarity.js';
-import type { BugRecord } from '../bugs/record.js';
+import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_BUG_RECORD, parseBugRecord } from '../bugs/record.js';
+import { EMPTY_BUG_RECORD, parseBugRecord } from '@open-tomato/rafa/bugs/record';
 
 import {
   COMMENT_OPENING,

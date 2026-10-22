@@ -49,8 +49,6 @@ import type { Key, Terminal } from '../../cli/prompt/terminal.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 import type { Resolution } from '../../tiers/resolve.js';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

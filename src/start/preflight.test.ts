@@ -108,11 +108,9 @@ import type { BoardIssue } from '../board/roadmap-board.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config/sections';
-
-import '../adapter-registry.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   existsSync,
@@ -136,6 +134,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt , trackerPathFor } from '@open-tomato/rafa/core/plan';
 import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
@@ -151,7 +150,6 @@ import {
   ghUnauthenticatedMessage,
 } from '../pr/preflight-items.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';
@@ -1217,7 +1215,7 @@ function syncConfig(root: string, kind: string, extra: readonly string[] = []): 
 }
 
 /** The module whose `git` sync adapter the passing control loads. */
-const SYNC_FIXTURE_MODULE = fileURLToPath(new URL('../modules/testdata/sync-fixture', import.meta.url));
+const SYNC_FIXTURE_MODULE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 describe('the sync-strategy check', () => {
   it('refuses git with no module ahead of the roster and every probe, storing nothing', async () => {

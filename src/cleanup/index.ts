@@ -86,7 +86,7 @@ export type {
   ReleasePaths,
   StaleRow,
 } from './groups.js';
-export type { PastHeadCommit, PastHeadRead } from './past-head.js';
+export type { PastHeadCommit, PastHeadRead } from '@open-tomato/rafa-release';
 export type {
   RemoteOnlyRead,
   RemoteOnlyReading,

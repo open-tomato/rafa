@@ -79,10 +79,10 @@ import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/ada
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED, haltHeadline } from './checkout-guard.js';
 import { openCheckoutExpectation } from './checkout-watch.js';

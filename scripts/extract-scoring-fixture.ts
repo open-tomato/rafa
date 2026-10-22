@@ -23,14 +23,15 @@
  * Exit codes: 0 written, 2 the extract could not run.
  */
 import type { ScrubContext } from '../src/fixtures/scrub.js';
-import type { BoardIssue, CauseJudgement, Filing, ScoringFixture } from '../src/triage/scoring-fixture.js';
+import type { BoardIssue, CauseJudgement, Filing, ScoringFixture } from '@open-tomato/rafa-pr';
 
 import { resolve } from 'node:path';
+
+import { FIXTURE_REPO, filingsOf } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { fixtureScrubber, machineScrubContext } from '../src/fixtures/scrub.js';
-import { FIXTURE_REPO, filingsOf } from '../src/triage/scoring-fixture.js';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[scoring-fixture]';

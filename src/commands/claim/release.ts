@@ -85,14 +85,17 @@
  * default `feat/{stub}` when left out; a release passes its seams'
  * `branchTemplate`.
  */
-import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { IssueBoard } from '@open-tomato/rafa-board';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
+import { gitSaid } from '@open-tomato/rafa-pr';
+
+import { expectOneArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 
@@ -106,10 +109,8 @@ import {
   readClaimBranch,
 } from '../../claims/git.js';
 import { unlabelReleased } from '../../claims/labels.js';
-import { gitSaid } from '../../pr/index.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
-import { expectOneArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { CLAIM_RELEASE_DECLARATION } from './declarations.js';
 

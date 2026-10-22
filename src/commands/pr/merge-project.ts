@@ -63,23 +63,27 @@
  * before this; `rafa board sync` catches that project up as
  * `rafa issue unblock` catches up the labels.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RefreshItems } from '../../board/project/add-issue.js';
-import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { BlockersReading } from '../../board/relations/port.js';
-import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { UnblockReport } from '../../board/unblock.js';
+import type {
+  BlockersReading,
+  BoardIssue,
+  GhRunner,
+  ProjectRunnerSeams,
+  RefreshConfig,
+  RefreshItems,
+  UnblockReport,
+} from '@open-tomato/rafa-board';
+
+import {
+  BOARD_SYNC_FIX,
+  closedIssuesIn,
+  createGhBoardListing,
+  openProjectRunner,
+  readBoardRepository,
+  refreshIssueItems,
+  selectBoardRelations,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
-import { openProjectRunner } from '../../board/project/project-runner.js';
-import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
-import { selectBoardRelations } from '../../board/relations/select.js';
-import { readBoardRepository } from '../../board/repository.js';
-import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { closedIssuesIn } from '../../board/roadmap.js';
 
 /** What {@link refreshProjectAfterMerge} is made with. */
 export interface MergeProjectOptions {

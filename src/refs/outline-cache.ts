@@ -35,7 +35,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { SCOPE_DIR } from '../project/scope.js';
+import { SCOPE_DIR } from '@open-tomato/rafa/project/scope';
 
 /** Where kept outlines are written, relative to the project root. */
 export const OUTLINE_CACHE_DIR: string = join(SCOPE_DIR, 'cache', 'outline', 'v2');

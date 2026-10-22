@@ -27,8 +27,6 @@
  */
 import type { CheckIssue, CheckReport } from '../check/run.js';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

@@ -36,8 +36,9 @@
  *     and the user scope's under a home and ranks the
  *     command line over both, the pure {@link parseConfigText} and
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
- *     {@link ConfigError}, and the names and defaults every setting
- *     takes.
+ *     {@link readProjectScope}, which reads the project's two files
+ *     alone, {@link ConfigError}, and the names and defaults every
+ *     setting takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
  *     which walks up from a directory to the nearest one holding a
  *     project config, or else to the main checkout of the
@@ -141,7 +142,7 @@ export type {
   AnyAdapter,
   PortImplementations,
 } from '@open-tomato/rafa/core/adapters';
-export type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+export type { ConfigRoots, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -209,7 +210,7 @@ export type {
   ModuleManifest,
   OutputChannel,
   OutputProvision,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export type {
   CheckOutcome,
   FindingKind,
@@ -270,7 +271,7 @@ export type {
   ScopeFileSystem,
   ScopeResolution,
   ScopeSeams,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 
 export {
   activeAdapterRegistry,
@@ -280,7 +281,7 @@ export {
   registerAdapters,
   restoreAdapters,
 } from '@open-tomato/rafa/core/adapters';
-export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+export { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 export {
@@ -304,8 +305,10 @@ export {
   STORE_BACKENDS,
   SYNC_STRATEGIES,
 } from '@open-tomato/rafa/core/config/sections';
-export { default as effortCollectCommand } from './effort/collect.js';
-export { default as effortReportCommand } from './effort/report.js';
+export {
+  collect as effortCollectCommand,
+  report as effortReportCommand,
+} from '@open-tomato/rafa-effort';
 export {
   decodeWirePayload,
   EFFORT_KEY_PROJECTIONS,
@@ -328,7 +331,7 @@ export {
   OUTPUT_CHANNELS,
   RUNNING_MANIFEST_SEAMS,
   validateManifest,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export { default as planCommand } from './plan.js';
 export {
   FINDING_KINDS,
@@ -360,7 +363,7 @@ export {
   scopeAt,
   ScopeError,
   selfAndAncestors,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 export { default as startCommand } from './start.js';
 
 registerCoreConfigSections();

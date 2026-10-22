@@ -37,9 +37,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { readSessions, runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { NOTHING_DISPATCHED, openRunSession } from './session.js';
 

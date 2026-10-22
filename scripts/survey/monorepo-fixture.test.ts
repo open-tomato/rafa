@@ -20,6 +20,8 @@ import {
 } from './monorepo-fixture';
 
 const SCRIPT = join(import.meta.dir, 'monorepo-fixture.ts');
+/** Fixture builds spawn git and bun; a loaded full-suite run outlasts bun's 5s hook default. */
+const HOOK_TIMEOUT_MS = 60_000;
 const REPOSITORY_ROOT = resolve(import.meta.dir, '..', '..');
 
 /** Runs git in a fixture and returns its trimmed stdout, failing on a non-zero exit. */
@@ -43,7 +45,7 @@ describe('buildFixtures under --no-install', () => {
   beforeAll(() => {
     out = mkdtempSync(join(tmpdir(), 'monorepo-fixture-test-'));
     built = buildFixtures({ variants: VARIANTS, out, install: false });
-  });
+  }, HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     rmSync(out, { recursive: true, force: true });
@@ -243,7 +245,7 @@ describe('the bun variant, installed', () => {
       throw new Error(`fixture build failed: ${result.stdout.toString()}${result.stderr.toString()}`);
     }
     root = realpathSync(join(out, 'bun'));
-  });
+  }, HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     rmSync(out, { recursive: true, force: true });

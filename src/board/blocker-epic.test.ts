@@ -21,7 +21,7 @@
  */
 import type { BoardView } from './epic-board.js';
 import type { BoardIssue, BoardIssueState } from './roadmap-board.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

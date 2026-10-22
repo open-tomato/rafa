@@ -284,8 +284,8 @@ import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
 import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
-import type { BugRecord, BugRules } from '../bugs/record.js';
 import type { RefVerifier } from '../refs/verify.js';
+import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
@@ -301,14 +301,14 @@ import type { TrackerRefWriteAction } from '@open-tomato/rafa/store/tracker-refs
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { bugTitle } from '@open-tomato/rafa/bugs/record';
+import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { bugTitle } from '../bugs/record.js';
-import { UNKNOWN_VALUE } from '../bugs/title.js';
-import { writeTrackerBlocker } from '../utils/tracker.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
 import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';

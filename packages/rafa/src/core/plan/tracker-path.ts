@@ -1,7 +1,7 @@
 /**
  * The tracker a plan file is tracked in, by path.
  *
- * {@link trackerPathFor} moved here from `src/utils/tracker.ts`, which
+ * {@link trackerPathFor} moved here from `packages/rafa/src/utils/tracker.ts`, which
  * re-exports it under the same name for the importers outside core.
  * `loop/session-readings.ts` reads a plan's checklist from its tracker
  * once there is one, so with the rewrite in core it imports nothing

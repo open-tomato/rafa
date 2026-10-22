@@ -86,13 +86,13 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { DoctorRefsSeams } from '../doctor-refs.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';

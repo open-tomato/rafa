@@ -21,15 +21,15 @@
  * again. The step a chain stopped at is named whatever it is.
  */
 
-import type { NextInvocation } from './actions.js';
 import type { NextCeiling } from './ceiling.js';
-import type { NextActionId, NextState } from './state.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { NextActionId, NextInvocation, NextState } from '@open-tomato/rafa-run';
+
+import { commandWords } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { ALWAYS_ASKED, BARE_YES_ACTIONS, ROADMAP_ACTIONS, YES_FLAG } from './ceiling.js';
-import { commandWords } from './hint.js';
 
 /** The usage line every refusal here names. */
 export const NEXT_USAGE = 'rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]';

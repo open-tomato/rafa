@@ -77,13 +77,13 @@ import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } fr
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
+import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { holdsClaim } from '../../claims/device.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
-import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { CLAIM_HAND_DECLARATION, CLAIM_HAND_TO_FLAG, CLAIM_HAND_WITHDRAW_FLAG } from './declarations.js';
 import {

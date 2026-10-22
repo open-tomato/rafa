@@ -50,7 +50,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { initHint } from '../project/scope.js';
+import { initHint } from '@open-tomato/rafa/project/scope';
 
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

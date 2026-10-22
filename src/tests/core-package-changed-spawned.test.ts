@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,11 +46,37 @@ function selected(name: string): { exitCode: number; files: string[] } {
   return { exitCode: run.exitCode, files };
 }
 
+/**
+ * Links the repository's `node_modules` into the scratch worktree, with the
+ * `@open-tomato` workspace links pointing at the worktree's own packages: a
+ * single directory link would resolve `@open-tomato/rafa-effort` to the
+ * checkout's copy and load every facade module twice.
+ */
+function linkNodeModules(real: string, target: string): void {
+  mkdirSync(join(target, 'node_modules'));
+  for (const entry of readdirSync(real)) {
+    if (entry === '@open-tomato') continue;
+    symlinkSync(join(real, entry), join(target, 'node_modules', entry));
+  }
+  const scopeDir = join(target, 'node_modules', '@open-tomato');
+  mkdirSync(scopeDir);
+  for (const entry of readdirSync(join(real, '@open-tomato'))) {
+    const link = join(real, '@open-tomato', entry);
+    const linkTarget = lstatSync(link).isSymbolicLink()
+      ? readlinkSync(link)
+      : link;
+    const isWorkspace = linkTarget.startsWith('../../packages/');
+    symlinkSync(isWorkspace
+      ? linkTarget
+      : realpathSync(link), join(scopeDir, entry));
+  }
+}
+
 beforeAll(() => {
   tempBase = mkdtempSync(join(tmpdir(), 'rafa-core-changed-'));
   worktree = join(tempBase, 'wt');
   git(['worktree', 'add', '--detach', worktree, 'HEAD'], REPO_ROOT);
-  symlinkSync(realNodeModules(), join(worktree, 'node_modules'));
+  linkNodeModules(realNodeModules(), worktree);
 }, SCRATCH_TIMEOUT_MS);
 
 afterAll(() => {

@@ -44,7 +44,7 @@
  * @module start/session-guard
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 import { haltIfCheckoutMoved, haltIfWrapUpMoved } from './checkout-watch.js';

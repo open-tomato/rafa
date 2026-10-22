@@ -14,10 +14,11 @@
  *
  * ## What this file imports
  *
- * Types alone, from `@open-tomato/rafa/core/command`, and no module
- * under `src/`: a value import of a command's helper would load it
- * with the roster and undo the laziness. `declarations.test.ts` reads
- * this file's imports and holds that.
+ * Types from `@open-tomato/rafa/core/command`, with the one value
+ * `HINT_FLAG_SPEC` from the same barrel, and no module under `src/`: a
+ * value import of a command's helper would load it with the roster and
+ * undo the laziness. `declarations.test.ts` reads this file's imports
+ * and holds that.
  *
  * So a constant a declaration spells and a module also reads lives
  * here, and the module imports it from here: `ISSUE_LIST_FLAGS`
@@ -28,7 +29,7 @@
  * `UNBLOCK_YES_FLAG` (`unblock.ts`).
  *
  * The values a declaration spells from outside `src/commands/`, which
- * no file here may import, are copies, and `declarations.test.ts` holds
+ * no file here may import, are copies, and `declarations-integration.test.ts` holds
  * each equal to its source: `ISSUE_STATE_WORDS`, `ISSUE_TYPE_WORDS` and
  * `ISSUE_PRIORITY_WORDS` are `ISSUE_STATES`, `ISSUE_TYPES` and
  * `ISSUE_PRIORITIES` (`src/adapters/tracker/issue-values.ts`);
@@ -37,12 +38,16 @@
  * `ISSUE_BLOCKED_LABEL` are `SPEC_READY_LABEL`
  * (`src/board/readiness.ts`), `SPEC_NEEDS_WORK_LABEL`
  * (`src/board/gate.ts`) and `SPEC_BLOCKED_LABEL`
- * (`src/board/blocked.ts`); and `ISSUE_HINT_FLAG_SPEC` is
- * `HINT_FLAG_SPEC` (`src/next/ending.ts`), the `--no-hint` flag
- * `issue ready` declares. A module keeps reading the source value for
+ * (`src/board/blocked.ts`). A module keeps reading the source value for
  * what it checks; the copy is what the help spells.
+ *
+ * The `--no-hint` flag `issue ready` declares is no copy: it is
+ * `HINT_FLAG_SPEC` itself, core's one spelling of it, which the other
+ * five commands that end with a hint declare too.
  */
 import type { CommandDeclaration, RafaFlagSpec, SubjectSpec } from '@open-tomato/rafa/core/command';
+
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
 /** The `issue` subject: its routing word and its roster line. */
 export const ISSUE_SUBJECT: SubjectSpec = Object.freeze({
@@ -92,19 +97,6 @@ export const ISSUE_NEEDS_WORK_LABEL = 'spec:needs-work';
 
 /** The label `issue unblock` takes off: a copy of `SPEC_BLOCKED_LABEL`; see the module note. */
 export const ISSUE_BLOCKED_LABEL = 'spec:blocked';
-
-/**
- * The `--hint` flag `issue ready` declares, so `--no-hint` suppresses
- * the ending: a copy of `HINT_FLAG_SPEC` (`src/next/ending.ts`); see the
- * module note.
- */
-export const ISSUE_HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
-  name: 'hint',
-  description: 'Ends by naming the one step that follows, asking it where there is a terminal to answer on;'
-    + ' `--no-hint` reads nothing and prints nothing.',
-  type: 'boolean',
-  default: true,
-});
 
 /** The type an issue filed with no `--type` is of. */
 export const DEFAULT_ISSUE_TYPE = 'code';
@@ -544,7 +536,7 @@ export const ISSUE_READY_DECLARATION: CommandDeclaration = Object.freeze<Command
         + ' a check that refuses still exits 2. Not with --yes.',
       type: 'boolean',
     },
-    ISSUE_HINT_FLAG_SPEC,
+    HINT_FLAG_SPEC,
   ],
   examples: [
     {

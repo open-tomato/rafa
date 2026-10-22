@@ -24,7 +24,7 @@
  * `loadConfig` hands the resolved busy timeout, reads `CONFIG_DEFAULTS`
  * from `src/config-registry.ts`, which imports `index.ts` by value, and
  * the timeout's bounds from `sections.ts`. `config-load.ts` once read
- * the logger's settings through `src/config-schema-logger.ts`, which
+ * the logger's settings through `packages/rafa/src/config-schema-logger.ts`, which
  * takes its readers from `sections.ts`; it now calls the load hook
  * `section.ts` holds, which the registry sets, and imports no section
  * file.
@@ -64,6 +64,6 @@
  * exports is here once, as the same binding, no other name is here, and
  * no name here is on either of the other two barrels.
  */
-export type { ConfigRoots } from './config-load.js';
+export type { ConfigRoots, ProjectScopeFiles } from './config-load.js';
 
-export { loadConfig, readConfigFile } from './config-load.js';
+export { loadConfig, readConfigFile, readProjectScope } from './config-load.js';

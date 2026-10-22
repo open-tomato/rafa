@@ -23,7 +23,7 @@
 import type { TakenReadings } from './hop-chain.js';
 import type { BoardView } from '../board/epic-board.js';
 import type { SpecIssueReader } from '../board/issue.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

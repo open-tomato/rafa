@@ -197,8 +197,8 @@ The rules, each one a line in the spec:
 ```mermaid
 flowchart LR
     D["defaults<br/>(rafa's own entry)"] --> M
-    U["~/.rafa/config.yaml<br/>or rafa.config.ts<br/>settings only"] --> M
-    P["rafa.config.ts<br/>project: settings · dangerous.* · flows"] --> M
+    U["user scope: ~/.rafa/rafa.config.ts or .mjs<br/>with ~/.rafa/config.yaml over it<br/>settings only"] --> M
+    P["project scope: rafa.config.ts or .mjs<br/>with .rafa/config.yaml over it<br/>settings · dangerous.* · flows"] --> M
     M["merge by key<br/>scalars last wins · maps merge · lists replace<br/>false removes · $replace is total"] --> R{"required set<br/>every 🔒 step present?"}
     R -- dropped --> E1([error: required-dropped])
     R -- ok --> V["validate<br/>rafa's schema, then each module's"]

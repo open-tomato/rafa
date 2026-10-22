@@ -31,9 +31,9 @@
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   mkdirSync,
@@ -59,6 +59,7 @@ import {
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { classifyPromptContent } from '../effort/classify.js';
@@ -67,7 +68,6 @@ import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 
@@ -249,7 +249,7 @@ describe('the injection mode a run resolves', () => {
     const resolved = await loadRunConfig(scopesOf(rootWith(FILE_CONFIG)), ['--plan=PLAN-x.md']);
 
     expect(resolved.config.inject).toBe(FILE_MODE);
-    expect(resolved.sources.inject).toBe('file');
+    expect(resolved.sources.inject).toBe('local');
   });
 
   it('lets --inject= outrank the file', async () => {
@@ -262,7 +262,7 @@ describe('the injection mode a run resolves', () => {
 
     // The same root without the flag: the file is read and answers.
     expect(unflagged.config.inject).toBe(FILE_MODE);
-    expect(unflagged.sources.inject).toBe('file');
+    expect(unflagged.sources.inject).toBe('local');
   });
 
   it('leaves the store to the file when the flag names the mode', async () => {
@@ -270,7 +270,7 @@ describe('the injection mode a run resolves', () => {
     const resolved = await loadRunConfig(scopesOf(root), [`--inject=${FLAG_MODE}`]);
 
     expect(resolved.config.store).toBe('ndjson');
-    expect(resolved.sources.store).toBe('file');
+    expect(resolved.sources.store).toBe('local');
     expect(resolved.sources.inject).toBe('cli');
   });
 
@@ -285,10 +285,22 @@ describe('the injection mode a run resolves', () => {
     expect(fromUser.config.inject).toBe(FILE_MODE);
     expect(fromUser.sources.inject).toBe('user');
     expect(injectSourceLabel(fromUser)).toBe(join(home, '.rafa', 'config.yaml'));
-    expect(fromFile.sources.inject).toBe('file');
+    expect(fromFile.sources.inject).toBe('local');
     expect(injectSourceLabel(fromFile)).toBe(join(projectRoot, '.rafa', 'config.yaml'));
     expect(injectSourceLabel(fromFlag)).toBe('--inject');
     expect(injectSourceLabel(fromDefault)).toBe('the default');
+  });
+
+  it('labels a mode a template answered by the template and the file that named it', async () => {
+    const resolved = await loadRunConfig(scopesOf(rootWith(null)), []);
+    const named = join(rootWith(null), '.rafa', 'config.yaml');
+    const fromTemplate = {
+      ...resolved,
+      sources: { ...resolved.sources, inject: 'template' as const },
+      provenance: { ...resolved.provenance, inject: { file: named, entry: 0, template: 'escalation' } },
+    };
+
+    expect(injectSourceLabel(fromTemplate)).toBe(`the escalation template named by ${named}`);
   });
 
   it('refuses a flag value no mode answers to', () => {

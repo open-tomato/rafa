@@ -25,8 +25,6 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardSubIssuesSummary } from '../../board/roadmap-board.js';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

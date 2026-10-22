@@ -7,7 +7,7 @@
  * fixture `git`, and the `modules:` and `allowList:` lines the refusal
  * names are filled in, parsed as a project's config, and loaded through
  * `loadModules` over the `sync-fixture` module under
- * `src/modules/testdata/`, which then selects that module's `git`. The
+ * `packages/rafa/src/modules/testdata/`, which then selects that module's `git`. The
  * same text without its `allowList:` line leaves `git` refused, so the
  * lines are what enabled it.
  *
@@ -40,7 +40,6 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { Sync } from '@open-tomato/rafa/ports';
 
 import '../../config-registry.js';
-import '../../adapter-registry.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,8 +50,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-
-import { loadModules, moduleSettings } from '../../modules/load.js';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import {
   createLocalSync,
@@ -73,7 +71,7 @@ afterAll(() => {
 const ROOT = join(tempBase, 'repo');
 
 /** The module whose `git` sync adapter the lines in a refusal load. */
-const FIXTURE_MODULE = fileURLToPath(new URL('../../modules/testdata/sync-fixture', import.meta.url));
+const FIXTURE_MODULE = fileURLToPath(new URL('../../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 /** The manifest seams the fixture module is held to. */
 const MANIFEST_SEAMS = { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS };

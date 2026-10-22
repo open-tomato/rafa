@@ -44,12 +44,11 @@
  * stays in the tree as a failed session's does.
  */
 import type { TaskDispatch } from './dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { BUDGET_FLAG } from '@open-tomato/rafa/core/plan';
-
-import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
+import { updateTrackerLine, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 /** The blocker text a task that ran out of its budget is marked with. */
 export const BUDGET_EXCEEDED = 'budget exceeded';

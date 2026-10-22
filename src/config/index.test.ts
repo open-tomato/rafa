@@ -1,13 +1,19 @@
 /**
- * Holds the `./config` subpath's values: it exports `defaults` and
- * `defineConfig` and no other value, and `defaults` holds every setting
+ * Holds the `./config` subpath's values: it exports `defaults`,
+ * `defineConfig` and `templates` and no other value, `templates` is the
+ * map `templates.ts` holds, its `escalation` typed `ConfigEntry` and
+ * taken into a config's entries by value, and `defaults` holds every setting
  * whose default is not null at its file key, in the file's spelling, so
  * each value read back through its setting's reader is the default it
  * came from. The subpath's types are held in `shape.test.ts`.
  */
+import type { ConfigEntry } from './index.js';
+
 import { describe, expect, test } from 'bun:test';
 
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
+
+import { CONFIG_TEMPLATES } from './templates.js';
 
 import * as subpath from './index.js';
 
@@ -47,8 +53,17 @@ const NULL_DEFAULTS = SETTING_NAMES.filter((setting) => CONFIG_DEFAULTS[setting]
 const SET_DEFAULTS = SETTING_NAMES.filter((setting) => CONFIG_DEFAULTS[setting] !== null);
 
 describe('the ./config subpath', () => {
-  test('exports defaults and defineConfig, and no other value', () => {
-    expect(Object.keys(subpath).sort()).toEqual(['defaults', 'defineConfig']);
+  test('exports defaults, defineConfig and templates, and no other value', () => {
+    expect(Object.keys(subpath).sort()).toEqual(['defaults', 'defineConfig', 'templates']);
+  });
+
+  test('exports templates as the map templates.ts holds, escalation a ConfigEntry spread by value', () => {
+    const escalation: ConfigEntry = subpath.templates.escalation;
+    const entries = subpath.defineConfig([{ ...escalation, naming: { branch: 'work/{stub}' } }]);
+
+    expect(subpath.templates).toBe(CONFIG_TEMPLATES);
+    expect(entries[0]?.checks).toBe(escalation.checks);
+    expect(entries[0]?.tests?.contract).toEqual(['**/*.contract.test.ts']);
   });
 
   test('defineConfig answers the very list it is given', () => {

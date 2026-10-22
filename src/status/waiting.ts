@@ -7,13 +7,11 @@
  * owner gate that lets no merge through. A read that fails is `unknown`,
  * never approved.
  */
-import type { PullRequests } from '../pr/index.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
+import type { OwnerApproval, PullRequests } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { readHopRecord, staleAgainst } from '../next/hop-record.js';
-import { readPositionFile } from '../project/position.js';
+import { readHopRecord, staleAgainst } from '@open-tomato/rafa/next/hop-record';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 /** The owner gate states that let no merge through, and so leave a pull request waiting. */
 export type WaitingGate = Exclude<OwnerApproval['state'], 'approved' | 'not-gated'>;

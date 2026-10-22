@@ -82,11 +82,11 @@
  * Every value goes through the caller's `redact` before it is shown.
  */
 import type { MatchedSignal, RankedIssue } from './similarity.js';
-import type { BugRecord } from '../bugs/record.js';
+import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 
-import { fenced } from '../bugs/fenced.js';
-import { BUG_FIELDS } from '../bugs/record.js';
+import { fenced } from '@open-tomato/rafa/bugs/fenced';
+import { BUG_FIELDS } from '@open-tomato/rafa/bugs/record';
 
 export { fenced };
 

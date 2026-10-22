@@ -56,8 +56,8 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { OwnerResolution } from '../../board/owner-resolve.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { Place } from '../../project/position.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

@@ -1,11 +1,21 @@
-import type { ImportGraphInput, Metafile, ResolveImport } from './import-graph';
+import type { FacadeRow, FacadeTables } from './facade-tables';
+import type {
+  ImportEdge,
+  ImportGraph,
+  ImportGraphInput,
+  Metafile,
+  ResolveImport,
+  UnresolvedImport,
+} from './import-graph';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import ts from 'typescript';
 
+import { readFacadeTables } from './facade-tables';
 import {
   buildImportGraph,
   bunResolver,
@@ -137,6 +147,32 @@ describe('helpers', () => {
     expect(textImports(text)).toEqual(['./a.js', './b.js', './c.js']);
   });
 
+  it('takes no specifier from the text of an import inside a template literal, after a regex that throws the scan off', () => {
+    const text = [
+      'import { a } from \'./a.js\';',
+      'const c = await import(\'./c.js\');',
+      'const LOADS = [',
+      '  /from[\'"`]x[^\'"`][\'"`]/g,',
+      '];',
+      'const NAME = \'x\';',
+      'const plain = `import { w } from \'./w.js\';`;',
+      'const fixture = `import type { X } from \'${name(\'b\')}\';`;',
+      'const other = `import { y } from \'${NAME}\';\\nimport \'${NAME}/z\';`;',
+      '',
+    ].join('\n');
+
+    // The control: after the regex holding a quote and a backtick, the token
+    // scan alone takes the template text for imports.
+    expect(ts.preProcessFile(text, true, true).importedFiles.map((file) => file.fileName))
+      .toEqual(expect.arrayContaining(['${NAME}', './w.js']));
+    expect(textImports(text)).toEqual(['./a.js', './c.js']);
+  });
+
+  it('keeps an import() written inside a template substitution', () => {
+    const text = 'const s = `${await import(\'./d.js\')}`;\n';
+    expect(textImports(text)).toEqual(['./d.js']);
+  });
+
   it('takes a stem by the code extension alone', () => {
     expect(fileStem('src/plan/parse.ts')).toBe('parse');
     expect(fileStem('src/a.test.ts')).toBe('a.test');
@@ -214,5 +250,169 @@ describe('a real bun build over a scratch repository', () => {
     await main(root);
     expect(readFileSync(join(root, 'docs/survey/import-graph.json'), 'utf8')).toBe(json);
     expect(readFileSync(join(root, 'docs/survey/import-graph.md'), 'utf8')).toBe(markdown);
+  });
+});
+
+/** The edges leaving `from`, less their `from`, so two importers' lists compare. */
+function edgesLeaving(edges: readonly ImportEdge[], from: string): Omit<ImportEdge, 'from'>[] {
+  return edges.filter((edge) => edge.from === from).map(({ kind, to }) => ({ kind, to }));
+}
+
+describe('an import read through a planted facade table', () => {
+  const entry = 'packages/rafa-alpha/index.ts';
+  const rows: FacadeRow[] = [
+    { kind: 'type', name: 'T', source: 'src/b/types.ts', sourceName: 'T' },
+    { kind: 'value', name: 'run', source: 'src/b/value.ts', sourceName: 'default' },
+    { kind: 'value', name: 'v', source: 'src/b/value.ts', sourceName: 'v' },
+  ];
+  const facades: FacadeTables = new Map([[entry, rows]]);
+  const resolve: ResolveImport = (specifier, from) => (specifier === '@open-tomato/rafa-alpha'
+    ? entry
+    : plantedResolve(specifier, from));
+
+  /** The graph of one importer's text beside the facade's two source files. */
+  function graphOf(text: string, withFacades: boolean = true): ImportGraph {
+    const files = ['src/a/importer.ts', 'src/b/types.ts', 'src/b/value.ts'];
+    const metafile: Metafile = { inputs: Object.fromEntries(files.map((path) => [path, { imports: [] }])) };
+    const sources = new Map([['src/a/importer.ts', text], ['src/b/types.ts', ''], ['src/b/value.ts', '']]);
+    return buildImportGraph({
+      ...(withFacades
+        ? { facades }
+        : {}),
+      files,
+      metafile,
+      resolve,
+      root: ROOT,
+      sources,
+    });
+  }
+
+  it('gives a `type` edge to a name the entry re-exports by `export type`, even through a value binding', () => {
+    expect(graphOf('import { T } from \'@open-tomato/rafa-alpha\';\n').edges).toEqual([
+      { from: 'src/a/importer.ts', kind: 'type', to: 'src/b/types.ts' },
+    ]);
+  });
+
+  it('takes every name through a namespace import, a star re-export and a side-effect import', () => {
+    const every: ImportEdge[] = [
+      { from: 'src/a/importer.ts', kind: 'type', to: 'src/b/types.ts' },
+      { from: 'src/a/importer.ts', kind: 'value', to: 'src/b/value.ts' },
+    ];
+    expect(graphOf('import * as alpha from \'@open-tomato/rafa-alpha\';\nexport const a = alpha;\n').edges).toEqual(every);
+    expect(graphOf('export * from \'@open-tomato/rafa-alpha\';\n').edges).toEqual(every);
+    expect(graphOf('import \'@open-tomato/rafa-alpha\';\n').edges).toEqual(every);
+    expect(graphOf('import type * as alpha from \'@open-tomato/rafa-alpha\';\nexport type A = typeof alpha;\n').edges).toEqual([
+      { from: 'src/a/importer.ts', kind: 'type', to: 'src/b/types.ts' },
+      { from: 'src/a/importer.ts', kind: 'type', to: 'src/b/value.ts' },
+    ]);
+  });
+
+  it('adds no edge through a facade when no tables are handed, the reading of the base', () => {
+    const graph = graphOf('import { v } from \'@open-tomato/rafa-alpha\';\n', false);
+    expect(graph.edges).toEqual([]);
+    expect(graph.unresolved).toEqual([]);
+    // The control: the same text with the tables handed gives the edge.
+    expect(graphOf('import { v } from \'@open-tomato/rafa-alpha\';\n').edges).toEqual([
+      { from: 'src/a/importer.ts', kind: 'value', to: 'src/b/value.ts' },
+    ]);
+  });
+});
+
+describe('a real bun build through a facade over a scratch repository', () => {
+  let root = '';
+  const specifier = '@open-tomato/rafa-alpha';
+  const relative = 'src/a/relative.ts';
+  const rewired = 'src/a/facade.ts';
+  const missing = 'src/a/missing.ts';
+  const files: Record<string, string> = {
+    'package.json': `${JSON.stringify({
+      dependencies: { [specifier]: 'workspace:*' },
+      name: 'scratch',
+      private: true,
+      workspaces: ['packages/*'],
+    })}\n`,
+    'packages/rafa-alpha/index.ts': 'export type { T } from \'../../src/b/types.js\';\nexport { default as run, v } from \'../../src/b/value.js\';\n',
+    'packages/rafa-alpha/package.json': `${JSON.stringify({ exports: { '.': './index.ts' }, name: specifier, private: true })}\n`,
+    [missing]: `import { gone, v } from '${specifier}';\nexport const y = v + gone;\n`,
+    [relative]: 'import type { T } from \'../b/types.js\';\nimport run, { v } from \'../b/value.js\';\nexport const x: T = v + run();\n',
+    [rewired]: `import type { T } from '${specifier}';\nimport { run, v } from '${specifier}';\nexport const x: T = v + run();\n`,
+    'src/b/types.ts': 'export type T = number;\n',
+    'src/b/value.ts': 'export const v = 1;\nexport default function run(): number {\n  return v;\n}\n',
+  };
+  const inScope = Object.keys(files)
+    .filter((path) => path.startsWith('src/'))
+    .sort();
+
+  /** The graph over the scratch tree, read through its facades or not. */
+  async function readGraph(withFacades: boolean): Promise<ImportGraph> {
+    const metafile = await readMetafile(root, inScope);
+    const sources = new Map(inScope.map((path) => [path, readFileSync(join(root, path), 'utf8')]));
+    return buildImportGraph({
+      ...(withFacades
+        ? { facades: readFacadeTables(root) }
+        : {}),
+      files: inScope,
+      metafile,
+      resolve: bunResolver(root),
+      root,
+      sources,
+    });
+  }
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'survey-import-graph-facade-'));
+    git(root, ['init', '--quiet']);
+    for (const [path, text] of Object.entries(files)) {
+      plant(root, path, text);
+    }
+    git(root, ['add', '--', ...Object.keys(files)]);
+    // Links the member under node_modules, so bun resolves the facade's name.
+    const install = Bun.spawnSync([process.execPath, 'install', '--offline'], { cwd: root, stderr: 'pipe', stdout: 'pipe' });
+    if (install.exitCode !== 0) {
+      throw new Error(`bun install exited ${install.exitCode}: ${install.stderr.toString()}`);
+    }
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  it('leaves the rewired importer\'s edge list equal to the relative importer\'s, with no edge to the entry', async () => {
+    const graph = await readGraph(true);
+    expect(bunResolver(root)(specifier, rewired)).toBe('packages/rafa-alpha/index.ts');
+    expect(edgesLeaving(graph.edges, rewired)).toEqual(edgesLeaving(graph.edges, relative));
+    expect(edgesLeaving(graph.edges, relative)).toEqual([
+      { kind: 'type', to: 'src/b/types.ts' },
+      { kind: 'value', to: 'src/b/value.ts' },
+    ]);
+    expect(graph.edges.some((edge) => edge.to.startsWith('packages/'))).toBe(false);
+  });
+
+  it('gives a `type` edge for a facade `import type`, which the metafile records as external alone', async () => {
+    const metafile = await readMetafile(root, inScope);
+    expect(metafile.inputs[rewired]?.imports).toEqual([{ external: true, kind: 'import-statement', path: specifier }]);
+    const graph = await readGraph(true);
+    expect(graph.edges).toContainEqual({ from: rewired, kind: 'type', to: 'src/b/types.ts' });
+    // The control: without the tables, the rewired importer adds no edge at all.
+    expect(edgesLeaving((await readGraph(false)).edges, rewired)).toEqual([]);
+  });
+
+  it('names a name the entry does not export under unresolved, with the specifier', async () => {
+    const graph = await readGraph(true);
+    expect(graph.unresolved).toEqual([{ from: missing, name: 'gone', specifier }]);
+    // The name the entry does export still gives its edge.
+    expect(edgesLeaving(graph.edges, missing)).toEqual([{ kind: 'value', to: 'src/b/value.ts' }]);
+  });
+
+  it('reads through the facades in main, into both outputs', async () => {
+    await main(root);
+    const json = JSON.parse(readFileSync(join(root, 'docs/survey/import-graph.json'), 'utf8')) as {
+      edges: ImportEdge[];
+      unresolved: UnresolvedImport[];
+    };
+    expect(edgesLeaving(json.edges, rewired)).toEqual(edgesLeaving(json.edges, relative));
+    expect(json.unresolved).toEqual([{ from: missing, name: 'gone', specifier }]);
+    const markdown = readFileSync(join(root, 'docs/survey/import-graph.md'), 'utf8');
+    expect(markdown).toContain(`- \`${missing}\`: \`gone\` from \`${specifier}\`, which the entry does not export`);
   });
 });

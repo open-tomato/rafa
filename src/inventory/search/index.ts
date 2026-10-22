@@ -95,9 +95,10 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { collectSessionRow, sessionLogDir } from '@open-tomato/rafa-effort';
+
 import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 
-import { collectSessionRow, sessionLogDir } from '../../effort/collect.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
 
 import { parseSearchBlock } from './block.js';

@@ -7,9 +7,9 @@
  * itself, and every `gh` call it sends, stays `./sources.test.ts`'s and
  * `./sources-hop.test.ts`'s to count.
  */
-import type { HopRecord } from './hop-record.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 
 import { describe, expect, test } from 'bun:test';
 

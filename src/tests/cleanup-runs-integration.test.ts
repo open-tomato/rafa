@@ -15,8 +15,6 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';

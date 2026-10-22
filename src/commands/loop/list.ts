@@ -40,6 +40,7 @@ import type { TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { isAbsolute, relative } from 'node:path';
 
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { sessionPhase } from '@open-tomato/rafa/core/loop';
 import {
   isLive,
@@ -49,8 +50,6 @@ import {
   sessionLine,
 } from '@open-tomato/rafa/core/loop/readings';
 import { countTasks } from '@open-tomato/rafa/core/plan';
-
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   phasedCounts,

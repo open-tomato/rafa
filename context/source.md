@@ -21,7 +21,7 @@ spells out, and the shapes the lint config forces.
   `../../release/version-tag.js` so two writers cannot spell one tag
   differently. Reach for the existing helper — a second spelling of a
   refusal is the real smell, as `release status`'s hand-rolled
-  `Expected no arguments` is beside `src/commands/plan/plan-files.ts`'s
+  `Expected no arguments` is beside `packages/rafa/src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
   `src/commands/release/workflows.ts` takes `readLadderFiles` from
   `src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
@@ -154,10 +154,32 @@ also `packages/rafa/src/ports/`, the effort store under
 `packages/rafa/src/effort/store/`, `packages/rafa/src/report/record.ts` and
 the cause codes of `packages/rafa/src/errors/codes.ts` and
 `packages/rafa/src/errors/rafa-codes.ts`: core by assignment, kept where they
-are. `CORE_FOLDERS` and `CORE_NAMED_FILES` of
-`scripts/survey/core-moves.ts` list core's folders and named files, and
-`isCoreFile` reads them: the one place a sweep, a survey script or a spawned
-loader takes core's location from.
+are. Pass 1 of #808 moved in the 36 root files that reach no feature
+(`scripts/codemod/moves/pass-1.ts`), each at its old path under
+`packages/rafa/src/`: the logger's six files and the events output
+(`adapters/logger/`, `adapters/output/events.ts`); the bug record and title
+(`bugs/record.ts`, `bugs/title.ts`) with the four bug helpers beside them; the
+plan-file readers (`commands/plan/plan-files.ts`); the four `config-schema-*.ts`
+section files (bugs, errors, features and logger); the module loader and its
+activation and manifest (`modules/`); the hop record (`next/hop-record.ts`);
+the doc task and the plan injection (`plan/doc-task.ts`, `plan/inject.ts`); the
+risk patterns and secrets (`plan/risk/patterns.ts`, `plan/risk/secrets.ts`);
+the project readers (`project/`); the live-loops reading
+(`runtime/live-loops.ts`); and the git, progress and tracker utilities
+(`utils/`). They sit outside `core/`, so no barrel rule holds them: a file
+outside the package imports each by its own subpath, which core's `exports`
+names by a key or a folder wildcard. The move tool,
+`scripts/codemod/pass-moves.ts`, leaves a colocated test the project's
+`tests.integration` globs match at the root, with its imports rewritten to
+subpaths, and lists it in its output, until #913 places integration tests;
+`src/modules/activate-integration.test.ts` is the one pass 1 moved and #1289
+moved back.
+
+Since the move, `CORE_FOLDERS` of `scripts/survey/core-moves.ts` is
+`[CORE_SOURCE]`, the package's source folder, and `CORE_NAMED_FILES` is empty,
+so every file under the package is core's and a file that moves in needs no
+entry. `isCoreFile` reads both: the one place a sweep, a survey script or a
+spawned loader takes core's location from.
 
 **Core is imported by its name, and a core file's subpath is its path under
 `packages/rafa/src/`.** The subpath drops the extension and a closing
@@ -175,7 +197,10 @@ them. So the thirteen barrels of `CORE_BARRELS` read
 `core/plan/block-reader` and `core/runtime`; the named files read
 `report/parse`, `report/record`, `schema/tiers` and `schema/project-id`; the
 augmentation target reads `core/config/config-schema`. A store file is
-`store/<file>` and a ports file `ports/<file>`.
+`store/<file>` and a ports file `ports/<file>`. A file moved outside `core/`
+takes the same spelling: `packages/rafa/src/bugs/record.ts` is `bugs/record`,
+which the package's `exports` names with `./bugs/*`, so a file outside the
+package imports it as `@open-tomato/rafa/bugs/record`.
 
 **Two names, by job.** An import reads `@open-tomato/rafa/<subpath>`, which
 the `paths` map of `tsconfig.packages.json` resolves to core's source, so no
@@ -201,10 +226,13 @@ import, `import type`, `export … from` or dynamic `import()` names a file
 behind a barrel. Inside `packages/rafa/src/core/`, a file imports the files it
 needs by relative path, siblings and other subjects' files alike, and never a
 barrel. No non-test file under `packages/rafa/src/` imports
-`@open-tomato/rafa/<anything>`, but no barrel rule reaches the effort store or
-the ports folder: the store imports core's barrels by relative path today, as
-`effort/store/move.ts` does, and this plan adds none. A grep at this commit
-found no barrel imported from inside core, but no sweep measures that half.
+`@open-tomato/rafa/<anything>`, and the barrels sweep reads the whole package as
+core's own, so no barrel rule holds the effort store, the ports or a moved file
+outside `core/`. They reach core's barrels by relative path, as
+`effort/store/move.ts` and `utils/tracker.ts` do. A scan of the non-test files
+at this commit found every such import names one of the thirteen barrels and no
+deeper file. A grep at this commit found no barrel imported from inside core,
+but no sweep measures that half.
 
 **The deep-import sweep holds the outside half.**
 `src/tests/core-barrels.sweep.test.ts` reads every code file a commit would
@@ -227,7 +255,9 @@ files it read at load, so an empty read cannot pass. A module augmentation is
 no import: a `declare module` naming
 `@open-tomato/rafa/core/config/config-schema`, which each
 `src/config-schema-*.ts` file writes to add its fields to `RafaConfig`, is
-answered under `augment` and passes. It has to name the declaring file:
+answered under `augment` and passes. The four section files inside the
+package (`packages/rafa/src/config-schema-*.ts`) name the same file by its
+relative path, `./core/config/config-schema.js`. It has to name the declaring file:
 spelled through the config barrel, two augmentations merged with each other
 and not with `RafaConfig`, whose `keyof` missed both. That file is one of
 core's `exports` entries until #808 retires them.
@@ -269,29 +299,42 @@ Each keeps its path under `src/` from before the move:
 `core/config/config.test.ts` sits at
 `src/tests/core-coupled/core/config/config.test.ts`, and it tests
 `packages/rafa/src/core/config/config.ts`. A file's text changes only in its
-specifiers, and `src/tests/core-coupled/README.md` lists what each reaches
-above core. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts` names the
-folder: the barrels sweep reads these files as core's and does not hold their
-imports to the barrel rule. The test-index guard reads them as any test: under
-its own path, in the unit the cut table lists it in, and held to the rule of
-its kind. A later spec sorts each file back into the package once its coupling
-is gone, or into the module it really tests.
+specifiers, and `src/tests/core-coupled/README.md` has one row per parked file
+naming what it reaches above core. A file that joins the folder takes its row
+in the same commit. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts`
+names the folder: the barrels sweep reads these files as core's and does not
+hold their imports to the barrel rule. The test-index guard reads them as any
+test: under its own path, in the unit the cut table lists it in, and held to
+the rule of its kind. A later spec sorts each file back into the package once
+its coupling is gone, or into the module it really tests.
 
 **The config sections are handed in, never imported.** Core declares the section
 contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
 carries its `package` name, its `settings`, its `defaults` and its cross-key
-`checks`. Core names no section. The fourteen are listed in
+`checks`. Core names no section. The fifteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and thirteen `src/config-schema-*.ts` files. That
-module registers nothing as it is imported: its `registerCoreConfigSections()`
-registers the fourteen with core and sets core's load hook, and `src/rafa.ts`,
+own (`core-section.ts`) and fourteen `config-schema-*.ts` files, ten under
+`src/` and four, for `bugs`, `errors`, `features` and `logger`, under
+`packages/rafa/src/`. That module registers nothing as it is imported: its
+`registerCoreConfigSections()` registers the fifteen with core and sets core's
+load hook, and `src/rafa.ts`,
 `src/index.ts` and `src/tests/preload.ts` call it ahead of
 `registerCoreAdapters()`, before anything loads a config. A second call
 registers nothing. A file outside
 `packages/rafa/src/core/` takes the merged `SETTINGS`, `CONFIG_DEFAULTS`,
 `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and `knownKeysAbove` from the
 registry, never from the core barrel, which exports none of them; core reads the
-same through the `active*` functions of `section.ts`. A registration that breaks
+same through the `active*` functions of `section.ts`. The two registered readers
+are `registeredDefaults()` and `registeredSettings()` of `section.ts`, which the
+core barrel re-exports: a feature file that needs the whole default record or
+the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
+`SETTINGS` are, and so imports no root file. The callers at this commit are
+`src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`,
+`src/effort/collect.ts` and `src/inventory/index.ts` for the defaults, and
+`src/refs/extract.ts` and `src/refs/verify.ts` for the settings. Each refuses
+with a `ConfigSectionError` naming `src/config-registry.ts` while no section is
+registered, so a constant built as a module loads, before an entry registers,
+reads the section file that defines its value instead. A registration that breaks
 a rule throws from the call, naming what it refused: a setting name two sections
 define, a file key a second section defines under another setting name, which
 names both setting names too, or a `dangerous.*` key a second section defines
@@ -299,10 +342,15 @@ under the same setting name, each naming both packages.
 
 **The adapters are handed in, never imported.** Core declares the adapter
 registry in `packages/rafa/src/core/adapters/registry.ts`, and that file
-imports no adapter: the adapters the registry lists sit above core, under
-`src/adapters/` and `src/effort/sync/`, while the two store backends,
-`store/sqlite` and `store/ndjson`, sit in the package under
-`packages/rafa/src/effort/store/`. `src/adapter-registry.ts`, outside
+imports no adapter. The adapters the registry lists are split by place. Four
+sit in the package: the console logger and the events output
+(`adapters/logger/console`, `adapters/output/events`), and the two store
+backends, `store/sqlite` and `store/ndjson`, under
+`packages/rafa/src/effort/store/`. The text output is core's own, under
+`core/output/`. The rest sit above core, under `src/adapters/` and
+`src/effort/sync/`: the json output, the local and GitHub trackers, the local
+learning adapter, the claude planner, and the file and local sync strategies.
+`src/adapter-registry.ts`, outside
 `packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
 as it is imported: its `registerCoreAdapters()` hands them to
 `registerAdapters` and answers the registry that call made. `src/rafa.ts` and
@@ -318,10 +366,13 @@ itself.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's
-keys. Each section file adds its own by a `declare module` naming that file as
-`@open-tomato/rafa/core/config/config-schema`, and not the config barrel, for
-the reason the augment note in the deep-import sweep paragraph above gives. So
-`ConfigSetting` names every key, and nothing in core names a section.
+keys. Each section file under `src/` adds its own by a `declare module` naming
+that file as `@open-tomato/rafa/core/config/config-schema`, and not the config
+barrel, for the reason the augment note in the deep-import sweep paragraph
+above gives. The four under `packages/rafa/src/` name it by its relative path,
+`./core/config/config-schema.js`, since no non-test file in the package imports
+`@open-tomato/rafa/<anything>`. So `ConfigSetting` names every key, and nothing
+in core names a section.
 
 **`ConfigShape` is composed from the sections, not merged into.** Each section
 file exports an interface of the keys a file writes for it (`HubShape` holds
@@ -341,8 +392,8 @@ memory.
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under
-`packages/rafa/src/core/` and fails on any import of a `src/config-schema-*.ts`
-file, by any specifier `textImports` finds, so a dynamic `import()` or a
+`packages/rafa/src/core/` and fails on any import of a `config-schema-*.ts`
+section file, at the root or in the package, by any specifier `textImports` finds, so a dynamic `import()` or a
 `require()` counts as much as a static import. Like the barrel sweep, it does
 not see an argument that is not a string literal. A second `describe` holds
 `loadConfig` with no section registered to a refusal naming
@@ -354,7 +405,8 @@ barrel back by value closes a cycle. The cycle fails with a `ReferenceError` at
 load, in one import order only, so a green `tsc` proves nothing about it. The
 five barrels beyond the subject indexes are the splits made so far.
 `config/sections.ts` holds the leaf pair `config-sections.ts` and
-`config-readers.ts`, split while `config-merged.ts` imported section files that
+`config-readers.ts`, with `branch-template.ts` and `merge-method.ts` as leaves
+beside them, split while `config-merged.ts` imported section files that
 import the pair back; that file is retired and nothing behind `config/index.ts`
 imports a section file now, so the split stands as it was made. `config/load.ts`
 stands alone, because `config-load.ts` reaches
@@ -362,12 +414,12 @@ stands alone, because `config-load.ts` reaches
 back. `loop/readings.ts` stands alone, because `session-readings.ts` reaches
 `packages/rafa/src/effort/store/task-finishes.ts`, from which
 `development-build.ts` imports `loop/index.ts` back. `loop/hops.ts` stands alone
-over `hop-record.ts`, split while `src/next/hop-record.ts` imported it back by
+over `hop-record.ts`, split while `packages/rafa/src/next/hop-record.ts` imported it back by
 value and the session record parser, which `sessions.ts` imports by value,
 imported that file by value; the parser now sits beside `sessions.ts` as
 `loop/session-record-parse.ts` and imports `hop-record.ts` by path, so the split
 stands as it was made. `plan/block-reader.ts` stands alone, split while
-`parse.ts` imported `src/utils/tracker.ts`, which imports `blocks.ts` back;
+`parse.ts` imported `packages/rafa/src/utils/tracker.ts`, which imports `blocks.ts` back;
 `parse.ts` now reads `plan/blocker-comment.ts` instead and no core file imports
 the tracker, so the split stands as it was made.
 
@@ -399,12 +451,45 @@ file no line holds. An edge with an end in an unassigned folder
 end, so it is never upward. Inside `src/schema/` the placement is per file,
 as the Packages section below lists.
 
+**The named lists are in `scripts/survey/cut-names.ts`.** `BOARD_NAMED`,
+`PR_NAMED`, `RUN_NAMED`, `RELEASE_NAMED`, `EFFORT_NAMED` and `INVENTORY_NAMED`
+hold the root files that reach each feature package, each sorted by UTF-16
+code unit. A file a list names is placed in that package whatever its folder,
+and keeps its path: no named file moves. `CUT_RULES` reads them and adds a
+package's own file beside its list where one belongs (`src/pr/index.ts` to
+`PR_NAMED`, `src/start/branch-decision.ts` to `RUN_NAMED`,
+`src/schema/frontmatter.ts` to `EFFORT_NAMED`). The CLI's three named files sit
+in its rule.
+
+**The left-to-place test is an edge check.** A file no rule holds is left to
+place, and it counts as the CLI's, the package that ranks highest. So an import
+from a feature package onto such a file is an upward edge, and the cut table
+counts the upward edges that end on each file it leaves to place. A cut passes
+the test when no feature package imports one. `docs/survey/cut-table.md` lists
+the files left to place under its "Files left to place" heading and marks each
+upward target `left to place` or `by rule`.
+
+**The coupling reading takes the same table.** `scripts/survey/coupling.ts`
+counts the value imports between the six feature packages of its `MOVE_ORDER`,
+the order they move in: `rafa-effort`, `rafa-inventory`, `rafa-board`,
+`rafa-release`, `rafa-pr` and `rafa-run`, which is not the cut table's rank
+order. A back edge runs from a package earlier in that order into a later one,
+since moved first the earlier package would import a file not yet moved. Run as
+`bun scripts/survey/coupling.ts --max=<percent>` from the root, it prints the
+back edges by package pair and one line, `back <n> of <total> value imports
+between feature packages, <percent>%`, and exits 1 when the percent is above
+`--max`. It reads the import graph and the cut table and writes nothing; an
+edge with an end in core, in the CLI or in a package outside the order is not
+counted.
+
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
 and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub,
 the sync service and the two shared-config packages
 (`packages/eslint-config/`, `packages/typescript-config/`) follow the same
-one-folder rule.
+one-folder rule. A facade folder is its package's too: `packages/rafa-effort/`
+sits in the `rafa-effort` row beside `src/effort/`, and the table lists none of
+its files, since the graph holds no facade entry.
 
 **The counts rank options and do not certify a cut.** An upward edge from
 `packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is
@@ -413,17 +498,197 @@ still counts as upward: the table's `remaining` column is the count less the
 cleared edges. A count is only as current as the graph it was read from. `tsc
 --build` with project references (#807) is the gate that certifies a cut.
 
+**The facade reader lists the names an outside file takes from a facade.**
+`scripts/survey/facade-names.ts --package=rafa-<name>` reads the root
+program's files that are not tests or test support and do not sit in the
+package, the universe its names come from, and prints each name they import
+from it, value or type, with its declaration. Three shapes it reports as
+problems rather than names: an anonymous default export (`anonymous-default`),
+a namespace import or `export *` (`namespace-import`), and two declarations
+under one name (`collision`). `--entry` prints the facade's `index.ts` as it
+would be written, and `--json` prints the whole reading. An import by the
+facade's name is read through the entry's table (`facade-tables.ts`): each
+name counts as taken from the file the entry re-exports it from, so a
+rewired importer reads as its relative form did and `--entry` prints the
+tracked entry unchanged. The import graph reads an import of
+`@open-tomato/rafa-<name>` the same way: an edge of the import's kind, `type`
+when the binding or the entry's row is one, from the importer to each file its
+names come from, and the facade entry is no node.
+
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with five members, all `private`: `packages/rafa/`
-  (`@open-tomato/rafa-core`, core, the name for good), `packages/rafa-hub/`
-  (`@open-tomato/rafa-hub`), `packages/rafa-sync-service/`
-  (`@open-tomato/rafa-sync-service`), and the two config packages,
-  `packages/typescript-config/` (`@open-tomato/rafa-typescript-config`) and
-  `packages/eslint-config/` (`@open-tomato/rafa-eslint-config`). Publishing
-  one is the manifest rule below, and the root `files` ships none of them.
+  `package.json`) with eleven members, all `private`: the five that
+  predate the facades, `packages/rafa/` (`@open-tomato/rafa-core`, core, the
+  name for good), `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
+  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and the
+  two config packages, `packages/typescript-config/`
+  (`@open-tomato/rafa-typescript-config`) and `packages/eslint-config/`
+  (`@open-tomato/rafa-eslint-config`); and the six facades that
+  `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
+  `packages/rafa-inventory/`, `packages/rafa-board/`,
+  `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
+  each under its final name, as the next bullet sets out. Publishing one is
+  the manifest rule below, and the root `files` ships none of them.
   The root publishes `@open-tomato/rafa` with core bundled.
+- **A feature package's name is a facade until its move.** Pass 2 gives each
+  of the six feature packages its final name as a facade: a private member at
+  `packages/rafa-<name>/` whose `package.json` maps `exports` `"."` to
+  `./index.ts`, has `lint` and `test` scripts and the eslint leaf's
+  devDependencies, and holds no `tsconfig.json`. The root declares it with
+  `workspace:*`. Its `index.ts` re-exports today's files from their `src/`
+  paths, with `.js` specifiers: `'../../src/effort/collect.js'`, never
+  `'.ts'`, since a `.ts` ending fails `tsc` with TS5097. The entry exports
+  exactly the names that non-test files outside the package import from it,
+  value and type alike, as `export type { … }` and `export { … }` lines and
+  nothing else. `scripts/survey/facade-names.ts --package=rafa-<name>` reads
+  that set with the checker, and `--entry` prints the entry it is written
+  from. eslint's `import/order` places a facade import in the `external`
+  group, with the other package imports, so a rewired importer (pass 3)
+  moves its line there. Pass 2 added the package's folder to `CUT_RULES`
+  with its facade, and at its move (pass 4) the facade becomes the package's
+  own `index`. Pass 2 moved no file under `src/` and changed no importer.
+- **The rewire moves effort's, inventory's, board's, release's, pr's and run's
+  importers onto their facades and keeps the files each one's groups name on
+  their paths.**
+  `bun scripts/codemod/rewire-facade.ts --package=rafa-<name>` `[--dry-run]`
+  takes each importer of a feature package that can take it by name and
+  rewrites it to import `@open-tomato/rafa-<name>`.
+  `scripts/codemod/rewire-groups.ts` puts each importer in the first of four
+  groups that holds it. The codemod rewrites the fourth, `rewire`, and leaves
+  the other three byte for byte:
+  - `loadCycle`: the package's own non-test files reach the importer over value
+    edges, so taking the package by name would load it inside that cycle.
+    Effort has six: `src/agents/roster.ts`, `src/check/run.ts`,
+    `src/inventory/record.ts`, `src/inventory/trees.ts`,
+    `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has five:
+    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`,
+    `src/start/preflight.ts` and `src/start/serving.ts`. Board has twenty-five:
+    `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
+    `src/claims/labels.ts`, `src/commands/switch.ts`, `src/effort/epic-cost.ts`,
+    `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
+    `src/next/owner-gate.ts`, `src/next/readings.ts`,
+    `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
+    `src/plan/store-rules.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
+    `src/pr/owner-approval.ts`, `src/start/preflight-claim.ts`,
+    `src/start/preflight-drift.ts`, `src/start/stale-docs.ts`,
+    `src/start/triage.ts`, `src/triage/bug-filing.ts`,
+    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/effort/epic-cost.ts` is among them, though it is an effort file that
+    imports board, because the load-cycle group comes first. Its edge to board
+    is the back edge the decouple step before pass 4 cuts with inventory's two.
+    Release has two: `src/board/project/facts.ts` and
+    `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
+    though it is a board file that imports release, because the load-cycle
+    group comes first; its edge to release is a back edge the decouple step
+    before pass 4 cuts.
+    Pr has sixteen: `src/claims/git.ts`, `src/claims/lost.ts`,
+    `src/cleanup/past-head.ts`, `src/cleanup/worktrees.ts`,
+    `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,
+    `src/next/hint.ts`, `src/next/hop-rows.ts`, `src/next/readings.ts`,
+    `src/release/branch-forecast.ts`, `src/release/fragment-tree.ts`,
+    `src/release/settle-pr.ts`, `src/start/branch-decision.ts`,
+    `src/start/pr-lifecycle.ts`, `src/start/pr-retarget.ts` and
+    `src/start/suite-blocker.ts`. Six of them, `src/cleanup/past-head.ts`,
+    `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,
+    `src/release/branch-forecast.ts`, `src/release/fragment-tree.ts` and
+    `src/release/settle-pr.ts`, are release files by the cut table's unit that
+    import pr from a package earlier in the move order; their edges are back
+    edges the decouple step before pass 4 cuts, and they sit in this group
+    because the load-cycle group comes first.
+    Run has fifteen: five board files (`src/board/gate.ts`,
+    `src/board/project/rules.ts`, `src/board/roadmap-claims.ts`,
+    `src/board/setup.ts` and `src/next/relation-readings.ts`), nine pr files
+    (`src/cleanup/groups.ts`, `src/cleanup/steps.ts`,
+    `src/next/owner-gate.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`
+    and the four `src/triage/` files) and one release file
+    (`src/next/epic-end.ts`). All fifteen are files of packages earlier in
+    `MOVE_ORDER` of `scripts/survey/coupling.ts`, by the cut table's unit, and
+    they sit in this group because the load-cycle group comes first. Their
+    edges to run are back edges the decouple step before pass 4 cuts, since
+    run moves last and no package imports it forward.
+  - `backEdge`: the importer sits in a package earlier in the move order than
+    the one it imports, so taking the package by name would make that earlier
+    package import a later one, which the decouple step before pass 4 cuts.
+    Inventory has two, `src/effort/report-skills.ts` and
+    `src/effort/skill-facts.ts`, both effort files: effort comes before
+    inventory in the move order, so they import it backwards, and the decouple
+    step before pass 4 cuts them. Board has none in the codemod's grouping,
+    because its one effort importer, `src/effort/epic-cost.ts`, is taken first
+    by the load-cycle group. Release has none in the codemod's grouping,
+    because its one board importer, `src/board/project/facts.ts`, is taken
+    first by the load-cycle group.
+    Pr has nineteen: `src/board/project/add-filed.ts`, the three
+    `src/commands/epic/` files (`close-docs.ts`, `close-triage.ts` and
+    `close.ts`), the two `src/commands/issue/` files (`create-bug.ts` and
+    `create.ts`), the ten `src/commands/release/` files,
+    `src/release/prepare.ts` and `src/release/verify.ts`, and one effort file,
+    `src/effort/report-doc-bugs.ts`. Each sits earlier in the move order than
+    pr, so each imports it backwards, and the decouple step before pass 4 cuts
+    them.
+    Run has seventeen: seven board files (`src/board/issue-edit-state.ts`,
+    `src/board/spec-source.ts`, `src/commands/board/list.ts`, the three
+    `src/commands/epic/` files `close-triage.ts`, `close.ts` and `new.ts`, and
+    `src/commands/issue/ready.ts`), the eight `src/commands/pr/` files
+    (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
+    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`),
+    one effort file (`src/effort/report-skills-read.ts`) and one inventory file
+    (`src/inventory/search/index.ts`). Each sits earlier in the move order than
+    run, so each imports it backwards, and the decouple step before pass 4 cuts
+    them.
+  - `declarationGraph`: the importer is reached from the `include` of a
+    declaration build whose `.d.ts` files ship, so a published type would name
+    a private package, which pass 4 settles. Effort has two:
+    `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
+    Board has the same two as effort. Release has the same two. Pr has the
+    same two. Run has the same two.
+
+  Tests move or rewire in pass 4 with the files they test, so the test files
+  that import a rewired package by path stay on their paths in pass 3. The
+  rewire guard, `scripts/survey/facade-rewire.sweep.test.ts`, holds each
+  rewired package to its row of `REWIRED`: no non-test file outside the
+  package imports one of its files by relative path unless the row names it
+  with its group, and each named file still does. Each row names its kept
+  files, effort's eight, inventory's seven, board's 48, release's twelve,
+  pr's seventy and run's forty, and a planted control reds on one relative
+  import. Board's, release's, pr's and run's rows add a fourth group the
+  codemod does not print, `libraryChunks`: board's row has 21 such files,
+  release's eight, pr's 33 and run's six: files a library entry reaches
+  statically and that stay on their paths after the rewire, since through the
+  facade that graph reaches the package's lazy command modules
+  (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`, `PR_FEATURE`
+  re-exports `src/commands/pr/index.ts` and `RUN_FEATURE` re-exports
+  `src/commands/claim/index.ts`) and the splitting build writes each as a chunk
+  of its own. Run's six are the library entry `src/index.ts` itself, with
+  `src/plan.ts`, `src/start.ts` and the three `src/commands/plan/` files
+  (`bundled-check.ts`, `claim-route.ts` and `store-check.ts`) it reaches. The
+  published-types case in
+  `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
+  scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
+  `-release`, `-pr` or `-run`, with a planted-text control.
+
+  The codemod matches a binding by name and file against the facade, so a
+  statement is refused whichever side names the other file. A binding taken
+  through a re-exporting module of the package, such as
+  `src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
+  refused by the codemod and is pointed at its origin file by hand before the
+  run: pass 3a did that three times, inventory's rewire six, and board's eight;
+  release's rewire refused no statement. Pr's rewire refused 21 bindings on 20
+  statements that took `PullRequests`, `resolvePrProvider`,
+  `ResolvePrProviderOptions`, `PrProviderReading`, `ghPreflightItems`,
+  `ghHostOf` and `ChecksVerdict` from their defining files while the facade
+  lists them under `src/pr/index.ts`, and each was pointed at the barrel by
+  hand before the run. Run's rewire refused 36 bindings on 9 statements in 7
+  files, 34 of them taken through the barrels `src/plan/index.ts` and
+  `src/cleanup/index.ts` while the facade lists them under the preflight and
+  cleanup files that define them, and `PreflightCheck` taken from
+  `src/preflight/run.ts` while the facade lists it under `src/plan/index.ts`,
+  so one rewire met both directions of the refusal; each statement was split
+  by hand before the run so every binding names the file the facade lists it
+  under.
+  A file whose stem names a fake is read as a test by the codemod and the
+  guard, so the three fakes `src/ci/runs-fake.ts`, `src/pr/gh-fake.ts` and
+  `src/pr/gh-fake-shapes.ts` keep their paths until pass 4.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
@@ -498,7 +763,6 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   No member here has the shape yet: this plan ships no plugin, so the publish
   rules and this example are what hold it.
 - **A package imports core through the entries the import rule allows.** A
-- **A package imports core through the entries the import rule allows.** A
   file outside core takes the barrels, the store and ports entries and the
   named files by the subpaths of "Core and its barrels" above, and nothing
   deeper. Today `packages/rafa-hub` and `packages/rafa-sync-service` import
@@ -530,7 +794,9 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
   `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
   several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
-  every run prints `Multiple projects found` to stderr.
+  every run prints `Multiple projects found` to stderr. A facade holds no
+  `tsconfig.json`, so the graph check asks it no `check-types` script and
+  the references build skips it, as it skips the config packages.
 - **The composite recipe builds the three code packages' declarations.** The
   `tsconfig.json` of `packages/rafa`, `packages/rafa-hub` and
   `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
@@ -585,15 +851,17 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   import.** A member's own `node_modules/` holds only what its manifest
   declares, so a bare import resolves from its manifest and not from the
   root's. Each member but the eslint-config package declares
-  `@open-tomato/rafa-eslint-config` (`workspace:*`), `eslint` and `typescript`
-  in its `devDependencies`, the last two at the root's ranges, so one install
-  serves its scripts; the two services also declare `@open-tomato/rafa-core`
-  (`workspace:*`). The graph check's fourth refusal holds the `@open-tomato/*`
-  imports to those declarations and reads no `eslint` or `typescript` import,
-  which the scripts name. The eslint-config package lists `eslint` in its
-  `dependencies`, declares `typescript` as a `devDependency`, and imports
-  itself by name through its own `exports`. After a manifest edit, `bun
-  install` refreshes `bun.lock` and the links.
+  `@open-tomato/rafa-eslint-config` (`workspace:*`) and `eslint` in its
+  `devDependencies`, the last at the root's range, so one install serves its
+  scripts; the three with a `check-types` script and the typescript-config
+  package also declare `typescript` at the root's range, and the two services
+  also declare `@open-tomato/rafa-core` (`workspace:*`). The graph check's
+  fourth refusal holds the `@open-tomato/*` imports to those declarations and
+  reads no `eslint` or `typescript` import, which the scripts name. The
+  eslint-config package lists `eslint` in its `dependencies`, declares
+  `typescript` as a `devDependency`, and imports itself by name through its
+  own `exports`. After a manifest edit, `bun install` refreshes `bun.lock` and
+  the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
   `src/rafa.ts` and six library entries with every publishable member as
@@ -606,11 +874,13 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps eight `types`-only entries for core's
-  files (`./core/config`, `./core/config/config-schema`,
+  them. The root `exports` also keeps thirteen `types`-only entries for
+  core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
-  `./ports/log-level`, `./report/parse` and `./store/check-rows`), which
-  #808 retires.
+  `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since
+  pass 1 moved the section files in, `./bugs/record` and the four
+  `./config-schema-*` files), which #808 retires. The first pass's
+  `include` names each moved file the root's config files import.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a
@@ -716,7 +986,8 @@ the end of the template. This section replaces nothing.
   test titles without one` until 2026-09-22, which those 46 falsify.
 - **An interface whose one `extends` is its whole content is refused**
   (`@typescript-eslint/no-empty-object-type`) everywhere but
-  `src/config-schema-*.ts`, where `eslint.config.mjs` allows it: a
+  `src/config-schema-*.ts` and `packages/rafa/src/config-schema-*.ts`,
+  where `eslint.config.mjs` and the package's own leaf allow it: a
   section's `interface RafaConfig extends HubSettings {}` inside its
   `declare module` is that shape on purpose. This bullet replaces
   nothing.
@@ -731,7 +1002,8 @@ the end of the template. This section replaces nothing.
 **The sweep `src/tests/import-cycle.sweep.test.ts` fails on any non-test
 runtime import cycle that spans two clusters.** It reads the import graph
 the way `scripts/survey/import-graph.ts` does: `readMetafile` and
-`buildImportGraph` from there, and the file set from
+`buildImportGraph` from there, handed the facade tables `readFacadeTables`
+of `scripts/survey/facade-tables.ts` reads, and the file set from
 `scripts/survey/files.ts`. Type-only imports are erased in the graph, so
 a type-level cycle passes; `tsc --build tsconfig.references.json`, over
 the composite packages' project references, is the gate for those.
@@ -745,9 +1017,12 @@ toward no cluster. The sweep prints the file coverage line, a count of files
 placed by folder majority, and a count of the unplaced ones; a new survey run
 that extends the map places them. The move of #905 renamed the map's keys to the
 `src/core/` paths, and the move into the package renamed them to
-`packages/rafa/src/core/` and kept each keyed file's cluster. Two moved files
-were never keyed, `plan-files.ts` and `session-readings.ts`, so the sweep places
-them by their folder.
+`packages/rafa/src/core/` and kept each keyed file's cluster. The map keys 16
+of the 36 files pass 1 moved, at their new paths. The other 20 are unkeyed, as
+are `core/plan/plan-files.ts` and `core/loop/session-readings.ts`. The sweep
+places each unkeyed file by its folder's majority, or counts it unplaced, as its
+coverage line reports. The moved files' relative barrel imports change no cycle:
+the sweep passes at this commit.
 
 **The map traces the 68-file cycle that crossed package lines before
 rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:
@@ -798,8 +1073,8 @@ names every non-test import edge and fails when a library file brings in
 the command half.
 
 **Edge case: a reader so widely used that it lives in the commands folder.**
-`src/commands/plan/plan-files.ts` is the command half of the plan readers: the
-first command that needed them (`rafa plan create`) wrote them there, and ten
+`packages/rafa/src/commands/plan/plan-files.ts` is the command half of the plan readers: the
+first command that needed them (`rafa plan create`) wrote them there, and sixty
 non-test files import it at this commit. Its library half, the readings that
 take no command context, is `packages/rafa/src/core/plan/plan-files.ts`, which
 command modules reach through the plan barrel. When a second command wants a

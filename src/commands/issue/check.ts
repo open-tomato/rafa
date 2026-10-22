@@ -69,6 +69,7 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
@@ -77,7 +78,6 @@ import { memoiseVerifier } from '../../board/refs-gate.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../../refs/reading.js';
 import { fingerprintText, RefsBlockError } from '../../refs/stamp.js';
 import { RefVerifyError } from '../../refs/verify.js';
-import { readSwitch } from '../plan/plan-files.js';
 import { createPlanRefsVerifier, registryRoster } from '../plan/refs-check.js';
 
 import { ISSUE_CHECK_DECLARATION, STAMP_FLAG } from './declarations.js';

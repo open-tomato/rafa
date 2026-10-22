@@ -58,7 +58,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_SECTION } from '../../core/config/core-section.js';
 import { loadConfig } from '../../core/config/load.js';
-import { EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '../../core/config/section.js';
+import {
+  EMPTY_CONFIG_REGISTRY,
+  registerConfigSections,
+  restoreConfigSections,
+  setConfigLoadHook,
+} from '../../core/config/section.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';
@@ -399,10 +404,13 @@ describe('writeTaskReport rows', () => {
     const previous = registerConfigSections([]);
     restoreConfigSections(EMPTY_CONFIG_REGISTRY);
     registerConfigSections([CORE_SECTION]);
+    // The load hook hands the logger this config's `logger` keys, which core's section lacks: off for this read.
+    const previousHook = setConfigLoadHook(null);
     try {
       expect((await loadConfig({ root, home: join(tempBase, 'home') }, {}, () => undefined)).config.store)
         .toBe('ndjson');
     } finally {
+      setConfigLoadHook(previousHook);
       restoreConfigSections(previous);
     }
 

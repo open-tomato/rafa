@@ -8,7 +8,7 @@
  * always answered one way would fail one of them.
  */
 import type { EpicView, PlaceView } from './place-line.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

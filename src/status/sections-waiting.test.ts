@@ -18,12 +18,12 @@ import type { GhResult } from '../adapters/tracker/github.js';
 import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
-import type { HopRecord } from '../next/hop-record.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { PullRequestDetail, PullRequestState } from '../pr/types.js';
-import type { Position } from '../project/position.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Position } from '@open-tomato/rafa/project/position';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +31,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { writePositionFile } from '../project/position.js';
 import { BRANCH, plantDemoProject } from '../tests/loop-session-fixtures.js';
 
 import { renderStatus } from './render.js';

@@ -60,7 +60,9 @@
  * spec's README section describes. So no single file can be refused for
  * it, and {@link hubUrlProblems} is the section's check: `resolveConfig`
  * asks it once every setting is ranked, and it names the file that chose
- * `service`. Every other
+ * `service`, read off that setting's provenance: a scope's module file
+ * and its YAML file, the local layer, are each named by their own path,
+ * as are the user scope's two files, which both report `user`. Every other
  * strategy reads no `hub` key, so a `hub.url` beside `local` is kept and
  * never refused: switching strategy is then a one-line edit.
  *
@@ -184,13 +186,14 @@ export const HUB_SETTINGS: { readonly [K in keyof HubSettings]: SettingSpec<K> }
 /** The strategy that reads the `hub` section. */
 const HUB_STRATEGY: SyncStrategy = 'service';
 
-/** The label a refusal opens with: the file that chose the strategy. */
+/**
+ * The label a refusal opens with: the file that chose the strategy, read
+ * off its provenance, so a scope's YAML file (source `local`, or `user`
+ * for the user scope's) is named rather than its layer word; the layer
+ * word itself where no file answered, the command line or a default.
+ */
 function labelOf(input: ConfigCheckInput): string {
-  const source = input.sources.effortSync;
-  const path = source === 'user'
-    ? input.userPath
-    : input.path;
-  return path ?? source;
+  return input.provenance.effortSync?.file ?? input.sources.effortSync;
 }
 
 /**

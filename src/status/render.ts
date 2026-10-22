@@ -74,15 +74,12 @@ import type {
   Section,
   StatusSections,
 } from './sections.js';
-import type { ChecksVerdict } from '../pr/checks.js';
-import type { Mergeability } from '../pr/index.js';
+import type { ChecksVerdict, Mergeability } from '@open-tomato/rafa-pr';
+
+import { SPEC_BLOCKED_LABEL, blockedLineSentence, idleText } from '@open-tomato/rafa-board';
 
 import { planLabel, sessionLine } from '@open-tomato/rafa/core/loop/readings';
 import { formatCounts } from '@open-tomato/rafa/core/plan';
-
-import { blockedLineSentence } from '../board/blocked-line.js';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { idleText } from '../board/roadmap-claims.js';
 
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 

@@ -2,10 +2,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { templateEntry } from '../../src/config/templates';
+
 import { readCutMap } from './cut-map';
 import { listTrackedFiles } from './files';
 import { readMembers } from './package-entries';
-import { readTestKindGlobs, testKind, type TestKind } from './test-kinds';
+import { testKind, type TestKind } from './test-kinds';
 
 /** The repository root, two folders above this file. */
 const ROOT = join(import.meta.dir, '..', '..');
@@ -47,20 +49,27 @@ describe('the survey readers over the live tree', () => {
     expect(map.unplaced([...STRETCH_10_RELEASE_TESTS, stray])).toEqual([stray]);
   });
 
-  it('places a test in a new subfolder by the walk and a mixed subtree by its own directory', () => {
+  it('places a test in a new subfolder by the walk and one by its own directory, and leaves a mixed directory unplaced', () => {
     const map = readCutMap(ROOT, 'docs/survey/cut-table.json');
     const errors = 'src/tests/core-coupled/errors/rafa-codes.test.ts';
+    const board = 'src/commands/board/new-file.test.ts';
+    // The files of `scripts/survey/cut-names.ts` put `src/commands/`'s own
+    // files in four units, and no row names the folder.
     const commands = 'src/commands/new-file.test.ts';
     const nowhere = 'src/nowhere/x.test.ts';
 
     expect(map.unitOf(errors)).toBe('@open-tomato/rafa');
-    expect(map.unitOf(commands)).toBe('@open-tomato/rafa');
+    expect(map.unitOf(board)).toBe('rafa-board');
+    expect(map.unitOf(commands)).toBeUndefined();
     expect(map.unitOf(nowhere)).toBeUndefined();
-    expect(map.unplaced([errors, commands, nowhere])).toEqual([nowhere]);
+    expect(map.unplaced([errors, board, commands, nowhere])).toEqual([commands, nowhere]);
   });
 
   it('classifies the tracked test files, with at least one use-case and one unit test', () => {
-    const globs = readTestKindGlobs(ROOT);
+    // The escalation template's lists: a checkout holds no .rafa/config.yaml
+    // to name it, and the section's own defaults are empty.
+    const escalation = templateEntry('escalation')?.tests;
+    const globs = { contract: escalation?.contract ?? [], integration: escalation?.integration ?? [] };
     const counts: Record<TestKind, number> = { contract: 0, 'use-case': 0, unit: 0 };
     for (const file of tracked.test) {
       counts[testKind(file, globs)] += 1;
