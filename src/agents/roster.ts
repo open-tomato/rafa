@@ -199,13 +199,13 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
+import { AGENT_DEFINITION_DIR } from '@open-tomato/rafa/utils/agent-definition';
 
 import { readTrees } from '../inventory/trees.js';
-import { readFrontmatter } from '../schema/frontmatter.js';
 import { collisionMessage, findTierItem, pinKey, pinLine, readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { serveVerdict } from '../tiers/serve.js';
-import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 /**
  * The agents Claude Code answers for with no definition of its own

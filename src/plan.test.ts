@@ -186,10 +186,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { epicContextArgs } from './board/epic-context.js';
-import { specPath } from './board/naming.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,

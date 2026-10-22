@@ -13,7 +13,7 @@ The runner reads the log with `collectSessionRow` and appends it under
 `sessions` with `kind` set to `search`.
 
 **`effort collect` reads the main checkout's project folder and every
-worktree project folder of the project** (`src/effort/session-log-dirs.ts`).
+worktree project folder of the project** (`packages/rafa/src/effort/session-log-dirs.ts`).
 Claude Code files a session under its working directory's encoded path,
 so a loop task run in a worktree lands in
 `~/.claude/projects/<main>--rafa-worktrees-<stub>/`, never in the main

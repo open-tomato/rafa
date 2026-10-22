@@ -59,7 +59,8 @@ import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename, isAbsolute } from 'node:path';
 
-import { pathsNamedIn } from './doc-only.js';
+import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
+
 import { testFailureOf } from './test-failure.js';
 
 /** The kinds the check reads down its table; any other is taken as said. */

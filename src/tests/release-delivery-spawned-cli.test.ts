@@ -23,9 +23,10 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createPrMergeCommand } from '../commands/pr/merge.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { serializeFragment } from '../release/fragment.js';
 import { RELEASE_PR_BRANCH } from '../release/settle-pr.js';
 
 import { dispatchInProject, eventsOf, expectExit, plantProjectConfig, runRafa } from './cli-capture.js';

@@ -16,11 +16,11 @@
  * race; a raw `git push --porcelain` to that origin is the control that
  * git itself ends a refusal's stdout on `Done`, which no sentence may.
  */
-import type { Fragment } from './fragment.js';
 import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,10 +30,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { serializeFragment } from './fragment.js';
 import { PUSH_SAID_NOTHING, pushSaid, ruleText, SETTLE_PR_SETTING, settleByPush } from './settle-push.js';
 import { withSettleWorktree } from './settle-worktree.js';
 

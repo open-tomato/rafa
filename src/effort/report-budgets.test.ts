@@ -9,13 +9,14 @@
  * one-hour cache among them, so a join summing every counter reddens.
  */
 import type { ReportSessionRow } from './report.js';
-import type { SessionUsageTotals } from './session-log.js';
+import type { SessionUsageTotals } from '@open-tomato/rafa/effort/session-log';
 import type { SessionBudget } from '@open-tomato/rafa/store/dispatches';
 
 import { describe, expect, it } from 'bun:test';
 
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
+
 import { budgetedSessions } from './report-budgets.js';
-import { emptyUsageTotals } from './session-log.js';
 
 /** A session row holding `usage` over zeroes, and `turns` assistant records. */
 function row(sessionId: string, turns: number, usage: Partial<SessionUsageTotals>): ReportSessionRow {

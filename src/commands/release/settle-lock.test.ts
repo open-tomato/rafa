@@ -24,10 +24,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { projectLockText } from '../../project/lock.js';
 import { projectConfigText } from '../../project/scaffold.js';
-import { serializeFragment } from '../../release/fragment.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 

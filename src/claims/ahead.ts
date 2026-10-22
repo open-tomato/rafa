@@ -74,9 +74,9 @@ import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
 
+import { planStub } from '@open-tomato/rafa/board/naming';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
-import { planStub } from '../board/naming.js';
 import { branchNameFor, REMOTE } from '../start/branch-decision.js';
 
 import { CLAIMED_REASONS, claimBranchGlob, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from './git.js';

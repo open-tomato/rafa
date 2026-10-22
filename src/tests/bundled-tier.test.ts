@@ -18,9 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import { checkDirectory } from '../check/run.js';
 import { parseAgentFrontmatter } from '../schema/agent.js';
-import { readFrontmatter } from '../schema/frontmatter.js';
 import { readItemBytes, resolveTiers } from '../tiers/resolve.js';
 import { DEFAULT_ROUTES, DEFAULT_ROUTING, resolveRouting } from '../tiers/routing.js';
 

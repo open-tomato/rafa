@@ -52,7 +52,7 @@ import type { SkillSignal } from '../schema/skill.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { renderFrontmatter } from '@open-tomato/rafa-effort';
+import { renderFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 import { SKILL_SIGNALS } from '../schema/skill.js';
 

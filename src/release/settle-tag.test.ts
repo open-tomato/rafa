@@ -9,12 +9,12 @@
  * `release.tag: settle` and a `push` delivery does write the tag, and
  * every skip is also shown to run no git at all.
  */
-import type { Fragment } from './fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
 import type { GitResult, GitRunner, PullRequestSummary } from '../pr/index.js';
 import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,10 +24,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { serializeFragment } from './fragment.js';
 import { PUSH_SAID_NOTHING, settleByPush } from './settle-push.js';
 import { RELEASE_TAG_COMMAND, tagSettle } from './settle-tag.js';
 import { withSettleWorktree } from './settle-worktree.js';

@@ -6,9 +6,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import { ESLint } from 'eslint';
 
+import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
+
 import { EMAIL_MARKER, HOST_MARKER, ScrubRefusal, findLeaks } from '../src/fixtures/scrub.js';
 import { ISSUE_OPENING, issueText } from '../src/triage/issue-text.js';
-import { HOME_MARKER } from '../src/triage/local-paths.js';
 
 import { FIXTURE_INDENT, scrubbedFilings, serializeFixture } from './extract-scoring-fixture.js';
 

@@ -9,13 +9,14 @@
  */
 import { describe, expect, test } from 'bun:test';
 
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import {
   AGENT_ISSUE_CODES,
   REQUIRED_AGENT_FIELDS,
   checkAgentFrontmatter,
   parseAgentFrontmatter,
 } from './agent.js';
-import { readFrontmatter } from './frontmatter.js';
 import { SKILL_ISSUE_CODES } from './skill.js';
 
 /** The two required fields, filled. */

@@ -50,8 +50,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
+
 import { checkFile } from '../check/run.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { countCharacters, LISTING_LIMIT } from '../schema/skill.js';
 
 import {

@@ -112,8 +112,8 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path';
 
 import { isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { checkProvenance, PROVENANCE_FIELD, readProvenance } from '../schema/provenance.js';
 
 import { SKILL_DELIVERY } from './delivery.js';

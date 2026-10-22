@@ -98,7 +98,7 @@
  * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
  * the shipped templates through `src/release/templates.ts`, nor
  * `release fragment`, which writes one change fragment through
- * `src/release/fragment.ts` and reads the waiting ones through
+ * `packages/rafa/src/release/fragment.ts` and reads the waiting ones through
  * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that

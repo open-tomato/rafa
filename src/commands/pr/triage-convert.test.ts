@@ -34,11 +34,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
 
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
-import { parseFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
 
 import { RESOLVE_STOP_EXIT, resolvePullRequest } from './triage-resolve.js';

@@ -116,7 +116,6 @@ import {
   addStaleDocLine,
   createGitRunner,
   docUpdateLineText,
-  localPathRedactor,
   namedSecrets,
   redactSecrets,
   staleDocLineText,
@@ -139,6 +138,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan , readDocsRole } from '@open-tomato/rafa/core/plan';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 

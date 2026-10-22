@@ -71,10 +71,11 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { posix } from 'node:path';
 
+import { FRAGMENT_EXTENSION } from '@open-tomato/rafa/release/fragment';
+
 import { gitSaid } from '../pr/index.js';
 
 import { forecastRelease } from './forecast.js';
-import { FRAGMENT_EXTENSION } from './fragment.js';
 import { packageBaseVersionAt } from './package-base-version.js';
 import { releaseStrategyFor } from './strategy.js';
 import { gitPathOf, readManifestVersion } from './version.js';

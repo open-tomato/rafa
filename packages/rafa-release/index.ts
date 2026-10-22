@@ -92,13 +92,6 @@ export {
   readFragmentTree,
 } from '../../src/release/fragment-tree.js';
 
-export {
-  FRAGMENT_PLAN_ID_PATTERN,
-  allocateFragmentName,
-  parseFragment,
-  serializeFragment,
-} from '../../src/release/fragment.js';
-
 export type {
   GuardReaction,
   MergeGuardSettings,

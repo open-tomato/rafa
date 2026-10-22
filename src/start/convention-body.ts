@@ -56,12 +56,13 @@ import type { SecretEnvironment } from '@open-tomato/rafa-pr';
 
 import { homedir } from 'node:os';
 
-import { localPathRedactor, namedSecrets, redactSecrets } from '@open-tomato/rafa-pr';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { RELEASE_BODY_SEAMS, writeBodyWith } from './release-body.js';
 

@@ -76,7 +76,6 @@ import { homedir } from 'node:os';
 import { resolveTracker } from '@open-tomato/rafa-board';
 import {
   TRIAGE_MODULE,
-  localPathRedactor,
   namedSecrets,
   redactSecrets,
 } from '@open-tomato/rafa-pr';
@@ -85,6 +84,7 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 /** What every line this module prints opens with, after its indent. */
 const LINE_PREFIX = 'Follow-ups: ';

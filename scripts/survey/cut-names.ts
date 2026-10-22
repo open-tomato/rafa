@@ -9,16 +9,16 @@
  */
 
 /**
- * The files named for `rafa-board`: the fifteen `src/board/` files
+ * The files named for `rafa-board`: the fourteen `src/board/` files
  * `docs/survey/cluster-map.json` puts in cluster c6, and the eight root
- * files that reach the board.
+ * files that reach the board. The fifteenth reaches only core and moved
+ * into it in the first decouple item, as `packages/rafa/src/board/naming.ts`.
  */
 export const BOARD_NAMED: readonly string[] = [
   'src/board/flags.ts',
   'src/board/gate.ts',
   'src/board/issue.ts',
   'src/board/leak.ts',
-  'src/board/naming.ts',
   'src/board/plan-field.ts',
   'src/board/plan-spec.ts',
   'src/board/previous-copy.ts',
@@ -101,7 +101,6 @@ export const RELEASE_NAMED: readonly string[] = [
 /** The files named for `rafa-effort`, the root files that reach the effort package. */
 export const EFFORT_NAMED: readonly string[] = [
   'src/config-schema-hub.ts',
-  'src/utils/agent-definition.ts',
 ];
 
 /**

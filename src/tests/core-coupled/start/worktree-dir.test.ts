@@ -8,9 +8,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
-import { worktreeDirAt } from './worktree-dir.js';
+import { CONFIG_DEFAULTS } from '../../../config-registry.js';
 
 /** A project root that is not the working directory the suite runs in. */
 const ROOT = join('/', 'nonesuch', 'project');

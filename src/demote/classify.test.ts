@@ -37,7 +37,8 @@ import type { ClassificationRule, SkillSource } from './classify.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { renderFrontmatter } from '../schema/frontmatter.js';
+import { renderFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import {
   INSTINCT_DOMAINS,
   checkInstinctFrontmatter,

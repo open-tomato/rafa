@@ -74,14 +74,13 @@
  * answers for reads as declaring no effort, so the resolver still
  * passes `--effort` and the CLI is left to refuse the name.
  */
-import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
-import type { AgentEffortLookup } from '@open-tomato/rafa/core/plan';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { AgentEffortLookup } from '../core/plan/index.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { isAgentName } from '@open-tomato/rafa/core/plan';
-
+import { isAgentName } from '../core/plan/index.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
 
 export { readFrontmatter };

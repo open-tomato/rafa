@@ -205,6 +205,7 @@ import type { Place } from '@open-tomato/rafa/project/position';
 
 import { existsSync, readdirSync } from 'node:fs';
 
+import { boardId } from '@open-tomato/rafa/board/naming';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { stubOfPlanFile } from '@open-tomato/rafa/core/plan';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
@@ -213,7 +214,6 @@ import { issueCheckCommand } from '../refs/check-command.js';
 
 import { readBlockedBy } from './blocked.js';
 import { resolveDefaultBoard } from './boards.js';
-import { boardId } from './naming.js';
 import { resolvePlace } from './place.js';
 import { findReadinessGaps, hasSpecReadyLabel, TEMPLATE_HEADINGS } from './readiness.js';
 import {

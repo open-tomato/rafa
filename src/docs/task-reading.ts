@@ -79,8 +79,7 @@ import { homedir } from 'node:os';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
-
-import { localPathRedactor } from '../triage/local-paths.js';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 /** The heading of the doc task's section. */
 export const DOC_TASK_HEADING = '## Documentation to repair';

@@ -38,7 +38,8 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, test } from 'bun:test';
 
-import { readFrontmatterDocument, renderFrontmatter, updateFrontmatter } from '../schema/frontmatter.js';
+import { readFrontmatterDocument, renderFrontmatter, updateFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import { ACTION_HEADING, CAUSE_HEADING, actionHash, parseInstinct } from '../schema/instinct.js';
 import {
   DESCRIPTION_LIMIT,

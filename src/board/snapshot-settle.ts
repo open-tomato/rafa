@@ -62,6 +62,7 @@ import type { Output } from '@open-tomato/rafa/ports';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
@@ -72,7 +73,6 @@ import {
   snapshotDiffersMessage,
   writeSpecSnapshot,
 } from './issue.js';
-import { notesPath, specPath } from './naming.js';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board snapshot settle';

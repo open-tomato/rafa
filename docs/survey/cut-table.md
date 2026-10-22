@@ -33,11 +33,11 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
 | `@open-tomato/rafa-core` | `packages/rafa/` (278) | - |
 | `rafa-inventory` | `src/inventory/` (28), `src/tiers/` (13), `src/schema/` (11), `src/backfill/` (10), `src/demote/` (10), `src/learning/` (10), `src/check/` (8), `src/task/` (8), `src/agents/` (4), `packages/rafa-inventory/` (0), `src/bundled/` (0) | `src/adapters/learning/held.ts`, `src/adapters/learning/local.ts`, `src/plan/risk/commands.ts`, `src/plan/risk/long-runs.ts`, `src/report/lessons.ts` |
-| `rafa-board` | `src/board/` (136), `src/commands/issue/` (44), `src/board/project/` (43), `src/commands/epic/` (35), `src/adapters/tracker/` (19), `src/refs/` (13), `src/commands/board/` (8), `packages/rafa-board/` (0) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/naming.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts`, `src/bugs/cause-rule.ts`, `src/commands/doctor-refs.ts`, `src/commands/plan/refs-check.ts`, `src/config-schema-board-project.ts`, `src/config-schema-issues.ts`, `src/epic/verify-plan.ts`, `src/next/hop-chain.ts`, `src/next/relation-readings.ts` |
+| `rafa-board` | `src/board/` (136), `src/commands/issue/` (44), `src/board/project/` (43), `src/commands/epic/` (35), `src/adapters/tracker/` (19), `src/refs/` (13), `src/commands/board/` (8), `packages/rafa-board/` (0) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `packages/rafa/src/board/naming.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts`, `src/bugs/cause-rule.ts`, `src/commands/doctor-refs.ts`, `src/commands/plan/refs-check.ts`, `src/config-schema-board-project.ts`, `src/config-schema-issues.ts`, `src/epic/verify-plan.ts`, `src/next/hop-chain.ts`, `src/next/relation-readings.ts` |
 | `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (65), `src/triage/` (40), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/bugs/fill.ts`, `src/bugs/versions.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/config-schema-readings.ts`, `src/config-schema-triage.ts`, `src/docs/open-lines.ts`, `src/docs/release-issue.ts`, `src/docs/task-reading.ts`, `src/next/owner-gate.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/pr/index.ts` |
 | `rafa-run` | `src/start/` (179), `src/claims/` (19), `src/suite/` (18), `src/commands/claim/` (15), `src/preflight/` (8), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/config-schema-checks.ts`, `src/config-schema-loop-continue.ts`, `src/config-schema-loop-retries.ts`, `src/config-schema-tests.ts`, `src/config-schema-wrap-up.ts`, `src/epic/verify-run.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/plan/validate.ts`, `src/runtime/install.ts`, `src/start/branch-decision.ts` |
 | `rafa-release` | `src/release/` (75), `src/commands/release/` (42), `packages/rafa-release/` (0) | `src/cleanup/past-head.ts`, `src/commands/doctor-ladder.ts`, `src/config-schema-release.ts`, `src/next/epic-end.ts`, `src/project/lock.ts` |
-| `rafa-effort` | `src/effort/` (68), `packages/rafa-effort/` (0) | `src/config-schema-hub.ts`, `src/utils/agent-definition.ts`, `src/schema/frontmatter.ts` |
+| `rafa-effort` | `src/effort/` (68), `packages/rafa-effort/` (0) | `src/config-schema-hub.ts`, `packages/rafa/src/utils/agent-definition.ts`, `packages/rafa/src/schema/frontmatter.ts` |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
 | `@open-tomato/rafa` | `src/cli/` (35) | `src/commands/index.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
@@ -67,7 +67,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 
 | File | Upward edges in | Counted in | Placed |
 | --- | --- | --- | --- |
-| `src/schema/frontmatter.ts` | 15 | `rafa-effort` | by rule |
+| `packages/rafa/src/schema/frontmatter.ts` | 15 | `rafa-effort` | by rule |
 | `src/release/guard-merge.ts` | 6 | `rafa-release` | by rule |
 | `src/release/enabled.ts` | 5 | `rafa-release` | by rule |
 | `src/release/settle.ts` | 5 | `rafa-release` | by rule |
@@ -77,13 +77,13 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `src/cli/describe.ts` | 4 | `@open-tomato/rafa` | by rule |
 | `src/next/ending.ts` | 4 | `rafa-run` | by rule |
 | `src/release/guard.ts` | 4 | `rafa-release` | by rule |
-| `src/utils/agent-definition.ts` | 4 | `rafa-effort` | by rule |
+| `packages/rafa/src/utils/agent-definition.ts` | 4 | `rafa-effort` | by rule |
 | `src/cleanup/past-head.ts` | 3 | `rafa-release` | by rule |
 | `src/cleanup/worktrees.ts` | 3 | `rafa-run` | by rule |
 | `src/next/readings.ts` | 3 | `rafa-run` | by rule |
 | `src/release/forecast.ts` | 3 | `rafa-release` | by rule |
 | `src/release/fragment-tree.ts` | 3 | `rafa-release` | by rule |
-| `src/release/fragment.ts` | 3 | `rafa-release` | by rule |
+| `packages/rafa/src/release/fragment.ts` | 3 | `rafa-release` | by rule |
 | `src/release/prepare.ts` | 3 | `rafa-release` | by rule |
 | `src/cli/registry.ts` | 2 | `@open-tomato/rafa` | by rule |
 | `src/commands/switch.ts` | 2 | `rafa-run` | by rule |

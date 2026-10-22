@@ -11,7 +11,7 @@
  *
  * ## What the fragment holds
  *
- * The file is `src/release/fragment.ts`'s format, written by
+ * The file is `packages/rafa/src/release/fragment.ts`'s format, written by
  * `serializeFragment`, so nothing written here is a file settle would
  * refuse to read:
  *
@@ -64,9 +64,9 @@
  * and the warnings.
  */
 import type { GitRunner } from '../../pr/index.js';
-import type { Fragment } from '../../release/fragment.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
@@ -75,10 +75,10 @@ import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-to
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
+import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readFragmentTree } from '../../release/fragment-tree.js';
-import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { packageNamed, readWorkspacePackages } from '../../release/workspace-packages.js';
 

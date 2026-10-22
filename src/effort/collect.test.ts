@@ -107,7 +107,7 @@
  */
 import type { CollectOptions } from './collect.js';
 import type { CommitLogParseResult, CommitStats } from './commits.js';
-import type { SessionLogCandidate } from './session-log-dirs.js';
+import type { SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
 
 import {
@@ -128,6 +128,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { stampPrompt } from '@open-tomato/rafa/core/plan';
+import { listSessionLogs, projectLogDirName, sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
 
 import { expectExit } from '../tests/cli-capture.js';
@@ -144,7 +145,6 @@ import {
   selectCommits,
   selectSessionLogs,
 } from './collect.js';
-import { listSessionLogs, projectLogDirName, sessionLogDir } from './session-log-dirs.js';
 
 /** The task prompt's prefix, taken from the shape that declares it. */
 const TASK_PREFIX = PROMPT_SHAPES

@@ -67,6 +67,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `project/worktree-root.test.ts` | `src/tests/git-identity.ts` |
 | `report/parse.test.ts` | `src/schema/instinct.ts` |
 | `schema/project-id.test.ts` | `src/tests/git-identity.ts` |
+| `start/worktree-dir.test.ts` | `src/config-registry.ts` |
 | `utils/git.test.ts` | `src/tests/git-identity.ts` |
 | `utils/progress.test.ts` | `scripts/control-byte-gate/control-byte-gate.ts`, `src/plan.ts` |
 | `utils/tracker.test.ts` | `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts`, `src/tests/output-sinks.ts` |

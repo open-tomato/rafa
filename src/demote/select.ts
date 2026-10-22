@@ -66,7 +66,7 @@ import type { InstinctScope } from '../schema/instinct.js';
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
-import { readFrontmatter } from '@open-tomato/rafa-effort';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 import { MARKDOWN_EXTENSION, SKILL_FILE } from '../check/layout.js';
 

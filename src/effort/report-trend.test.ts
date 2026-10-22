@@ -26,8 +26,9 @@ import type { TrendOptions, TrendSessionRow } from './report-trend.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
+
 import { DRIFT_METRICS, dominantKey, summariseTrend, TREND_METRICS } from './report-trend.js';
-import { emptyUsageTotals } from './session-log.js';
 
 const MS_PER_MINUTE = 60_000;
 

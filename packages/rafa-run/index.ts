@@ -460,8 +460,6 @@ export {
 
 export { readTypeCheckRecipe } from '../../src/start/type-step.js';
 
-export { worktreeDirAt } from '../../src/start/worktree-dir.js';
-
 export { runWrapUp } from '../../src/start/wrap-up-run.js';
 
 export type { WrapUpLearning } from '../../src/start/wrap-up.js';

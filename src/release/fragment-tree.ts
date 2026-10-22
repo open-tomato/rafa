@@ -57,14 +57,14 @@
  * `origin/main` moving mid-read cannot mix two trees into one answer,
  * and every later argv names that hash rather than caller text.
  */
-import type { FragmentReading } from './fragment.js';
 import type { GitRunner } from '../pr/index.js';
+import type { FragmentReading } from '@open-tomato/rafa/release/fragment';
 
 import { posix } from 'node:path';
 
-import { gitSaid } from '../pr/index.js';
+import { FRAGMENT_EXTENSION, FRAGMENT_PLAN_ID_PATTERN, parseFragment } from '@open-tomato/rafa/release/fragment';
 
-import { FRAGMENT_EXTENSION, FRAGMENT_PLAN_ID_PATTERN, parseFragment } from './fragment.js';
+import { gitSaid } from '../pr/index.js';
 
 /** One fragment present in the tree, with the commit that added it. */
 export interface TreeFragment {

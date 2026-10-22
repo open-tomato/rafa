@@ -13,7 +13,7 @@
  * the chain in the ordering case, so an order that followed the dates
  * rather than the chain would fail it.
  */
-import type { Fragment } from './fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -22,11 +22,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { readFragmentTree } from './fragment-tree.js';
-import { serializeFragment } from './fragment.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-fragment-tree-')));

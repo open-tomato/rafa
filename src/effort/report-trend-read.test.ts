@@ -18,6 +18,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
@@ -26,7 +27,6 @@ import { plantProject, plantProjectConfig } from '../tests/cli-capture.js';
 
 import { readTrendInputs, trendReportOf } from './report-trend-read.js';
 import { summariseTrend } from './report-trend.js';
-import { emptyUsageTotals } from './session-log.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-trend-read-')));
 

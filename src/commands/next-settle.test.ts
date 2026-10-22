@@ -31,8 +31,8 @@ import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
-import type { Fragment } from '../release/fragment.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,10 +41,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { settleState } from '../next/settle-step.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { serializeFragment } from '../release/fragment.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

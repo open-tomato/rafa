@@ -17,8 +17,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { projectConfigText } from '../project/scaffold.js';
-import { serializeFragment } from '../release/fragment.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

@@ -43,9 +43,9 @@ import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { namesOnlyDocs } from '@open-tomato/rafa/triage/doc-only';
 
 import { addStaleDocLine, staleDocLineText } from '../../docs/release-issue.js';
-import { namesOnlyDocs } from '../../triage/doc-only.js';
 
 /** True when `criterion` names only documentation; see the module note. */
 export function isDocsOnlyCriterion(criterion: EpicCriterion): boolean {

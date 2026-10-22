@@ -58,7 +58,7 @@
  */
 import type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 
-import { readLines } from './session-log.js';
+import { readLines } from '@open-tomato/rafa/effort/session-log';
 
 export type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 

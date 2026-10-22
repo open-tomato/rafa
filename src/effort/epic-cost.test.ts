@@ -21,6 +21,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
 import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
 
 import {
@@ -30,7 +31,6 @@ import {
   renderEpicCost,
   summariseEpicCost,
 } from './epic-cost.js';
-import { emptyUsageTotals } from './session-log.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-epic-cost-'));
 let planted = 0;

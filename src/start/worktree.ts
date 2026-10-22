@@ -192,10 +192,10 @@ import { createGitRunner, gitSaid, parseWorktrees } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';
 import { readClaimCatchUp } from './claim-catch-up.js';
-import { worktreeDirAt } from './worktree-dir.js';
 import { isConfigLockRefusal, setUpstream, upstreamArgv, upstreamRefusal } from './worktree-upstream.js';
 
 /** The indent a quoted git line carries, as `./branch.ts` indents its own. */

@@ -81,8 +81,9 @@ import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { boardId, createGhRunner, createGithubTracker } from '@open-tomato/rafa-board';
+import { createGhRunner, createGithubTracker } from '@open-tomato/rafa-board';
 
+import { boardId } from '@open-tomato/rafa/board/naming';
 import {
   expectOneArgument,
   readSwitch,

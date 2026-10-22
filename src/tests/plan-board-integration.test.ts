@@ -96,6 +96,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { notesPath as localNotesPath, specPath } from '@open-tomato/rafa/board/naming';
+
 import {
   closedIssueMessage,
   missingSpecLabelMessage,
@@ -104,7 +106,6 @@ import {
   snapshotText,
   SPEC_LABEL,
 } from '../board/issue.js';
-import { notesPath as localNotesPath, specPath } from '../board/naming.js';
 import { resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';

@@ -38,10 +38,6 @@ export { parseReportArgs } from '../../src/effort/report-args.js';
 
 export { default as report } from '../../src/effort/report.js';
 
-export { sessionLogDir } from '../../src/effort/session-log-dirs.js';
-
-export { readSessionLog } from '../../src/effort/session-log.js';
-
 export { SKILL_USE_CLI_VERSION } from '../../src/effort/skill-use.js';
 
 export type { PullBeforeReadInput } from '../../src/effort/sync/contact.js';
@@ -63,17 +59,3 @@ export type { FileSyncOptions } from '../../src/effort/sync/file.js';
 export { createFileSync } from '../../src/effort/sync/file.js';
 
 export { createLocalSync } from '../../src/effort/sync/select.js';
-
-export {
-  mergeFrontmatter,
-  readFrontmatter,
-  readFrontmatterDocument,
-  renderFrontmatter,
-  writeFrontmatter,
-} from '../../src/schema/frontmatter.js';
-
-export {
-  AGENT_DEFINITION_DIR,
-  agentEffortLookup,
-  findAgentDefinition,
-} from '../../src/utils/agent-definition.js';

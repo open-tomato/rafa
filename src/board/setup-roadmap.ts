@@ -67,6 +67,7 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 
 import { writeFileSync } from 'node:fs';
 
+import { ID_PREFIX } from '@open-tomato/rafa/board/naming';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import {
   branchFromTemplate,
@@ -78,7 +79,6 @@ import {
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 
-import { ID_PREFIX } from './naming.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE, severalRoadmapsMessage } from './roadmap.js';
 import { readRoadmapSetting, roadmapIssueIn, withRoadmapIssue } from './setup-config.js';
 import { detailOf, holdsLabel, parseRows, partOf, PREFIX, rowNumber, rowText } from './setup-parts.js';

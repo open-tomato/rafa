@@ -17,6 +17,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { branchName } from '@open-tomato/rafa/board/naming';
+
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 
 import {
@@ -28,7 +30,6 @@ import {
   staleCopyMessage,
 } from './issue-edit-state.js';
 import { SPEC_LABEL } from './issue.js';
-import { branchName } from './naming.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 
 const ISSUE = 12;

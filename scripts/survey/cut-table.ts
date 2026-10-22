@@ -321,7 +321,7 @@ export const CUT_RULES: CutRules = {
     {
       folders: ['packages/rafa-effort/', 'src/effort/'],
       name: 'rafa-effort',
-      named: [...EFFORT_NAMED, 'src/schema/frontmatter.ts'],
+      named: EFFORT_NAMED,
     },
     {
       folders: ['packages/rafa-hub/'],

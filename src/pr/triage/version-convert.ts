@@ -114,9 +114,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
 import {
-  FRAGMENT_PLAN_ID_PATTERN,
   RELEASE_REMOTE,
-  allocateFragmentName,
   compareVersions,
   directoryPrefix,
   gitPathOf,
@@ -124,11 +122,11 @@ import {
   readGuard,
   readManifestVersion,
   replaceManifestVersion,
-  serializeFragment,
 } from '@open-tomato/rafa-release';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
+import { FRAGMENT_PLAN_ID_PATTERN, allocateFragmentName, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 /** What one conversion reads. */
 export interface VersionConvertInput {

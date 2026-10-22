@@ -32,9 +32,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
+
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_LABEL } from '../board/issue.js';
-import { specPath } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ACCEPT_REFS_FLAG } from '../board/refs-gate.js';
 import { readRefsBlock } from '../refs/stamp.js';

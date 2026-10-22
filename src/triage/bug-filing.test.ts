@@ -11,9 +11,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bugTitle } from '@open-tomato/rafa/bugs/record';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { bugFilingOf, DEFAULT_BUG_RULES, reproduceOf, rerunOf } from './bug-filing.js';
-import { localPathRedactor } from './local-paths.js';
 import { redactSecrets } from './triage.js';
 
 /** A home that holds the checkout, as a developer's does. */

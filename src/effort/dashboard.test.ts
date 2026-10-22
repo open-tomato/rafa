@@ -8,9 +8,10 @@ import type { ReportSessionRow } from './report.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
+
 import { summariseSkills, totalsOf } from './dashboard.js';
 import { summariseSessions } from './report.js';
-import { emptyUsageTotals } from './session-log.js';
 
 /** A metric of `numerator` over `denominator`, its percent left to the caller. */
 function metric(numerator: number, denominator: number): SkillsMetric {

@@ -23,9 +23,9 @@
  *     columns still read, so the `?` is known to come from the base.
  */
 import type { ReleaseListReading, ReleaseListResult } from './list.js';
-import type { Fragment } from '../../release/fragment.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -34,7 +34,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 

@@ -34,11 +34,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createGitRunner } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { bodyWithRelease, releaseBodyBlock } from '../../release/branch-forecast.js';
 import { forecastRelease } from '../../release/forecast.js';
-import { serializeFragment } from '../../release/fragment.js';
 import { releaseStrategyFor } from '../../release/strategy.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';

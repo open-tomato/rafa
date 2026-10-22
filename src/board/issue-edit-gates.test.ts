@@ -18,6 +18,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, test } from 'bun:test';
 
+import { branchName } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { CLAIMED_LABEL } from '../claims/stale.js';
@@ -28,7 +29,6 @@ import { editStateRefusalMessage, readEditState } from './issue-edit-state.js';
 import { addedTextSource, editedBodySource, requireEditText } from './issue-edit-text.js';
 import { SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
-import { branchName } from './naming.js';
 import { READINESS_REFUSAL_EXIT, SPEC_READY_LABEL } from './readiness.js';
 import {
   createGhEditorLogin,

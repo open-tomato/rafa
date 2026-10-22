@@ -20,7 +20,7 @@
  * other than the main checkout, the same reading `readMergeRefusal`
  * makes. It is a loop worktree only when it is ONE directory below
  * `loop.worktreeDir`, resolved from the main checkout by `worktreeDirAt`
- * (`src/start/worktree-dir.ts`), and that directory's name is the
+ * (`packages/rafa/src/start/worktree-dir.ts`), and that directory's name is the
  * stub. Git prints each path resolved, so the directory is compared in
  * both spellings through {@link LoopWorktreeSeams.realPath}, as
  * `src/cleanup/worktrees.ts` compares its roots. A holder anywhere
@@ -90,11 +90,11 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
 import { countChanges, WORKTREE_STATUS } from '../../cleanup/worktrees.js';
 import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
 import { shellQuote } from '../../pr/preflight-items.js';
-import { worktreeDirAt } from '../../start/worktree-dir.js';
 
 /** How every refusal here opens, as `src/pr/merge.ts`'s refusals open. */
 const REFUSAL_PREFIX = 'rafa pr merge refuses';

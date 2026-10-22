@@ -457,9 +457,12 @@ hold the root files that reach each feature package, each sorted by UTF-16
 code unit. A file a list names is placed in that package whatever its folder,
 and keeps its path: no named file moves. `CUT_RULES` reads them and adds a
 package's own file beside its list where one belongs (`src/pr/index.ts` to
-`PR_NAMED`, `src/start/branch-decision.ts` to `RUN_NAMED`,
-`src/schema/frontmatter.ts` to `EFFORT_NAMED`). The CLI's three named files sit
-in its rule.
+`PR_NAMED`, `src/start/branch-decision.ts` to `RUN_NAMED`). The CLI's three
+named files sit in its rule. The first decouple item (#808) took three files
+off the lists before moving them into core, now
+`packages/rafa/src/board/naming.ts`,
+`packages/rafa/src/utils/agent-definition.ts` and
+`packages/rafa/src/schema/frontmatter.ts`.
 
 **The left-to-place test is an edge check.** A file no rule holds is left to
 place, and it counts as the CLI's, the package that ranks highest. So an import
@@ -573,14 +576,16 @@ names come from, and the facade entry is no node.
   the other three byte for byte:
   - `loadCycle`: the package's own non-test files reach the importer over value
     edges, so taking the package by name would load it inside that cycle.
-    Effort has six: `src/agents/roster.ts`, `src/check/run.ts`,
+    Effort has none: its six, `src/agents/roster.ts`, `src/check/run.ts`,
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
-    `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has four:
+    `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
+    for the frontmatter and agent-definition files, which the first decouple
+    item moved into core. Inventory has four:
     `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`
     and `src/start/preflight.ts`; `src/start/serving.ts` is an inventory file
-    by name, so it is no importer. Board has twenty-five:
+    by name, so it is no importer. Board has twenty-four:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
-    `src/claims/labels.ts`, `src/commands/switch.ts`, `src/effort/epic-cost.ts`,
+    `src/claims/labels.ts`, `src/commands/switch.ts`,
     `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
     `src/next/owner-gate.ts`, `src/next/readings.ts`,
     `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
@@ -589,9 +594,9 @@ names come from, and the facade entry is no node.
     `src/start/preflight-drift.ts`, `src/start/stale-docs.ts`,
     `src/start/triage.ts`, `src/triage/bug-filing.ts`,
     `src/triage/refs-section.ts` and `src/triage/triage.ts`.
-    `src/effort/epic-cost.ts` is among them, though it is an effort file that
-    imports board, because the load-cycle group comes first. Its edge to board
-    is the back edge the decouple step before pass 4 cuts with inventory's three.
+    `src/effort/epic-cost.ts`, an effort file, sat among them until the first
+    decouple item moved `packages/rafa/src/board/naming.ts`, its one board
+    import, into core.
     Release has two: `src/board/project/facts.ts` and
     `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
     though it is a board file that imports release, because the load-cycle
@@ -628,17 +633,17 @@ names come from, and the facade entry is no node.
     Inventory has three, `src/effort/report-skills-read.ts`,
     `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, all effort
     files: effort comes before inventory in the move order, so they import it
-    backwards, and the decouple step before pass 4 cuts them. Board has none in the codemod's grouping,
-    because its one effort importer, `src/effort/epic-cost.ts`, is taken first
-    by the load-cycle group. Release has none in the codemod's grouping,
+    backwards, and the decouple step before pass 4 cuts them. Board has none:
+    no effort file imports it. Release has none in the codemod's grouping,
     because its one board importer, `src/board/project/facts.ts`, is taken
     first by the load-cycle group.
-    Pr has nineteen: `src/board/project/add-filed.ts`, the three
+    Pr has eighteen: `src/board/project/add-filed.ts`, the three
     `src/commands/epic/` files (`close-docs.ts`, `close-triage.ts` and
     `close.ts`), the two `src/commands/issue/` files (`create-bug.ts` and
     `create.ts`), the ten `src/commands/release/` files,
-    `src/release/prepare.ts` and `src/release/verify.ts`, and one effort file,
-    `src/effort/report-doc-bugs.ts`. Each sits earlier in the move order than
+    `src/release/prepare.ts` and `src/release/verify.ts`;
+    `src/effort/report-doc-bugs.ts` left it when the first decouple item
+    moved `packages/rafa/src/triage/doc-only.ts` into core. Each sits earlier in the move order than
     pr, so each imports it backwards, and the decouple step before pass 4 cuts
     them.
     Run has fifteen: seven board files (`src/board/issue-edit-state.ts`,
@@ -663,8 +668,8 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight, inventory's seven, board's 27, release's four,
-  pr's 37 and run's 34, and a planted control reds on one relative import.
+  files, effort's two, inventory's seven, board's 26, release's four,
+  pr's 36 and run's 32, and a planted control reds on one relative import.
   No row keeps a file for the library build: board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`, 68 files a library
   entry reaches statically (board 21, release eight, pr 33 and run six) that
@@ -903,9 +908,9 @@ names come from, and the facade entry is no node.
   exists yet, and no schema has moved: this is the placement the cut takes.
 - **Each schema under `src/schema/` lands in one package**, the one
   `docs/survey/content-schema-importers.md` names for it:
-  - `tiers.ts` and `project-id.ts`, already under `packages/rafa/src/schema/`:
-    `@open-tomato/rafa-core` (core)
-  - `frontmatter.ts`: `rafa-effort`
+  - `tiers.ts`, `project-id.ts` and `frontmatter.ts`, under
+    `packages/rafa/src/schema/`: `@open-tomato/rafa-core` (core);
+    `frontmatter.ts` moved there from `rafa-effort` in the first decouple item
   - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
   - `agent.ts`: `@open-tomato/rafa` (the CLI)

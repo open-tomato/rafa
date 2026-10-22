@@ -1,5 +1,5 @@
 /**
- * Tests for the board naming convention (`src/board/naming.ts`): the
+ * Tests for the board naming convention (`packages/rafa/src/board/naming.ts`): the
  * slug read off a title, the spec path, the plan stub, the branch and
  * the pull-request title spelled from it, and the local notes file
  * spelled from the number alone.
@@ -69,7 +69,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { branchGlob, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { branchGlob, DEFAULT_BRANCH_TEMPLATE } from '../core/config/sections.js';
 
 import {
   boardId,

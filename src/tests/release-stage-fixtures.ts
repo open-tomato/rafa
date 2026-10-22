@@ -26,15 +26,14 @@
 import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
 import type { BranchForecast, BranchForecastInput } from '../release/branch-forecast.js';
 import type { ChangelogNote } from '../release/changelog.js';
-import type { Fragment } from '../release/fragment.js';
 import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 import type { ReleaseRefused, ReleaseVerified } from '../release/verify.js';
 import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { sinkOutput } from './output-sinks.js';
 

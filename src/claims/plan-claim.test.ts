@@ -23,8 +23,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { branchName } from '@open-tomato/rafa/board/naming';
+
 import { createGhIssueBoard } from '../board/issue-board.js';
-import { branchName } from '../board/naming.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from './git.js';

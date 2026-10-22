@@ -30,23 +30,25 @@ interface RewiredRow {
 }
 
 /**
- * One row per rewired package. Effort's six load-cycle files would put the
- * facade on a cycle through effort if they imported it by name, and its two
- * declaration-graph files are reached from `src/config/index.ts`, whose
- * declarations ship as `dist/config/*.d.ts`. Inventory's five load-cycle
- * files would do the same through inventory, and its two back-edge files
+ * One row per rewired package. Effort's two declaration-graph files are
+ * reached from `src/config/index.ts`, whose declarations ship as
+ * `dist/config/*.d.ts`; its six load-cycle files left the row when the
+ * first decouple item moved their only effort imports into core, as
+ * `packages/rafa/src/schema/frontmatter.ts` and
+ * `packages/rafa/src/utils/agent-definition.ts`. Inventory's five
+ * load-cycle files would put the facade on a cycle through inventory if
+ * they imported it by name, and its two back-edge files
  * are effort files, and effort comes before inventory in the move order.
- * Board's 25 load-cycle files are mostly run and pr files that board's files
- * reach through `src/claims/`, `src/next/` and `src/start/`, and its one
- * effort importer, `src/effort/epic-cost.ts`, is a back edge the load-cycle
- * group takes first; its two declaration-graph files are effort's two.
+ * Board's 24 load-cycle files are mostly run and pr files that board's files
+ * reach through `src/claims/`, `src/next/` and `src/start/`; its two
+ * declaration-graph files are effort's two.
  * Release's one board importer, `src/board/project/facts.ts`, is a back edge
  * the load-cycle group takes first, and its two declaration-graph files are
  * effort's two.
  * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, six of them release files that are back edges the
- * load-cycle group takes first. Its 19 back-edge files are board, release and
- * effort files, every one earlier in the move order, and its two
+ * load-cycle group takes first. Its 18 back-edge files are board and release
+ * files, every one earlier in the move order, and its two
  * declaration-graph files are effort's two.
  * Run's 15 load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
@@ -63,14 +65,8 @@ interface RewiredRow {
 const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
-      'src/agents/roster.ts': 'loadCycle',
-      'src/check/run.ts': 'loadCycle',
       'src/config-registry.ts': 'declarationGraph',
       'src/config/shape.ts': 'declarationGraph',
-      'src/inventory/record.ts': 'loadCycle',
-      'src/inventory/trees.ts': 'loadCycle',
-      'src/schema/instinct.ts': 'loadCycle',
-      'src/tiers/serve.ts': 'loadCycle',
     },
     packageName: 'rafa-effort',
   },
@@ -95,7 +91,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/switch.ts': 'loadCycle',
       'src/config-registry.ts': 'declarationGraph',
       'src/config/shape.ts': 'declarationGraph',
-      'src/effort/epic-cost.ts': 'loadCycle',
       'src/epic/verify-run.ts': 'loadCycle',
       'src/next/hop-action.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
@@ -152,7 +147,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/release/tag.ts': 'backEdge',
       'src/config-registry.ts': 'declarationGraph',
       'src/config/shape.ts': 'declarationGraph',
-      'src/effort/report-doc-bugs.ts': 'backEdge',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',

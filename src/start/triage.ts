@@ -217,7 +217,6 @@ import {
   checkedKindOf,
   hasText,
   inheritedFailureOf,
-  localPathRedactor,
   namedSecrets,
   redactSecrets,
   scoreText,
@@ -229,6 +228,7 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';

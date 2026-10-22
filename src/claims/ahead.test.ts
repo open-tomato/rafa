@@ -20,7 +20,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { branchName } from '../board/naming.js';
+import { branchName } from '@open-tomato/rafa/board/naming';
+
 import { createGitRunner } from '../pr/index.js';
 
 import {

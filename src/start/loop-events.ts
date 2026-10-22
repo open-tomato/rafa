@@ -38,13 +38,13 @@ import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readSessionLog, sessionLogDir } from '@open-tomato/rafa-effort';
-
 import { oneLine, padKind } from '@open-tomato/rafa/adapters/output/events';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { readSessionLog } from '@open-tomato/rafa/effort/session-log';
+import { sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { listTrackerTasks } from '@open-tomato/rafa/utils/tracker';
 
 import { parsePlan } from '../plan/index.js';

@@ -61,11 +61,10 @@ import type { InstinctRecord } from '@open-tomato/rafa/ports';
 import type { FindingKind, FindingSignal } from '@open-tomato/rafa/report/parse';
 
 import { FINDING_DOMAINS, FINDING_KINDS, FINDING_SIGNALS } from '@open-tomato/rafa/report/parse';
+import { readFrontmatterDocument, renderFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 import { PROJECT_ID_LENGTH, PROJECT_ID_PATTERN } from '@open-tomato/rafa/schema/project-id';
 
 import { actionHash } from '../learning/identity.js';
-
-import { readFrontmatterDocument, renderFrontmatter } from './frontmatter.js';
 
 export type { ProjectIdSeams } from '@open-tomato/rafa/schema/project-id';
 

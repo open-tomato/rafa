@@ -66,12 +66,12 @@ import type { CommandFinding, PathSeams, RiskLevel } from '@open-tomato/rafa-inv
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
-import { findAgentDefinition } from '@open-tomato/rafa-effort';
 import { readBodyCommands, readLongRuns, readTaskLineCommands } from '@open-tomato/rafa-inventory';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { scanSecretNames } from '@open-tomato/rafa/plan/risk/secrets';
 import { resolveSkillTiers } from '@open-tomato/rafa/schema/tiers';
+import { findAgentDefinition } from '@open-tomato/rafa/utils/agent-definition';
 
 import { readAccounts } from './risk/accounts.js';
 

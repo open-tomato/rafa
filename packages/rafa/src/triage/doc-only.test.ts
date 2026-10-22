@@ -1,5 +1,5 @@
 /**
- * Tests for the documentation-only reading (`src/triage/doc-only.ts`).
+ * Tests for the documentation-only reading (`packages/rafa/src/triage/doc-only.ts`).
  *
  * The module is pure — a text in, a boolean out — so every case is a
  * literal. A reading that answered `false` for everything would pass each
@@ -49,7 +49,7 @@ describe('namesOnlyDocs', () => {
   });
 
   it('answers false for a .test.ts path, with a slash and bare', () => {
-    expect(namesOnlyDocs('src/triage/doc-only.test.ts fails under the full suite')).toBe(false);
+    expect(namesOnlyDocs('packages/rafa/src/triage/doc-only.test.ts fails under the full suite')).toBe(false);
     expect(namesOnlyDocs('doc-only.test.ts fails under the full suite')).toBe(false);
     expect(namesOnlyDocs('README.md is right, doc-only.test.ts is not')).toBe(false);
   });

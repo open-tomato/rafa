@@ -266,7 +266,7 @@ their `id`.
 ### Documentation-only failures in `rafa epic close`
 
 A failed acceptance check of `rafa epic close` whose criterion's text names
-only documentation is no bug. `namesOnlyDocs` (`src/triage/doc-only.ts`)
+only documentation is no bug. `namesOnlyDocs` (`packages/rafa/src/triage/doc-only.ts`)
 decides it: at least one path named, and every named path a `.md` or `.mdx`
 file, a path under `docs/` or `context/`, or a `README` or `CHANGELOG`. A
 criterion naming a source file beside a page, or no path at all, is filed as

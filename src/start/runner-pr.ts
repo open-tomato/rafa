@@ -79,7 +79,6 @@ import path from 'node:path';
 
 import {
   createGhRunner,
-  pullRequestTitle,
   refreshFailedWarning,
   refreshIssueItems,
 } from '@open-tomato/rafa-board';
@@ -90,9 +89,10 @@ import {
   parseWorkingTree,
   pushBranch,
 } from '@open-tomato/rafa-pr';
-import { parseFragment } from '@open-tomato/rafa-release';
 
+import { pullRequestTitle } from '@open-tomato/rafa/board/naming';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
 
 /** The steps an attempt can be blocked at, in the order they run. */
 export const RUNNER_PR_STEPS = ['dirty tree', 'push', 'create'] as const;

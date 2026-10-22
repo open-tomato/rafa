@@ -51,7 +51,7 @@ import type {
   AgentDefinitionCandidate,
   AgentDefinitionRoots,
 } from './agent-definition.js';
-import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import {
   mkdirSync,
@@ -75,7 +75,7 @@ import {
 } from './agent-definition.js';
 
 /** This repo's root, whose own definitions the last case reads. */
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 /** Setting sources naming the user scope, so the home is searched. */
 const WITH_USER: readonly ClaudeSettingSource[] = ['user', 'project', 'local'];

@@ -32,7 +32,7 @@
  * those stacks. Anything else wrong and the file is left alone: the
  * judgement fields are the backfill's, and they come from a session
  * that reads the body. The write goes through
- * `src/schema/frontmatter.ts`, so the body survives byte for byte, and
+ * `packages/rafa/src/schema/frontmatter.ts`, so the body survives byte for byte, and
  * the report is the RE-CHECK of what was written.
  *
  * ## The exit code

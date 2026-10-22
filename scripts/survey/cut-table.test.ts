@@ -110,7 +110,7 @@ describe('CUT_RULES', () => {
       .map(([path]) => path)
       .sort();
 
-    expect(inC6).toHaveLength(15);
+    expect(inC6).toHaveLength(14);
     expect(BOARD_NAMED.filter((path) => path.startsWith('src/board/'))).toEqual(inC6);
     expect(CUT_RULES.packages.find((rule) => rule.name === 'rafa-board')?.named).toEqual(BOARD_NAMED);
   });
@@ -119,11 +119,11 @@ describe('CUT_RULES', () => {
 /** Each feature package's list of `cut-names.ts`, its length, and the file its rule names beside the list. */
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
   ['rafa-inventory', INVENTORY_NAMED, 6, []],
-  ['rafa-board', BOARD_NAMED, 23, []],
+  ['rafa-board', BOARD_NAMED, 22, []],
   ['rafa-pr', PR_NAMED, 17, ['src/pr/index.ts']],
   ['rafa-run', RUN_NAMED, 25, ['src/start/branch-decision.ts']],
   ['rafa-release', RELEASE_NAMED, 5, []],
-  ['rafa-effort', EFFORT_NAMED, 2, ['src/schema/frontmatter.ts']],
+  ['rafa-effort', EFFORT_NAMED, 1, []],
 ];
 
 /**
@@ -143,8 +143,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 78 files across the six lists, the 60 of the plan, the fifteen of cluster c6, the two learning adapter files and the session serving file', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(78);
+  it('names 76 files across the six lists, 59 of the plan\'s 60, fourteen of cluster c6, the two learning adapter files and the session serving file', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(76);
   });
 });
 
@@ -247,7 +247,7 @@ describe('placeFile', () => {
   it('places a named file by name, against its folder: src/schema/ is split per file', () => {
     expect(placeFile('packages/rafa/src/schema/tiers.ts')).toEqual({ by: 'folder', folder: 'packages/rafa/', package: CORE_PACKAGE });
     expect(placeFile('packages/rafa/src/schema/project-id.ts').package).toBe(CORE_PACKAGE);
-    expect(placeFile('src/schema/frontmatter.ts')).toEqual({ by: 'named', folder: undefined, package: 'rafa-effort' });
+    expect(placeFile('packages/rafa/src/schema/frontmatter.ts')).toEqual({ by: 'folder', folder: 'packages/rafa/', package: CORE_PACKAGE });
     expect(placeFile('src/schema/agent.ts')).toEqual({ by: 'named', folder: undefined, package: CLI_PACKAGE });
     expect(placeFile('src/schema/skill.ts')).toEqual({ by: 'folder', folder: 'src/schema/', package: 'rafa-inventory' });
   });
@@ -260,7 +260,7 @@ describe('placeFile', () => {
 
   it('sends the test file of a named file where the named file goes', () => {
     expect(placeFile('src/schema/agent.test.ts')).toEqual({ by: 'named', folder: undefined, package: CLI_PACKAGE });
-    expect(placeFile('src/schema/frontmatter.test.ts').package).toBe('rafa-effort');
+    expect(placeFile('packages/rafa/src/schema/frontmatter.test.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('src/schema/skill.test.ts').package).toBe('rafa-inventory');
   });
 
