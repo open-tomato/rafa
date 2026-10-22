@@ -20,12 +20,10 @@
  * the Roadmap's #13 and #11, is the control.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Place } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-
-import '../adapter-registry.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,8 +31,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 

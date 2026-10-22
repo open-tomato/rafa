@@ -69,7 +69,7 @@ import type { DemotionVerdict } from './classify.js';
 
 import { createHash } from 'node:crypto';
 
-import { readFrontmatterDocument, renderFrontmatter } from '../schema/frontmatter.js';
+import { readFrontmatterDocument, renderFrontmatter } from '@open-tomato/rafa-effort';
 
 import { DEMOTION_VERDICTS } from './classify.js';
 

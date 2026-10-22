@@ -16,8 +16,6 @@ import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 import type { StoreIdentitySeams, StoreMeta } from '@open-tomato/rafa/store/store-meta';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

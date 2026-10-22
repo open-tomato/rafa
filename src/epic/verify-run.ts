@@ -121,14 +121,13 @@ import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
+import { DEFAULT_BASE_BRANCH, WORKTREES_SUBDIR, shellQuote } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 
-import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
-import { shellQuote } from '../pr/preflight-items.js';
-import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { SESSION_ID_FLAG } from '../start/dispatch.js';
 
 import { fenceFor } from './verify-plan.js';

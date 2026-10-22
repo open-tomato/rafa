@@ -159,15 +159,19 @@ function warnThroughActiveOutput(message: string): void {
 
 /**
  * Where the injection mode came from, as the operator log names it: the
- * flag, the file that answered, or the default. The labels sit in a
+ * flag, the file that answered, the template a file named, or the
+ * default. The labels sit in a
  * record over every source, so a source added to `ConfigSource` fails to
  * compile here until it has one, rather than being named the default.
  */
-export function injectSourceLabel({ sources, path, userPath }: ResolvedConfig): string {
+export function injectSourceLabel({ sources, path, localPath, userPath, provenance }: ResolvedConfig): string {
+  const origin = provenance.inject;
   const labels: Record<ConfigSource, string> = {
     cli: INJECT_FLAG,
+    local: localPath ?? 'the local config file',
     file: path ?? 'the config file',
-    user: userPath ?? 'the user config file',
+    user: origin?.file ?? userPath ?? 'the user config file',
+    template: `the ${origin?.template ?? 'config'} template named by ${origin?.file ?? 'a config file'}`,
     default: 'the default',
   };
   return labels[sources.inject];

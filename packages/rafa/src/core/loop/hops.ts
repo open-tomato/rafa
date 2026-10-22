@@ -15,7 +15,7 @@
  * `index.ts`, and it closed a runtime cycle there.
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
- * imports the barrel back by value is a runtime cycle. `src/next/hop-record.ts`
+ * imports the barrel back by value is a runtime cycle. `packages/rafa/src/next/hop-record.ts`
  * imports `asHopRecord` by value to re-export it, and
  * `src/loop/session-record-parse.ts` imported it from there by value
  * when the split was made (the parser has since moved beside
@@ -23,21 +23,21 @@
  * `sessions.ts`, behind `index.ts`, imports that parser by value. So
  * `hop-record.ts` behind `index.ts` closed a cycle of four files:
  * `index.ts`, `sessions.ts`, `src/loop/session-record-parse.ts` and
- * `src/next/hop-record.ts`. `hop-record.ts` imports no file, so a barrel
+ * `packages/rafa/src/next/hop-record.ts`. `hop-record.ts` imports no file, so a barrel
  * that holds it alone is imported back by nothing it reaches.
  *
  * Measured when the split was made: with the names on `index.ts` and
- * `src/project/position.ts` and `src/next/hop-record.ts` importing it,
+ * `packages/rafa/src/project/position.ts` and `packages/rafa/src/next/hop-record.ts` importing it,
  * `src/tests/import-cycle.sweep.test.ts` failed on that cycle across
  * c1, c2 and c3 of `docs/survey/cluster-map.json`, and with them on this
  * barrel it passed.
  *
  * ## What it exports
  *
- * `Place` and `asPlace`, which `src/project/position.ts` re-exports;
+ * `Place` and `asPlace`, which `packages/rafa/src/project/position.ts` re-exports;
  * `HopKind`, `HopState`, `HopRecord` and `asHopRecord`, which
- * `src/next/hop-record.ts` re-exports; and `isRecord`, which
- * `src/project/position.ts` reads for its own check. `hops.test.ts` holds
+ * `packages/rafa/src/next/hop-record.ts` re-exports; and `isRecord`, which
+ * `packages/rafa/src/project/position.ts` reads for its own check. `hops.test.ts` holds
  * the list to `hop-record.ts`, and holds that no name here is on the
  * other two loop barrels.
  */

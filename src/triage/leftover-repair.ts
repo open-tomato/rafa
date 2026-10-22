@@ -56,14 +56,13 @@
  * throws, as `insertTrackerTask` does; the caller answers the throw.
  */
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { InsertedTask } from '../utils/tracker.js';
 import type { BugKind } from '@open-tomato/rafa/report/parse';
+import type { InsertedTask } from '@open-tomato/rafa/utils/tracker';
 
 import { readFileSync } from 'node:fs';
 
 import { parseTaskDeclaration , escapeBlockerText } from '@open-tomato/rafa/core/plan';
-
-import { insertTrackerTask, listTrackerTasks } from '../utils/tracker.js';
+import { insertTrackerTask, listTrackerTasks } from '@open-tomato/rafa/utils/tracker';
 
 /** The two kinds a leftover repair is inserted for. */
 export type LeftoverKind = Extract<BugKind, 'own-fallout' | 'own-gap'>;

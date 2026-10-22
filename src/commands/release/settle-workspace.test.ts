@@ -23,8 +23,6 @@ import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { WorkspaceWorld } from '../../tests/workspace-world.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

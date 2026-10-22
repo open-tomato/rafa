@@ -15,8 +15,6 @@ import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { GhRunner, GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent, EditableIssue, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

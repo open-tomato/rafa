@@ -49,17 +49,18 @@
  * repository `gh` will not name and a listing it will not answer are each one
  * {@link freedProblemLine} warning, and `pr merge` keeps its exit code.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardIssue } from '../../board/roadmap-board.js';
+import type { BoardIssue, GhRunner } from '@open-tomato/rafa-board';
+
+import {
+  NATIVE_MODE,
+  closedIssuesIn,
+  createGhBoardListing,
+  readBoardRepository,
+  selectBoardRelations,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { selectBoardRelations } from '../../board/relations/select.js';
-import { readBoardRepository } from '../../board/repository.js';
-import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { closedIssuesIn } from '../../board/roadmap.js';
-import { NATIVE_MODE } from '../epic/move-native.js';
 
 import { INDENT } from './merge-cleanup.js';
 

@@ -9,10 +9,12 @@
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `sections.test.ts` reads its barrel.
  *
- * Two names are held by name, so a reading that came back empty, or one
+ * Four names are held by name, so a reading that came back empty, or one
  * that saw runtime names alone, fails rather than agreeing with itself:
- * `loadConfig`, the one function every command imports, and
- * `ConfigRoots`, the one type `config-load.ts` exports.
+ * `loadConfig`, the one function every command imports,
+ * `readProjectScope`, which reads the project's two files alone, and
+ * `ConfigRoots` and `ProjectScopeFiles`, the two types `config-load.ts`
+ * exports.
  *
  * The last case holds the three barrels apart. `InjectMode` on
  * `sections.ts` and `ConfigError` on `index.ts` are its controls: a
@@ -70,6 +72,7 @@ describe('the load barrel', () => {
     const expected = Object.keys(load).sort();
 
     expect(expected).toContain('loadConfig');
+    expect(expected).toContain('readProjectScope');
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
@@ -85,8 +88,10 @@ describe('the load barrel', () => {
     const names = readExportNames([BARREL, LOAD]);
 
     expect(names[LOAD]).toContain('ConfigRoots');
+    expect(names[LOAD]).toContain('ProjectScopeFiles');
     expect(names[LOAD]).toContain('loadConfig');
     expect(Object.keys(load)).not.toContain('ConfigRoots');
+    expect(Object.keys(load)).not.toContain('ProjectScopeFiles');
     expect(names[BARREL]).toEqual(names[LOAD] ?? []);
   });
 

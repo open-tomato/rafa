@@ -11,7 +11,7 @@ import type { ContinueDecision } from './decision-parse.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { findNextTask } from '../utils/tracker.js';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import {
   EMPTY_PASS_OVER,

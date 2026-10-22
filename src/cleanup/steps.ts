@@ -156,11 +156,11 @@
  *     `git push origin --delete +plus` deletes `+plus` and leaves `plus`.
  */
 import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.js';
-import type { PastHeadRead } from './past-head.js';
 import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PastHeadRead } from '@open-tomato/rafa-release';
 
 import { rmSync } from 'node:fs';
 

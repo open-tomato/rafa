@@ -1,10 +1,10 @@
 /**
  * One scope's paths, and the project the dispatcher resolved: the
- * shapes `resolveScope` answers in `src/project/scope.ts`, and
+ * shapes `resolveScope` answers in `packages/rafa/src/project/scope.ts`, and
  * {@link scopeAt}, which builds a scope from its base directory.
  *
  * The walk itself, `resolveScope` with its refusals and its hint, stays
- * in `src/project/scope.ts`, which imports these names from the config
+ * in `packages/rafa/src/project/scope.ts`, which imports these names from the config
  * barrel and re-exports them under the same names. Core holds the
  * shapes alone, so `RafaContext` can name the project a command runs in
  * and the session store can find a project's `.rafa` directory without

@@ -89,9 +89,10 @@ import type { PrSeams } from './pr-context.js';
 import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
+import { closedIssuesIn } from '@open-tomato/rafa-board';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { closedIssuesIn } from '../../board/roadmap.js';
 import { formatRows } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';

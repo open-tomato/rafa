@@ -14,7 +14,8 @@
  * setting at a value that differs from the other's — `version` and
  * `release.strategy` are the exceptions, since each accepts one value. Loading them
  * together through `loadConfig` and reading `PROJECT_VALUES` back off
- * every setting, every source labelled `file`, is what shows the project
+ * every setting, every source labelled `local` (a project's
+ * `.rafa/config.yaml` is its local layer), is what shows the project
  * file outranks the user's key by key rather than by accident; the
  * paired control loads the user file alone, under the same home, and
  * reads `USER_VALUES` back, every source `user`. A third set of values,
@@ -53,6 +54,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import {
   ConfigError,
   ConfigSectionError,
@@ -63,7 +65,6 @@ import {
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));
@@ -295,12 +296,21 @@ const PROJECT_TEXT = [
   '  duplicates: allow',
   'naming:',
   '  branch: "project/{stub}"',
+  'templates: [escalation]',
   'tests:',
   '  fullSuiteTriggers: ["project/*.toml"]',
   '  integration: ["project/**/*.e2e.ts"]',
   '  contract: ["project/**/*.pact.ts"]',
   '  alwaysRun: ["project/**/*.sweep.ts"]',
   '  retakeRedAlone: false',
+  'checks:',
+  '  task: [affected]',
+  '  stage: [related, integration]',
+  '  loop: [full]',
+  '  pullRequest: [unit, contract, integration]',
+  '  stretch: [related, contract]',
+  '  releasePullRequest: [integration]',
+  '  publish: [full]',
   'features:',
   '  board: false',
   '  pr: false',
@@ -423,11 +433,19 @@ const PROJECT_VALUES: RafaConfig = {
   taskLessons: 'off',
   mergeDuplicates: 'allow',
   namingBranch: 'project/{stub}',
+  templates: ['escalation'],
   testsFullSuiteTriggers: ['project/*.toml'],
   testsIntegration: ['project/**/*.e2e.ts'],
   testsContract: ['project/**/*.pact.ts'],
   testsAlwaysRun: ['project/**/*.sweep.ts'],
   testsRetakeRedAlone: false,
+  checksTask: ['affected'],
+  checksStage: ['related', 'integration'],
+  checksLoop: ['full'],
+  checksPullRequest: ['unit', 'contract', 'integration'],
+  checksStretch: ['related', 'contract'],
+  checksReleasePullRequest: ['integration'],
+  checksPublish: ['full'],
   featuresBoard: false,
   featuresPr: false,
   featuresRun: false,
@@ -577,12 +595,21 @@ const USER_TEXT = [
   '  duplicates: error',
   'naming:',
   '  branch: "user/{stub}"',
+  'templates: []',
   'tests:',
   '  fullSuiteTriggers: []',
   '  integration: ["user/**/*.e2e.ts"]',
   '  contract: ["user/**/*.pact.ts"]',
   '  alwaysRun: []',
   '  retakeRedAlone: true',
+  'checks:',
+  '  task: [unit]',
+  '  stage: []',
+  '  loop: [related, contract]',
+  '  pullRequest: [full]',
+  '  stretch: []',
+  '  releasePullRequest: [unit, full]',
+  '  publish: [integration]',
   'features:',
   '  board: true',
   '  pr: true',
@@ -691,11 +718,19 @@ const USER_VALUES: RafaConfig = {
   taskLessons: 'on',
   mergeDuplicates: 'error',
   namingBranch: 'user/{stub}',
+  templates: [],
   testsFullSuiteTriggers: [],
   testsIntegration: ['user/**/*.e2e.ts'],
   testsContract: ['user/**/*.pact.ts'],
   testsAlwaysRun: [],
   testsRetakeRedAlone: true,
+  checksTask: ['unit'],
+  checksStage: [],
+  checksLoop: ['related', 'contract'],
+  checksPullRequest: ['full'],
+  checksStretch: [],
+  checksReleasePullRequest: ['unit', 'full'],
+  checksPublish: ['integration'],
   featuresBoard: true,
   featuresPr: true,
   featuresRun: true,
@@ -721,7 +756,7 @@ describe('loadConfig across the whole schema', () => {
     const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual(PROJECT_VALUES);
-    expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
+    expect(resolved.sources).toEqual(sourcesWith({}, 'local'));
 
     // The control: the same home with no project file to outrank it
     // answers the user's own values, so the project's above was a real
@@ -757,13 +792,13 @@ describe('loadConfig across the whole schema', () => {
       outputMode: 'cli',
       settingSources: 'cli',
       taskSkills: 'cli',
-    }, 'file'));
+    }, 'local'));
 
     // The control: the same roots with no flag answer the project's
     // values for every setting the flag named above.
     const unflagged = await loadConfig(roots, {}, quiet);
     expect(unflagged.config).toEqual(PROJECT_VALUES);
-    expect(unflagged.sources).toEqual(sourcesWith({}, 'file'));
+    expect(unflagged.sources).toEqual(sourcesWith({}, 'local'));
   });
 });
 
@@ -774,7 +809,7 @@ describe('an unknown key nested under a section', () => {
     const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.trackerDefault).toBe('linear');
-    expect(resolved.extras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
+    expect(resolved.localExtras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
     expect(lines).toEqual([
       `rafa config: unknown key "tracker.kind" in ${literalPath(roots.root)} `
         + 'has no effect in this version (known keys under tracker: default, fallback)',
@@ -1261,6 +1296,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'naming:\n  branch: "feat/{stub}"', 'namingBranch', 'feat/{stub}',
   ],
   [
+    'templates', 'templates: [escalation, ""]',
+    'templates[1] is "", expected a template name',
+    'templates: [escalation]', 'templates', ['escalation'],
+  ],
+  [
     'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: [""]',
     'tests.fullSuiteTriggers[0] is "", expected a glob pattern relative to the repository root',
     'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
@@ -1284,6 +1324,41 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: "false"',
     'tests.retakeRedAlone is "false", expected true or false',
     'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
+  ],
+  [
+    'checks.task', 'checks:\n  task: [affected, affected]',
+    'checks.task is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "affected" is written twice',
+    'checks:\n  task: [affected]', 'checksTask', ['affected'],
+  ],
+  [
+    'checks.stage', 'checks:\n  stage: [related, e2e]',
+    'checks.stage[1] is "e2e", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  stage: [related, integration]', 'checksStage', ['related', 'integration'],
+  ],
+  [
+    'checks.loop', 'checks:\n  loop: full',
+    'checks.loop is "full", expected a list of check names from: affected, related, unit, contract, integration, full',
+    'checks:\n  loop: [full]', 'checksLoop', ['full'],
+  ],
+  [
+    'checks.pullRequest', 'checks:\n  pullRequest: { unit: true }',
+    'checks.pullRequest is a mapping, expected a list of check names from: affected, related, unit, contract, integration, full',
+    'checks:\n  pullRequest: [unit, contract]', 'checksPullRequest', ['unit', 'contract'],
+  ],
+  [
+    'checks.stretch', 'checks:\n  stretch: ["bun test"]',
+    'checks.stretch[0] is "bun test", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  stretch: [related]', 'checksStretch', ['related'],
+  ],
+  [
+    'checks.releasePullRequest', 'checks:\n  releasePullRequest: [unit, full, unit]',
+    'checks.releasePullRequest is a list, expected a list of check names, each at most once, from: affected, related, unit, contract, integration, full; "unit" is written twice',
+    'checks:\n  releasePullRequest: [integration]', 'checksReleasePullRequest', ['integration'],
+  ],
+  [
+    'checks.publish', 'checks:\n  publish: [Full]',
+    'checks.publish[0] is "Full", expected one of: affected, related, unit, contract, integration, full',
+    'checks:\n  publish: [full]', 'checksPublish', ['full'],
   ],
   [
     'features.board', 'features:\n  board: 0',
@@ -1324,13 +1399,13 @@ describe('each section, an unusable value refused by name beside an accepting co
   );
 
   it.each(SECTION_CASES)(
-    'accepts a usable %s into the config, sourced from the file',
+    'accepts a usable %s into the config, sourced from the local file',
     async (_label, _unusable, _problem, usable, setting, expected) => {
       const roots = scopes(`${usable}\n`, null);
       const resolved = await loadConfig(roots, {}, quiet);
 
       expect<unknown>(resolved.config[setting]).toEqual(expected);
-      expect(resolved.sources[setting]).toBe('file');
+      expect(resolved.sources[setting]).toBe('local');
     },
   );
 });
@@ -1348,7 +1423,7 @@ describe('maps merged across the user and project layers', () => {
       ['react-query', 'user'],
       ['lint', 'rafa'],
     ]));
-    expect(resolved.sources.tiersSkills).toBe('file');
+    expect(resolved.sources.tiersSkills).toBe('local');
   });
 
   it('merges routing by key over the defaults, user rows then project rows', async () => {
@@ -1413,7 +1488,7 @@ describe('a user-level pin naming an unloaded tier', () => {
  * covers only with an absolute path.
  */
 describe('the release plan\'s six keys, through loadConfig', () => {
-  it('reads all six from .rafa/config.yaml, sourced from the file', async () => {
+  it('reads all six from .rafa/config.yaml, sourced from the local file', async () => {
     const roots = scopes(
       [
         'pr:',
@@ -1440,12 +1515,12 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       dangerousAcceptVersionCollision: true,
     });
     expect(resolved.sources).toMatchObject({
-      prVersionCollision: 'file',
-      releaseFragments: 'file',
-      releaseStrategy: 'file',
-      releaseSettle: 'file',
-      releaseTag: 'file',
-      dangerousAcceptVersionCollision: 'file',
+      prVersionCollision: 'local',
+      releaseFragments: 'local',
+      releaseStrategy: 'local',
+      releaseSettle: 'local',
+      releaseTag: 'local',
+      dangerousAcceptVersionCollision: 'local',
     });
   });
 
@@ -1481,6 +1556,76 @@ describe('the release plan\'s six keys, through loadConfig', () => {
   });
 });
 
+const TEMPLATE_GLOBS = {
+  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+  testsIntegration: [
+    '**/*-integration.test.ts',
+    '**/*.integration.test.ts',
+    '**/*-spawned*.test.ts',
+    '**/*-cli.test.ts',
+  ],
+  testsContract: ['**/*.contract.test.ts'],
+};
+
+const EMPTY_GLOBS = {
+  testsFullSuiteTriggers: [],
+  testsIntegration: [],
+  testsContract: [],
+};
+
+const EMPTY_CHECKS = {
+  checksTask: [],
+  checksStage: [],
+  checksLoop: [],
+  checksPullRequest: [],
+  checksStretch: [],
+  checksReleasePullRequest: [],
+  checksPublish: [],
+};
+
+describe('the escalation template over the checks and the three glob keys', () => {
+  it('resolves the template\'s globs and check points, and empties the four unnamed checks', async () => {
+    const resolved = await loadConfig(scopes('templates: [escalation]\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({
+      ...TEMPLATE_GLOBS,
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
+      checksPullRequest: [],
+      checksStretch: [],
+      checksReleasePullRequest: [],
+      checksPublish: [],
+    });
+    expect(resolved.sources).toMatchObject({
+      testsFullSuiteTriggers: 'template',
+      checksTask: 'template',
+      checksStage: 'template',
+      checksLoop: 'template',
+    });
+  });
+
+  it('resolves every checks key and the three glob keys to empty lists with no template', async () => {
+    const resolved = await loadConfig(scopes('version: 1\n', null), {}, quiet);
+
+    expect(resolved.config).toMatchObject({ ...EMPTY_GLOBS, ...EMPTY_CHECKS });
+    expect(resolved.sources).toMatchObject({ checksTask: 'default', testsIntegration: 'default' });
+  });
+
+  it('lets a written checks.stage replace the template\'s entry alone, sourced from the local file', async () => {
+    const resolved = await loadConfig(
+      scopes('templates: [escalation]\nchecks:\n  stage: [related]\n', null),
+      {},
+      quiet,
+    );
+
+    expect(resolved.config.checksStage).toEqual(['related']);
+    expect(resolved.sources.checksStage).toBe('local');
+    expect(resolved.config.checksTask).toEqual(['affected']);
+    expect(resolved.sources.checksTask).toBe('template');
+  });
+});
+
 describe('every registered setting, resolved through loadConfig', () => {
   it('names each registered setting in both files and in the defaults', () => {
     expect([...Object.keys(PROJECT_VALUES)].sort()).toEqual([...SETTING_NAMES].sort());
@@ -1496,7 +1641,7 @@ describe('every registered setting, resolved through loadConfig', () => {
 
     for (const name of SETTING_NAMES) {
       expect({ name, value: both.config[name], source: both.sources[name] })
-        .toEqual({ name, value: PROJECT_VALUES[name], source: 'file' });
+        .toEqual({ name, value: PROJECT_VALUES[name], source: 'local' });
       expect({ name, value: userOnly.config[name], source: userOnly.sources[name] })
         .toEqual({ name, value: USER_VALUES[name], source: 'user' });
       expect({ name, value: neither.config[name], source: neither.sources[name] })
@@ -1581,20 +1726,22 @@ describe('loadConfig over a project whose rafa.config.ts holds only types', () =
     expect(resolved.sources.prBase).toBe('user');
   });
 
-  it('reads the TS file over a YAML file of the same scope, warning about the shadow once', async () => {
+  it('reads a YAML file over the TS file of the same scope key by key, warning about neither', async () => {
     const roots = scopes('naming:\n  branch: yaml/{stub}\npr:\n  base: yaml-base\n', null);
+    const yaml = literalPath(roots.root);
     const ts = writeAt(
       join(roots.root, 'rafa.config.ts'),
-      typedModuleText([{ naming: { branch: 'ts/{stub}' } }]),
+      typedModuleText([{ naming: { branch: 'ts/{stub}' }, plan: { dir: 'ts-plans' } }]),
     );
     const { lines, warn } = sink();
     const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, warn));
 
-    expect(resolved.config.namingBranch).toBe('ts/{stub}');
-    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual([CONFIG_DEFAULTS.prBase, 'default']);
-    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
-    expect(lines.filter((line) => line.includes(literalPath(roots.root)))).toHaveLength(1);
-    expect(lines).toHaveLength(1);
+    expect([resolved.config.namingBranch, resolved.sources.namingBranch, resolved.provenance.namingBranch])
+      .toEqual(['yaml/{stub}', 'local', { file: yaml, entry: 0 }]);
+    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual(['yaml-base', 'local']);
+    expect([resolved.config.planDir, resolved.sources.planDir, resolved.provenance.planDir])
+      .toEqual(['ts-plans', 'file', { file: ts, entry: 0 }]);
+    expect(lines).toEqual([]);
   });
 
   it('warns about two entries of one TS file setting pr.base at warn, and refuses at error', async () => {

@@ -31,19 +31,18 @@
  * whenever a command opens it.
  */
 import type { CurrentRange } from './update-range.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardPart } from '../board/setup.js';
+import type { BoardPart, GhRunner } from '@open-tomato/rafa-board';
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { listBoardLabels, missingBoardLabels, setUpLabels } from '@open-tomato/rafa-board';
+import { writeProjectLock } from '@open-tomato/rafa-release';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { SCOPE_DIR } from '@open-tomato/rafa/project/scope';
 
-import { listBoardLabels, missingBoardLabels, setUpLabels } from '../board/setup.js';
-
-import { writeProjectLock } from './lock.js';
 import { PROJECT_TREE, writeProjectScope } from './scaffold.js';
-import { SCOPE_DIR } from './scope.js';
 
 /** A deprecation a project is moved off on update (#718). None is registered yet. */
 export interface Deprecation {

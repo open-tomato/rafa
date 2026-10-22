@@ -31,7 +31,21 @@
     "./core/config/config-schema": "./src/core/config/config-schema.ts",
     "./store/*": "./src/effort/store/*.ts",
     "./ports/*": "./src/ports/*.ts",
-    "./errors/*": "./src/errors/*.ts"
+    "./errors/*": "./src/errors/*.ts",
+    "./adapters/logger/*": "./src/adapters/logger/*.ts",
+    "./adapters/output/events": "./src/adapters/output/events.ts",
+    "./bugs/*": "./src/bugs/*.ts",
+    "./commands/plan/plan-files": "./src/commands/plan/plan-files.ts",
+    "./config-schema-bugs": "./src/config-schema-bugs.ts",
+    "./config-schema-errors": "./src/config-schema-errors.ts",
+    "./config-schema-features": "./src/config-schema-features.ts",
+    "./config-schema-logger": "./src/config-schema-logger.ts",
+    "./modules/*": "./src/modules/*.ts",
+    "./next/hop-record": "./src/next/hop-record.ts",
+    "./plan/*": "./src/plan/*.ts",
+    "./project/*": "./src/project/*.ts",
+    "./runtime/live-loops": "./src/runtime/live-loops.ts",
+    "./utils/*": "./src/utils/*.ts"
   },
   "scripts": {
     "lint": "eslint .",

@@ -34,8 +34,6 @@ import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { Fragment } from '../release/fragment.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

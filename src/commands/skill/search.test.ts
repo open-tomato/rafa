@@ -24,8 +24,6 @@
 import type { SearchCommandResult } from './search.js';
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

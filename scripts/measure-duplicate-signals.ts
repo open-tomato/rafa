@@ -28,16 +28,21 @@
  *
  * Exit codes: 0 printed, 2 the read could not run.
  */
-import type { BoardIssue, CauseJudgement } from '../src/triage/scoring-fixture.js';
-import type { RankedFields } from '../src/triage/similarity.js';
+import type { BoardIssue, CauseJudgement, RankedFields } from '@open-tomato/rafa-pr';
 
 import { resolve } from 'node:path';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import {
+  FIXTURE_REPO,
+  causeOf,
+  causeSignalOf,
+  issueWordsOf,
+  jaccard,
+  sharesBoundary,
+} from '@open-tomato/rafa-pr';
 
-import { parseBugRecord } from '../src/bugs/record.js';
-import { FIXTURE_REPO, causeOf } from '../src/triage/scoring-fixture.js';
-import { causeSignalOf, issueWordsOf, jaccard, sharesBoundary } from '../src/triage/similarity.js';
+import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[duplicate-signals]';

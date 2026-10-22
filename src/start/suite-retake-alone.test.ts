@@ -33,10 +33,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { blockerText, TOUCHED_BEFORE_NAMED } from './suite-blocker.js';
 import { aloneJunitFileFor, RETAKE_ALONE_MAX_FILES, STEP_ONLY_BEFORE } from './suite-retake-alone.js';
@@ -171,6 +171,10 @@ function contextWith(answers: readonly Answer[], options: { readonly retake?: bo
       testsIntegration: [],
       testsAlwaysRun: [],
       testsRetakeRedAlone: options.retake ?? true,
+      testsContract: [],
+      checksTask: ['affected'],
+      checksStage: ['related', 'integration'],
+      checksLoop: ['full'],
     },
     owns: () => Promise.resolve(options.owns ?? null),
     seams: {

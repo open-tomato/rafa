@@ -24,8 +24,6 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

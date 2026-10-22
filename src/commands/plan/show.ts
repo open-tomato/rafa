@@ -42,13 +42,16 @@
  * shown and never refused: `rafa plan validate` is the check that exits
  * nonzero on one.
  */
-import type { PlanIssue, PlanStage, PlanTask } from '../../plan/index.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { PlansDir, TaskCounts } from '@open-tomato/rafa/core/plan';
+import type { PlanIssue, PlanStage, PlanTask } from '@open-tomato/rafa-run';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { parsePlan } from '@open-tomato/rafa-run';
+
+import { expectOneArgument, requireProject, resolvePlansDir } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import {
   checkbox,
@@ -59,10 +62,6 @@ import {
   isStampableStub,
   planFileName,
 } from '@open-tomato/rafa/core/plan';
-
-import { parsePlan } from '../../plan/index.js';
-
-import { expectOneArgument, requireProject, resolvePlansDir } from './plan-files.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa plan show <stub> [--tracker]';

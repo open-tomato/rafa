@@ -18,8 +18,6 @@
 import type { LoopWaitSeams } from './wait.js';
 import type { LoopEvent } from '../../start/loop-events.js';
 
-import '../../adapter-registry.js';
-
 import { appendFileSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

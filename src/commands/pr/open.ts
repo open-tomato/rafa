@@ -53,9 +53,9 @@ import type { LineFlags, PrSeams } from './pr-context.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readRequiredFlag } from '@open-tomato/rafa-board';
 
-import { readRequiredFlag } from '../issue/issue-tracker.js';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { PR_OPEN_DECLARATION } from './declarations.js';
 import { DEFAULT_PR_SEAMS, expectNoArguments, lineRefusal, onProvider, openPrContext, PR_USAGE } from './pr-context.js';

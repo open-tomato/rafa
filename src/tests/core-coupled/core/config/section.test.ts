@@ -26,6 +26,17 @@
  * active registry unchanged (2), the package refusal dropped (1), and
  * the merged checks left empty (2).
  *
+ * The whole-record readers, `registeredDefaults` and
+ * `registeredSettings`, are held to refuse an emptied registry with the
+ * sentence naming `src/config-registry.ts`, and to answer the registered
+ * records as the same objects the `active*` readers answer, over the
+ * fixture sections and over the registration every later file reads.
+ * Three mutations were driven against them on 2026-10-20, with this file
+ * and `src/config-registry.test.ts` run together and `section.ts`
+ * restored sha256-identical after: the refusal dropped (2 fail), the
+ * defaults answered as a copy (2), and the settings answered as another
+ * record (3).
+ *
  * The key indexes (`activeSettingByKey`, `activeSectionPaths` and
  * `activeKnownKeysAbove`) are driven over the fixture sections alone,
  * in an emptied registry, so every key and section they answer is one
@@ -36,7 +47,7 @@
  * The load hook is module state too, apart from the registry. Each case
  * that sets one reads the hook in place first and puts it back in a
  * `finally`, so the hook `src/config-registry.ts` set for every later
- * file survives this one.
+ * file survives this one. The template hook is held the same way.
  */
 import type {
   ConfigCheck,
@@ -44,6 +55,7 @@ import type {
   ConfigLoadHook,
   ConfigSection,
   ConfigSectionRegistry,
+  ConfigTemplateHook,
 } from '@open-tomato/rafa/core/config/section';
 
 import '../../../../config-registry.js';
@@ -55,6 +67,7 @@ import { CORE_SECTION } from '@open-tomato/rafa/core/config/core-section';
 import {
   activeChecks,
   activeConfigLoadHook,
+  activeConfigTemplateHook,
   activeDefaults,
   activeKnownKeysAbove,
   activeSectionPaths,
@@ -65,8 +78,11 @@ import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   registerConfigSections,
+  registeredDefaults,
+  registeredSettings,
   restoreConfigSections,
   setConfigLoadHook,
+  setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config/section';
 
 /** Core's specs, which the fixture sections borrow. */
@@ -371,6 +387,41 @@ describe('registerConfigSections', () => {
   });
 });
 
+/** The sentence the whole-record readers refuse with over an empty registry, for `reader`. */
+function unregisteredSentence(reader: string): string {
+  return `no config section is registered: call registerCoreConfigSections from src/config-registry.ts before ${reader}`;
+}
+
+describe('registeredDefaults and registeredSettings', () => {
+  it('refuse over an empty registry, each naming src/config-registry.ts and itself', () => {
+    withEmptyRegistry(() => {
+      expect(refusalOf(() => registeredDefaults()).problems).toEqual([unregisteredSentence('registeredDefaults')]);
+      expect(refusalOf(() => registeredSettings()).problems).toEqual([unregisteredSentence('registeredSettings')]);
+    });
+  });
+
+  it('answer the registered records, the same objects the active readers answer', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha(), beta()]);
+
+      expect<unknown>(registeredDefaults()).toBe(activeDefaults());
+      expect<unknown>(registeredSettings()).toBe(activeSettings());
+      expect<unknown>(registeredDefaults()).toEqual({
+        store: 'sqlite',
+        planDir: '.rafa/plans',
+        dangerousAcceptStaleRefs: false,
+      });
+      expect(registeredSettings().dangerousAcceptStaleRefs).toBe(SETTINGS.dangerousAcceptStaleRefs);
+    });
+  });
+
+  it('answer the record the registry registered for every later file, outside an emptied registry', () => {
+    expect(Object.keys(registeredSettings()).length).toBeGreaterThan(Object.keys(SETTINGS).length);
+    expect<unknown>(registeredDefaults()).toBe(activeDefaults());
+    expect<unknown>(registeredSettings()).toBe(activeSettings());
+  });
+});
+
 /** The prerequisite lists and the modules, under the package `gamma`: settings with item keys. */
 function gamma(): ConfigSection {
   return {
@@ -491,6 +542,49 @@ describe('setConfigLoadHook', () => {
       expect(activeConfigLoadHook()).toBe(hook);
     } finally {
       setConfigLoadHook(held);
+    }
+  });
+});
+
+describe('setConfigTemplateHook', () => {
+  it('makes the hook activeConfigTemplateHook answers, answering the one it replaced, and clears it with null', () => {
+    const held = activeConfigTemplateHook();
+    const entry = Object.freeze({ checks: Object.freeze({ task: Object.freeze(['affected']) }) });
+    const first: ConfigTemplateHook = (name) => name === 'first'
+      ? entry
+      : null;
+    const second: ConfigTemplateHook = () => null;
+    try {
+      const replaced = [setConfigTemplateHook(first), setConfigTemplateHook(second)];
+      const active = activeConfigTemplateHook();
+      const cleared = setConfigTemplateHook(null);
+
+      expect(replaced).toEqual([held, first]);
+      expect(active).toBe(second);
+      expect(cleared).toBe(second);
+      expect(activeConfigTemplateHook()).toBeNull();
+      expect(first('first')).toBe(entry);
+      expect(first('stranger')).toBeNull();
+    } finally {
+      setConfigTemplateHook(held);
+    }
+    expect(activeConfigTemplateHook()).toBe(held);
+  });
+
+  it('is left as it was when a registry is restored, and apart from the load hook', () => {
+    const heldTemplate = activeConfigTemplateHook();
+    const heldLoad = activeConfigLoadHook();
+    const hook: ConfigTemplateHook = () => null;
+    try {
+      setConfigTemplateHook(hook);
+      withEmptyRegistry(() => {
+        restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+      });
+
+      expect(activeConfigTemplateHook()).toBe(hook);
+      expect(activeConfigLoadHook()).toBe(heldLoad);
+    } finally {
+      setConfigTemplateHook(heldTemplate);
     }
   });
 });

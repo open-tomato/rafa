@@ -49,8 +49,6 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

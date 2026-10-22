@@ -5,20 +5,19 @@
  *
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start` each call {@link endWithNextStep} as the last thing they
- * do, and each declares {@link HINT_FLAG_SPEC} so `--no-hint` turns it
- * off, the three `pr` commands through `PR_HINT_FLAG_SPEC`
- * (`src/commands/pr/declarations.ts`) and `issue ready` through
- * `ISSUE_HINT_FLAG_SPEC` (`src/commands/issue/declarations.ts`), copies
- * their tests hold equal to this one, since a declaration imports no
- * module under `src/`. Two things live here rather than in `./hint.ts`
- * and rather than six times over:
+ * do, and each declares `HINT_FLAG_SPEC` so `--no-hint` turns it off.
+ * The flag lives in core (`packages/rafa/src/core/command/shared-flags.ts`,
+ * through the command barrel), not here: three of the six are declared
+ * in a declarations file (`src/commands/pr/declarations.ts`,
+ * `src/commands/issue/declarations.ts`), which imports core's entries
+ * alone, so core is the one place all six reach the same value from, and
+ * the help of all six reads the same.
  *
- *  - the QUESTION being put and the action being run, which
- *    `./hint.ts` deliberately does neither of: it words the ending and
- *    reads the state, and nothing in it opens a prompter or calls a
- *    command;
- *  - the flag declaration, so the six spell `--no-hint` the same and
- *    the help of all six reads the same.
+ * What lives here rather than in `./hint.ts` and rather than six times
+ * over is the QUESTION being put and the action being run, which
+ * `./hint.ts` deliberately does neither of: it words the ending and
+ * reads the state, and nothing in it opens a prompter or calls a
+ * command.
  *
  * ## A yes runs the step, through the same call `rafa next` makes
  *
@@ -76,7 +75,7 @@
  * the chain ends once, with the chain's reading, rather than twice.
  */
 import type { NextHintSeams, NextStepHint } from './hint.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec , Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { createLinePrompter } from '@open-tomato/rafa/core/command';
@@ -84,21 +83,7 @@ import { createLinePrompter } from '@open-tomato/rafa/core/command';
 import { answeredYes } from '../start/branch-decision.js';
 
 import { runAction } from './actions.js';
-import { HINT_FLAG, nextStepHint } from './hint.js';
-
-/**
- * The flag each of the six declares, so `--no-hint` suppresses the
- * ending: this value, or for the three `pr` commands and `issue ready`
- * a copy of it. Boolean and defaulting to true, which is what makes
- * `--no-hint` read as false for it (`src/cli/core/parseArgs.ts`).
- */
-export const HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
-  name: HINT_FLAG,
-  description: 'Ends by naming the one step that follows, asking it where there is a terminal to answer on;'
-    + ' `--no-hint` reads nothing and prints nothing.',
-  type: 'boolean',
-  default: true,
-});
+import { nextStepHint } from './hint.js';
 
 /**
  * The output an action writes through: the caller's, with `result`
@@ -181,7 +166,8 @@ export async function endWithNextStep(
  * with no hint read: a plan that was not written and a loop that would
  * not start have moved nothing, and the ending is for a command that
  * did its work. The flag is the command's own to declare
- * ({@link HINT_FLAG_SPEC}), since it is part of the help it publishes.
+ * (`HINT_FLAG_SPEC`, from core's command barrel), since it is part of
+ * the help it publishes.
  */
 export function endingWith(command: RafaCommand, seams: NextEndingSeams = DEFAULT_ENDING_SEAMS): RafaCommand {
   return Object.freeze({

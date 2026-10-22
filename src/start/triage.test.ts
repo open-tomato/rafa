@@ -89,8 +89,6 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 
-import '../adapter-registry.js';
-
 import {
   existsSync,
   mkdirSync,
@@ -115,6 +113,7 @@ import {
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
 import { createJsonOutput } from '../adapters/output/json.js';
 import { draftFixture } from '../adapters/tracker/contract.js';
@@ -126,7 +125,6 @@ import { scopeWarning } from '../board/project/refresh-warnings.js';
 import { bugRulesOf, ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { bugKeyOf, createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
-import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
   createStartTriage,

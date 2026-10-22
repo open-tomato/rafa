@@ -1,6 +1,6 @@
 /**
  * The current place: where this checkout stands, as a (board, epic) pair,
- * and its home, read from the position file (`src/project/position.ts`)
+ * and its home, read from the position file (`packages/rafa/src/project/position.ts`)
  * and checked against ONE board listing (`./roadmap-board.ts`) the caller
  * has already read. Nothing here lists the board or spawns `gh`: the
  * listing is handed in, and the default board arrives through a seam asked
@@ -62,9 +62,9 @@
  * found is the caller's to refuse.
  */
 import type { BoardIssue } from './roadmap-board.js';
-import type { Place, Position, PositionUnsetReason } from '../project/position.js';
+import type { Place, Position, PositionUnsetReason } from '@open-tomato/rafa/project/position';
 
-import { readPositionFile } from '../project/position.js';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 import { readEpics } from './epics.js';
 import { firstNowEpic } from './now-epic.js';

@@ -202,23 +202,29 @@ import type { FreedReport } from './merge-freed.js';
 import type { MergeGuardReport } from './merge-guard.js';
 import type { UncheckedMerge, UncheckedMergeReport } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
-import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { PidProbe } from '@open-tomato/rafa/core/loop';
+import type {
+  GhRunner,
+  RoadmapTickResult,
+  UnblockAsk,
+  UnblockReport,
+} from '@open-tomato/rafa-board';
+
+import {
+  closedIssuesIn,
+  commandRetrySeams,
+  createGhRunner,
+  epicTickSentence,
+  tickSentence,
+  unblockAfterMerge,
+} from '@open-tomato/rafa-board';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { epicTickSentence } from '../../board/epic-tick.js';
-import { commandRetrySeams } from '../../board/project/project-runner.js';
-import { tickSentence } from '../../board/roadmap-tick.js';
-import { closedIssuesIn } from '../../board/roadmap.js';
-import { unblockAfterMerge } from '../../board/unblock-after-merge.js';
 import { endWithNextStep } from '../../next/ending.js';
 import {
   createGitRunner,

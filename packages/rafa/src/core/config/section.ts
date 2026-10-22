@@ -13,6 +13,12 @@
  * sections lives outside `packages/rafa/src/core/`, in `src/config-registry.ts`, the
  * module that calls {@link registerConfigSections}.
  *
+ * {@link registeredDefaults} and {@link registeredSettings} answer the
+ * same two records typed whole, as {@link RafaConfig} and
+ * {@link SettingsRecord}, for a feature file that reads a default or a
+ * spec without importing that module; each refuses with a
+ * {@link ConfigSectionError} naming it while nothing is registered.
+ *
  * This file imports types alone, so it loads first in any order and can
  * be imported by value from the loader and from every section file
  * without closing a runtime cycle.
@@ -91,7 +97,7 @@
  *
  * A setting core resolves can be read by a module outside `packages/rafa/src/core/`
  * that core must not import: the logger's settings are read through
- * `loggerSettingsOf` in `src/config-schema-logger.ts`. So the module that
+ * `loggerSettingsOf` in `packages/rafa/src/config-schema-logger.ts`. So the module that
  * lists the sections also hands core one {@link ConfigLoadHook} with
  * {@link setConfigLoadHook}, and `loadConfig` (`config-load.ts`) calls
  * {@link activeConfigLoadHook} with every config it resolves, before it
@@ -99,12 +105,32 @@
  * own, beside the registry rather than in it: restoring a registry
  * leaves the hook as it was, and a case that sets one puts the previous
  * hook back in a `finally`, as a case that registers does.
+ *
+ * ## The template hook
+ *
+ * A config template is a named entry a file adopts with its `templates`
+ * key, and the templates live outside `packages/rafa/src/core/` too,
+ * in `src/config/templates.ts`, which core must not import. So core
+ * takes one {@link ConfigTemplateHook} through
+ * {@link setConfigTemplateHook}, for the module that lists the sections
+ * to set, and answers it off {@link activeConfigTemplateHook} for the
+ * loader to call by name. The hook answers the entry a name
+ * stands for, a mapping nested as a file nests its keys (the shape of a
+ * `ConfigEntry`, `src/config/entry.ts`, typed here as a plain
+ * {@link Mapping} since core imports nothing from `src/config/`), or null
+ * for a name it does not know, and may carry the `names` it knows, which
+ * the loader lists when it refuses a name. Like the load hook it is a module-level
+ * value of its own, beside the registry: restoring a registry leaves it
+ * as it was, and a case that sets one puts the previous hook back in a
+ * `finally`.
  */
+import type { SettingOrigin } from './config-origins.js';
 import type {
   ConfigSetting,
   RafaConfig,
   SettingSpec,
 } from './config-schema.js';
+import type { Mapping } from './config-sections.js';
 import type { ConfigSource } from './config.js';
 
 /** Every setting's spec, by name: the record a section hands a part of. */
@@ -120,6 +146,13 @@ export interface ConfigCheckInput {
   readonly path: string | null;
   /** The user scope's file consulted, or null when there was none. */
   readonly userPath: string | null;
+  /**
+   * The file and entry that answered each setting, null where the
+   * command line or a default did: the one reading that tells a scope's
+   * local file from its module file, and the user scope's two files,
+   * which both report `user`, apart.
+   */
+  readonly provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
 }
 
 /**
@@ -354,6 +387,50 @@ export function activeChecks(): readonly ConfigCheck[] {
   return active.checks;
 }
 
+/**
+ * Refuses a read by `reader` while no section is registered, with the
+ * sentence that names the module whose call registers them.
+ */
+function requireRegistered(reader: string): void {
+  if (active.sections.length > 0) return;
+  throw new ConfigSectionError([
+    `no config section is registered: call registerCoreConfigSections from src/config-registry.ts before ${reader}`,
+  ]);
+}
+
+/**
+ * Every setting's default, typed as the whole {@link RafaConfig}: the
+ * active registry's defaults, the same object {@link activeDefaults}
+ * answers, for a file outside `packages/rafa/src/core/` that reads a
+ * default without importing the module that lists the sections.
+ *
+ * Throws a {@link ConfigSectionError} naming `src/config-registry.ts`
+ * while no section is registered, as `loadConfig` refuses then. Types
+ * are erased at runtime, so core cannot list the {@link ConfigSetting}
+ * names and refuses an empty registry alone: the completeness rule
+ * pairs every registered setting with its default, and
+ * `src/config-registry.test.ts` holds what the registration answers
+ * here equal to the registry's whole `CONFIG_DEFAULTS`. Read it when a
+ * default is needed, never as a module loads: an entry registers after
+ * its imports have loaded.
+ */
+export function registeredDefaults(): Readonly<RafaConfig> {
+  requireRegistered('registeredDefaults');
+  return active.defaults as Readonly<RafaConfig>;
+}
+
+/**
+ * Every setting's spec, typed as the whole {@link SettingsRecord}: the
+ * active registry's settings, the same object {@link activeSettings}
+ * answers. Refuses as {@link registeredDefaults} does, on the same
+ * reading, and `src/config-registry.test.ts` holds it equal to the
+ * registry's whole `SETTINGS`.
+ */
+export function registeredSettings(): SettingsRecord {
+  requireRegistered('registeredSettings');
+  return active.settings as SettingsRecord;
+}
+
 /** The key indexes read off one registry's settings; see the module note. */
 interface KeyIndex {
   /** Setting names by the dotted key a file spells them with. */
@@ -462,4 +539,38 @@ export function setConfigLoadHook(hook: ConfigLoadHook | null): ConfigLoadHook |
 /** The hook `loadConfig` calls with every config it resolves, or null when none is set. */
 export function activeConfigLoadHook(): ConfigLoadHook | null {
   return loadHook;
+}
+
+/**
+ * The entry a config template's name stands for, a mapping nested as a
+ * file nests its keys, or null for a name the hook does not know. See
+ * "The template hook" in the module note.
+ */
+export interface ConfigTemplateHook {
+  /** The entry `name` stands for, or null for a name the hook does not know. */
+  (name: string): Mapping | null;
+  /**
+   * Every name the hook knows, which `loadConfig` lists when it refuses
+   * one a file gives. Absent from a hook that cannot list its names.
+   */
+  readonly names?: readonly string[];
+}
+
+/** The module-level hook {@link activeConfigTemplateHook} answers. */
+let templateHook: ConfigTemplateHook | null = null;
+
+/**
+ * Makes `hook` the one core reads a config template's entry from, or
+ * clears it with null. Answers the hook it replaced, for a caller to put
+ * back.
+ */
+export function setConfigTemplateHook(hook: ConfigTemplateHook | null): ConfigTemplateHook | null {
+  const previous = templateHook;
+  templateHook = hook;
+  return previous;
+}
+
+/** The hook core reads a config template's entry from, or null when none is set. */
+export function activeConfigTemplateHook(): ConfigTemplateHook | null {
+  return templateHook;
 }

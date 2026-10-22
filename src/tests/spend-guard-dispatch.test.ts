@@ -78,8 +78,6 @@
 import type { CommandSpend, RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
-import '../adapter-registry.js';
-
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

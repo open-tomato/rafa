@@ -94,6 +94,8 @@ import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -125,7 +127,6 @@ import {
   TRUST_REFUSAL_EXIT,
   trustRefusalMessage,
 } from '../../board/trust.js';
-import { fileStamp } from '../../effort/file-stamp.js';
 
 import { planPriorityEdit, priorityMessage, readPriorityFlag } from './edit-priority.js';
 import {

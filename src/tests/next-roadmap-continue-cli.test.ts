@@ -39,9 +39,9 @@
  * lines, which `next-roadmap-hop-cli.test.ts` already pins.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { Position } from '../project/position.js';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { Position } from '@open-tomato/rafa/project/position';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -50,10 +50,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readHopRecord, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { readHopRecord, writeHopRecord } from '../next/hop-record.js';
-import { positionFilePath, writePositionFile } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, eventsOf, runRafa } from './cli-capture.js';

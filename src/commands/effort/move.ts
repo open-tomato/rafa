@@ -22,6 +22,7 @@
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { KindMove, MoveResult } from '@open-tomato/rafa/store/move';
 
+import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { SchemaRefusedError } from '@open-tomato/rafa/store/bring-forward';
@@ -29,8 +30,6 @@ import { DevelopmentBuildRefusedError } from '@open-tomato/rafa/store/developmen
 import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
 import { MOVE_TARGET, MoveRefusal, moveToSqlite } from '@open-tomato/rafa/store/move';
-
-import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort move';

@@ -76,21 +76,21 @@
 import type { PublishTarget } from './tag-follow-ups.js';
 import type { VersionReading } from './tag-units.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { TaggedRelease } from '../../release/version-tag.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { StdioOptions } from 'node:child_process';
 
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { parseReleaseTag } from '../../release/version-tag.js';
-import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { RELEASE_PUBLISH_DECLARATION, RELEASE_PUBLISH_DRY_RUN_FLAG, RELEASE_PUBLISH_TAG_FLAG } from './declarations.js';
 import { readPublishTarget } from './tag-follow-ups.js';

@@ -31,8 +31,6 @@
 import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { BlessedBundle, InstinctRecord, Learning, MergeResult } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

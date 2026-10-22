@@ -125,7 +125,7 @@ export type {
   InjectionRequest,
   InjectionTask,
   PlanInjection,
-} from './inject.js';
+} from '@open-tomato/rafa/plan/inject';
 export type {
   PlanBlockKind,
   PlanHeader,
@@ -150,5 +150,5 @@ export {
 export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
 export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
 export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
-export { renderInjection } from './inject.js';
+export { renderInjection } from '@open-tomato/rafa/plan/inject';
 export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '@open-tomato/rafa/core/plan';

@@ -46,18 +46,19 @@
  * Every type is `import type`, so this module loads nothing.
  */
 import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
-import type { BugsShape } from '../config-schema-bugs.js';
-import type { ErrorsShape } from '../config-schema-errors.js';
-import type { FeaturesShape } from '../config-schema-features.js';
+import type { ChecksShape } from '../config-schema-checks.js';
 import type { HubShape } from '../config-schema-hub.js';
 import type { IssuesShape } from '../config-schema-issues.js';
-import type { LoggerShape } from '../config-schema-logger.js';
 import type { LoopContinueShape } from '../config-schema-loop-continue.js';
 import type { LoopRetriesShape } from '../config-schema-loop-retries.js';
 import type { ReleaseDangerousShape, ReleaseShape } from '../config-schema-release.js';
 import type { TestsShape } from '../config-schema-tests.js';
 import type { TriageShape } from '../config-schema-triage.js';
 import type { WrapUpShape } from '../config-schema-wrap-up.js';
+import type { BugsShape } from '@open-tomato/rafa/config-schema-bugs';
+import type { ErrorsShape } from '@open-tomato/rafa/config-schema-errors';
+import type { FeaturesShape } from '@open-tomato/rafa/config-schema-features';
+import type { LoggerShape } from '@open-tomato/rafa/config-schema-logger';
 import type {
   ModuleSourceKind,
   PrerequisiteKind,
@@ -153,6 +154,7 @@ export interface DangerousShape extends ReleaseDangerousShape {
 /** The nested file shape: core's keys, and each section's; see the module note. */
 export interface ConfigShape extends
   BugsShape,
+  ChecksShape,
   ErrorsShape,
   FeaturesShape,
   HubShape,
@@ -262,4 +264,6 @@ export interface ConfigShape extends
     /** `naming.branch`: the template the branch `loop start` creates is named from, holding `{stub}` once. */
     readonly branch: string;
   };
+  /** `templates`: the config templates this file adopts, by name. */
+  readonly templates: readonly string[];
 }

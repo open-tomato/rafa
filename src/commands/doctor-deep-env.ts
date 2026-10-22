@@ -112,11 +112,15 @@
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 
+import {
+  OVERRIDE_SCOPES,
+  overrideSettingsPath,
+  pathDirectories,
+  readSettings,
+} from '@open-tomato/rafa-inventory';
+
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 import { sessionSpawnEnv } from '@open-tomato/rafa/core/loop';
-
-import { pathDirectories } from '../check/references.js';
-import { OVERRIDE_SCOPES, overrideSettingsPath, readSettings } from '../inventory/disabled.js';
 
 /** The Claude Code version the settings `env` rules were read from. */
 export const SESSION_ENV_CLI_VERSION = '2.1.280';

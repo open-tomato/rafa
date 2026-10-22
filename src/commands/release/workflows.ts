@@ -45,17 +45,18 @@
  * {@link ReleaseWorkflowsResult}: the level, the rows, and with `--write`
  * the part each write answered.
  */
-import type { BoardPart } from '../../board/setup.js';
 import type { LadderLevelReading, LadderWorkflow, LadderWorkflowReading } from '../../release/ladder.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { BoardPart } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+
 import { LADDER_WORKFLOWS, ladderLevel, ladderWorkflowNeeded } from '../../release/ladder.js';
 import { readReleaseTemplate, writeReleaseWorkflow } from '../../release/templates.js';
 import { readLadderFiles } from '../doctor-ladder.js';
-import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { RELEASE_WORKFLOWS_DECLARATION, RELEASE_WORKFLOWS_WRITE_FLAG } from './declarations.js';
 

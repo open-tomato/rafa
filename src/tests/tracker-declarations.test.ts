@@ -108,8 +108,8 @@
  * declared one and belongs beside the rest of them in
  * `tests/findNextTask.test.ts`.
  */
-import type { TaskInfo } from '../utils/tracker.js';
 import type { TestScope } from '@open-tomato/rafa/core/plan';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   mkdirSync,
@@ -128,8 +128,7 @@ import {
   readTestScope,
   stripTaskDeclaration,
 } from '@open-tomato/rafa/core/plan';
-
-import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
+import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

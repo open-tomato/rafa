@@ -36,11 +36,11 @@
  * through, so the codes and messages are the skill's. Optional here as
  * there.
  */
-import type { Provenance, ProvenanceIssueCode } from './provenance.js';
+import type { Provenance, ProvenanceIssueCode } from '@open-tomato/rafa-inventory';
+
+import { checkProvenance, readProvenance } from '@open-tomato/rafa-inventory';
 
 import { isAgentName } from '@open-tomato/rafa/core/plan';
-
-import { checkProvenance, readProvenance } from './provenance.js';
 
 /** The fields an agent definition cannot omit. */
 export const REQUIRED_AGENT_FIELDS = ['name', 'description'] as const;

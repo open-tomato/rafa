@@ -57,10 +57,10 @@
  * through {@link redactRemote}, which replaces the user-info of a
  * scheme URL with `***`.
  */
-import type { RiskLevel } from './commands.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhRunner } from '@open-tomato/rafa-board';
+import type { RiskLevel } from '@open-tomato/rafa-inventory';
 
 import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 

@@ -48,30 +48,36 @@
  * `.claude/skills`, a `<dir>` that is not there, a missing report, a
  * report that does not parse, and a report still marked `draft`.
  */
-import type { DemotionAction, DemotionActionKind } from '../../demote/apply.js';
-import type { DemotionVerdict } from '../../demote/classify.js';
-import type { DemotionReport } from '../../demote/report.js';
-import type { DemotionScope } from '../../demote/select.js';
-import type { ProjectFound } from '../../project/scope.js';
-import type { InstinctScope } from '../../schema/instinct.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type {
+  DemotionAction,
+  DemotionActionKind,
+  DemotionReport,
+  DemotionScope,
+  DemotionVerdict,
+  InstinctScope,
+} from '@open-tomato/rafa-inventory';
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { pathDirectories } from '../../check/references.js';
-import { applyDemotion, DEMOTION_ACTION_KINDS, planDemotion } from '../../demote/apply.js';
-import { DEMOTION_VERDICTS } from '../../demote/classify.js';
-import { buildDemotionReport } from '../../demote/draft.js';
 import {
+  DEMOTION_ACTION_KINDS,
+  DEMOTION_VERDICTS,
+  REVIEWED_STATUS,
+  applyDemotion,
+  buildDemotionReport,
   countVerdicts,
   parseDemotionReport,
-  REVIEWED_STATUS,
+  pathDirectories,
+  planDemotion,
+  resolveDemotionScope,
+  selectSources,
   writeDemotionReport,
-} from '../../demote/report.js';
-import { resolveDemotionScope, selectSources } from '../../demote/select.js';
+} from '@open-tomato/rafa-inventory';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** The one thing neither the context nor the registry carries. */
 export interface SkillDemoteSeams {

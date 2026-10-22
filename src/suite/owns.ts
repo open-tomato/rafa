@@ -1,6 +1,6 @@
 /**
  * A plan's `Owns:` folders: the folders a stage step's tests are chosen
- * under (`stageStepScope` in `./scope.ts`).
+ * under (`resolveChecks`' `related` in `./checks.ts`).
  *
  * A plan has no `Owns:` line of its own. It names the spec issue it was
  * written from in its `rafa:plan` block (`issue: "<n>"`, the header field

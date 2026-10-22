@@ -16,7 +16,7 @@
  * its first line and writes the Versions section.
  */
 import type { FailureBoundary } from './handler.js';
-import type { BugRecord } from '../bugs/record.js';
+import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 
 import { codedErrorOf, failureOf } from './handler.js';
 

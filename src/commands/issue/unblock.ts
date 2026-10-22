@@ -86,7 +86,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
@@ -102,9 +102,6 @@ export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all] [--yes]';
 
 /** An issue number as a line types it: a whole number from 1. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
-
-/** The answers that mean yes to the question, which is spelled `[y/N]`. */
-const YES_ANSWERS: readonly string[] = ['y', 'yes'];
 
 /** What a line asked for: the issues named, or every blocked one. */
 export interface UnblockLine {
@@ -171,32 +168,12 @@ function projectRoot(context: RafaContext): string {
   return context.project.root;
 }
 
-/** An answer to one question: yes for `y` or `yes`, however it is cased and padded. */
-function isYes(answer: string | null): boolean {
-  return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
-}
-
 /** How a run's question is answered: by `--yes`, through the prompter on a terminal, or not at all. */
 function askFor(line: UnblockLine, isTerminal: () => boolean, prompt: UnblockAsk): UnblockAsk | null {
   if (line.yes) return answeredByYesFlag;
   return isTerminal()
     ? prompt
     : null;
-}
-
-/** The prompter every question of one run goes through, opened on the first and closed by `close`. */
-function lazyPrompter(open: () => Prompter): { ask: UnblockAsk; close: () => void } {
-  let prompter: Prompter | null = null;
-  return {
-    ask: async (question: string): Promise<boolean> => {
-      prompter ??= open();
-      return isYes(await prompter.ask(question));
-    },
-    close: (): void => {
-      prompter?.close();
-      prompter = null;
-    },
-  };
 }
 
 /** The question as `--yes` answers it: yes, with nothing put and no prompter opened. */

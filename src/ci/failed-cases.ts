@@ -36,7 +36,7 @@
  *     milliseconds. The timing is taken off the case name, and a line
  *     without one is still read.
  */
-import { parseFailedLogLine } from '../pr/triage/evidence.js';
+import { parseFailedLogLine } from '@open-tomato/rafa-pr';
 
 /** The failed cases of one test file. */
 export interface FailedCaseFile {

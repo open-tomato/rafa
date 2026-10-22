@@ -71,21 +71,37 @@
  * from {@link DeepSettingsSeams}.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { OverrideReading } from '../inventory/disabled.js';
-import type { Inventory, InventorySeams } from '../inventory/index.js';
-import type { McpDeclaration, McpReading } from '../inventory/mcp.js';
-import type { InventoryRecord } from '../inventory/record.js';
-import type { Resolution } from '../tiers/resolve.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type {
+  Inventory,
+  InventoryRecord,
+  InventorySeams,
+  McpDeclaration,
+  McpReading,
+  OverrideReading,
+  Resolution,
+} from '@open-tomato/rafa-inventory';
 
 import { join } from 'node:path';
 
-import { CONFIG_FILE } from '@open-tomato/rafa/core/config';
+import {
+  CLAUDE_JSON_FILE,
+  DISABLE_KEY,
+  MCP_SCOPES,
+  OVERRIDES_KEY,
+  OVERRIDE_DISABLED,
+  PROJECTS_KEY,
+  REJECT_KEY,
+  buildInventory,
+  mcpServerFor,
+  overrideFor,
+  overrideSettingsPath,
+  pinKey,
+  readMcpServers,
+  readSkillOverrides,
+} from '@open-tomato/rafa-inventory';
 
-import { OVERRIDE_DISABLED, OVERRIDES_KEY, overrideFor, overrideSettingsPath, readSkillOverrides } from '../inventory/disabled.js';
-import { buildInventory } from '../inventory/index.js';
-import { CLAUDE_JSON_FILE, DISABLE_KEY, MCP_SCOPES, mcpServerFor, PROJECTS_KEY, readMcpServers, REJECT_KEY } from '../inventory/mcp.js';
-import { pinKey } from '../tiers/resolve.js';
+import { CONFIG_FILE } from '@open-tomato/rafa/core/config';
 
 /** The section's title. */
 export const SETTINGS_SECTION_TITLE = 'Settings';

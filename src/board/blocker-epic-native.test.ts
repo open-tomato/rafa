@@ -30,7 +30,7 @@ import type { EpicRelations } from './epics.js';
 import type { RelatedIssue } from './relations/port.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueState } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

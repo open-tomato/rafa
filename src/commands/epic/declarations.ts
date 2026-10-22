@@ -29,7 +29,7 @@
  * `DEFAULT_HORIZON` (`new.ts`) and `ACCEPT_UNCHECKED_FLAG` (`close.ts`).
  *
  * The values a declaration spells from outside `src/commands/`, which
- * no file here may import, are copies, and `declarations.test.ts` holds
+ * no file here may import, are copies, and `declarations-integration.test.ts` holds
  * each equal to its source: `EPIC_REASON_FLAG` is `REASON_FLAG`
  * (`src/board/epic-trail.ts`), and `EPIC_HORIZON_WORDS` is `HORIZONS`
  * (`src/board/roadmap-epic-rows.ts`). A module keeps reading the source

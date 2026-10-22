@@ -8,7 +8,7 @@
  */
 import type { RecheckVerdict } from '../../bugs/recheck-verdict.js';
 import type { RunnableReference } from '../../bugs/test-reference.js';
-import type { IssueTrackerData } from '../issue/issue-tracker.js';
+import type { IssueTrackerData } from '@open-tomato/rafa-board';
 
 /** The indent of the reproduce text under a `manual` row. */
 const REPRODUCE_INDENT = '    ';

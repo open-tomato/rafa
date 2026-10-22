@@ -268,7 +268,7 @@ module implementing `git`, `service` or `p2p` also names its own settings under
 (`packages/rafa/src/core/adapters/registry.ts`) by the composition root
 `src/adapter-registry.ts`: `sync/local` (no action) and `sync/file` (copy
 exchange).** The `git`, `service` and `p2p` adapters come from
-modules loaded under `src/modules/load.ts`; core ships no code for them.
+modules loaded under `packages/rafa/src/modules/load.ts`; core ships no code for them.
 When `rafa doctor`, the loop preflight and `describe` read the config,
 a strategy with no adapter and no module to implement it is named with
 the `modules:` and `allowList:` lines that enable the module. A project
