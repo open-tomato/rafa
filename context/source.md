@@ -181,6 +181,30 @@ so every file under the package is core's and a file that moves in needs no
 entry. `isCoreFile` reads both: the one place a sweep, a survey script or a
 spawned loader takes core's location from.
 
+**Nine more files moved into core at commit 94769d8, with their colocated
+tests.** They are `packages/rafa/src/board/naming.ts`,
+`packages/rafa/src/triage/doc-only.ts`, `packages/rafa/src/triage/local-paths.ts`,
+`packages/rafa/src/start/worktree-dir.ts`, `packages/rafa/src/release/fragment.ts`,
+`packages/rafa/src/schema/frontmatter.ts`,
+`packages/rafa/src/utils/agent-definition.ts`,
+`packages/rafa/src/effort/session-log.ts` and
+`packages/rafa/src/effort/session-log-dirs.ts`, each at its path under
+`packages/rafa/src/`. `scripts/codemod/moves/decouple-1.ts` lists them and
+`scripts/codemod/pass-moves.ts` moved them. Eight of them have a subpath of
+their own, `@open-tomato/rafa/board/naming`, `triage/doc-only`,
+`triage/local-paths`, `start/worktree-dir`, `release/fragment`,
+`schema/frontmatter`, `effort/session-log` and `effort/session-log-dirs`, each
+an `exports` key of `packages/rafa/package.json` to its `./src/` file;
+`agent-definition.ts` is held by the `./utils/*` wildcard. The
+`tsconfig.packages.json` wildcard for `@open-tomato/rafa/*` did not change. The
+flag `SESSION_ID_FLAG` (`'--session-id'`) moved at commit d9b339b from
+`src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
+`SETTING_SOURCES_FLAG`, and the loop barrel exports it with no re-export at the
+old path. `src/start/serving.ts` is an inventory file by name, though it sits
+under `src/start/`: it imports only `src/tiers/` and `src/inventory/trees.ts`,
+so `INVENTORY_NAMED` of `scripts/survey/cut-names.ts` names it (commit 24fdaf6)
+and it does not move.
+
 **Core is imported by its name, and a core file's subpath is its path under
 `packages/rafa/src/`.** The subpath drops the extension and a closing
 `/index`: `packages/rafa/src/core/config/index.ts` is `core/config` and
@@ -458,11 +482,13 @@ code unit. A file a list names is placed in that package whatever its folder,
 and keeps its path: no named file moves. `CUT_RULES` reads them and adds a
 package's own file beside its list where one belongs (`src/pr/index.ts` to
 `PR_NAMED`, `src/start/branch-decision.ts` to `RUN_NAMED`). The CLI's three
-named files sit in its rule. The first decouple item (#808) took three files
-off the lists before moving them into core, now
-`packages/rafa/src/board/naming.ts`,
-`packages/rafa/src/utils/agent-definition.ts` and
-`packages/rafa/src/schema/frontmatter.ts`.
+named files sit in its rule. The first decouple item (#808) took `naming.ts` off `BOARD_NAMED` and
+`agent-definition.ts` off `EFFORT_NAMED` as they moved into core, now
+`packages/rafa/src/board/naming.ts` and
+`packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
+effort rule of `CUT_RULES` for `packages/rafa/src/schema/frontmatter.ts`. The
+placement, in the same item, added `src/start/serving.ts` to `INVENTORY_NAMED`,
+a file that stays under `src/start/`.
 
 **The left-to-place test is an edge check.** A file no rule holds is left to
 place, and it counts as the CLI's, the package that ranks highest. So an import
@@ -559,7 +585,10 @@ names come from, and the facade entry is no node.
   loaders of its lazy command modules and every library entry reaching the
   facade would reach them. The roster, `src/commands/index.ts`, is its one
   importer, which `src/tests/commands-entry.sweep.test.ts` holds, and
-  `--commands` prints it. eslint's `import/order` places a facade import in
+  `--commands` prints it. Each of the four facades' `index.test.ts` holds both
+  entries, the index against its names and the commands entry against the
+  names taken through it, and `facade-names.ts` renders both.
+  eslint's `import/order` places a facade import in
   the `external` group, with the other package imports, so a rewired
   importer (pass 3) moves its line there. Pass 2 added the package's folder
   to `CUT_RULES` with its facade, and at its move (pass 4) the facade
@@ -670,18 +699,19 @@ names come from, and the facade entry is no node.
   with its group, and each named file still does. Each row names its kept
   files, effort's two, inventory's seven, board's 26, release's four,
   pr's 36 and run's 32, and a planted control reds on one relative import.
-  No row keeps a file for the library build: board's, release's, pr's and
-  run's rows once held a fourth group, `libraryChunks`, 68 files a library
-  entry reaches statically (board 21, release eight, pr 33 and run six) that
-  stayed on their paths while each facade carried its feature, since through
+  No row keeps a file for the library build. Board's, release's, pr's and
+  run's rows once held a fourth group, `libraryChunks`: 68 files a library
+  entry reaches statically (board 21, release eight, pr 33 and run six), kept
+  on their paths while each facade carried its feature object, since through
   the facade that graph reached the package's lazy command modules and the
-  splitting build wrote each as a chunk of its own. With the feature object
-  in the commands entry alone, the 68 import the facades and the group is
-  gone. The
-  published-types case in
+  splitting build wrote each as a chunk of its own. The feature objects left
+  the facades for the commands entries at commit e54b5e3, and the rewire at
+  commit da2acc3 took the 68 onto the facades, so the group is gone from the
+  guard's `KeptGroup` and from every row. The published-types case of
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,
-  `-release`, `-pr` or `-run`, with a planted-text control.
+  `-release`, `-pr` or `-run`, nor a commands entry of board, release, pr or
+  run, each with a planted-text control.
 
   The codemod matches a binding by name and file against the facade, so a
   statement is refused whichever side names the other file. A binding taken
