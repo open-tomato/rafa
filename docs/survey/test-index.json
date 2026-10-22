@@ -236665,6 +236665,20 @@
       ],
       "supportFolders": []
     },
+    "src/tests/commands-entry.sweep.test.ts": {
+      "folder": "src/tests",
+      "folders": [],
+      "index": 0,
+      "sourceFiles": 0,
+      "spawns": true,
+      "spawnsVia": [
+        "src/tests/commands-entry.sweep.test.ts"
+      ],
+      "support": [
+        "src/tests/sweep-timeout.ts"
+      ],
+      "supportFolders": []
+    },
     "src/tests/commit-refusals.test.ts": {
       "folder": "src/tests",
       "folders": [

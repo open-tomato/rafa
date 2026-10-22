@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2166 files, 2138 of them in 12 packages (616 left to place) and 28 in 3 unassigned folders. Of the 4815 edges between two files neither of which is a test, value and type alike, 142 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2167 files, 2139 of them in 12 packages (617 left to place) and 28 in 3 unassigned folders. Of the 4815 edges between two files neither of which is a test, value and type alike, 142 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -21,7 +21,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 9 | `rafa-effort` | 74 | 38 | 36 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 656 | 175 | 455 | 26 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 657 | 175 | 456 | 26 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -96,7 +96,7 @@ None.
 
 ## Files left to place
 
-No rule holds these 616 files. By folder, with the upward edges that end on its files:
+No rule holds these 617 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
@@ -130,7 +130,7 @@ No rule holds these 616 files. By folder, with the upward edges that end on its 
 | `src/ports/` | 1 | 1 | 0 |
 | `src/project/` | 11 | 6 | 0 |
 | `src/status/` | 19 | 9 | 0 |
-| `src/tests/` | 230 | 23 | 0 |
+| `src/tests/` | 231 | 23 | 0 |
 | `src/tests/core-coupled/` | 4 | 0 | 0 |
 | `src/tests/core-coupled/adapters/logger/` | 3 | 0 | 0 |
 | `src/tests/core-coupled/bugs/` | 3 | 0 | 0 |

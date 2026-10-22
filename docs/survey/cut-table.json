@@ -1759,6 +1759,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/commands-entry.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/commit-refusals.test.ts",
       "upwardEdgesIn": 0
     },
@@ -5966,7 +5971,7 @@
       "edges": [],
       "fileCounts": {
         "source": 175,
-        "test": 455,
+        "test": 456,
         "testSupport": 26
       },
       "files": [
@@ -6361,6 +6366,7 @@
         "src/tests/cli-surface.test.ts",
         "src/tests/command-output.test.ts",
         "src/tests/commands-direction.sweep.test.ts",
+        "src/tests/commands-entry.sweep.test.ts",
         "src/tests/commit-refusals.test.ts",
         "src/tests/config-code-spawned.test.ts",
         "src/tests/config-layers-prose.sweep.test.ts",
@@ -6646,8 +6652,8 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2166,
-    "leftToPlace": 616,
+    "files": 2167,
+    "leftToPlace": 617,
     "nonTestEdges": 4815,
     "unassignedFiles": 28,
     "unrankedEdges": 77,

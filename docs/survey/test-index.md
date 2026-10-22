@@ -1,8 +1,8 @@
 # Test index
 
-Coverage: 2166 of 2166 tracked files read (src/ and packages/*/src/).
+Coverage: 2167 of 2167 tracked files read (src/ and packages/*/src/).
 
-1231 test files indexed, 444 of them spawning a process; 884 source files, 7 of them reached by no test outside support files. A test's index is the number of folders (a package counts as one) its transitive imports reach through source files, doubled when it spawns a process; folders reached only through `src/tests/` support files and fakes are listed apart and not counted.
+1232 test files indexed, 445 of them spawning a process; 884 source files, 7 of them reached by no test outside support files. A test's index is the number of folders (a package counts as one) its transitive imports reach through source files, doubled when it spawns a process; folders reached only through `src/tests/` support files and fakes are listed apart and not counted.
 
 ## The 20 highest indexes
 
