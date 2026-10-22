@@ -54,7 +54,7 @@ import type { BranchGroups, ReleasePaths } from './groups.js';
 import type { RemoteOnlyRow, RemoteOnlySettings } from './remote-only.js';
 import type { RunRow, RunSeams } from './runs.js';
 import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
-import type { PullRequests } from '../pr/types.js';
+import type { PullRequests } from '../pr/index.js';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
