@@ -650,7 +650,7 @@ describe('the fields the schema requires', () => {
   });
 
   test('writes a domain from the closed vocabulary', () => {
-    expect(INSTINCT_DOMAINS).toContain(converted.instinct?.domain ?? 'absent');
+    expect(INSTINCT_DOMAINS as readonly string[]).toContain(converted.instinct?.domain ?? 'absent');
   });
 });
 
