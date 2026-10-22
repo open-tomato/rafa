@@ -3,10 +3,11 @@
  * function with no process exit:
  *
  *   - export equality: {@link readFacadeExports} reads what a facade's
- *     `index.ts` exports, with the TypeScript checker over the root
- *     tsconfig's options, and {@link compareFacade} holds that list to the
- *     reading of `facade-names.ts`: a name missing, a name extra, and a
- *     name bound to another declaration;
+ *     `index.ts`, or its commands entry `commands.ts`, exports, with the
+ *     TypeScript checker over the root tsconfig's options, and
+ *     {@link compareFacade} holds that list to the names of the same entry
+ *     in the reading of `facade-names.ts`: a name missing, a name extra,
+ *     and a name bound to another declaration;
  *   - the fresh-process load: {@link loadsFresh} imports a specifier in a
  *     new `bun` process, which runs no test preload, so an entry that only
  *     loads beside the suite's other modules is caught;
@@ -22,6 +23,7 @@
  */
 
 import type { FacadeNameKind, FacadeReading } from './facade-names';
+import type { FacadeEntryKind } from './facade-tables';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -209,24 +211,30 @@ export function readFacadeExports(root: string, entryPath: string, tsconfig = 't
 }
 
 /**
- * Holds an entry's exports to a reading. Pure.
+ * Holds one entry's exports to the names of that entry in a reading. Pure.
  *
- * Two bindings differ when their declaring file or their kind differs:
- * the reading names a declaration by its file, and a facade that exports
- * a name of the right file under the wrong kind does not stand for it.
+ * The names compared are those whose `entry` is the one named: the index
+ * is held to the names taken through it, the commands entry to the names
+ * taken through it alone. Two bindings differ when their declaring file
+ * or their kind differs: the reading names a declaration by its file, and
+ * a facade that exports a name of the right file under the wrong kind does
+ * not stand for it.
  *
  * @param reading - The reading of `readFacadeNames`.
  * @param exports - The entry's exports, as {@link readFacadeExports}
  *   answers them.
+ * @param entry - The entry the exports are read off: `index` for
+ *   `packages/rafa-<name>/index.ts`, `commands` for its `commands.ts`.
  * @returns The names missing, the names extra and the names misaligned,
  *   each sorted.
  */
-export function compareFacade(reading: FacadeReading, exports: readonly FacadeExport[]): FacadeComparison {
+export function compareFacade(reading: FacadeReading, exports: readonly FacadeExport[], entry: FacadeEntryKind): FacadeComparison {
+  const names = reading.names.filter((name) => name.entry === entry);
   const exported = new Map(exports.map((item) => [item.name, item]));
-  const read = new Set(reading.names.map((name) => name.name));
+  const read = new Set(names.map((name) => name.name));
   const missing: string[] = [];
   const misaligned: FacadeMisalignment[] = [];
-  for (const name of reading.names) {
+  for (const name of names) {
     const found = exported.get(name.name);
     if (found === undefined) {
       missing.push(name.name);

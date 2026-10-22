@@ -502,15 +502,20 @@ cleared edges. A count is only as current as the graph it was read from. `tsc
 `scripts/survey/facade-names.ts --package=rafa-<name>` reads the root
 program's files that are not tests or test support and do not sit in the
 package, the universe its names come from, and prints each name they import
-from it, value or type, with its declaration. Three shapes it reports as
+from it, value or type, with its declaration. Four shapes it reports as
 problems rather than names: an anonymous default export (`anonymous-default`),
-a namespace import or `export *` (`namespace-import`), and two declarations
-under one name (`collision`). `--entry` prints the facade's `index.ts` as it
-would be written, and `--json` prints the whole reading. An import by the
-facade's name is read through the entry's table (`facade-tables.ts`): each
-name counts as taken from the file the entry re-exports it from, so a
+a namespace import or `export *` (`namespace-import`), two declarations
+under one name (`collision`), and a name taken through an entry that the
+entry does not export (`unexported-name`). `--entry` prints the facade's
+`index.ts` as it would be written, `--commands` its commands entry
+`commands.ts`, and `--json` prints the whole reading. An import by the
+facade's name or by its commands entry's, `@open-tomato/rafa-<name>/commands`,
+is read through that entry's table (`facade-tables.ts`, which reads both):
+each name counts as taken from the file the entry re-exports it from, so a
 rewired importer reads as its relative form did and `--entry` prints the
-tracked entry unchanged. The import graph reads an import of
+tracked entry unchanged. Each name records the entry it is taken through: the
+commands entry when every import of it goes through that entry, else the
+index, which `--entry` writes. The import graph reads an import of
 `@open-tomato/rafa-<name>` the same way: an edge of the import's kind, `type`
 when the binding or the entry's row is one, from the importer to each file its
 names come from, and the facade entry is no node.

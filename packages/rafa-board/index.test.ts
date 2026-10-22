@@ -22,6 +22,7 @@ describe(`the ${PACKAGE} facade`, () => {
     const comparison = compareFacade(
       readFacadeNames(ROOT, PACKAGE),
       readFacadeExports(ROOT, `packages/${PACKAGE}/index.ts`),
+      'index',
     );
     expect(comparison, JSON.stringify(comparison, null, 2)).toEqual({ extra: [], misaligned: [], missing: [] });
   }, SWEEP_TIMEOUT);

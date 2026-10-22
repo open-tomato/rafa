@@ -1,7 +1,8 @@
 /**
  * The reader over a planted tree with its own cut rules, the pure
- * renderer, and the command line. The live reading of this repository
- * is `facade-names.sweep.test.ts`.
+ * renderers of the index and the commands entry, and the command line,
+ * each also over a planted member holding both entries. The live reading
+ * of this repository is `facade-names.sweep.test.ts`.
  */
 import type { CutRules } from './cut-table';
 import type { FacadeName, FacadeReading } from './facade-names';
@@ -12,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { facadeFolder, main, readFacadeNames, renderFacadeEntry, renderProblem } from './facade-names';
+import { facadeFolder, main, readFacadeNames, renderCommandsEntry, renderFacadeEntry, renderProblem } from './facade-names';
 
 /** The planted rules: one package with a folder and a named file, the rest, and an unassigned folder. */
 const RULES: CutRules = {
@@ -112,6 +113,7 @@ const TREE: Readonly<Record<string, string>> = {
 function entry(name: string, fields: Partial<FacadeName>): FacadeName {
   return {
     declaredIn: 'src/pkg/a.ts',
+    entry: 'index',
     exportedBy: 'src/pkg/a.ts',
     importers: ['src/user.ts'],
     kind: 'value',
@@ -218,12 +220,13 @@ describe('renderFacadeEntry', () => {
       entry('Alias', { kind: 'type' }),
       entry('alpha', {}),
       entry('Only', { exportedBy: 'src/pkg/index.ts', kind: 'type' }),
+      entry('FEATURE', { declaredIn: 'src/pkg/feature.ts', entry: 'commands', exportedBy: 'src/pkg/feature.ts' }),
     ],
     package: 'rafa-pkg',
     problems: [],
   };
 
-  it('writes one group per file, types then values, names sorted, specifiers ending .js', () => {
+  it('writes one group per file of the index names, types then values, names sorted, specifiers ending .js', () => {
     expect(renderFacadeEntry(planted, 'packages/rafa-pkg/')).toBe([
       '/**',
       ' * The facade of `rafa-pkg`: every name a file outside the',
@@ -249,6 +252,28 @@ describe('renderFacadeEntry', () => {
 
   it('is pure: the same reading gives the same text, with or without the closing slash', () => {
     expect(renderFacadeEntry(planted, 'packages/rafa-pkg')).toBe(renderFacadeEntry(planted, 'packages/rafa-pkg/'));
+  });
+
+  it('writes the commands entry from the commands names alone, under a header naming --commands', () => {
+    expect(renderCommandsEntry(planted, 'packages/rafa-pkg/')).toBe([
+      '/**',
+      ' * The commands entry of `rafa-pkg`: every name a file outside',
+      ' * the package takes through it alone, re-exported from where it lives today.',
+      ' * Written by `bun scripts/survey/facade-names.ts --package=rafa-pkg --commands`.',
+      ' */',
+      '',
+      'export { FEATURE } from \'../../src/pkg/feature.js\';',
+      '',
+    ].join('\n'));
+  });
+
+  it('writes the header alone for a reading with no commands name, and the index with the name once it is the index\'s, the controls', () => {
+    const indexOnly: FacadeReading = { ...planted, names: planted.names.filter((name) => name.entry === 'index') };
+    expect(renderCommandsEntry(indexOnly, 'packages/rafa-pkg/')).toEndWith(' */\n');
+    expect(renderCommandsEntry(indexOnly, 'packages/rafa-pkg/')).not.toMatch(/^export /m);
+    expect(renderFacadeEntry(indexOnly, 'packages/rafa-pkg/')).toBe(renderFacadeEntry(planted, 'packages/rafa-pkg/'));
+    const allIndex: FacadeReading = { ...planted, names: planted.names.map((name) => ({ ...name, entry: 'index' as const })) };
+    expect(renderFacadeEntry(allIndex, 'packages/rafa-pkg/')).toContain('export { FEATURE } from \'../../src/pkg/feature.js\';');
   });
 
   it('names the facade folder by the package less its scope', () => {
@@ -282,6 +307,13 @@ describe('main over a planted tree', () => {
     expect(run.stderr).toHaveLength(reading.problems.length);
   });
 
+  it('refuses --commands with the problems on stderr when any exists', () => {
+    const run = main(root, ['--package=rafa-pkg', '--commands'], { rules: RULES });
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toEqual([]);
+    expect(run.stderr).toHaveLength(reading.problems.length);
+  });
+
   it('prints the entry with --entry when no problem exists', () => {
     const run = main(root, ['--package=rafa-pkg', '--entry'], { rules: RULES, tsconfig: 'tsconfig.scripts.json' });
     expect(run.exitCode).toBe(0);
@@ -291,7 +323,8 @@ describe('main over a planted tree', () => {
   it.each([
     [['--package=rafa-nope'], 'no package named rafa-nope'],
     [[], 'no --package= given'],
-    [['--package=rafa-pkg', '--json', '--entry'], '--json and --entry are one of'],
+    [['--package=rafa-pkg', '--json', '--entry'], '--json, --entry and --commands are one of'],
+    [['--package=rafa-pkg', '--entry', '--commands'], '--json, --entry and --commands are one of'],
     [['--package=rafa-pkg', '--loud'], 'refused argument --loud'],
   ])('refuses %j on exit 1', (args, message) => {
     const run = main(root, args, { rules: RULES });
@@ -430,5 +463,174 @@ describe('readFacadeNames through a facade entry', () => {
     expect(run.stderr).toEqual([]);
     expect(run.exitCode).toBe(0);
     expect(`${run.stdout.join('\n')}\n`).toBe(readFileSync(join(facadeRoot, 'packages/rafa-pkg/index.ts'), 'utf8'));
+  });
+});
+
+/** The commands entry's name, as the roster spells it. */
+const COMMANDS_SPECIFIER = `${FACADE_SPECIFIER}/commands`;
+
+/** The header of the planted index, as `--entry` writes it. */
+const INDEX_HEADER = FACADE_ENTRY.split('\n').slice(0, 5);
+
+/** The header of the planted commands entry, as `--commands` writes it. */
+const COMMANDS_HEADER = [
+  '/**',
+  ' * The commands entry of `rafa-pkg`: every name a file outside',
+  ' * the package takes through it alone, re-exported from where it lives today.',
+  ' * Written by `bun scripts/survey/facade-names.ts --package=rafa-pkg --commands`.',
+  ' */',
+];
+
+/** The planted index, as `--entry` writes it from the reading of `tsconfig.json`. */
+const COMMANDS_ROOT_INDEX = [
+  ...INDEX_HEADER,
+  '',
+  'export {',
+  '  answer,',
+  '  shared,',
+  '} from \'../../src/pkg/a.js\';',
+  '',
+].join('\n');
+
+/** The planted commands entry, as `--commands` writes it from the roster's reading alone. */
+const COMMANDS_ROOT_COMMANDS = [
+  ...COMMANDS_HEADER,
+  '',
+  'export { shared } from \'../../src/pkg/a.js\';',
+  '',
+  'export { FEATURE } from \'../../src/pkg/feature.js\';',
+  '',
+].join('\n');
+
+/**
+ * A member holding both entries. The roster takes `FEATURE` and `shared`
+ * through the commands entry and `answer` through the index; `other.ts`
+ * takes `shared` through the index too, so in the reading of
+ * `tsconfig.json` `shared` is the index's. `tsconfig.roster.json` reads the
+ * roster alone, where `shared` is the commands entry's. `stray.ts` takes a
+ * name through each entry that the entry does not export.
+ */
+const COMMANDS_TREE: Readonly<Record<string, string>> = {
+  'packages/rafa-pkg/commands.ts': COMMANDS_ROOT_COMMANDS,
+  'packages/rafa-pkg/index.ts': COMMANDS_ROOT_INDEX,
+  'packages/rafa-pkg/package.json': JSON.stringify({
+    exports: { '.': './index.ts', './commands': './commands.ts' },
+    name: FACADE_SPECIFIER,
+    private: true,
+  }),
+  'src/cli/other.ts': [
+    `import { shared } from '${FACADE_SPECIFIER}';`,
+    '',
+    'export const used = shared;',
+  ].join('\n'),
+  'src/cli/roster.ts': [
+    `import { answer } from '${FACADE_SPECIFIER}';`,
+    `import { FEATURE, shared } from '${COMMANDS_SPECIFIER}';`,
+    '',
+    'export const roster = [FEATURE, answer, shared];',
+  ].join('\n'),
+  'src/cli/stray.ts': [
+    `import { FEATURE } from '${FACADE_SPECIFIER}';`,
+    `import { answer } from '${COMMANDS_SPECIFIER}';`,
+    '',
+    'export const stray = [FEATURE, answer];',
+  ].join('\n'),
+  'src/pkg/a.ts': 'export const answer = 42;\nexport const shared = 1;\n',
+  'src/pkg/feature.ts': 'export const FEATURE = { name: \'pkg\' };\n',
+  'tsconfig.json': JSON.stringify({ compilerOptions: COMPILER_OPTIONS, files: ['src/cli/other.ts', 'src/cli/roster.ts'] }),
+  'tsconfig.roster.json': JSON.stringify({ compilerOptions: COMPILER_OPTIONS, files: ['src/cli/roster.ts'] }),
+  'tsconfig.stray.json': JSON.stringify({ compilerOptions: COMPILER_OPTIONS, files: ['src/cli/stray.ts'] }),
+};
+
+describe('readFacadeNames through a commands entry beside the index', () => {
+  let commandsRoot = '';
+
+  beforeAll(() => {
+    commandsRoot = mkdtempSync(join(tmpdir(), 'facade-names-commands-'));
+    for (const [path, text] of Object.entries(COMMANDS_TREE)) {
+      mkdirSync(dirname(join(commandsRoot, path)), { recursive: true });
+      writeFileSync(join(commandsRoot, path), text);
+    }
+    mkdirSync(join(commandsRoot, 'node_modules/@open-tomato'), { recursive: true });
+    symlinkSync('../../packages/rafa-pkg', join(commandsRoot, 'node_modules', FACADE_SPECIFIER));
+  });
+
+  afterAll(() => {
+    rmSync(commandsRoot, { force: true, recursive: true });
+  });
+
+  /** The reading of one tsconfig of the commands root. */
+  function readWith(tsconfig: string, facades?: Map<string, never[]>): FacadeReading {
+    return readFacadeNames(commandsRoot, 'rafa-pkg', {
+      rules: FACADE_RULES,
+      tsconfig,
+      ...(facades === undefined
+        ? {}
+        : { facades }),
+    });
+  }
+
+  it('records the entry each name is taken through, a name taken through both being the index\'s', () => {
+    const both = readWith('tsconfig.json');
+    expect(both.names.map((name) => [name.name, name.entry, name.exportedBy, name.importers])).toEqual([
+      ['FEATURE', 'commands', 'src/pkg/feature.ts', ['src/cli/roster.ts']],
+      ['answer', 'index', 'src/pkg/a.ts', ['src/cli/roster.ts']],
+      ['shared', 'index', 'src/pkg/a.ts', ['src/cli/other.ts', 'src/cli/roster.ts']],
+    ]);
+    expect(both.problems).toEqual([]);
+  });
+
+  it('gives the commands entry a name taken through it alone', () => {
+    const roster = readWith('tsconfig.roster.json');
+    expect(roster.names.map((name) => [name.name, name.entry])).toEqual([
+      ['FEATURE', 'commands'],
+      ['answer', 'index'],
+      ['shared', 'commands'],
+    ]);
+  });
+
+  it('renders the index from the index names and the commands entry from the rest', () => {
+    const both = readWith('tsconfig.json');
+    expect(renderFacadeEntry(both, 'packages/rafa-pkg/')).toBe(COMMANDS_ROOT_INDEX);
+    expect(renderCommandsEntry(both, 'packages/rafa-pkg/')).toBe([
+      ...COMMANDS_HEADER,
+      '',
+      'export { FEATURE } from \'../../src/pkg/feature.js\';',
+      '',
+    ].join('\n'));
+    expect(renderCommandsEntry(readWith('tsconfig.roster.json'), 'packages/rafa-pkg/')).toBe(COMMANDS_ROOT_COMMANDS);
+  });
+
+  it('prints the tracked commands entry with --commands and the tracked index with --entry', () => {
+    const commands = main(commandsRoot, ['--package=rafa-pkg', '--commands'], { rules: FACADE_RULES, tsconfig: 'tsconfig.roster.json' });
+    expect(commands.stderr).toEqual([]);
+    expect(commands.exitCode).toBe(0);
+    expect(`${commands.stdout.join('\n')}\n`).toBe(readFileSync(join(commandsRoot, 'packages/rafa-pkg/commands.ts'), 'utf8'));
+    const index = main(commandsRoot, ['--package=rafa-pkg', '--entry'], { rules: FACADE_RULES });
+    expect(index.exitCode).toBe(0);
+    expect(`${index.stdout.join('\n')}\n`).toBe(readFileSync(join(commandsRoot, 'packages/rafa-pkg/index.ts'), 'utf8'));
+  });
+
+  it('lists a name an entry does not export as a problem, through either entry, and records no name for it', () => {
+    const stray = readWith('tsconfig.stray.json');
+    expect(stray.names).toEqual([]);
+    expect(stray.problems).toEqual([
+      { importer: 'src/cli/stray.ts', kind: 'unexported-name', name: 'answer', target: 'packages/rafa-pkg/commands.ts' },
+      { importer: 'src/cli/stray.ts', kind: 'unexported-name', name: 'FEATURE', target: 'packages/rafa-pkg/index.ts' },
+    ]);
+    expect(renderProblem(stray.problems[0]!)).toBe('unexported-name\tsrc/cli/stray.ts\tpackages/rafa-pkg/commands.ts\tanswer');
+    const run = main(commandsRoot, ['--package=rafa-pkg', '--commands'], { rules: FACADE_RULES, tsconfig: 'tsconfig.stray.json' });
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toEqual(stray.problems.map((problem) => `problem\t${renderProblem(problem)}`));
+  });
+
+  it('takes no name through the commands entry without the tables, the control', () => {
+    const blind = readWith('tsconfig.roster.json', new Map());
+    expect(blind.names.map((name) => [name.name, name.entry])).toEqual([
+      ['FEATURE', 'index'],
+      ['answer', 'index'],
+      ['shared', 'index'],
+    ]);
+    expect(renderCommandsEntry(blind, 'packages/rafa-pkg/')).not.toMatch(/^export /m);
   });
 });
