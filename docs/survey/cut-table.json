@@ -2054,6 +2054,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-coupled/start/worktree-dir.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/core-coupled/utils/git.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3149,8 +3154,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 159,
-        "test": 113,
+        "source": 168,
+        "test": 121,
         "testSupport": 6
       },
       "files": [
@@ -3165,6 +3170,8 @@
         "packages/rafa/src/adapters/logger/settings.ts",
         "packages/rafa/src/adapters/output/events.test.ts",
         "packages/rafa/src/adapters/output/events.ts",
+        "packages/rafa/src/board/naming.test.ts",
+        "packages/rafa/src/board/naming.ts",
         "packages/rafa/src/bugs/closest.test.ts",
         "packages/rafa/src/bugs/closest.ts",
         "packages/rafa/src/bugs/fenced.test.ts",
@@ -3285,6 +3292,10 @@
         "packages/rafa/src/core/runtime/identity.ts",
         "packages/rafa/src/core/runtime/index.test.ts",
         "packages/rafa/src/core/runtime/index.ts",
+        "packages/rafa/src/effort/session-log-dirs.test.ts",
+        "packages/rafa/src/effort/session-log-dirs.ts",
+        "packages/rafa/src/effort/session-log.test.ts",
+        "packages/rafa/src/effort/session-log.ts",
         "packages/rafa/src/effort/store/absences.test.ts",
         "packages/rafa/src/effort/store/absences.ts",
         "packages/rafa/src/effort/store/bring-forward.test.ts",
@@ -3420,21 +3431,32 @@
         "packages/rafa/src/project/roots.ts",
         "packages/rafa/src/project/scope.ts",
         "packages/rafa/src/project/worktree-root.ts",
+        "packages/rafa/src/release/fragment.test.ts",
+        "packages/rafa/src/release/fragment.ts",
         "packages/rafa/src/report/parse.ts",
         "packages/rafa/src/report/record.test.ts",
         "packages/rafa/src/report/record.ts",
         "packages/rafa/src/runtime/live-loops.test.ts",
         "packages/rafa/src/runtime/live-loops.ts",
+        "packages/rafa/src/schema/frontmatter.test.ts",
+        "packages/rafa/src/schema/frontmatter.ts",
         "packages/rafa/src/schema/project-id.ts",
         "packages/rafa/src/schema/tiers.test.ts",
         "packages/rafa/src/schema/tiers.ts",
+        "packages/rafa/src/start/worktree-dir.ts",
+        "packages/rafa/src/triage/doc-only.test.ts",
+        "packages/rafa/src/triage/doc-only.ts",
+        "packages/rafa/src/triage/local-paths.test.ts",
+        "packages/rafa/src/triage/local-paths.ts",
+        "packages/rafa/src/utils/agent-definition.test.ts",
+        "packages/rafa/src/utils/agent-definition.ts",
         "packages/rafa/src/utils/git.ts",
         "packages/rafa/src/utils/progress.ts",
         "packages/rafa/src/utils/tracker-open-tasks.test.ts",
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 278
+        "packages/rafa/": 295
       },
       "folders": [
         "packages/rafa/"
@@ -3448,76 +3470,6 @@
     {
       "clearedByIssue118": 0,
       "edges": [
-        {
-          "from": "src/agents/roster.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/agents/roster.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/utils/agent-definition.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/backfill/derive.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/backfill/proposal-batch.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/backfill/proposal-file.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/backfill/propose.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/check/run.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/demote/classify.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/demote/report.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/demote/select.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
         {
           "from": "src/inventory/browse.ts",
           "fromPackage": "rafa-inventory",
@@ -3540,79 +3492,16 @@
           "toPackage": "@open-tomato/rafa"
         },
         {
-          "from": "src/inventory/disabled.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/inventory/record.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/inventory/search/index.ts",
           "fromPackage": "rafa-inventory",
           "kind": "value",
           "to": "src/effort/collect.ts",
           "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/inventory/search/index.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/effort/session-log-dirs.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/inventory/search/index.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/start/dispatch.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/inventory/search/rank.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/inventory/show.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/inventory/trees.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/utils/agent-definition.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/schema/instinct.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/tiers/serve.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/schema/frontmatter.ts",
-          "toPackage": "rafa-effort"
         }
       ],
       "fileCounts": {
-        "source": 56,
-        "test": 56,
+        "source": 57,
+        "test": 57,
         "testSupport": 0
       },
       "files": [
@@ -3707,6 +3596,8 @@
         "src/schema/skill.ts",
         "src/schema/stack.test.ts",
         "src/schema/stack.ts",
+        "src/start/serving.test.ts",
+        "src/start/serving.ts",
         "src/task/resolve-skills.test.ts",
         "src/task/resolve-skills.ts",
         "src/task/sections.test.ts",
@@ -3761,11 +3652,12 @@
         "src/adapters/learning/local.ts",
         "src/plan/risk/commands.ts",
         "src/plan/risk/long-runs.ts",
-        "src/report/lessons.ts"
+        "src/report/lessons.ts",
+        "src/start/serving.ts"
       ],
       "rank": 4,
-      "remaining": 23,
-      "upwardEdges": 23
+      "remaining": 4,
+      "upwardEdges": 4
     },
     {
       "clearedByIssue118": 0,
@@ -3796,13 +3688,6 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/release/fragment-tree.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/board/project/facts.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/release/fragment.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -3869,13 +3754,6 @@
           "toPackage": "rafa-pr"
         },
         {
-          "from": "src/commands/epic/close-docs.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/triage/doc-only.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
           "from": "src/commands/epic/close-triage.ts",
           "fromPackage": "rafa-board",
           "kind": "type",
@@ -3900,13 +3778,6 @@
           "from": "src/commands/epic/close-triage.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
-          "to": "src/triage/local-paths.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
-          "from": "src/commands/epic/close-triage.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
           "to": "src/triage/triage.ts",
           "toPackage": "rafa-pr"
         },
@@ -3922,13 +3793,6 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/epic/verify-run.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/epic/close.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/start/dispatch.ts",
           "toPackage": "rafa-run"
         },
         {
@@ -3957,13 +3821,6 @@
           "fromPackage": "rafa-board",
           "kind": "value",
           "to": "src/bugs/versions.ts",
-          "toPackage": "rafa-pr"
-        },
-        {
-          "from": "src/commands/issue/create-bug.ts",
-          "fromPackage": "rafa-board",
-          "kind": "value",
-          "to": "src/triage/local-paths.ts",
           "toPackage": "rafa-pr"
         },
         {
@@ -4038,8 +3895,8 @@
         }
       ],
       "fileCounts": {
-        "source": 156,
-        "test": 180,
+        "source": 155,
+        "test": 179,
         "testSupport": 7
       },
       "files": [
@@ -4143,8 +4000,6 @@
         "src/board/leak.test.ts",
         "src/board/leak.ts",
         "src/board/listing-mode.test.ts",
-        "src/board/naming.test.ts",
-        "src/board/naming.ts",
         "src/board/now-epic.test.ts",
         "src/board/now-epic.ts",
         "src/board/owner-resolve.test.ts",
@@ -4413,7 +4268,6 @@
         "src/board/gate.ts",
         "src/board/issue.ts",
         "src/board/leak.ts",
-        "src/board/naming.ts",
         "src/board/plan-field.ts",
         "src/board/plan-spec.ts",
         "src/board/previous-copy.ts",
@@ -4434,8 +4288,8 @@
         "src/next/relation-readings.ts"
       ],
       "rank": 5,
-      "remaining": 38,
-      "upwardEdges": 38
+      "remaining": 33,
+      "upwardEdges": 33
     },
     {
       "clearedByIssue118": 0,
@@ -4571,13 +4425,6 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/cleanup/worktrees.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/merge-loop-worktree.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/start/worktree-dir.ts",
           "toPackage": "rafa-run"
         },
         {
@@ -4728,13 +4575,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/plan/risk.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/utils/agent-definition.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
@@ -4774,13 +4614,6 @@
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "src/release/fragment-tree.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/pr/triage/version-convert.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/release/fragment.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4848,8 +4681,8 @@
         }
       ],
       "fileCounts": {
-        "source": 95,
-        "test": 122,
+        "source": 93,
+        "test": 120,
         "testSupport": 2
       },
       "files": [
@@ -5039,8 +4872,6 @@
         "src/triage/bug-key.test.ts",
         "src/triage/bug-key.ts",
         "src/triage/closed-issue-triage.test.ts",
-        "src/triage/doc-only.test.ts",
-        "src/triage/doc-only.ts",
         "src/triage/inherited.test.ts",
         "src/triage/inherited.ts",
         "src/triage/issue-text.test.ts",
@@ -5049,8 +4880,6 @@
         "src/triage/kind-route.ts",
         "src/triage/leftover-repair.test.ts",
         "src/triage/leftover-repair.ts",
-        "src/triage/local-paths.test.ts",
-        "src/triage/local-paths.ts",
         "src/triage/own-check.integration.test.ts",
         "src/triage/own-check.test.ts",
         "src/triage/own-check.ts",
@@ -5077,7 +4906,7 @@
         "packages/rafa-pr/": 0,
         "src/commands/pr/": 79,
         "src/pr/": 65,
-        "src/triage/": 40
+        "src/triage/": 36
       },
       "folders": [
         "packages/rafa-pr/",
@@ -5107,8 +4936,8 @@
         "src/pr/index.ts"
       ],
       "rank": 6,
-      "remaining": 58,
-      "upwardEdges": 58
+      "remaining": 55,
+      "upwardEdges": 55
     },
     {
       "clearedByIssue118": 0,
@@ -5126,27 +4955,6 @@
           "kind": "value",
           "to": "src/cli/core/parseArgs.ts",
           "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/start/dispatch.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/utils/agent-definition.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/start/loop-events.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/effort/session-log-dirs.ts",
-          "toPackage": "rafa-effort"
-        },
-        {
-          "from": "src/start/loop-events.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/effort/session-log.ts",
-          "toPackage": "rafa-effort"
         },
         {
           "from": "src/start/preflight-sync.ts",
@@ -5202,13 +5010,6 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/release/version.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/start/runner-pr.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/release/fragment.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -5269,8 +5070,8 @@
         }
       ],
       "fileCounts": {
-        "source": 123,
-        "test": 165,
+        "source": 121,
+        "test": 163,
         "testSupport": 0
       },
       "files": [
@@ -5465,8 +5266,6 @@
         "src/start/runner-pr.ts",
         "src/start/runtime.test.ts",
         "src/start/runtime.ts",
-        "src/start/serving.test.ts",
-        "src/start/serving.ts",
         "src/start/session-decisions.test.ts",
         "src/start/session-guard.test.ts",
         "src/start/session-guard.ts",
@@ -5528,8 +5327,6 @@
         "src/start/triage.ts",
         "src/start/type-step.test.ts",
         "src/start/type-step.ts",
-        "src/start/worktree-dir.test.ts",
-        "src/start/worktree-dir.ts",
         "src/start/worktree-upstream-integration.test.ts",
         "src/start/worktree-upstream.test.ts",
         "src/start/worktree-upstream.ts",
@@ -5568,7 +5365,7 @@
         "src/claims/": 19,
         "src/commands/claim/": 15,
         "src/preflight/": 8,
-        "src/start/": 179,
+        "src/start/": 175,
         "src/suite/": 18
       },
       "folders": [
@@ -5609,8 +5406,8 @@
         "src/start/branch-decision.ts"
       ],
       "rank": 7,
-      "remaining": 22,
-      "upwardEdges": 22
+      "remaining": 18,
+      "upwardEdges": 18
     },
     {
       "clearedByIssue118": 0,
@@ -5624,8 +5421,8 @@
         }
       ],
       "fileCounts": {
-        "source": 56,
-        "test": 71,
+        "source": 55,
+        "test": 70,
         "testSupport": 0
       },
       "files": [
@@ -5696,8 +5493,6 @@
         "src/release/forecast.ts",
         "src/release/fragment-tree.test.ts",
         "src/release/fragment-tree.ts",
-        "src/release/fragment.test.ts",
-        "src/release/fragment.ts",
         "src/release/guard-merge.test.ts",
         "src/release/guard-merge.ts",
         "src/release/guard.test.ts",
@@ -5760,7 +5555,7 @@
       "filesByFolder": {
         "packages/rafa-release/": 0,
         "src/commands/release/": 42,
-        "src/release/": 75
+        "src/release/": 73
       },
       "folders": [
         "packages/rafa-release/",
@@ -5783,8 +5578,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 38,
-        "test": 36,
+        "source": 34,
+        "test": 32,
         "testSupport": 0
       },
       "files": [
@@ -5836,10 +5631,6 @@
         "src/effort/report-trend.ts",
         "src/effort/report.test.ts",
         "src/effort/report.ts",
-        "src/effort/session-log-dirs.test.ts",
-        "src/effort/session-log-dirs.ts",
-        "src/effort/session-log.test.ts",
-        "src/effort/session-log.ts",
         "src/effort/skill-facts.test.ts",
         "src/effort/skill-facts.ts",
         "src/effort/skill-signals.test.ts",
@@ -5857,15 +5648,11 @@
         "src/effort/sync/select.test.ts",
         "src/effort/sync/select.ts",
         "src/effort/trend-stats.test.ts",
-        "src/effort/trend-stats.ts",
-        "src/schema/frontmatter.test.ts",
-        "src/schema/frontmatter.ts",
-        "src/utils/agent-definition.test.ts",
-        "src/utils/agent-definition.ts"
+        "src/effort/trend-stats.ts"
       ],
       "filesByFolder": {
         "packages/rafa-effort/": 0,
-        "src/effort/": 68
+        "src/effort/": 64
       },
       "folders": [
         "packages/rafa-effort/",
@@ -5873,9 +5660,7 @@
       ],
       "name": "rafa-effort",
       "named": [
-        "src/config-schema-hub.ts",
-        "src/utils/agent-definition.ts",
-        "src/schema/frontmatter.ts"
+        "src/config-schema-hub.ts"
       ],
       "rank": 9,
       "remaining": 0,
@@ -5971,7 +5756,7 @@
       "edges": [],
       "fileCounts": {
         "source": 175,
-        "test": 456,
+        "test": 457,
         "testSupport": 26
       },
       "files": [
@@ -6425,6 +6210,7 @@
         "src/tests/core-coupled/project/worktree-root.test.ts",
         "src/tests/core-coupled/report/parse.test.ts",
         "src/tests/core-coupled/schema/project-id.test.ts",
+        "src/tests/core-coupled/start/worktree-dir.test.ts",
         "src/tests/core-coupled/utils/git.test.ts",
         "src/tests/core-coupled/utils/progress.test.ts",
         "src/tests/core-coupled/utils/tracker.test.ts",
@@ -6653,11 +6439,11 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2167,
-    "leftToPlace": 617,
-    "nonTestEdges": 4815,
+    "leftToPlace": 618,
+    "nonTestEdges": 4811,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 142
+    "upwardEdges": 111
   },
   "unassigned": [
     {
@@ -6699,8 +6485,8 @@
       },
       "importsFrom": {
         "@open-tomato/rafa": 2,
-        "@open-tomato/rafa-core": 19,
-        "rafa-board": 5,
+        "@open-tomato/rafa-core": 20,
+        "rafa-board": 4,
         "rafa-pr": 7,
         "rafa-run": 1,
         "src/ci/": 1,
