@@ -81,13 +81,13 @@ import type {
   RunStanding,
   StandAsideReason,
 } from './branch-decision.js';
-import type { GitRunner, WorkingTreeStatus } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner, WorkingTreeStatus } from '@open-tomato/rafa-pr';
+
+import { createGitRunner, gitSaid, parseWorkingTree } from '@open-tomato/rafa-pr';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { createGitRunner, gitSaid, parseWorkingTree } from '../pr/index.js';
 
 import {
   answeredYes,

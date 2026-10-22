@@ -90,8 +90,6 @@ export {
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
-export { RUN_FEATURE } from '../../src/commands/claim/index.js';
-
 export {
   default as command,
   defaultBoardOnce,
@@ -362,7 +360,6 @@ export { createRunDecisions } from '../../src/start/continue-run.js';
 
 export type { TaskLearning } from '../../src/start/dispatch.js';
 export {
-  SESSION_ID_FLAG,
   dispatchTask,
   renderProgressForDispatch,
   storeTaskReport,
@@ -431,9 +428,6 @@ export {
   runFromSelectedRuntime,
 } from '../../src/start/runtime.js';
 
-export type { SessionServing } from '../../src/start/serving.js';
-export { resolveSessionTiers } from '../../src/start/serving.js';
-
 export { haltBeforeSession } from '../../src/start/session-guard.js';
 
 export {
@@ -465,8 +459,6 @@ export {
 } from '../../src/start/triage.js';
 
 export { readTypeCheckRecipe } from '../../src/start/type-step.js';
-
-export { worktreeDirAt } from '../../src/start/worktree-dir.js';
 
 export { runWrapUp } from '../../src/start/wrap-up-run.js';
 

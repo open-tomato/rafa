@@ -1,6 +1,6 @@
 /**
  * Tests for the local path redaction triage runs before a bug's key and
- * text are built (`src/triage/local-paths.ts`).
+ * text are built (`packages/rafa/src/triage/local-paths.ts`).
  *
  * Every root here is a path that does not exist, so no realpath form is
  * added and each case reads only the text it names; the case with a real

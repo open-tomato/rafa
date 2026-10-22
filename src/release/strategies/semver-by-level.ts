@@ -67,8 +67,9 @@ import type {
 } from '../strategy.js';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
+import { FRAGMENT_PLAN_ID_PATTERN } from '@open-tomato/rafa/release/fragment';
+
 import { groupChangeNotes, renderNoteLines, renderReleaseHeading } from '../changelog.js';
-import { FRAGMENT_PLAN_ID_PATTERN } from '../fragment.js';
 import { highestChangeLevel } from '../level.js';
 import { nextVersion } from '../version.js';
 

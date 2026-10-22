@@ -179,6 +179,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -189,7 +190,6 @@ import { BOARDS_LIST_ARGS } from './boards.js';
 import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import { ISSUE_REFUSAL_EXIT, ISSUE_VIEW_FIELDS, snapshotDiffersMessage, snapshotText, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
-import { notesPath, specPath } from './naming.js';
 import { boardRepoLabel, inspectSpecIssue, resolvePlanSpec, UNNAMED_REPO } from './plan-spec.js';
 import { previousDir } from './previous-copy.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './readiness.js';

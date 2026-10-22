@@ -72,9 +72,9 @@
  * worktree add --track`, its second line without the `error:` prefix.
  * That version was not run here. Only the first line is matched.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr';
 
-import { gitSaid } from '../pr/index.js';
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { REMOTE } from './branch-decision.js';
 

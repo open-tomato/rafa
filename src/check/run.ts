@@ -56,7 +56,7 @@
  * the body, and a file with anything else wrong is not the backfill's
  * business yet.
  *
- * The write goes through `src/schema/frontmatter.ts`, so the body
+ * The write goes through `packages/rafa/src/schema/frontmatter.ts`, so the body
  * survives byte for byte and every other key keeps its place. The
  * report returned is the RE-CHECK of what was written, not the check
  * that decided to write: a fix that somehow produced a failing file
@@ -92,7 +92,8 @@ import type { StackValue } from '../schema/stack.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
-import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
+import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import { parseInstinct } from '../schema/instinct.js';
 import { checkSkillFrontmatter, isSkillWarning } from '../schema/skill.js';
 import { AGNOSTIC_STACK, inferStacks } from '../schema/stack.js';

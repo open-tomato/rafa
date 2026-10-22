@@ -57,6 +57,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
 
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -68,7 +69,6 @@ import {
   snapshotText,
   SPEC_LABEL,
 } from './issue.js';
-import { notesPath, specPath } from './naming.js';
 import { previousDir } from './previous-copy.js';
 import {
   notesRebuiltLine,

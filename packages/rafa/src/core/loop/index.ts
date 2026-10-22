@@ -230,6 +230,7 @@ export {
   interruptClaudeSessions,
   runClaude,
   runClaudeCaptured,
+  SESSION_ID_FLAG,
   SETTING_SOURCES_FLAG,
   spawnClaude,
   spawnClaudeCaptured,

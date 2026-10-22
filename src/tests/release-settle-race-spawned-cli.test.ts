@@ -31,7 +31,7 @@
  * and settle exits 1 without trying a third time.
  */
 import type { ScratchRepo, CapturedRun } from './cli-capture.js';
-import type { Fragment } from '../release/fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

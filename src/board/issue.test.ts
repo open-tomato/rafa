@@ -156,6 +156,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { createFakeGh } from '../adapters/tracker/github-fake.js';
@@ -178,7 +179,6 @@ import {
   SPEC_LABEL,
   writeSpecSnapshot,
 } from './issue.js';
-import { notesPath, specPath } from './naming.js';
 import { previousDir } from './previous-copy.js';
 
 /** Where every file this file writes goes. */

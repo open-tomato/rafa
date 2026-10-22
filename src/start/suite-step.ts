@@ -294,23 +294,24 @@ import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { CheckName, ChecksSettings } from '../config-schema-checks.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { PreloadReading } from '../suite/scope.js';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
 import type { GhRunner } from '@open-tomato/rafa-board';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { readFileSync } from 'node:fs';
 import { constants } from 'node:os';
 import { basename, join } from 'node:path';
+
+import { createGitRunner, gitSaid } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runsDir, updateSession } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 
-import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
   baselineOf,
   baselinePathFor,

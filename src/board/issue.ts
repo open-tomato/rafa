@@ -211,13 +211,13 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { carryRefsBlock, readRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';
-import { notesPath, specPath } from './naming.js';
 import { movePreviousCopy } from './previous-copy.js';
 
 /** What every refusal and every failure this module raises opens with. */

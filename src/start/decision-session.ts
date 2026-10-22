@@ -28,9 +28,8 @@ import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/l
 
 import { randomUUID } from 'node:crypto';
 
-import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { runClaudeCaptured, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 
-import { SESSION_ID_FLAG } from './dispatch.js';
 import { withStamp } from './stamp.js';
 
 /** The tools a decision session may use: reading, never writing or running. */

@@ -47,8 +47,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseReport } from '@open-tomato/rafa/report/parse';
+import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
 
-import { HOME_MARKER } from './local-paths.js';
 import { staleDocSentence, triageStaleDocs } from './stale-docs.js';
 import { triageReport } from './triage.js';
 

@@ -1,5 +1,5 @@
 /**
- * Tests for the change fragment format (`src/release/fragment.ts`):
+ * Tests for the change fragment format (`packages/rafa/src/release/fragment.ts`):
  * the parser and its four refusals, the optional `package` key, the
  * serialiser, and the name allocation. Everything is driven from string literals; the module
  * opens no file.
@@ -260,7 +260,7 @@ describe('package key against real and scoped fragments', () => {
   test('every fragment under this repository\'s .changes/ parses with package null', () => {
     // A release commit deletes every fragment, and git keeps no empty folder,
     // so on a just-settled tree `.changes/` is absent: no fragment to read.
-    const dir = join(import.meta.dir, '..', '..', '.changes');
+    const dir = join(import.meta.dir, '..', '..', '..', '..', '.changes');
     if (!existsSync(dir)) return;
     const names = readdirSync(dir).filter((name) => name.endsWith('.md'));
 

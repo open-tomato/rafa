@@ -24,9 +24,9 @@
 import type { SettlePlace } from './settle-step.js';
 import type { NextActionId } from './state.js';
 import type { SettleWaiting } from '../pr/settle-waiting.js';
-import type { Fragment } from '../release/fragment.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 import type { ReleaseMove } from '../release/release-move.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,8 +35,9 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createGitRunner } from '../pr/index.js';
-import { serializeFragment } from '../release/fragment.js';
 import { moveSpelling } from '../release/release-move.js';
 
 import { actionInvocation, NEXT_COMMAND_ACTIONS } from './actions.js';

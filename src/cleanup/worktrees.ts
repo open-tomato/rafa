@@ -21,7 +21,7 @@
  * second left there only when its run could not remove it, and the
  * loop's own `loop.worktreeDir`, `.rafa/worktrees/<stub>` unless a layer
  * names another, resolved from the project root by `worktreeDirAt`
- * (`src/start/worktree-dir.ts`) as the loop resolves it when it adds one.
+ * (`packages/rafa/src/start/worktree-dir.ts`) as the loop resolves it when it adds one.
  * A loop worktree is judged by the same blockers as the other two, so
  * one a live loop session holds, or one with uncommitted work, stays.
  * `<repo>` is the main worktree, the block git lists first, so the
@@ -98,10 +98,10 @@ import { join, sep } from 'node:path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { readSessions, runsDir } from '@open-tomato/rafa/core/loop';
+import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
-import { worktreeDirAt } from '../start/worktree-dir.js';
 
 /** Where under the repository Claude Code makes its worktrees. */
 export const CLAUDE_WORKTREES_SUBDIR: string = join('.claude', 'worktrees');

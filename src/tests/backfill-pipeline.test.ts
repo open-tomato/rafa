@@ -47,10 +47,11 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
+
 import { DRAFT_FILE, parseProposalFile, proposalPath, REVIEWED_FILE, UNANSWERED_ROW } from '../backfill/proposal-file.js';
 import { createSkillBackfillCommand } from '../commands/skill/backfill.js';
 import { createSkillCheckCommand } from '../commands/skill/check.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

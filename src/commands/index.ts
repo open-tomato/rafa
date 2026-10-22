@@ -14,12 +14,18 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name from its package's facade: `board` (the `issue`, `board` and
- * `epic` subjects) from `@open-tomato/rafa-board`, and `pr`, `run` (the
- * `claim` subject) and `release` from `@open-tomato/rafa-pr`,
- * `@open-tomato/rafa-run` and `@open-tomato/rafa-release`, one subject
- * each. The `switch` command comes from run's facade too, under its
- * `command` name.
+ * name from its package's commands entry, and their subjects from the
+ * package's facade: `board` (the `issue`, `board` and `epic` subjects)
+ * from `@open-tomato/rafa-board/commands`, and `pr`, `run` (the `claim`
+ * subject) and `release` from `@open-tomato/rafa-pr/commands`,
+ * `@open-tomato/rafa-run/commands` and
+ * `@open-tomato/rafa-release/commands`, one subject each, each subject
+ * from the package's bare name. The `switch` command comes from run's
+ * facade too, under its `command` name. The feature objects have an
+ * entry of their own because a feature's index holds the loaders of its
+ * lazy command modules: a facade that carried the feature reached those
+ * modules from every library entry that imports the facade, and this
+ * file is the one importer of a commands entry.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -92,7 +98,7 @@
  * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
  * the shipped templates through `src/release/templates.ts`, nor
  * `release fragment`, which writes one change fragment through
- * `src/release/fragment.ts` and reads the waiting ones through
+ * `packages/rafa/src/release/fragment.ts` and reads the waiting ones through
  * `src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
@@ -471,10 +477,14 @@
 import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
-import { PR_FEATURE, PR_SUBJECT } from '@open-tomato/rafa-pr';
-import { RELEASE_FEATURE, RELEASE_SUBJECT } from '@open-tomato/rafa-release';
-import { CLAIM_SUBJECT, RUN_FEATURE, command as switchCommand } from '@open-tomato/rafa-run';
+import { BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
+import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands';
+import { PR_SUBJECT } from '@open-tomato/rafa-pr';
+import { PR_FEATURE } from '@open-tomato/rafa-pr/commands';
+import { RELEASE_SUBJECT } from '@open-tomato/rafa-release';
+import { RELEASE_FEATURE } from '@open-tomato/rafa-release/commands';
+import { CLAIM_SUBJECT, command as switchCommand } from '@open-tomato/rafa-run';
+import { RUN_FEATURE } from '@open-tomato/rafa-run/commands';
 
 import { createCommandRegistry } from '../cli/registry.js';
 

@@ -82,9 +82,8 @@ import type { TierSeams } from '@open-tomato/rafa/schema/tiers';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readFrontmatter } from '@open-tomato/rafa-effort';
-
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 /** The Claude Code version the override and switch rules were read from. */
 export const OVERRIDES_CLI_VERSION = '2.1.280';

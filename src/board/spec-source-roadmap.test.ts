@@ -143,6 +143,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
@@ -160,7 +161,6 @@ import {
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { dryEpicSentence, NOW_HORIZON_LABEL } from './epic-walk.js';
 import { ISSUE_REFUSAL_EXIT, SPEC_LABEL } from './issue.js';
-import { specPath } from './naming.js';
 import { SPEC_READY_LABEL } from './readiness.js';
 import { unweighedPositionNotice } from './roadmap-rows.js';
 import { exhaustedMessage, ROADMAP_SETTING, ROADMAP_TITLE } from './roadmap.js';

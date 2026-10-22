@@ -67,10 +67,11 @@
  * ref is asked about first and named in the reason, and an empty failed
  * `merge-base` reads as no shared history.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { CLAIM_SUBJECT } from '../claims/record.js';
-import { gitSaid } from '../pr/index.js';
 
 import { localRef, REMOTE, remoteTrackingRef } from './branch-decision.js';
 

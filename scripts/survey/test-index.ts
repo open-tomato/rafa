@@ -61,9 +61,10 @@
  *     to a package as much as a value one does. A re-export
  *     (`export … from`) is an edge like any other import, so a test that
  *     reaches a file through a barrel reaches the file's folder. An import
- *     of a facade (`packages/rafa-<name>/index.ts`) is read through the
- *     facade's table: an edge to the file each name taken is re-exported
- *     from, never to the facade.
+ *     of a facade (`packages/rafa-<name>/index.ts`), or of its commands
+ *     entry (`packages/rafa-<name>/commands.ts`), is read through that
+ *     member's table: an edge to the file each name taken is re-exported
+ *     from, never to the facade or the entry.
  *   - The walk stops at a `test-support` file: `src/tests/` helpers,
  *     fixtures and fakes. The support files reached are listed apart, and
  *     so is each folder the walk reaches only through them

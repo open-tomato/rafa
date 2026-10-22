@@ -66,25 +66,34 @@
  * A store that cannot be read is not caught here: `readDeviceStoreId`
  * throws what the store's open throws, and the command ends on it.
  */
-import type { GateIssue } from '../../board/gate.js';
-import type { PlanSpecResolution } from '../../board/plan-spec.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { ResolvedSpec } from '../../board/spec-source.js';
-import type { AheadRequest } from '../../claims/ahead.js';
-import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
 import type { Output } from '@open-tomato/rafa/ports';
+import type {
+  GateIssue,
+  PlanSpecResolution,
+  RefreshConfig,
+  ResolvedSpec,
+} from '@open-tomato/rafa-board';
+import type {
+  AheadRequest,
+  PlanClaim,
+  PlanClaimContext,
+  PlanClaimRequest,
+} from '@open-tomato/rafa-run';
+
+import { createGhRunner, createRefreshingGhIssueBoard } from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
+import {
+  aheadClaimedLine,
+  aheadEnabled,
+  aheadNotClaimedWarning,
+  readDeviceStoreId,
+} from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
-import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
-import { readDeviceStoreId } from '../../claims/device.js';
-import { resolvePrProvider } from '../../pr/provider.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */
 export const CLAIM_REFUSAL_EXIT = 1;

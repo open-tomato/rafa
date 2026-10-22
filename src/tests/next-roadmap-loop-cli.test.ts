@@ -48,13 +48,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { planStub } from '@open-tomato/rafa/board/naming';
 import { parseSessionRecord, runsDir } from '@open-tomato/rafa/core/loop';
 import { hopFilePath, readHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
 
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_LABEL } from '../board/issue.js';
-import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { projectConfigText } from '../project/scaffold.js';
 

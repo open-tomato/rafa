@@ -11,7 +11,8 @@
  */
 import { describe, expect, test } from 'bun:test';
 
-import { readFrontmatter } from './frontmatter.js';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import {
   FIRST_PARTY,
   PROVENANCE_ISSUE_CODES,

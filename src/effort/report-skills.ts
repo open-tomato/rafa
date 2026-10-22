@@ -93,9 +93,9 @@ import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { readFileSync } from 'node:fs';
 
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 
-import { readFrontmatter } from '../schema/frontmatter.js';
 import { readScopes } from '../schema/scope-records.js';
 
 import { findRecurrences } from './recurrence.js';

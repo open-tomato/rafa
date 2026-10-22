@@ -45,7 +45,15 @@
     "./plan/*": "./src/plan/*.ts",
     "./project/*": "./src/project/*.ts",
     "./runtime/live-loops": "./src/runtime/live-loops.ts",
-    "./utils/*": "./src/utils/*.ts"
+    "./utils/*": "./src/utils/*.ts",
+    "./board/naming": "./src/board/naming.ts",
+    "./effort/session-log": "./src/effort/session-log.ts",
+    "./effort/session-log-dirs": "./src/effort/session-log-dirs.ts",
+    "./release/fragment": "./src/release/fragment.ts",
+    "./schema/frontmatter": "./src/schema/frontmatter.ts",
+    "./start/worktree-dir": "./src/start/worktree-dir.ts",
+    "./triage/doc-only": "./src/triage/doc-only.ts",
+    "./triage/local-paths": "./src/triage/local-paths.ts"
   },
   "scripts": {
     "lint": "eslint .",

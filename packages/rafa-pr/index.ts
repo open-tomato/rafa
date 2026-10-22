@@ -76,8 +76,6 @@ export {
 
 export { PR_SUBJECT } from '../../src/commands/pr/declarations.js';
 
-export { PR_FEATURE } from '../../src/commands/pr/index.js';
-
 export type { PrSeams } from '../../src/commands/pr/pr-context.js';
 export {
   DEFAULT_PR_SEAMS,
@@ -220,8 +218,6 @@ export {
   hasText,
 } from '../../src/triage/bug-key.js';
 
-export { namesOnlyDocs } from '../../src/triage/doc-only.js';
-
 export type { InheritedTriage } from '../../src/triage/inherited.js';
 export { inheritedFailureOf } from '../../src/triage/inherited.js';
 
@@ -231,11 +227,6 @@ export type { KindRouteOptions } from '../../src/triage/kind-route.js';
 export { checkedKindOf } from '../../src/triage/kind-route.js';
 
 export { isLeftoverRepairTask } from '../../src/triage/leftover-repair.js';
-
-export {
-  HOME_MARKER,
-  localPathRedactor,
-} from '../../src/triage/local-paths.js';
 
 export {
   readPlanBase,

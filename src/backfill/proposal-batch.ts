@@ -64,7 +64,7 @@ import type { LayoutEntry } from '../check/layout.js';
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 
 import { SKILL_FILE, scanLayout } from '../check/layout.js';
 import { sourceHash } from '../demote/report.js';

@@ -49,8 +49,9 @@
  */
 import type { CheckIssue } from '../check/run.js';
 
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import { hasCheckFailure } from '../check/run.js';
-import { readFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT } from '../schema/skill.js';
 
 /** Longest a summary may be, in codepoints: the checker's description cap. */

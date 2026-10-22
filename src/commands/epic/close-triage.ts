@@ -72,7 +72,7 @@
  * `Criterion <n>: filed, but not added to the project: <message>`.
  *
  * A failed check whose criterion's text names only documentation
- * (`namesOnlyDocs`, `src/triage/doc-only.ts`) is no bug: in place of the
+ * (`namesOnlyDocs`, `packages/rafa/src/triage/doc-only.ts`) is no bug: in place of the
  * report it is one `unsettled` stale-docs row with no plan stub and one
  * line on the release's stale-docs issue, on the same tracker, the
  * version read once per run (`EpicCloseSeams.staleDocsVersion`).
@@ -93,6 +93,7 @@ import { join } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
@@ -101,7 +102,6 @@ import { commandRetrySeams, openProjectRunner } from '../../board/project/projec
 import { bugRulesOf } from '../../config-schema-issues.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
 import { unresolvedTracker } from '../../start/triage.js';
-import { localPathRedactor } from '../../triage/local-paths.js';
 import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';
 
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';

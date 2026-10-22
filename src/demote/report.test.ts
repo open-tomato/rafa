@@ -40,7 +40,7 @@ import type { DemotionReportIssueCode, DemotionReportRow } from './report.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { readFrontmatter } from '../schema/frontmatter.js';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 import { DEMOTION_VERDICTS } from './classify.js';
 import {

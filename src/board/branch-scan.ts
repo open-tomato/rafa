@@ -27,9 +27,9 @@
 import type { RemoteClaimReader } from './roadmap-claims.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
+import { boardId } from '@open-tomato/rafa/board/naming';
 import { BRANCH_STUB, DEFAULT_BRANCH_TEMPLATE, isBranchTemplate } from '@open-tomato/rafa/core/config/sections';
 
-import { boardId } from './naming.js';
 import { createRemoteClaimReader } from './roadmap-claims.js';
 
 /** The remote the branch scan asks when the caller names none. */

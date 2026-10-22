@@ -89,15 +89,15 @@
  * SIGINT, is {@link LintOutcome.interrupted}: never red, as an
  * interrupted test run is not.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { gitSaid } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { gitSaid } from '../pr/index.js';
 
 /** The command the step runs, before its report flags and the files; the blocker hands the session this. */
 export const LINT_COMMAND: readonly string[] = ['bunx', 'eslint', '--no-warn-ignored'];

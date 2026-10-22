@@ -105,7 +105,7 @@ import type {
   InstinctSource,
 } from '../schema/instinct.js';
 
-import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 
 import { collectReferences } from '../check/references.js';
 import { actionHash, parseInstinct, writeInstinct } from '../schema/instinct.js';

@@ -448,7 +448,7 @@ export const usdAmount: Reader<number> = (raw, at) => {
  * Accepts an issue number as the board spells one: a whole number above
  * zero, and no string spelled like one.
  *
- * The bound matches `src/board/naming.ts`, which refuses anything else
+ * The bound matches `packages/rafa/src/board/naming.ts`, which refuses anything else
  * with a `RangeError` rather than spelling `rafa-0` into a path. A
  * setting read here is handed straight to `gh issue view <n>`, so `0`,
  * `-1` and `2.5` are refused where the person can still fix the file,

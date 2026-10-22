@@ -181,9 +181,11 @@ import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
-import type { GitRunner } from '../pr/index.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { claimDurationHours, CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -205,7 +207,6 @@ import {
 } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { resolvePrProvider } from '../pr/provider.js';
 
 import { branchNameFor, REMOTE } from './branch-decision.js';
 

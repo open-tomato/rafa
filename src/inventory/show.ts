@@ -69,9 +69,8 @@ import type { InventoryKind, InventoryRecord } from './record.js';
 
 import { readFileSync } from 'node:fs';
 
-import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
-
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 
 /** One other holder of the shown item's kind and name. */
 export interface ShowHolder {

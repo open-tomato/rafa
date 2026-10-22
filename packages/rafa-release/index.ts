@@ -23,8 +23,6 @@ export {
 
 export { RELEASE_SUBJECT } from '../../src/commands/release/declarations.js';
 
-export { RELEASE_FEATURE } from '../../src/commands/release/index.js';
-
 export type { WaitingReading } from '../../src/commands/release/status-fragments.js';
 export {
   forecastPhrase,
@@ -93,13 +91,6 @@ export {
   fragmentIdOf,
   readFragmentTree,
 } from '../../src/release/fragment-tree.js';
-
-export {
-  FRAGMENT_PLAN_ID_PATTERN,
-  allocateFragmentName,
-  parseFragment,
-  serializeFragment,
-} from '../../src/release/fragment.js';
 
 export type {
   GuardReaction,

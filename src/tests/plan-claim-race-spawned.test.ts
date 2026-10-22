@@ -18,7 +18,7 @@
  * beside its own stand-in `claude`, stays empty to prove it.
  *
  * Both clones resolve the SAME issue and title, so `planStub` and
- * `branchName` (`src/board/naming.ts`) compute the same stub and the
+ * `branchName` (`packages/rafa/src/board/naming.ts`) compute the same stub and the
  * same claim branch for each of them without either one being told the
  * other's answer; that is what makes the second clone's claim collide
  * with the first's rather than land on a branch of its own.
@@ -33,10 +33,10 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { branchName, planStub } from '@open-tomato/rafa/board/naming';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 import { SPEC_LABEL } from '../board/issue.js';
-import { branchName, planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { createGitRunner } from '../pr/index.js';
 

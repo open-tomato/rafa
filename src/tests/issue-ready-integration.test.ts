@@ -43,12 +43,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../board/gate.js';
 import { SPEC_LABEL } from '../board/issue.js';
-import { specPath } from '../board/naming.js';
 import { resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage } from '../board/readiness.js';
 import { createIssueReadyCommand, readyQuestion } from '../commands/issue/ready.js';

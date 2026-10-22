@@ -71,6 +71,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
@@ -84,7 +85,6 @@ import {
   snapshotDiffersMessage,
   SPEC_LABEL,
 } from './issue.js';
-import { specPath } from './naming.js';
 import { ROADMAP_TITLE } from './roadmap.js';
 import {
   describeIssue,

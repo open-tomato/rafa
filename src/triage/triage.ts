@@ -306,6 +306,7 @@ import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
@@ -320,7 +321,6 @@ import {
   similarCommentOpening,
 } from './issue-text.js';
 import { routeByKind } from './kind-route.js';
-import { localPathRedactor } from './local-paths.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 import { nearestOpenBugs, rankedCandidates } from './similarity.js';
 import { triageStaleDocs } from './stale-docs.js';

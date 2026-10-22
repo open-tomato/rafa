@@ -43,10 +43,9 @@
  */
 import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
+import { boardId } from '@open-tomato/rafa/board/naming';
 import { formatDuration } from '@open-tomato/rafa/core/loop/readings';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { boardId } from '../board/naming.js';
 
 import { minutesBetween } from './commits.js';
 import { formatCount } from './report-format.js';

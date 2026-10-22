@@ -11,13 +11,13 @@
  * to `rafa/release`, and the lease settle pushes under is then refused by
  * git itself.
  */
-import type { Fragment } from './fragment.js';
 import type { SettlePrOutcome } from './settle-pr.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
 import type { PullRequestsAnswers, PullRequestsDouble } from '../pr/pull-requests-double.js';
 import type { PullRequestDetail, PullRequestDraft, PullRequestSummary } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,11 +27,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { serializeFragment } from './fragment.js';
 import { RELEASE_PR_BRANCH, releasePullBody, settleByPr } from './settle-pr.js';
 import { PUSH_SAID_NOTHING } from './settle-push.js';
 import { withSettleWorktree } from './settle-worktree.js';

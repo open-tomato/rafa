@@ -64,9 +64,9 @@
  * file it would then refuse to read. The level words and their order are
  * `PLAN_RELEASE_LEVELS` from `packages/rafa/src/core/plan/parse.ts`, not a third spelling.
  */
-import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 
-import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
+import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
 
 /** The fence line that opens and closes a fragment's front matter. */
 export const FRAGMENT_FENCE = '---';

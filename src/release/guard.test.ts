@@ -11,9 +11,9 @@
  * that never looked is paired with the commit the case recorded when it
  * made it, not with "not null".
  */
-import type { Fragment } from './fragment.js';
 import type { GuardFacts, GuardRead, GuardReading } from './guard.js';
 import type { SettleSettings } from './settle.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,11 +23,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { serializeFragment } from './fragment.js';
 import {
   guardFixCommand,
   guardLines,

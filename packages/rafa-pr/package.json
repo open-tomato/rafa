@@ -9,7 +9,8 @@
   },
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./commands": "./commands.ts"
   },
   "scripts": {
     "lint": "eslint .",

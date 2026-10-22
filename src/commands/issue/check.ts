@@ -69,11 +69,11 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { boardId, notesFileName, SPEC_EXTENSION } from '@open-tomato/rafa/board/naming';
 import { readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { boardId, notesFileName, SPEC_EXTENSION } from '../../board/naming.js';
 import { memoiseVerifier } from '../../board/refs-gate.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../../refs/reading.js';
 import { fingerprintText, RefsBlockError } from '../../refs/stamp.js';

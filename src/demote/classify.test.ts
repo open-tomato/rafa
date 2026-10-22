@@ -37,7 +37,8 @@ import type { ClassificationRule, SkillSource } from './classify.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { renderFrontmatter } from '../schema/frontmatter.js';
+import { renderFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import {
   INSTINCT_DOMAINS,
   checkInstinctFrontmatter,
@@ -649,7 +650,7 @@ describe('the fields the schema requires', () => {
   });
 
   test('writes a domain from the closed vocabulary', () => {
-    expect(INSTINCT_DOMAINS).toContain(converted.instinct?.domain ?? 'absent');
+    expect(INSTINCT_DOMAINS as readonly string[]).toContain(converted.instinct?.domain ?? 'absent');
   });
 });
 

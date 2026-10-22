@@ -44,9 +44,9 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { branchName, planStub } from '@open-tomato/rafa/board/naming';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { branchName, planStub } from '../board/naming.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { createGitRunner } from '../pr/index.js';
 import { REMOTE } from '../start/branch-decision.js';

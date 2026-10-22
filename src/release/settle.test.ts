@@ -14,10 +14,10 @@
  * with committer dates of their own, so an order taken from names or a
  * date taken from the clock would fail the cases that read them.
  */
-import type { Fragment } from './fragment.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleSettings, SettleUnitFold } from './settle.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,11 +27,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { LOCK_FILE, projectLockText } from '../project/lock.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { serializeFragment } from './fragment.js';
 import { RAFA_PACKAGE_NAME } from './settle-lock.js';
 import { withSettleWorktree } from './settle-worktree.js';
 import { buildSettle, CHANGELOG_TITLE, readSettle } from './settle.js';

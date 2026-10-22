@@ -22,9 +22,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { openNdjsonStore } from '@open-tomato/rafa/store';
-
-import { sessionLogDir } from '../effort/session-log-dirs.js';
 
 import { scratchHomeEnv } from './scratch-home-env.js';
 

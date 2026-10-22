@@ -260,10 +260,31 @@ export type {
   ReportPresent,
   ReportReading,
   ReportStatus,
-  ServiceRequester,
   ServiceRequestInit,
+  ServiceRequester,
   TaskReport,
-} from './plan/index.js';
+} from '@open-tomato/rafa-run';
+export {
+  FINDING_KINDS,
+  FINDING_SIGNALS,
+  PLAN_BLOCK_KINDS,
+  PLAN_HEADER_FIELDS,
+  PROBE_TIMEOUT_MS,
+  RAFA_BLOCK_KINDS,
+  REPORT_STATUSES,
+  isRafaBlockKind,
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePlan,
+  parsePrerequisites,
+  parseReport,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+  readRafaBlocks,
+  renderInjection,
+  runPreflight,
+  runShellProbe,
+} from '@open-tomato/rafa-run';
 export type {
   NoProject,
   ProjectFound,
@@ -333,27 +354,6 @@ export {
   validateManifest,
 } from '@open-tomato/rafa/modules/manifest';
 export { default as planCommand } from './plan.js';
-export {
-  FINDING_KINDS,
-  FINDING_SIGNALS,
-  isRafaBlockKind,
-  loadPlanPrerequisites,
-  mergePlanPrerequisites,
-  parsePlan,
-  parsePrerequisites,
-  parseReport,
-  PLAN_BLOCK_KINDS,
-  PLAN_HEADER_FIELDS,
-  planPrerequisites,
-  prerequisitesPathForPlan,
-  PROBE_TIMEOUT_MS,
-  RAFA_BLOCK_KINDS,
-  readRafaBlocks,
-  renderInjection,
-  REPORT_STATUSES,
-  runPreflight,
-  runShellProbe,
-} from './plan/index.js';
 export {
   DISK_FILE_SYSTEM,
   INIT_COMMAND,

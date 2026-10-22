@@ -95,16 +95,16 @@
  * library. With no line to report, a null `pulls` prints nothing.
  */
 import type { PromotedReading, SkippedWithReason } from './promoted.js';
-import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory';
+import type { GitResult, GitRunner, PullRequests } from '@open-tomato/rafa-pr';
 
 import { isAbsolute, posix, relative } from 'node:path';
 
+import { gitSaid } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { gitSaid } from '../pr/index.js';
 
 import { parsePromoted } from './promoted.js';
 import { bodyWithSentence } from './release-stage.js';

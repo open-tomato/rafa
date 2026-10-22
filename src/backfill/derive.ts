@@ -99,11 +99,7 @@ import type { StackName } from '../schema/stack.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import {
-  mergeFrontmatter,
-  readFrontmatterDocument,
-  writeFrontmatter,
-} from '@open-tomato/rafa-effort';
+import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 import { SKILL_FILE, scanLayout } from '../check/layout.js';
 import { checkFile } from '../check/run.js';

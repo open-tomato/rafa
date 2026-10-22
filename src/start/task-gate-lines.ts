@@ -44,11 +44,11 @@
  * base the base line hands it.
  */
 import type { TypeCheckRecipe } from './type-step.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { gitSaid } from '../pr/index.js';
 
 import { scratchTsconfigFields, TEST_FILE_SUFFIX, tscArgv } from './type-step.js';
 

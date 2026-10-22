@@ -96,6 +96,7 @@ import { join } from 'node:path';
 
 import { fileStamp } from '@open-tomato/rafa-effort';
 
+import { boardId } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -116,7 +117,6 @@ import {
   staleCopyMessage,
 } from '../../board/issue-edit-state.js';
 import { completenessApplies, requireEditText } from '../../board/issue-edit-text.js';
-import { boardId } from '../../board/naming.js';
 import { boardRepoLabel } from '../../board/plan-spec.js';
 import {
   createGhEditorLogin,

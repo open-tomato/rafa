@@ -92,7 +92,8 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { planStub } from '../board/naming.js';
+import { planStub } from '@open-tomato/rafa/board/naming';
+
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { DRY_RUN_FLAG } from '../next/lines.js';
 

@@ -101,7 +101,7 @@
  *     would point every repository that has not run `rafa init --board`
  *     at one project's issue number.
  *   - It is a number and not a string. `gh issue view <n>` takes the
- *     number, `src/board/naming.ts` refuses anything that is not a
+ *     number, `packages/rafa/src/board/naming.ts` refuses anything that is not a
  *     positive whole one, and `issueNumber` refuses it here instead,
  *     where a person can still fix the file.
  *

@@ -17,7 +17,7 @@
  * that exits 0 and writes nothing more.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { Fragment } from '../release/fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,7 +26,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

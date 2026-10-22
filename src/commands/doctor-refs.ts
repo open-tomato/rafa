@@ -109,10 +109,10 @@ import type { Output } from '@open-tomato/rafa/ports';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '@open-tomato/rafa/board/naming';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '../board/naming.js';
 import { memoiseVerifier } from '../board/refs-gate.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { withOutlineCache } from '../refs/outline-cache.js';

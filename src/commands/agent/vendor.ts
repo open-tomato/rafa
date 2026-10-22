@@ -102,10 +102,11 @@ import type { AgentDefinitionFile } from '@open-tomato/rafa-inventory';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { AGENT_DEFINITION_DIR, readFrontmatter } from '@open-tomato/rafa-effort';
 import { bundledAgentsDirectory, readAgentDirectory } from '@open-tomato/rafa-inventory';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+import { AGENT_DEFINITION_DIR } from '@open-tomato/rafa/utils/agent-definition';
 
 /** The usage line a refusal names. */
 export const USAGE = 'rafa agent vendor <name>... [--force]';

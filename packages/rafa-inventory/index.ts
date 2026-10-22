@@ -182,7 +182,6 @@ export {
 export {
   BUNDLED_AGENTS_DIR,
   bundledAgentsDirectory,
-  readTrees,
 } from '../../src/inventory/trees.js';
 
 export { promotable } from '../../src/learning/bless.js';
@@ -234,6 +233,12 @@ export type {
 } from '../../src/schema/scope-records.js';
 export { readScopes } from '../../src/schema/scope-records.js';
 
+export type { SessionServing } from '../../src/start/serving.js';
+export {
+  resolveSessionTiers,
+  serveSession,
+} from '../../src/start/serving.js';
+
 export type {
   ResolvedSkill,
   TaskInput,
@@ -261,8 +266,6 @@ export type {
 export {
   pinKey,
   pinLine,
-  readItemBytes,
-  resolveTiers,
 } from '../../src/tiers/resolve.js';
 
 export {
@@ -270,11 +273,9 @@ export {
   DEFAULT_ROUTING,
 } from '../../src/tiers/routing.js';
 
-export type { ServedSet } from '../../src/tiers/serve.js';
 export {
   SKILL_FILE,
   provenanceBlock,
-  serveResolution,
 } from '../../src/tiers/serve.js';
 
 export { bareSkillName } from '../../src/tiers/skill-names.js';

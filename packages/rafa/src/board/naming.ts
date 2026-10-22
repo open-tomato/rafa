@@ -82,7 +82,7 @@
  */
 import path from 'path';
 
-import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '../core/config/sections.js';
 
 /** The prefix every board id carries: `rafa-20`. */
 export const ID_PREFIX = 'rafa';

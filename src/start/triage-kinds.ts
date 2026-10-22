@@ -57,22 +57,30 @@
  * refuses, is one warning line; neither stops the run.
  */
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { BaseRunAnswer, NamedTest } from '../triage/base-run.js';
-import type { KindRouteOptions } from '../triage/kind-route.js';
-import type { BugTriage, TriageResult } from '../triage/triage.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { BugKind, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { BugRouteEntry, BugRoute } from '@open-tomato/rafa/store/bug-routes';
 import type { FindingsDispatch, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type {
+  BaseRunAnswer,
+  BugTriage,
+  KindRouteOptions,
+  NamedTest,
+  TriageResult,
+} from '@open-tomato/rafa-pr';
+
+import {
+  createBaseRunCache,
+  readPlanBase,
+  readPlanFiles,
+  resolveBaseBranch,
+  runNamedTestAt,
+} from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { BUG_KINDS } from '@open-tomato/rafa/report/parse';
 import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
-
-import { resolveBaseBranch } from '../cleanup/branches.js';
-import { createBaseRunCache, runNamedTestAt } from '../triage/base-run.js';
-import { readPlanBase, readPlanFiles } from '../triage/plan-commits.js';
 
 /** What the run's kind routing is made with. */
 export interface StartKindOptions {

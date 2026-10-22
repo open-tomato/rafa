@@ -108,7 +108,6 @@ import {
   NO_COMMIT,
   checkoutOf,
   codeVersionOf,
-  localPathRedactor,
   namedSecrets,
   redactSecrets,
 } from '@open-tomato/rafa-pr';
@@ -119,6 +118,7 @@ import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/r
 import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';
 

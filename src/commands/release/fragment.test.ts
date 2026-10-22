@@ -32,8 +32,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
-import { parseFragment, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';

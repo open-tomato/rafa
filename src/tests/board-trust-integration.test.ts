@@ -64,10 +64,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { SPEC_LABEL } from '../board/issue.js';
-import { specPath } from '../board/naming.js';
 import { inspectRoadmapIssue, resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ghBoardTrust } from '../board/trust.js';

@@ -76,18 +76,17 @@
  * sentence — one line, worded for the pull request body — says whether
  * it succeeded.
  */
-import type { Fragment } from './fragment.js';
 import type { ReleaseFileEdit, ReleasePrepared, ReleaseSettings } from './prepare.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
 
 import { gitSaid } from '../pr/index.js';
-
-import { parseFragment } from './fragment.js';
 
 /** Why a verification refused the session's edit. */
 export type ReleaseRefusalReason =

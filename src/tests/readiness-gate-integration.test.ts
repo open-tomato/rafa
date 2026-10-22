@@ -46,6 +46,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { rejectedPath } from '@open-tomato/rafa/core/plan';
 
@@ -57,7 +58,6 @@ import {
   SPEC_NOT_READY_EXIT,
 } from '../board/gate.js';
 import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from '../board/issue.js';
-import { specPath } from '../board/naming.js';
 import { resolvePlanSpec } from '../board/plan-spec.js';
 import {
   findReadinessGaps,

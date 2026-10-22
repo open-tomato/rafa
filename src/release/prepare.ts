@@ -85,23 +85,23 @@
 import type { ChangelogNote } from './changelog.js';
 import type { ReleaseEnabledSource, ReleaseFileReading, ReleaseFileSettings } from './enabled.js';
 import type { TreeFragment } from './fragment-tree.js';
-import type { Fragment } from './fragment.js';
 import type { ReleaseLevelReading, ReleaseLevelSource } from './level.js';
 import type { BaseVersionOptions } from './version.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { gitSaid } from '../pr/index.js';
 
 import { groupChangeNotes, renderNoteLines } from './changelog.js';
 import { resolveReleaseEnabled } from './enabled.js';
 import { readFragmentTree } from './fragment-tree.js';
-import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from './fragment.js';
 import { resolveReleaseLevel } from './level.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from './version.js';
 

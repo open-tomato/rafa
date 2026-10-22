@@ -46,8 +46,8 @@
  * prints that line, and every answer — success or not — names the
  * strategy that gave it.
  */
-import type { Fragment } from './fragment.js';
 import type { ReleaseStrategy } from '@open-tomato/rafa/core/config/sections';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { createSemverByLevel } from './strategies/semver-by-level.js';
 

@@ -7,9 +7,10 @@ import type { TrendOptions, TrendReport, TrendSessionRow } from './report-trend.
 
 import { describe, expect, it } from 'bun:test';
 
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
+
 import { formatChange, formatShare, formatTokens, formatTrendReport } from './report-trend-format.js';
 import { summariseTrend } from './report-trend.js';
-import { emptyUsageTotals } from './session-log.js';
 
 const MS_PER_MINUTE = 60_000;
 

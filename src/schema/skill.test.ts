@@ -40,7 +40,8 @@
  */
 import { describe, expect, test } from 'bun:test';
 
-import { readFrontmatter } from './frontmatter.js';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+
 import {
   DESCRIPTION_LIMIT,
   FORBIDDEN_SKILL_FIELDS,

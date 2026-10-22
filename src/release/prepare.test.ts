@@ -62,11 +62,11 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { parseFragment, serializeFragment } from './fragment.js';
 import { prepareRelease } from './prepare.js';
 
 /** A temporary directory of this file's own. */

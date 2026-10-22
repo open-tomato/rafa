@@ -92,54 +92,55 @@
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type {
-  StaleDocEntry,
-  StaleDocLineResult,
-  StaleDocsTracker,
-  StaleDocTickResult,
-} from '../docs/release-issue.js';
-import type { GitRunner } from '../pr/index.js';
-import type { SettleForecast } from '../release/forecast.js';
-import type { FoldFragment } from '../release/strategy.js';
-import type { SecretEnvironment } from '../triage/triage.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
+import type {
+  GitRunner,
+  SecretEnvironment,
+  StaleDocEntry,
+  StaleDocLineResult,
+  StaleDocTickResult,
+  StaleDocsTracker,
+} from '@open-tomato/rafa-pr';
+import type { FoldFragment, SettleForecast } from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
+
+import {
+  DOC_UPDATE_TITLE,
+  addStaleDocLine,
+  createGitRunner,
+  docUpdateLineText,
+  namedSecrets,
+  redactSecrets,
+  staleDocLineText,
+  staleDocsVersion,
+  tickStaleDocLine,
+} from '@open-tomato/rafa-pr';
+import {
+  RELEASE_BASE_BRANCH,
+  RELEASE_REMOTE,
+  forecastSettle,
+  readFragmentTree,
+  readManifestVersion,
+  releaseStrategyFor,
+  resolveReleaseEnabled,
+  versionAt,
+} from '@open-tomato/rafa-release';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan , readDocsRole } from '@open-tomato/rafa/core/plan';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import {
-  addStaleDocLine,
-  DOC_UPDATE_TITLE,
-  docUpdateLineText,
-  staleDocLineText,
-  staleDocsVersion,
-  tickStaleDocLine,
-} from '../docs/release-issue.js';
-import { createGitRunner } from '../pr/index.js';
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import { forecastSettle } from '../release/forecast.js';
-import { readFragmentTree } from '../release/fragment-tree.js';
-import { versionAt } from '../release/settle.js';
-import { releaseStrategyFor } from '../release/strategy.js';
-import {
-  readManifestVersion,
-  RELEASE_BASE_BRANCH,
-  RELEASE_REMOTE,
-} from '../release/version.js';
-import { localPathRedactor } from '../triage/local-paths.js';
-import { namedSecrets, redactSecrets } from '../triage/triage.js';
 
 /** What every line this module prints opens with, after its indent. */
 const LINE_PREFIX = 'Stale docs: ';

@@ -111,9 +111,9 @@ import type { BoardIssueState } from '../roadmap-board.js';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
 
 import { directoryPrefix, fragmentIdOf } from '../../release/fragment-tree.js';
-import { parseFragment } from '../../release/fragment.js';
 
 import {
   batchesOf,

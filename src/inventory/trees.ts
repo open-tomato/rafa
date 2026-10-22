@@ -76,10 +76,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
 import { realEntry, SKILL_TIERS, skillTierDirectory, tierExists } from '@open-tomato/rafa/schema/tiers';
+import { AGENT_DEFINITION_DIR } from '@open-tomato/rafa/utils/agent-definition';
 
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 
 import { checkVerdict, EMPTY_FRONTMATTER, readInventoryText, summarize } from './record.js';
 

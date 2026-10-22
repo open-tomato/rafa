@@ -170,8 +170,8 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
-import type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectLogDir, SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
 import type {
   EffortStore,
   SessionEffortRow,
@@ -186,6 +186,8 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError, registeredDefaults } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { readLines, readSessionLog } from '@open-tomato/rafa/effort/session-log';
+import { listProjectSessionLogs, projectLogDirs } from '@open-tomato/rafa/effort/session-log-dirs';
 import { selectEffortStore } from '@open-tomato/rafa/store';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
@@ -193,8 +195,6 @@ import { findFirstEnqueue } from './classify.js';
 import { parseCollectArgs } from './collect-args.js';
 import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { readCommitLog } from './commits.js';
-import { listProjectSessionLogs, projectLogDirs } from './session-log-dirs.js';
-import { readLines, readSessionLog } from './session-log.js';
 import { createHubContact } from './sync/contact.js';
 
 /**
@@ -215,8 +215,8 @@ export type { CollectArgs } from './collect-args.js';
 export { parseCollectArgs, parseSinceInstant } from './collect-args.js';
 
 /* The session log location moved to its own module; re-exported so callers keep one import. */
-export type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
-export { listSessionLogs, projectLogDirName, projectLogDirs, sessionLogDir } from './session-log-dirs.js';
+export type { ProjectLogDir, SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
+export { listSessionLogs, projectLogDirName, projectLogDirs, sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 
 /** Candidates split into the three buckets, which partition them. */
 export interface SessionSelection {

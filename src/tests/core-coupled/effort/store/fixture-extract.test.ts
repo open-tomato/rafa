@@ -41,9 +41,9 @@ import {
 import { unionStores } from '@open-tomato/rafa/store/merge-union';
 import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
 import { ORIGIN_TABLES } from '@open-tomato/rafa/store/origins';
+import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
 
 import { EMAIL_MARKER, fixtureScrubber, HOST_MARKER, ScrubRefusal } from '../../../../fixtures/scrub.js';
-import { HOME_MARKER } from '../../../../triage/local-paths.js';
 
 /** A planted row's columns other than `seq` and its origin pair. */
 type FixtureRow = Readonly<Record<string, SQLQueryBindings>>;

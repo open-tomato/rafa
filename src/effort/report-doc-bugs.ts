@@ -39,8 +39,7 @@
 import { existsSync } from 'node:fs';
 
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { namesOnlyDocs } from '../triage/doc-only.js';
+import { namesOnlyDocs } from '@open-tomato/rafa/triage/doc-only';
 
 /** The stored bugs a tracker could be handed, and those naming only documentation. */
 export interface DocOnlyBugs {

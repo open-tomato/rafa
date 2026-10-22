@@ -358,12 +358,14 @@
  * `interrupted`, no task is marked, and the run returns, its record
  * `stopped`, as it does when a pause's hold ends on the signal.
  */
-import type { TaskLearning } from './start/dispatch.js';
-import type { TaskHandout } from './start/handout.js';
-import type { SessionServing } from './start/serving.js';
-import type { WrapUpLearning } from './start/wrap-up.js';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { SessionServing } from '@open-tomato/rafa-inventory';
+import type {
+  TaskHandout,
+  TaskLearning,
+  WrapUpLearning,
+} from '@open-tomato/rafa-run';
 
 import fs from 'fs';
 import { homedir } from 'os';
@@ -371,6 +373,67 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { createHubContact } from '@open-tomato/rafa-effort';
+import { createGitRunner } from '@open-tomato/rafa-pr';
+import {
+  LoopEnd,
+  advanceExpectation,
+  announcePlanIssues,
+  announceRiskTotal,
+  announceRunDirs,
+  announceRunStepOnly,
+  bindEventsFile,
+  configuredRetries,
+  createRunDecisions,
+  createRunRetries,
+  createRunSuiteSteps,
+  createStartPreflightClaim,
+  createStartPreflightDrift,
+  createStartStaleDocs,
+  createStartTriage,
+  dispatchTask,
+  emitLoopEvent,
+  finishCleanExit,
+  guardCheckout,
+  guardRunBranch,
+  haltBeforeSession,
+  haltIfCheckoutMoved,
+  heldOnNothingLeftBehind,
+  holdWhilePaused,
+  injectSourceLabel,
+  injectionPlace,
+  isBudgetExit,
+  loadRunConfig,
+  markBudgetExit,
+  openCheckoutExpectation,
+  openRunSession,
+  readAlwaysRunFiles,
+  readPreviousDecisionNeeded,
+  readPreviousPassOver,
+  readRunArgs,
+  readRunStepOnly,
+  readTypeCheckRecipe,
+  refuseDetachedRun,
+  refuseEffortDirRun,
+  refuseRetryWithoutBudget,
+  refuseUnusableCriteria,
+  refuseWorktreeBesideCreateBranch,
+  refuseWorktreeWhileTracking,
+  renderProgressForDispatch,
+  resolvePlanPath,
+  resolveRunRetries,
+  retryTaskOf,
+  runFromSelectedRuntime,
+  runStartFailures,
+  runStartPreflight,
+  runWrapUp,
+  setActivePlanStub,
+  settleRunCheckout,
+  storeTaskReport,
+  taskPosition,
+  taskTokens,
+  unbindEventsFile,
+  unlessText,
+} from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
@@ -381,65 +444,6 @@ import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
 import { requireNoticesAnswered } from './notices/run.js';
-import { createGitRunner } from './pr/index.js';
-import { isBudgetExit, markBudgetExit } from './start/budget.js';
-import { guardCheckout } from './start/checkout-guard.js';
-import {
-  advanceExpectation,
-  haltIfCheckoutMoved,
-  openCheckoutExpectation,
-} from './start/checkout-watch.js';
-import { announceRunDirs } from './start/checkout.js';
-import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
-import { configuredRetries, refuseRetryWithoutBudget, refuseUnusableCriteria } from './start/continue-args.js';
-import { LoopEnd } from './start/continue-exits.js';
-import { createRunDecisions } from './start/continue-run.js';
-import {
-  dispatchTask,
-  renderProgressForDispatch,
-  storeTaskReport,
-} from './start/dispatch.js';
-import {
-  bindEventsFile,
-  emitLoopEvent,
-  injectionPlace,
-  taskPosition,
-  taskTokens,
-  unbindEventsFile,
-  unlessText,
-} from './start/loop-events.js';
-import { holdWhilePaused } from './start/pause.js';
-import { resolvePlanPath } from './start/plan-path.js';
-import { createStartPreflightClaim } from './start/preflight-claim.js';
-import { createStartPreflightDrift } from './start/preflight-drift.js';
-import { runStartPreflight } from './start/preflight.js';
-import { createRunRetries, resolveRunRetries, retryTaskOf } from './start/retry-budget.js';
-import { announceRiskTotal } from './start/risk-total.js';
-import { settleRunCheckout } from './start/run-checkout.js';
-import {
-  announcePlanIssues,
-  injectSourceLabel,
-  loadRunConfig,
-  refuseDetachedRun,
-  refuseEffortDirRun,
-} from './start/run-config.js';
-import {
-  guardRunBranch,
-  readRunArgs,
-  refuseWorktreeBesideCreateBranch,
-  refuseWorktreeWhileTracking,
-} from './start/run-setup.js';
-import { runFromSelectedRuntime } from './start/runtime.js';
-import { haltBeforeSession } from './start/session-guard.js';
-import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
-import { createStartStaleDocs } from './start/stale-docs.js';
-import { setActivePlanStub } from './start/stamp.js';
-import { announceRunStepOnly, readRunStepOnly } from './start/step-only-report.js';
-import { createRunSuiteSteps } from './start/suite-steps-run.js';
-import { readAlwaysRunFiles } from './start/task-gate-lines.js';
-import { createStartTriage, runStartFailures } from './start/triage.js';
-import { readTypeCheckRecipe } from './start/type-step.js';
-import { runWrapUp } from './start/wrap-up-run.js';
 import { deferUntil } from './utils/schedule.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

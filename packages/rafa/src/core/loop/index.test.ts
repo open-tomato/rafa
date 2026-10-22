@@ -32,6 +32,10 @@
  * function of the parser `sessions.ts` does not re-export, which the
  * barrel must not hold.
  *
+ * The sixth case holds `SESSION_ID_FLAG` by value: it moved here from
+ * `src/start/dispatch.ts`, which keeps no re-export, so every file that
+ * spawns a session under its own id takes it from this barrel.
+ *
  * Seven mutations were driven against this file on 2026-10-12, one run
  * each, with the barrel, `sessions.ts` and `claude.ts` restored and
  * verified with `sha256sum -c`. The barrel leaving out `readSessions`
@@ -175,5 +179,12 @@ describe('the loop barrel', () => {
     expect(Object.keys(sessions)).not.toContain('SessionState');
     expect(Object.keys(claude)).not.toContain('CapturedSession');
     expect(names[BARREL]).toEqual(expected);
+  });
+
+  it('carries SESSION_ID_FLAG, the flag a session runs under its id with, as claude.ts declares it', () => {
+    const exported: Readonly<Record<string, unknown>> = barrel;
+
+    expect(exported['SESSION_ID_FLAG']).toBe('--session-id');
+    expect(exported['SESSION_ID_FLAG'] === claude.SESSION_ID_FLAG).toBe(true);
   });
 });

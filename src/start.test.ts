@@ -208,7 +208,7 @@ function plantedStart(body: readonly string[]): string {
 describe('the wrap-up branch of start.ts', () => {
   it('hands the whole wrap-up to runWrapUp and calls nothing else', () => {
     expect(NAMES).toEqual(['runWrapUp']);
-    expect(importedFrom(START, './start/wrap-up-run.js')).toEqual(['runWrapUp']);
+    expect(importedFrom(START, '@open-tomato/rafa-run')).toContain('runWrapUp');
   });
 
   it('reads a branch making a release call of its own beside the hand-over as making both', () => {
@@ -656,7 +656,7 @@ describe('the events file start.ts binds around the run', () => {
 
   it('binds the run\'s events file under the project root straight after opening the session record', () => {
     expect(STATEMENTS.next).toBe('bindEventsFile(repoRoot, session.id);');
-    expect(importedFrom(START, './start/loop-events.js')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
+    expect(importedFrom(START, '@open-tomato/rafa-run')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
   });
 
   it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {

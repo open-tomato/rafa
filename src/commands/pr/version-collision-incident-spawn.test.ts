@@ -59,7 +59,8 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseFragment } from '../../release/fragment.js';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
+
 import { expectExit, plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 import { hostToolDirs } from '../../tests/stand-in-gh.js';

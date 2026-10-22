@@ -125,10 +125,8 @@ import { DEFAULT_BASE_BRANCH, WORKTREES_SUBDIR, shellQuote } from '@open-tomato/
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
-import { claudeArgs, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
+import { claudeArgs, SESSION_ID_FLAG, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
-
-import { SESSION_ID_FLAG } from '../start/dispatch.js';
 
 import { fenceFor } from './verify-plan.js';
 

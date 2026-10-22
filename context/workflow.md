@@ -88,7 +88,7 @@ declaration carrying an agent never passes `--model` or `--tools`: the agent
 file's own frontmatter names its model and tool set, and every tracked file the
 table names carries a `model:`. `effort` is the exception, being the cost lever
 a plan most needs to reach the session: `--effort` joins `--agent` unless the
-definition declares an `effort` of its own. `src/utils/agent-definition.ts`
+definition declares an `effort` of its own. `packages/rafa/src/utils/agent-definition.ts`
 answers that from `.claude/agents/<name>.md` under the repo root, then under the
 home directory when `loop.settingSources` includes `user`, and takes a file only
 when its frontmatter `name` is the name asked for, because the CLI resolves

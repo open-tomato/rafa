@@ -19,8 +19,8 @@
  *    batch whose newest date sits at either end, so the newest sits in
  *    the middle.
  */
-import type { Fragment } from '../fragment.js';
 import type { FoldFragment } from '../strategy.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { describe, expect, test } from 'bun:test';
 

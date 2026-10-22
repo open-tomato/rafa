@@ -145,12 +145,6 @@ export type {
 } from '../../src/board/issue.js';
 export { createGhSpecIssueReader } from '../../src/board/issue.js';
 
-export {
-  boardId,
-  planStub,
-  pullRequestTitle,
-} from '../../src/board/naming.js';
-
 export { firstNowEpic } from '../../src/board/now-epic.js';
 
 export type {
@@ -411,8 +405,6 @@ export type {
 export { causeOf } from '../../src/bugs/cause-rule.js';
 
 export { BOARD_SUBJECT } from '../../src/commands/board/declarations.js';
-
-export { BOARD_FEATURE } from '../../src/commands/board/index.js';
 
 export type {
   DoctorRefsReading,

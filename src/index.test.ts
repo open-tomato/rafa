@@ -699,9 +699,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/registry.js', ['mountKey']],
   ]],
   ['./commands/agent/vendor.js', [
-    ['@open-tomato/rafa-effort', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
     ['@open-tomato/rafa-inventory', ['bundledAgentsDirectory', 'readAgentDirectory']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/schema/frontmatter', ['readFrontmatter']],
+    ['@open-tomato/rafa/utils/agent-definition', ['AGENT_DEFINITION_DIR']],
   ]],
   ['./commands/agent/list.js', [
     ['@open-tomato/rafa-inventory', ['VENDOR_COMMAND', 'buildInventory', 'pathDirectories']],
@@ -866,7 +867,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/prompt.js', ['defaultPromptSeams', 'engineerPrompt']],
   ]],
   ['./commands/stretch/item.js', [
-    ['@open-tomato/rafa-board', ['boardId', 'createGhRunner', 'createGithubTracker']],
+    ['@open-tomato/rafa-board', ['createGhRunner', 'createGithubTracker']],
+    ['@open-tomato/rafa/board/naming', ['boardId']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
@@ -904,13 +906,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/bug/recheck.js', [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'boardRepoLabel', 'createGhRunner', 'ghBoardTrust', 'issueName', 'issueRef', 'lineRefusal', 'onTracker', 'readBoardTrust', 'resolveIssueTracker', 'trustRefusalClause']],
-    ['@open-tomato/rafa-pr', ['DIRTY_MARK', 'NO_COMMIT', 'checkoutOf', 'codeVersionOf', 'localPathRedactor', 'namedSecrets', 'redactSecrets']],
+    ['@open-tomato/rafa-pr', ['DIRTY_MARK', 'NO_COMMIT', 'checkoutOf', 'codeVersionOf', 'namedSecrets', 'redactSecrets']],
     ['@open-tomato/rafa-run', ['suiteEnv']],
     ['@open-tomato/rafa/bugs/record', ['parseBugRecord']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'RAFA_VERSION']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
+    ['@open-tomato/rafa/triage/local-paths', ['localPathRedactor']],
     ['../../bugs/test-reference.js', ['readTestReference', 'resolveTestReference']],
     ['./recheck-report.js', ['recheckComment', 'referenceText', 'renderRecheck']],
     ['./recheck-run.js', ['recheckBug']],

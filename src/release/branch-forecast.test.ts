@@ -13,10 +13,10 @@
  */
 import type { BranchForecast } from './branch-forecast.js';
 import type { TreeFragment } from './fragment-tree.js';
-import type { Fragment } from './fragment.js';
 import type { ReleasePrepared } from './prepare.js';
 import type { ReleaseVerified } from './verify.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
@@ -38,7 +39,6 @@ import {
   releaseBodyLines,
 } from './branch-forecast.js';
 import { readFragmentTree } from './fragment-tree.js';
-import { parseFragment, serializeFragment } from './fragment.js';
 import { readGuard } from './guard.js';
 
 const COMMIT = 'c'.repeat(40);

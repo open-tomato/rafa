@@ -107,7 +107,7 @@
  * no other prompt content, tool output or message body is carried.
  */
 import type { SessionKind } from './classify.js';
-import type { SessionStats } from './session-log.js';
+import type { SessionStats } from '@open-tomato/rafa/effort/session-log';
 import type {
   PlanStubMatch,
   PlanStubResolution,

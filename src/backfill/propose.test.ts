@@ -52,8 +52,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
+
 import { sourceHash } from '../demote/report.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { DESCRIPTION_LIMIT } from '../schema/skill.js';
 
 import {

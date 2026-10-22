@@ -25,8 +25,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
-import { parseFragment, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
 
 import {

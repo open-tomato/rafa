@@ -136,7 +136,6 @@ import type {
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
 import {
   buildInventory,
   checkReferences,
@@ -149,6 +148,7 @@ import { parsePrerequisites, prerequisitesPathForPlan } from '@open-tomato/rafa-
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
 
 /** What a need is for. */

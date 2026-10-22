@@ -110,7 +110,7 @@
  * lines, and `--plan=` alone to a refusal naming the flag.
  */
 import type { ReportSessionRow } from './report.js';
-import type { SessionUsageTotals } from './session-log.js';
+import type { SessionUsageTotals } from '@open-tomato/rafa/effort/session-log';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { SessionEffortRow } from '@open-tomato/rafa/store/types';
 
@@ -129,6 +129,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { emptyUsageTotals } from '@open-tomato/rafa/effort/session-log';
 import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
 import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
@@ -154,7 +155,6 @@ import {
   sortGroups,
   summariseSessions,
 } from './report.js';
-import { emptyUsageTotals } from './session-log.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 

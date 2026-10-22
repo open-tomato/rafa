@@ -158,7 +158,7 @@ The fragment is written by step 1 of the wrap-up (the loop), never by the
 session. Verify step 3 checks that the fragment is the only file the release
 step changed (git status over the version file, changelog and fragments folder),
 and the commit is `chore: release fragment <plan id>`. The wrap-up never edits
-the version file or the changelog. `src/release/fragment.ts` holds the format,
+the version file or the changelog. `packages/rafa/src/release/fragment.ts` holds the format,
 parser, and the name allocation logic (`src/release/fragment-tree.ts` reads
 the base branch's fragments after a `git fetch` to pick the right name).
 

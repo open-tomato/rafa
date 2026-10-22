@@ -14,7 +14,7 @@
  * through `foldWithStrategy` — the same path `forecast.ts` and settle
  * take — so nothing here is a shortcut around the module's own contract.
  */
-import type { Fragment } from './fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,12 +24,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+
 import { createGitRunner } from '../pr/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { readFragmentTree } from './fragment-tree.js';
-import { serializeFragment } from './fragment.js';
 import { releaseStrategyFor } from './strategy.js';
 
 /** A temporary directory of this file's own. */

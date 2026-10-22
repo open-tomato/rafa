@@ -58,13 +58,13 @@
  * has answered. A finish whose write reached a pull request, or that
  * had nothing to write, is left alone.
  */
-import type { PrProviderReading, PullRequests } from '../pr/index.js';
+import type { PrProviderReading, PullRequests } from '@open-tomato/rafa-pr';
+
+import { ghPullRequestsIn, resolvePrProvider } from '@open-tomato/rafa-pr';
+import { bodyWithRelease } from '@open-tomato/rafa-release';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
-import { bodyWithRelease } from '../release/branch-forecast.js';
 
 /** What one finish writes into the body, before it is written. */
 export interface BodyWrite {

@@ -38,7 +38,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {

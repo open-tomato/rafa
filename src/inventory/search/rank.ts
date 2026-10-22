@@ -73,7 +73,7 @@ import type { InventoryRecord } from '../record.js';
 
 import { readFileSync } from 'node:fs';
 
-import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 
 import { readInventoryFrontmatter } from '../record.js';
 
