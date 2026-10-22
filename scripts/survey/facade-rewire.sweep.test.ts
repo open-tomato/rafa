@@ -35,9 +35,9 @@ interface RewiredRow {
  * `dist/config/*.d.ts`; its six load-cycle files left the row when the
  * first decouple item moved their only effort imports into core, as
  * `packages/rafa/src/schema/frontmatter.ts` and
- * `packages/rafa/src/utils/agent-definition.ts`. Inventory's five
+ * `packages/rafa/src/utils/agent-definition.ts`. Inventory's four
  * load-cycle files would put the facade on a cycle through inventory if
- * they imported it by name, and its two back-edge files
+ * they imported it by name, and its three back-edge files
  * are effort files, and effort comes before inventory in the move order.
  * Board's 24 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`; its two
@@ -52,9 +52,9 @@ interface RewiredRow {
  * declaration-graph files are effort's two.
  * Run's 15 load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
- * moves last. Its 17 back-edge files are board, pr, effort and inventory
- * files, every one earlier in the move order, and its two declaration-graph
- * files are effort's two.
+ * moves last. Its 15 back-edge files are board and pr files, every one
+ * earlier in the move order, and its two declaration-graph files are
+ * effort's two.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a

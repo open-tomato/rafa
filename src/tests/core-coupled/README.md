@@ -41,7 +41,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `core/output/index.test.ts` | `src/adapters/output/json.ts` |
 | `core/runtime/identity.test.ts` | `package.json`, the root manifest |
 | `effort/store/changes.test.ts` | `src/tests/merged-stores.ts` |
-| `effort/store/fixture-extract.test.ts` | `src/fixtures/scrub.ts`, `src/triage/local-paths.ts` |
+| `effort/store/fixture-extract.test.ts` | `src/fixtures/scrub.ts` |
 | `effort/store/forward-compat.test.ts` | `src/effort/skill-facts.ts` |
 | `effort/store/index.test.ts` | `src/adapter-registry.ts` |
 | `effort/store/location.test.ts` | `src/tests/cli-capture.ts` |

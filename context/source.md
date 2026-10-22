@@ -182,7 +182,7 @@ entry. `isCoreFile` reads both: the one place a sweep, a survey script or a
 spawned loader takes core's location from.
 
 **Nine more files moved into core at commit 94769d8, with their colocated
-tests.** They are `packages/rafa/src/board/naming.ts`,
+tests but one.** They are `packages/rafa/src/board/naming.ts`,
 `packages/rafa/src/triage/doc-only.ts`, `packages/rafa/src/triage/local-paths.ts`,
 `packages/rafa/src/start/worktree-dir.ts`, `packages/rafa/src/release/fragment.ts`,
 `packages/rafa/src/schema/frontmatter.ts`,
@@ -197,7 +197,9 @@ their own, `@open-tomato/rafa/board/naming`, `triage/doc-only`,
 an `exports` key of `packages/rafa/package.json` to its `./src/` file;
 `agent-definition.ts` is held by the `./utils/*` wildcard. The
 `tsconfig.packages.json` wildcard for `@open-tomato/rafa/*` did not change. The
-flag `SESSION_ID_FLAG` (`'--session-id'`) moved at commit d9b339b from
+ninth test, `worktree-dir.test.ts`, was parked under
+`src/tests/core-coupled/start/` before the move and stays there. The flag
+`SESSION_ID_FLAG` (`'--session-id'`) moved at commit d9b339b from
 `src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
 `SETTING_SOURCES_FLAG`, and the loop barrel exports it with no re-export at the
 old path. `src/start/serving.ts` is an inventory file by name, though it sits
