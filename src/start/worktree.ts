@@ -183,15 +183,15 @@
 import type { BranchPlan, BranchRoute } from './branch-decision.js';
 import type { ClaimCatchUpReading } from './claim-catch-up.js';
 import type { Sleep } from './worktree-upstream.js';
-import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
+import type { GitResult, GitRunner, WorktreeEntry } from '@open-tomato/rafa-pr';
 
 import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { createGitRunner, gitSaid, parseWorktrees } from '@open-tomato/rafa-pr';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { createGitRunner, gitSaid, parseWorktrees } from '../pr/index.js';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';
 import { readClaimCatchUp } from './claim-catch-up.js';

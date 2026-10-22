@@ -129,19 +129,17 @@
  * crashing.
  */
 import type { BranchesRead, BranchesUnread, LocalBranch } from './branches.js';
-import type { PastHeadRead, PastHeadReading, PastHeadSettings } from './past-head.js';
 import type { WorktreeBlockKind, WorktreeRow } from './worktrees.js';
 import type { MergedPullRequest, PullRequests } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { PastHeadRead, PastHeadReading, PastHeadSettings } from '@open-tomato/rafa-release';
 
 import { basename } from 'node:path';
 
+import { RELEASE_DEFAULTS, readPastHead } from '@open-tomato/rafa-release';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
-
-import { RELEASE_DEFAULTS } from '../config-schema-release.js';
-
-import { readPastHead } from './past-head.js';
 
 /** The wording every Stale and Not-pushed row carries when no provider is configured. */
 export const MERGED_STATE_UNKNOWN = 'merged state unknown';

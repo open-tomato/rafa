@@ -114,16 +114,16 @@
  * SIGINT, is {@link TypeOutcome.interrupted}: never red, as an
  * interrupted test run is not.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
+import { gitSaid } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { gitSaid } from '../pr/index.js';
 
 /** The suffix of the files the step checks. */
 export const TEST_FILE_SUFFIX = '.test.ts';

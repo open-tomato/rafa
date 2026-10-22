@@ -663,21 +663,16 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's eight, inventory's seven, board's 48, release's twelve,
-  pr's seventy and run's forty, and a planted control reds on one relative
-  import. Board's, release's, pr's and run's rows add a fourth group the
-  codemod does not print, `libraryChunks`: board's row has 21 such files,
-  release's eight, pr's 33 and run's six: files a library entry reaches
-  statically and that stay on their paths after the rewire, since through the
-  facade that graph reached the package's lazy command modules while the
-  facade carried the feature (`RELEASE_FEATURE` re-exports
-  `src/commands/release/index.ts`, `PR_FEATURE` re-exports
-  `src/commands/pr/index.ts` and `RUN_FEATURE` re-exports
-  `src/commands/claim/index.ts`, each now through its commands entry alone)
-  and the splitting build wrote each as a chunk of its own. Run's six are the
-  library entry `src/index.ts` itself, with `src/plan.ts`, `src/start.ts` and
-  the three `src/commands/plan/` files (`bundled-check.ts`, `claim-route.ts`
-  and `store-check.ts`) it reaches. The
+  files, effort's eight, inventory's seven, board's 27, release's four,
+  pr's 37 and run's 34, and a planted control reds on one relative import.
+  No row keeps a file for the library build: board's, release's, pr's and
+  run's rows once held a fourth group, `libraryChunks`, 68 files a library
+  entry reaches statically (board 21, release eight, pr 33 and run six) that
+  stayed on their paths while each facade carried its feature, since through
+  the facade that graph reached the package's lazy command modules and the
+  splitting build wrote each as a chunk of its own. With the feature object
+  in the commands entry alone, the 68 import the facades and the group is
+  gone. The
   published-types case in
   `src/tests/package-build.test.ts` checks that no `dist/**/*.d.ts` of the
   scratch build names `@open-tomato/rafa-effort`, `-inventory`, `-board`,

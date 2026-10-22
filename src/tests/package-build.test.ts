@@ -560,7 +560,12 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * the config through core's `registeredDefaults()` and
  * `registeredSettings()`: `src/config-registry.ts` and the section files
  * then sit in a chunk of their own, apart from the error codes and the
- * logger settings they shared one with.
+ * logger settings they shared one with. It has one `index-<hash>.js` fewer
+ * since the 68 library-chunk files took the facades: a shared chunk the
+ * splitting build no longer writes once pr's 33 take `@open-tomato/rafa-pr`,
+ * the effort store's copy, wire, merge and migrate files, which now sit in
+ * the chunk they imported from, beside the store's sqlite backend and
+ * core's command, git and loop helpers.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1284,7 +1289,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(165);
+    expect(before).toHaveLength(164);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

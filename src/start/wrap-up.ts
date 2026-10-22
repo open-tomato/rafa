@@ -56,11 +56,11 @@
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
-import type { PullRequests } from '../pr/index.js';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory';
+import type { PullRequests } from '@open-tomato/rafa-pr';
 import type {
   ReleasePreparation,
   ReleasePrepared,
@@ -70,14 +70,12 @@ import type {
 import { posix } from 'node:path';
 
 import { promotable } from '@open-tomato/rafa-inventory';
+import { createGitRunner, ghPullRequestsIn, mechanicalConflictBullet } from '@open-tomato/rafa-pr';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { runClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
-
-import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
-import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';
 
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';
 import { serveSession } from './serving.js';

@@ -69,13 +69,14 @@
  * for each, exit 0.
  */
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/index.js';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
 
 import { planStub } from '../board/naming.js';
-import { gitSaid } from '../pr/index.js';
 import { branchNameFor, REMOTE } from '../start/branch-decision.js';
 
 import { CLAIMED_REASONS, claimBranchGlob, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from './git.js';

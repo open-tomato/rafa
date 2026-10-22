@@ -37,19 +37,22 @@
  * which answers a path it never writes. `loop start`'s preflight reads
  * the plan where the loop finds it, with the same rules.
  */
-import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
+import type { StoreRuleProblem } from '@open-tomato/rafa-run';
 
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+
+import {
+  findStoreRuleProblems,
+  prerequisitesPathForPlan,
+  storeRuleLine,
+} from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, plural, rejectedPath } from '@open-tomato/rafa/core/plan';
-
-import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
-import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 
 /** The text at `path`, or null when no file sits there. */
 function readFileOrNull(path: string | null): string | null {

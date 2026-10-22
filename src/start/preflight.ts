@@ -335,7 +335,6 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
-import type { ResolvePrProviderOptions } from '../pr/index.js';
 import type {
   PreflightItems,
   PrerequisiteReminder,
@@ -346,11 +345,14 @@ import type { TierSettings } from '../tiers/resolve.js';
 import type { PrerequisiteItem, RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { PreflightWriterSeams } from '@open-tomato/rafa/store/preflight';
+import type { ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
 
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
+
+import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { registeredDefaults } from '@open-tomato/rafa/core/config';
@@ -373,7 +375,6 @@ import {
   unresolvedSkillLine,
 } from '../agents/roster.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
-import { ghPreflightItems, resolvePrProvider } from '../pr/index.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import {
   loadPlanPrerequisites,

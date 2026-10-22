@@ -35,15 +35,14 @@
  * names none. Nothing here throws on a read: `readDocTaskInput` answers
  * a failed read as a sentence the section carries.
  */
-import type { DocTaskInputOptions } from '../docs/task-reading.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { DocTaskInputOptions } from '@open-tomato/rafa-pr';
+
+import { readDocTaskInput, renderDocTaskSection, resolveBaseBranch } from '@open-tomato/rafa-pr';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { readDocsRole } from '@open-tomato/rafa/core/plan';
-
-import { resolveBaseBranch } from '../cleanup/branches.js';
-import { readDocTaskInput, renderDocTaskSection } from '../docs/task-reading.js';
 
 /** Where the run's doc task reads its input: what `start()` knows of the run. */
 export interface DocTaskPlace {

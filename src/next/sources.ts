@@ -245,7 +245,6 @@
  *   `./state.ts` leaves out its `unblock` row. The key is left out in
  *   `labels` mode.
  */
-import type { EpicEndRelease } from './epic-end.js';
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { SettleReader } from './settle-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
@@ -253,12 +252,14 @@ import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
-import type { MergeGuardSettings } from '../release/guard-merge.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { EpicEndRelease, MergeGuardSettings } from '@open-tomato/rafa-release';
+
+import { readEpicEndRelease } from '@open-tomato/rafa-release';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
@@ -275,7 +276,6 @@ import { readCurrentPlace } from '../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
-import { readEpicEndRelease } from './epic-end.js';
 import { nextOwnerGate } from './owner-gate.js';
 import {
   awayTargetOf,

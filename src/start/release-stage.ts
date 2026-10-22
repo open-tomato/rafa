@@ -131,34 +131,37 @@
  * request has the base as its head, or none (#627).
  */
 import type { BodyWrite, ReleaseBodyRecord, ReleaseBodySeams } from './release-body.js';
-import type { GitResult, GitRunner, PushOutcome } from '../pr/index.js';
-import type { BranchForecast, BranchForecastInput, BranchForecastSettings } from '../release/branch-forecast.js';
-import type { ChangelogNote } from '../release/changelog.js';
+import type { GitResult, GitRunner, PushOutcome } from '@open-tomato/rafa-pr';
 import type {
+  BranchForecast,
+  BranchForecastInput,
+  BranchForecastSettings,
+  ChangelogNote,
   ReleasePreparation,
   ReleasePreparationInput,
   ReleasePrepared,
   ReleaseSettings,
-} from '../release/prepare.js';
-import type { ReleaseVerification, ReleaseVerificationContext } from '../release/verify.js';
+  ReleaseVerification,
+  ReleaseVerificationContext,
+} from '@open-tomato/rafa-release';
+
+import { ASSUMPTIONS_HEADING } from '@open-tomato/rafa-board';
+import { createGitRunner, gitSaid, pushBranch } from '@open-tomato/rafa-pr';
+import {
+  RELEASE_BASE_BRANCH,
+  forecastLine,
+  prepareRelease,
+  readBranchForecast,
+  releaseBodyBlock,
+  releaseBodyLines,
+  releaseLevelReport,
+  verifyRelease,
+} from '@open-tomato/rafa-release';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
-
-import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
-import { createGitRunner, gitSaid, pushBranch } from '../pr/index.js';
-import {
-  forecastLine,
-  readBranchForecast,
-  releaseBodyBlock,
-  releaseBodyLines,
-} from '../release/branch-forecast.js';
-import { releaseLevelReport } from '../release/level.js';
-import { prepareRelease } from '../release/prepare.js';
-import { verifyRelease } from '../release/verify.js';
-import { RELEASE_BASE_BRANCH } from '../release/version.js';
 
 import { RELEASE_BODY_SEAMS, writeBody } from './release-body.js';
 

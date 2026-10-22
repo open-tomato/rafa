@@ -195,16 +195,34 @@ import type { RefreshAddedItems } from '../board/project/add-issue.js';
 import type { RefreshConfig } from '../board/project/refresh.js';
 import type { IssuesConfigSettings } from '../config-schema-issues.js';
 import type { SuiteFailure } from '../suite/run.js';
-import type { InheritedTriage } from '../triage/inherited.js';
-import type { KindRouteOptions } from '../triage/kind-route.js';
-import type { BugTriage, SecretEnvironment, TriageOptions, TriageResult } from '../triage/triage.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type {
+  BugTriage,
+  InheritedTriage,
+  KindRouteOptions,
+  SecretEnvironment,
+  TriageOptions,
+  TriageResult,
+} from '@open-tomato/rafa-pr';
 
 import { homedir } from 'node:os';
+
+import {
+  artifactOf,
+  blockerTextOf,
+  checkedKindOf,
+  hasText,
+  inheritedFailureOf,
+  localPathRedactor,
+  namedSecrets,
+  redactSecrets,
+  scoreText,
+  triageReport,
+} from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -218,17 +236,6 @@ import { addFiledBugs } from '../board/project/add-filed.js';
 import { openProjectRunner } from '../board/project/project-runner.js';
 import { bugRulesOf } from '../config-schema-issues.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
-import { artifactOf, hasText } from '../triage/bug-key.js';
-import { inheritedFailureOf } from '../triage/inherited.js';
-import { scoreText } from '../triage/issue-text.js';
-import { checkedKindOf } from '../triage/kind-route.js';
-import { localPathRedactor } from '../triage/local-paths.js';
-import {
-  blockerTextOf,
-  namedSecrets,
-  redactSecrets,
-  triageReport,
-} from '../triage/triage.js';
 
 import { emitLoopEvent } from './loop-events.js';
 import {

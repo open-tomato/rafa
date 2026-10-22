@@ -85,12 +85,11 @@
  * (`../pr/preflight-items.ts`) when a shell would not take it as it
  * stands.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { existsSync, realpathSync } from 'node:fs';
 
-import { createGitRunner } from '../pr/index.js';
-import { shellQuote } from '../pr/preflight-items.js';
+import { createGitRunner, shellQuote } from '@open-tomato/rafa-pr';
 
 /** The reason a halted task is stored with, and its `[BLOCKED]` blocker text. */
 export const CHECKOUT_MOVED = 'checkout moved';

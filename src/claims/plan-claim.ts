@@ -121,16 +121,17 @@
 import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { DeviceStoreId, DeviceStoreIds } from './device.js';
 import type { ClaimBranchReading } from './git.js';
-import type { IssueBoard } from '../board/issue-board.js';
-import type { GitRunner } from '../pr/index.js';
 import type { ClaimsAhead, ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { IssueBoard } from '@open-tomato/rafa-board';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import path from 'node:path';
 
+import { weighBranchClaim } from '@open-tomato/rafa-board';
+import { gitSaid } from '@open-tomato/rafa-pr';
+
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
 
-import { weighBranchClaim } from '../board/roadmap-claims.js';
-import { gitSaid } from '../pr/index.js';
 import { branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
 
 import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';

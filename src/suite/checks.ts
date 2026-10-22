@@ -79,8 +79,7 @@
 import type { CheckName } from '../config-schema-checks.js';
 import type { TestScope } from '@open-tomato/rafa/core/plan';
 
-import { normaliseFolder } from '../board/board-body.js';
-import { owningBoard } from '../board/board-owns.js';
+import { normaliseFolder, owningBoard } from '@open-tomato/rafa-board';
 
 /** Why a check point runs the full suite: the entry or the line named `full`, or a trigger widened `affected`. */
 export type FullCheckReason = 'declared' | 'trigger';

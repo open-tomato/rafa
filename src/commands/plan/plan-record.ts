@@ -46,22 +46,23 @@
  * does, so `./plan-record.test.ts` reads the bytes of each message off
  * a sink.
  */
-import type { PlanFieldStamp } from '../../board/plan-field.js';
+import type { PlanFieldStamp } from '@open-tomato/rafa-board';
 
 import fs from 'fs';
 import path from 'path';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { SKIP_REVIEW_FLAG } from '../../board/flags.js';
-import { issueFieldLine, stampPlanIssue } from '../../board/plan-field.js';
 import {
   REVIEW_MISSING_LINE,
   REVIEW_SKIPPED_LINE,
+  SKIP_REVIEW_FLAG,
+  issueFieldLine,
+  stampPlanIssue,
   stampReviewMissing,
   stampReviewSkipped,
-} from '../../board/review-stamp.js';
+} from '@open-tomato/rafa-board';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 /**
  * Records one line in the generated plan's `rafa:plan` block, answering

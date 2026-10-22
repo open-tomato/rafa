@@ -24,12 +24,15 @@
  * and widens {@link SettleWaitingPlace} into its own follow-up place.
  * Nothing here imports from `src/commands/`.
  */
-import type { MergeGuardSettings } from '../release/guard-merge.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { MergeGuardSettings } from '@open-tomato/rafa-release';
 
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import { moveSpelling } from '../release/release-move.js';
-import { readSettle, settleMoves } from '../release/settle.js';
+import {
+  moveSpelling,
+  readSettle,
+  resolveReleaseEnabled,
+  settleMoves,
+} from '@open-tomato/rafa-release';
 
 /**
  * The remote whose `<base>` the dry run reads. `merge-cleanup.ts` has

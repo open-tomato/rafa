@@ -114,9 +114,11 @@ import type { RunSession } from './session.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
-import type { PullRequestSummary } from '../pr/index.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { PullRequestSummary } from '@open-tomato/rafa-pr';
+
+import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -125,7 +127,6 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { parsePlan } from '../plan/index.js';
-import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { writeConventionLines } from './convention-body.js';
