@@ -104,11 +104,18 @@ export const EFFORT_NAMED: readonly string[] = [
   'src/utils/agent-definition.ts',
 ];
 
-/** The files named for `rafa-inventory`, the root files that reach the inventory package. */
+/**
+ * The files named for `rafa-inventory`, the root files that reach the
+ * inventory package. `src/start/serving.ts` reaches only inventory files
+ * (`src/tiers/` and `src/inventory/trees.ts`) and sits in `src/start/`,
+ * so it is named here under pass 1's rule that a file goes with the
+ * latest feature it reaches.
+ */
 export const INVENTORY_NAMED: readonly string[] = [
   'src/adapters/learning/held.ts',
   'src/adapters/learning/local.ts',
   'src/plan/risk/commands.ts',
   'src/plan/risk/long-runs.ts',
   'src/report/lessons.ts',
+  'src/start/serving.ts',
 ];

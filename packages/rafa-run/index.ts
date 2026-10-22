@@ -428,9 +428,6 @@ export {
   runFromSelectedRuntime,
 } from '../../src/start/runtime.js';
 
-export type { SessionServing } from '../../src/start/serving.js';
-export { resolveSessionTiers } from '../../src/start/serving.js';
-
 export { haltBeforeSession } from '../../src/start/session-guard.js';
 
 export {

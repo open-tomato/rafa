@@ -360,8 +360,8 @@
  */
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { SessionServing } from '@open-tomato/rafa-inventory';
 import type {
-  SessionServing,
   TaskHandout,
   TaskLearning,
   WrapUpLearning,

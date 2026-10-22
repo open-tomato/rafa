@@ -109,13 +109,13 @@
 import type { CheckoutExpectation } from './checkout-guard.js';
 import type { PassedOverTask } from './loop-events.js';
 import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
-import type { SessionServing } from './serving.js';
 import type { RunSession } from './session.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { SessionServing } from '@open-tomato/rafa-inventory';
 import type { PullRequestSummary } from '@open-tomato/rafa-pr';
 
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '@open-tomato/rafa-pr';

@@ -76,13 +76,13 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
+      'src/effort/report-skills-read.ts': 'backEdge',
       'src/effort/report-skills.ts': 'backEdge',
       'src/effort/skill-facts.ts': 'backEdge',
       'src/effort/skill-use.ts': 'loadCycle',
       'src/start/dispatch.ts': 'loadCycle',
       'src/start/handout.ts': 'loadCycle',
       'src/start/preflight.ts': 'loadCycle',
-      'src/start/serving.ts': 'loadCycle',
     },
     packageName: 'rafa-inventory',
   },
@@ -194,7 +194,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/pr/wait.ts': 'backEdge',
       'src/config-registry.ts': 'declarationGraph',
       'src/config/shape.ts': 'declarationGraph',
-      'src/effort/report-skills-read.ts': 'backEdge',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/relation-readings.ts': 'loadCycle',

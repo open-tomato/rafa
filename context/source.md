@@ -575,9 +575,10 @@ names come from, and the facade entry is no node.
     edges, so taking the package by name would load it inside that cycle.
     Effort has six: `src/agents/roster.ts`, `src/check/run.ts`,
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
-    `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has five:
-    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`,
-    `src/start/preflight.ts` and `src/start/serving.ts`. Board has twenty-five:
+    `src/schema/instinct.ts` and `src/tiers/serve.ts`. Inventory has four:
+    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`
+    and `src/start/preflight.ts`; `src/start/serving.ts` is an inventory file
+    by name, so it is no importer. Board has twenty-five:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
     `src/claims/labels.ts`, `src/commands/switch.ts`, `src/effort/epic-cost.ts`,
     `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
@@ -590,7 +591,7 @@ names come from, and the facade entry is no node.
     `src/triage/refs-section.ts` and `src/triage/triage.ts`.
     `src/effort/epic-cost.ts` is among them, though it is an effort file that
     imports board, because the load-cycle group comes first. Its edge to board
-    is the back edge the decouple step before pass 4 cuts with inventory's two.
+    is the back edge the decouple step before pass 4 cuts with inventory's three.
     Release has two: `src/board/project/facts.ts` and
     `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
     though it is a board file that imports release, because the load-cycle
@@ -624,10 +625,10 @@ names come from, and the facade entry is no node.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
-    Inventory has two, `src/effort/report-skills.ts` and
-    `src/effort/skill-facts.ts`, both effort files: effort comes before
-    inventory in the move order, so they import it backwards, and the decouple
-    step before pass 4 cuts them. Board has none in the codemod's grouping,
+    Inventory has three, `src/effort/report-skills-read.ts`,
+    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, all effort
+    files: effort comes before inventory in the move order, so they import it
+    backwards, and the decouple step before pass 4 cuts them. Board has none in the codemod's grouping,
     because its one effort importer, `src/effort/epic-cost.ts`, is taken first
     by the load-cycle group. Release has none in the codemod's grouping,
     because its one board importer, `src/board/project/facts.ts`, is taken
@@ -640,14 +641,13 @@ names come from, and the facade entry is no node.
     `src/effort/report-doc-bugs.ts`. Each sits earlier in the move order than
     pr, so each imports it backwards, and the decouple step before pass 4 cuts
     them.
-    Run has seventeen: seven board files (`src/board/issue-edit-state.ts`,
+    Run has fifteen: seven board files (`src/board/issue-edit-state.ts`,
     `src/board/spec-source.ts`, `src/commands/board/list.ts`, the three
     `src/commands/epic/` files `close-triage.ts`, `close.ts` and `new.ts`, and
     `src/commands/issue/ready.ts`), the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
-    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`),
-    one effort file (`src/effort/report-skills-read.ts`) and one inventory file
-    (`src/inventory/search/index.ts`). Each sits earlier in the move order than
+    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
+    `wait.ts`). Each sits earlier in the move order than
     run, so each imports it backwards, and the decouple step before pass 4 cuts
     them.
   - `declarationGraph`: the importer is reached from the `include` of a

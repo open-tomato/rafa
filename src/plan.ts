@@ -235,8 +235,8 @@ import {
   readEpicContext,
   readGateFlags,
 } from '@open-tomato/rafa-board';
-import { DEFAULT_ROUTING, renderSkillIndex } from '@open-tomato/rafa-inventory';
-import { branchNameFor, claimPlanIssue, resolveSessionTiers } from '@open-tomato/rafa-run';
+import { DEFAULT_ROUTING, renderSkillIndex, resolveSessionTiers } from '@open-tomato/rafa-inventory';
+import { branchNameFor, claimPlanIssue } from '@open-tomato/rafa-run';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
