@@ -175,13 +175,13 @@ its change reaches:
   any non-empty entry. The session never runs it.
 
 **Config keys for test selection and running:**
-- `checks.task`, `checks.stage` and `checks.loop` are the check points the
-  runner reads (`checksTask`, `checksStage`, `checksLoop`,
-  `packages/rafa/src/config-schema-checks.ts`). Each is a list of check names defaulting to
-  empty, and an empty list runs nothing and blocks nothing at that point.
-  `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
-  `checks.publish` take the same reader and default empty too, but no step
-  reads them yet.
+- `checks.task`, `checks.stage` and `checks.loop` are the check points
+  the runner reads (`checksTask`, `checksStage`, `checksLoop`,
+  `packages/rafa/src/config-schema-checks.ts`). Each is a list of check
+  names defaulting to empty, and an empty list runs nothing and blocks
+  nothing at that point. `checks.pullRequest`, `checks.stretch`,
+  `checks.releasePullRequest` and `checks.publish` take the same reader
+  and default empty too, but no step reads them yet.
 - `templates` (a list of template names, `src/config/templates.ts`) holds the
   one template, `escalation`. `templates: [escalation]` adopts it: the three
   glob keys below, and `checks.task: [affected]`, `checks.stage: [related,

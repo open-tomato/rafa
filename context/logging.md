@@ -4,14 +4,15 @@
 and `api` exchanges, each with its module, cause code and hint when known.
 It sits beside `Output`, and the two never share a job.
 
-The logger's files are core's. The port is in `packages/rafa/src/ports/`. The
-console adapter, the level rule (`settings.ts`), the active logger, the `api`
-filter, the colour rule and the contract are under
-`packages/rafa/src/adapters/logger/`, the events output is
-`packages/rafa/src/adapters/output/events.ts`, and the `logger` section is
-`packages/rafa/src/config-schema-logger.ts`. A file outside the package imports
-the logger by its subpath, `@open-tomato/rafa/adapters/logger/<file>`, and the
-port through `@open-tomato/rafa/ports` (`context/source.md`, "Core and its
+The logger's files are core's. The port is in
+`packages/rafa/src/ports/`. The console adapter, the level rule
+(`settings.ts`), the active logger, the `api` filter, the colour rule
+and the contract are under `packages/rafa/src/adapters/logger/`, the
+events output is `packages/rafa/src/adapters/output/events.ts`, and the
+`logger` section is `packages/rafa/src/config-schema-logger.ts`. A file
+outside the package imports the logger by its subpath,
+`@open-tomato/rafa/adapters/logger/<file>`, and the port through
+`@open-tomato/rafa/ports` (`context/source.md`, "Core and its
 barrels").
 
 ### What goes where
