@@ -35,14 +35,14 @@ interface RewiredRow {
  * `dist/config/*.d.ts`; its six load-cycle files left the row when the
  * first decouple item moved their only effort imports into core, as
  * `packages/rafa/src/schema/frontmatter.ts` and
- * `packages/rafa/src/utils/agent-definition.ts`. Inventory's one
+ * `packages/rafa/src/utils/agent-definition.ts`. Inventory's last
  * load-cycle file, `src/effort/skill-use.ts`, imports `bareSkillName` from
  * `src/tiers/skill-names.ts`; the import graph held the search's edge into
  * `src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
  * the codemod read a cycle through inventory when the rewire ran. The second
- * decouple item cut that edge, and on the graph its survey regenerated the
- * codemod lists the file to rewire; it keeps its path and its `loadCycle`
- * entry until a rewire takes it. The rewire stage of that item took the other seven files of
+ * decouple item cut that edge, and once its survey was regenerated the
+ * codemod took the file onto the facade too, so inventory's row is empty.
+ * The rewire stage of that item took the other seven files of
  * the row onto the facade: the three effort files of the skills report,
  * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
  * `src/inventory/browse.ts`.
@@ -80,9 +80,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-effort',
   },
   {
-    allowed: {
-      'src/effort/skill-use.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-inventory',
   },
   {

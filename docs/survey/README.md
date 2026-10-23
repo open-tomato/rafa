@@ -188,7 +188,7 @@ not drifted from the current repository.
   after them: 29 importers rewired at commit e26b0b0, with 70 files kept on their paths, 33 of them library chunks, and
   run's after them: 36 importers rewired at commit a0db37c, with 40 files kept on their paths, 6 of them library chunks.
   Since the second decouple item (rafa-1317) the pile reads inventory first and effort second: inventory's rewire took
-  its seven importers at commit 8e97fc5, keeping `src/effort/skill-use.ts` on its path, effort's three skills-report
+  its seven importers at commit 8e97fc5, and `src/effort/skill-use.ts` after the graph's regeneration read no cycle through it, effort's three skills-report
   importers took the inventory facade at the same commit, and board's three freed importers were rewired there too. The
   decouple column of each row, which the item's documentation task (rafa-1311) wrote, reads the rewire at commit
   da2acc3, where board's, release's, pr's and run's 21, 8, 33 and 6 library chunks were rewired onto their facades once

@@ -623,14 +623,11 @@ names come from, and the facade entry is no node.
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
     `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
     for the frontmatter and agent-definition files, which the first decouple
-    item moved into core. Inventory keeps one after this item,
-    `src/effort/skill-use.ts`, which the graph reached from inventory's search
-    through `src/effort/collect.ts` until the second decouple item cut that
-    edge. The rewire at commit 8e97fc5 read the graph before that cut's
-    regeneration and kept the file on `../tiers/skill-names.js`, as the guard's
-    `loadCycle` row says; the graph regenerated at commit 41eb051 lists it to
-    rewire and reads no load cycle, and no task of this item ran that rewire, so
-    it stays on its path until pass 4 rewires it;
+    item moved into core. Inventory has none either: its last,
+    `src/effort/skill-use.ts`, was reached from inventory's search through
+    `src/effort/collect.ts` until the second decouple item cut that edge, and
+    it took the facade once the graph was regenerated without the cycle, so
+    the guard's inventory row is empty;
     `src/start/serving.ts` is an inventory file by name, so it is no
     importer. Board has twenty-one:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
