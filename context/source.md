@@ -863,9 +863,14 @@ names come from, and the facade entry is no node.
   root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
   `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
   several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
-  every run prints `Multiple projects found` to stderr. A facade holds no
-  `tsconfig.json`, so the graph check asks it no `check-types` script and
-  the references build skips it, as it skips the config packages.
+  every run prints `Multiple projects found` to stderr. A facade over `src/`
+  holds no `tsconfig.json`, so the graph check asks it no `check-types`
+  script and the references build skips it, as it skips the config
+  packages. `packages/rafa-inventory`, which holds its own files, has a
+  composite `tsconfig.json` referencing `../rafa`, a `check-types` script
+  and an entry in the solution file, and its `bunfig.toml` preloads
+  `test-preload.ts`, which registers core's section alone, so `bun test`
+  run from its folder reads core's settings.
 - **The composite recipe builds the three code packages' declarations.** The
   `tsconfig.json` of `packages/rafa`, `packages/rafa-hub` and
   `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
@@ -922,7 +927,7 @@ names come from, and the facade entry is no node.
   root's. Each member but the eslint-config package declares
   `@open-tomato/rafa-eslint-config` (`workspace:*`) and `eslint` in its
   `devDependencies`, the last at the root's range, so one install serves its
-  scripts; the three with a `check-types` script and the typescript-config
+  scripts; the members with a `check-types` script and the typescript-config
   package also declare `typescript` at the root's range, and the two services
   also declare `@open-tomato/rafa-core` (`workspace:*`). The graph check's
   fourth refusal holds the `@open-tomato/*` imports to those declarations and
