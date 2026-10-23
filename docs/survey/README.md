@@ -91,8 +91,8 @@ their scripts were added; `import-graph.{json,md}` was written again since, at t
 `test-index.json` at commit 41eb051, the regeneration after the second decouple item's rewires, while `concepts` and
 `provenance` were last changed at commit 04d0162. The map `cut-table.{json,md}`, which is not one of the four, was
 written again at the commits its entry names. The regeneration after run's rewire, at commit 66b66a0, wrote
-`import-graph.{json,md}` and `cut-table.{json,md}` again and left `test-index.{json,md}` unchanged; the loads task of
-#808's first decouple item (rafa-1311) wrote all six again, and so did the survey task after that item's core moves, and
+`import-graph.{json,md}` and `cut-table.{json,md}` again and left `test-index.{json,md}` unchanged; the loads task of the
+first decouple item of #808 (rafa-1311) wrote all six again, and so did the survey task after that item's core moves, and
 the survey task of rafa-1317 wrote `import-graph`, `cut-table` and `test-index.json` again at commit 41eb051, leaving
 `test-index.md` unchanged. Run the maps again with `scripts/survey/maps.test.ts` (added at 9a015be) to verify they have
 not drifted from the current repository.
