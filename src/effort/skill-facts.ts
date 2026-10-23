@@ -96,13 +96,13 @@ import type { SkillInvocation } from '@open-tomato/rafa/store/skill-invocations'
 
 import { existsSync } from 'node:fs';
 
+import { bareSkillName } from '@open-tomato/rafa-inventory';
+
 import { ACROSS_STORES_ORDER } from '@open-tomato/rafa/store/origins';
 import { readPlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { readReportedSkills } from '@open-tomato/rafa/store/reports';
 import { readSkillInvocations, UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { bareSkillName } from '../tiers/skill-names.js';
 
 /** One skill a session invoked, and how often, both sides summed. */
 export interface SkillCount {

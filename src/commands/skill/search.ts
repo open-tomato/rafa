@@ -85,6 +85,7 @@ import type {
   SearchOutcome,
 } from '@open-tomato/rafa-inventory';
 
+import { collectSessionRow } from '@open-tomato/rafa-effort';
 import { droppedLine, rankSearch, runSearch } from '@open-tomato/rafa-inventory';
 
 import { expectOneArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -275,6 +276,7 @@ async function runSearchCommand(context: RafaContext, seams: SearchSeams, kind: 
           records: inventory.records,
           settingSources,
           store,
+          collectRow: collectSessionRow,
           home: project.home,
           ...(seams.spawn === undefined
             ? {}

@@ -6993,7 +6993,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -7137,7 +7136,7 @@
         "src/tiers/resolve.test.ts",
         "src/tiers/routing.test.ts"
       ],
-      "testsFromOtherFolders": 282
+      "testsFromOtherFolders": 281
     },
     "packages/rafa/src/config-schema-logger.ts": {
       "folder": "packages/rafa",
@@ -7941,7 +7940,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -8033,7 +8031,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 251
+      "testsFromOtherFolders": 250
     },
     "packages/rafa/src/core/adapters/registry.ts": {
       "folder": "packages/rafa",
@@ -8407,7 +8405,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -8499,7 +8496,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 251
+      "testsFromOtherFolders": 250
     },
     "packages/rafa/src/core/command/command.ts": {
       "folder": "packages/rafa",
@@ -33147,7 +33144,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -33284,7 +33280,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 361
+      "testsFromOtherFolders": 360
     },
     "packages/rafa/src/core/config/merge-method.ts": {
       "folder": "packages/rafa",
@@ -52532,7 +52528,6 @@
         "src/fixtures/fixture-guard.sweep.test.ts",
         "src/fixtures/scrub.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
         "src/loop/wait-reasons.test.ts",
@@ -52793,7 +52788,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 573
+      "testsFromOtherFolders": 572
     },
     "packages/rafa/src/core/output/stream.ts": {
       "folder": "packages/rafa",
@@ -56323,7 +56318,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
@@ -56628,7 +56622,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 642
+      "testsFromOtherFolders": 641
     },
     "packages/rafa/src/core/plan/blocks.ts": {
       "folder": "packages/rafa",
@@ -59183,7 +59177,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
@@ -59488,7 +59481,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 642
+      "testsFromOtherFolders": 641
     },
     "packages/rafa/src/core/plan/parse.ts": {
       "folder": "packages/rafa",
@@ -59847,7 +59840,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
@@ -60152,7 +60144,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 642
+      "testsFromOtherFolders": 641
     },
     "packages/rafa/src/core/plan/plan-files.ts": {
       "folder": "packages/rafa",
@@ -60511,7 +60503,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
@@ -60816,7 +60807,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 642
+      "testsFromOtherFolders": 641
     },
     "packages/rafa/src/core/plan/plan-stamp.ts": {
       "folder": "packages/rafa",
@@ -62258,7 +62249,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/loop/blocked-tasks.test.ts",
         "src/loop/events-file.test.ts",
@@ -62563,7 +62553,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 642
+      "testsFromOtherFolders": 641
     },
     "packages/rafa/src/core/runtime/identity.ts": {
       "folder": "packages/rafa",
@@ -71714,7 +71704,6 @@
         "src/fixtures/fixture-guard.sweep.test.ts",
         "src/fixtures/scrub.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
         "src/next/hint.test.ts",
@@ -71877,7 +71866,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 326
+      "testsFromOtherFolders": 325
     },
     "packages/rafa/src/effort/store/fix-schema.ts": {
       "folder": "packages/rafa",
@@ -73311,7 +73300,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -73403,7 +73391,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 251
+      "testsFromOtherFolders": 250
     },
     "packages/rafa/src/effort/store/legacy.ts": {
       "folder": "packages/rafa",
@@ -90891,7 +90879,6 @@
         "src/effort/skill-signals.test.ts",
         "src/effort/skill-use.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -90918,7 +90905,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 85
+      "testsFromOtherFolders": 84
     },
     "packages/rafa/src/effort/store/sqlite.ts": {
       "folder": "packages/rafa",
@@ -97196,7 +97183,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/loop/events-file.test.ts",
         "src/loop/wait-reasons.test.ts",
         "src/modules/activate-integration.test.ts",
@@ -97428,7 +97414,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 562
+      "testsFromOtherFolders": 561
     },
     "packages/rafa/src/effort/store/types.ts": {
       "folder": "packages/rafa",
@@ -98856,7 +98842,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -98948,7 +98933,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 251
+      "testsFromOtherFolders": 250
     },
     "packages/rafa/src/errors/codes.ts": {
       "folder": "packages/rafa",
@@ -99358,7 +99343,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ceiling.test.ts",
@@ -99603,7 +99587,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 557
+      "testsFromOtherFolders": 556
     },
     "packages/rafa/src/errors/rafa-codes.ts": {
       "folder": "packages/rafa",
@@ -100011,7 +99995,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ceiling.test.ts",
@@ -100251,7 +100234,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 551
+      "testsFromOtherFolders": 550
     },
     "packages/rafa/src/errors/rafa-error.ts": {
       "folder": "packages/rafa",
@@ -100644,7 +100627,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ceiling.test.ts",
@@ -100854,7 +100836,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 501
+      "testsFromOtherFolders": 500
     },
     "packages/rafa/src/modules/activate.ts": {
       "folder": "packages/rafa",
@@ -101203,7 +101185,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -101280,7 +101261,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 158
+      "testsFromOtherFolders": 157
     },
     "packages/rafa/src/modules/load.ts": {
       "folder": "packages/rafa",
@@ -101629,7 +101610,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -101706,7 +101686,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 158
+      "testsFromOtherFolders": 157
     },
     "packages/rafa/src/modules/manifest.ts": {
       "folder": "packages/rafa",
@@ -102056,7 +102036,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -102133,7 +102112,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/resolve.integration.test.ts"
       ],
-      "testsFromOtherFolders": 158
+      "testsFromOtherFolders": 157
     },
     "packages/rafa/src/next/hop-record.ts": {
       "folder": "packages/rafa",
@@ -108677,7 +108656,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ceiling.test.ts",
@@ -108887,7 +108865,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 500
+      "testsFromOtherFolders": 499
     },
     "packages/rafa/src/project/worktree-root.ts": {
       "folder": "packages/rafa",
@@ -109277,7 +109255,6 @@
         "src/index.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/modules/activate-integration.test.ts",
         "src/next/actions.test.ts",
         "src/next/ceiling.test.ts",
@@ -109487,7 +109464,7 @@
         "src/triage/test-failure-triage.test.ts",
         "src/triage/triage.test.ts"
       ],
-      "testsFromOtherFolders": 500
+      "testsFromOtherFolders": 499
     },
     "packages/rafa/src/release/fragment.ts": {
       "folder": "packages/rafa",
@@ -165046,7 +165023,6 @@
         "src/effort/sync/file.test.ts",
         "src/effort/sync/select.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
         "src/next/relations-mode.test.ts",
@@ -165183,7 +165159,7 @@
         "src/tiers/resolve.test.ts",
         "src/tiers/routing.test.ts"
       ],
-      "testsFromOtherFolders": 241
+      "testsFromOtherFolders": 240
     },
     "src/config-schema-issues.ts": {
       "folder": "src",
@@ -170239,7 +170215,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -170263,7 +170238,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 65
+      "testsFromOtherFolders": 64
     },
     "src/effort/classify.ts": {
       "folder": "src/effort",
@@ -170330,7 +170305,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/search/prompt.test.ts",
         "src/next/ending.test.ts",
         "src/pr/conflict-sentence.sweep.test.ts",
@@ -170362,7 +170336,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 73
+      "testsFromOtherFolders": 72
     },
     "src/effort/collect-args.ts": {
       "folder": "src/effort",
@@ -170416,7 +170390,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -170439,7 +170412,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 53
+      "testsFromOtherFolders": 52
     },
     "src/effort/collect-skills.ts": {
       "folder": "src/effort",
@@ -170493,7 +170466,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -170516,7 +170488,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 53
+      "testsFromOtherFolders": 52
     },
     "src/effort/collect.ts": {
       "folder": "src/effort",
@@ -170570,7 +170542,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -170593,7 +170564,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 53
+      "testsFromOtherFolders": 52
     },
     "src/effort/commits.ts": {
       "folder": "src/effort",
@@ -170648,7 +170619,6 @@
         "src/effort/report-trend.test.ts",
         "src/effort/report.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -170672,7 +170642,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 54
+      "testsFromOtherFolders": 53
     },
     "src/effort/dashboard-format.ts": {
       "folder": "src/effort",
@@ -171919,7 +171889,6 @@
         "src/effort/report.test.ts",
         "src/effort/skill-use.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/ending.test.ts",
         "src/refs/reading.test.ts",
         "src/refs/verify.test.ts",
@@ -171944,7 +171913,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 64
+      "testsFromOtherFolders": 63
     },
     "src/effort/store/index.ts": {
       "folder": "src/effort/store",
@@ -172010,7 +171979,6 @@
         "src/effort/report.test.ts",
         "src/effort/sync/contact.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
         "src/next/relations-mode.test.ts",
@@ -172037,7 +172005,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 76
+      "testsFromOtherFolders": 75
     },
     "src/effort/sync/doctor-reading.ts": {
       "folder": "src/effort/sync",
@@ -172245,7 +172213,6 @@
         "src/effort/sync/file.test.ts",
         "src/effort/sync/select.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
         "src/next/relations-mode.test.ts",
@@ -172313,7 +172280,7 @@
         "src/tests/user-facing-spelling.sweep.test.ts",
         "src/tests/worktree-shared-store-integration.test.ts"
       ],
-      "testsFromOtherFolders": 128
+      "testsFromOtherFolders": 127
     },
     "src/effort/trend-stats.ts": {
       "folder": "src/effort",
@@ -207860,7 +207827,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -207945,7 +207911,7 @@
         "src/tiers/serve.test.ts",
         "src/tiers/skill-names.test.ts"
       ],
-      "testsFromOtherFolders": 157
+      "testsFromOtherFolders": 156
     },
     "src/tiers/resolve.ts": {
       "folder": "src/tiers",
@@ -208282,7 +208248,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -208394,7 +208359,7 @@
         "src/tiers/serve.test.ts",
         "src/tiers/skill-names.test.ts"
       ],
-      "testsFromOtherFolders": 209
+      "testsFromOtherFolders": 208
     },
     "src/tiers/routing-table.ts": {
       "folder": "src/tiers",
@@ -208856,7 +208821,6 @@
         "src/inventory/disabled.test.ts",
         "src/inventory/index.test.ts",
         "src/inventory/plugins.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/inventory/trees.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
@@ -208940,7 +208904,7 @@
         "src/tiers/serve.test.ts",
         "src/tiers/skill-names.test.ts"
       ],
-      "testsFromOtherFolders": 157
+      "testsFromOtherFolders": 156
     },
     "src/tiers/skill-names.ts": {
       "folder": "src/tiers",
@@ -209008,7 +208972,6 @@
         "src/effort/skill-signals.test.ts",
         "src/effort/skill-use.test.ts",
         "src/index.test.ts",
-        "src/inventory/search/index.test.ts",
         "src/next/actions.test.ts",
         "src/next/ending.test.ts",
         "src/pr/conflict-sentence.sweep.test.ts",
@@ -209074,7 +209037,7 @@
         "src/tests/worktree-shared-store-integration.test.ts",
         "src/tiers/skill-names.test.ts"
       ],
-      "testsFromOtherFolders": 123
+      "testsFromOtherFolders": 122
     },
     "src/tools/ts-symbols/cli.ts": {
       "folder": "src/tools/ts-symbols",
@@ -227440,18 +227403,14 @@
       "folder": "src/inventory/search",
       "folders": [
         "packages/rafa",
-        "src",
         "src/check",
-        "src/effort",
-        "src/effort/sync",
         "src/inventory",
         "src/inventory/search",
         "src/learning",
-        "src/schema",
-        "src/tiers"
+        "src/schema"
       ],
-      "index": 10,
-      "sourceFiles": 140,
+      "index": 6,
+      "sourceFiles": 103,
       "spawns": false,
       "spawnsVia": [],
       "support": [],

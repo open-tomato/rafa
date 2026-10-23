@@ -36,12 +36,17 @@
  * body, and never halts the run: a board or a git that cannot be read is
  * a notice, and anything else the check throws is one warning.
  */
-import type { BoardListing } from '../board/roadmap-board.js';
 import type { DriftBranches } from '../claims/drift.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { BoardListing } from '@open-tomato/rafa-board';
 
 import { readdirSync } from 'node:fs';
 
+import {
+  createCachedBoardListing,
+  createGhRunner,
+  scanClaimBranches,
+} from '@open-tomato/rafa-board';
 import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -49,9 +54,6 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { errorCode, isSessionId, runsDir } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createCachedBoardListing } from '../board/board-cache.js';
-import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */

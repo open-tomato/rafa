@@ -111,7 +111,7 @@ import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { Inventory, InventoryRecord } from '@open-tomato/rafa-inventory';
 
-import { browse, buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
+import { buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -121,6 +121,7 @@ import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
 import { processTerminal, refuseWithoutTerminal } from '../../cli/prompt/terminal.js';
+import { browse } from '../../inventory/browse.js';
 
 /** What neither the context nor the registry carries. */
 export interface SkillListSeams {

@@ -9,8 +9,9 @@ one from `store` in the project's config, `sqlite` by default.
 (`src/inventory/search/index.ts`) stores the `search` row of its own
 session: Claude Code files that session's log under the scratch copy it
 ran in, never under the project's log directories `effort collect` walks.
-The runner reads the log with `collectSessionRow` and appends it under
-`sessions` with `kind` set to `search`.
+The runner reads the log with the collector its caller passes as
+`collectRow` (`rafa skill search` passes `collectSessionRow`) and appends
+it under `sessions` with `kind` set to `search`.
 
 **`effort collect` reads the main checkout's project folder and every
 worktree project folder of the project** (`packages/rafa/src/effort/session-log-dirs.ts`).

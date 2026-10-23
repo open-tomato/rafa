@@ -479,12 +479,17 @@ as the Packages section below lists.
 
 **The named lists are in `scripts/survey/cut-names.ts`.** `BOARD_NAMED`,
 `PR_NAMED`, `RUN_NAMED`, `RELEASE_NAMED`, `EFFORT_NAMED` and `INVENTORY_NAMED`
-hold the root files that reach each feature package, each sorted by UTF-16
-code unit. A file a list names is placed in that package whatever its folder,
-and keeps its path: no named file moves. `CUT_RULES` reads them and adds a
-package's own file beside its list where one belongs (`src/pr/index.ts` to
-`PR_NAMED`, `src/start/branch-decision.ts` to `RUN_NAMED`). The CLI's three
-named files sit in its rule. The first decouple item (#808) took `naming.ts` off `BOARD_NAMED` and
+hold the root files that reach each feature package, each sorted by UTF-16 code
+unit. A file a list names is placed in that package whatever its folder, and
+keeps its path: no named file moves. `CUT_RULES` reads them and adds a package's
+own file beside its list where one belongs (`src/pr/index.ts` to `PR_NAMED`,
+`src/start/branch-decision.ts` to `RUN_NAMED`). The CLI's named files are four,
+`CLI_NAMED`: the roster, the bin entry and the agent schema, which were the CLI
+rule's three inline names, and `src/inventory/browse.ts`, the view behind
+`rafa skill list -i`, which sits under `src/inventory/` but is a CLI file by
+name: the CLI's prompt files it uses, `src/cli/prompt/page.ts`, `select.ts` and
+`terminal.ts`, are CLI-internal, so it counts no edge out of inventory and does
+not move. The first decouple item (#808) took `naming.ts` off `BOARD_NAMED` and
 `agent-definition.ts` off `EFFORT_NAMED` as they moved into core, now
 `packages/rafa/src/board/naming.ts` and
 `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
@@ -502,16 +507,23 @@ upward target `left to place` or `by rule`.
 
 **The coupling reading takes the same table.** `scripts/survey/coupling.ts`
 counts the value imports between the six feature packages of its `MOVE_ORDER`,
-the order they move in: `rafa-effort`, `rafa-inventory`, `rafa-board`,
+the order they move in: `rafa-inventory`, `rafa-effort`, `rafa-board`,
 `rafa-release`, `rafa-pr` and `rafa-run`, which is not the cut table's rank
-order. A back edge runs from a package earlier in that order into a later one,
-since moved first the earlier package would import a file not yet moved. Run as
+order (inventory first by the decision of 23 October 2026). A back edge
+runs from a package earlier in that order into a later one, since moved
+first the earlier package would import a file not yet moved. An importer
+pair is a file that is no test and imports a package of the order it is not
+placed in, by a value or a type edge, counted once per package; a pair is
+kept when the file imports that package by a relative path. Run as
 `bun scripts/survey/coupling.ts --max=<percent>` from the root, it prints the
 back edges by package pair and one line, `back <n> of <total> value imports
-between feature packages, <percent>%`, and exits 1 when the percent is above
-`--max`. It reads the import graph and the cut table and writes nothing; an
-edge with an end in core, in the CLI or in a package outside the order is not
-counted.
+between feature packages, <percent>%`, then a second, `kept <k> of <n>
+importers on relative paths, <percent>%`, and exits 1 when either percent is
+above `--max`, so `--max` applies to both lines. The kept line reads over 20%
+until pass 4 rewires the kept files. It reads the import graph, the cut table
+and the tracked files of the kept pairs, and writes nothing; an edge with an
+end in core, in the CLI or in a package outside the order is not counted on
+the first line.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
@@ -611,20 +623,25 @@ names come from, and the facade entry is no node.
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
     `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
     for the frontmatter and agent-definition files, which the first decouple
-    item moved into core. Inventory has four:
-    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`
-    and `src/start/preflight.ts`; `src/start/serving.ts` is an inventory file
-    by name, so it is no importer. Board has twenty-four:
+    item moved into core. Inventory has none either: its last,
+    `src/effort/skill-use.ts`, was reached from inventory's search through
+    `src/effort/collect.ts` until the second decouple item cut that edge, and
+    it took the facade once the graph was regenerated without the cycle, so
+    the guard's inventory row is empty;
+    `src/start/serving.ts` is an inventory file by name, so it is no
+    importer. Board has twenty-one:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
     `src/claims/labels.ts`, `src/commands/switch.ts`,
     `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
     `src/next/owner-gate.ts`, `src/next/readings.ts`,
     `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
-    `src/plan/store-rules.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
-    `src/pr/owner-approval.ts`, `src/start/preflight-claim.ts`,
-    `src/start/preflight-drift.ts`, `src/start/stale-docs.ts`,
-    `src/start/triage.ts`, `src/triage/bug-filing.ts`,
-    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/pr/gh-close.ts`, `src/pr/gh.ts`, `src/pr/owner-approval.ts`,
+    `src/start/stale-docs.ts`, `src/start/triage.ts`,
+    `src/triage/bug-filing.ts`, `src/triage/refs-section.ts` and
+    `src/triage/triage.ts`. The second decouple item took the importers it
+    freed onto the facades: inventory's `src/start/dispatch.ts`, `handout.ts`
+    and `preflight.ts`, and board's `src/plan/store-rules.ts`,
+    `src/start/preflight-claim.ts` and `preflight-drift.ts`.
     `src/effort/epic-cost.ts`, an effort file, sat among them until the first
     decouple item moved `packages/rafa/src/board/naming.ts`, its one board
     import, into core.
@@ -661,10 +678,11 @@ names come from, and the facade entry is no node.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
-    Inventory has three, `src/effort/report-skills-read.ts`,
-    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, all effort
-    files: effort comes before inventory in the move order, so they import it
-    backwards, and the decouple step before pass 4 cuts them. Board has none:
+    Inventory has none since the 23 October 2026 swap put it first: its
+    three effort importers, `src/effort/report-skills-read.ts`,
+    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, import it
+    forward and take it by name since the second decouple item's rewire.
+    Board has none:
     no effort file imports it. Release has none in the codemod's grouping,
     because its one board importer, `src/board/project/facts.ts`, is taken
     first by the load-cycle group.
@@ -699,7 +717,7 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's two, inventory's seven, board's 26, release's four,
+  files, effort's two, inventory's one, board's 23, release's four,
   pr's 36 and run's 32, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
@@ -721,7 +739,10 @@ names come from, and the facade entry is no node.
   `src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
   refused by the codemod and is pointed at its origin file by hand before the
   run: pass 3a did that three times, inventory's rewire six, and board's eight;
-  release's rewire refused no statement. Pr's rewire refused 21 bindings on 20
+  release's rewire refused no statement. The second decouple item's rewires
+  pointed four refused bindings on three statements by hand before the run:
+  two statements through `src/learning/index.ts` and one through
+  `src/board/roadmap.ts`. Pr's rewire refused 21 bindings on 20
   statements that took `PullRequests`, `resolvePrProvider`,
   `ResolvePrProviderOptions`, `PrProviderReading`, `ghPreflightItems`,
   `ghHostOf` and `ChecksVerdict` from their defining files while the facade

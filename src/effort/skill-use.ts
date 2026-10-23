@@ -78,10 +78,10 @@ import type { SkillUse, SkillUseReading } from '@open-tomato/rafa/store/skill-in
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { bareSkillName } from '@open-tomato/rafa-inventory';
+
 import { readLines, sessionIdFromPath } from '@open-tomato/rafa/effort/session-log';
 import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
-
-import { bareSkillName } from '../tiers/skill-names.js';
 
 /** The Claude Code version whose log format this collector was written against. */
 export const SKILL_USE_CLI_VERSION = '2.1.280';

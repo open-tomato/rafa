@@ -341,10 +341,10 @@ import type {
   PrerequisiteSettings,
 } from '../preflight/prerequisites-md.js';
 import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
-import type { TierSettings } from '../tiers/resolve.js';
 import type { PrerequisiteItem, RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { PreflightWriterSeams } from '@open-tomato/rafa/store/preflight';
+import type { TierSettings } from '@open-tomato/rafa-inventory';
 import type { ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
 
 import { randomUUID } from 'crypto';
@@ -352,6 +352,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
+import {
+  collidingPlanSkills,
+  missingAgentLine,
+  missingPlanAgents,
+  resolveAgentRoster,
+  skillCollisionLine,
+  unresolvedPlanSkills,
+  unresolvedSkillLine,
+} from '@open-tomato/rafa-inventory';
 import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -365,15 +374,6 @@ import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '@open
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
 import { listOpenTasks } from '@open-tomato/rafa/utils/tracker';
 
-import {
-  collidingPlanSkills,
-  missingAgentLine,
-  missingPlanAgents,
-  resolveAgentRoster,
-  skillCollisionLine,
-  unresolvedPlanSkills,
-  unresolvedSkillLine,
-} from '../agents/roster.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import {

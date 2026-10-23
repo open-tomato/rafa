@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
   BOARD_NAMED,
+  CLI_NAMED,
   EFFORT_NAMED,
   INVENTORY_NAMED,
   PR_NAMED,
@@ -116,7 +117,7 @@ describe('CUT_RULES', () => {
   });
 });
 
-/** Each feature package's list of `cut-names.ts`, its length, and the file its rule names beside the list. */
+/** Each feature package's list of `cut-names.ts` and the CLI's, its length, and the file its rule names beside the list. */
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
   ['rafa-inventory', INVENTORY_NAMED, 6, []],
   ['rafa-board', BOARD_NAMED, 22, []],
@@ -124,6 +125,7 @@ const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], le
   ['rafa-run', RUN_NAMED, 25, ['src/start/branch-decision.ts']],
   ['rafa-release', RELEASE_NAMED, 5, []],
   ['rafa-effort', EFFORT_NAMED, 1, []],
+  ['@open-tomato/rafa', CLI_NAMED, 4, []],
 ];
 
 /**
@@ -143,8 +145,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 76 files across the six lists, 59 of the plan\'s 60, fourteen of cluster c6, the two learning adapter files and the session serving file', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(76);
+  it('names 80 files across the seven lists, 59 of the plan\'s 60, fourteen of cluster c6, the two learning adapter files, the session serving file and the CLI\'s four', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(80);
   });
 });
 

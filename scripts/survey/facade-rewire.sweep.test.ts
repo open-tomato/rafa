@@ -35,13 +35,22 @@ interface RewiredRow {
  * `dist/config/*.d.ts`; its six load-cycle files left the row when the
  * first decouple item moved their only effort imports into core, as
  * `packages/rafa/src/schema/frontmatter.ts` and
- * `packages/rafa/src/utils/agent-definition.ts`. Inventory's four
- * load-cycle files would put the facade on a cycle through inventory if
- * they imported it by name, and its three back-edge files
- * are effort files, and effort comes before inventory in the move order.
- * Board's 24 load-cycle files are mostly run and pr files that board's files
+ * `packages/rafa/src/utils/agent-definition.ts`. Inventory's last
+ * load-cycle file, `src/effort/skill-use.ts`, imports `bareSkillName` from
+ * `src/tiers/skill-names.ts`; the import graph held the search's edge into
+ * `src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
+ * the codemod read a cycle through inventory when the rewire ran. The second
+ * decouple item cut that edge, and once its survey was regenerated the
+ * codemod took the file onto the facade too, so inventory's row is empty.
+ * The rewire stage of that item took the other seven files of
+ * the row onto the facade: the three effort files of the skills report,
+ * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
+ * `src/inventory/browse.ts`.
+ * Board's 21 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`; its two
- * declaration-graph files are effort's two.
+ * declaration-graph files are effort's two. The same stage took
+ * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
+ * `preflight-drift.ts` onto the facade.
  * Release's one board importer, `src/board/project/facts.ts`, is a back edge
  * the load-cycle group takes first, and its two declaration-graph files are
  * effort's two.
@@ -71,15 +80,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-effort',
   },
   {
-    allowed: {
-      'src/effort/report-skills-read.ts': 'backEdge',
-      'src/effort/report-skills.ts': 'backEdge',
-      'src/effort/skill-facts.ts': 'backEdge',
-      'src/effort/skill-use.ts': 'loadCycle',
-      'src/start/dispatch.ts': 'loadCycle',
-      'src/start/handout.ts': 'loadCycle',
-      'src/start/preflight.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-inventory',
   },
   {
@@ -99,12 +100,9 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/relations-mode.ts': 'loadCycle',
       'src/next/sources.ts': 'loadCycle',
       'src/next/state.ts': 'loadCycle',
-      'src/plan/store-rules.ts': 'loadCycle',
       'src/pr/gh-close.ts': 'loadCycle',
       'src/pr/gh.ts': 'loadCycle',
       'src/pr/owner-approval.ts': 'loadCycle',
-      'src/start/preflight-claim.ts': 'loadCycle',
-      'src/start/preflight-drift.ts': 'loadCycle',
       'src/start/stale-docs.ts': 'loadCycle',
       'src/start/triage.ts': 'loadCycle',
       'src/triage/bug-filing.ts': 'loadCycle',

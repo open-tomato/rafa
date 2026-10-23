@@ -565,7 +565,9 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * splitting build no longer writes once pr's 33 take `@open-tomato/rafa-pr`,
  * the effort store's copy, wire, merge and migrate files, which now sit in
  * the chunk they imported from, beside the store's sqlite backend and
- * core's command, git and loop helpers.
+ * core's command, git and loop helpers. It has one `index-<hash>.js` more
+ * since the inventory and board importers took their facades: a shared
+ * chunk the splitting build now writes for the facade statements.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1289,7 +1291,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(164);
+    expect(before).toHaveLength(165);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

@@ -66,9 +66,10 @@
  */
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
 
+import { findPinnedMigrations } from '@open-tomato/rafa-board';
+
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 
-import { findPinnedMigrations } from '../board/readiness.js';
 import { parsePrerequisites } from '../preflight/prerequisites-md.js';
 
 /** Which of the three rules a problem breaks. */

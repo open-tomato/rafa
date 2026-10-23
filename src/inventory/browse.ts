@@ -67,14 +67,14 @@
  * standard input is never read. `ctrl-c` in any view is the view's
  * `CommandExit` with exit code 130, passed on as it is.
  */
-import type { InventoryRecord } from './record.js';
 import type { Key, NoTerminalOptions, Terminal } from '../cli/prompt/terminal.js';
+import type { InventoryRecord } from '@open-tomato/rafa-inventory';
+
+import { readShowView, renderShowView } from '@open-tomato/rafa-inventory';
 
 import { page } from '../cli/prompt/page.js';
 import { select } from '../cli/prompt/select.js';
 import { processTerminal, refuseWithoutTerminal, stdinKeys } from '../cli/prompt/terminal.js';
-
-import { readShowView, renderShowView } from './show.js';
 
 /** The key that quits from any view (in the list, only with an empty filter). */
 export const QUIT_CHAR = 'q';

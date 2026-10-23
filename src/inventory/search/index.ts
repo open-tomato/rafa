@@ -62,8 +62,9 @@
  * under the directory it ran in, the scratch copy. So the runner stores
  * the row itself, once the session has exited, from
  * `<home>/.claude/projects/<encoded scratch path>/<session id>.jsonl`,
- * read by the collector's own `collectSessionRow` and appended to the
- * store the caller passes under `sessions`.
+ * read by the collector the caller passes as `collectRow` (`rafa skill
+ * search` passes effort's `collectSessionRow`) and appended to the store
+ * the caller passes under `sessions`.
  *
  * The scratch path is encoded as its REAL path. Measured on macOS
  * 2026-09-24: under `~/.claude/projects` every session run in `/tmp`
@@ -89,13 +90,12 @@ import type { ScratchCopy } from './scratch.js';
 import type { InventoryKind, InventoryRecord } from '../record.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
 import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-
-import { collectSessionRow } from '@open-tomato/rafa-effort';
 
 import { claudeArgs, SESSION_ID_FLAG, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
@@ -165,6 +165,15 @@ export interface SearchFallback extends SessionOutcome {
 /** What {@link runSearch} answers; see the module note. */
 export type SearchOutcome = SearchNoCandidates | SearchAnswered | SearchUnanswerable | SearchFallback;
 
+/**
+ * Reads one session log into its effort row, as effort's
+ * `collectSessionRow` does; see the module note.
+ */
+export type SearchRowCollector = (
+  candidate: SessionLogCandidate,
+  planStubs: readonly string[],
+) => Promise<SessionEffortRow>;
+
 /** What one search is run with. */
 export interface SearchOptions {
   /** Whether skills or agents are searched. */
@@ -177,6 +186,8 @@ export interface SearchOptions {
   readonly settingSources: readonly ClaudeSettingSource[];
   /** The store the `search` row is appended to. */
   readonly store: EffortStore;
+  /** Reads the session's log into its row. No default; see the module note. */
+  readonly collectRow: SearchRowCollector;
   /** The home Claude Code files session logs under. No default. */
   readonly home: string;
   /** The session spawner. Defaults to the real capturing door. */
@@ -239,6 +250,7 @@ function messageOf(error: unknown): string {
  */
 async function writeSearchEffort(
   store: EffortStore,
+  collectRow: SearchRowCollector,
   logPath: string,
   sessionId: string,
 ): Promise<SearchEffortWrite> {
@@ -248,7 +260,7 @@ async function writeSearchEffort(
   try {
     const stats = statSync(logPath);
     const candidate = { path: logPath, sessionId, sizeBytes: stats.size, modifiedAtMs: stats.mtimeMs };
-    const collected = await collectSessionRow(candidate, []);
+    const collected = await collectRow(candidate, []);
     const row: SessionEffortRow = { ...collected, kind: 'search' };
     const result = store.append('sessions', [row]);
     if (result.appended === 0) {
@@ -326,6 +338,6 @@ export async function runSearch(options: SearchOptions): Promise<SearchOutcome> 
     };
   }, options.scratchRoot);
 
-  const effort = await writeSearchEffort(options.store, logPath, sessionId);
+  const effort = await writeSearchEffort(options.store, options.collectRow, logPath, sessionId);
   return { ...answer, ranking, effort };
 }

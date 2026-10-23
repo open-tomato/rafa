@@ -728,7 +728,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../check-report.js', ['checkCommandRun', 'DEFAULT_CHECK_SEAMS', 'SKILL_CHECK_USAGE']],
   ]],
   ['./commands/skill/list.js', [
-    ['@open-tomato/rafa-inventory', ['browse', 'buildInventory', 'pathDirectories']],
+    ['@open-tomato/rafa-inventory', ['buildInventory', 'pathDirectories']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
@@ -736,6 +736,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/modules/load', ['loadModules', 'moduleSettings']],
     ['@open-tomato/rafa/schema/tiers', ['isSkillTier', 'SKILL_TIERS']],
     ['../../cli/prompt/terminal.js', ['processTerminal', 'refuseWithoutTerminal']],
+    ['../../inventory/browse.js', ['browse']],
   ]],
   ['./commands/skill/show.js', [
     ['@open-tomato/rafa-inventory', ['findShown', 'readShowView', 'renderShowView']],
@@ -744,6 +745,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./list.js', ['DEFAULT_SKILL_LIST_SEAMS', 'projectInventory', 'warningLines']],
   ]],
   ['./commands/skill/search.js', [
+    ['@open-tomato/rafa-effort', ['collectSessionRow']],
     ['@open-tomato/rafa-inventory', ['droppedLine', 'rankSearch', 'runSearch']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],

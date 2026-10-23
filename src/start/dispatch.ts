@@ -95,13 +95,9 @@
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
 import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
-import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { InstinctRecord } from '../learning/index.js';
 import type { InjectionRequest, PlanInjection } from '../plan/index.js';
 import type { SuiteFailure } from '../suite/run.js';
-import type { ResolvedSkill } from '../task/resolve-skills.js';
-import type { Resolution } from '../tiers/resolve.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
@@ -110,8 +106,22 @@ import type { Learning } from '@open-tomato/rafa/ports';
 import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type {
+  InstinctRecord,
+  Resolution,
+  ResolvedSkill,
+  SessionServing,
+} from '@open-tomato/rafa-inventory';
 
 import { randomUUID } from 'crypto';
+
+import {
+  renderLessonsSection,
+  renderSkillsSection,
+  reportLessons,
+  resolveSessionTiers,
+  serveSession,
+} from '@open-tomato/rafa-inventory';
 
 import { runClaudeCaptured, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
@@ -122,15 +132,12 @@ import { agentEffortLookup } from '@open-tomato/rafa/utils/agent-definition';
 import { PROGRESS_CAP_BYTES, writeProgress } from '@open-tomato/rafa/utils/progress';
 
 import { renderInjection } from '../plan/index.js';
-import { reportLessons } from '../report/lessons.js';
-import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
 import { docTaskPrompt } from './doc-task.js';
 import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
-import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
 import { alwaysRunLines, baseLines, typeCheckLines } from './task-gate-lines.js';
 

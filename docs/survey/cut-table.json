@@ -3469,39 +3469,10 @@
     },
     {
       "clearedByIssue118": 0,
-      "edges": [
-        {
-          "from": "src/inventory/browse.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/cli/prompt/page.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/inventory/browse.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/cli/prompt/select.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/inventory/browse.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/cli/prompt/terminal.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
-          "from": "src/inventory/search/index.ts",
-          "fromPackage": "rafa-inventory",
-          "kind": "value",
-          "to": "src/effort/collect.ts",
-          "toPackage": "rafa-effort"
-        }
-      ],
+      "edges": [],
       "fileCounts": {
-        "source": 57,
-        "test": 57,
+        "source": 56,
+        "test": 56,
         "testSupport": 0
       },
       "files": [
@@ -3541,8 +3512,6 @@
         "src/demote/report.ts",
         "src/demote/select.test.ts",
         "src/demote/select.ts",
-        "src/inventory/browse.test.ts",
-        "src/inventory/browse.ts",
         "src/inventory/disabled.test.ts",
         "src/inventory/disabled.ts",
         "src/inventory/index.test.ts",
@@ -3627,7 +3596,7 @@
         "src/bundled/": 0,
         "src/check/": 8,
         "src/demote/": 10,
-        "src/inventory/": 28,
+        "src/inventory/": 26,
         "src/learning/": 10,
         "src/schema/": 11,
         "src/task/": 8,
@@ -3656,8 +3625,8 @@
         "src/start/serving.ts"
       ],
       "rank": 4,
-      "remaining": 4,
-      "upwardEdges": 4
+      "remaining": 0,
+      "upwardEdges": 0
     },
     {
       "clearedByIssue118": 0,
@@ -5755,8 +5724,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 175,
-        "test": 457,
+        "source": 176,
+        "test": 458,
         "testSupport": 26
       },
       "files": [
@@ -6058,6 +6027,8 @@
         "src/fixtures/scrub.ts",
         "src/index.test.ts",
         "src/index.ts",
+        "src/inventory/browse.test.ts",
+        "src/inventory/browse.ts",
         "src/loop/awake-clock.test.ts",
         "src/loop/awake-clock.ts",
         "src/loop/blocked-tasks.test.ts",
@@ -6428,6 +6399,7 @@
       "name": "@open-tomato/rafa",
       "named": [
         "src/commands/index.ts",
+        "src/inventory/browse.ts",
         "src/rafa.ts",
         "src/schema/agent.ts"
       ],
@@ -6443,7 +6415,7 @@
     "nonTestEdges": 4811,
     "unassignedFiles": 28,
     "unrankedEdges": 77,
-    "upwardEdges": 111
+    "upwardEdges": 107
   },
   "unassigned": [
     {

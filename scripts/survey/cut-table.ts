@@ -25,8 +25,9 @@
  *      every file no line above holds.
  *
  * What the CLI holds by rule is the dispatcher (`src/cli/`, with the bin
- * entry `src/rafa.ts`), the roster (`src/commands/index.ts`) and
- * `src/schema/agent.ts`. No path in the tree is named as "the default
+ * entry `src/rafa.ts`), the roster (`src/commands/index.ts`),
+ * `src/schema/agent.ts` and the browse view `src/inventory/browse.ts`,
+ * which reaches `src/cli/prompt/`: `CLI_NAMED` of `cut-names.ts`. No path in the tree is named as "the default
  * workflows", so the files that will be them are among the files left to
  * place. Inside `src/schema/` the placement is per file, as
  * `docs/survey/content-schema-importers.md` names it.
@@ -61,6 +62,7 @@ import { join, posix } from 'node:path';
 import { CORE_PACKAGE as CORE_PACKAGE_FOLDER, subjectFolder } from './core-moves';
 import {
   BOARD_NAMED,
+  CLI_NAMED,
   EFFORT_NAMED,
   INVENTORY_NAMED,
   PR_NAMED,
@@ -336,7 +338,7 @@ export const CUT_RULES: CutRules = {
     {
       folders: ['src/cli/'],
       name: CLI_PACKAGE,
-      named: ['src/commands/index.ts', 'src/rafa.ts', 'src/schema/agent.ts'],
+      named: CLI_NAMED,
     },
   ],
   rest: CLI_PACKAGE,
