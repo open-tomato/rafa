@@ -86,17 +86,17 @@
  */
 import type { SkillFact } from './skill-facts.js';
 import type { LessonSignalRow, RecurrenceMatcher, SkillSignalRow, SkillTally } from './skill-signals.js';
-import type { Resolution } from '../tiers/resolve.js';
 import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { TierSeams } from '@open-tomato/rafa/schema/tiers';
 import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { Resolution } from '@open-tomato/rafa-inventory';
 
 import { readFileSync } from 'node:fs';
 
+import { readScopes } from '@open-tomato/rafa-inventory';
+
 import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
-
-import { readScopes } from '../schema/scope-records.js';
 
 import { findRecurrences } from './recurrence.js';
 import { readSkillFacts } from './skill-facts.js';

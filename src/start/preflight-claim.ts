@@ -176,15 +176,15 @@
  * best-effort: a board that is not `gh`, or a write that fails, is one
  * warning beside a run that goes on.
  */
-import type { IssueBoard } from '../board/issue-board.js';
-import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { IssueBoard, RefreshConfig } from '@open-tomato/rafa-board';
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
+import { createGhRunner, createRefreshingGhIssueBoard } from '@open-tomato/rafa-board';
 import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -193,8 +193,6 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPath } from '@open-tomato/rafa/core/plan';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createRefreshingGhIssueBoard } from '../board/project/issue-board-refresh.js';
 import { holdsClaim, readDeviceStoreId } from '../claims/device.js';
 import {
   claimBranchIssue,

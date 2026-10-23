@@ -613,20 +613,23 @@ names come from, and the facade entry is no node.
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
     `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
     for the frontmatter and agent-definition files, which the first decouple
-    item moved into core. Inventory has four:
-    `src/effort/skill-use.ts`, `src/start/dispatch.ts`, `src/start/handout.ts`
-    and `src/start/preflight.ts`; `src/start/serving.ts` is an inventory file
-    by name, so it is no importer. Board has twenty-four:
+    item moved into core. Inventory has one, `src/effort/skill-use.ts`,
+    which the committed graph still reaches from inventory's search through
+    `src/effort/collect.ts`, an edge the second decouple item cut in the code;
+    `src/start/serving.ts` is an inventory file by name, so it is no
+    importer. Board has twenty-one:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
     `src/claims/labels.ts`, `src/commands/switch.ts`,
     `src/epic/verify-run.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`,
     `src/next/owner-gate.ts`, `src/next/readings.ts`,
     `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
-    `src/plan/store-rules.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
-    `src/pr/owner-approval.ts`, `src/start/preflight-claim.ts`,
-    `src/start/preflight-drift.ts`, `src/start/stale-docs.ts`,
-    `src/start/triage.ts`, `src/triage/bug-filing.ts`,
-    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/pr/gh-close.ts`, `src/pr/gh.ts`, `src/pr/owner-approval.ts`,
+    `src/start/stale-docs.ts`, `src/start/triage.ts`,
+    `src/triage/bug-filing.ts`, `src/triage/refs-section.ts` and
+    `src/triage/triage.ts`. The second decouple item took the importers it
+    freed onto the facades: inventory's `src/start/dispatch.ts`, `handout.ts`
+    and `preflight.ts`, and board's `src/plan/store-rules.ts`,
+    `src/start/preflight-claim.ts` and `preflight-drift.ts`.
     `src/effort/epic-cost.ts`, an effort file, sat among them until the first
     decouple item moved `packages/rafa/src/board/naming.ts`, its one board
     import, into core.
@@ -665,8 +668,9 @@ names come from, and the facade entry is no node.
     package import a later one, which the decouple step before pass 4 cuts.
     Inventory has none since the 23 October 2026 swap put it first: its
     three effort importers, `src/effort/report-skills-read.ts`,
-    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, now
-    import it forward and read as `rewire`. Board has none:
+    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, import it
+    forward and take it by name since the second decouple item's rewire.
+    Board has none:
     no effort file imports it. Release has none in the codemod's grouping,
     because its one board importer, `src/board/project/facts.ts`, is taken
     first by the load-cycle group.
@@ -701,7 +705,7 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's two, inventory's seven, board's 26, release's four,
+  files, effort's two, inventory's one, board's 23, release's four,
   pr's 36 and run's 32, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
