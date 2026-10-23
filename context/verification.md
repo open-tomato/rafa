@@ -208,7 +208,8 @@ its change reaches:
   takes it with no config: it reads each `.md` file under `context/`, `docs/`
   (less `docs/survey/`), `.claude/`, `README.md` and `AGENTS.md`, and each code
   file under `src/`, `scripts/` and `packages/`, and it fails on any `from` path
-  of a move list under `scripts/codemod/moves/` that a scanned file still names.
+  of a move list under `scripts/codemod/moves/` that a scanned file still names,
+  once that entry's `to` exists: a list written ahead of its run counts nothing.
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a

@@ -3,7 +3,9 @@
  * names a `from` path of any move list under `scripts/codemod/moves/`, with
  * the `.ts` dropped or kept. The codemod rewrites such mentions when it
  * runs; this suite holds the tree to it afterwards, so a doc line or a
- * comment written later against the old path is caught.
+ * comment written later against the old path is caught. A `from` counts
+ * once its `to` exists: a list written ahead of its run has moved nothing
+ * yet, and the tree still names its paths by right.
  *
  * ## Scope
  *
@@ -33,7 +35,7 @@
  * with the extension, one without, and one split across a wrapped line.
  */
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,9 +59,17 @@ const CHANGELOG_NAME = 'CHANGELOG.md';
 
 interface MoveEntry {
   readonly from: string;
+  readonly to: string;
 }
 
-/** Every `from` of every move list file under the moves folder. */
+/** The `from` of each entry whose `to` exists: the paths a run has moved away from. */
+export function movedFroms(entries: readonly MoveEntry[], exists: (path: string) => boolean): string[] {
+  return entries
+    .filter((entry) => typeof entry?.from === 'string' && typeof entry.to === 'string' && exists(entry.to))
+    .map((entry) => entry.from);
+}
+
+/** Every moved `from` of every move list file under the moves folder. */
 async function loadFroms(root: string): Promise<string[]> {
   const dir = join(root, MOVES_DIR);
   const lists = readdirSync(dir)
@@ -69,9 +79,7 @@ async function loadFroms(root: string): Promise<string[]> {
     const loaded = await import(join(dir, name)) as Record<string, unknown>;
     for (const value of Object.values(loaded)) {
       if (!Array.isArray(value)) continue;
-      for (const entry of value as MoveEntry[]) {
-        if (typeof entry?.from === 'string') froms.push(entry.from);
-      }
+      froms.push(...movedFroms(value as MoveEntry[], (path) => existsSync(join(root, path))));
     }
   }
   return froms;
@@ -168,6 +176,17 @@ describe('no tracked file still names a path a move list moved away from', () =>
 
   it('leaves the new path and longer names alone', () => {
     expect(stalePathsIn('At packages/rafa/src/utils/git.ts and src/utils/git-hooks.ts.', LISTED)).toEqual([]);
+  });
+
+  it('counts a listed path once its destination exists, and not before', () => {
+    const entries = [
+      { from: 'src/utils/git.ts', to: 'packages/rafa/src/utils/git.ts' },
+      { from: 'src/unlisted/later.ts', to: 'packages/rafa-unlisted/src/unlisted/later.ts' },
+    ];
+    const present = new Set(['packages/rafa/src/utils/git.ts']);
+
+    expect(movedFroms(entries, (path) => present.has(path))).toEqual(['src/utils/git.ts']);
+    expect(movedFroms(entries, () => true)).toEqual(['src/utils/git.ts', 'src/unlisted/later.ts']);
   });
 
   it('throws rather than answering an empty listing where git cannot run', () => {
