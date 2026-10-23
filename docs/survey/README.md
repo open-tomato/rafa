@@ -195,6 +195,7 @@ not drifted from the current repository.
   each feature object had its commands entry (`@open-tomato/rafa-<name>/commands`, at commit e54b5e3), run's
   `serving.ts` placed in inventory at commit 24fdaf6, and the move of the nine core-only files into core at commit
   94769d8; inventory's row reads no library chunk, the placement and the flag taken from core.
+  The pile's rows were put in the swapped order by hand at commit 2ce4312.
 
 ### Cluster contract traces
 

@@ -520,9 +520,10 @@ back edges by package pair and one line, `back <n> of <total> value imports
 between feature packages, <percent>%`, then a second, `kept <k> of <n>
 importers on relative paths, <percent>%`, and exits 1 when either percent is
 above `--max`, so `--max` applies to both lines. The kept line reads over 20%
-until pass 4 rewires the kept files. It reads the import graph and the cut
-table and writes nothing; an edge with an end in core, in the CLI or in a
-package outside the order is not counted on the first line.
+until pass 4 rewires the kept files. It reads the import graph, the cut table
+and the tracked files of the kept pairs, and writes nothing; an edge with an
+end in core, in the CLI or in a package outside the order is not counted on
+the first line.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
