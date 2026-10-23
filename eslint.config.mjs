@@ -39,18 +39,18 @@ export default [
           target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa-inventory/src',
           except: ['./learning'],
-          message: 'src/learning/ imports nothing from the rest of src/.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from the rest of the package\'s src/.',
         }, {
           target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa/src',
-          message: 'src/learning/ imports nothing from core.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from core.',
         }],
       }],
       'no-restricted-imports': ['error', {
         paths: ['node:fs', 'node:fs/promises', 'fs', 'fs/promises'].map(
           (name) => ({
             name,
-            message: 'src/learning/ touches no filesystem.',
+            message: 'packages/rafa-inventory/src/learning/ touches no filesystem.',
           }),
         ),
       }],

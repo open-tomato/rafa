@@ -43,7 +43,11 @@
  * An upward edge from a file under `packages/rafa/src/core/config/` into a
  * `src/config-schema-<section>.ts` file is marked as cleared by #118,
  * which makes each package own its config section. It still counts as
- * upward: `remaining` is the count less the cleared edges.
+ * upward: `remaining` is the count less the cleared edges. The rule reads
+ * none since the third decouple item (rafa-1325) moved the eleven
+ * sections into core's package, where an import from core's config folder
+ * into a section is inside core and no upward edge; it stays for a section
+ * that moves back into a feature package that publishes on its own.
  *
  * The files left to place are the files of step 3. Each carries the
  * number of upward edges that end on it, since placing it lower is what
@@ -277,16 +281,15 @@ export const CUT_RULES: CutRules = {
       named: [],
     },
     {
+      // #1321: pass 4a emptied `src/agents/`, `src/backfill/`, `src/check/`,
+      // `src/demote/`, `src/learning/` and `src/task/`, so they leave the
+      // list. `src/tiers/` stays for `resolve.integration.test.ts`, at the
+      // root until #913; `src/inventory/` and `src/schema/` hold the
+      // CLI-named pairs; `src/bundled/` holds content and no code file.
       folders: ['packages/rafa-inventory/', 
-        'src/agents/',
-        'src/backfill/',
         'src/bundled/',
-        'src/check/',
-        'src/demote/',
         'src/inventory/',
-        'src/learning/',
         'src/schema/',
-        'src/task/',
         'src/tiers/',
       ],
       name: 'rafa-inventory',
