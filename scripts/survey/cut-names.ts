@@ -10,9 +10,13 @@
 
 /**
  * The files named for `rafa-board`: the fourteen `src/board/` files
- * `docs/survey/cluster-map.json` puts in cluster c6, and the eight root
+ * `docs/survey/cluster-map.json` puts in cluster c6, and the six root
  * files that reach the board. The fifteenth reaches only core and moved
  * into it in the first decouple item, as `packages/rafa/src/board/naming.ts`.
+ * The section files `config-schema-board-project.ts` and
+ * `config-schema-issues.ts` left the list in the third decouple item
+ * (rafa-1325), which moves them into core's package, where the
+ * `packages/rafa/` folder of `CUT_RULES` places them.
  */
 export const BOARD_NAMED: readonly string[] = [
   'src/board/flags.ts',
@@ -32,14 +36,18 @@ export const BOARD_NAMED: readonly string[] = [
   'src/bugs/cause-rule.ts',
   'src/commands/doctor-refs.ts',
   'src/commands/plan/refs-check.ts',
-  'src/config-schema-board-project.ts',
-  'src/config-schema-issues.ts',
   'src/epic/verify-plan.ts',
   'src/next/hop-chain.ts',
   'src/next/relation-readings.ts',
 ];
 
-/** The files named for `rafa-pr`, the root files that reach the pull-request package. */
+/**
+ * The files named for `rafa-pr`, the root files that reach the
+ * pull-request package. The section files `config-schema-readings.ts`
+ * and `config-schema-triage.ts` left the list in the third decouple item
+ * (rafa-1325), which moves them into core's package, where the
+ * `packages/rafa/` folder of `CUT_RULES` places them.
+ */
 export const PR_NAMED: readonly string[] = [
   'src/bugs/filed-values.ts',
   'src/bugs/fill.ts',
@@ -47,8 +55,6 @@ export const PR_NAMED: readonly string[] = [
   'src/cleanup/branches.ts',
   'src/cleanup/groups.ts',
   'src/cleanup/steps.ts',
-  'src/config-schema-readings.ts',
-  'src/config-schema-triage.ts',
   'src/docs/open-lines.ts',
   'src/docs/release-issue.ts',
   'src/docs/task-reading.ts',
@@ -60,18 +66,21 @@ export const PR_NAMED: readonly string[] = [
   'src/plan/risk/accounts.ts',
 ];
 
-/** The files named for `rafa-run`, the root files that reach the run package, `src/next/preconditions.ts` among them. */
+/**
+ * The files named for `rafa-run`, the root files that reach the run
+ * package, `src/next/preconditions.ts` among them. The five section
+ * files, `config-schema-checks.ts`, `config-schema-loop-continue.ts`,
+ * `config-schema-loop-retries.ts`, `config-schema-tests.ts` and
+ * `config-schema-wrap-up.ts`, left the list in the third decouple item
+ * (rafa-1325), which moves them into core's package, where the
+ * `packages/rafa/` folder of `CUT_RULES` places them.
+ */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',
   'src/cleanup/remote-only.ts',
   'src/cleanup/runs.ts',
   'src/cleanup/worktrees.ts',
   'src/commands/switch.ts',
-  'src/config-schema-checks.ts',
-  'src/config-schema-loop-continue.ts',
-  'src/config-schema-loop-retries.ts',
-  'src/config-schema-tests.ts',
-  'src/config-schema-wrap-up.ts',
   'src/epic/verify-run.ts',
   'src/loop/events-file.ts',
   'src/next/actions.ts',
@@ -89,19 +98,27 @@ export const RUN_NAMED: readonly string[] = [
   'src/runtime/install.ts',
 ];
 
-/** The files named for `rafa-release`, the root files that reach the release package. */
+/**
+ * The files named for `rafa-release`, the root files that reach the
+ * release package. The section file `config-schema-release.ts` left the
+ * list in the third decouple item (rafa-1325), which moves it into core's
+ * package, where the `packages/rafa/` folder of `CUT_RULES` places it.
+ */
 export const RELEASE_NAMED: readonly string[] = [
   'src/cleanup/past-head.ts',
   'src/commands/doctor-ladder.ts',
-  'src/config-schema-release.ts',
   'src/next/epic-end.ts',
   'src/project/lock.ts',
 ];
 
-/** The files named for `rafa-effort`, the root files that reach the effort package. */
-export const EFFORT_NAMED: readonly string[] = [
-  'src/config-schema-hub.ts',
-];
+/**
+ * The files named for `rafa-effort`: none since the third decouple item
+ * (rafa-1325). The one file it named, the section file
+ * `config-schema-hub.ts`, moves into core's package in that item, where
+ * the `packages/rafa/` folder of `CUT_RULES` places it, so no name is
+ * needed.
+ */
+export const EFFORT_NAMED: readonly string[] = [];
 
 /**
  * The files named for `rafa-inventory`: none since pass 4a. The six

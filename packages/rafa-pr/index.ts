@@ -83,13 +83,6 @@ export {
   openPrContext,
 } from '../../src/commands/pr/pr-context.js';
 
-export type { TriageShape } from '../../src/config-schema-triage.js';
-export {
-  TRIAGE_DEFAULTS,
-  TRIAGE_SECTION,
-  TRIAGE_SETTINGS,
-} from '../../src/config-schema-triage.js';
-
 export type {
   OpenLinesTracker,
   OpenStaleDocLine,

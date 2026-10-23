@@ -23,11 +23,10 @@
  * are refused by `readProjectScope`, naming the file.
  */
 
-import { TESTS_DEFAULTS } from '@open-tomato/rafa-run';
-
 import { readProjectScope } from '@open-tomato/rafa/core/config/load';
 
 import { registerCoreConfigSections } from '../../src/config-registry';
+import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
 
 /** The kind of a test file: a unit, contract or use-case test. */
 export type TestKind = 'unit' | 'contract' | 'use-case';
