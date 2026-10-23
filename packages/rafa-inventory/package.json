@@ -13,6 +13,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "check-types": "tsc --build",
     "lint": "eslint .",
     "test": "bun test"
   },

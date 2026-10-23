@@ -159,7 +159,7 @@ describe('the vocabulary', () => {
   });
 
   test('the language subset is the keys of the extension table, sorted', () => {
-    expect([...LANGUAGE_STACKS]).toEqual(
+    expect(([...LANGUAGE_STACKS] as string[])).toEqual(
       Object.keys(LANGUAGE_EXTENSIONS).sort((a, b) => a.localeCompare(b)),
     );
     expect(LANGUAGE_STACKS).not.toContain('springboot');

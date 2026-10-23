@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
@@ -24,6 +24,21 @@ const TABLE_PATH = join(ROOT, 'docs', 'survey', 'cut-table.json');
 const PACKAGE_COUNT = 12;
 const UNASSIGNED_FOLDERS = ['src/ci/', 'src/commands/stretch/', 'src/stretch/'];
 
+const PACKAGES_DIR = join(ROOT, 'packages');
+
+/**
+ * A folder moved into a workspace package (pass 4a on) is present when it
+ * sits below `packages/<name>/` at the same path.
+ */
+function isFolder(path: string): boolean {
+  return existsSync(path) && statSync(path).isDirectory();
+}
+
+function folderPresent(folder: string): boolean {
+  return isFolder(join(ROOT, folder))
+    || readdirSync(PACKAGES_DIR).some((name) => isFolder(join(PACKAGES_DIR, name, folder)));
+}
+
 const table = (await Bun.file(TABLE_PATH).json()) as CutTable;
 
 describe('docs/survey/cut-table.json', () => {
@@ -43,10 +58,7 @@ describe('docs/survey/cut-table.json', () => {
   test('every assigned folder is present in the tree', () => {
     const missing = table.packages
       .flatMap((pkg) => pkg.folders)
-      .filter((folder) => {
-        const path = join(ROOT, folder);
-        return !existsSync(path) || !statSync(path).isDirectory();
-      });
+      .filter((folder) => !folderPresent(folder));
     expect(missing).toEqual([]);
   });
 

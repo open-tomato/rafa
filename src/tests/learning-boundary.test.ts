@@ -45,7 +45,8 @@ function ruleIds(messages: Linter.LintMessage[]): (string | null)[] {
   return messages.map((message) => message.ruleId);
 }
 
-const SCRATCH = 'src/learning/boundary-scratch.ts';
+const LEARNING_DIR = 'packages/rafa-inventory/src/learning';
+const SCRATCH = `${LEARNING_DIR}/boundary-scratch.ts`;
 
 describe('the src/learning/ boundary rule', () => {
   test('refuses an import of @open-tomato/rafa/core/config from src/learning/', async () => {
@@ -58,10 +59,10 @@ describe('the src/learning/ boundary rule', () => {
     expect(messages[0]?.message).toContain('src/learning/ imports nothing from core.');
   });
 
-  test('refuses an import of ../plan/index.js from src/learning/', async () => {
+  test('refuses an import of ../tiers/resolve.js from src/learning/', async () => {
     const messages = await messagesFor(
       SCRATCH,
-      'export { parsePlan } from \'../plan/index.js\';\n',
+      'export { resolveTiers } from \'../tiers/resolve.js\';\n',
     );
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
@@ -90,7 +91,7 @@ describe('the src/learning/ boundary rule', () => {
 
   test('lets a parent import that stays in src/learning/ through', async () => {
     const messages = await messagesFor(
-      'src/learning/testdata/boundary-scratch.ts',
+      `${LEARNING_DIR}/testdata/boundary-scratch.ts`,
       'export { actionHash } from \'../identity.js\';\n',
     );
 

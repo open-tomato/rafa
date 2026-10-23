@@ -6,6 +6,7 @@
   "references": [
     { "path": "./packages/rafa" },
     { "path": "./packages/rafa-hub" },
+    { "path": "./packages/rafa-inventory" },
     { "path": "./packages/rafa-sync-service" }
   ]
 }

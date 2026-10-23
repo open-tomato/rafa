@@ -31,17 +31,17 @@ export default [
     // specifier, so `@open-tomato/rafa/core/config` from `src/learning/`
     // is refused while `../x.js` from a subdirectory of it is not.
     // `src/tests/learning-boundary.test.ts` lints a file planted under
-    // `src/learning/` against this block.
-    files: ['src/learning/**/*.ts'],
+    // `packages/rafa-inventory/src/learning/` against this block.
+    files: ['packages/rafa-inventory/src/learning/**/*.ts'],
     rules: {
       'import/no-restricted-paths': ['error', {
         zones: [{
-          target: './src/learning',
-          from: './src',
+          target: './packages/rafa-inventory/src/learning',
+          from: './packages/rafa-inventory/src',
           except: ['./learning'],
           message: 'src/learning/ imports nothing from the rest of src/.',
         }, {
-          target: './src/learning',
+          target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa/src',
           message: 'src/learning/ imports nothing from core.',
         }],

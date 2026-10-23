@@ -1296,6 +1296,7 @@ describe('dispatchTask, handing out the shipped PROMPT.md', () => {
       promptContent,
       planContent: `- [ ] ${LINE}\n`,
       inject: 'full',
+      base: null,
       repoRoot: root,
       checkout: root,
       home: join(root, 'home'),
