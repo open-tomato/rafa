@@ -67,7 +67,7 @@
  * checkout, a pause and an interrupt are never retried: a blind re-run
  * repeats each of them.
  */
-import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';

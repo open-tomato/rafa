@@ -38,7 +38,7 @@
  * outside `packages/rafa/src/core/` imports, the dispatcher; and `scopeAt` and
  * `ProjectFound`, a value and a type of `scope.ts`.
  * `HubContext` is held absent from `config.ts`: the hub's types are
- * `src/config-schema-hub.ts`'s, which no file under `packages/rafa/src/core/` imports.
+ * `packages/rafa/src/config-schema-hub.ts`'s, which no file under `packages/rafa/src/core/` imports.
  */
 import { resolve } from 'node:path';
 

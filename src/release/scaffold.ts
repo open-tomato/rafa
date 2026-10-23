@@ -5,7 +5,7 @@
  * `dangerous.acceptVersionCollision`, each
  * spelled at its schema default, read off the release section that
  * defines it (`PR_DEFAULTS`, `RELEASE_DEFAULTS` and
- * `DANGEROUS_RELEASE_DEFAULTS` of `src/config-schema-release.ts`), the
+ * `DANGEROUS_RELEASE_DEFAULTS` of `packages/rafa/src/config-schema-release.ts`), the
  * values `CONFIG_DEFAULTS` of `src/config-registry.ts` spreads.
  * `src/project/scaffold.ts` places them, each under its own section.
  *
@@ -24,7 +24,7 @@
  * Nothing here reads the disk, the clock or the environment: the three
  * exports are constants built once from the defaults.
  */
-import { DANGEROUS_RELEASE_DEFAULTS, PR_DEFAULTS, RELEASE_DEFAULTS } from '../config-schema-release.js';
+import { DANGEROUS_RELEASE_DEFAULTS, PR_DEFAULTS, RELEASE_DEFAULTS } from '@open-tomato/rafa/config-schema-release';
 
 /**
  * The commented lines the config `rafa init` writes carries for the

@@ -25,6 +25,14 @@ import type { SyncStrategy, ValueAt } from '@open-tomato/rafa/core/config/sectio
 import { describe, expect, it } from 'bun:test';
 
 import {
+  HUB_SECTION,
+  hubContextOf,
+  hubTimeout,
+  hubTimeoutMs,
+  hubUrl,
+  hubUrlProblems,
+} from '@open-tomato/rafa/config-schema-hub';
+import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -32,15 +40,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { SETTINGS } from './config-registry.js';
-import {
-  HUB_SECTION,
-  hubContextOf,
-  hubTimeout,
-  hubTimeoutMs,
-  hubUrl,
-  hubUrlProblems,
-} from './config-schema-hub.js';
+import { SETTINGS } from '../../config-registry.js';
 
 /** Where every reader case reads its value. */
 const AT: ValueAt = { label: 'F: hub.x', key: 'hub.x' };

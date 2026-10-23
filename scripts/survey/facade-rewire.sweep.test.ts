@@ -65,7 +65,7 @@ interface RewiredRow {
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
- * was the `LoopRetries` type of `src/config-schema-loop-retries.ts`. Run's
+ * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
  * 15 back-edge files are board and pr files, every one earlier in the
  * move order.
  * No row keeps a file for the library build any more. Board, release, pr

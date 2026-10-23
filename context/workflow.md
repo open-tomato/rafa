@@ -275,7 +275,7 @@ runner runs the suite after the task commits when the task declares
   to an empty list, which runs nothing and blocks nothing at its point.
   `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
   `checks.publish` take the same reader and default empty too, but no step
-  reads them yet (`src/config-schema-checks.ts`)
+  reads them yet (`packages/rafa/src/config-schema-checks.ts`)
 - `templates` is a list of template names (`src/config/templates.ts`), which
   holds one template, `escalation`. `templates: [escalation]` adopts it: the
   three glob keys below, and the three check points it names:

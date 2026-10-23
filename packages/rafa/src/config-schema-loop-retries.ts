@@ -49,12 +49,12 @@
  * flag that outranks it for one run is `loop start --retry=<n>`, read
  * by `start/run-setup.ts`.
  */
-import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
-import type { Reader } from '@open-tomato/rafa/core/config/sections';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
-import { refused } from '@open-tomato/rafa/core/config/sections';
+import { refused } from './core/config/sections.js';
 
-declare module '@open-tomato/rafa/core/config/config-schema' {
+declare module './core/config/config-schema.js' {
   /** The `loop-retries` section's fields, added to core's. */
   interface RafaConfig extends LoopRetriesSettings {}
 }

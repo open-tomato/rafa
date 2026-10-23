@@ -155,7 +155,7 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
 import type {
   MergeMethod,
   PrProvider,
@@ -166,7 +166,7 @@ import type {
   ReleaseStrategy,
   ReleaseTagMode,
   VersionCollisionMode,
-} from '@open-tomato/rafa/core/config/sections';
+} from './core/config/sections.js';
 
 import {
   flag,
@@ -184,9 +184,9 @@ import {
   text,
   usdAmount,
   versionCollisionMode,
-} from '@open-tomato/rafa/core/config/sections';
+} from './core/config/sections.js';
 
-declare module '@open-tomato/rafa/core/config/config-schema' {
+declare module './core/config/config-schema.js' {
   /** The `release` section's fields, added to core's. */
   interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
 }

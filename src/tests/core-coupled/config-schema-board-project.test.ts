@@ -28,6 +28,7 @@ import type { ConfigOverrides, ConfigSetting } from '@open-tomato/rafa/core/conf
 
 import { describe, expect, it } from 'bun:test';
 
+import { BOARD_PROJECT_SECTION } from '@open-tomato/rafa/config-schema-board-project';
 import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
@@ -36,8 +37,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { BOARD_PROJECT_SECTION } from './config-schema-board-project.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every project-file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

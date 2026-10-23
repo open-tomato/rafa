@@ -261,7 +261,7 @@ either is read. A deployment of the `service` strategy requires `hub.url` (the
 hub's address), and may name `hub.tokenSecret` (the secret store name where the
 token is held, never the token itself) and `hub.timeout` (how long a request may
 take, `3s` by default, from `1s` to `30s`, as `3s`). `selectSync` hands the
-three to the adapter as `AdapterContext.hub` (`src/config-schema-hub.ts`). A
+three to the adapter as `AdapterContext.hub` (`packages/rafa/src/config-schema-hub.ts`). A
 module implementing `git`, `service` or `p2p` also names its own settings under
 `modules:`.
 

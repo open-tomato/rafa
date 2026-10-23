@@ -43,7 +43,7 @@
  * ## Paths are relative to the repository root
  *
  * Both settings are paths relative to the root
- * (`src/config-schema-release.ts`), so every reading resolves them
+ * (`packages/rafa/src/config-schema-release.ts`), so every reading resolves them
  * against the `repoRoot` it is handed
  * and reports both spellings: `path` as the config wrote it, for a
  * message a person reads, and `resolved` as this module stat'd it, for

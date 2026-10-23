@@ -14,7 +14,7 @@
  * `rafa.config.mjs` at the root, and `.rafa/config.yaml`, the local layer.
  * Each arrives with the templates its `templates` key names already laid
  * under its own keys. A key the local file sets comes first, then the
- * module file's, then `TESTS_DEFAULTS` of `src/config-schema-tests.ts`,
+ * module file's, then `TESTS_DEFAULTS` of `packages/rafa/src/config-schema-tests.ts`,
  * whose two lists are empty. A list a file sets empty stays empty, since
  * a list written `[]` has been said. No pattern is copied here.
  *
@@ -23,10 +23,10 @@
  * are refused by `readProjectScope`, naming the file.
  */
 
+import { TESTS_DEFAULTS } from '@open-tomato/rafa/config-schema-tests';
 import { readProjectScope } from '@open-tomato/rafa/core/config/load';
 
 import { registerCoreConfigSections } from '../../src/config-registry';
-import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
 
 /** The kind of a test file: a unit, contract or use-case test. */
 export type TestKind = 'unit' | 'contract' | 'use-case';

@@ -45,7 +45,7 @@
  * be read, rather than meeting it on the run's first decision.
  */
 import type { ContinueDecision, DecisionStrategy } from './decision-parse.js';
-import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';

@@ -62,7 +62,7 @@
  * inside a value is inserted verbatim, and the marker lines never reach
  * the session.
  */
-import type { ContinueCriteriaMode } from '../config-schema-loop-continue.js';
+import type { ContinueCriteriaMode } from '@open-tomato/rafa/config-schema-loop-continue';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { existsSync, readFileSync } from 'node:fs';

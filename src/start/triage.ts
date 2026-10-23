@@ -193,8 +193,8 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RefreshAddedItems } from '../board/project/add-issue.js';
 import type { RefreshConfig } from '../board/project/refresh.js';
-import type { IssuesConfigSettings } from '../config-schema-issues.js';
 import type { SuiteFailure } from '../suite/run.js';
+import type { IssuesConfigSettings } from '@open-tomato/rafa/config-schema-issues';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
@@ -223,6 +223,7 @@ import {
   triageReport,
 } from '@open-tomato/rafa-pr';
 
+import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
@@ -234,7 +235,6 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../board/project/add-filed.js';
 import { openProjectRunner } from '../board/project/project-runner.js';
-import { bugRulesOf } from '../config-schema-issues.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 
 import { emitLoopEvent } from './loop-events.js';

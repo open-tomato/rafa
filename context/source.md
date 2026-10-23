@@ -1089,11 +1089,11 @@ the end of the template. This section replaces nothing.
   test titles without one` until 2026-09-22, which those 46 falsify.
 - **An interface whose one `extends` is its whole content is refused**
   (`@typescript-eslint/no-empty-object-type`) everywhere but
-  `src/config-schema-*.ts` and `packages/rafa/src/config-schema-*.ts`,
-  where `eslint.config.mjs` and the package's own leaf allow it: a
-  section's `interface RafaConfig extends HubSettings {}` inside its
-  `declare module` is that shape on purpose. This bullet replaces
-  nothing.
+  `packages/rafa/src/config-schema-*.ts`, where `eslint.config.mjs` and
+  the package's own leaf allow it: a section's `interface RafaConfig
+  extends HubSettings {}` inside its `declare module` is that shape on
+  purpose. The root's `src/config-schema-*.ts` glob left with the
+  section files (rafa-1325).
 - **Markdown is a lint target, and every fenced block needs a language**
   (`markdown/fenced-code-language`). A fence shown INSIDE a fenced example
   — a `context/` page quoting the comment a command writes, say — is read

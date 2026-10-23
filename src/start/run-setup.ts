@@ -58,10 +58,9 @@ import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 
+import { isLoopRetryCount } from '@open-tomato/rafa/config-schema-loop-retries';
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { isLoopRetryCount } from '../config-schema-loop-retries.js';
 
 import { branchNameFor, detachedHeadRefusal, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';

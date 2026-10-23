@@ -37,8 +37,15 @@ function corePath(path: string): string {
 
 const CONFIG_BARRELS: string[] = CORE_BARRELS.config.map((barrel) => baseName(barrel));
 
-/** Section files hold their `*_SETTINGS` records; a test file is no section. */
-const SECTION_FILES = readdirSync(SRC)
+/** The folder the section files sit in: core's package since the third decouple item (rafa-1325). */
+const SECTION_DIR = join(REPO_ROOT, CORE_ROOT);
+
+/**
+ * Section files hold their `*_SETTINGS` records; a test file is no section.
+ * Core's four and the eleven feature sections sit in core's package since
+ * the third decouple item (rafa-1325), so the folder holds fifteen.
+ */
+const SECTION_FILES = readdirSync(SECTION_DIR)
   .filter((name) => /^config-schema-.+\.ts$/.test(name) && !name.endsWith('.test.ts'))
   .sort();
 
@@ -99,11 +106,11 @@ describe('each config barrel loaded first in a fresh process', () => {
 
 describe('each config-schema section file loaded first in a fresh process', () => {
   test('the tree holds section files to load', () => {
-    expect(SECTION_FILES.length).toBeGreaterThanOrEqual(11);
+    expect(SECTION_FILES.length).toBeGreaterThanOrEqual(15);
   });
 
   test.each(SECTION_FILES)('%s loads, exits 0 and its first setting is read from SETTINGS', async (file) => {
-    const run = await loadFirst(join(SRC, file));
+    const run = await loadFirst(join(SECTION_DIR, file));
     expectExit(run, 0);
     const result = reading(run);
     if (file === 'config-schema-readings.ts') {

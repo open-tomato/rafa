@@ -273,7 +273,7 @@ and stops: no tracker is resolved and nothing is filed.
 
 ### Config
 
-`src/config-schema-issues.ts` reads five keys:
+`packages/rafa/src/config-schema-issues.ts` reads five keys:
 
 ```yaml
 issues:

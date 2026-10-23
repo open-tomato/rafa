@@ -25,10 +25,20 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `bugs/record.test.ts` | `src/triage/issue-text.ts`, `src/triage/similarity.ts` |
 | `bugs/stack-path.test.ts` | `src/tests/package-tree.ts` |
 | `commands/plan/plan-files.test.ts` | `src/config-registry.ts`, `src/tests/cli-capture.ts` |
+| `config-schema-board-project.test.ts` | `src/config-registry.ts` |
 | `config-schema-bugs.test.ts` | `src/config-registry.ts` |
+| `config-schema-checks.test.ts` | `src/config-registry.ts` |
 | `config-schema-errors.test.ts` | `src/config-registry.ts` |
 | `config-schema-features-integration.test.ts` | `src/config-registry.ts` |
+| `config-schema-hub.test.ts` | `src/config-registry.ts` |
+| `config-schema-issues.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts` |
 | `config-schema-logger.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
+| `config-schema-loop-continue.test.ts` | `src/config-registry.ts` |
+| `config-schema-loop-retries.test.ts` | `src/config-registry.ts` |
+| `config-schema-release.test.ts` | `src/config-registry.ts` |
+| `config-schema-tests.test.ts` | `src/config-registry.ts`, `src/config/templates.ts` |
+| `config-schema-triage.test.ts` | `src/config-registry.ts` |
+| `config-schema-wrap-up.test.ts` | `src/config-registry.ts` |
 | `core/command/version.test.ts` | `package.json`, the root manifest |
 | `core/config/config-load-templates.test.ts` | `src/config-registry.ts` |
 | `core/config/config-load.test.ts` | `src/config-registry.ts`, `src/tests/output-sinks.ts` |

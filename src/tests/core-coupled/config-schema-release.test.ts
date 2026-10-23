@@ -28,6 +28,13 @@ import type { Reader, ValueAt } from '@open-tomato/rafa/core/config/sections';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  DANGEROUS_RELEASE_DEFAULTS,
+  mergeMethod,
+  PR_DEFAULTS,
+  RELEASE_DEFAULTS,
+  RELEASE_SECTION,
+} from '@open-tomato/rafa/config-schema-release';
+import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -35,14 +42,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import {
-  DANGEROUS_RELEASE_DEFAULTS,
-  mergeMethod,
-  PR_DEFAULTS,
-  RELEASE_DEFAULTS,
-  RELEASE_SECTION,
-} from './config-schema-release.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

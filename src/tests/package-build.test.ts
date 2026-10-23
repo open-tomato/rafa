@@ -543,6 +543,16 @@ const EXPORTS = {
   './config-schema-errors': { types: './dist/config-schema-errors.d.ts' },
   './config-schema-features': { types: './dist/config-schema-features.d.ts' },
   './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
+  './config-schema-board-project': { types: './dist/config-schema-board-project.d.ts' },
+  './config-schema-checks': { types: './dist/config-schema-checks.d.ts' },
+  './config-schema-hub': { types: './dist/config-schema-hub.d.ts' },
+  './config-schema-issues': { types: './dist/config-schema-issues.d.ts' },
+  './config-schema-loop-continue': { types: './dist/config-schema-loop-continue.d.ts' },
+  './config-schema-loop-retries': { types: './dist/config-schema-loop-retries.d.ts' },
+  './config-schema-release': { types: './dist/config-schema-release.d.ts' },
+  './config-schema-tests': { types: './dist/config-schema-tests.d.ts' },
+  './config-schema-triage': { types: './dist/config-schema-triage.d.ts' },
+  './config-schema-wrap-up': { types: './dist/config-schema-wrap-up.d.ts' },
 };
 
 /** The prefix of a specifier that names one of the package's own subpaths. */
@@ -1179,7 +1189,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name to their types, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the fourteen config sections among them, to their types, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -1282,7 +1292,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(21);
+    expect(targets).toHaveLength(31);
     expect(missing).toEqual([]);
   });
 

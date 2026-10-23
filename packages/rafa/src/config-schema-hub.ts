@@ -79,12 +79,12 @@ import type {
   ConfigCheckInput,
   ConfigSection,
   SettingSpec,
-} from '@open-tomato/rafa/core/config';
-import type { Reader, SyncStrategy } from '@open-tomato/rafa/core/config/sections';
+} from './core/config/index.js';
+import type { Reader, SyncStrategy } from './core/config/sections.js';
 
-import { describeValue, refused, text } from '@open-tomato/rafa/core/config/sections';
+import { describeValue, refused, text } from './core/config/sections.js';
 
-declare module '@open-tomato/rafa/core/config/config-schema' {
+declare module './core/config/config-schema.js' {
   /** The `hub` section's fields, added to core's. */
   interface RafaConfig extends HubSettings {}
 }

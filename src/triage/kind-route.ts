@@ -78,7 +78,7 @@ import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { KindCheck, NamedTestReadings } from './own-check.js';
 import type { PlanBaseReading, PlanFilesReading } from './plan-commits.js';
 import type { BugTriage, BugTriageAction, TriageOptions } from './triage.js';
-import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

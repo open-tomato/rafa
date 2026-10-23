@@ -29,7 +29,7 @@
  * `MergeMethod`, `MERGE_METHODS` and `isMergeMethod` are core's
  * (`packages/rafa/src/core/config/merge-method.ts`), re-exported by
  * `./types.js` and listed here under the same names. The config's
- * `pr.mergeMethod` setting (`src/config-schema-release.ts`) takes them
+ * `pr.mergeMethod` setting (`packages/rafa/src/config-schema-release.ts`) takes them
  * from core's sections barrel and imports nothing under `src/pr/`: this
  * barrel carries the `gh` adapter and its spawner, which would sit
  * behind every config read.

@@ -11,7 +11,7 @@
  * over the suggestion.
  *
  * This module imports nothing, so the config schema
- * (`src/config-schema-issues.ts`) reads the built-in places without
+ * (`packages/rafa/src/config-schema-issues.ts`) reads the built-in places without
  * reaching the modules that read the config.
  */
 

@@ -57,7 +57,7 @@
  * A `cleanup.keep` pattern is matched with `Bun.Glob`, whose `*` stops
  * at a `/`. Measured on Bun 1.3.14: `release/*` matches `release/x` and
  * NOT `release/a/b`, which `release/**` matches. The config schema keeps
- * every pattern as written (`src/config-schema-readings.ts`), and `Bun.Glob`
+ * every pattern as written (`packages/rafa/src/config-schema-readings.ts`), and `Bun.Glob`
  * accepts every string (`packages/rafa-inventory/src/schema/skill.ts`), so no pattern throws
  * here either.
  *

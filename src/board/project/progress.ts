@@ -64,7 +64,7 @@
  * result. The clock and the event stamp are the command's seams, the
  * system's own when left out.
  */
-import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
+import type { BoardProjectProgressSeconds } from '@open-tomato/rafa/config-schema-board-project';
 import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
 import type { CliEventNamed, Output } from '@open-tomato/rafa/ports';
 

@@ -177,7 +177,7 @@ its change reaches:
 **Config keys for test selection and running:**
 - `checks.task`, `checks.stage` and `checks.loop` are the check points the
   runner reads (`checksTask`, `checksStage`, `checksLoop`,
-  `src/config-schema-checks.ts`). Each is a list of check names defaulting to
+  `packages/rafa/src/config-schema-checks.ts`). Each is a list of check names defaulting to
   empty, and an empty list runs nothing and blocks nothing at that point.
   `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
   `checks.publish` take the same reader and default empty too, but no step

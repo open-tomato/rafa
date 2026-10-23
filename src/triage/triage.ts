@@ -513,7 +513,7 @@ export interface TriageOptions {
   readonly env?: SecretEnvironment;
   /**
    * The rules a bug record is built under, as `bugRulesOf`
-   * (`src/config-schema-issues.ts`) answers them from the run's config:
+   * (`packages/rafa/src/config-schema-issues.ts`) answers them from the run's config:
    * the title template, the summary cap, the vocabulary and the cause
    * codes. `DEFAULT_BUG_RULES` (`./bug-filing.ts`) when left out.
    */
