@@ -744,6 +744,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./list.js', ['DEFAULT_SKILL_LIST_SEAMS', 'projectInventory', 'warningLines']],
   ]],
   ['./commands/skill/search.js', [
+    ['@open-tomato/rafa-effort', ['collectSessionRow']],
     ['@open-tomato/rafa-inventory', ['droppedLine', 'rankSearch', 'runSearch']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'readSwitch']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],

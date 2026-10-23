@@ -7,16 +7,20 @@
  * records what it was spawned with and what its working directory held
  * WHILE it ran, writes a session log where Claude Code would file one
  * (under the planted home, at the real path of that directory), and
- * answers the stdout the case gives it. No case starts a real session.
+ * answers the stdout the case gives it. No case starts a real session,
+ * and none reads a log into a row: the search is handed a planted
+ * collector that answers a row of its own fields, kind `other`, and
+ * records the candidate it was given.
  *
  * Each absence is paired with a control that shows it could have been
  * present: the file the scratch copy leaves out ranks for another
  * question, the agent the skill search leaves out ranks in an agent
- * search, and the log whose prompt the classifier reads as `other` is
- * shown to read as `other` before the runner stores it as `search`.
+ * search, and the collector's row, shown to answer kind `other`, is
+ * stored as `search` with the collector's own fields.
  */
 import type { InventoryRecord } from '../record.js';
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
 import type { EffortStore, SessionEffortRow } from '@open-tomato/rafa/store/types';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -25,10 +29,10 @@ import { join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { collectSessionRow, sessionLogDir } from '../../effort/collect.js';
 import { readInventoryText, summarize } from '../record.js';
 
 import { SEARCH_PROMPT_PREFIX } from './prompt.js';
@@ -106,6 +110,63 @@ let home: string;
 let scratchRoot: string;
 let records: InventoryRecord[];
 let store: EffortStore;
+/** The candidates the planted collector was handed, in call order. */
+let collected: { candidate: SessionLogCandidate; planStubs: readonly string[] }[];
+
+/** The models the planted collector's row reports, no log's reading. */
+const PLANTED_MODELS = { 'planted-model': 3 };
+/** The branch the planted collector's row reports. */
+const PLANTED_BRANCH = 'planted/branch';
+
+/**
+ * The collector the search is handed: a row of kind `other` with the
+ * planted fields, keyed by the candidate it records.
+ */
+function plantedCollector(candidate: SessionLogCandidate, planStubs: readonly string[]): Promise<SessionEffortRow> {
+  collected.push({ candidate, planStubs });
+  return Promise.resolve({
+    sessionId: candidate.sessionId,
+    filePath: candidate.path,
+    lineCount: 2,
+    recordCount: 2,
+    unparsedLineCount: 0,
+    recordTypeCounts: { assistant: 1, 'queue-operation': 1 },
+    assistantRecordCount: 1,
+    firstTimestamp: '2026-09-24T09:00:00.000Z',
+    lastTimestamp: '2026-09-24T09:00:00.000Z',
+    gitBranchCounts: { [PLANTED_BRANCH]: 1 },
+    entrypointCounts: { 'sdk-cli': 1 },
+    effortCounts: {},
+    sidechainRecordCount: 0,
+    modelCounts: PLANTED_MODELS,
+    usage: {
+      inputTokens: 900,
+      outputTokens: 210,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+      ephemeral1hInputTokens: 0,
+      ephemeral5mInputTokens: 0,
+      webSearchRequests: 0,
+      webFetchRequests: 0,
+      thinkingTokens: 0,
+    },
+    kind: 'other',
+    mode: 'local',
+    branch: PLANTED_BRANCH,
+    branchRecordCount: 1,
+    distinctBranchCount: 1,
+    branchType: null,
+    branchStub: null,
+    planStub: null,
+    planStubMatch: 'none',
+    issueIdentifier: null,
+    taskText: null,
+    enqueueRecordIndex: 0,
+    sizeBytes: candidate.sizeBytes,
+    modifiedAt: '2026-09-24T09:00:01.000Z',
+    worktree: null,
+  });
+}
 
 /** Writes `text` at `path`, making its directory. */
 function plant(path: string, text: string): string {
@@ -152,6 +213,7 @@ beforeEach(() => {
     recordOf({ kind: 'agent', name: 'reviewer', source: 'project', path: plant(join(project, 'agents', 'reviewer.md'), REVIEWER) }),
   ];
   store = openNdjsonStore(join(base, 'repo'));
+  collected = [];
 });
 
 afterEach(() => {
@@ -250,6 +312,7 @@ function search(spawn: CapturingSpawner, question: string = QUESTION): ReturnTyp
     records,
     settingSources: ['project', 'local'],
     store,
+    collectRow: plantedCollector,
     home,
     spawn,
     scratchRoot,
@@ -463,7 +526,7 @@ const BACKENDS: readonly (readonly [string, (root: string) => EffortStore])[] = 
 ];
 
 describe.each(BACKENDS)('%s: the search effort row', (name, open) => {
-  test('stores one row of kind search, read from the session\'s log', async () => {
+  test('stores one row of kind search, read by the collector it is handed', async () => {
     store = open(join(base, `${name}-repo`));
     const { spawn } = stubSpawner({ answer: ok(searchBlock(['matches: []', 'unanswerable: true'])) });
 
@@ -474,17 +537,14 @@ describe.each(BACKENDS)('%s: the search effort row', (name, open) => {
     expect(outcome.effort.written).toBe(true);
     const rows = store.read('sessions') as SessionEffortRow[];
     expect(rows.map((row) => [row.sessionId, row.kind, row.modelCounts])).toEqual([
-      [SESSION_ID, 'search', { 'claude-haiku-4-5': 1 }],
+      [SESSION_ID, 'search', PLANTED_MODELS],
     ]);
   });
 
-  test('stores the row as search when the log\'s prompt classifies as other', async () => {
+  test('stores the collector\'s row as search, its own kind other', async () => {
     store = open(join(base, `${name}-repo`));
     let logPath = '';
-    const { spawn: inner } = stubSpawner({
-      answer: ok(searchBlock(['matches: []', 'unanswerable: true'])),
-      logPrompt: () => 'Reply with exactly the word: ok',
-    });
+    const { spawn: inner } = stubSpawner({ answer: ok(searchBlock(['matches: []', 'unanswerable: true'])) });
     const spawn: CapturingSpawner = async (args, prompt, options) => {
       const session = await inner(args, prompt, options);
       logPath = join(sessionLogDir(realpathSync(options?.cwd ?? ''), home), `${SESSION_ID}.jsonl`);
@@ -493,10 +553,16 @@ describe.each(BACKENDS)('%s: the search effort row', (name, open) => {
 
     await search(spawn);
 
-    const stats = statSync(logPath);
-    const plain = await collectSessionRow({ path: logPath, sessionId: SESSION_ID, sizeBytes: stats.size, modifiedAtMs: stats.mtimeMs }, []);
+    expect(collected.map(({ candidate, planStubs }) => [candidate.path, candidate.sessionId, planStubs])).toEqual([
+      [logPath, SESSION_ID, []],
+    ]);
+    const plain = await plantedCollector(collected[0]!.candidate, []);
     expect(plain.kind).toBe('other');
-    expect((store.read('sessions') as SessionEffortRow[]).map((row) => row.kind)).toEqual(['search']);
+    const rows = store.read('sessions') as SessionEffortRow[];
+    expect(rows).toEqual([{ ...plain, kind: 'search' }]);
+    expect(rows.map((row) => [row.kind, row.branch, row.modelCounts, row.filePath])).toEqual([
+      ['search', PLANTED_BRANCH, PLANTED_MODELS, logPath],
+    ]);
   });
 });
 
