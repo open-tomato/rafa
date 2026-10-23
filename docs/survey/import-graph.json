@@ -168,10 +168,21 @@
     "packages/rafa/src/bugs/title.test.ts": 0,
     "packages/rafa/src/bugs/title.ts": 0,
     "packages/rafa/src/commands/plan/plan-files.ts": 1491.705046,
+    "packages/rafa/src/config-schema-board-project.ts": 148.998841,
     "packages/rafa/src/config-schema-bugs.ts": 15.665508,
+    "packages/rafa/src/config-schema-checks.ts": 202.358365,
     "packages/rafa/src/config-schema-errors.ts": 215.880984,
     "packages/rafa/src/config-schema-features.ts": 13.998841,
+    "packages/rafa/src/config-schema-hub.ts": 12.476619,
+    "packages/rafa/src/config-schema-issues.ts": 2316.909527,
     "packages/rafa/src/config-schema-logger.ts": 58.399852,
+    "packages/rafa/src/config-schema-loop-continue.ts": 80.332175,
+    "packages/rafa/src/config-schema-loop-retries.ts": 197.306766,
+    "packages/rafa/src/config-schema-readings.ts": 0,
+    "packages/rafa/src/config-schema-release.ts": 123.841507,
+    "packages/rafa/src/config-schema-tests.ts": 84.429,
+    "packages/rafa/src/config-schema-triage.ts": 15.665508,
+    "packages/rafa/src/config-schema-wrap-up.ts": 16.998841,
     "packages/rafa/src/core/adapters/index.test.ts": 0,
     "packages/rafa/src/core/adapters/index.ts": 3635.289428,
     "packages/rafa/src/core/adapters/registry.test.ts": 0,
@@ -1229,27 +1240,6 @@
     "src/config-locked.ts": 36.291667,
     "src/config-registry.test.ts": 0,
     "src/config-registry.ts": 10471.132669,
-    "src/config-schema-board-project.test.ts": 0,
-    "src/config-schema-board-project.ts": 148.998841,
-    "src/config-schema-checks.test.ts": 0,
-    "src/config-schema-checks.ts": 202.358365,
-    "src/config-schema-hub.test.ts": 0,
-    "src/config-schema-hub.ts": 12.476619,
-    "src/config-schema-issues.test.ts": 0,
-    "src/config-schema-issues.ts": 2316.909527,
-    "src/config-schema-loop-continue.test.ts": 0,
-    "src/config-schema-loop-continue.ts": 80.332175,
-    "src/config-schema-loop-retries.test.ts": 0,
-    "src/config-schema-loop-retries.ts": 197.306766,
-    "src/config-schema-readings.ts": 0,
-    "src/config-schema-release.test.ts": 0,
-    "src/config-schema-release.ts": 123.841507,
-    "src/config-schema-tests.test.ts": 0,
-    "src/config-schema-tests.ts": 84.429,
-    "src/config-schema-triage.test.ts": 0,
-    "src/config-schema-triage.ts": 15.665508,
-    "src/config-schema-wrap-up.test.ts": 0,
-    "src/config-schema-wrap-up.ts": 16.998841,
     "src/config-set.test.ts": 0,
     "src/config-set.ts": 199.272222,
     "src/config/entry.test.ts": 0,
@@ -1873,10 +1863,20 @@
     "src/tests/core-coupled/bugs/record.test.ts": 0,
     "src/tests/core-coupled/bugs/stack-path.test.ts": 0,
     "src/tests/core-coupled/commands/plan/plan-files.test.ts": 0,
+    "src/tests/core-coupled/config-schema-board-project.test.ts": 0,
     "src/tests/core-coupled/config-schema-bugs.test.ts": 0,
+    "src/tests/core-coupled/config-schema-checks.test.ts": 0,
     "src/tests/core-coupled/config-schema-errors.test.ts": 0,
     "src/tests/core-coupled/config-schema-features-integration.test.ts": 0,
+    "src/tests/core-coupled/config-schema-hub.test.ts": 0,
+    "src/tests/core-coupled/config-schema-issues.test.ts": 0,
     "src/tests/core-coupled/config-schema-logger.test.ts": 0,
+    "src/tests/core-coupled/config-schema-loop-continue.test.ts": 0,
+    "src/tests/core-coupled/config-schema-loop-retries.test.ts": 0,
+    "src/tests/core-coupled/config-schema-release.test.ts": 0,
+    "src/tests/core-coupled/config-schema-tests.test.ts": 0,
+    "src/tests/core-coupled/config-schema-triage.test.ts": 0,
+    "src/tests/core-coupled/config-schema-wrap-up.test.ts": 0,
     "src/tests/core-coupled/core/command/version.test.ts": 0,
     "src/tests/core-coupled/core/config/config-load-templates.test.ts": 0,
     "src/tests/core-coupled/core/config/config-load.test.ts": 0,
@@ -2185,7 +2185,7 @@
         "src/commands/epic": 31,
         "src/commands/issue": 38,
         "src/commands/plan": 10,
-        "src/commands/pr": 7,
+        "src/commands/pr": 8,
         "src/commands/release": 2,
         "src/epic": 4,
         "src/next": 8,
@@ -2509,6 +2509,7 @@
         "src/commands/pr/merge-project.ts",
         "src/commands/pr/merge-tick.test.ts",
         "src/commands/pr/merge-tick.ts",
+        "src/commands/pr/merge.test.ts",
         "src/commands/release/settle-project.test.ts",
         "src/commands/release/settle-project.ts",
         "src/commands/roadmap-native.test.ts",
@@ -2586,21 +2587,21 @@
         "src/triage/refs-section.ts"
       ],
       "name": "c01-github",
-      "size": 384
+      "size": 385
     },
     {
       "folders": {
         "packages/rafa/src/core/loop": 1,
         "packages/rafa/src/effort": 2,
         "packages/rafa/src/release": 2,
+        "packages/rafa/src/runtime": 2,
         "src": 2,
         "src/board/project": 1,
         "src/cleanup": 1,
         "src/cli": 1,
-        "src/commands": 8,
+        "src/commands": 9,
         "src/commands/bug": 2,
         "src/commands/config": 1,
-        "src/commands/effort": 1,
         "src/commands/loop": 7,
         "src/commands/pr": 15,
         "src/commands/release": 36,
@@ -2614,8 +2615,9 @@
         "src/pr": 2,
         "src/pr/triage": 2,
         "src/project": 5,
-        "src/release": 66,
+        "src/release": 64,
         "src/release/strategies": 2,
+        "src/runtime": 2,
         "src/start": 25,
         "src/tests": 90
       },
@@ -2626,6 +2628,8 @@
         "packages/rafa/src/effort/session-log-dirs.ts",
         "packages/rafa/src/release/fragment.test.ts",
         "packages/rafa/src/release/fragment.ts",
+        "packages/rafa/src/runtime/live-loops.test.ts",
+        "packages/rafa/src/runtime/live-loops.ts",
         "src/board/project/sync-stand-in.ts",
         "src/cleanup/worktrees.test.ts",
         "src/cli/feature-load-cli.test.ts",
@@ -2638,7 +2642,6 @@
         "src/commands/doctor-ladder.ts",
         "src/commands/doctor-release.test.ts",
         "src/commands/doctor-release.ts",
-        "src/commands/effort/dashboard.test.ts",
         "src/commands/init-scratch.test.ts",
         "src/commands/loop/list.test.ts",
         "src/commands/loop/pause.test.ts",
@@ -2699,6 +2702,7 @@
         "src/commands/release/workflows.test.ts",
         "src/commands/release/workflows.ts",
         "src/commands/self-update.test.ts",
+        "src/commands/self-update.ts",
         "src/commands/skill/search.test.ts",
         "src/commands/stretch/item.test.ts",
         "src/docs/release-issue.test.ts",
@@ -2731,8 +2735,6 @@
         "src/release/branch-forecast.ts",
         "src/release/changelog.test.ts",
         "src/release/changelog.ts",
-        "src/release/enabled.test.ts",
-        "src/release/enabled.ts",
         "src/release/fold-spawned.test.ts",
         "src/release/forecast.test.ts",
         "src/release/forecast.ts",
@@ -2791,6 +2793,8 @@
         "src/release/version.ts",
         "src/release/workspace-packages.test.ts",
         "src/release/workspace-packages.ts",
+        "src/runtime/install.test.ts",
+        "src/runtime/install.ts",
         "src/start.test.ts",
         "src/start/checkout-guard-before-spawn-integration.test.ts",
         "src/start/checkout-guard-commits-integration.test.ts",
@@ -2909,10 +2913,11 @@
         "src/tests/worktree-start-refusals-integration.test.ts"
       ],
       "name": "c02-cli-capture",
-      "size": 286
+      "size": 288
     },
     {
       "folders": {
+        "packages/rafa/src": 1,
         "packages/rafa/src/commands/plan": 1,
         "packages/rafa/src/core/runtime": 3,
         "packages/rafa/src/effort": 2,
@@ -2921,14 +2926,13 @@
         "packages/rafa/src/report": 3,
         "packages/rafa/src/triage": 4,
         "packages/rafa/src/utils": 1,
-        "src": 1,
         "src/adapters/tracker": 3,
         "src/board/project": 1,
         "src/claims": 1,
         "src/commands": 3,
         "src/commands/claim": 1,
         "src/commands/docs": 2,
-        "src/commands/effort": 16,
+        "src/commands/effort": 17,
         "src/commands/epic": 3,
         "src/commands/release": 2,
         "src/docs": 5,
@@ -2946,6 +2950,7 @@
       "hub": "packages/rafa/src/effort/store/sqlite.ts",
       "members": [
         "packages/rafa/src/commands/plan/plan-files.ts",
+        "packages/rafa/src/config-schema-issues.ts",
         "packages/rafa/src/core/runtime/identity.ts",
         "packages/rafa/src/core/runtime/index.test.ts",
         "packages/rafa/src/core/runtime/index.ts",
@@ -3066,6 +3071,7 @@
         "src/commands/doctor-install.test.ts",
         "src/commands/effort/copy.test.ts",
         "src/commands/effort/copy.ts",
+        "src/commands/effort/dashboard.test.ts",
         "src/commands/effort/dashboard.ts",
         "src/commands/effort/fix-schema.test.ts",
         "src/commands/effort/fix-schema.ts",
@@ -3085,7 +3091,6 @@
         "src/commands/epic/close-triage.ts",
         "src/commands/release/status-stale-docs.test.ts",
         "src/commands/release/status-stale-docs.ts",
-        "src/config-schema-issues.ts",
         "src/docs/open-lines.test.ts",
         "src/docs/open-lines.ts",
         "src/docs/release-issue.ts",
@@ -3215,266 +3220,7 @@
         "src/triage/triage.ts"
       ],
       "name": "c03-sqlite",
-      "size": 268
-    },
-    {
-      "folders": {
-        "packages/rafa-inventory/src/agents": 2,
-        "packages/rafa-inventory/src/backfill": 10,
-        "packages/rafa-inventory/src/check": 8,
-        "packages/rafa-inventory/src/demote": 10,
-        "packages/rafa-inventory/src/inventory": 14,
-        "packages/rafa-inventory/src/inventory/search": 11,
-        "packages/rafa-inventory/src/plan/risk": 3,
-        "packages/rafa-inventory/src/schema": 7,
-        "packages/rafa-inventory/src/start": 1,
-        "packages/rafa-inventory/src/task": 8,
-        "packages/rafa-inventory/src/tiers": 10,
-        "packages/rafa/src/board": 1,
-        "packages/rafa/src/core/config": 2,
-        "packages/rafa/src/modules": 1,
-        "packages/rafa/src/plan": 3,
-        "packages/rafa/src/plan/risk": 4,
-        "packages/rafa/src/project": 6,
-        "packages/rafa/src/runtime": 2,
-        "packages/rafa/src/schema": 4,
-        "packages/rafa/src/utils": 2,
-        "src": 3,
-        "src/board": 1,
-        "src/commands": 24,
-        "src/commands/agent": 6,
-        "src/commands/plan": 8,
-        "src/commands/skill": 9,
-        "src/commands/update": 1,
-        "src/notices": 1,
-        "src/plan": 8,
-        "src/plan/risk": 1,
-        "src/preflight": 6,
-        "src/project": 3,
-        "src/runtime": 2,
-        "src/schema": 2,
-        "src/start": 4,
-        "src/tests": 11,
-        "src/tests/core-coupled/plan": 1,
-        "src/tests/core-coupled/project": 2,
-        "src/tests/inventory-coupled/agents": 2,
-        "src/tests/inventory-coupled/plan/risk": 1,
-        "src/tests/inventory-coupled/tiers": 2,
-        "src/tiers": 1
-      },
-      "hub": "packages/rafa/src/core/config/sections.ts",
-      "members": [
-        "packages/rafa-inventory/src/agents/roster.ts",
-        "packages/rafa-inventory/src/agents/vendorable.ts",
-        "packages/rafa-inventory/src/backfill/backup.test.ts",
-        "packages/rafa-inventory/src/backfill/backup.ts",
-        "packages/rafa-inventory/src/backfill/derive.test.ts",
-        "packages/rafa-inventory/src/backfill/derive.ts",
-        "packages/rafa-inventory/src/backfill/proposal-batch.test.ts",
-        "packages/rafa-inventory/src/backfill/proposal-batch.ts",
-        "packages/rafa-inventory/src/backfill/proposal-file.test.ts",
-        "packages/rafa-inventory/src/backfill/proposal-file.ts",
-        "packages/rafa-inventory/src/backfill/propose.test.ts",
-        "packages/rafa-inventory/src/backfill/propose.ts",
-        "packages/rafa-inventory/src/check/layout.test.ts",
-        "packages/rafa-inventory/src/check/layout.ts",
-        "packages/rafa-inventory/src/check/references.test.ts",
-        "packages/rafa-inventory/src/check/references.ts",
-        "packages/rafa-inventory/src/check/run.test.ts",
-        "packages/rafa-inventory/src/check/run.ts",
-        "packages/rafa-inventory/src/check/shell-lines.test.ts",
-        "packages/rafa-inventory/src/check/shell-lines.ts",
-        "packages/rafa-inventory/src/demote/apply.test.ts",
-        "packages/rafa-inventory/src/demote/apply.ts",
-        "packages/rafa-inventory/src/demote/classify.test.ts",
-        "packages/rafa-inventory/src/demote/classify.ts",
-        "packages/rafa-inventory/src/demote/draft.test.ts",
-        "packages/rafa-inventory/src/demote/draft.ts",
-        "packages/rafa-inventory/src/demote/report.test.ts",
-        "packages/rafa-inventory/src/demote/report.ts",
-        "packages/rafa-inventory/src/demote/select.test.ts",
-        "packages/rafa-inventory/src/demote/select.ts",
-        "packages/rafa-inventory/src/inventory/disabled.test.ts",
-        "packages/rafa-inventory/src/inventory/disabled.ts",
-        "packages/rafa-inventory/src/inventory/index.test.ts",
-        "packages/rafa-inventory/src/inventory/index.ts",
-        "packages/rafa-inventory/src/inventory/mcp.test.ts",
-        "packages/rafa-inventory/src/inventory/mcp.ts",
-        "packages/rafa-inventory/src/inventory/plugins.test.ts",
-        "packages/rafa-inventory/src/inventory/plugins.ts",
-        "packages/rafa-inventory/src/inventory/record.test.ts",
-        "packages/rafa-inventory/src/inventory/record.ts",
-        "packages/rafa-inventory/src/inventory/search/block.test.ts",
-        "packages/rafa-inventory/src/inventory/search/block.ts",
-        "packages/rafa-inventory/src/inventory/search/index.test.ts",
-        "packages/rafa-inventory/src/inventory/search/index.ts",
-        "packages/rafa-inventory/src/inventory/search/prompt.ts",
-        "packages/rafa-inventory/src/inventory/search/quote.test.ts",
-        "packages/rafa-inventory/src/inventory/search/quote.ts",
-        "packages/rafa-inventory/src/inventory/search/rank.test.ts",
-        "packages/rafa-inventory/src/inventory/search/rank.ts",
-        "packages/rafa-inventory/src/inventory/search/scratch.test.ts",
-        "packages/rafa-inventory/src/inventory/search/scratch.ts",
-        "packages/rafa-inventory/src/inventory/show.test.ts",
-        "packages/rafa-inventory/src/inventory/show.ts",
-        "packages/rafa-inventory/src/inventory/trees.test.ts",
-        "packages/rafa-inventory/src/inventory/trees.ts",
-        "packages/rafa-inventory/src/plan/risk/commands.test.ts",
-        "packages/rafa-inventory/src/plan/risk/commands.ts",
-        "packages/rafa-inventory/src/plan/risk/long-runs.ts",
-        "packages/rafa-inventory/src/schema/failure-strings.ts",
-        "packages/rafa-inventory/src/schema/provenance.test.ts",
-        "packages/rafa-inventory/src/schema/provenance.ts",
-        "packages/rafa-inventory/src/schema/skill.test.ts",
-        "packages/rafa-inventory/src/schema/skill.ts",
-        "packages/rafa-inventory/src/schema/stack.test.ts",
-        "packages/rafa-inventory/src/schema/stack.ts",
-        "packages/rafa-inventory/src/start/serving.test.ts",
-        "packages/rafa-inventory/src/task/resolve-skills.test.ts",
-        "packages/rafa-inventory/src/task/resolve-skills.ts",
-        "packages/rafa-inventory/src/task/sections.test.ts",
-        "packages/rafa-inventory/src/task/sections.ts",
-        "packages/rafa-inventory/src/task/select-lessons.test.ts",
-        "packages/rafa-inventory/src/task/select-lessons.ts",
-        "packages/rafa-inventory/src/task/skill-index.test.ts",
-        "packages/rafa-inventory/src/task/skill-index.ts",
-        "packages/rafa-inventory/src/tiers/delivery.test.ts",
-        "packages/rafa-inventory/src/tiers/delivery.ts",
-        "packages/rafa-inventory/src/tiers/resolve.ts",
-        "packages/rafa-inventory/src/tiers/routing-table.test.ts",
-        "packages/rafa-inventory/src/tiers/routing-table.ts",
-        "packages/rafa-inventory/src/tiers/routing.ts",
-        "packages/rafa-inventory/src/tiers/serve.test.ts",
-        "packages/rafa-inventory/src/tiers/serve.ts",
-        "packages/rafa-inventory/src/tiers/skill-names.test.ts",
-        "packages/rafa-inventory/src/tiers/skill-names.ts",
-        "packages/rafa/src/board/naming.test.ts",
-        "packages/rafa/src/core/config/load.ts",
-        "packages/rafa/src/core/config/sections.ts",
-        "packages/rafa/src/modules/manifest.ts",
-        "packages/rafa/src/plan/doc-task.ts",
-        "packages/rafa/src/plan/inject.test.ts",
-        "packages/rafa/src/plan/inject.ts",
-        "packages/rafa/src/plan/risk/patterns.test.ts",
-        "packages/rafa/src/plan/risk/patterns.ts",
-        "packages/rafa/src/plan/risk/secrets.test.ts",
-        "packages/rafa/src/plan/risk/secrets.ts",
-        "packages/rafa/src/project/bin-path.test.ts",
-        "packages/rafa/src/project/bin-path.ts",
-        "packages/rafa/src/project/roots.test.ts",
-        "packages/rafa/src/project/roots.ts",
-        "packages/rafa/src/project/scope.ts",
-        "packages/rafa/src/project/worktree-root.ts",
-        "packages/rafa/src/runtime/live-loops.test.ts",
-        "packages/rafa/src/runtime/live-loops.ts",
-        "packages/rafa/src/schema/frontmatter.test.ts",
-        "packages/rafa/src/schema/frontmatter.ts",
-        "packages/rafa/src/schema/tiers.test.ts",
-        "packages/rafa/src/schema/tiers.ts",
-        "packages/rafa/src/utils/agent-definition.test.ts",
-        "packages/rafa/src/utils/agent-definition.ts",
-        "src/board/epic-guard.test.ts",
-        "src/commands/agent/list.test.ts",
-        "src/commands/agent/list.ts",
-        "src/commands/agent/show.test.ts",
-        "src/commands/agent/show.ts",
-        "src/commands/agent/vendor.test.ts",
-        "src/commands/agent/vendor.ts",
-        "src/commands/doctor-deep-env.test.ts",
-        "src/commands/doctor-deep-env.ts",
-        "src/commands/doctor-deep-needs.test.ts",
-        "src/commands/doctor-deep-needs.ts",
-        "src/commands/doctor-deep-providers.ts",
-        "src/commands/doctor-deep-row.test.ts",
-        "src/commands/doctor-deep-row.ts",
-        "src/commands/doctor-deep-sections.test.ts",
-        "src/commands/doctor-deep-settings.test.ts",
-        "src/commands/doctor-deep-settings.ts",
-        "src/commands/doctor-deep.test.ts",
-        "src/commands/doctor-deep.ts",
-        "src/commands/doctor-description.ts",
-        "src/commands/doctor-install.ts",
-        "src/commands/doctor-render.ts",
-        "src/commands/doctor-stretch.test.ts",
-        "src/commands/doctor-stretch.ts",
-        "src/commands/doctor-tiers.test.ts",
-        "src/commands/doctor-tiers.ts",
-        "src/commands/doctor.ts",
-        "src/commands/init.test.ts",
-        "src/commands/init.ts",
-        "src/commands/plan/bundled-check.test.ts",
-        "src/commands/plan/bundled-check.ts",
-        "src/commands/plan/needs.ts",
-        "src/commands/plan/risk.test.ts",
-        "src/commands/plan/risk.ts",
-        "src/commands/plan/store-check.ts",
-        "src/commands/plan/validate.test.ts",
-        "src/commands/plan/validate.ts",
-        "src/commands/self-update.ts",
-        "src/commands/skill/backfill.test.ts",
-        "src/commands/skill/backfill.ts",
-        "src/commands/skill/demote.test.ts",
-        "src/commands/skill/demote.ts",
-        "src/commands/skill/list.test.ts",
-        "src/commands/skill/list.ts",
-        "src/commands/skill/search.ts",
-        "src/commands/skill/show.test.ts",
-        "src/commands/skill/show.ts",
-        "src/commands/tiers-scratch.test.ts",
-        "src/commands/update/current.ts",
-        "src/index.test.ts",
-        "src/index.ts",
-        "src/notices/run.ts",
-        "src/plan.ts",
-        "src/plan/index.test.ts",
-        "src/plan/index.ts",
-        "src/plan/needs.test.ts",
-        "src/plan/needs.ts",
-        "src/plan/risk.ts",
-        "src/plan/risk/accounts.ts",
-        "src/plan/store-rules.test.ts",
-        "src/plan/store-rules.ts",
-        "src/plan/validate.ts",
-        "src/preflight/first-dispatch.test.ts",
-        "src/preflight/first-dispatch.ts",
-        "src/preflight/fork.test.ts",
-        "src/preflight/fork.ts",
-        "src/preflight/prerequisites-md.ts",
-        "src/preflight/run.ts",
-        "src/project/root-choice.test.ts",
-        "src/project/root-choice.ts",
-        "src/project/update-current.ts",
-        "src/runtime/install.test.ts",
-        "src/runtime/install.ts",
-        "src/schema/agent.test.ts",
-        "src/schema/agent.ts",
-        "src/start/plan-path.test.ts",
-        "src/start/plan-path.ts",
-        "src/start/preflight.ts",
-        "src/start/risk-total.ts",
-        "src/tests/backfill-pipeline.test.ts",
-        "src/tests/bundled-tier.test.ts",
-        "src/tests/core-coupled/plan/doc-task.test.ts",
-        "src/tests/core-coupled/project/scope-fallback.test.ts",
-        "src/tests/core-coupled/project/worktree-root.test.ts",
-        "src/tests/demotion-pass.test.ts",
-        "src/tests/doctor-deep-env-integration.test.ts",
-        "src/tests/inventory-coupled/agents/roster.test.ts",
-        "src/tests/inventory-coupled/agents/vendorable.test.ts",
-        "src/tests/inventory-coupled/plan/risk/long-runs.test.ts",
-        "src/tests/inventory-coupled/tiers/resolve.test.ts",
-        "src/tests/inventory-coupled/tiers/routing.test.ts",
-        "src/tests/inventory-live.test.ts",
-        "src/tests/operators.test.ts",
-        "src/tests/package-build.test.ts",
-        "src/tests/plan-format-source.test.ts",
-        "src/tests/preflight-halts.test.ts",
-        "src/tests/project-skills-check.test.ts",
-        "src/tests/schema-records.test.ts",
-        "src/tiers/resolve.integration.test.ts"
-      ],
-      "name": "c04-sections",
-      "size": 208
+      "size": 269
     },
     {
       "folders": {
@@ -3483,19 +3229,20 @@
         "packages/rafa-inventory/src/report": 2,
         "packages/rafa-inventory/src/schema": 4,
         "packages/rafa-inventory/src/start": 1,
+        "packages/rafa/src": 1,
         "packages/rafa/src/adapters/output": 2,
         "packages/rafa/src/core/output": 1,
         "packages/rafa/src/core/plan": 5,
         "packages/rafa/src/ports": 1,
         "packages/rafa/src/utils": 2,
-        "src": 2,
+        "src": 1,
         "src/adapters/planner": 2,
         "src/board": 10,
         "src/commands/instinct": 9,
         "src/commands/plan": 4,
         "src/preflight": 1,
         "src/start": 112,
-        "src/suite": 12,
+        "src/suite": 13,
         "src/tests": 19,
         "src/tests/core-coupled/report": 1,
         "src/tests/core-coupled/utils": 1,
@@ -3527,6 +3274,7 @@
         "packages/rafa-inventory/src/start/serving.ts",
         "packages/rafa/src/adapters/output/events.test.ts",
         "packages/rafa/src/adapters/output/events.ts",
+        "packages/rafa/src/config-schema-checks.ts",
         "packages/rafa/src/core/output/index.ts",
         "packages/rafa/src/core/plan/block-reader.test.ts",
         "packages/rafa/src/core/plan/block-reader.ts",
@@ -3561,7 +3309,6 @@
         "src/commands/plan/plan-record.ts",
         "src/commands/plan/review-gate.test.ts",
         "src/commands/plan/review-gate.ts",
-        "src/config-schema-checks.ts",
         "src/preflight/run.test.ts",
         "src/start.ts",
         "src/start/background-wait.test.ts",
@@ -3678,6 +3425,7 @@
         "src/start/wrap-up.ts",
         "src/suite/baseline.test.ts",
         "src/suite/baseline.ts",
+        "src/suite/checks.ts",
         "src/suite/deadline-spawn.test.ts",
         "src/suite/deadline-spawn.ts",
         "src/suite/failure-lines.test.ts",
@@ -3713,8 +3461,260 @@
         "src/triage/leftover-repair.test.ts",
         "src/utils/schedule.ts"
       ],
-      "name": "c05-index",
-      "size": 207
+      "name": "c04-index",
+      "size": 208
+    },
+    {
+      "folders": {
+        "packages/rafa-inventory/src/agents": 2,
+        "packages/rafa-inventory/src/backfill": 10,
+        "packages/rafa-inventory/src/check": 8,
+        "packages/rafa-inventory/src/demote": 10,
+        "packages/rafa-inventory/src/inventory": 14,
+        "packages/rafa-inventory/src/inventory/search": 11,
+        "packages/rafa-inventory/src/plan/risk": 3,
+        "packages/rafa-inventory/src/schema": 7,
+        "packages/rafa-inventory/src/start": 1,
+        "packages/rafa-inventory/src/task": 8,
+        "packages/rafa-inventory/src/tiers": 10,
+        "packages/rafa/src/board": 1,
+        "packages/rafa/src/core/config": 2,
+        "packages/rafa/src/modules": 1,
+        "packages/rafa/src/plan": 3,
+        "packages/rafa/src/plan/risk": 4,
+        "packages/rafa/src/project": 6,
+        "packages/rafa/src/schema": 4,
+        "packages/rafa/src/utils": 2,
+        "src": 3,
+        "src/board": 1,
+        "src/commands": 23,
+        "src/commands/agent": 6,
+        "src/commands/plan": 8,
+        "src/commands/skill": 9,
+        "src/commands/update": 1,
+        "src/notices": 1,
+        "src/plan": 8,
+        "src/plan/risk": 1,
+        "src/preflight": 6,
+        "src/project": 3,
+        "src/schema": 2,
+        "src/start": 4,
+        "src/tests": 11,
+        "src/tests/core-coupled/plan": 1,
+        "src/tests/core-coupled/project": 2,
+        "src/tests/inventory-coupled/agents": 2,
+        "src/tests/inventory-coupled/plan/risk": 1,
+        "src/tests/inventory-coupled/tiers": 2,
+        "src/tiers": 1
+      },
+      "hub": "packages/rafa/src/core/config/sections.ts",
+      "members": [
+        "packages/rafa-inventory/src/agents/roster.ts",
+        "packages/rafa-inventory/src/agents/vendorable.ts",
+        "packages/rafa-inventory/src/backfill/backup.test.ts",
+        "packages/rafa-inventory/src/backfill/backup.ts",
+        "packages/rafa-inventory/src/backfill/derive.test.ts",
+        "packages/rafa-inventory/src/backfill/derive.ts",
+        "packages/rafa-inventory/src/backfill/proposal-batch.test.ts",
+        "packages/rafa-inventory/src/backfill/proposal-batch.ts",
+        "packages/rafa-inventory/src/backfill/proposal-file.test.ts",
+        "packages/rafa-inventory/src/backfill/proposal-file.ts",
+        "packages/rafa-inventory/src/backfill/propose.test.ts",
+        "packages/rafa-inventory/src/backfill/propose.ts",
+        "packages/rafa-inventory/src/check/layout.test.ts",
+        "packages/rafa-inventory/src/check/layout.ts",
+        "packages/rafa-inventory/src/check/references.test.ts",
+        "packages/rafa-inventory/src/check/references.ts",
+        "packages/rafa-inventory/src/check/run.test.ts",
+        "packages/rafa-inventory/src/check/run.ts",
+        "packages/rafa-inventory/src/check/shell-lines.test.ts",
+        "packages/rafa-inventory/src/check/shell-lines.ts",
+        "packages/rafa-inventory/src/demote/apply.test.ts",
+        "packages/rafa-inventory/src/demote/apply.ts",
+        "packages/rafa-inventory/src/demote/classify.test.ts",
+        "packages/rafa-inventory/src/demote/classify.ts",
+        "packages/rafa-inventory/src/demote/draft.test.ts",
+        "packages/rafa-inventory/src/demote/draft.ts",
+        "packages/rafa-inventory/src/demote/report.test.ts",
+        "packages/rafa-inventory/src/demote/report.ts",
+        "packages/rafa-inventory/src/demote/select.test.ts",
+        "packages/rafa-inventory/src/demote/select.ts",
+        "packages/rafa-inventory/src/inventory/disabled.test.ts",
+        "packages/rafa-inventory/src/inventory/disabled.ts",
+        "packages/rafa-inventory/src/inventory/index.test.ts",
+        "packages/rafa-inventory/src/inventory/index.ts",
+        "packages/rafa-inventory/src/inventory/mcp.test.ts",
+        "packages/rafa-inventory/src/inventory/mcp.ts",
+        "packages/rafa-inventory/src/inventory/plugins.test.ts",
+        "packages/rafa-inventory/src/inventory/plugins.ts",
+        "packages/rafa-inventory/src/inventory/record.test.ts",
+        "packages/rafa-inventory/src/inventory/record.ts",
+        "packages/rafa-inventory/src/inventory/search/block.test.ts",
+        "packages/rafa-inventory/src/inventory/search/block.ts",
+        "packages/rafa-inventory/src/inventory/search/index.test.ts",
+        "packages/rafa-inventory/src/inventory/search/index.ts",
+        "packages/rafa-inventory/src/inventory/search/prompt.ts",
+        "packages/rafa-inventory/src/inventory/search/quote.test.ts",
+        "packages/rafa-inventory/src/inventory/search/quote.ts",
+        "packages/rafa-inventory/src/inventory/search/rank.test.ts",
+        "packages/rafa-inventory/src/inventory/search/rank.ts",
+        "packages/rafa-inventory/src/inventory/search/scratch.test.ts",
+        "packages/rafa-inventory/src/inventory/search/scratch.ts",
+        "packages/rafa-inventory/src/inventory/show.test.ts",
+        "packages/rafa-inventory/src/inventory/show.ts",
+        "packages/rafa-inventory/src/inventory/trees.test.ts",
+        "packages/rafa-inventory/src/inventory/trees.ts",
+        "packages/rafa-inventory/src/plan/risk/commands.test.ts",
+        "packages/rafa-inventory/src/plan/risk/commands.ts",
+        "packages/rafa-inventory/src/plan/risk/long-runs.ts",
+        "packages/rafa-inventory/src/schema/failure-strings.ts",
+        "packages/rafa-inventory/src/schema/provenance.test.ts",
+        "packages/rafa-inventory/src/schema/provenance.ts",
+        "packages/rafa-inventory/src/schema/skill.test.ts",
+        "packages/rafa-inventory/src/schema/skill.ts",
+        "packages/rafa-inventory/src/schema/stack.test.ts",
+        "packages/rafa-inventory/src/schema/stack.ts",
+        "packages/rafa-inventory/src/start/serving.test.ts",
+        "packages/rafa-inventory/src/task/resolve-skills.test.ts",
+        "packages/rafa-inventory/src/task/resolve-skills.ts",
+        "packages/rafa-inventory/src/task/sections.test.ts",
+        "packages/rafa-inventory/src/task/sections.ts",
+        "packages/rafa-inventory/src/task/select-lessons.test.ts",
+        "packages/rafa-inventory/src/task/select-lessons.ts",
+        "packages/rafa-inventory/src/task/skill-index.test.ts",
+        "packages/rafa-inventory/src/task/skill-index.ts",
+        "packages/rafa-inventory/src/tiers/delivery.test.ts",
+        "packages/rafa-inventory/src/tiers/delivery.ts",
+        "packages/rafa-inventory/src/tiers/resolve.ts",
+        "packages/rafa-inventory/src/tiers/routing-table.test.ts",
+        "packages/rafa-inventory/src/tiers/routing-table.ts",
+        "packages/rafa-inventory/src/tiers/routing.ts",
+        "packages/rafa-inventory/src/tiers/serve.test.ts",
+        "packages/rafa-inventory/src/tiers/serve.ts",
+        "packages/rafa-inventory/src/tiers/skill-names.test.ts",
+        "packages/rafa-inventory/src/tiers/skill-names.ts",
+        "packages/rafa/src/board/naming.test.ts",
+        "packages/rafa/src/core/config/load.ts",
+        "packages/rafa/src/core/config/sections.ts",
+        "packages/rafa/src/modules/manifest.ts",
+        "packages/rafa/src/plan/doc-task.ts",
+        "packages/rafa/src/plan/inject.test.ts",
+        "packages/rafa/src/plan/inject.ts",
+        "packages/rafa/src/plan/risk/patterns.test.ts",
+        "packages/rafa/src/plan/risk/patterns.ts",
+        "packages/rafa/src/plan/risk/secrets.test.ts",
+        "packages/rafa/src/plan/risk/secrets.ts",
+        "packages/rafa/src/project/bin-path.test.ts",
+        "packages/rafa/src/project/bin-path.ts",
+        "packages/rafa/src/project/roots.test.ts",
+        "packages/rafa/src/project/roots.ts",
+        "packages/rafa/src/project/scope.ts",
+        "packages/rafa/src/project/worktree-root.ts",
+        "packages/rafa/src/schema/frontmatter.test.ts",
+        "packages/rafa/src/schema/frontmatter.ts",
+        "packages/rafa/src/schema/tiers.test.ts",
+        "packages/rafa/src/schema/tiers.ts",
+        "packages/rafa/src/utils/agent-definition.test.ts",
+        "packages/rafa/src/utils/agent-definition.ts",
+        "src/board/epic-guard.test.ts",
+        "src/commands/agent/list.test.ts",
+        "src/commands/agent/list.ts",
+        "src/commands/agent/show.test.ts",
+        "src/commands/agent/show.ts",
+        "src/commands/agent/vendor.test.ts",
+        "src/commands/agent/vendor.ts",
+        "src/commands/doctor-deep-env.test.ts",
+        "src/commands/doctor-deep-env.ts",
+        "src/commands/doctor-deep-needs.test.ts",
+        "src/commands/doctor-deep-needs.ts",
+        "src/commands/doctor-deep-providers.ts",
+        "src/commands/doctor-deep-row.test.ts",
+        "src/commands/doctor-deep-row.ts",
+        "src/commands/doctor-deep-sections.test.ts",
+        "src/commands/doctor-deep-settings.test.ts",
+        "src/commands/doctor-deep-settings.ts",
+        "src/commands/doctor-deep.test.ts",
+        "src/commands/doctor-deep.ts",
+        "src/commands/doctor-description.ts",
+        "src/commands/doctor-install.ts",
+        "src/commands/doctor-render.ts",
+        "src/commands/doctor-stretch.test.ts",
+        "src/commands/doctor-stretch.ts",
+        "src/commands/doctor-tiers.test.ts",
+        "src/commands/doctor-tiers.ts",
+        "src/commands/doctor.ts",
+        "src/commands/init.test.ts",
+        "src/commands/init.ts",
+        "src/commands/plan/bundled-check.test.ts",
+        "src/commands/plan/bundled-check.ts",
+        "src/commands/plan/needs.ts",
+        "src/commands/plan/risk.test.ts",
+        "src/commands/plan/risk.ts",
+        "src/commands/plan/store-check.ts",
+        "src/commands/plan/validate.test.ts",
+        "src/commands/plan/validate.ts",
+        "src/commands/skill/backfill.test.ts",
+        "src/commands/skill/backfill.ts",
+        "src/commands/skill/demote.test.ts",
+        "src/commands/skill/demote.ts",
+        "src/commands/skill/list.test.ts",
+        "src/commands/skill/list.ts",
+        "src/commands/skill/search.ts",
+        "src/commands/skill/show.test.ts",
+        "src/commands/skill/show.ts",
+        "src/commands/tiers-scratch.test.ts",
+        "src/commands/update/current.ts",
+        "src/index.test.ts",
+        "src/index.ts",
+        "src/notices/run.ts",
+        "src/plan.ts",
+        "src/plan/index.test.ts",
+        "src/plan/index.ts",
+        "src/plan/needs.test.ts",
+        "src/plan/needs.ts",
+        "src/plan/risk.ts",
+        "src/plan/risk/accounts.ts",
+        "src/plan/store-rules.test.ts",
+        "src/plan/store-rules.ts",
+        "src/plan/validate.ts",
+        "src/preflight/first-dispatch.test.ts",
+        "src/preflight/first-dispatch.ts",
+        "src/preflight/fork.test.ts",
+        "src/preflight/fork.ts",
+        "src/preflight/prerequisites-md.ts",
+        "src/preflight/run.ts",
+        "src/project/root-choice.test.ts",
+        "src/project/root-choice.ts",
+        "src/project/update-current.ts",
+        "src/schema/agent.test.ts",
+        "src/schema/agent.ts",
+        "src/start/plan-path.test.ts",
+        "src/start/plan-path.ts",
+        "src/start/preflight.ts",
+        "src/start/risk-total.ts",
+        "src/tests/backfill-pipeline.test.ts",
+        "src/tests/bundled-tier.test.ts",
+        "src/tests/core-coupled/plan/doc-task.test.ts",
+        "src/tests/core-coupled/project/scope-fallback.test.ts",
+        "src/tests/core-coupled/project/worktree-root.test.ts",
+        "src/tests/demotion-pass.test.ts",
+        "src/tests/doctor-deep-env-integration.test.ts",
+        "src/tests/inventory-coupled/agents/roster.test.ts",
+        "src/tests/inventory-coupled/agents/vendorable.test.ts",
+        "src/tests/inventory-coupled/plan/risk/long-runs.test.ts",
+        "src/tests/inventory-coupled/tiers/resolve.test.ts",
+        "src/tests/inventory-coupled/tiers/routing.test.ts",
+        "src/tests/inventory-live.test.ts",
+        "src/tests/operators.test.ts",
+        "src/tests/package-build.test.ts",
+        "src/tests/plan-format-source.test.ts",
+        "src/tests/preflight-halts.test.ts",
+        "src/tests/project-skills-check.test.ts",
+        "src/tests/schema-records.test.ts",
+        "src/tiers/resolve.integration.test.ts"
+      ],
+      "name": "c05-sections",
+      "size": 203
     },
     {
       "folders": {
@@ -3744,7 +3744,7 @@
         "src/commands/loop": 1,
         "src/commands/module": 4,
         "src/commands/plan": 5,
-        "src/commands/pr": 27,
+        "src/commands/pr": 26,
         "src/commands/skill": 1,
         "src/commands/update": 9,
         "src/errors": 6,
@@ -3894,7 +3894,6 @@
         "src/commands/pr/list.ts",
         "src/commands/pr/merge-refuse.ts",
         "src/commands/pr/merge-skip-checks.test.ts",
-        "src/commands/pr/merge.test.ts",
         "src/commands/pr/merge.ts",
         "src/commands/pr/open.test.ts",
         "src/commands/pr/open.ts",
@@ -3967,11 +3966,11 @@
         "src/triage/similarity.ts"
       ],
       "name": "c06-index",
-      "size": 201
+      "size": 200
     },
     {
       "folders": {
-        "packages/rafa/src": 4,
+        "packages/rafa/src": 12,
         "packages/rafa/src/adapters/logger": 1,
         "packages/rafa/src/core/adapters": 4,
         "packages/rafa/src/core/command": 16,
@@ -3983,7 +3982,7 @@
         "packages/rafa/src/modules": 3,
         "packages/rafa/src/modules/testdata/hub-down-sync": 1,
         "packages/rafa/src/ports": 1,
-        "src": 25,
+        "src": 7,
         "src/board": 1,
         "src/cli": 1,
         "src/commands": 7,
@@ -3994,10 +3993,11 @@
         "src/modules/testdata/pull-merge-sync": 1,
         "src/preflight": 1,
         "src/project": 3,
-        "src/release": 4,
+        "src/release": 6,
         "src/start": 2,
+        "src/suite": 1,
         "src/tests": 5,
-        "src/tests/core-coupled": 4,
+        "src/tests/core-coupled": 14,
         "src/tests/core-coupled/core/command": 1,
         "src/tests/core-coupled/core/config": 6,
         "src/tests/core-coupled/core/loop": 1,
@@ -4009,10 +4009,18 @@
       "hub": "packages/rafa/src/core/config/index.ts",
       "members": [
         "packages/rafa/src/adapters/logger/settings.ts",
+        "packages/rafa/src/config-schema-board-project.ts",
         "packages/rafa/src/config-schema-bugs.ts",
         "packages/rafa/src/config-schema-errors.ts",
         "packages/rafa/src/config-schema-features.ts",
+        "packages/rafa/src/config-schema-hub.ts",
         "packages/rafa/src/config-schema-logger.ts",
+        "packages/rafa/src/config-schema-loop-continue.ts",
+        "packages/rafa/src/config-schema-loop-retries.ts",
+        "packages/rafa/src/config-schema-release.ts",
+        "packages/rafa/src/config-schema-tests.ts",
+        "packages/rafa/src/config-schema-triage.ts",
+        "packages/rafa/src/config-schema-wrap-up.ts",
         "packages/rafa/src/core/adapters/index.test.ts",
         "packages/rafa/src/core/adapters/index.ts",
         "packages/rafa/src/core/adapters/registry.test.ts",
@@ -4092,24 +4100,6 @@
         "src/config-locked.ts",
         "src/config-registry.test.ts",
         "src/config-registry.ts",
-        "src/config-schema-board-project.test.ts",
-        "src/config-schema-board-project.ts",
-        "src/config-schema-checks.test.ts",
-        "src/config-schema-hub.test.ts",
-        "src/config-schema-hub.ts",
-        "src/config-schema-issues.test.ts",
-        "src/config-schema-loop-continue.test.ts",
-        "src/config-schema-loop-continue.ts",
-        "src/config-schema-loop-retries.test.ts",
-        "src/config-schema-loop-retries.ts",
-        "src/config-schema-release.test.ts",
-        "src/config-schema-release.ts",
-        "src/config-schema-tests.test.ts",
-        "src/config-schema-tests.ts",
-        "src/config-schema-triage.test.ts",
-        "src/config-schema-triage.ts",
-        "src/config-schema-wrap-up.test.ts",
-        "src/config-schema-wrap-up.ts",
         "src/config/entry.test.ts",
         "src/config/entry.ts",
         "src/config/index.test.ts",
@@ -4131,18 +4121,31 @@
         "src/project/pre-init-dirs.ts",
         "src/project/scaffold.test.ts",
         "src/rafa.ts",
+        "src/release/enabled.test.ts",
+        "src/release/enabled.ts",
         "src/release/scaffold.test.ts",
         "src/release/scaffold.ts",
         "src/release/setting.test.ts",
         "src/release/setting.ts",
         "src/start/preflight-sync.test.ts",
         "src/start/preflight-sync.ts",
+        "src/suite/checks.test.ts",
         "src/tests/config-layers.test.ts",
         "src/tests/core-config-sections.sweep.test.ts",
+        "src/tests/core-coupled/config-schema-board-project.test.ts",
         "src/tests/core-coupled/config-schema-bugs.test.ts",
+        "src/tests/core-coupled/config-schema-checks.test.ts",
         "src/tests/core-coupled/config-schema-errors.test.ts",
         "src/tests/core-coupled/config-schema-features-integration.test.ts",
+        "src/tests/core-coupled/config-schema-hub.test.ts",
+        "src/tests/core-coupled/config-schema-issues.test.ts",
         "src/tests/core-coupled/config-schema-logger.test.ts",
+        "src/tests/core-coupled/config-schema-loop-continue.test.ts",
+        "src/tests/core-coupled/config-schema-loop-retries.test.ts",
+        "src/tests/core-coupled/config-schema-release.test.ts",
+        "src/tests/core-coupled/config-schema-tests.test.ts",
+        "src/tests/core-coupled/config-schema-triage.test.ts",
+        "src/tests/core-coupled/config-schema-wrap-up.test.ts",
         "src/tests/core-coupled/core/command/version.test.ts",
         "src/tests/core-coupled/core/config/config-load-templates.test.ts",
         "src/tests/core-coupled/core/config/config-load.test.ts",
@@ -4162,7 +4165,7 @@
         "src/utils/agent-shell.ts"
       ],
       "name": "c07-index",
-      "size": 152
+      "size": 155
     },
     {
       "folders": {
@@ -4356,7 +4359,7 @@
         "src/project": 1,
         "src/start": 1,
         "src/status": 8,
-        "src/suite": 4,
+        "src/suite": 2,
         "src/tests": 5,
         "src/tests/core-coupled/next": 1,
         "src/tests/core-coupled/project": 1
@@ -4469,8 +4472,6 @@
         "src/status/sections-waiting.test.ts",
         "src/status/sections.ts",
         "src/status/waiting.ts",
-        "src/suite/checks.test.ts",
-        "src/suite/checks.ts",
         "src/suite/scope.test.ts",
         "src/suite/scope.ts",
         "src/tests/core-coupled/next/hop-record.integration.test.ts",
@@ -4482,7 +4483,7 @@
         "src/tests/tracker-declarations.test.ts"
       ],
       "name": "c09-index",
-      "size": 117
+      "size": 115
     },
     {
       "folders": {
@@ -4733,13 +4734,24 @@
     },
     {
       "folders": {
+        "packages/rafa/src": 1
+      },
+      "hub": "packages/rafa/src/config-schema-readings.ts",
+      "members": [
+        "packages/rafa/src/config-schema-readings.ts"
+      ],
+      "name": "c15-config-schema-readings",
+      "size": 1
+    },
+    {
+      "folders": {
         "packages/rafa/src/core/command": 1
       },
       "hub": "packages/rafa/src/core/command/registry-types.test.ts",
       "members": [
         "packages/rafa/src/core/command/registry-types.test.ts"
       ],
-      "name": "c15-registry-types.test",
+      "name": "c16-registry-types.test",
       "size": 1
     },
     {
@@ -4750,7 +4762,7 @@
       "members": [
         "packages/rafa/src/core/command/types.test.ts"
       ],
-      "name": "c16-types.test",
+      "name": "c17-types.test",
       "size": 1
     },
     {
@@ -4761,7 +4773,7 @@
       "members": [
         "src/commands/board/index.test.ts"
       ],
-      "name": "c17-index.test",
+      "name": "c18-index.test",
       "size": 1
     },
     {
@@ -4772,7 +4784,7 @@
       "members": [
         "src/commands/claim/declarations.test.ts"
       ],
-      "name": "c18-declarations.test",
+      "name": "c19-declarations.test",
       "size": 1
     },
     {
@@ -4783,7 +4795,7 @@
       "members": [
         "src/commands/claim/index.test.ts"
       ],
-      "name": "c19-index.test",
+      "name": "c20-index.test",
       "size": 1
     },
     {
@@ -4794,7 +4806,7 @@
       "members": [
         "src/commands/epic/declarations.test.ts"
       ],
-      "name": "c20-declarations.test",
+      "name": "c21-declarations.test",
       "size": 1
     },
     {
@@ -4805,7 +4817,7 @@
       "members": [
         "src/commands/issue/declarations.test.ts"
       ],
-      "name": "c21-declarations.test",
+      "name": "c22-declarations.test",
       "size": 1
     },
     {
@@ -4816,7 +4828,7 @@
       "members": [
         "src/commands/pr/declarations.test.ts"
       ],
-      "name": "c22-declarations.test",
+      "name": "c23-declarations.test",
       "size": 1
     },
     {
@@ -4827,7 +4839,7 @@
       "members": [
         "src/commands/pr/index.test.ts"
       ],
-      "name": "c23-index.test",
+      "name": "c24-index.test",
       "size": 1
     },
     {
@@ -4838,7 +4850,7 @@
       "members": [
         "src/commands/release/declarations.test.ts"
       ],
-      "name": "c24-declarations.test",
+      "name": "c25-declarations.test",
       "size": 1
     },
     {
@@ -4849,18 +4861,7 @@
       "members": [
         "src/commands/release/index.test.ts"
       ],
-      "name": "c25-index.test",
-      "size": 1
-    },
-    {
-      "folders": {
-        "src": 1
-      },
-      "hub": "src/config-schema-readings.ts",
-      "members": [
-        "src/config-schema-readings.ts"
-      ],
-      "name": "c26-config-schema-readings",
+      "name": "c26-index.test",
       "size": 1
     },
     {
@@ -7398,6 +7399,21 @@
       "to": "packages/rafa/src/project/scope.ts"
     },
     {
+      "from": "packages/rafa/src/config-schema-board-project.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-board-project.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-board-project.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
       "from": "packages/rafa/src/config-schema-bugs.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/config/config-schema.ts"
@@ -7409,6 +7425,21 @@
     },
     {
       "from": "packages/rafa/src/config-schema-bugs.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-checks.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-checks.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-checks.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
@@ -7453,6 +7484,61 @@
       "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
+      "from": "packages/rafa/src/config-schema-hub.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-hub.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-hub.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/bugs/places.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/bugs/record.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/bugs/title.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-errors.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-issues.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/errors/rafa-codes.ts"
+    },
+    {
       "from": "packages/rafa/src/config-schema-logger.ts",
       "kind": "value",
       "to": "packages/rafa/src/adapters/logger/settings.ts"
@@ -7476,6 +7562,96 @@
       "from": "packages/rafa/src/config-schema-logger.ts",
       "kind": "type",
       "to": "packages/rafa/src/ports/log-level.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-continue.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-continue.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-continue.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-retries.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-retries.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-loop-retries.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-release.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-release.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-release.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-tests.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-tests.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-tests.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-triage.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-triage.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-triage.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-wrap-up.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/config-schema.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-wrap-up.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "packages/rafa/src/config-schema-wrap-up.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
       "from": "packages/rafa/src/core/adapters/index.test.ts",
@@ -14205,17 +14381,17 @@
     {
       "from": "src/board/project/progress.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-board-project.ts"
+    },
+    {
+      "from": "src/board/project/progress.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
       "from": "src/board/project/progress.ts",
       "kind": "type",
       "to": "packages/rafa/src/ports/index.ts"
-    },
-    {
-      "from": "src/board/project/progress.ts",
-      "kind": "type",
-      "to": "src/config-schema-board-project.ts"
     },
     {
       "from": "src/board/project/project-fake.test.ts",
@@ -14555,12 +14731,12 @@
     {
       "from": "src/board/project/retry.ts",
       "kind": "type",
-      "to": "src/adapters/tracker/github.ts"
+      "to": "packages/rafa/src/config-schema-board-project.ts"
     },
     {
       "from": "src/board/project/retry.ts",
       "kind": "type",
-      "to": "src/config-schema-board-project.ts"
+      "to": "src/adapters/tracker/github.ts"
     },
     {
       "from": "src/board/project/rules-blocked.test.ts",
@@ -17730,6 +17906,11 @@
     {
       "from": "src/cleanup/groups.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-release.ts"
+    },
+    {
+      "from": "src/cleanup/groups.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
@@ -17751,11 +17932,6 @@
       "from": "src/cleanup/groups.ts",
       "kind": "type",
       "to": "src/cleanup/worktrees.ts"
-    },
-    {
-      "from": "src/cleanup/groups.ts",
-      "kind": "value",
-      "to": "src/config-schema-release.ts"
     },
     {
       "from": "src/cleanup/groups.ts",
@@ -24074,6 +24250,11 @@
     },
     {
       "from": "src/commands/epic/close-triage.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/commands/epic/close-triage.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/command/index.ts"
     },
@@ -24141,11 +24322,6 @@
       "from": "src/commands/epic/close-triage.ts",
       "kind": "type",
       "to": "src/commands/epic/close.ts"
-    },
-    {
-      "from": "src/commands/epic/close-triage.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/commands/epic/close-triage.ts",
@@ -27100,6 +27276,11 @@
     {
       "from": "src/commands/issue/create-bug.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/commands/issue/create-bug.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/command/index.ts"
     },
     {
@@ -27136,11 +27317,6 @@
       "from": "src/commands/issue/create-bug.ts",
       "kind": "value",
       "to": "src/commands/issue/issue-tracker.ts"
-    },
-    {
-      "from": "src/commands/issue/create-bug.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/commands/issue/create-bug.ts",
@@ -36195,7 +36371,17 @@
     {
       "from": "src/config-registry.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-board-project.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
       "to": "packages/rafa/src/config-schema-bugs.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-checks.ts"
     },
     {
       "from": "src/config-registry.ts",
@@ -36210,427 +36396,57 @@
     {
       "from": "src/config-registry.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-hub.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
       "to": "packages/rafa/src/config-schema-logger.ts"
     },
     {
       "from": "src/config-registry.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-loop-continue.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-release.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-triage.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-wrap-up.ts"
+    },
+    {
+      "from": "src/config-registry.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-board-project.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-checks.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-hub.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-loop-continue.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-loop-retries.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-release.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-tests.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-triage.ts"
-    },
-    {
-      "from": "src/config-registry.ts",
-      "kind": "value",
-      "to": "src/config-schema-wrap-up.ts"
     },
     {
       "from": "src/config-registry.ts",
       "kind": "value",
       "to": "src/config/templates.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-board-project.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-board-project.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-checks.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-checks.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-checks.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-checks.ts"
-    },
-    {
-      "from": "src/config-schema-checks.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-checks.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-checks.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-hub.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-hub.test.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-hub.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-hub.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-hub.ts"
-    },
-    {
-      "from": "src/config-schema-hub.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-hub.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-hub.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/bugs/title.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/errors/rafa-codes.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
-    },
-    {
-      "from": "src/config-schema-issues.test.ts",
-      "kind": "value",
-      "to": "src/project/scaffold.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/bugs/places.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/bugs/record.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/bugs/title.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/config-schema-errors.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-issues.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/errors/rafa-codes.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-loop-continue.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-loop-continue.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-loop-retries.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-loop-retries.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-release.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-release.test.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-release.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-release.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-release.ts"
-    },
-    {
-      "from": "src/config-schema-release.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-release.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-release.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-tests.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-tests.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-tests.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-tests.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-tests.ts"
-    },
-    {
-      "from": "src/config-schema-tests.test.ts",
-      "kind": "value",
-      "to": "src/config/templates.ts"
-    },
-    {
-      "from": "src/config-schema-tests.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-tests.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-tests.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-triage.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-triage.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-triage.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-triage.ts"
-    },
-    {
-      "from": "src/config-schema-triage.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-triage.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-triage.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.test.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.test.ts",
-      "kind": "value",
-      "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-wrap-up.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/config-schema.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/config-schema-wrap-up.ts",
-      "kind": "value",
-      "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
       "from": "src/config-set.test.ts",
@@ -36725,7 +36541,17 @@
     {
       "from": "src/config/shape.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-board-project.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
       "to": "packages/rafa/src/config-schema-bugs.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
     },
     {
       "from": "src/config/shape.ts",
@@ -36740,7 +36566,47 @@
     {
       "from": "src/config/shape.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-hub.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
       "to": "packages/rafa/src/config-schema-logger.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-continue.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-release.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-triage.ts"
+    },
+    {
+      "from": "src/config/shape.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-wrap-up.ts"
     },
     {
       "from": "src/config/shape.ts",
@@ -36751,56 +36617,6 @@
       "from": "src/config/shape.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/config/sections.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-board-project.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-hub.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-issues.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-continue.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-release.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-tests.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-triage.ts"
-    },
-    {
-      "from": "src/config/shape.ts",
-      "kind": "type",
-      "to": "src/config-schema-wrap-up.ts"
     },
     {
       "from": "src/config/templates.test.ts",
@@ -38570,6 +38386,11 @@
     {
       "from": "src/effort/sync/select.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-hub.ts"
+    },
+    {
+      "from": "src/effort/sync/select.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/adapters/index.ts"
     },
     {
@@ -38586,11 +38407,6 @@
       "from": "src/effort/sync/select.ts",
       "kind": "type",
       "to": "packages/rafa/src/ports/index.ts"
-    },
-    {
-      "from": "src/effort/sync/select.ts",
-      "kind": "value",
-      "to": "src/config-schema-hub.ts"
     },
     {
       "from": "src/effort/trend-stats.test.ts",
@@ -42815,6 +42631,11 @@
     {
       "from": "src/project/scaffold.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/project/scaffold.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/config/index.ts"
     },
     {
@@ -42831,11 +42652,6 @@
       "from": "src/project/scaffold.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/project/scaffold.ts",
-      "kind": "value",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/project/scaffold.ts",
@@ -43790,7 +43606,7 @@
     {
       "from": "src/release/scaffold.ts",
       "kind": "value",
-      "to": "src/config-schema-release.ts"
+      "to": "packages/rafa/src/config-schema-release.ts"
     },
     {
       "from": "src/release/setting.test.ts",
@@ -45459,6 +45275,11 @@
     },
     {
       "from": "src/start/continue-args.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/start/continue-args.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/command/index.ts"
     },
@@ -45466,11 +45287,6 @@
       "from": "src/start/continue-args.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/config/index.ts"
-    },
-    {
-      "from": "src/start/continue-args.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
     },
     {
       "from": "src/start/continue-args.ts",
@@ -45765,12 +45581,12 @@
     {
       "from": "src/start/decision-prompt.ts",
       "kind": "type",
-      "to": "packages/rafa/src/utils/tracker.ts"
+      "to": "packages/rafa/src/config-schema-loop-continue.ts"
     },
     {
       "from": "src/start/decision-prompt.ts",
       "kind": "type",
-      "to": "src/config-schema-loop-continue.ts"
+      "to": "packages/rafa/src/utils/tracker.ts"
     },
     {
       "from": "src/start/decision-prompt.ts",
@@ -46150,6 +45966,11 @@
     {
       "from": "src/start/follow-ups-integration.test.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/start/follow-ups-integration.test.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/git/index.ts"
     },
     {
@@ -46181,11 +46002,6 @@
       "from": "src/start/follow-ups-integration.test.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/start/follow-ups-integration.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/start/follow-ups-integration.test.ts",
@@ -47779,6 +47595,11 @@
     },
     {
       "from": "src/start/retry-budget.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/start/retry-budget.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/output/index.ts"
     },
@@ -47786,11 +47607,6 @@
       "from": "src/start/retry-budget.ts",
       "kind": "type",
       "to": "packages/rafa/src/utils/tracker.ts"
-    },
-    {
-      "from": "src/start/retry-budget.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
     },
     {
       "from": "src/start/retry-budget.ts",
@@ -48080,6 +47896,11 @@
     {
       "from": "src/start/run-setup.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/start/run-setup.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/command/index.ts"
     },
     {
@@ -48091,11 +47912,6 @@
       "from": "src/start/run-setup.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/output/index.ts"
-    },
-    {
-      "from": "src/start/run-setup.ts",
-      "kind": "value",
-      "to": "src/config-schema-loop-retries.ts"
     },
     {
       "from": "src/start/run-setup.ts",
@@ -48930,6 +48746,11 @@
     {
       "from": "src/start/suite-stage-step-entry.test.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-stage-step-entry.test.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/loop/index.ts"
     },
     {
@@ -48941,11 +48762,6 @@
       "from": "src/start/suite-stage-step-entry.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/utils/tracker.ts"
-    },
-    {
-      "from": "src/start/suite-stage-step-entry.test.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/start/suite-stage-step-entry.test.ts",
@@ -48985,17 +48801,17 @@
     {
       "from": "src/start/suite-stage-step.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-stage-step.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/loop/index.ts"
     },
     {
       "from": "src/start/suite-stage-step.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/output/index.ts"
-    },
-    {
-      "from": "src/start/suite-stage-step.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/start/suite-stage-step.ts",
@@ -49100,6 +48916,11 @@
     {
       "from": "src/start/suite-step-loop-entry.test.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-step-loop-entry.test.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/loop/index.ts"
     },
     {
@@ -49111,11 +48932,6 @@
       "from": "src/start/suite-step-loop-entry.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/utils/tracker.ts"
-    },
-    {
-      "from": "src/start/suite-step-loop-entry.test.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/start/suite-step-loop-entry.test.ts",
@@ -49474,6 +49290,16 @@
     },
     {
       "from": "src/start/suite-step.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-step.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "from": "src/start/suite-step.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
@@ -49496,16 +49322,6 @@
       "from": "src/start/suite-step.ts",
       "kind": "type",
       "to": "src/adapters/tracker/github.ts"
-    },
-    {
-      "from": "src/start/suite-step.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
-    },
-    {
-      "from": "src/start/suite-step.ts",
-      "kind": "type",
-      "to": "src/config-schema-tests.ts"
     },
     {
       "from": "src/start/suite-step.ts",
@@ -49670,6 +49486,11 @@
     {
       "from": "src/start/suite-task-step-entry.test.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-task-step-entry.test.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/loop/index.ts"
     },
     {
@@ -49681,11 +49502,6 @@
       "from": "src/start/suite-task-step-entry.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/utils/tracker.ts"
-    },
-    {
-      "from": "src/start/suite-task-step-entry.test.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/start/suite-task-step-entry.test.ts",
@@ -49770,6 +49586,11 @@
     {
       "from": "src/start/suite-task-step.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/start/suite-task-step.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/loop/index.ts"
     },
     {
@@ -49781,11 +49602,6 @@
       "from": "src/start/suite-task-step.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/plan/index.ts"
-    },
-    {
-      "from": "src/start/suite-task-step.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/start/suite-task-step.ts",
@@ -49910,17 +49726,17 @@
     {
       "from": "src/start/task-gate-lines.test.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "from": "src/start/task-gate-lines.test.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/output/index.ts"
     },
     {
       "from": "src/start/task-gate-lines.test.ts",
       "kind": "type",
       "to": "packages/rafa/src/ports/index.ts"
-    },
-    {
-      "from": "src/start/task-gate-lines.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-tests.ts"
     },
     {
       "from": "src/start/task-gate-lines.test.ts",
@@ -50015,6 +49831,11 @@
     {
       "from": "src/start/triage-inherited.test.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/start/triage-inherited.test.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/output/index.ts"
     },
     {
@@ -50031,11 +49852,6 @@
       "from": "src/start/triage-inherited.test.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/start/triage-inherited.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage-inherited.test.ts",
@@ -50061,6 +49877,11 @@
       "from": "src/start/triage-inherited.test.ts",
       "kind": "value",
       "to": "src/triage/triage.ts"
+    },
+    {
+      "from": "src/start/triage-kind-routes.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage-kind-routes.test.ts",
@@ -50101,11 +49922,6 @@
       "from": "src/start/triage-kind-routes.test.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/start/triage-kind-routes.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage-kind-routes.test.ts",
@@ -50140,6 +49956,11 @@
     {
       "from": "src/start/triage-kinds-integration.test.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/start/triage-kinds-integration.test.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/git/index.ts"
     },
     {
@@ -50176,11 +49997,6 @@
       "from": "src/start/triage-kinds-integration.test.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
-    },
-    {
-      "from": "src/start/triage-kinds-integration.test.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage-kinds-integration.test.ts",
@@ -50254,6 +50070,11 @@
     },
     {
       "from": "src/start/triage-kinds.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/start/triage-kinds.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
@@ -50284,11 +50105,6 @@
     },
     {
       "from": "src/start/triage-kinds.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
-    },
-    {
-      "from": "src/start/triage-kinds.ts",
       "kind": "value",
       "to": "src/triage/base-run.ts"
     },
@@ -50306,6 +50122,11 @@
       "from": "src/start/triage-kinds.ts",
       "kind": "type",
       "to": "src/triage/triage.ts"
+    },
+    {
+      "from": "src/start/triage-stale-docs-integration.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage-stale-docs-integration.test.ts",
@@ -50340,11 +50161,6 @@
     {
       "from": "src/start/triage-stale-docs-integration.test.ts",
       "kind": "value",
-      "to": "src/config-schema-issues.ts"
-    },
-    {
-      "from": "src/start/triage-stale-docs-integration.test.ts",
-      "kind": "value",
       "to": "src/start/triage.ts"
     },
     {
@@ -50356,6 +50172,11 @@
       "from": "src/start/triage-stale-docs-integration.test.ts",
       "kind": "value",
       "to": "src/triage/triage.ts"
+    },
+    {
+      "from": "src/start/triage.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage.test.ts",
@@ -50450,11 +50271,6 @@
     {
       "from": "src/start/triage.test.ts",
       "kind": "value",
-      "to": "src/config-schema-issues.ts"
-    },
-    {
-      "from": "src/start/triage.test.ts",
-      "kind": "value",
       "to": "src/start/triage.ts"
     },
     {
@@ -50466,6 +50282,11 @@
       "from": "src/start/triage.test.ts",
       "kind": "value",
       "to": "src/triage/triage.ts"
+    },
+    {
+      "from": "src/start/triage.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage.ts",
@@ -50541,11 +50362,6 @@
       "from": "src/start/triage.ts",
       "kind": "type",
       "to": "src/board/project/refresh.ts"
-    },
-    {
-      "from": "src/start/triage.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/start/triage.ts",
@@ -51094,6 +50910,11 @@
     },
     {
       "from": "src/start/wrap-up-run.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-wrap-up.ts"
+    },
+    {
+      "from": "src/start/wrap-up-run.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/command/index.ts"
     },
@@ -51121,11 +50942,6 @@
       "from": "src/start/wrap-up-run.ts",
       "kind": "value",
       "to": "src/cleanup/index.ts"
-    },
-    {
-      "from": "src/start/wrap-up-run.ts",
-      "kind": "type",
-      "to": "src/config-schema-wrap-up.ts"
     },
     {
       "from": "src/start/wrap-up-run.ts",
@@ -52340,6 +52156,11 @@
     {
       "from": "src/suite/checks.ts",
       "kind": "type",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/suite/checks.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/plan/index.ts"
     },
     {
@@ -52351,11 +52172,6 @@
       "from": "src/suite/checks.ts",
       "kind": "value",
       "to": "src/board/board-owns.ts"
-    },
-    {
-      "from": "src/suite/checks.ts",
-      "kind": "type",
-      "to": "src/config-schema-checks.ts"
     },
     {
       "from": "src/suite/deadline-spawn.test.ts",
@@ -53398,6 +53214,21 @@
       "to": "src/tests/cli-capture.ts"
     },
     {
+      "from": "src/tests/core-coupled/config-schema-board-project.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-board-project.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-board-project.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-board-project.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
       "from": "src/tests/core-coupled/config-schema-bugs.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/config-schema-bugs.ts"
@@ -53409,6 +53240,21 @@
     },
     {
       "from": "src/tests/core-coupled/config-schema-bugs.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-checks.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-checks.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-checks.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-checks.test.ts",
       "kind": "value",
       "to": "src/config-registry.ts"
     },
@@ -53453,6 +53299,56 @@
       "to": "src/config-registry.ts"
     },
     {
+      "from": "src/tests/core-coupled/config-schema-hub.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-hub.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-hub.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-hub.test.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-hub.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/bugs/title.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/errors/rafa-codes.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-issues.test.ts",
+      "kind": "value",
+      "to": "src/project/scaffold.ts"
+    },
+    {
       "from": "src/tests/core-coupled/config-schema-logger.test.ts",
       "kind": "value",
       "to": "packages/rafa/src/adapters/logger/settings.ts"
@@ -53486,6 +53382,111 @@
       "from": "src/tests/core-coupled/config-schema-logger.test.ts",
       "kind": "value",
       "to": "src/tests/cli-capture.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-continue.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-loop-continue.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-continue.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-continue.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-retries.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-retries.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-loop-retries.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-release.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-release.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-release.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-release.test.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-release.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-tests.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-tests.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-tests.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/sections.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-tests.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-tests.test.ts",
+      "kind": "value",
+      "to": "src/config/templates.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-triage.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-triage.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-triage.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-triage.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-wrap-up.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/config-schema-wrap-up.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-wrap-up.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/config/index.ts"
+    },
+    {
+      "from": "src/tests/core-coupled/config-schema-wrap-up.test.ts",
+      "kind": "value",
+      "to": "src/config-registry.ts"
     },
     {
       "from": "src/tests/core-coupled/core/command/version.test.ts",
@@ -59130,6 +59131,11 @@
     {
       "from": "src/triage/bug-filing.ts",
       "kind": "value",
+      "to": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "from": "src/triage/bug-filing.ts",
+      "kind": "value",
       "to": "packages/rafa/src/core/command/index.ts"
     },
     {
@@ -59166,11 +59172,6 @@
       "from": "src/triage/bug-filing.ts",
       "kind": "value",
       "to": "src/bugs/versions.ts"
-    },
-    {
-      "from": "src/triage/bug-filing.ts",
-      "kind": "value",
-      "to": "src/config-schema-issues.ts"
     },
     {
       "from": "src/triage/bug-filing.ts",
@@ -59374,6 +59375,11 @@
     },
     {
       "from": "src/triage/kind-route.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/triage/kind-route.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/config/sections.ts"
     },
@@ -59391,11 +59397,6 @@
       "from": "src/triage/kind-route.ts",
       "kind": "value",
       "to": "packages/rafa/src/triage/doc-only.ts"
-    },
-    {
-      "from": "src/triage/kind-route.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
     },
     {
       "from": "src/triage/kind-route.ts",
@@ -59449,6 +59450,11 @@
     },
     {
       "from": "src/triage/leftover-repair.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "from": "src/triage/leftover-repair.ts",
       "kind": "value",
       "to": "packages/rafa/src/core/plan/index.ts"
     },
@@ -59461,11 +59467,6 @@
       "from": "src/triage/leftover-repair.ts",
       "kind": "value",
       "to": "packages/rafa/src/utils/tracker.ts"
-    },
-    {
-      "from": "src/triage/leftover-repair.ts",
-      "kind": "type",
-      "to": "src/config-schema-loop-retries.ts"
     },
     {
       "from": "src/triage/own-check.integration.test.ts",
@@ -60155,522 +60156,522 @@
       "path": "packages/rafa-hub/src/two-devices.integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/adapters/learning/held.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/adapters/learning/held.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/adapters/learning/local.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/agents/roster.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/agents/vendorable.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/backfill/backup.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/backfill/backup.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/backfill/derive.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/backfill/derive.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/backfill/proposal-batch.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/backfill/proposal-batch.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/backfill/proposal-file.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/backfill/proposal-file.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/backfill/propose.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/backfill/propose.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/check/layout.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/check/layout.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/check/references.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/check/references.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/check/run.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/check/run.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/check/shell-lines.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/check/shell-lines.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/demote/apply.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/demote/apply.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/demote/classify.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/demote/classify.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/demote/draft.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/demote/draft.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/demote/report.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/demote/report.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/demote/select.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/demote/select.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/disabled.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/disabled.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/index.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/index.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/mcp.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/mcp.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/plugins.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/plugins.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/record.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/record.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/search/block.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/block.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/search/index.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/index.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/prompt.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/search/quote.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/quote.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/search/rank.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/rank.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/search/scratch.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/search/scratch.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/show.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/show.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/inventory/trees.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/inventory/trees.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/learning/bless.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/learning/bless.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/learning/identity.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/learning/identity.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/learning/index.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/learning/index.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/learning/merge.property.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/learning/merge.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/learning/merge.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/learning/types.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/plan/risk/commands.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/plan/risk/commands.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/plan/risk/long-runs.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/report/lessons.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/report/lessons.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/failure-strings.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/schema/instinct.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/instinct.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/schema/provenance.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/provenance.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa-inventory/src/schema/scope-records.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/scope-records.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/schema/skill.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/skill.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/schema/stack.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/schema/stack.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/start/serving.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa-inventory/src/start/serving.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/task/resolve-skills.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/task/resolve-skills.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/task/sections.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/task/sections.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/task/select-lessons.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/task/select-lessons.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/task/skill-index.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/task/skill-index.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/tiers/delivery.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/delivery.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/resolve.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/tiers/routing-table.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/routing-table.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/routing.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/tiers/serve.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/serve.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa-inventory/src/tiers/skill-names.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa-inventory/src/tiers/skill-names.ts"
     },
@@ -60770,17 +60771,17 @@
       "path": "packages/rafa/src/adapters/logger/settings.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa/src/adapters/output/events.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/adapters/output/events.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/board/naming.test.ts"
     },
@@ -60842,7 +60843,17 @@
     {
       "cluster": "c07-index",
       "kind": "source",
+      "path": "packages/rafa/src/config-schema-board-project.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
       "path": "packages/rafa/src/config-schema-bugs.ts"
+    },
+    {
+      "cluster": "c04-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-checks.ts"
     },
     {
       "cluster": "c07-index",
@@ -60857,7 +60868,52 @@
     {
       "cluster": "c07-index",
       "kind": "source",
+      "path": "packages/rafa/src/config-schema-hub.ts"
+    },
+    {
+      "cluster": "c03-sqlite",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-issues.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
       "path": "packages/rafa/src/config-schema-logger.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-loop-continue.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-loop-retries.ts"
+    },
+    {
+      "cluster": "c15-config-schema-readings",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-readings.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-release.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-tests.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-triage.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "source",
+      "path": "packages/rafa/src/config-schema-wrap-up.ts"
     },
     {
       "cluster": "c07-index",
@@ -60920,7 +60976,7 @@
       "path": "packages/rafa/src/core/command/lazy.ts"
     },
     {
-      "cluster": "c15-registry-types.test",
+      "cluster": "c16-registry-types.test",
       "kind": "test",
       "path": "packages/rafa/src/core/command/registry-types.test.ts"
     },
@@ -60960,7 +61016,7 @@
       "path": "packages/rafa/src/core/command/spends.ts"
     },
     {
-      "cluster": "c16-types.test",
+      "cluster": "c17-types.test",
       "kind": "test",
       "path": "packages/rafa/src/core/command/types.test.ts"
     },
@@ -61080,7 +61136,7 @@
       "path": "packages/rafa/src/core/config/load.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/core/config/load.ts"
     },
@@ -61110,7 +61166,7 @@
       "path": "packages/rafa/src/core/config/sections.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/core/config/sections.ts"
     },
@@ -61275,7 +61331,7 @@
       "path": "packages/rafa/src/core/output/active.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/core/output/index.ts"
     },
@@ -61295,12 +61351,12 @@
       "path": "packages/rafa/src/core/output/text.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa/src/core/plan/block-reader.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/core/plan/block-reader.ts"
     },
@@ -61315,12 +61371,12 @@
       "path": "packages/rafa/src/core/plan/blocker-comment.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa/src/core/plan/blocks.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/core/plan/blocks.ts"
     },
@@ -61345,7 +61401,7 @@
       "path": "packages/rafa/src/core/plan/index.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa/src/core/plan/parse.test.ts"
     },
@@ -61955,7 +62011,7 @@
       "path": "packages/rafa/src/modules/manifest.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/modules/manifest.ts"
     },
@@ -61985,37 +62041,37 @@
       "path": "packages/rafa/src/next/hop-record.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/plan/doc-task.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/plan/inject.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/plan/inject.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/plan/risk/patterns.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/plan/risk/patterns.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/plan/risk/secrets.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/plan/risk/secrets.ts"
     },
@@ -62035,17 +62091,17 @@
       "path": "packages/rafa/src/ports/log-level.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/ports/spec-review.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/project/bin-path.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/project/bin-path.ts"
     },
@@ -62065,22 +62121,22 @@
       "path": "packages/rafa/src/project/position.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/project/roots.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/project/roots.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/project/scope.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/project/worktree-root.ts"
     },
@@ -62110,22 +62166,22 @@
       "path": "packages/rafa/src/report/record.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c02-cli-capture",
       "kind": "test",
       "path": "packages/rafa/src/runtime/live-loops.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c02-cli-capture",
       "kind": "source",
       "path": "packages/rafa/src/runtime/live-loops.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/schema/frontmatter.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/schema/frontmatter.ts"
     },
@@ -62135,12 +62191,12 @@
       "path": "packages/rafa/src/schema/project-id.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/schema/tiers.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/schema/tiers.ts"
     },
@@ -62170,12 +62226,12 @@
       "path": "packages/rafa/src/triage/local-paths.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "packages/rafa/src/utils/agent-definition.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "packages/rafa/src/utils/agent-definition.ts"
     },
@@ -62190,12 +62246,12 @@
       "path": "packages/rafa/src/utils/progress.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "packages/rafa/src/utils/tracker-open-tasks.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "packages/rafa/src/utils/tracker.ts"
     },
@@ -62220,12 +62276,12 @@
       "path": "src/adapters/output/json.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/adapters/planner/claude.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/adapters/planner/claude.ts"
     },
@@ -62540,7 +62596,7 @@
       "path": "src/board/epic-dependents.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/board/epic-guard.test.ts"
     },
@@ -62650,12 +62706,12 @@
       "path": "src/board/flags.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/board/gate.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/board/gate.ts"
     },
@@ -62765,12 +62821,12 @@
       "path": "src/board/place.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/board/plan-field.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/board/plan-field.ts"
     },
@@ -63140,22 +63196,22 @@
       "path": "src/board/repository.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/board/review-comment.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/board/review-comment.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/board/review-stamp.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/board/review-stamp.ts"
     },
@@ -63285,12 +63341,12 @@
       "path": "src/board/snapshot-settle.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/board/spec-review.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/board/spec-review.ts"
     },
@@ -63830,12 +63886,12 @@
       "path": "src/cli/spends-roster.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/agent/list.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/agent/list.ts"
     },
@@ -63845,22 +63901,22 @@
       "path": "src/commands/agent/search.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/agent/show.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/agent/show.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/agent/vendor.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/agent/vendor.ts"
     },
@@ -63875,7 +63931,7 @@
       "path": "src/commands/board/index-integration.test.ts"
     },
     {
-      "cluster": "c17-index.test",
+      "cluster": "c18-index.test",
       "kind": "test",
       "path": "src/commands/board/index.test.ts"
     },
@@ -63985,7 +64041,7 @@
       "path": "src/commands/claim/declarations-integration.test.ts"
     },
     {
-      "cluster": "c18-declarations.test",
+      "cluster": "c19-declarations.test",
       "kind": "test",
       "path": "src/commands/claim/declarations.test.ts"
     },
@@ -64010,7 +64066,7 @@
       "path": "src/commands/claim/index-integration.test.ts"
     },
     {
-      "cluster": "c19-index.test",
+      "cluster": "c20-index.test",
       "kind": "test",
       "path": "src/commands/claim/index.test.ts"
     },
@@ -64175,22 +64231,22 @@
       "path": "src/commands/doctor-config.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep-env.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep-env.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep-needs.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep-needs.ts"
     },
@@ -64200,47 +64256,47 @@
       "path": "src/commands/doctor-deep-providers.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep-providers.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep-row.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep-row.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep-sections.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep-settings.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep-settings.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-deep.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-deep.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-description.ts"
     },
@@ -64280,7 +64336,7 @@
       "path": "src/commands/doctor-install.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-install.ts"
     },
@@ -64365,17 +64421,17 @@
       "path": "src/commands/doctor-release.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-render.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-stretch.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-stretch.ts"
     },
@@ -64385,12 +64441,12 @@
       "path": "src/commands/doctor-tab-config.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/doctor-tiers.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor-tiers.ts"
     },
@@ -64400,7 +64456,7 @@
       "path": "src/commands/doctor.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/doctor.ts"
     },
@@ -64420,7 +64476,7 @@
       "path": "src/commands/effort/copy.ts"
     },
     {
-      "cluster": "c02-cli-capture",
+      "cluster": "c03-sqlite",
       "kind": "test",
       "path": "src/commands/effort/dashboard.test.ts"
     },
@@ -64565,7 +64621,7 @@
       "path": "src/commands/epic/declarations-integration.test.ts"
     },
     {
-      "cluster": "c20-declarations.test",
+      "cluster": "c21-declarations.test",
       "kind": "test",
       "path": "src/commands/epic/declarations.test.ts"
     },
@@ -64750,12 +64806,12 @@
       "path": "src/commands/init-scratch.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/init.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/init.ts"
     },
@@ -64765,7 +64821,7 @@
       "path": "src/commands/instinct/check.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/instinct/flag.test.ts"
     },
@@ -64775,42 +64831,42 @@
       "path": "src/commands/instinct/flag.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/instinct/instinct-records.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/instinct/instinct-records.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/instinct/list.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/instinct/list.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/instinct/promote.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/instinct/promote.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/instinct/show.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/instinct/show.ts"
     },
@@ -64870,7 +64926,7 @@
       "path": "src/commands/issue/declarations-integration.test.ts"
     },
     {
-      "cluster": "c21-declarations.test",
+      "cluster": "c22-declarations.test",
       "kind": "test",
       "path": "src/commands/issue/declarations.test.ts"
     },
@@ -65165,12 +65221,12 @@
       "path": "src/commands/plan/blocked-offer.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/plan/bundled-check.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/plan/bundled-check.ts"
     },
@@ -65205,17 +65261,17 @@
       "path": "src/commands/plan/needs.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/plan/needs.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/plan/plan-record.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/plan/plan-record.ts"
     },
@@ -65250,22 +65306,22 @@
       "path": "src/commands/plan/refs-check.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/commands/plan/review-gate.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/commands/plan/review-gate.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/plan/risk.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/plan/risk.ts"
     },
@@ -65295,17 +65351,17 @@
       "path": "src/commands/plan/store-check.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/plan/store-check.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/plan/validate.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/plan/validate.ts"
     },
@@ -65335,7 +65391,7 @@
       "path": "src/commands/pr/declarations-integration.test.ts"
     },
     {
-      "cluster": "c22-declarations.test",
+      "cluster": "c23-declarations.test",
       "kind": "test",
       "path": "src/commands/pr/declarations.test.ts"
     },
@@ -65350,7 +65406,7 @@
       "path": "src/commands/pr/index-integration.test.ts"
     },
     {
-      "cluster": "c23-index.test",
+      "cluster": "c24-index.test",
       "kind": "test",
       "path": "src/commands/pr/index.test.ts"
     },
@@ -65515,7 +65571,7 @@
       "path": "src/commands/pr/merge-untracked.test.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c01-github",
       "kind": "test",
       "path": "src/commands/pr/merge.test.ts"
     },
@@ -65710,7 +65766,7 @@
       "path": "src/commands/release/declarations-integration.test.ts"
     },
     {
-      "cluster": "c24-declarations.test",
+      "cluster": "c25-declarations.test",
       "kind": "test",
       "path": "src/commands/release/declarations.test.ts"
     },
@@ -65735,7 +65791,7 @@
       "path": "src/commands/release/index-integration.test.ts"
     },
     {
-      "cluster": "c25-index.test",
+      "cluster": "c26-index.test",
       "kind": "test",
       "path": "src/commands/release/index.test.ts"
     },
@@ -65935,17 +65991,17 @@
       "path": "src/commands/self-update.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c02-cli-capture",
       "kind": "source",
       "path": "src/commands/self-update.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/skill/backfill.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/skill/backfill.ts"
     },
@@ -65955,22 +66011,22 @@
       "path": "src/commands/skill/check.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/skill/demote.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/skill/demote.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/skill/list.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/skill/list.ts"
     },
@@ -65980,17 +66036,17 @@
       "path": "src/commands/skill/search.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/skill/search.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/skill/show.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/skill/show.ts"
     },
@@ -66060,7 +66116,7 @@
       "path": "src/commands/switch.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/commands/tiers-scratch.test.ts"
     },
@@ -66075,7 +66131,7 @@
       "path": "src/commands/update/current.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/commands/update/current.ts"
     },
@@ -66143,111 +66199,6 @@
       "cluster": "c07-index",
       "kind": "source",
       "path": "src/config-registry.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-board-project.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-board-project.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-checks.test.ts"
-    },
-    {
-      "cluster": "c05-index",
-      "kind": "source",
-      "path": "src/config-schema-checks.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-hub.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-hub.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-issues.test.ts"
-    },
-    {
-      "cluster": "c03-sqlite",
-      "kind": "source",
-      "path": "src/config-schema-issues.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-loop-continue.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-loop-continue.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-loop-retries.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-loop-retries.ts"
-    },
-    {
-      "cluster": "c26-config-schema-readings",
-      "kind": "source",
-      "path": "src/config-schema-readings.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-release.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-release.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-tests.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-tests.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-triage.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-triage.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "test",
-      "path": "src/config-schema-wrap-up.test.ts"
-    },
-    {
-      "cluster": "c07-index",
-      "kind": "source",
-      "path": "src/config-schema-wrap-up.ts"
     },
     {
       "cluster": "c12-start",
@@ -66725,12 +66676,12 @@
       "path": "src/fixtures/scrub.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/index.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/index.ts"
     },
@@ -67040,7 +66991,7 @@
       "path": "src/notices/notices.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/notices/run.ts"
     },
@@ -67050,17 +67001,17 @@
       "path": "src/plan.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/plan/index.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/index.ts"
     },
@@ -67070,12 +67021,12 @@
       "path": "src/plan/list.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/plan/needs.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/needs.ts"
     },
@@ -67085,7 +67036,7 @@
       "path": "src/plan/risk.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/risk.ts"
     },
@@ -67095,22 +67046,22 @@
       "path": "src/plan/risk/accounts.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/risk/accounts.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/plan/store-rules.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/store-rules.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/plan/validate.ts"
     },
@@ -67455,22 +67406,22 @@
       "path": "src/pr/worktree.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/preflight/first-dispatch.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/preflight/first-dispatch.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/preflight/fork.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/preflight/fork.ts"
     },
@@ -67480,17 +67431,17 @@
       "path": "src/preflight/prerequisites-md.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/preflight/prerequisites-md.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/preflight/run.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/preflight/run.ts"
     },
@@ -67525,12 +67476,12 @@
       "path": "src/project/pre-init-dirs.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/project/root-choice.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/project/root-choice.ts"
     },
@@ -67545,7 +67496,7 @@
       "path": "src/project/scaffold.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/project/update-current.ts"
     },
@@ -67670,12 +67621,12 @@
       "path": "src/release/changelog.ts"
     },
     {
-      "cluster": "c02-cli-capture",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/release/enabled.test.ts"
     },
     {
-      "cluster": "c02-cli-capture",
+      "cluster": "c07-index",
       "kind": "source",
       "path": "src/release/enabled.ts"
     },
@@ -67995,22 +67946,22 @@
       "path": "src/release/workspace-packages.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c02-cli-capture",
       "kind": "test",
       "path": "src/runtime/install.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c02-cli-capture",
       "kind": "source",
       "path": "src/runtime/install.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/schema/agent.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/schema/agent.ts"
     },
@@ -68020,17 +67971,17 @@
       "path": "src/start.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/background-wait.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/background-wait.ts"
     },
@@ -68050,22 +68001,22 @@
       "path": "src/start/branch-decision.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/branch.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/branch.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/budget.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/budget.ts"
     },
@@ -68095,37 +68046,37 @@
       "path": "src/start/checkout-guard-worktree-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/checkout-guard.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/checkout-guard.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/checkout-watch.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/checkout-watch.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/checkout.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/checkout.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/claim-catch-up-integration.test.ts"
     },
@@ -68140,22 +68091,22 @@
       "path": "src/start/claim-catch-up.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/commit.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/commit.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/continue-args.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/continue-args.ts"
     },
@@ -68165,17 +68116,17 @@
       "path": "src/start/continue-exits.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/continue-exits.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/continue-run.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/continue-run.ts"
     },
@@ -68190,22 +68141,22 @@
       "path": "src/start/convention-body.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/decision-parse.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/decision-parse.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/decision-prompt.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/decision-prompt.ts"
     },
@@ -68225,12 +68176,12 @@
       "path": "src/start/detached-head-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/dispatch.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/dispatch.ts"
     },
@@ -68240,12 +68191,12 @@
       "path": "src/start/doc-task-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/doc-task.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/doc-task.ts"
     },
@@ -68265,32 +68216,32 @@
       "path": "src/start/follow-ups.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/forced-draft.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/forced-draft.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/handout.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/handout.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/inherited-notice.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/inherited-notice.ts"
     },
@@ -68300,57 +68251,57 @@
       "path": "src/start/inherited-red-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/lint-step.packages.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/lint-step.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/lint-step.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/loop-events.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/loop-events.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/pass-over.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/pass-over.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/pause.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/pause.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/start/plan-path.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/start/plan-path.ts"
     },
@@ -68370,7 +68321,7 @@
       "path": "src/start/pr-retarget.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/pr-retarget.ts"
     },
@@ -68405,32 +68356,32 @@
       "path": "src/start/preflight-sync.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/preflight.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/start/preflight.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/promoted-check.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/promoted-check.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/promoted.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/promoted.ts"
     },
@@ -68460,12 +68411,12 @@
       "path": "src/start/release-stage.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/retry-budget.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/retry-budget.ts"
     },
@@ -68475,42 +68426,42 @@
       "path": "src/start/risk-total.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "source",
       "path": "src/start/risk-total.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/run-checkout-base-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/run-checkout.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/run-checkout.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/run-config.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/run-config.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/run-setup.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/run-setup.ts"
     },
@@ -68525,32 +68476,32 @@
       "path": "src/start/runner-pr.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/runtime.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/runtime.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/session-decisions.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/session-guard.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/session-guard.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/session-hop.test.ts"
     },
@@ -68560,12 +68511,12 @@
       "path": "src/start/session-worktree.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/session.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/session.ts"
     },
@@ -68590,77 +68541,77 @@
       "path": "src/start/stamp.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/stamp.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/step-only-report.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/step-only-report.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-blocker.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-blocker.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-outside-case.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-outside-case.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-retake-alone.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-retake-alone.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-stage-ledger.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-stage-ledger.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-stage-step-entry.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-stage-step.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-stage-step.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step-checks-integration.test.ts"
     },
@@ -68670,7 +68621,7 @@
       "path": "src/start/suite-step-known-baseline-failure-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step-loop-entry.test.ts"
     },
@@ -68680,7 +68631,7 @@
       "path": "src/start/suite-step-no-owns-full-suite-tally-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step-outside-case-integration.test.ts"
     },
@@ -68690,7 +68641,7 @@
       "path": "src/start/suite-step-pre-wrap-up-repair-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step-retake-alone-integration.test.ts"
     },
@@ -68710,82 +68661,82 @@
       "path": "src/start/suite-step-task-scope-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step-type-step-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-step.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-step.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-steps-run.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-steps-run.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-task-step-entry.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/suite-task-step.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/suite-task-step.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/sweep-timing.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/sweep-timing.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/task-always-run.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/task-always-run.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/task-gate-lines.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/task-gate-lines.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/task-step-checks.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/task-step-checks.ts"
     },
@@ -68830,17 +68781,17 @@
       "path": "src/start/triage.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/type-step.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/type-step.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/worktree-upstream-integration.test.ts"
     },
@@ -68855,12 +68806,12 @@
       "path": "src/start/worktree-upstream.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/worktree.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/worktree.ts"
     },
@@ -68870,7 +68821,7 @@
       "path": "src/start/wrap-up-delivered-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/wrap-up-integration.test.ts"
     },
@@ -68880,32 +68831,32 @@
       "path": "src/start/wrap-up-late-pr-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/wrap-up-retry.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/wrap-up-retry.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/wrap-up-run.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/wrap-up-run.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/start/wrap-up.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/start/wrap-up.ts"
     },
@@ -69070,42 +69021,42 @@
       "path": "src/stretch/stretch-folders.integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/baseline.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/baseline.ts"
     },
     {
-      "cluster": "c09-index",
+      "cluster": "c07-index",
       "kind": "test",
       "path": "src/suite/checks.test.ts"
     },
     {
-      "cluster": "c09-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/checks.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/deadline-spawn.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/deadline-spawn.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/failure-lines.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/failure-lines.ts"
     },
@@ -69120,22 +69071,22 @@
       "path": "src/suite/owns.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/run-baseline-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/run-recheck-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/run.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/run.ts"
     },
@@ -69150,12 +69101,12 @@
       "path": "src/suite/scope.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/suite/unhandled.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/suite/unhandled.ts"
     },
@@ -69180,7 +69131,7 @@
       "path": "src/tests/agents-split-accounting.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/backfill-pipeline.test.ts"
     },
@@ -69205,12 +69156,12 @@
       "path": "src/tests/board-trust-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/branch-integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/bundled-tier.test.ts"
     },
@@ -69367,7 +69318,17 @@
     {
       "cluster": "c07-index",
       "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-board-project.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
       "path": "src/tests/core-coupled/config-schema-bugs.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-checks.test.ts"
     },
     {
       "cluster": "c07-index",
@@ -69382,7 +69343,47 @@
     {
       "cluster": "c07-index",
       "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-hub.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-issues.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
       "path": "src/tests/core-coupled/config-schema-logger.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-loop-continue.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-loop-retries.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-release.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-tests.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-triage.test.ts"
+    },
+    {
+      "cluster": "c07-index",
+      "kind": "test",
+      "path": "src/tests/core-coupled/config-schema-wrap-up.test.ts"
     },
     {
       "cluster": "c07-index",
@@ -69530,7 +69531,7 @@
       "path": "src/tests/core-coupled/next/hop-record.integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/core-coupled/plan/doc-task.test.ts"
     },
@@ -69550,7 +69551,7 @@
       "path": "src/tests/core-coupled/project/position.integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/core-coupled/project/scope-fallback.test.ts"
     },
@@ -69560,12 +69561,12 @@
       "path": "src/tests/core-coupled/project/scope.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/core-coupled/project/worktree-root.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/core-coupled/report/parse.test.ts"
     },
@@ -69590,12 +69591,12 @@
       "path": "src/tests/core-coupled/utils/progress.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/core-coupled/utils/tracker.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/core-package-changed-spawned.test.ts"
     },
@@ -69610,7 +69611,7 @@
       "path": "src/tests/cut-table-shape.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/declaration-dispatch.test.ts"
     },
@@ -69630,7 +69631,7 @@
       "path": "src/tests/default-plan-dirs.sweep.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/demotion-pass.test.ts"
     },
@@ -69645,7 +69646,7 @@
       "path": "src/tests/detached-head-start-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/dispatch-records.test.ts"
     },
@@ -69660,7 +69661,7 @@
       "path": "src/tests/docs-plan-spawned.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/doctor-deep-env-integration.test.ts"
     },
@@ -69770,12 +69771,12 @@
       "path": "src/tests/facade-subpaths.sweep.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/findNextTask.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/finished-task.test.ts"
     },
@@ -69820,7 +69821,7 @@
       "path": "src/tests/init-scope.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/instinct-list-cli.test.ts"
     },
@@ -69835,17 +69836,17 @@
       "path": "src/tests/inventory-cli.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/inventory-coupled/adapters/learning/local.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-coupled/agents/roster.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-coupled/agents/vendorable.test.ts"
     },
@@ -69855,22 +69856,22 @@
       "path": "src/tests/inventory-coupled/inventory/search/prompt.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-coupled/plan/risk/long-runs.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-coupled/tiers/resolve.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-coupled/tiers/routing.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/inventory-live.test.ts"
     },
@@ -69900,7 +69901,7 @@
       "path": "src/tests/issue-ready-integration.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/learning-adapter.test.ts"
     },
@@ -69910,7 +69911,7 @@
       "path": "src/tests/learning-boundary.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/learning-contract.test.ts"
     },
@@ -70075,22 +70076,22 @@
       "path": "src/tests/next-roadmap-status-waiting-cli.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/operators.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/output-sinks.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test-support",
       "path": "src/tests/output-sinks.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/package-build.test.ts"
     },
@@ -70130,7 +70131,7 @@
       "path": "src/tests/parity-lineage.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/plan-and-schedule.test.ts"
     },
@@ -70155,12 +70156,12 @@
       "path": "src/tests/plan-create-store-rules-integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/plan-format-source.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/plan-injection.test.ts"
     },
@@ -70195,7 +70196,7 @@
       "path": "src/tests/pr-show-closes-integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/preflight-halts.test.ts"
     },
@@ -70205,7 +70206,7 @@
       "path": "src/tests/preload.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/project-skills-check.test.ts"
     },
@@ -70225,7 +70226,7 @@
       "path": "src/tests/public-entries.sweep.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/rafa-block-strip.test.ts"
     },
@@ -70245,7 +70246,7 @@
       "path": "src/tests/readme-spenders.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test-support",
       "path": "src/tests/real-node-modules.ts"
     },
@@ -70360,17 +70361,17 @@
       "path": "src/tests/repo-hygiene.sweep.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/report-ask-live.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/report-ask.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/report-status-marks.test.ts"
     },
@@ -70400,7 +70401,7 @@
       "path": "src/tests/routing-table-agents.sweep.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tests/schema-records.test.ts"
     },
@@ -70435,7 +70436,7 @@
       "path": "src/tests/skill-name-refusal.test.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/tests/skills-declaration-strip.test.ts"
     },
@@ -70620,7 +70621,7 @@
       "path": "src/tests/worktree-start-refusals-integration.test.ts"
     },
     {
-      "cluster": "c04-sections",
+      "cluster": "c05-sections",
       "kind": "test",
       "path": "src/tiers/resolve.integration.test.ts"
     },
@@ -70710,7 +70711,7 @@
       "path": "src/triage/kind-route.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "test",
       "path": "src/triage/leftover-repair.test.ts"
     },
@@ -70835,7 +70836,7 @@
       "path": "src/utils/agent-shell.ts"
     },
     {
-      "cluster": "c05-index",
+      "cluster": "c04-index",
       "kind": "source",
       "path": "src/utils/schedule.ts"
     }
