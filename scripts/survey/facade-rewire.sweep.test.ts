@@ -37,8 +37,9 @@ interface RewiredRow {
  * `packages/rafa/src/schema/frontmatter.ts` and
  * `packages/rafa/src/utils/agent-definition.ts`. Inventory's four
  * load-cycle files would put the facade on a cycle through inventory if
- * they imported it by name, and its three back-edge files
- * are effort files, and effort comes before inventory in the move order.
+ * they imported it by name, and its three back-edge files are effort
+ * files, which the codemod reads as to rewire now that inventory moves
+ * first and which the rewire stage takes onto the facade.
  * Board's 24 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`; its two
  * declaration-graph files are effort's two.

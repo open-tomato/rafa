@@ -37,11 +37,15 @@ import { classifyFile } from './files';
 
 /**
  * The feature packages in the order they move, as the spec names it (not
- * the cut table's rank order).
+ * the cut table's rank order). Inventory moves before effort by the
+ * decision of 23 October 2026: with inventory first, one edge is left to
+ * cut before the first move, inventory's one import of effort, against
+ * five with effort first, the four value edges and one type edge of
+ * effort's skills report into inventory.
  */
 export const MOVE_ORDER: readonly string[] = [
-  'rafa-effort',
   'rafa-inventory',
+  'rafa-effort',
   'rafa-board',
   'rafa-release',
   'rafa-pr',

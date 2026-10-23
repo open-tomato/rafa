@@ -68,7 +68,7 @@ const PLANTED: readonly CouplingEdge[] = [
 
 describe('MOVE_ORDER', () => {
   it('holds the six feature packages in the order the spec names', () => {
-    expect(MOVE_ORDER).toEqual(['rafa-effort', 'rafa-inventory', 'rafa-board', 'rafa-release', 'rafa-pr', 'rafa-run']);
+    expect(MOVE_ORDER).toEqual(['rafa-inventory', 'rafa-effort', 'rafa-board', 'rafa-release', 'rafa-pr', 'rafa-run']);
   });
 });
 

@@ -502,10 +502,11 @@ upward target `left to place` or `by rule`.
 
 **The coupling reading takes the same table.** `scripts/survey/coupling.ts`
 counts the value imports between the six feature packages of its `MOVE_ORDER`,
-the order they move in: `rafa-effort`, `rafa-inventory`, `rafa-board`,
+the order they move in: `rafa-inventory`, `rafa-effort`, `rafa-board`,
 `rafa-release`, `rafa-pr` and `rafa-run`, which is not the cut table's rank
-order. A back edge runs from a package earlier in that order into a later one,
-since moved first the earlier package would import a file not yet moved. Run as
+order (inventory first by the decision of 23 October 2026). A back edge
+runs from a package earlier in that order into a later one, since moved
+first the earlier package would import a file not yet moved. Run as
 `bun scripts/survey/coupling.ts --max=<percent>` from the root, it prints the
 back edges by package pair and one line, `back <n> of <total> value imports
 between feature packages, <percent>%`, and exits 1 when the percent is above
@@ -661,10 +662,10 @@ names come from, and the facade entry is no node.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
-    Inventory has three, `src/effort/report-skills-read.ts`,
-    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, all effort
-    files: effort comes before inventory in the move order, so they import it
-    backwards, and the decouple step before pass 4 cuts them. Board has none:
+    Inventory has none since the 23 October 2026 swap put it first: its
+    three effort importers, `src/effort/report-skills-read.ts`,
+    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, now
+    import it forward and read as `rewire`. Board has none:
     no effort file imports it. Release has none in the codemod's grouping,
     because its one board importer, `src/board/project/facts.ts`, is taken
     first by the load-cycle group.
