@@ -5,7 +5,7 @@
  *
  * The scopes are `<root>/.rafa/instincts` and `~/.rafa/instincts`
  * (`packages/rafa/src/schema/tiers.ts`), nearest the work first, and what counts as
- * a record there is `src/schema/scope-records.ts`'s: a top-level `.md`, with
+ * a record there is `packages/rafa-inventory/src/schema/scope-records.ts`'s: a top-level `.md`, with
  * the Learning adapter's `instincts.ndjson` and `flags.ndjson` passed
  * over without a word. So the count this prints is a count of records,
  * never of the store's lines.

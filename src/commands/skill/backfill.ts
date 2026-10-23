@@ -38,7 +38,7 @@
  * An `--apply` run copies each file it is about to rewrite to
  * `<base>/.rafa/backfill/backup/<relative path>` before the write, both
  * for the proposal rows and for the derivation
- * (`src/backfill/backup.ts`). A file under the checkout the command
+ * (`packages/rafa-inventory/src/backfill/backup.ts`). A file under the checkout the command
  * runs in is not copied: git holds it, and the loop commits the pass's
  * edits like any task's. The copies are taken BEFORE the writes rather
  * than per write, so a run that dies between two files has a copy of

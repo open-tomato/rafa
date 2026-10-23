@@ -1,6 +1,6 @@
 /**
  * `rafa agent show <name> [--full]`: one agent definition whole, as the
- * show view of `src/inventory/show.ts` renders it.
+ * show view of `packages/rafa-inventory/src/inventory/show.ts` renders it.
  *
  * `rafa agent list` says where each agent sits and whether a loop
  * session resolves it; this command says what one of them IS: its
@@ -8,7 +8,7 @@
  * the name with its source and state, and the body's headings with
  * their file lines. `--full` prints the whole file in place of the
  * frontmatter and the headings. Every part is built by
- * `src/inventory/show.ts`, which `rafa skill show` and the browse view
+ * `packages/rafa-inventory/src/inventory/show.ts`, which `rafa skill show` and the browse view
  * share, so no two of them can print one item two ways.
  *
  * ## Which agent a name shows

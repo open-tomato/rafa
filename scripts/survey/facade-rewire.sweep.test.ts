@@ -37,7 +37,7 @@ interface RewiredRow {
  * `packages/rafa/src/schema/frontmatter.ts` and
  * `packages/rafa/src/utils/agent-definition.ts`. Inventory's last
  * load-cycle file, `src/effort/skill-use.ts`, imports `bareSkillName` from
- * `src/tiers/skill-names.ts`; the import graph held the search's edge into
+ * `packages/rafa-inventory/src/tiers/skill-names.ts`; the import graph held the search's edge into
  * `src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
  * the codemod read a cycle through inventory when the rewire ran. The second
  * decouple item cut that edge, and once its survey was regenerated the

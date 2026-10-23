@@ -67,17 +67,17 @@
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
- * definitions through `src/agents/roster.ts`, nor `agent list`, which
+ * definitions through `packages/rafa-inventory/src/agents/roster.ts`, nor `agent list`, which
  * lists the agents `buildInventory` (`src/inventory/`) reads, nor
- * `agent show`, which shows one of them through `src/inventory/show.ts`,
+ * `agent show`, which shows one of them through `packages/rafa-inventory/src/inventory/show.ts`,
  * nor `agent search` and `skill search`, which find the items that
  * answer a question through `src/inventory/search/`, the agent one
  * built by `skill/search.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
- * through `src/check/run.ts` and share `commands/check-report.ts`, nor
+ * through `packages/rafa-inventory/src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
  * (`src/inventory/`) reads from every source, nor `skill show`, which
- * shows one of them through `src/inventory/show.ts`, nor `skill demote` and
+ * shows one of them through `packages/rafa-inventory/src/inventory/show.ts`, nor `skill demote` and
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two

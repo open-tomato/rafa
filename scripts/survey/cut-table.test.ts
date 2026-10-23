@@ -257,7 +257,7 @@ describe('placeFile', () => {
   it('places the two report files in core and names the third for rafa-inventory', () => {
     expect(placeFile('packages/rafa/src/report/parse.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa/src/report/record.ts').package).toBe(CORE_PACKAGE);
-    expect(placeFile('src/report/lessons.ts')).toEqual({ by: 'named', folder: undefined, package: 'rafa-inventory' });
+    expect(placeFile('packages/rafa-inventory/src/report/lessons.ts')).toEqual({ by: 'named', folder: undefined, package: 'rafa-inventory' });
   });
 
   it('sends the test file of a named file where the named file goes', () => {

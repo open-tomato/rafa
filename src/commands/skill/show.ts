@@ -1,13 +1,13 @@
 /**
  * `rafa skill show <name> [--full]`: one skill whole, as the show view
- * of `src/inventory/show.ts` renders it.
+ * of `packages/rafa-inventory/src/inventory/show.ts` renders it.
  *
  * `rafa skill list` says where each skill sits and whether it answers;
  * this command says what one of them IS: its inventory record, its
  * frontmatter as written, every other holder of the name with its
  * source and state, and the body's headings with their file lines.
  * `--full` prints the whole file in place of the frontmatter and the
- * headings. Every part is built by `src/inventory/show.ts`, which
+ * headings. Every part is built by `packages/rafa-inventory/src/inventory/show.ts`, which
  * `rafa agent show` and the browse view share, so no two of them can
  * print one item two ways.
  *

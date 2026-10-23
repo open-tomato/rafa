@@ -1,7 +1,7 @@
 {
   "name": "@open-tomato/rafa-inventory",
   "version": "0.46.0",
-  "description": "Facade of the inventory package (#808, pass 2): re-exports today's files from src/ under the package's final name, and becomes its own index at its move.",
+  "description": "The inventory package (#808): its files live under its own src/ since pass 4a, index.ts re-exports the names the files outside it import, and every file is a subpath through ./*.",
   "private": true,
   "license": "Apache-2.0",
   "openTomato": {
@@ -9,11 +9,15 @@
   },
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "lint": "eslint .",
     "test": "bun test"
+  },
+  "dependencies": {
+    "@open-tomato/rafa-core": "workspace:*"
   },
   "devDependencies": {
     "@open-tomato/rafa-eslint-config": "workspace:*",

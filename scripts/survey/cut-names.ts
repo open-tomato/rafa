@@ -104,19 +104,20 @@ export const EFFORT_NAMED: readonly string[] = [
 ];
 
 /**
- * The files named for `rafa-inventory`, the root files that reach the
- * inventory package. `src/start/serving.ts` reaches only inventory files
- * (`src/tiers/` and `src/inventory/trees.ts`) and sits in `src/start/`,
- * so it is named here under pass 1's rule that a file goes with the
- * latest feature it reaches.
+ * The files named for `rafa-inventory`: root files that reached the
+ * inventory package, moved into it by pass 4a with their names
+ * following. `start/serving.ts` reached only inventory files (`tiers/`
+ * and `inventory/trees.ts`) and sat in the root's `start/` folder, so it
+ * was named here under pass 1's rule that a file goes with the latest
+ * feature it reaches.
  */
 export const INVENTORY_NAMED: readonly string[] = [
-  'src/adapters/learning/held.ts',
-  'src/adapters/learning/local.ts',
-  'src/plan/risk/commands.ts',
-  'src/plan/risk/long-runs.ts',
-  'src/report/lessons.ts',
-  'src/start/serving.ts',
+  'packages/rafa-inventory/src/adapters/learning/held.ts',
+  'packages/rafa-inventory/src/adapters/learning/local.ts',
+  'packages/rafa-inventory/src/plan/risk/commands.ts',
+  'packages/rafa-inventory/src/plan/risk/long-runs.ts',
+  'packages/rafa-inventory/src/report/lessons.ts',
+  'packages/rafa-inventory/src/start/serving.ts',
 ];
 
 /**

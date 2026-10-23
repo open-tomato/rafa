@@ -20,8 +20,8 @@
  * there. That the agent hint is conditional is held by a name no agent
  * holds, whose refusal carries no hint.
  */
-import type { ShowView } from '../../inventory/show.js';
-import type { Resolution } from '../../tiers/resolve.js';
+import type { ShowView } from '@open-tomato/rafa-inventory/inventory/show';
+import type { Resolution } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

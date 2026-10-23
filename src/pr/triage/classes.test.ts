@@ -6,7 +6,7 @@
  * file has:
  *
  *  - Hold the class set closed from both ends, the way
- *    `src/check/references.test.ts` holds its issue codes. One case
+ *    `packages/rafa-inventory/src/check/references.test.ts` holds its issue codes. One case
  *    walks {@link TRIAGE_CLASSES} and collects the classes the
  *    eligibility rule calls simple, so a class added to the list
  *    without a decision about its eligibility, and an eligibility

@@ -27,7 +27,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { actionHash, ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
+import { actionHash, ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createInstinctShowCommand, evidenceLine, unknownIdMessage } from './show.js';

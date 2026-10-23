@@ -12,7 +12,7 @@
  *
  * Nothing here reads a file, the environment or a process. Which lines
  * of a body are command lines at all is decided upstream, by the caller
- * over `src/check/shell-lines.ts`; this module is handed one command
+ * over `packages/rafa-inventory/src/check/shell-lines.ts`; this module is handed one command
  * and answers which patterns it matches.
  *
  * ## Where a command word counts

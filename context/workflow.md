@@ -11,7 +11,7 @@ is whatever the edit happens to be (`Remove ...`, `Rewrite ...`,
 `Split ...`) while the thing it names is reliably a markdown file, so
 the shape discriminates where the verb does not.
 
-<!-- routing-table:start (generated from DEFAULT_ROUTES in src/tiers/routing.ts; do not edit by hand) -->
+<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa-inventory/src/tiers/routing.ts; do not edit by hand) -->
 | Task shape | Agent | Where it lives |
 |---|---|---|
 | `prose` — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `src/bundled/agents/doc-updater.md` |
@@ -23,7 +23,7 @@ the shape discriminates where the verb does not.
 
 **This table is generated from rafa's `routing` defaults**
 (`DEFAULT_ROUTES` in `packages/rafa/src/core/config/default-routing.ts`) by
-`src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
+`packages/rafa-inventory/src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
 the page and the generator disagree, so change a row there and
 regenerate the table rather than editing it here. A project's own config
 can add, re-point or remove a row under `routing`: its module file
@@ -65,7 +65,7 @@ downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call. `loop start` no longer
 waits for that: its preflight resolves the roster from the three agent
 tiers, the project's and the home's `.claude/agents` and rafa's own
-`bundled/agents`, through `resolveTiers` (`src/agents/roster.ts`), and
+`bundled/agents`, through `resolveTiers` (`packages/rafa-inventory/src/agents/roster.ts`), and
 refuses the run, ahead of every prerequisite probe, when a still-to-run
 task of the plan or the tracker names an agent no loaded tier serves:
 one no tier holds, one `tiers.agents` switches off, one only an unloaded
@@ -261,7 +261,7 @@ An open task gets a `long-run` note when its sentence says "full suite" or
 "whole suite", in any case, or when a code span in it runs `bun test` with
 no path. `--changed=<base>` narrows the run, so it is not flagged. The note
 names the line and the fix, which is to declare `tests=full` on the task and
-take the run out of its text (`src/plan/risk/long-runs.ts`). It is level
+take the run out of its text (`packages/rafa-inventory/src/plan/risk/long-runs.ts`). It is level
 `note`, so `--strict` still exits 0 on it. A task session's Bash call stops
 at 10 minutes, and a whole-suite run can outlast that, which is why the
 runner runs the suite after the task commits when the task declares
@@ -380,15 +380,15 @@ scopes.
 **Every task's prompt holds a skill index, and at dispatch the session is
 handed both the skills it needs and the lessons it learned from earlier
 work.** The planner reads a compact skill index (`renderSkillIndex` in
-`src/task/skill-index.ts`) that lists every enabled skill a loop session
+`packages/rafa-inventory/src/task/skill-index.ts`) that lists every enabled skill a loop session
 will see, one line per skill with its bare name, tags and either its
 prevents clause or a one-line summary. A plan can name the skills each
 task needs with `skills=` beside its text; a task declaring none gets
-none. At dispatch, one of three resolvers (`src/task/resolve-skills.ts`)
-picks the skills to offer, and (`src/task/select-lessons.ts`) picks up to 5
+none. At dispatch, one of three resolvers (`packages/rafa-inventory/src/task/resolve-skills.ts`)
+picks the skills to offer, and (`packages/rafa-inventory/src/task/select-lessons.ts`) picks up to 5
 blessed lessons from the learning store when they are enabled. Both go into
 the task's prompt as two sections, after the blocker line and before
-`PROMPT.md`, rendered by (`src/task/sections.ts`).
+`PROMPT.md`, rendered by (`packages/rafa-inventory/src/task/sections.ts`).
 
 **The three resolvers are `planner`, `tag` and `none`.** The planner
 resolver uses the task's `skills=` declaration and offers exactly those

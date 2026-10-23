@@ -128,7 +128,7 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     label: 'search',
     prefix: '# Inventory search instructions',
     firstLineInfix: null,
-    source: 'src/inventory/search/prompt.ts',
+    source: 'packages/rafa-inventory/src/inventory/search/prompt.ts',
   },
 ];
 

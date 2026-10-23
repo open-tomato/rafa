@@ -135,6 +135,7 @@ import { planStubFromPrompt , trackerPathFor } from '@open-tomato/rafa/core/plan
 import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { serveSession } from '@open-tomato/rafa-inventory/start/serving';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
@@ -153,7 +154,6 @@ import { sinkOutput } from '../tests/output-sinks.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';
-import { serveSession } from './serving.js';
 import { setActivePlanStub } from './stamp.js';
 
 /** This file's scratch directory. */

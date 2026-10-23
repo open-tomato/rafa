@@ -12,7 +12,7 @@
 import type { BundleMetafile } from './bundle';
 import type { WorkspacePackage } from '../../src/release/workspace-packages.js';
 
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -23,6 +23,7 @@ import {
   bundlesFor,
   externalsLine,
   findingLine,
+  LEARNING_ENTRY,
   LIBRARY_ENTRIES,
   NO_EXTERNALS_FLAG,
   parseBundleArgs,
@@ -170,14 +171,25 @@ describe('the lines', () => {
 });
 
 describe('bundlesFor', () => {
-  test('builds the CLI to <out>/cli.js and the six library entries with splitting into <out>/', () => {
+  test('builds the CLI to <out>/cli.js and the five library entries with splitting into <out>/', () => {
     const [cli, library] = bundlesFor('dist/', '/abs/dist');
     expect(cli).toEqual({ label: 'dist/cli.js', args: ['src/rafa.ts', '--target=bun', '--outfile=/abs/dist/cli.js'] });
     expect(library).toEqual({
       label: 'dist/',
       args: [...LIBRARY_ENTRIES, '--target=bun', '--splitting', '--root=src', '--outdir=/abs/dist'],
     });
-    expect(LIBRARY_ENTRIES).toHaveLength(6);
+    expect(LIBRARY_ENTRIES).toHaveLength(5);
+    expect(LIBRARY_ENTRIES.every((entry) => entry.startsWith('src/'))).toBe(true);
+  });
+
+  test('builds the learning entry, outside src/, alone to <out>/learning/index.js', () => {
+    const builds = bundlesFor('dist/', '/abs/dist');
+    expect(builds).toHaveLength(3);
+    expect(builds[2]).toEqual({
+      label: 'dist/learning/index.js',
+      args: [LEARNING_ENTRY, '--target=bun', '--outfile=/abs/dist/learning/index.js'],
+    });
+    expect(LEARNING_ENTRY.startsWith('src/')).toBe(false);
   });
 });
 
@@ -238,6 +250,7 @@ const PLANTED: Readonly<Record<string, string>> = {
     '',
   ].join('\n'),
   ...Object.fromEntries(LIBRARY_ENTRIES.map((entry) => [entry, 'export const entry = true;\n'])),
+  [LEARNING_ENTRY]: 'export const entry = true;\n',
 };
 
 /** What one run of the script said and left. */
@@ -283,7 +296,10 @@ describe('bundle.ts as a process over a planted workspace', () => {
     expect(run.lines).toEqual([
       'dist/cli.js built with externals: @scope/plugin',
       'dist/ built with externals: @scope/plugin',
+      'dist/learning/index.js built with externals: @scope/plugin',
     ]);
+    expect(existsSync(join(root, 'dist', 'learning', 'index.js'))).toBe(true);
+    expect(existsSync(join(root, 'packages', 'rafa-inventory', 'src', 'learning', 'index.js'))).toBe(false);
     expect(run.exitCode).toBe(0);
     expect(run.bundle).not.toContain(PLUGIN_MARKER);
     expect(run.bundle).not.toContain('packages/plugin');

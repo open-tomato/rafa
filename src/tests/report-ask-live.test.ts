@@ -19,7 +19,7 @@
  * session has nothing of this checkout's own to read or edit — holding
  * one planted file, {@link GOTCHA_FILE}, whose content is a small,
  * self-contained gotcha for the task to notice and report on.
- * `src/report/testdata/live-session-report.txt` was captured the same
+ * `packages/rafa-inventory/src/report/testdata/live-session-report.txt` was captured the same
  * way, from a hand-written prompt; this fixture is the first captured
  * from a prompt this codebase itself builds.
  *

@@ -2,7 +2,7 @@
  * The records the Learning port passes, and the answers it gives: core's
  * declaration of the six types `packages/rafa/src/ports/index.ts` names for it.
  *
- * The learning library declares the same six in `src/learning/types.ts`
+ * The learning library declares the same six in `packages/rafa-inventory/src/learning/types.ts`
  * and keeps them there. `src/learning/` imports nothing from the rest of
  * `src/`, and core imports nothing above it, so neither side can take
  * the other's declaration: each declares its own, and

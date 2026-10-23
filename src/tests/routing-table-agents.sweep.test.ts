@@ -5,7 +5,7 @@
  * THIRD column is the load-bearing one: the rafa-tier file,
  * `src/bundled/agents/<name>.md`, that ships with the package. The
  * table is generated from rafa's routing defaults
- * (`src/tiers/routing-table.ts`), and `src/tiers/routing-table.test.ts`
+ * (`packages/rafa-inventory/src/tiers/routing-table.ts`), and `packages/rafa-inventory/src/tiers/routing-table.test.ts`
  * holds the page equal to the generator. This file holds what the
  * generated rows claim against the tree: every path is tracked, on
  * disk, and named after the agent of its row.
@@ -40,7 +40,7 @@
  * `user-level`, for agents that live outside the repo, and this file
  * held those rows to the negative claim that no tracked project file
  * shadowed them. The routing defaults name no such agent
- * (`src/tiers/routing.ts`), so the generated table has no such row,
+ * (`packages/rafa-inventory/src/tiers/routing.ts`), so the generated table has no such row,
  * and a third column in that form now reads as unrecognised.
  *
  * ## Reading tracked-ness

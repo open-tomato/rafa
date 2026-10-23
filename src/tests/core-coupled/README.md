@@ -55,7 +55,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `effort/store/settings.test.ts` | `src/config-registry.ts` |
 | `effort/store/stale-docs.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/store-sources.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
-| `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `src/schema/failure-strings.ts`, `src/schema/skill.ts` |
+| `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `packages/rafa-inventory/src/schema/failure-strings.ts`, `packages/rafa-inventory/src/schema/skill.ts` |
 | `modules/load.test.ts` | `src/config-registry.ts` |
 | `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
 | `plan/doc-task.test.ts` | `src/plan/index.ts`, `src/plan/validate.ts` |
@@ -65,7 +65,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `project/scope-fallback.test.ts` | `src/tests/git-identity.ts` |
 | `project/scope.test.ts` | `src/config-registry.ts` |
 | `project/worktree-root.test.ts` | `src/tests/git-identity.ts` |
-| `report/parse.test.ts` | `src/schema/instinct.ts` |
+| `report/parse.test.ts` | `packages/rafa-inventory/src/schema/instinct.ts` |
 | `schema/project-id.test.ts` | `src/tests/git-identity.ts` |
 | `start/worktree-dir.test.ts` | `src/config-registry.ts` |
 | `utils/git.test.ts` | `src/tests/git-identity.ts` |

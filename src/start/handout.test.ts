@@ -13,20 +13,20 @@
  */
 import type { TaskLearning } from './dispatch.js';
 import type { TaskHandout } from './handout.js';
-import type { InstinctRecord } from '../learning/index.js';
-import type { TaskInput } from '../task/resolve-skills.js';
-import type { Resolution } from '../tiers/resolve.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { TaskInput } from '@open-tomato/rafa-inventory/task/resolve-skills';
+import type { Resolution } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { sinkOutput } from '../tests/output-sinks.js';
-import { resolveTiers } from '../tiers/resolve.js';
 
 import {
   EMPTY_RESOLUTION,

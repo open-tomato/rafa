@@ -37,9 +37,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CONFIG_FILE } from '@open-tomato/rafa/core/config';
-
-import { buildInventory } from '../inventory/index.js';
-import { INSTALLED_PLUGINS_PATH, PLUGINS_RECORD_VERSION } from '../inventory/plugins.js';
+import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
+import { INSTALLED_PLUGINS_PATH, PLUGINS_RECORD_VERSION } from '@open-tomato/rafa-inventory/inventory/plugins';
 
 import { renderDeepSection } from './doctor-deep-row.js';
 import { byGroup, readDeepSettings, SETTINGS_SECTION_TITLE, settingsSection } from './doctor-deep-settings.js';

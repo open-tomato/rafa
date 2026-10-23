@@ -86,7 +86,7 @@
  * diagnostics, since the type import it no longer names is an unused
  * local under the root tsconfig.
  *
- * The learning records moved to `src/learning/types.ts` on 2026-09-25,
+ * The learning records moved to `packages/rafa-inventory/src/learning/types.ts` on 2026-09-25,
  * and the entry re-exports them. Each of the six is held to resolve to
  * its declaration there, through the export's alias, and the entry is
  * held to declare none of their names itself, so a copy that matches
@@ -99,7 +99,7 @@
  * `src/learning/`; the entry re-exports them from there, and that leaf
  * is the declaration each is held to. `src/tests/learning-contract.test.ts`
  * holds it to the library's. Measured that day at 43 pass: the held
- * path left at `src/learning/types.ts` reddened the six cases and
+ * path left at `packages/rafa-inventory/src/learning/types.ts` reddened the six cases and
  * nothing else.
  *
  * The `Sync` port arrived on 2026-09-29 with its four refusals. Six

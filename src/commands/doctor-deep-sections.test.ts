@@ -28,7 +28,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { pathDirectories } from '../check/references.js';
+import { pathDirectories } from '@open-tomato/rafa-inventory/check/references';
 
 import { readSessionEnv } from './doctor-deep-env.js';
 import { readDeepStackTools, stackToolsSection } from './doctor-deep-needs.js';

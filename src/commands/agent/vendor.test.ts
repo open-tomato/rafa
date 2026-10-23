@@ -45,7 +45,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { resolveAgentRoster } from '../../agents/roster.js';
+import { resolveAgentRoster } from '@open-tomato/rafa-inventory/agents/roster';
+
 import { CONFIG_DEFAULTS } from '../../config-registry.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

@@ -2,8 +2,8 @@
  * Where a skill and an instinct live: the three skill tiers, the two
  * instinct scopes, and the paths each resolves to.
  *
- * `src/check/layout.ts` answers what one directory holds and
- * `src/check/run.ts` checks it; neither knows which directory it was
+ * `packages/rafa-inventory/src/check/layout.ts` answers what one directory holds and
+ * `packages/rafa-inventory/src/check/run.ts` checks it; neither knows which directory it was
  * handed or why. This module is the other half: it answers WHICH
  * directories exist to be checked, so `rafa skill list` and every later
  * writer name a tier rather than a path, and one place carries the

@@ -6,11 +6,11 @@
  * A module of its own beside `./doctor-deep-env.ts`, as `./doctor.ts`
  * is near the 800-line cap (`context/source.md`). It re-derives
  * nothing: which items exist and whether a session sees them is
- * `buildInventory`'s `visibleToLoop` (`src/inventory/index.ts`), which
+ * `buildInventory`'s `visibleToLoop` (`packages/rafa-inventory/src/inventory/index.ts`), which
  * `skillOverrides` entry switched a skill off is `readSkillOverrides`'
- * (`src/inventory/disabled.ts`), and which MCP server a `-p` session
+ * (`packages/rafa-inventory/src/inventory/disabled.ts`), and which MCP server a `-p` session
  * starts is `readMcpServers`, `isLoadedUnder` and `mcpServerFor`
- * (`src/inventory/mcp.ts`). Their rules, and the Claude Code version
+ * (`packages/rafa-inventory/src/inventory/mcp.ts`). Their rules, and the Claude Code version
  * they were measured against, are documented there, not here.
  *
  * {@link readDeepSettings} reads into data; {@link settingsSection}

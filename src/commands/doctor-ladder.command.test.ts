@@ -28,10 +28,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+
 import { LADDER_WORKFLOWS, PUBLISH_SWITCH_VARIABLE } from '../release/ladder.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { createDoctorCommand } from './doctor.js';
 

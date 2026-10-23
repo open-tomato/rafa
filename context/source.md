@@ -202,8 +202,8 @@ ninth test, `worktree-dir.test.ts`, was parked under
 `SESSION_ID_FLAG` (`'--session-id'`) moved at commit d9b339b from
 `src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
 `SETTING_SOURCES_FLAG`, and the loop barrel exports it with no re-export at the
-old path. `src/start/serving.ts` is an inventory file by name, though it sits
-under `src/start/`: it imports only `src/tiers/` and `src/inventory/trees.ts`,
+old path. `packages/rafa-inventory/src/start/serving.ts` is an inventory file by name, though it sits
+under `src/start/`: it imports only `src/tiers/` and `packages/rafa-inventory/src/inventory/trees.ts`,
 so `INVENTORY_NAMED` of `scripts/survey/cut-names.ts` names it (commit 24fdaf6)
 and it does not move.
 
@@ -356,7 +356,7 @@ core barrel re-exports: a feature file that needs the whole default record or
 the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
 `SETTINGS` are, and so imports no root file. The callers at this commit are
 `src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`,
-`src/effort/collect.ts` and `src/inventory/index.ts` for the defaults, and
+`src/effort/collect.ts` and `packages/rafa-inventory/src/inventory/index.ts` for the defaults, and
 `src/refs/extract.ts` and `src/refs/verify.ts` for the settings. Each refuses
 with a `ConfigSectionError` naming `src/config-registry.ts` while no section is
 registered, so a constant built as a module loads, before an entry registers,
@@ -494,7 +494,7 @@ not move. The first decouple item (#808) took `naming.ts` off `BOARD_NAMED` and
 `packages/rafa/src/board/naming.ts` and
 `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
 effort rule of `CUT_RULES` for `packages/rafa/src/schema/frontmatter.ts`. The
-placement, in the same item, added `src/start/serving.ts` to `INVENTORY_NAMED`,
+placement, in the same item, added `packages/rafa-inventory/src/start/serving.ts` to `INVENTORY_NAMED`,
 a file that stays under `src/start/`.
 
 **The left-to-place test is an edge check.** A file no rule holds is left to
@@ -619,16 +619,16 @@ names come from, and the facade entry is no node.
   the other three byte for byte:
   - `loadCycle`: the package's own non-test files reach the importer over value
     edges, so taking the package by name would load it inside that cycle.
-    Effort has none: its six, `src/agents/roster.ts`, `src/check/run.ts`,
-    `src/inventory/record.ts`, `src/inventory/trees.ts`,
-    `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
+    Effort has none: its six, `packages/rafa-inventory/src/agents/roster.ts`, `packages/rafa-inventory/src/check/run.ts`,
+    `packages/rafa-inventory/src/inventory/record.ts`, `packages/rafa-inventory/src/inventory/trees.ts`,
+    `packages/rafa-inventory/src/schema/instinct.ts` and `packages/rafa-inventory/src/tiers/serve.ts`, imported effort only
     for the frontmatter and agent-definition files, which the first decouple
     item moved into core. Inventory has none either: its last,
     `src/effort/skill-use.ts`, was reached from inventory's search through
     `src/effort/collect.ts` until the second decouple item cut that edge, and
     it took the facade once the graph was regenerated without the cycle, so
     the guard's inventory row is empty;
-    `src/start/serving.ts` is an inventory file by name, so it is no
+    `packages/rafa-inventory/src/start/serving.ts` is an inventory file by name, so it is no
     importer. Board has twenty-one:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,
     `src/claims/labels.ts`, `src/commands/switch.ts`,
@@ -736,12 +736,12 @@ names come from, and the facade entry is no node.
   The codemod matches a binding by name and file against the facade, so a
   statement is refused whichever side names the other file. A binding taken
   through a re-exporting module of the package, such as
-  `src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
+  `packages/rafa-inventory/src/learning/index.ts`, `src/board/setup.ts` or `src/board/gate.ts`, is
   refused by the codemod and is pointed at its origin file by hand before the
   run: pass 3a did that three times, inventory's rewire six, and board's eight;
   release's rewire refused no statement. The second decouple item's rewires
   pointed four refused bindings on three statements by hand before the run:
-  two statements through `src/learning/index.ts` and one through
+  two statements through `packages/rafa-inventory/src/learning/index.ts` and one through
   `src/board/roadmap.ts`. Pr's rewire refused 21 bindings on 20
   statements that took `PullRequests`, `resolvePrProvider`,
   `ResolvePrProviderOptions`, `PrProviderReading`, `ghPreflightItems`,
@@ -933,13 +933,15 @@ names come from, and the facade entry is no node.
   the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
-  `src/rafa.ts` and six library entries with every publishable member as
-  `--external` (core is private, so it stays bundled) and fails when a
-  bundle holds a publishable member's file. Two of those entries,
-  `src/effort/store/index.ts` and `src/ports/index.ts`, are one-line `export *`
-  shims of `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the
-  `dist/` files the root `exports` name exist until #808 bundles core into
-  the root. Its declarations come in two passes:
+  `src/rafa.ts`, five library entries under `src/` and, alone, the
+  learning entry the inventory package holds since pass 4a, with every
+  publishable member as `--external` (core is private, so it stays
+  bundled), and fails when a bundle holds a publishable member's file.
+  Two of those entries, `src/effort/store/index.ts` and
+  `src/ports/index.ts`, are one-line `export *` shims of
+  `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the `dist/`
+  files the root `exports` name exist until #808 bundles core into the
+  root. Its declarations come in two passes:
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
@@ -968,7 +970,7 @@ names come from, and the facade entry is no node.
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
   - `agent.ts`: `@open-tomato/rafa` (the CLI)
 - **One upward edge survives the placement.** `src/effort/report-skills.ts`
-  (rafa-effort) reads `readScopes` from `src/schema/scope-records.ts`,
+  (rafa-effort) reads `readScopes` from `packages/rafa-inventory/src/schema/scope-records.ts`,
   which lands in rafa-inventory. No placement clears it, because
   `scope-records.ts` imports inventory's `instinct.ts` and
   `check/layout.ts`. The survey page records it under its upward edges.
@@ -1004,7 +1006,7 @@ crosses the cap without any capture going red. Count the file with `wc -l` when 
 already near the cap; a module that has to grow puts the new concern in
 a new file, and a note that has outgrown its module can move to the
 `context/` page that owns the subject. Some modules including
-`src/schema/instinct.ts` exceed the cap; the cap is a convention about
+`packages/rafa-inventory/src/schema/instinct.ts` exceed the cap; the cap is a convention about
 the target size, not an upper bound the gates enforce.
 
 **The cap is a rule about modules, not about their tests.** Multiple

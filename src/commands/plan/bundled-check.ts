@@ -46,7 +46,7 @@
  * One {@link BundledEdit} per item, in the order the plan first names
  * them, the items of a root named whole sorted by name: its kind and
  * name, the path as the first span naming it typed it, every line that
- * names it, and the pin `pinLine` (`src/tiers/resolve.ts`) writes for it
+ * names it, and the pin `pinLine` (`packages/rafa-inventory/src/tiers/resolve.ts`) writes for it
  * at the `project` tier, so the line is the one `doctor` and the
  * preflight refusal already name. An item named on two lines is one
  * edit holding both.

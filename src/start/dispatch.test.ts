@@ -60,12 +60,12 @@
 import type { CheckoutExpectation } from './checkout-guard.js';
 import type { DispatchGuard, TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
 import type { TaskHandout } from './handout.js';
-import type { SessionServing } from './serving.js';
-import type { InstinctRecord } from '../learning/index.js';
-import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
 import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { SessionServing } from '@open-tomato/rafa-inventory/start/serving';
+import type { ResolvedSkill } from '@open-tomato/rafa-inventory/task/resolve-skills';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -80,8 +80,8 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { renderLessonsSection, renderSkillsSection } from '@open-tomato/rafa-inventory/task/sections';
 
-import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CHECKOUT_MOVED, haltHeadline } from './checkout-guard.js';

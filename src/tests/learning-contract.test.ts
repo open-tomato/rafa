@@ -8,10 +8,10 @@
  * imports nothing above it, so core declares the six types in
  * `packages/rafa/src/ports/learning.ts` and the two bounds in
  * `packages/rafa/src/core/config/config-sections.ts`, and the library keeps its own in
- * `src/learning/types.ts` and `src/learning/identity.ts`. This file
+ * `packages/rafa-inventory/src/learning/types.ts` and `packages/rafa-inventory/src/learning/identity.ts`. This file
  * imports both sides, which is why it sits outside core: core through
  * `packages/rafa/src/ports/index.ts` and the sections barrel, the library through
- * `src/learning/index.ts`.
+ * `packages/rafa-inventory/src/learning/index.ts`.
  *
  * ## What holds the types
  *
@@ -30,14 +30,6 @@
  * if a fixture were dropped from it.
  */
 import type {
-  BlessedBundle as LibraryBlessedBundle,
-  InstinctRecord as LibraryInstinctRecord,
-  MergeDecision as LibraryMergeDecision,
-  MergeResult as LibraryMergeResult,
-  MergeRule as LibraryMergeRule,
-  SyncPayload as LibrarySyncPayload,
-} from '../learning/index.js';
-import type {
   BlessedBundle as CoreBlessedBundle,
   InstinctRecord as CoreInstinctRecord,
   MergeDecision as CoreMergeDecision,
@@ -45,6 +37,14 @@ import type {
   MergeRule as CoreMergeRule,
   SyncPayload as CoreSyncPayload,
 } from '@open-tomato/rafa/ports';
+import type {
+  BlessedBundle as LibraryBlessedBundle,
+  InstinctRecord as LibraryInstinctRecord,
+  MergeDecision as LibraryMergeDecision,
+  MergeResult as LibraryMergeResult,
+  MergeRule as LibraryMergeRule,
+  SyncPayload as LibrarySyncPayload,
+} from '@open-tomato/rafa-inventory/learning/index';
 
 import { describe, expect, test } from 'bun:test';
 
@@ -52,11 +52,10 @@ import {
   CONFIDENCE_MAX as CORE_CONFIDENCE_MAX,
   CONFIDENCE_MIN as CORE_CONFIDENCE_MIN,
 } from '@open-tomato/rafa/core/config/sections';
-
 import {
   CONFIDENCE_MAX as LIBRARY_CONFIDENCE_MAX,
   CONFIDENCE_MIN as LIBRARY_CONFIDENCE_MIN,
-} from '../learning/index.js';
+} from '@open-tomato/rafa-inventory/learning/index';
 
 /**
  * `true` when `A` and `B` are the same union of keys, and `false`

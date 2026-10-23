@@ -5,8 +5,8 @@
  * through the `read` seam.
  */
 import type { BrowseEvent, BrowseState } from './browse.js';
-import type { InventoryRecord } from './record.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
+import type { InventoryRecord } from '@open-tomato/rafa-inventory/inventory/record';
 
 import { describe, expect, test } from 'bun:test';
 

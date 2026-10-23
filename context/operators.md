@@ -10,7 +10,7 @@ may become a feature.
 `src/bundled/operators/` holds them, `agents/<name>.md` and
 `skills/<name>/SKILL.md`. The build copies `src/bundled/` whole, so they ship in
 the package. The rafa tier reads only `bundled/agents` (`BUNDLED_AGENTS_DIR`,
-`src/inventory/trees.ts`) and `bundled/skills` (`BUNDLED_SKILLS_DIR`,
+`packages/rafa-inventory/src/inventory/trees.ts`) and `bundled/skills` (`BUNDLED_SKILLS_DIR`,
 `packages/rafa/src/schema/tiers.ts`), so no loop session is ever served an
 operator and the planner never routes a task to one.
 `src/tests/operators.test.ts` holds both, and runs `rafa skill check` over the

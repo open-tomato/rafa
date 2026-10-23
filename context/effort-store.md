@@ -6,7 +6,7 @@ and a SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks
 one from `store` in the project's config, `sqlite` by default.
 
 **One kind of session row is not collected.** The search runner
-(`src/inventory/search/index.ts`) stores the `search` row of its own
+(`packages/rafa-inventory/src/inventory/search/index.ts`) stores the `search` row of its own
 session: Claude Code files that session's log under the scratch copy it
 ran in, never under the project's log directories `effort collect` walks.
 The runner reads the log with the collector its caller passes as

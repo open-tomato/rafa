@@ -98,7 +98,7 @@ with `source_id` set to the session id.
 
 ## The local adapter
 
-Located at `src/adapters/learning/local.ts`. Runs the library on every push and pull.
+Located at `packages/rafa-inventory/src/adapters/learning/local.ts`. Runs the library on every push and pull.
 
 ### Held set and logs
 
@@ -166,7 +166,7 @@ being asked to read `progress.txt` and decide.
    subject, or says why not, in a `rafa:promoted` block:
    - `id → path/to/context/page.md` — lesson promoted.
    - `id → skipped: <reason>` — lesson not promoted.
-   - Ids come from `lessonId` in `src/report/lessons.ts`: a slug of the
+   - Ids come from `lessonId` in `packages/rafa-inventory/src/report/lessons.ts`: a slug of the
      trigger plus the first 8 hex digits of its action hash, never
      holding whitespace. A second line for an id already answered is
      unreadable, so an example block needs distinct ids.
