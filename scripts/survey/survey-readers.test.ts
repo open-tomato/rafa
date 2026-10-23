@@ -44,7 +44,7 @@ describe('the survey readers over the live tree', () => {
     for (const path of STRETCH_10_RELEASE_TESTS) {
       expect(map.unitOf(path)).toBe('rafa-release');
     }
-    expect(map.unitOf('src/schema/new-file.test.ts')).toBe('rafa-inventory');
+    expect(map.unitOf('packages/rafa-inventory/src/schema/new-file.test.ts')).toBe('rafa-inventory');
     expect(map.unitOf(stray)).toBeUndefined();
     expect(map.unplaced([...STRETCH_10_RELEASE_TESTS, stray])).toEqual([stray]);
   });
