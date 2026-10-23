@@ -613,9 +613,11 @@ names come from, and the facade entry is no node.
     `src/inventory/record.ts`, `src/inventory/trees.ts`,
     `src/schema/instinct.ts` and `src/tiers/serve.ts`, imported effort only
     for the frontmatter and agent-definition files, which the first decouple
-    item moved into core. Inventory has one, `src/effort/skill-use.ts`,
-    which the committed graph still reaches from inventory's search through
-    `src/effort/collect.ts`, an edge the second decouple item cut in the code;
+    item moved into core. Inventory had one, `src/effort/skill-use.ts`,
+    which the graph reached from inventory's search through
+    `src/effort/collect.ts` until the second decouple item cut that edge;
+    on the graph regenerated after the cut the codemod lists it to rewire,
+    and it keeps its path until a rewire takes it, as the guard's row says;
     `src/start/serving.ts` is an inventory file by name, so it is no
     importer. Board has twenty-one:
     `src/bugs/filed-values.ts`, `src/claims/ahead.ts`, `src/claims/drift.ts`,

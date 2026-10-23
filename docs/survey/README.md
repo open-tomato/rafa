@@ -162,12 +162,16 @@ repository.
   `src/tests/commands-entry.sweep.test.ts`, and again by the survey task after
   that item's core moves, which placed the nine moved files in core and the
   parked `src/tests/core-coupled/start/worktree-dir.test.ts` left to place,
+  and again by the survey task of #808's second decouple item (rafa-1317),
+  which emptied `rafa-inventory`'s `edges` and named
+  `src/inventory/browse.ts` to the CLI with its test,
   from the graph above: 2167 files, 2139 of
   them in 12 packages (618 left to place and counted in `@open-tomato/rafa`)
   and 28 in the three unassigned folders `src/ci/`, `src/commands/stretch/` and `src/stretch/`; each facade folder lists 0 files,
   since the graph's scope holds no facade entry. Of 4811 edges between non-test files (4815 before
-  the core moves, 4805 before run's rewire) 111 point upward (142 before the
-  core moves), core's `edges` none, none cleared
+  the core moves, 4805 before run's rewire) 107 point upward (111 before the
+  second decouple item, 142 before the core moves), core's and
+  inventory's `edges` none, none cleared
   by #118, and 77 touch an unassigned folder and have no rank.
   Read by
   `bun scripts/survey/test-index.ts --baseline --map=docs/survey/cut-table.json` and by its guard with `--against=`; any
