@@ -923,3 +923,36 @@ describe('the codemod\'s refusals under --package=rafa-inventory', () => {
     expect(snapshot(root)).toEqual(before);
   });
 });
+
+/** A build file and the root manifest naming moved paths, and a script outside the build naming one as the control. */
+const BUILD_FILES: Readonly<Record<string, string>> = {
+  'package.json': `${JSON.stringify({ scripts: { build: 'bun build src/tiers/tier.ts --outfile=dist/tier.js' } }, null, 2)}\n`,
+  'scripts/build/bundle.ts': lines(
+    '/** The entries, built with --root=src; src/learning/learn.ts is one. */',
+    'export const LIBRARY_ENTRIES: readonly string[] = [\'src/learning/learn.ts\', \'src/commands/browse.ts\'];',
+  ),
+  'scripts/report.ts': lines('export const LEARN = \'src/learning/learn.ts\';'),
+};
+
+describe('the codemod under --package=rafa-inventory, over the build\'s files', () => {
+  const root = plant(BUILD_FILES, FEATURE_TREE);
+  const result = run([`--list=${FEATURE_LIST_PATH}`, '--package=rafa-inventory'], root);
+
+  it('5. lists the moved paths of scripts/build/ and the root package.json and leaves their text', async () => {
+    const { code, out } = await result;
+
+    expect(code).toBe(0);
+    expect(out).toContain('5. left to the move task: moved paths in the build\'s files, left as written (3)');
+    expect(out).toContain('  package.json:3 src/tiers/tier.ts -> packages/rafa-inventory/src/tiers/tier.ts');
+    expect(out).toContain('  scripts/build/bundle.ts:1 src/learning/learn.ts -> packages/rafa-inventory/src/learning/learn.ts');
+    expect(out).toContain('  scripts/build/bundle.ts:2 src/learning/learn.ts -> packages/rafa-inventory/src/learning/learn.ts');
+    expect(read(root, 'scripts/build/bundle.ts')).toBe(BUILD_FILES['scripts/build/bundle.ts']!);
+    expect(read(root, 'package.json')).toBe(BUILD_FILES['package.json']!);
+  });
+
+  it('5. rewrites the same path in a script outside the build, the control that the path is read', async () => {
+    await result;
+
+    expect(read(root, 'scripts/report.ts')).toBe(lines('export const LEARN = \'packages/rafa-inventory/src/learning/learn.ts\';'));
+  });
+});
