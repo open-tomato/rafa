@@ -483,7 +483,9 @@ hold the root files that reach each feature package, each sorted by UTF-16 code
 unit. A file a list names is placed in that package whatever its folder, and
 keeps its path: no named file moves. `CUT_RULES` reads them and adds a package's
 own file beside its list where one belongs (`src/pr/index.ts` to `PR_NAMED`,
-`src/start/branch-decision.ts` to `RUN_NAMED`). The CLI's named files are four,
+`src/start/branch-decision.ts` to `RUN_NAMED`). `INVENTORY_NAMED` is empty
+since pass 4a moved its six files into `packages/rafa-inventory/src/`, where
+the package's folder rule places them. The CLI's named files are four,
 `CLI_NAMED`: the roster, the bin entry and the agent schema, which were the CLI
 rule's three inline names, and `src/inventory/browse.ts`, the view behind
 `rafa skill list -i`, which sits under `src/inventory/` but is a CLI file by

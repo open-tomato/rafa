@@ -119,7 +119,7 @@ describe('CUT_RULES', () => {
 
 /** Each feature package's list of `cut-names.ts` and the CLI's, its length, and the file its rule names beside the list. */
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
-  ['rafa-inventory', INVENTORY_NAMED, 6, []],
+  ['rafa-inventory', INVENTORY_NAMED, 0, []],
   ['rafa-board', BOARD_NAMED, 22, []],
   ['rafa-pr', PR_NAMED, 17, ['src/pr/index.ts']],
   ['rafa-run', RUN_NAMED, 25, ['src/start/branch-decision.ts']],
@@ -145,8 +145,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 80 files across the seven lists, 59 of the plan\'s 60, fourteen of cluster c6, the two learning adapter files, the session serving file and the CLI\'s four', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(80);
+  it('names 74 files across the seven lists, the 80 before pass 4a less the six inventory files it moved into the package', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(74);
   });
 });
 
@@ -254,10 +254,10 @@ describe('placeFile', () => {
     expect(placeFile('src/schema/skill.ts')).toEqual({ by: 'folder', folder: 'src/schema/', package: 'rafa-inventory' });
   });
 
-  it('places the two report files in core and names the third for rafa-inventory', () => {
+  it('places the two report files in core and the third, moved in pass 4a, in rafa-inventory by its folder', () => {
     expect(placeFile('packages/rafa/src/report/parse.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa/src/report/record.ts').package).toBe(CORE_PACKAGE);
-    expect(placeFile('packages/rafa-inventory/src/report/lessons.ts')).toEqual({ by: 'named', folder: undefined, package: 'rafa-inventory' });
+    expect(placeFile('packages/rafa-inventory/src/report/lessons.ts')).toEqual({ by: 'folder', folder: 'packages/rafa-inventory/', package: 'rafa-inventory' });
   });
 
   it('sends the test file of a named file where the named file goes', () => {

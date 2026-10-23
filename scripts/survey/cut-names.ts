@@ -104,21 +104,14 @@ export const EFFORT_NAMED: readonly string[] = [
 ];
 
 /**
- * The files named for `rafa-inventory`: root files that reached the
- * inventory package, moved into it by pass 4a with their names
- * following. `start/serving.ts` reached only inventory files (`tiers/`
- * and `inventory/trees.ts`) and sat in the root's `start/` folder, so it
- * was named here under pass 1's rule that a file goes with the latest
- * feature it reaches.
+ * The files named for `rafa-inventory`: none since pass 4a. The six
+ * root files it named, the two learning adapter files, the two plan risk
+ * readings, `report/lessons.ts` and `start/serving.ts`, moved into the
+ * package in pass 4a, to their paths below `packages/rafa-inventory/src/`,
+ * and the `packages/rafa-inventory/` folder of `CUT_RULES` places them
+ * now, so no name is needed.
  */
-export const INVENTORY_NAMED: readonly string[] = [
-  'packages/rafa-inventory/src/adapters/learning/held.ts',
-  'packages/rafa-inventory/src/adapters/learning/local.ts',
-  'packages/rafa-inventory/src/plan/risk/commands.ts',
-  'packages/rafa-inventory/src/plan/risk/long-runs.ts',
-  'packages/rafa-inventory/src/report/lessons.ts',
-  'packages/rafa-inventory/src/start/serving.ts',
-];
+export const INVENTORY_NAMED: readonly string[] = [];
 
 /**
  * The files named for the CLI, `@open-tomato/rafa`. The first, third and
