@@ -63,10 +63,11 @@ step anyway.
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
 and the test files, then `bun run --filter './packages/*' check-types`, which
-runs the `check-types` script of each member that has one. Three do:
-`packages/rafa` (core), `packages/rafa-hub` and `packages/rafa-sync-service`.
-Each runs `tsc --build` over its composite `tsconfig.json`, which leaves its
-test files out as the root does, writes declarations into its own `.tsbuild/`
+runs the `check-types` script of each member that has one. Four do:
+`packages/rafa` (core), `packages/rafa-hub`, `packages/rafa-sync-service` and
+`packages/rafa-inventory`. Each runs `tsc --build` over its composite
+`tsconfig.json`, which leaves its test files out as the root does, writes
+declarations into its own `.tsbuild/`
 (gitignored at every depth), and builds the projects it references first, so
 a service reads core's declarations from `packages/rafa/.tsbuild/`. The two
 config packages, `packages/typescript-config` and `packages/eslint-config`,
@@ -269,7 +270,7 @@ on that repair's line and halts.
 with three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
 cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
-`bun run check-types`, the root config and the three composite members,
+`bun run check-types`, the root config and the four composite members,
 which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
 tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.

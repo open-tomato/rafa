@@ -2,10 +2,11 @@
  * The records the Learning port passes, and the answers it gives: core's
  * declaration of the six types `packages/rafa/src/ports/index.ts` names for it.
  *
- * The learning library declares the same six in `packages/rafa-inventory/src/learning/types.ts`
- * and keeps them there. `src/learning/` imports nothing from the rest of
- * `src/`, and core imports nothing above it, so neither side can take
- * the other's declaration: each declares its own, and
+ * The learning library declares the same six in
+ * `packages/rafa-inventory/src/learning/types.ts` and keeps them there. That
+ * folder imports nothing outside itself, and core imports nothing above it,
+ * so neither side can take the other's declaration: each declares its own,
+ * and
  * `src/tests/learning-contract.test.ts` holds every pair mutually
  * assignable, so a field added, dropped or retyped on one side alone
  * fails to compile there.

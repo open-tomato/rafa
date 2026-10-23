@@ -80,15 +80,15 @@ root `tsconfig.json` and each composite member's `tsconfig.json` extend
 `tsconfig.packages.json`, which extends
 `@open-tomato/rafa-typescript-config/base`, the name the root's
 `workspace:*` line links into `node_modules`. So the root config and the
-three code packages are held to both flags by `bun run check-types`, with no
-flag on the command line. The package's `base.test.ts` holds both flags and
+four composite members are held to both flags by `bun run check-types`, with
+no flag on the command line. The package's `base.test.ts` holds both flags and
 `declaration`. `declaration` sits beside them because `tsc` refuses
 `isolatedDeclarations` without it; under the base's `noEmit` it writes no
 file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
-`tsconfig.json` of each of the three code packages leaves its test files out
+`tsconfig.json` of each of the four composite members leaves its test files out
 too, as the root does, so `check-types` holds no test file anywhere: `tsc`
 reports no `isolatedDeclarations` error for a program with any other error,
 and the test files carry hundreds (the spike's probe 8, #804).
@@ -205,7 +205,7 @@ ninth test, `worktree-dir.test.ts`, was parked under
 `src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
 `SETTING_SOURCES_FLAG`, and the loop barrel exports it with no re-export at the
 old path. `packages/rafa-inventory/src/start/serving.ts` is an inventory file by
-name, though it keeps its path under `src/start/`: it imports only
+name, though it sat under `src/start/` before the move: it imports only
 `packages/rafa-inventory/src/tiers/` and
 `packages/rafa-inventory/src/inventory/trees.ts`, so `INVENTORY_NAMED` of
 `scripts/survey/cut-names.ts` named it (commit 24fdaf6), and the move of pass 4a
@@ -501,8 +501,9 @@ so it counts no edge out of inventory and does not move. The first decouple item
 and `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
 effort rule of `CUT_RULES` for `packages/rafa/src/schema/frontmatter.ts`. The
 placement, in the same item, added `serving.ts` under `src/start/` to
-`INVENTORY_NAMED`, a file whose path under `src/start/` the move of pass 4a
-kept, at `packages/rafa-inventory/src/start/serving.ts`.
+`INVENTORY_NAMED`; the move of pass 4a then moved it into the package, to
+`packages/rafa-inventory/src/start/serving.ts`, and the list has been empty
+since.
 
 **The left-to-place test is an edge check.** A file no rule holds is left to
 place, and it counts as the CLI's, the package that ranks highest. So an import
@@ -579,7 +580,7 @@ names come from, and the facade entry is no node.
   `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and the
   two config packages, `packages/typescript-config/`
   (`@open-tomato/rafa-typescript-config`) and `packages/eslint-config/`
-  (`@open-tomato/rafa-eslint-config`); and the six facades that
+  (`@open-tomato/rafa-eslint-config`); and the six feature packages that
   `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
   `packages/rafa-inventory/`, `packages/rafa-board/`,
   `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
@@ -870,7 +871,7 @@ names come from, and the facade entry is no node.
   `bun run check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json`
   leaves out `packages/` and the test files, then `bun run --filter
   './packages/*' check-types`, which runs the `check-types` script of each
-  member that has one: `tsc --build` in the three composite members. `bun run
+  member that has one: `tsc --build` in the four composite members. `bun run
   lint` lints package code from the root config like `src/`, its `testdata/`
   folders included, and so does the runner's lint step on a task's diff; the
   root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
@@ -892,27 +893,31 @@ names come from, and the facade entry is no node.
   and an entry in the solution file, and its `bunfig.toml` preloads
   `test-preload.ts`, which registers core's section alone, so `bun test`
   run from its folder reads core's settings.
-- **The composite recipe builds the three code packages' declarations.** The
-  `tsconfig.json` of `packages/rafa`, `packages/rafa-hub` and
-  `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
-  and sets `composite: true`, `noEmit: false`, `emitDeclarationOnly: true`,
-  `rootDir: "src"`, `outDir: ".tsbuild"` and `tsBuildInfoFile:
-  ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages never share one
-  (TS6377). It leaves its test files out, and its `references` name what it
-  imports: core none, the two services `../rafa`. `tsc --build` builds a
+- **The composite recipe builds the four composite members' declarations.**
+  The `tsconfig.json` of `packages/rafa`, `packages/rafa-hub`,
+  `packages/rafa-sync-service` and `packages/rafa-inventory` keeps the
+  `extends` of `tsconfig.packages.json` and sets `composite: true`,
+  `noEmit: false`, `emitDeclarationOnly: true`, `rootDir` (`"src"`, or `"."` in
+  `packages/rafa-inventory`, whose `index.ts` sits beside `src/`), `outDir:
+  ".tsbuild"` and `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last
+  so two packages never share one (TS6377). It leaves its test files out, and
+  its `references` name what it imports: core none, and every other member
+  `../rafa`. `tsc --build` builds a
   reference first, reads core through `paths` from that reference's
   declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
-  every depth. Each code package's `turbo.json` extends the root's
+  every depth. Each of the three code packages' `turbo.json` extends the root's
   (`"extends": ["//"]`) and declares `check-types.outputs` as `.tsbuild/**`, so
   a cache hit restores the declarations a dependent's build reads. The two
-  config packages emit nothing and carry no override. A service with its
+  config packages emit nothing and carry no override. `packages/rafa-inventory`
+  has no `turbo.json`, so its `check-types` runs under the root's definition,
+  which declares no outputs. A service with its
   reference to core dropped fails with `TS6307` and `TS6059` on core's files,
   and still writes their `.d.ts` files beside core's sources, so a run that
   fails that way leaves stray files under `packages/rafa/src/` to remove; list
   them with `git ls-files --others --exclude-standard`.
 - **The solution file builds the members in dependency order.** The root
   `tsconfig.references.json` holds `"files": []` and one reference per
-  composite member, so `tsc --build tsconfig.references.json` builds all three
+  composite member, so `tsc --build tsconfig.references.json` builds all four
   and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
   umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
   reads core's source through `paths` as before.

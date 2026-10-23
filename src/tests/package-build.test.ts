@@ -253,19 +253,18 @@
  *
  * ## The learning subpath, by the package's name
  *
- * `./learning` joined the exports map and the build's entry list
- * together, for the library under `src/learning/`. The computed cases
- * above read it by path, as `dist/learning/index.js`; two more import it
- * as a consumer does, by `@open-tomato/rafa/learning`, from a scratch
- * directory whose `node_modules/@open-tomato/rafa` links to the scratch
- * package, so the name resolves through the manifest's own exports map.
- * One imports it under bun and holds its names to the source entry's and
- * its `actionHash` to the source's answer; the other does the same under
- * node, which is what lets `README.md` name `./learning` among the
- * subpaths that load there: the library needs only `node:crypto`. Both
- * import `@open-tomato/rafa/unmapped` from the same directory first, as
- * the control that a name the map does not carry is refused, so the
- * link is not what makes the import pass.
+ * `./learning` joined the exports map and the build's entry list together, for
+ * the library under `packages/rafa-inventory/src/learning/`. The computed cases
+ * above read it by path, as `dist/learning/index.js`; two more import it as a
+ * consumer does, by `@open-tomato/rafa/learning`, from a scratch directory
+ * whose `node_modules/@open-tomato/rafa` links to the scratch package, so the
+ * name resolves through the manifest's own exports map. One imports it under
+ * bun and holds its names to the source entry's and its `actionHash` to the
+ * source's answer; the other does the same under node, which is what lets
+ * `README.md` name `./learning` among the subpaths that load there: the library
+ * needs only `node:crypto`. Both import `@open-tomato/rafa/unmapped` from the
+ * same directory first, as the control that a name the map does not carry is
+ * refused, so the link is not what makes the import pass.
  *
  * Two mutations of `package.json` were driven on 2026-09-25 with bun
  * 1.3.14 and node 22.14.0, one run of this file each, 54 pass before and

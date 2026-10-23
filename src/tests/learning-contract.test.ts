@@ -3,13 +3,14 @@
  * `Learning` port passes, and the two confidence bounds the `confidence`
  * reader reads, held to the learning library's own.
  *
- * Neither side may import the other. `src/learning/` imports nothing
- * from the rest of `src/` (`learning-boundary.test.ts`), and core
- * imports nothing above it, so core declares the six types in
- * `packages/rafa/src/ports/learning.ts` and the two bounds in
- * `packages/rafa/src/core/config/config-sections.ts`, and the library keeps its own in
- * `packages/rafa-inventory/src/learning/types.ts` and `packages/rafa-inventory/src/learning/identity.ts`. This file
- * imports both sides, which is why it sits outside core: core through
+ * Neither side may import the other. The library under
+ * `packages/rafa-inventory/src/learning/` imports nothing outside its folder
+ * (`learning-boundary.test.ts`), and core imports nothing above it, so core
+ * declares the six types in `packages/rafa/src/ports/learning.ts` and the two
+ * bounds in `packages/rafa/src/core/config/config-sections.ts`, and the
+ * library keeps its own in `packages/rafa-inventory/src/learning/types.ts` and
+ * `packages/rafa-inventory/src/learning/identity.ts`. This file imports both
+ * sides, which is why it sits outside core: core through
  * `packages/rafa/src/ports/index.ts` and the sections barrel, the library through
  * `packages/rafa-inventory/src/learning/index.ts`.
  *

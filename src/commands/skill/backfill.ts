@@ -5,13 +5,12 @@
  * proposal pass that asks a session for what no table can derive, and
  * the apply that writes the reviewed proposals and then derives.
  *
- * The work is `src/backfill/`'s: `derive.ts` answers `stack`, `paths`
- * and `when_to_use` from tables and from a skill's own bytes,
- * `proposal-batch.ts` selects and batches what a session is asked,
- * `propose.ts` runs the sessions and applies the reviewed answers, and
- * `backup.ts` takes the copy that makes a rewrite reversible. This
- * module is the declaration, the reading of the line, and the lines a
- * run prints.
+ * The work is `packages/rafa-inventory/src/backfill/`'s: `derive.ts` answers
+ * `stack`, `paths` and `when_to_use` from tables and from a skill's own bytes,
+ * `proposal-batch.ts` selects and batches what a session is asked, `propose.ts`
+ * runs the sessions and applies the reviewed answers, and `backup.ts` takes the
+ * copy that makes a rewrite reversible. This module is the declaration, the
+ * reading of the line, and the lines a run prints.
  *
  * ## The three modes, and why they are one command
  *

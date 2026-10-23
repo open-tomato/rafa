@@ -3,8 +3,8 @@
 The agent task loop for ralph, packaged and ready to ship. A single-package
 implementation of the loop from `agentic-research`, with all the pieces
 running under bun and ready for publishing to npm as `@open-tomato/rafa`.
-Core, the hub, the two config packages and the six facades are bun workspaces
-in `packages/`.
+Core, the hub, the two config packages and the six feature packages are bun
+workspaces in `packages/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.

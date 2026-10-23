@@ -53,7 +53,7 @@ import type { Route } from './routing.js';
 import { DEFAULT_ROUTES } from './routing.js';
 
 /** The line that opens the generated region. */
-export const ROUTING_TABLE_START = '<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa-inventory/src/tiers/routing.ts; do not edit by hand) -->';
+export const ROUTING_TABLE_START = '<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa/src/core/config/default-routing.ts; do not edit by hand) -->';
 
 /** The line that closes the generated region. */
 export const ROUTING_TABLE_END = '<!-- routing-table:end -->';

@@ -126,8 +126,9 @@
  *   - `./ports`. The spec declares it in phase 0 and fills it in phase 1,
  *     from its own entry.
  *   - `./learning`, the library that settles lessons, from its own entry
- *     at `packages/rafa-inventory/src/learning/index.ts`. It imports nothing from the rest of
- *     `src/`, and no name this entry exports comes from it.
+ *     at `packages/rafa-inventory/src/learning/index.ts`. It imports
+ *     nothing from outside its own folder, and no name this entry exports
+ *     comes from it.
  *
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.

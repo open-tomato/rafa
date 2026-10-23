@@ -11,7 +11,7 @@ is whatever the edit happens to be (`Remove ...`, `Rewrite ...`,
 `Split ...`) while the thing it names is reliably a markdown file, so
 the shape discriminates where the verb does not.
 
-<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa-inventory/src/tiers/routing.ts; do not edit by hand) -->
+<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa/src/core/config/default-routing.ts; do not edit by hand) -->
 | Task shape | Agent | Where it lives |
 |---|---|---|
 | `prose` — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `src/bundled/agents/doc-updater.md` |
