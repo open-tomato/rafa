@@ -76,8 +76,7 @@ import {
   parseReport,
   REPORT_STATUSES,
 } from '@open-tomato/rafa/report/parse';
-
-import { INSTINCT_DOMAINS } from '../../../schema/instinct.js';
+import { INSTINCT_DOMAINS } from '@open-tomato/rafa-inventory/schema/instinct';
 
 /** A bare backtick fence, spelled once. */
 const FENCE = '```';
@@ -773,7 +772,7 @@ describe('an out_of_scope_bugs entry\'s kind', () => {
   });
 
   describe('in a report written on the prompt before the key existed', () => {
-    const output = readFileSync(new URL('../../../report/testdata/no-kind-report.txt', import.meta.url), 'utf8');
+    const output = readFileSync(new URL('../../../../packages/rafa-inventory/src/report/testdata/no-kind-report.txt', import.meta.url), 'utf8');
     const reading = presentOf(parseReport(output));
 
     it('holds bug entries and no kind key, read off the raw text', () => {
@@ -1224,7 +1223,7 @@ describe('the final message a real session ended with', () => {
    * list survived, entry for entry, against the raw text rather than
    * against a copy of what the parser itself already says.
    */
-  const output = readFileSync(new URL('../../../report/testdata/live-session-report.txt', import.meta.url), 'utf8');
+  const output = readFileSync(new URL('../../../../packages/rafa-inventory/src/report/testdata/live-session-report.txt', import.meta.url), 'utf8');
   const reading = presentOf(parseReport(output));
 
   const EXPECTED_FINDINGS: ReportFinding[] = [

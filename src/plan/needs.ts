@@ -18,7 +18,7 @@
  *     on 2026-09-24), so a declared name only ever meets a bare one.
  *   - Every `tools=` entry shaped `mcp__<server>__…`, or a bare
  *     `mcp__<server>`, names the MCP server `<server>`, looked up by the
- *     MCP reader (`src/inventory/mcp.ts`). The server segment runs to the
+ *     MCP reader (`packages/rafa-inventory/src/inventory/mcp.ts`). The server segment runs to the
  *     first `__` after the prefix, and is compared as written: how Claude
  *     Code spells a server name holding a character a tool name cannot
  *     was not measured.
@@ -29,7 +29,7 @@
  *     `parsePrerequisites` gives a probe (`auto` and `start` items), in
  *     `PREREQUISITES-<stub>.md` beside the plan, is split at `|`, `&&`,
  *     `||` and `;`, and each part's program is its first word as the
- *     skill checker reads one (`toolOf` in `src/check/shell-lines.ts`),
+ *     skill checker reads one (`toolOf` in `packages/rafa-inventory/src/check/shell-lines.ts`),
  *     after any leading `!` and `NAME=value` words. A lookup —
  *     `command -v <name>`, `which <name>`, `type <name>`, `hash <name>` —
  *     names `<name>`, the program the probe asks after, and not the

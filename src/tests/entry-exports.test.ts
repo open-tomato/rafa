@@ -419,7 +419,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'TrackerPortVersion',
     'TransitionResult',
   ],
-  'src/learning/index.ts': [
+  'packages/rafa-inventory/src/learning/index.ts': [
     'BlessOptions',
     'BlessedBundle',
     'CONFIDENCE_MAX',

@@ -9,12 +9,12 @@
  * bundle is pulled through a registered stub adapter, and the row is read
  * back from the SQLite store with a raw query.
  */
-import type { InstinctRecord } from '../learning/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskHandout } from '../start/handout.js';
-import type { SessionServing } from '../start/serving.js';
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { SessionServing } from '@open-tomato/rafa-inventory/start/serving';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

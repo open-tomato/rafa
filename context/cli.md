@@ -29,10 +29,10 @@ module's note is the long form.
 | `packages/rafa/src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `packages/rafa-inventory/src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `packages/rafa-inventory/src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; and `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what only `instinct list` and `instinct show` use: the id lookup and the project a command context carries |
-| `src/schema/scope-records.ts` | the two instinct scopes read as records: which files in a scope are records, what one file reads as, `readScope` and `readScopes`; read by both commands, the local Learning adapter and the skills report |
+| `packages/rafa-inventory/src/schema/scope-records.ts` | the two instinct scopes read as records: which files in a scope are records, what one file reads as, `readScope` and `readScopes`; read by both commands, the local Learning adapter and the skills report |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the publishable workspace packages with their versions, waiting counts and newest tags (`status-packages.ts`) and the audit of the changelog's released history (`src/release/audit.ts`) and the count of open stale-docs lines on the tracker the chain lands on (`status-stale-docs.ts`; `none` at zero, `?` when unread, never the exit code), writing nothing; `release settle`, below; `release tag [--push]`, which puts `v<version>` for the root and `<name>@<version>` for each publishable workspace package (`tag-units.ts`) on the commit of the release branch that set that unit's version, once every unit is decided, skipping a unit a tag already names and refusing `tagged` only when every unit is skipped, and prints the push and publish lines rather than running them, a package's publish in its folder, the publish line replaced under `release.publish: ci` by a sentence naming `.github/workflows/release-publish.yml` and json's `publish: "ci"` on the unit; with `--push` it pushes each tag to the remote the release branch tracks (`origin` when it tracks none) through `src/release/tag-push.ts` and drops its push line, and a push that fails exits 1 with git's words and keeps the local tags |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, the package after the title when the fragment names one, add date and commit) and, for a fold that answered, one `Version: <base> → <next>` line per unit it moves (the root's first, a package's naming it before its versions: `Version: @scope/plugin 0.1.0 → 0.2.0`), then one line for the delivery and one for the tags, which name every tag the step wrote, one per unit. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse or names a package the workspace at the base lacks or a private one (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery, the tag and the project refresh as the terminal result's data. With `board.project.number` set, a push that left the base without the folded fragments is followed by the project refresh of `settle-project.ts`: the issues closed by the pull requests that added them, read off `associatedPullRequests` through `gh api graphql`, each line a warning that keeps the exit code. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
 | `src/commands/release/declarations.ts` | the seven `release` commands as `CommandDeclaration`s, each command less its `run`, which `createReleaseStatusCommand`, `createReleaseSettleCommand`, `createReleaseTagCommand`, `createReleasePublishCommand`, `createReleaseWorkflowsCommand`, `createReleaseFragmentCommand` and `createReleaseListCommand` spread under their own; `RELEASE_SUBJECT`, the subject's routing word and roster line; and the flags a declaration spells that a module reads too: `RELEASE_STATUS_PLAN_FLAG` (`status.ts`), `RELEASE_SETTLE_DRY_RUN_FLAG` (`settle.ts`), `RELEASE_TAG_PUSH_FLAG` (`tag.ts`), `RELEASE_PUBLISH_TAG_FLAG` and `RELEASE_PUBLISH_DRY_RUN_FLAG` (`publish.ts`), `RELEASE_WORKFLOWS_WRITE_FLAG` (`workflows.ts`) and the five `RELEASE_FRAGMENT_*_FLAG`s (`fragment.ts`). It imports types from `@open-tomato/rafa/core/command` alone and no module under `src/`, which `declarations.test.ts` reads off its source |
@@ -58,14 +58,14 @@ module's note is the long form.
 | `src/commands/index.ts` | the roster: `CORE_SUBJECTS` and `CORE_COMMANDS`, core's own subjects and commands; `ROSTER_SUBJECTS`, every subject in roster order, each feature subject the one its declaration file exports; `BUNDLED_FEATURES`, `BOARD_FEATURE`, `PR_FEATURE`, `RUN_FEATURE` and `RELEASE_FEATURE`; `createRosterRegistry({ off })`, one registry of `CORE_COMMANDS` followed by the commands of every feature `off` does not name, the subjects no kept command declares dropped and a name that is no bundled feature's refused; and `CORE_REGISTRY`, `createRosterRegistry()` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
 | `packages/rafa/src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share that reads a command's context, arguments or flags: the project it was handed, the config that project resolves (`resolveProjectConfig`), the plans directory by that config (`resolvePlansDir`), the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value. The task counts, the file names, an issue as a line and `rejectedPath` are its library half, `packages/rafa/src/core/plan/plan-files.ts`, which imports nothing under `src/commands/` |
-| `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design. An open task's sentence that asks its session for a whole-suite run (the phrase "full suite" or "whole suite", or a code span running `bun test` with no path; `bun test src/plan/` and `bun test --changed=<base>` are not one) is a `long-run` `note` from `src/plan/risk/long-runs.ts`, naming the line and the fix, `tests=full` on the task; a `note`, so `--strict` exits 0 on it |
+| `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design. An open task's sentence that asks its session for a whole-suite run (the phrase "full suite" or "whole suite", or a code span running `bun test` with no path; `bun test src/plan/` and `bun test --changed=<base>` are not one) is a `long-run` `note` from `packages/rafa-inventory/src/plan/risk/long-runs.ts`, naming the line and the fix, `tests=full` on the task; a `note`, so `--strict` exits 0 on it |
 | `src/commands/plan/needs.ts` | `rafa plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing] [--source=<source>]`: the reading of `src/plan/needs.ts` over one plan or one spec, in code and starting no session, so it declares no `spends`. A plan resolves as `plan risk` resolves its own, the default plan when none is named. `--spec` and `--issue` go through `resolveCreateSpec` (`spec-route.ts`) handed no offer, so a spec is found and an issue checked and snapshotted under `specs.dir` exactly as `plan create` does, and an issue `plan create` refuses is refused with the same code. The inventory is built as `skill list` builds it, `PATH` read off `RafaContext.env`. `--missing` keeps what `isUnmet` reports and the stacks not met, prints nothing at all when nothing is kept, and exits 1 when anything is, json mode writing each kept row as an `error` log event first; `--source` keeps the agents and skills one source holds, so it drops every MCP server, program, missing item and stack row, and refuses only a value written as no source. A plan beside `--spec` or `--issue`, `--spec` beside `--issue`, `--missing` typed ahead of the plan, a plan that is no file, no default plan and a config `loadConfig` refuses are exit code 1. Exit code 0 otherwise, whatever it finds |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run`. `runIssueReady` is reached through a dynamic import of `../issue/ready.js` made when the offer runs, so loading `plan create` loads no `issue` command module |
 | `src/commands/plan/blocked-offer.ts` | the offer `plan create --next` makes past a blocked line: `Plan #<n> instead? [y/N]` over the line `src/board/blocked-line.ts` found, made only where there is a terminal, and never under `--dry-run` |
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/plan/claim-route.ts` | the claim `plan create` makes on its issue before its session: `resolveAndClaim` resolves the spec, runs the cheap refusals, claims through `src/claims/plan-claim.ts` and prints the answer; a refused `--issue` or `--spec` exits 1 naming the owner, a refused `--next` pick is passed over and the walk resolved again, and an unclaimed run warns and plans; a claim ahead report (`src/claims/ahead.ts`) is printed after the claim. `createPlanClaimContext` builds the seams: `git`, the `gh` issue board or none, the store id, `claims.staleAfter`, `claims.ahead`, and `naming.branch`, the template the claim branches are named and read under |
 | `src/commands/plan/store-check.ts` | the effort-store rules of `src/plan/store-rules.ts` read over one plan and the `PREREQUISITES-<stub>.md` beside it (`checkStoreRules`), the one reading `plan validate` and `plan create` share; `enforceStoreRules` runs it on `plan create` straight after the planner answers and before the readiness gate settles, and on any problem moves both files into `rejected/` beside them and exits 1 with one `<file>:<line>: <rule>: <text>` line per problem, under `--skip-review` too |
-| `src/commands/plan/bundled-check.ts` | the bundled-item reading `plan validate` and `plan create` share, shaped like `store-check.ts`: `findBundledEdits` reads each agent or skill a plan's still-to-run tasks edit under `src/bundled/` or through a `.claude/` link into it, against the project's bundle, and `bundledEditLine` words the note each edit prints; the pin text is `pinLine` in `src/tiers/resolve.ts`, `writeTierPins` writes each pin once as a `[human]` item of the `PREREQUISITES-<stub>.md` beside the plan, and `notePlanBundledEdits` is the call `plan create` makes straight after its store check (`src/plan.ts`). A note, never a refusal: `plan validate` still exits 0 on a plan whose only finding is one, and `plan create` moves nothing into `rejected/` for it |
+| `src/commands/plan/bundled-check.ts` | the bundled-item reading `plan validate` and `plan create` share, shaped like `store-check.ts`: `findBundledEdits` reads each agent or skill a plan's still-to-run tasks edit under `src/bundled/` or through a `.claude/` link into it, against the project's bundle, and `bundledEditLine` words the note each edit prints; the pin text is `pinLine` in `packages/rafa-inventory/src/tiers/resolve.ts`, `writeTierPins` writes each pin once as a `[human]` item of the `PREREQUISITES-<stub>.md` beside the plan, and `notePlanBundledEdits` is the call `plan create` makes straight after its store check (`src/plan.ts`). A note, never a refusal: `plan validate` still exits 0 on a plan whose only finding is one, and `plan create` moves nothing into `rejected/` for it |
 | `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: `CREATE_DANGEROUS_PHRASES`, the `dangerous` field of `plan create`, so the loader's one pass line for `dangerous.acceptStaleRefs` (`packages/rafa/src/core/config/dangerous.ts`) ends `; check 4 re-stamps every reference of the spec as reviewed and refuses none on this run`, on every `plan create` run with the key on, `--spec` and `--dry-run` included, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, verifying every reference and refusing on drift, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and a roster (`planRoster`): flags extracted only from code spans whose first word is `rafa`, symbols read at their declaration position in the source, the checkout's own roster read by running `bun src/rafa.ts describe --output=json` when the project root is `@open-tomato/rafa` with `src/rafa.ts` tracked, otherwise the core roster its caller hands in, built with `registryRoster` from `RafaContext.registry` (a parameter since a static import of `src/commands/index.ts` is a load-order cycle through `src/plan.ts`), with one warning line printed when the checkout's roster cannot be read; never under `--dry-run` or `--spec` |
 | `src/commands/issue/ready.ts` | `rafa issue ready <n> [--yes \| --dry-run]`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), made under `board.relationships: labels` only (in `native` mode an epic is the one sub-issue parent, and the check is skipped), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes, or under `--yes` with no question once every check has passed, terminal or not. Exit code 0 for the normal completion; 1 for an unusable config, a value given to `--yes` or `--dry-run`, `--yes` with `--dry-run` (they ask for opposite things, refused before anything is opened) or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The five status values are `marked` (a typed yes or `--yes`), `declined` (question answered no), `unasked` (no terminal and no `--yes`), `already` (label already on), and `checked` (every check passed under `--dry-run`, message `#<n> is ready to mark; --dry-run wrote nothing.`). `--yes` answers the question alone: the write-access, template and `epic:` checks refuse under it as they do without it, writing nothing. `rafa next` never passes it, and its ceiling still refuses `--yes=ready`. `--dry-run` makes every check and prints both readings, asking nothing and writing nothing whatever the terminal, exit 0 for `checked` and `already` and 2 for a check that refuses, and runs no ending; it reads the template only, not `spec:blocked`, so a blocked issue with a complete body still reads as ready to mark (#1093). The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all] [--yes]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state (one state listing, then one `gh issue view` for each blocker a full listing did not hold), and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal unless `--yes` is typed: `--yes` answers the question yes with no prompter opened, terminal or not, writes `Removed spec:blocked from #<n> under --yes; every blocker is closed: #<ids>`, and still changes nothing for an issue with a blocker open or a line it refuses to guess at; a value given to it is refused with exit code 1. With `board.relationships: native` it reads the line, then prints that GitHub clears a blocker when the blocking issue closes, reads no board, refreshes the named issue on the project when `board.project.number` is set (no issue under `--all`), and exits 0 (`src/commands/issue/unblock-native.ts`). |
@@ -106,8 +106,8 @@ module's note is the long form.
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the config rows over `src/commands/doctor-config.ts` once the config is loaded, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the project rows over `src/commands/doctor-project.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
 | `src/commands/doctor-config.ts` | the config rows of `rafa doctor`, written as soon as the config is loaded: one `warn` line per config warning in the load's words (a YAML file beside a `rafa.config.ts` or `rafa.config.mjs` is read as its scope's local layer and is no row), then in text mode one `note` row under `Config:` per `dangerous.*` key set off its default, read off the load's sink so a pass is never also a warning; json mode keeps every line a `warn` event, so a YAML project reads `doctor` as before (`src/tests/fixtures/config-parity/doctor.txt`) |
 | `src/commands/doctor-deep.ts` | `rafa doctor --deep`'s whole reading: each deep section read once per run into one `DeepReading`, the text lines both render, and the seams `DoctorSeams` takes for them; it decides what each section is read under, in which order, and how the Environment reading reads as rows |
-| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `packages/rafa/src/core/loop/session-env.ts` for the spawn layer and `src/inventory/disabled.ts` for the settings files |
-| `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `src/inventory/disabled.ts`'s rules |
+| `src/commands/doctor-deep-env.ts` | the Environment reading of `--deep`: the environment a loop session would run with, the directory it would run in, and how that environment differs from the shell's, over `packages/rafa/src/core/loop/session-env.ts` for the spawn layer and `packages/rafa-inventory/src/inventory/disabled.ts` for the settings files |
+| `src/commands/doctor-deep-settings.ts` | the Settings reading of `--deep`: the setting sources a loop session loads, and every agent, skill and MCP server configured on this machine that such a session is not handed, over `src/inventory/` and `packages/rafa-inventory/src/inventory/disabled.ts`'s rules |
 | `src/commands/doctor-deep-providers.ts` | the Providers reading of `--deep`: the configured tracker and pull request provider, and — when either goes through `gh` — whether `gh` answers under the environment it is handed |
 | `src/commands/doctor-deep-needs.ts` | the Stack tools and Plan needs readings of `--deep`: every unmet stack tool and, for a plan `--plan` names alone, its unmet needs over `src/plan/needs.ts` |
 | `src/commands/doctor-deep-row.ts` | the row every deep section is read into, the section holding them, and the text lines both render to; each status is `ok`, `warn` or `note`, never a failure or a `PreflightCheck` |
@@ -949,7 +949,7 @@ New; it replaces no earlier text. What a row or an action added to
   loads it, and `rafa agent vendor` for the user tier; held by two loaded
   tiers with different contents, with both paths and the pin line; or a
   rafa-tier holder the served directory refuses
-  (`src/agents/roster.ts`). Then each `skills=` name of those tasks that
+  (`packages/rafa-inventory/src/agents/roster.ts`). Then each `skills=` name of those tasks that
   two loaded tiers hold with different contents, under `tiers.skills`, as
   `<file>: <the line `skillCollisionLine` words>` with both paths and the
   pin line. Then each other `skills=` name the resolution resolves to no
@@ -1266,7 +1266,7 @@ New; it replaces no earlier text. What a row or an action added to
   copies, when a plan under `plan.dir` routes to an agent that resolves
   only in `~/.claude/agents` under the resolved `loop.settingSources`,
   naming each plan, its lines and `rafa agent vendor <name>`
-  (`src/agents/vendorable.ts`); a missing agent no user definition
+  (`packages/rafa-inventory/src/agents/vendorable.ts`); a missing agent no user definition
   carries is left to the preflight, which refuses on it, and so is a
   name the rafa tier holds, even under `tiers.rafa: off`, whose fix is
   the setting and not a copy. `init` writes nothing under `.claude/`,
@@ -1652,7 +1652,7 @@ New; it replaces no earlier text. What a row or an action added to
 - **`agent list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
   lists every agent definition the inventory holds**
   (`src/commands/agent/list.ts`, over `buildInventory` in
-  `src/inventory/index.ts`), built as `skill list` builds it and taking
+  `packages/rafa-inventory/src/inventory/index.ts`), built as `skill list` builds it and taking
   the same three filters. `--source` names a whole source string
   (`project`, `rafa`, `user`, `plugin:<name>`, `addon:<name>`), aliased
   `--tier` for one release after this one; `--state` takes `enabled`,
@@ -1684,7 +1684,7 @@ New; it replaces no earlier text. What a row or an action added to
   `--output=json`.
 - **`agent show <name> [--full]` shows the agent definition a name
   resolves to** (`src/commands/agent/show.ts`, over the show view of
-  `src/inventory/show.ts`). The inventory is built through the
+  `packages/rafa-inventory/src/inventory/show.ts`). The inventory is built through the
   `projectInventory` `src/commands/skill/list.ts` exports, the name is
   the frontmatter `name` `agent list` prints, and it shows its first
   holder in precedence order (`findShown`): the agent definition that
@@ -1732,7 +1732,7 @@ New; it replaces no earlier text. What a row or an action added to
   `instinct check <dir>` run the checker over one tier**
   (`src/commands/skill/check.ts`, `src/commands/instinct/check.ts`,
   sharing `src/commands/check-report.ts`). The five checks of
-  `src/check/run.ts` run in order and all of them on every file, so one
+  `packages/rafa-inventory/src/check/run.ts` run in order and all of them on every file, so one
   run names every rule a file breaks and the file counts once.
   Both declare `needsProject: false`: the checker's project seam is
   `--project` and nothing else, since a tier is often
@@ -1785,7 +1785,7 @@ New; it replaces no earlier text. What a row or an action added to
   draws `<name>` where its own says `<name>...`.
 - **`skill list [--source=<source>] [--state=<state>] [--hidden-from-loop] [-i]`
   lists every skill the inventory holds** (`src/commands/skill/list.ts`,
-  over `buildInventory` in `src/inventory/index.ts`). The inventory is
+  over `buildInventory` in `packages/rafa-inventory/src/inventory/index.ts`). The inventory is
   built against the project the dispatcher resolved, its home, the
   config's `loop.settingSources`, `tiers.rafa`, `tiers.skills` and
   `tiers.agents`, and the modules `loadModules` answers `loaded`; the
@@ -1824,7 +1824,7 @@ New; it replaces no earlier text. What a row or an action added to
   the `terminal` and `keys` seams of the factory.
 - **`skill show <name> [--full]` shows the skill a name resolves to**
   (`src/commands/skill/show.ts`, over the show view of
-  `src/inventory/show.ts`). The inventory is built as `skill list`
+  `packages/rafa-inventory/src/inventory/show.ts`). The inventory is built as `skill list`
   builds it, through the `projectInventory` that module exports, and
   the name shows its first holder in precedence order (`findShown`): the
   skill that answers, or the disabled one still holding the name. A
@@ -1845,122 +1845,114 @@ New; it replaces no earlier text. What a row or an action added to
   `loop.settingSources` and the warnings are the result's `data`, `text`
   holding the file under `--full` alone.
 - **`skill search "<question>" [--all] [--no-model]` finds the skills that
-  answer a question** (`src/commands/skill/search.ts`, through `runSearch`
-  and `rankSearch` of `src/inventory/search/`). The inventory is built
-  through `projectInventory`, as `skill list` builds it. Each kind
-  searched is one `runSearch`: the ranking by the question's words, one
-  `haiku` session in a scratch copy of the top twelve, the quote check
-  against the file and one `search` effort row, stored in the store
-  `selectEffortStore` opens from the project's config. `--all` searches
-  agent definitions as well, skills first, one session per kind, since a
-  candidate is keyed by its name and a skill and an agent may share one.
-  `--no-model` runs the ranking alone, prints it and stops: no session
-  starts, no scratch copy is made and no effort row is written. The
-  command's `spends` declaration is `unless --no-model`, so the spend
-  guard warns about a session a run carrying that flag would start. Text mode
-  prints, per kind, a heading naming the kind, the question and the
-  project, then the kept matches with each quote and its `path:line` and
-  the dropped line, or "not answerable from these files", or the numbered
-  ranking (under `--no-model`, and after a `warn:` notice of a fallback
-  when the session gave no usable answer), or `(no skill ranks for these
-  words)` when no session starts. The parser's issues and an effort row
-  that was not stored are `warn:` lines. The exit code is 0 whatever is
-  found; 1 for no question or two, a blank one, a value read into
-  `--all` or `--no-model`, and a config `loadConfig` refuses. The
-  switches are read ahead of the question through `readSwitch`, since
-  `--all "<question>"` hands the question to `--all`. In json mode the
-  result's `data` holds the project, `loop.settingSources`, the
-  question, `model`, the warnings and one entry per kind: the runner's
-  outcome, or `status: ranked` with the ranking under `--no-model`.
-- **`skill demote <dir> [--apply]` runs the demotion pass over one
-  skills directory** (`src/commands/skill/demote.ts`, over
-  `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and
-  `<base>` decides the scope: the home makes it `user`, writing to
-  `~/.rafa/`, and any other base a `project` one, writing under that
-  base's `.rafa/`. Anything else is refused, which is why this command
-  runs INSIDE a project where the two checkers do not — the home is
-  what tells the scopes apart, and it is read off the project the
-  dispatcher resolved, as `skill list` reads its own. `<dir>` resolves
-  against the working directory, the command's one seam.
-  Without `--apply` it selects every `<name>/SKILL.md` and, by
-  `origin`, the `learned/*.md` files (`src/demote/select.ts`),
-  classifies each (`src/demote/classify.ts`) and writes
-  `<base>/.rafa/demoted/report.md` (`src/demote/draft.ts`,
-  `src/demote/report.ts`), MOVING NOTHING. A report already there has
-  each override carried onto the row for the same path whose hash is
-  unchanged, and keeps `status: reviewed` only when the row set is
-  identical; a report that does not parse is warned about and carried
-  from not at all.
-  With `--apply` it reads that report back and refuses the whole run
-  when it is missing, does not parse, or is still `draft`. Then, one
-  row at a time (`src/demote/apply.ts`): an observation becomes a
-  record under `<base>/.rafa/instincts/`, run through `checkFile` with
-  NO project root — which is how `instinct check` runs — before it is
-  written, with the original moved under `<base>/.rafa/demoted/` at its
-  relative path; a procedure `SKILL.md` is left where it is and a
-  procedure `learned/<name>.md` moves to `<dir>/<name>/SKILL.md`; an
-  unclassified row the review did not decide is left alone. A row whose
-  file changed since the report, whose file is gone with nothing
-  matching at its destination, whose record the conversion refuses and
-  whose record the checker fails are each refused ALONE, so one stale
-  row does not throw away a review of 124. A second `--apply` reads the
-  moved rows as `done` and changes nothing.
-  `skill backfill` rewrites the frontmatter of every skill the demotion
-  KEPT, so once it has run every surviving row of that report carries a
-  stale hash, and a re-`--apply` answers a wall of `file changed since
-  the report was written` that is hash drift and no reading at all
-  about the demotion. To count afterwards what a report turned into,
-  read the report with `parseDemotionReport` and `effectiveVerdict` and
-  match each observation row against the instinct scope's
-  `evidence[].path` through `readFrontmatter`; never re-run `--apply`
-  to measure.
-  The exit code is the number of rows refused, capped at 255, and 1 is
-  kept for the refusals above and for no directory, a second word and
-  an `--apply` that read the directory as its value. In json mode the
-  counts, or the per-row actions, are the result's `data` on a run that
-  refused no row.
-- **`skill backfill <dir> [--propose|--apply] [--project=<root>]` fills
-  in the fields a skills directory lacks** (`src/commands/skill/backfill.ts`,
-  over `src/backfill/`). `<dir>` is read as `skill demote` reads it —
-  a `<base>/.claude/skills`, the home making it `user` and any other
-  base a `project` one — and everything the run writes outside the
-  skills directory goes under that `<base>/.rafa/backfill/`. So this
-  command too runs INSIDE a project, and `<dir>` and `--project`
-  resolve against the working directory, the command's one path seam;
-  the spawner each session runs through is its other.
-  With no flag the run PLANS: `planDerivation` (`src/backfill/derive.ts`)
-  answers what `stack`, `paths` and `when_to_use` would be written,
-  `selectProposals` (`src/backfill/proposal-batch.ts`) counts the files
-  a session would be asked about, and NOTHING is written.
-  With `--propose` it runs `runProposalPass` (`src/backfill/propose.ts`):
-  one `claude -p` session per batch of twenty through the capturing
-  spawner of `packages/rafa/src/core/loop/claude.ts`, the setting sources
+  answer a question** (`src/commands/skill/search.ts`, through `runSearch` and
+  `rankSearch` of `packages/rafa-inventory/src/inventory/search/`). The
+  inventory is built through `projectInventory`, as `skill list` builds it. Each
+  kind searched is one `runSearch`: the ranking by the question's words, one
+  `haiku` session in a scratch copy of the top twelve, the quote check against
+  the file and one `search` effort row, stored in the store `selectEffortStore`
+  opens from the project's config. `--all` searches agent definitions as well,
+  skills first, one session per kind, since a candidate is keyed by its name and
+  a skill and an agent may share one. `--no-model` runs the ranking alone,
+  prints it and stops: no session starts, no scratch copy is made and no effort
+  row is written. The command's `spends` declaration is `unless --no-model`, so
+  the spend guard warns about a session a run carrying that flag would start.
+  Text mode prints, per kind, a heading naming the kind, the question and the
+  project, then the kept matches with each quote and its `path:line` and the
+  dropped line, or "not answerable from these files", or the numbered ranking
+  (under `--no-model`, and after a `warn:` notice of a fallback when the session
+  gave no usable answer), or `(no skill ranks for these words)` when no session
+  starts. The parser's issues and an effort row that was not stored are `warn:`
+  lines. The exit code is 0 whatever is found; 1 for no question or two, a blank
+  one, a value read into `--all` or `--no-model`, and a config `loadConfig`
+  refuses. The switches are read ahead of the question through `readSwitch`,
+  since `--all "<question>"` hands the question to `--all`. In json mode the
+  result's `data` holds the project, `loop.settingSources`, the question,
+  `model`, the warnings and one entry per kind: the runner's outcome, or
+  `status: ranked` with the ranking under `--no-model`.
+- **`skill demote <dir> [--apply]` runs the demotion pass over one skills
+  directory** (`src/commands/skill/demote.ts`, over
+  `packages/rafa-inventory/src/demote/`). `<dir>` must be a
+  `<base>/.claude/skills`, and `<base>` decides the scope: the home makes it
+  `user`, writing to `~/.rafa/`, and any other base a `project` one, writing
+  under that base's `.rafa/`. Anything else is refused, which is why this
+  command runs INSIDE a project where the two checkers do not — the home is what
+  tells the scopes apart, and it is read off the project the dispatcher
+  resolved, as `skill list` reads its own. `<dir>` resolves against the working
+  directory, the command's one seam. Without `--apply` it selects every
+  `<name>/SKILL.md` and, by `origin`, the `learned/*.md` files
+  (`packages/rafa-inventory/src/demote/select.ts`), classifies each
+  (`packages/rafa-inventory/src/demote/classify.ts`) and writes
+  `<base>/.rafa/demoted/report.md`
+  (`packages/rafa-inventory/src/demote/draft.ts`,
+  `packages/rafa-inventory/src/demote/report.ts`), MOVING NOTHING. A report
+  already there has each override carried onto the row for the same path whose
+  hash is unchanged, and keeps `status: reviewed` only when the row set is
+  identical; a report that does not parse is warned about and carried from not
+  at all. With `--apply` it reads that report back and refuses the whole run
+  when it is missing, does not parse, or is still `draft`. Then, one row at a
+  time (`packages/rafa-inventory/src/demote/apply.ts`): an observation becomes a
+  record under `<base>/.rafa/instincts/`, run through `checkFile` with NO
+  project root — which is how `instinct check` runs — before it is written, with
+  the original moved under `<base>/.rafa/demoted/` at its relative path; a
+  procedure `SKILL.md` is left where it is and a procedure `learned/<name>.md`
+  moves to `<dir>/<name>/SKILL.md`; an unclassified row the review did not
+  decide is left alone. A row whose file changed since the report, whose file is
+  gone with nothing matching at its destination, whose record the conversion
+  refuses and whose record the checker fails are each refused ALONE, so one
+  stale row does not throw away a review of 124. A second `--apply` reads the
+  moved rows as `done` and changes nothing. `skill backfill` rewrites the
+  frontmatter of every skill the demotion KEPT, so once it has run every
+  surviving row of that report carries a stale hash, and a re-`--apply` answers
+  a wall of `file changed since the report was written` that is hash drift and
+  no reading at all about the demotion. To count afterwards what a report turned
+  into, read the report with `parseDemotionReport` and `effectiveVerdict` and
+  match each observation row against the instinct scope's `evidence[].path`
+  through `readFrontmatter`; never re-run `--apply` to measure. The exit code is
+  the number of rows refused, capped at 255, and 1 is kept for the refusals
+  above and for no directory, a second word and an `--apply` that read the
+  directory as its value. In json mode the counts, or the per-row actions, are
+  the result's `data` on a run that refused no row.
+- **`skill backfill <dir> [--propose|--apply] [--project=<root>]` fills in the
+  fields a skills directory lacks** (`src/commands/skill/backfill.ts`, over
+  `packages/rafa-inventory/src/backfill/`). `<dir>` is read as `skill demote`
+  reads it — a `<base>/.claude/skills`, the home making it `user` and any other
+  base a `project` one — and everything the run writes outside the skills
+  directory goes under that `<base>/.rafa/backfill/`. So this command too runs
+  INSIDE a project, and `<dir>` and `--project` resolve against the working
+  directory, the command's one path seam; the spawner each session runs through
+  is its other. With no flag the run PLANS: `planDerivation`
+  (`packages/rafa-inventory/src/backfill/derive.ts`) answers what `stack`,
+  `paths` and `when_to_use` would be written, `selectProposals`
+  (`packages/rafa-inventory/src/backfill/proposal-batch.ts`) counts the files a
+  session would be asked about, and NOTHING is written. With `--propose` it runs
+  `runProposalPass` (`packages/rafa-inventory/src/backfill/propose.ts`): one
+  `claude -p` session per batch of twenty through the capturing spawner of
+  `packages/rafa/src/core/loop/claude.ts`, the setting sources
   `loop.settingSources` resolves to, and one
-  `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each
-  `status: draft` and each row of a session that answered nothing
-  readable marked `unanswered`. No skill is touched.
-  With `--apply` it reads those files back — refusing the whole run
-  when one does not parse — copies every file a reviewed row could
-  rewrite under `<base>/.rafa/backfill/backup/` (`src/backfill/backup.ts`),
-  writes the rows (`applyProposals`), then plans the derivation with
-  the trigger sentences those rows carried, copies what it will rewrite
-  and derives (`applyDerivation`). A file under the checkout the
-  command runs in is copied nowhere: git holds it. A draft file, a
-  file naming another skills directory, a skill that changed since its
-  proposal and any write that fails a check the file passed before are
-  each refused ALONE, and no body is ever written.
-  The exit code is the number of rows and files refused, capped at 255,
-  and 1 is kept for no directory, a second word, `--propose` and
-  `--apply` together, a switch that read the directory as its value, a
-  bare `--project`, a `<dir>` that is no `.claude/skills` or is not
-  there, and a proposal file that does not parse. In json mode the
-  actions and their counts are the result's `data` on a run that
+  `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each `status: draft`
+  and each row of a session that answered nothing readable marked `unanswered`.
+  No skill is touched. With `--apply` it reads those files back — refusing the
+  whole run when one does not parse — copies every file a reviewed row could
+  rewrite under `<base>/.rafa/backfill/backup/`
+  (`packages/rafa-inventory/src/backfill/backup.ts`), writes the rows
+  (`applyProposals`), then plans the derivation with the trigger sentences those
+  rows carried, copies what it will rewrite and derives (`applyDerivation`). A
+  file under the checkout the command runs in is copied nowhere: git holds it. A
+  draft file, a file naming another skills directory, a skill that changed since
+  its proposal and any write that fails a check the file passed before are each
+  refused ALONE, and no body is ever written. The exit code is the number of
+  rows and files refused, capped at 255, and 1 is kept for no directory, a
+  second word, `--propose` and `--apply` together, a switch that read the
+  directory as its value, a bare `--project`, a `<dir>` that is no
+  `.claude/skills` or is not there, and a proposal file that does not parse. In
+  json mode the actions and their counts are the result's `data` on a run that
   refused nothing.
 - **`instinct list` and `instinct show <id>` read the two instinct
   scopes** (`src/commands/instinct/list.ts`,
   `src/commands/instinct/show.ts`, sharing
   `src/commands/instinct/instinct-records.ts` and reading the scopes
-  through `src/schema/scope-records.ts`). The scopes are
+  through `packages/rafa-inventory/src/schema/scope-records.ts`). The scopes are
   `packages/rafa/src/schema/tiers.ts`'s — `<root>/.rafa/instincts` and
   `~/.rafa/instincts`, nearest the work first — and both commands run
   INSIDE a project, reading the home and the root off the project the

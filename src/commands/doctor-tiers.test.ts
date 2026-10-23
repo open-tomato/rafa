@@ -23,8 +23,8 @@
  * without `user`, so a row that is absent is absent for its reason and
  * not because nothing was read.
  */
-import type { InventorySeams } from '../inventory/index.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { InventorySeams } from '@open-tomato/rafa-inventory/inventory/index';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,9 +32,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+
 import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
-import { buildInventory } from '../inventory/index.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { renderDeepRow } from './doctor-deep-row.js';
 import {

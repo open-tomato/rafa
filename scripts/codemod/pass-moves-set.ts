@@ -3,7 +3,8 @@
  * and 2, reading which files move where from a move list and the files a
  * commit would hold. A listed file moves to its `to`; its colocated tests
  * and its folder's `testdata/` go with it; a moved test whose imports
- * reach a file outside the package and the move is parked instead. A
+ * reach a file outside core, the target package (`pass-target.ts`) and the
+ * move is parked under the target's parking folder instead. A
  * colocated test the project's `tests.integration` globs match is left in
  * place, until #913 places each integration test with the package entry it
  * drives. Every function here is pure over its input; the rewrites of each
@@ -11,18 +12,17 @@
  */
 import type { SiteNote } from './core-package-text';
 import type { FileMove } from './moves/types';
+import type { PassTarget } from './pass-target';
 import type { ResolveImport } from '../survey/import-graph';
 
 import { posix } from 'node:path';
 
 import { isCodeFile } from '../survey/core-barrels';
-import { CORE_PARKED_TESTS, CORE_SOURCE } from '../survey/core-moves';
+import { CORE_SOURCE } from '../survey/core-moves';
 import { classifyFile } from '../survey/files';
 
 import { CODE_EXTENSION, parseSource, specifierSites } from './core-package-text';
-
-/** The folder a parked test's path is read below, with its closing `/`. */
-export const SOURCE_ROOT = 'src/';
+import { CORE_TARGET, parkedPath, SOURCE_ROOT } from './pass-target';
 
 /** One file that changes path. */
 export interface PathMove {
@@ -30,9 +30,9 @@ export interface PathMove {
   readonly to: string;
 }
 
-/** One parked test, with the files outside the package it reaches. */
+/** One parked test, with the files outside core, the target and the move it reaches. */
 export interface ParkedTest extends PathMove {
-  /** The files outside the package and the move its imports reach, sorted. */
+  /** The files outside core, the target and the move its imports reach, sorted. */
   readonly reaches: readonly string[];
 }
 
@@ -55,16 +55,18 @@ export interface PassMovesInput {
   readonly integrationGlobs: readonly string[];
   /** Whether a path exists on disk; the committable files unless handed in. */
   readonly present?: (path: string) => boolean;
+  /** The package the list moves into; core unless handed in. */
+  readonly target?: PassTarget;
 }
 
 /**
- * Where a parked test lands: its path below `src/` under {@link CORE_PARKED_TESTS}.
+ * The target of a run's input, core when it names none.
  *
- * @param path - Its path before the move, under `src/`.
- * @returns Its parked path.
+ * @param input - The run's input.
+ * @returns Its target.
  */
-export function parkedPath(path: string): string {
-  return `${CORE_PARKED_TESTS}${path.slice(SOURCE_ROOT.length)}`;
+export function targetOf(input: PassMovesInput): PassTarget {
+  return input.target ?? CORE_TARGET;
 }
 
 /** Whether a resolved location is outside the repository. */
@@ -79,6 +81,7 @@ export function byFrom(a: PathMove, b: PathMove): number {
 
 /** The refusals the list earns before any file is read. */
 function listRefusals(input: PassMovesInput, present: (path: string) => boolean): SiteNote[] {
+  const target = targetOf(input);
   const files = new Set(input.files);
   const refusals: SiteNote[] = [];
   const seen = new Set<string>();
@@ -89,7 +92,7 @@ function listRefusals(input: PassMovesInput, present: (path: string) => boolean)
     if (!input.tracked.has(move.from)) refuse('is not tracked');
     else if (!files.has(move.from)) refuse('is not on disk');
     if (input.tracked.has(move.to) || present(move.to)) refuse(`moves to ${move.to}, which exists`);
-    if (!move.to.startsWith(CORE_SOURCE)) refuse(`moves to ${move.to}, outside ${CORE_SOURCE}`);
+    if (!move.to.startsWith(target.source)) refuse(`moves to ${move.to}, outside ${target.source}`);
     for (const path of [move.from, move.to]) {
       if (seen.has(path)) refuse(`lists ${path} twice`);
       seen.add(path);
@@ -162,7 +165,9 @@ function testdataMoves(files: readonly string[], moves: readonly FileMove[]): { 
 }
 
 /**
- * Step 2: the files outside the package and the move a test's imports reach.
+ * Step 2: the files outside core, the target's folder and the move a test's
+ * imports reach. For core the target's folder is read as its source folder,
+ * as it was before the target.
  *
  * @param input - The run's input.
  * @param inPackage - The path after the move of each file that moves into the package.
@@ -174,10 +179,14 @@ function reachesOf(input: PassMovesInput, inPackage: ReadonlyMap<string, string>
   if (text === undefined || !isCodeFile(file)) {
     return [];
   }
+  const target = targetOf(input);
+  const kept = target.core
+    ? [CORE_SOURCE]
+    : [CORE_SOURCE, target.folder];
   const reached = new Set<string>();
   for (const site of specifierSites(parseSource(file, text))) {
     const landed = input.resolve(site.node.text, file);
-    if (landed !== undefined && !isOutsideRepository(landed) && !inPackage.has(landed) && !landed.startsWith(CORE_SOURCE)) {
+    if (landed !== undefined && !isOutsideRepository(landed) && !inPackage.has(landed) && !kept.some((folder) => landed.startsWith(folder))) {
       reached.add(landed);
     }
   }
@@ -227,7 +236,7 @@ export function readMoveSet(input: PassMovesInput, present: (path: string) => bo
       refusals.push({ file: test.from, line: 0, text: `reaches ${reaches.join(', ')}, and is not under ${SOURCE_ROOT} to park` });
       continue;
     }
-    parked.push({ from: test.from, reaches, to: parkedPath(test.from) });
+    parked.push({ from: test.from, reaches, to: parkedPath(targetOf(input), test.from) });
   }
   const parkedFrom = new Set(parked.map((test) => test.from));
   const colocated = tests.filter((test) => !parkedFrom.has(test.from));

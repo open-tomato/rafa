@@ -240,7 +240,7 @@ export const SESSION_ID_FLAG = '--session-id';
  * for a decision `core/plan/declaration.ts` already makes.
  *
  * `served` is `ServedSet.flags` from `serveResolution`
- * (`src/tiers/serve.ts`), the session-only flags handing the run's
+ * (`packages/rafa-inventory/src/tiers/serve.ts`), the session-only flags handing the run's
  * served directory over, and is taken as it is for the same reason.
  * It defaults to empty, so a caller that serves nothing spawns what it
  * spawned before. It goes BEFORE `flags`, never after: `--tools` has to
@@ -415,7 +415,7 @@ export interface CapturedSession {
 export interface CapturedSpawnOptions {
   /**
    * The session's working directory, or the loop's own when absent. The
-   * search session (`src/inventory/search/index.ts`) names the scratch
+   * search session (`packages/rafa-inventory/src/inventory/search/index.ts`) names the scratch
    * copy of its candidates, each check session of the epic verification
    * run (`src/epic/verify-run.ts`) a detached worktree of main, the plan
    * session of the `claude` planner (`src/adapters/planner/claude.ts`)

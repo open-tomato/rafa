@@ -39,8 +39,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'bun:test';
 
 import { readFrontmatterDocument, renderFrontmatter, updateFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
-
-import { ACTION_HEADING, CAUSE_HEADING, actionHash, parseInstinct } from '../schema/instinct.js';
+import { ACTION_HEADING, CAUSE_HEADING, actionHash, parseInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 import {
   DESCRIPTION_LIMIT,
   LISTING_LIMIT,
@@ -48,8 +47,8 @@ import {
   countCharacters,
   listingLength,
   parseSkillFrontmatter,
-} from '../schema/skill.js';
-import { AGNOSTIC_STACK, isStackList, stackGlobs, stackPaths } from '../schema/stack.js';
+} from '@open-tomato/rafa-inventory/schema/skill';
+import { AGNOSTIC_STACK, isStackList, stackGlobs, stackPaths } from '@open-tomato/rafa-inventory/schema/stack';
 
 /** The four required fields, filled with values every v2 check accepts. */
 const SKILL_BASE = {

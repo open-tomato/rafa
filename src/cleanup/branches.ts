@@ -58,7 +58,7 @@
  * at a `/`. Measured on Bun 1.3.14: `release/*` matches `release/x` and
  * NOT `release/a/b`, which `release/**` matches. The config schema keeps
  * every pattern as written (`src/config-schema-readings.ts`), and `Bun.Glob`
- * accepts every string (`src/schema/skill.ts`), so no pattern throws
+ * accepts every string (`packages/rafa-inventory/src/schema/skill.ts`), so no pattern throws
  * here either.
  *
  * ## Why it answers rather than throws

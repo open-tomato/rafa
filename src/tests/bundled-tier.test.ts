@@ -9,7 +9,7 @@
  * in `project-skills-check.test.ts`, so a clean answer does not depend
  * on this machine's toolchain.
  */
-import type { TierRow, TierSettings } from '../tiers/resolve.js';
+import type { TierRow, TierSettings } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,11 +19,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+import { checkDirectory } from '@open-tomato/rafa-inventory/check/run';
+import { readItemBytes, resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
+import { DEFAULT_ROUTES, DEFAULT_ROUTING, resolveRouting } from '@open-tomato/rafa-inventory/tiers/routing';
 
-import { checkDirectory } from '../check/run.js';
 import { parseAgentFrontmatter } from '../schema/agent.js';
-import { readItemBytes, resolveTiers } from '../tiers/resolve.js';
-import { DEFAULT_ROUTES, DEFAULT_ROUTING, resolveRouting } from '../tiers/routing.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SKILLS_DIR = join(REPO_ROOT, 'src', 'bundled', 'skills');

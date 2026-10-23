@@ -34,22 +34,24 @@
  *     both. An unused export appended to a module changed no chunk at
  *     all, which is why that reading was taken on a change the bundle
  *     keeps.
- *   - `bun scripts/build/bundle.ts` runs the next two builds, each with
+ *   - `bun scripts/build/bundle.ts` runs the next three builds, each with
  *     every publishable workspace package as `--external`, and fails
  *     when a bundle holds a file of one (see that script's module note).
  *     It is copied into the scratch package beside the manifest.
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
- *   - The six library entries are built together with `--splitting`.
- *     Without it each entry is a bundle of its own, and `parsePlan`,
- *     `parseReport`, `openSqliteStore` and `EFFORT_KEY_PROJECTIONS` were
- *     each a different value from `dist/index.js` than from their
- *     subpath's bundle, so `src/index.ts`'s rule that a subpath's names
- *     are the root's own bindings held in source only. With it, the
- *     shared code moves into chunks beside `index.js` and all four were
- *     identical. `--root=src` spells out where each entry lands: at its
- *     source's path under `dist/`.
+ *   - The five library entries under `src/` are built together with
+ *     `--splitting`. Without it each entry is a bundle of its own, and
+ *     `parsePlan`, `parseReport`, `openSqliteStore` and
+ *     `EFFORT_KEY_PROJECTIONS` were each a different value from
+ *     `dist/index.js` than from their subpath's bundle, so
+ *     `src/index.ts`'s rule that a subpath's names are the root's own
+ *     bindings held in source only. With it, the shared code moves into
+ *     chunks beside `index.js` and all four were identical. `--root=src` spells out where each entry lands: at its
+ *     source's path under `dist/`. The learning entry, in the inventory
+ *     package since pass 4a and so outside `src/`, is built alone to
+ *     `dist/learning/index.js`; no name of the root entry comes from it.
  *   - `tsc -p packages/rafa/tsconfig.types.json` and then
  *     `tsc -p tsconfig.config-types.json` follow them and write the
  *     declarations of the `./config` subpath, the one entry whose types
@@ -251,25 +253,24 @@
  *
  * ## The learning subpath, by the package's name
  *
- * `./learning` joined the exports map and the build's entry list
- * together, for the library under `src/learning/`. The computed cases
- * above read it by path, as `dist/learning/index.js`; two more import it
- * as a consumer does, by `@open-tomato/rafa/learning`, from a scratch
- * directory whose `node_modules/@open-tomato/rafa` links to the scratch
- * package, so the name resolves through the manifest's own exports map.
- * One imports it under bun and holds its names to the source entry's and
- * its `actionHash` to the source's answer; the other does the same under
- * node, which is what lets `README.md` name `./learning` among the
- * subpaths that load there: the library needs only `node:crypto`. Both
- * import `@open-tomato/rafa/unmapped` from the same directory first, as
- * the control that a name the map does not carry is refused, so the
- * link is not what makes the import pass.
+ * `./learning` joined the exports map and the build's entry list together, for
+ * the library under `packages/rafa-inventory/src/learning/`. The computed cases
+ * above read it by path, as `dist/learning/index.js`; two more import it as a
+ * consumer does, by `@open-tomato/rafa/learning`, from a scratch directory
+ * whose `node_modules/@open-tomato/rafa` links to the scratch package, so the
+ * name resolves through the manifest's own exports map. One imports it under
+ * bun and holds its names to the source entry's and its `actionHash` to the
+ * source's answer; the other does the same under node, which is what lets
+ * `README.md` name `./learning` among the subpaths that load there: the library
+ * needs only `node:crypto`. Both import `@open-tomato/rafa/unmapped` from the
+ * same directory first, as the control that a name the map does not carry is
+ * refused, so the link is not what makes the import pass.
  *
  * Two mutations of `package.json` were driven on 2026-09-25 with bun
  * 1.3.14 and node 22.14.0, one run of this file each, 54 pass before and
  * after and the manifest restored byte-identical (sha256). Dropping the
  * `./learning` exports entry reddened 3 of 54: the exports map case and
- * both name cases. Dropping `src/learning/index.ts` from the build's
+ * both name cases. Dropping `packages/rafa-inventory/src/learning/index.ts` from the build's
  * entry list reddened 5 of 54: the exports-target case, the two computed
  * `dist/learning/index.js` cases and both name cases.
  *
@@ -487,12 +488,12 @@ import ts from 'typescript';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import * as portsSource from '@open-tomato/rafa/ports';
 import * as storeSource from '@open-tomato/rafa/store';
+import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
 
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import * as configSource from '../config/index.js';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';
-import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
@@ -567,7 +568,12 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * the chunk they imported from, beside the store's sqlite backend and
  * core's command, git and loop helpers. It has one `index-<hash>.js` more
  * since the inventory and board importers took their facades: a shared
- * chunk the splitting build now writes for the facade statements.
+ * chunk the splitting build now writes for the facade statements. It has
+ * two `index-<hash>.js` fewer since pass 4a moved the learning library
+ * into the inventory package and the learning entry came to be built
+ * alone: its four modules, which sat in a chunk of their own beside an
+ * empty one, now sit in the shared chunk the inventory files are in, and
+ * no lazy command module entered a library entry.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1291,7 +1297,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(165);
+    expect(before).toHaveLength(163);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

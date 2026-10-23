@@ -12,10 +12,10 @@
  * once the difference is put in.
  */
 import type { SkillFact, SkillFactEntry } from './skill-facts.js';
-import type { InventoryKind, InventorySource } from '../inventory/record.js';
-import type { Resolution, TierRow, TierSettings } from '../tiers/resolve.js';
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
 import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { InventoryKind, InventorySource } from '@open-tomato/rafa-inventory/inventory/record';
+import type { Resolution, TierRow, TierSettings } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +29,8 @@ import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { writeTriage } from '@open-tomato/rafa/store/triage';
-
-import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
-import { resolveTiers } from '../tiers/resolve.js';
+import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
+import { resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { findRecurrences } from './recurrence.js';
 import {

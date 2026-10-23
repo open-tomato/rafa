@@ -3,7 +3,7 @@
  * five checks over every skill a skills directory registers, and over
  * every file in it that registers nothing.
  *
- * The work is `src/check/run.ts`'s and the reading of the line is
+ * The work is `packages/rafa-inventory/src/check/run.ts`'s and the reading of the line is
  * `src/commands/check-report.ts`'s; this module is the declaration.
  * What it is FOR is the law the phase spells out: nothing enters a
  * tier unchecked, rafa's own bundled skills included. The demotion
@@ -17,7 +17,7 @@
  * `.claude/skills`, or rafa's own `bundled/skills` — and is scanned
  * one level deep, as Claude Code registers it. `--project=<root>` is
  * the checkout the bodies are consumed in, which is what a body's
- * `src/check/references.ts` is resolved against. The two are separate
+ * `packages/rafa-inventory/src/check/references.ts` is resolved against. The two are separate
  * on purpose: checking a user tier against the project you happen to
  * stand in would fail every body naming a file of some OTHER project,
  * so without the flag a project-looking path is counted

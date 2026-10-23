@@ -38,9 +38,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
-
-import { SKILL_DELIVERY } from '../tiers/delivery.js';
-import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
+import { SKILL_DELIVERY } from '@open-tomato/rafa-inventory/tiers/delivery';
+import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '@open-tomato/rafa-inventory/tiers/serve';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

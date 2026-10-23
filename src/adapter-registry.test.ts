@@ -71,12 +71,12 @@
  * with both modules restored and verified with `sha256sum -c`: the root
  * registering nothing reddened 32 cases, every case of this file.
  */
-import type { DescribedInstinctRecord } from './adapters/learning/local.js';
 import type { AdapterContext, AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { InstinctRecord, Sync } from '@open-tomato/rafa/ports';
 import type { SessionEffortRow } from '@open-tomato/rafa/store';
+import type { DescribedInstinctRecord } from '@open-tomato/rafa-inventory/adapters/learning/local';
 
 import './config-registry.js';
 
@@ -107,13 +107,13 @@ import {
   registerConfigSections,
   restoreConfigSections,
 } from '@open-tomato/rafa/core/config';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { draftFixture } from './adapters/tracker/contract.js';
 import { createFakeGh } from './adapters/tracker/github-fake.js';
 import { parseLocalIssue } from './adapters/tracker/local.js';
 import { parseSpecReview } from './board/spec-review.js';
-import { actionHash } from './learning/index.js';
 import { scratchHomeEnv } from './tests/scratch-home-env.js';
 
 /** The module that registers the config defaults, as a child process imports it. */

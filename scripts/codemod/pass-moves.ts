@@ -1,17 +1,20 @@
 /**
- * The pass-moves codemod: moves the files of a move list into core's
- * package, `packages/rafa/src/` (#808), and rewrites every path that
- * names them. It is a program over lists, in the shape of
+ * The pass-moves codemod: moves the files of a move list into a package,
+ * core's `packages/rafa/src/` or a feature package's (#808), and rewrites
+ * every path that names them. It is a program over lists, in the shape of
  * `core-package.ts`: every list it acts on is printed with its count, and
  * `--dry-run` prints them and changes nothing.
  *
  * Usage, from the repository root or naming it:
  *
- *   bun scripts/codemod/pass-moves.ts --list=scripts/codemod/moves/pass-1.ts [--dry-run] [<root>]
+ *   bun scripts/codemod/pass-moves.ts --list=scripts/codemod/moves/pass-1.ts [--package=<name>] [--dry-run] [<root>]
  *
  * The list is a module under `scripts/codemod/moves/` that exports one
  * array of `FileMove` (`moves/types.ts`); its path is read from the
- * working folder.
+ * working folder. `--package=` names the target by its folder under
+ * `packages/`, as `rewire-facade.ts` spells it (`rafa-inventory`), and
+ * must name a workspace member; absent, or `rafa`, the target is core
+ * (`pass-target.ts`). The steps below read "the package" as the target.
  *
  * ## What it reads
  *
@@ -35,24 +38,31 @@
  *     until #913 places each integration test with the package entry it
  *     drives.
  *  2. Parks each moved test file whose imports, resolved, reach a file of
- *     the repository outside the package and outside the move (a root
- *     file, a `src/tests/` helper, the root `package.json`) at
- *     `CORE_PARKED_TESTS` under its path below `src/`, and prints what
+ *     the repository outside core, outside the package's folder and
+ *     outside the move (a root file, a `src/tests/` helper, the root
+ *     `package.json`) at the target's parking folder
+ *     (`src/tests/core-coupled/` for core, `src/tests/<name>-coupled/`
+ *     for `rafa-<name>`) under its path below `src/`, and prints what
  *     each reaches as a row of that folder's README.
  *  3. Rewrites every specifier of a code file outside the package, under
  *     `src/`, `scripts/`, `packages/<name>/src/` or at the root, that
  *     resolves to a moved file to that file's subpath
  *     ({@link packageSubpath}): static imports, `import type`,
  *     `export … from`, `import()`, `require()`, `import('…')` types and
- *     `declare module`. A parked test's import of a moved or core file
- *     reads its subpath too, and its relative import of any other file
- *     the relative path from its new folder.
- *  4. Rewrites a moved file's own specifiers: a bare
+ *     `declare module`. For a feature package, a file directly under a
+ *     `packages/<name>/` is read too, and one in the package's folder but
+ *     outside its `src/` (its facade `index.ts`, a `commands.ts`) takes
+ *     the relative path from its own folder instead. A parked test's
+ *     import of a moved or core file reads its subpath too, a bare core
+ *     specifier keeping its text, and its relative import of any other
+ *     file the relative path from its new folder.
+ *  4. Rewrites a moved file's own specifiers. Into core, a bare
  *     `@open-tomato/rafa/<subpath>`, a `declare module` target included,
  *     becomes the relative path from the file's new folder to the file it
- *     resolves to, with a `.js` form for a `.ts` file. A relative specifier
- *     between two moved files keeps its text: the package mirrors the
- *     layout under `src/`.
+ *     resolves to, with a `.js` form for a `.ts` file; into a feature
+ *     package it keeps its text, since core is another package. A
+ *     relative specifier between two moved files keeps its text: the
+ *     package mirrors the layout under `src/`.
  *  5. Rewrites a moved path named in prose and in the comments and string
  *     literals of code files to the path after the move
  *     ({@link rewriteMovedPath}), with and without its code extension,
@@ -64,7 +74,11 @@
  *     {@link CODE_PROSE_ROOTS}. It leaves every file under a `testdata/`
  *     or a module's `fixtures/` folder, the codemod's own files, the move
  *     lists and the earlier codemods ({@link CODEMOD_FOLDER}), and the
- *     files of {@link LEFT_TO_HAND}.
+ *     files of {@link LEFT_TO_HAND}. A moved path in the build's files,
+ *     the code under `scripts/build/` and the root `package.json`, keeps
+ *     its text and is listed for the move task: rewritten, an entry of
+ *     the library build's `--root=src` would build outside `dist/`
+ *     without a word (`pass-prose.ts`).
  *  6. Lists and leaves each line of a moved or parked test that builds a
  *     path from `import.meta`, since the test sits deeper now, and each
  *     line of a code file outside the move that builds one naming a moved
@@ -74,30 +88,31 @@
  *
  * A run with any refusal writes nothing: a listed `from` that is not
  * tracked or not on disk, a `to` that exists or lies outside the
- * package's source, a path listed twice, a moved file whose relative or
- * `@open-tomato/rafa/` specifier resolves to nothing or outside the move
- * and outside the package, a test to park that is not under `src/`, and
- * two rewrites of one span.
+ * package's source, a path listed twice, a moved file whose relative
+ * specifier (or, into core, `@open-tomato/rafa/` specifier) resolves to
+ * nothing or outside the move and outside the package, a test to park
+ * that is not under `src/`, and two rewrites of one span.
  *
- * Exit codes: 0 the run finished; 2 it could not run or refused.
+ * Exit codes: 0 the run finished; 2 it could not run, named no workspace
+ * member, or refused.
  */
 import type { Edit, SiteNote } from './core-package-text';
 import type { FileMove } from './moves/types';
 import type { ParkedTest, PassMovesInput, PathMove } from './pass-moves-set';
+import type { PassTarget } from './pass-target';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join, posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { isCodeFile } from '../survey/core-barrels';
-import { CORE_PARKED_TESTS, CORE_SOURCE } from '../survey/core-moves';
+import { CORE_SOURCE } from '../survey/core-moves';
 import { classifyFile } from '../survey/files';
 import { bunResolver } from '../survey/import-graph';
 import { readTestKindGlobs } from '../survey/test-kinds';
 
 import {
   applyEdits,
-  CODE_EXTENSION,
   lineOf,
   parseSource,
   proseSpans,
@@ -107,7 +122,18 @@ import {
   tokenEdits,
 } from './core-package-text';
 import { applyTreeChanges, committableFiles, TreeError } from './core-package-tree';
-import { isOutsideRepository, readMoveSet, SOURCE_ROOT } from './pass-moves-set';
+import { isOutsideRepository, readMoveSet, targetOf } from './pass-moves-set';
+import { buildNotes, CLUSTER_MAP_FILE, CODEMOD_FOLDER, isBuildScope, isProseScope, proseForms, rewriteMovedPath } from './pass-prose';
+import {
+  checkWorkspaceMember,
+  CORE_TARGET,
+  PACKAGE_PREFIX,
+  packageSubpath,
+  PassTargetError,
+  readmeRow,
+  readPassTarget,
+  SOURCE_ROOT,
+} from './pass-target';
 
 /** The flag that prints the lists and changes nothing. */
 export const DRY_RUN_FLAG = '--dry-run';
@@ -115,43 +141,11 @@ export const DRY_RUN_FLAG = '--dry-run';
 /** The flag that names the move list, before its `=`. */
 export const LIST_FLAG = '--list';
 
+/** The flag that names the target package, before its `=`. */
+export const PACKAGE_FLAG = '--package';
+
 /** What a wrong command line is answered with. */
-export const USAGE: string = `Usage: bun scripts/codemod/pass-moves.ts ${LIST_FLAG}=<move list> [${DRY_RUN_FLAG}] [<root>]`;
-
-/** The name a file outside the package imports core by, with its closing `/`. */
-export const PACKAGE_PREFIX = '@open-tomato/rafa/';
-
-/** The cluster map whose keys step 5 renames. */
-export const CLUSTER_MAP_FILE = 'docs/survey/cluster-map.json';
-
-/** The folders whose code files' comments and strings step 5 rewrites, each with its closing `/`. */
-export const CODE_PROSE_ROOTS: readonly string[] = ['context/', 'packages/', 'scripts/', 'src/'];
-
-/** The folders whose `.md` files step 5 rewrites, each with its closing `/`. */
-export const PROSE_ROOTS: readonly string[] = ['.claude/', 'context/', 'docs/'];
-
-/** The `.md` files at the root step 5 rewrites. */
-export const ROOT_PROSE: readonly string[] = ['AGENTS.md', 'README.md'];
-
-/** The survey folder, a dated record that step 5 leaves but for its generated maps. */
-export const SURVEY_FOLDER = 'docs/survey/';
-
-/** The generated maps of {@link SURVEY_FOLDER} that step 5 rewrites: the three the move regenerates. */
-export const SURVEY_MAPS: readonly string[] = ['docs/survey/cut-table.md', 'docs/survey/import-graph.md', 'docs/survey/test-index.md'];
-
-/**
- * The folder step 5 leaves: the codemod's own files, the move lists under
- * `moves/` and the earlier codemods. Each spells the tree before its own
- * move, and its tests plant that tree.
- */
-export const CODEMOD_FOLDER = 'scripts/codemod/';
-
-/**
- * The files step 5 leaves to the move task: the cases of the cut table
- * plant graphs whose paths the live `CUT_RULES` place, so a planted path
- * keeps its meaning only as written.
- */
-export const LEFT_TO_HAND: readonly string[] = ['scripts/survey/cut-table.test.ts'];
+export const USAGE: string = `Usage: bun scripts/codemod/pass-moves.ts ${LIST_FLAG}=<move list> [${PACKAGE_FLAG}=<name>] [${DRY_RUN_FLAG}] [<root>]`;
 
 /** One specifier that changes, named by the importer's path before the move. */
 export interface SpecifierRewrite {
@@ -169,9 +163,25 @@ export interface PathMentions {
 
 export type { SiteNote } from './core-package-text';
 export type { ParkedTest, PassMovesInput, PathMove } from './pass-moves-set';
+export type { PassTarget } from './pass-target';
+export {
+  BUILD_FOLDER,
+  BUILD_MANIFEST,
+  CLUSTER_MAP_FILE,
+  CODE_PROSE_ROOTS,
+  CODEMOD_FOLDER,
+  LEFT_TO_HAND,
+  PROSE_ROOTS,
+  ROOT_PROSE,
+  rewriteMovedPath,
+  SURVEY_FOLDER,
+  SURVEY_MAPS,
+} from './pass-prose';
 
 /** Everything one run would do, and the text of every file it writes. */
 export interface PassMovesPlan {
+  /** The package the list moves into. */
+  readonly target: PassTarget;
   /** Step 1: the listed files, sorted by `from`. */
   readonly moves: readonly PathMove[];
   /** Step 1: the colocated tests that move into the package, sorted. */
@@ -198,6 +208,8 @@ export interface PassMovesPlan {
   readonly clusterKeys: readonly PathMove[];
   /** Step 5: the moved paths rewritten, per file, sorted by file. */
   readonly mentions: readonly PathMentions[];
+  /** Step 5: the moved paths of the build's files, left as written for the move task ({@link isBuildScope}). */
+  readonly buildReads: readonly SiteNote[];
   /** Step 6: the `import.meta` path lines of moved and parked tests, left to the move task. */
   readonly pathReads: readonly SiteNote[];
   /** Step 6: the `import.meta` path lines outside the move that name a moved file or folder, left to the move task. */
@@ -229,59 +241,6 @@ const PATH_SEGMENT = /^[\w.@/-]+$/;
 const JS_FORM: Readonly<Record<string, string>> = { '.cts': '.cjs', '.mts': '.mjs', '.ts': '.js', '.tsx': '.jsx' };
 
 /**
- * The subpath a file outside the package imports a package file by: its
- * path below {@link CORE_SOURCE} with a code extension and a closing
- * `/index` dropped, and `effort/store` spelled `store`.
- *
- * @param path - A file's path under {@link CORE_SOURCE}.
- * @returns The specifier, such as `@open-tomato/rafa/utils/tracker`.
- */
-export function packageSubpath(path: string): string {
-  const below = path.slice(CORE_SOURCE.length).replace(CODE_EXTENSION, '')
-    .replace(/\/index$/, '');
-  const named = below === 'effort/store' || below.startsWith('effort/store/')
-    ? `store${below.slice('effort/store'.length)}`
-    : below;
-  return `${PACKAGE_PREFIX}${named}`;
-}
-
-/**
- * The text a moved path takes after the move, or `undefined` when it is
- * not one: a moved or parked file by its full path, else a path under a
- * moved folder, or the folder itself, under that folder's new path.
- *
- * @param token - A path as written, opening with `src/`.
- * @param finals - The path after the move of each moved and parked file.
- * @param folders - The moved folders, each path with its closing `/`.
- * @returns The path after the move, or `undefined`.
- */
-export function rewriteMovedPath(token: string, finals: ReadonlyMap<string, string>, folders: readonly PathMove[]): string | undefined {
-  const exact = finals.get(token);
-  if (exact !== undefined) {
-    return exact;
-  }
-  for (const folder of folders) {
-    if (token.startsWith(folder.from)) {
-      return `${folder.to}${token.slice(folder.from.length)}`;
-    }
-    if (token === folder.from.slice(0, -1)) {
-      return folder.to.slice(0, -1);
-    }
-  }
-  return undefined;
-}
-
-/**
- * A file's README row as `src/tests/core-coupled/README.md` writes it.
- *
- * @param test - A parked test.
- * @returns The row.
- */
-export function readmeRow(test: ParkedTest): string {
-  return `| \`${test.to.slice(CORE_PARKED_TESTS.length)}\` | ${test.reaches.map((path) => `\`${path}\``).join(', ')} |`;
-}
-
-/**
  * The paths one line builds from `import.meta`, read from its quoted
  * literals: each opening with `./` or `../`, as `new URL('./x', import.meta.url)`
  * names it, and all of them joined, as `join(import.meta.dir, '..', 'x')`
@@ -304,31 +263,15 @@ export function metaPaths(file: string, line: string): readonly string[] {
   return [...new Set([...urls, ...joined].map((path) => path.replace(/\/$/, '')))];
 }
 
-/** Whether a path lies under a `testdata/` folder or a module's `fixtures/` folder. */
-function isFrozen(path: string): boolean {
-  const folders = path.split('/').slice(0, -1);
-  return folders.includes('testdata') || folders.some((folder, depth) => folder === 'fixtures' && depth > 1);
-}
-
-/** Whether a path is a code file outside the package whose specifiers step 3 reads. */
-function isImporterScope(path: string): boolean {
-  return isCodeFile(path) && !path.startsWith(CORE_SOURCE)
-    && (path.startsWith(SOURCE_ROOT) || path.startsWith('scripts/') || /^packages\/[^/]+\/src\//.test(path) || !path.includes('/'));
-}
-
-/** Whether step 5 reads a file. */
-function isProseScope(file: string): boolean {
-  if (isFrozen(file) || file.startsWith(CODEMOD_FOLDER) || LEFT_TO_HAND.includes(file)) {
-    return false;
-  }
-  if (isCodeFile(file)) {
-    return CODE_PROSE_ROOTS.some((root) => file.startsWith(root));
-  }
-  if (!file.endsWith('.md')) {
-    return false;
-  }
-  return ROOT_PROSE.includes(file)
-    || (PROSE_ROOTS.some((root) => file.startsWith(root)) && (!file.startsWith(SURVEY_FOLDER) || SURVEY_MAPS.includes(file)));
+/**
+ * Whether a path is a code file outside the package's source whose
+ * specifiers step 3 reads: one directly under a `packages/<name>/` only
+ * for a feature target.
+ */
+function isImporterScope(target: PassTarget, path: string): boolean {
+  return isCodeFile(path) && !path.startsWith(target.source)
+    && (path.startsWith(SOURCE_ROOT) || path.startsWith('scripts/') || /^packages\/[^/]+\/src\//.test(path) || !path.includes('/')
+      || (!target.core && /^packages\/[^/]+\/[^/]+$/.test(path)));
 }
 
 function byFileAndLine(a: { readonly file: string; readonly line: number }, b: { readonly file: string; readonly line: number }): number {
@@ -342,11 +285,13 @@ interface Rules {
   readonly listed: ReadonlySet<string>;
   /** The path after the move of each moved and parked file. */
   readonly finals: ReadonlyMap<string, string>;
+  /** The package the list moves into. */
+  readonly target: PassTarget;
 }
 
 /** Whether a path, after the move, sits in the package. */
 function landsInPackage(rules: Rules, path: string): boolean {
-  return (rules.finals.get(path) ?? path).startsWith(CORE_SOURCE);
+  return (rules.finals.get(path) ?? path).startsWith(rules.target.source);
 }
 
 /** What one file's specifiers come to. */
@@ -375,7 +320,7 @@ function rewriteOwn(rules: Rules, file: string, text: string): FileSpecifiers {
   for (const site of specifierSites(source)) {
     const written = site.node.text;
     const relative = written.startsWith('.');
-    if (!relative && !written.startsWith(PACKAGE_PREFIX)) continue;
+    if (!relative && (!rules.target.core || !written.startsWith(PACKAGE_PREFIX))) continue;
     const line = lineOf(source, site.node.getStart(source));
     const landed = rules.input.resolve(written, file);
     const reachesOut = landed === undefined || isOutsideRepository(landed) || !landsInPackage(rules, landed);
@@ -399,7 +344,40 @@ function rewriteOwn(rules: Rules, file: string, text: string): FileSpecifiers {
 }
 
 /**
- * Step 3 over one file outside the package, a parked test included.
+ * Step 3's text for one specifier: a file of the package by its subpath,
+ * or by its relative path from a file in the package's folder outside its
+ * source; a core file by core's subpath, a bare one keeping its text; any
+ * other file by its relative path from the importer's new folder.
+ *
+ * @param rules - The run's lists.
+ * @param final - The importer's path after the move.
+ * @param written - The specifier as written.
+ * @param landed - The file it resolves to, before the move.
+ * @returns The specifier after the move.
+ */
+function importerSpecifier(rules: Rules, final: string, written: string, landed: string): string {
+  const { target } = rules;
+  const path = rules.finals.get(landed) ?? landed;
+  if (path.startsWith(target.source)) {
+    if (final.startsWith(target.folder)) {
+      return relativeSpecifier(final, path, written);
+    }
+    return rules.finals.has(landed) || !written.startsWith(target.prefix)
+      ? packageSubpath(target, path)
+      : written;
+  }
+  if (path.startsWith(CORE_SOURCE)) {
+    return written.startsWith(PACKAGE_PREFIX)
+      ? written
+      : packageSubpath(CORE_TARGET, path);
+  }
+  return written.startsWith('.')
+    ? relativeSpecifier(final, path, written)
+    : written;
+}
+
+/**
+ * Step 3 over one file outside the package's source, a parked test included.
  *
  * @param rules - The run's lists.
  * @param file - The file's path before the move.
@@ -416,41 +394,13 @@ function rewriteImporter(rules: Rules, file: string, text: string): FileSpecifie
     const written = site.node.text;
     const landed = rules.input.resolve(written, file);
     if (landed === undefined || isOutsideRepository(landed) || (!parked && !rules.finals.has(landed))) continue;
-    const target = rules.finals.get(landed) ?? landed;
-    let to = written;
-    if (target.startsWith(CORE_SOURCE)) {
-      to = rules.finals.has(landed) || !written.startsWith(PACKAGE_PREFIX)
-        ? packageSubpath(target)
-        : written;
-    } else if (written.startsWith('.')) {
-      to = relativeSpecifier(final, target, written);
-    }
+    const to = importerSpecifier(rules, final, written, landed);
     if (to !== written) {
       edits.push({ end: site.node.end - 1, pos: site.node.getStart(source) + 1, text: to });
       rewrites.push({ file, from: written, line: lineOf(source, site.node.getStart(source)), to });
     }
   }
   return { edits, escapes: [], refusals: [], rewrites };
-}
-
-/**
- * The path forms step 5 rewrites: each moved and parked file by its full
- * path, and each moved code file by its path without the extension where
- * no other file or folder is named by it.
- *
- * @param files - The committable files.
- * @param finals - The path after the move of each moved and parked file.
- * @returns The forms, each with its path after the move.
- */
-function proseForms(files: readonly string[], finals: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
-  const forms = new Map(finals);
-  const stems = (path: string): string => path.replace(CODE_EXTENSION, '');
-  for (const [from, to] of finals) {
-    const stem = stems(from);
-    const named = stem !== from && !files.some((file) => file !== from && (file.startsWith(`${stem}/`) || stems(file) === stem));
-    if (named) forms.set(stem, stems(to));
-  }
-  return forms;
 }
 
 /**
@@ -463,7 +413,8 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
   const files = new Set(input.files);
   const present = input.present ?? ((path: string): boolean => files.has(path));
   const set = readMoveSet(input, present);
-  const rules: Rules = { finals: set.finals, input, listed: new Set(input.moves.map((move) => move.from)) };
+  const target = targetOf(input);
+  const rules: Rules = { finals: set.finals, input, listed: new Set(input.moves.map((move) => move.from)), target };
   const forms = proseForms(input.files, set.finals);
   const rewriteToken = (token: string): string | undefined => rewriteMovedPath(token, forms, set.folders);
   const writes = new Map<string, string>();
@@ -472,6 +423,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
   const mentions: PathMentions[] = [];
   const pathReads: SiteNote[] = [];
   const movedPathReads: SiteNote[] = [];
+  const buildReads: SiteNote[] = [];
   const namesMoved = (path: string): boolean => set.finals.has(path)
     || set.folders.some((folder) => path === folder.from.slice(0, -1) || path.startsWith(folder.from));
   const escapes: SiteNote[] = [];
@@ -485,7 +437,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
     const final = set.finals.get(file) ?? file;
     if (isCodeFile(file)) {
       const intoPackage = set.finals.has(file) && !parkedFrom.has(file);
-      if (intoPackage || isImporterScope(file)) {
+      if (intoPackage || isImporterScope(target, file)) {
         const result = intoPackage
           ? rewriteOwn(rules, file, text)
           : rewriteImporter(rules, file, text);
@@ -506,7 +458,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
         });
       }
     }
-    if (isProseScope(file)) {
+    if (isProseScope(file) || isBuildScope(file)) {
       const source = isCodeFile(file)
         ? parseSource(file, text)
         : undefined;
@@ -514,8 +466,12 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
         ? [[0, text.length] as const]
         : proseSpans(source, new Set(specifierSites(source).map((site) => site.node.getStart(source))));
       const found = spans.flatMap((span) => tokenEdits(text, span, rewriteToken));
-      edits.push(...found);
-      if (found.length > 0) mentions.push({ count: found.length, file });
+      if (isBuildScope(file)) {
+        buildReads.push(...buildNotes(file, text, found));
+      } else {
+        edits.push(...found);
+        if (found.length > 0) mentions.push({ count: found.length, file });
+      }
     }
     const next = applyEdits(text, edits);
     if (next === undefined) {
@@ -534,6 +490,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
   }
 
   return {
+    buildReads: buildReads.sort(byFileAndLine),
     clusterKeys,
     colocated: set.colocated,
     escapes: escapes.sort(byFileAndLine),
@@ -547,6 +504,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
     pathReads: pathReads.sort(byFileAndLine),
     refusals: refusals.sort(byFileAndLine),
     specifiers: specifiers.sort(byFileAndLine),
+    target,
     testdata: set.testdata,
     writes,
   };
@@ -586,14 +544,15 @@ function indexFiles(root: string): ReadonlySet<string> {
  * @param root - The repository root.
  * @param moves - The move list.
  * @param integrationGlobs - The project's `tests.integration` patterns.
+ * @param target - The package the list moves into; core unless handed in.
  * @returns The plan.
  * @throws {TreeError} When `git ls-files` fails.
  */
-export function readPassMoves(root: string, moves: readonly FileMove[], integrationGlobs: readonly string[]): PassMovesPlan {
+export function readPassMoves(root: string, moves: readonly FileMove[], integrationGlobs: readonly string[], target: PassTarget = CORE_TARGET): PassMovesPlan {
   const files = committableFiles(root);
   const sources = new Map<string, string>();
   for (const file of files) {
-    if (isCodeFile(file) || file.endsWith('.md') || file === CLUSTER_MAP_FILE) {
+    if (isCodeFile(file) || file.endsWith('.md') || file === CLUSTER_MAP_FILE || isBuildScope(file)) {
       sources.set(file, readFileSync(join(root, file), 'utf8'));
     }
   }
@@ -604,6 +563,7 @@ export function readPassMoves(root: string, moves: readonly FileMove[], integrat
     present: (path) => existsSync(join(root, path)),
     resolve: bunResolver(root),
     sources,
+    target,
     tracked: indexFiles(root),
   });
 }
@@ -655,12 +615,13 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
   const rewrite = (item: SpecifierRewrite): string => `${item.file}:${item.line} '${item.from}' -> '${item.to}'`;
   const note = (item: SiteNote): string => `${item.file}:${item.line} ${item.text}`;
   return [
+    `the package: ${plan.target.source}, imported as ${plan.target.prefix}`,
     ...section('1. moved into the package', plan.moves.map(move)),
     ...section('1. colocated tests moved with them', plan.colocated.map(move)),
     ...section('1. integration tests left at the root, imports rewritten', plan.left),
     ...section('1. testdata files moved with their folder', plan.testdata.map(move)),
     ...section('2. parked tests', plan.parked.map(move)),
-    ...section('2. parked tests as README rows', plan.parked.map(readmeRow)),
+    ...section('2. parked tests as README rows', plan.parked.map((test) => readmeRow(plan.target, test))),
     `3. importers rewritten: ${plan.specifiers.length} specifier(s) in ${plan.importers} file(s) outside the move, parked tests apart`,
     ...section('3. specifiers rewritten to subpaths', plan.specifiers.map(rewrite)),
     ...section('4. moved files\' own specifiers rewritten', plan.ownSpecifiers.map(rewrite)),
@@ -668,6 +629,7 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
     ...section('5. cluster-map paths renamed', plan.clusterKeys.map(move)),
     `5. moved paths rewritten in prose, comments and strings: ${plan.mentions.reduce((sum, item) => sum + item.count, 0)}`,
     ...section('5. files whose moved paths are rewritten', plan.mentions.map((item) => `${item.file} (${item.count})`)),
+    ...section('5. left to the move task: moved paths in the build\'s files, left as written', plan.buildReads.map(note)),
     ...section('6. left to the move task: test lines building a path from import.meta', plan.pathReads.map(note)),
     ...section('6. left to the move task: lines outside the move building a path from import.meta to a moved file', plan.movedPathReads.map(note)),
     ...section('refused', plan.refusals.map(note)),
@@ -682,29 +644,44 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
 /** The command line, read. */
 interface Arguments {
   readonly list: string;
+  /** The target's name, `rafa` when `--package=` is absent. */
+  readonly packageName: string;
   readonly root: string;
   readonly dryRun: boolean;
+}
+
+/** The values of one `<flag>=` among the flags. */
+function flagValues(flags: readonly string[], flag: string): readonly string[] {
+  return flags.filter((item) => item.startsWith(`${flag}=`)).map((item) => item.slice(flag.length + 1));
 }
 
 function readArguments(argv: readonly string[], cwd: string): Arguments | undefined {
   const flags = argv.filter((argument) => argument.startsWith('--'));
   const roots = argv.filter((argument) => !argument.startsWith('--'));
-  const lists = flags.filter((flag) => flag.startsWith(`${LIST_FLAG}=`)).map((flag) => flag.slice(LIST_FLAG.length + 1));
-  const unknown = flags.filter((flag) => flag !== DRY_RUN_FLAG && !flag.startsWith(`${LIST_FLAG}=`));
-  if (roots.length > 1 || unknown.length > 0 || lists.length !== 1 || lists[0] === '') {
+  const lists = flagValues(flags, LIST_FLAG);
+  const packages = flagValues(flags, PACKAGE_FLAG);
+  const unknown = flags.filter((flag) => flag !== DRY_RUN_FLAG && !flag.startsWith(`${LIST_FLAG}=`) && !flag.startsWith(`${PACKAGE_FLAG}=`));
+  if (roots.length > 1 || unknown.length > 0 || lists.length !== 1 || lists[0] === '' || packages.length > 1 || packages[0] === '') {
     return undefined;
   }
-  return { dryRun: flags.includes(DRY_RUN_FLAG), list: resolve(cwd, lists[0]!), root: resolve(cwd, roots[0] ?? '.') };
+  return {
+    dryRun: flags.includes(DRY_RUN_FLAG),
+    list: resolve(cwd, lists[0]!),
+    packageName: packages[0] ?? CORE_TARGET.name,
+    root: resolve(cwd, roots[0] ?? '.'),
+  };
 }
 
 /**
- * The command line: `--list=<file> [--dry-run] [<root>]`, the list and
- * the root read from `cwd`, the root defaulting to it.
+ * The command line: `--list=<file> [--package=<name>] [--dry-run] [<root>]`,
+ * the list and the root read from `cwd`, the root defaulting to it and the
+ * package to core.
  *
  * @param argv - The arguments after the script.
  * @param cwd - The working folder.
  * @param streams - Where the lines go.
- * @returns 0 when the run finished, 2 when it could not run or refused.
+ * @returns 0 when the run finished, 2 when it could not run, named no
+ *   workspace member, or refused.
  */
 export async function main(argv: readonly string[], cwd: string, streams: PassMovesStreams): Promise<number> {
   const args = readArguments(argv, cwd);
@@ -713,8 +690,10 @@ export async function main(argv: readonly string[], cwd: string, streams: PassMo
     return 2;
   }
   try {
+    const target = readPassTarget(args.packageName);
+    checkWorkspaceMember(args.root, target);
     const moves = await loadMoveList(args.list);
-    const plan = readPassMoves(args.root, moves, (await readTestKindGlobs(args.root)).integration);
+    const plan = readPassMoves(args.root, moves, (await readTestKindGlobs(args.root)).integration, target);
     if (!args.dryRun && plan.refusals.length === 0) {
       applyPassMoves(args.root, plan);
     }
@@ -725,7 +704,7 @@ export async function main(argv: readonly string[], cwd: string, streams: PassMo
       ? 2
       : 0;
   } catch (error) {
-    if (!(error instanceof PassMovesError) && !(error instanceof TreeError)) {
+    if (!(error instanceof PassMovesError) && !(error instanceof TreeError) && !(error instanceof PassTargetError)) {
       throw error;
     }
     streams.err(error.message);

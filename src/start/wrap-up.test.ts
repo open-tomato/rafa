@@ -79,12 +79,12 @@
  * 1.3.14, 2026-10-13).
  */
 import type { WrapUpLearning } from './wrap-up.js';
-import type { InstinctRecord } from '../learning/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
 
 import { createHash } from 'node:crypto';
 
@@ -93,10 +93,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:tes
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
-import { actionHash } from '../learning/index.js';
 import { createGhPullRequests } from '../pr/index.js';
 import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
 import { sinkOutput } from '../tests/output-sinks.js';

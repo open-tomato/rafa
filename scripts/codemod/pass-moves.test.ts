@@ -17,14 +17,11 @@ import {
   CLUSTER_MAP_FILE,
   main,
   metaPaths,
-  packageSubpath,
-  readmeRow,
   readPassMoves,
   reportLines,
   rewriteMovedPath,
   USAGE,
 } from './pass-moves';
-import { parkedPath } from './pass-moves-set';
 
 function lines(...text: readonly string[]): string {
   return `${text.join('\n')}\n`;
@@ -202,12 +199,12 @@ function write(root: string, files: Readonly<Record<string, string>>): void {
 /** The identity and signing setting of the planted commit, so it reads no host configuration. */
 const COMMIT_CONFIG: readonly string[] = ['-c', 'user.name=rafa test', '-c', 'user.email=rafa@example.test', '-c', 'commit.gpgsign=false'];
 
-/** Plants the tree in a new git repository, its files committed. */
-function plant(extra: Readonly<Record<string, string>> = {}): string {
+/** Plants a tree, the core one unless named, in a new git repository, its files committed. */
+function plant(extra: Readonly<Record<string, string>> = {}, tree: Readonly<Record<string, string>> = TREE): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'pass-moves-')));
   roots.push(root);
   git(root, ['init', '-q']);
-  write(root, { ...TREE, ...extra });
+  write(root, { ...tree, ...extra });
   git(root, ['add', '-A']);
   git(root, [...COMMIT_CONFIG, 'commit', '-q', '-m', 'plant']);
   return root;
@@ -230,23 +227,6 @@ async function run(argv: readonly string[], cwd = '/'): Promise<{ code: number; 
   const code = await main(argv, cwd, { err: (line) => err.push(line), out: (line) => out.push(line) });
   return { code, err, out };
 }
-
-describe('packageSubpath and parkedPath', () => {
-  it.each([
-    ['packages/rafa/src/utils/tracker.ts', '@open-tomato/rafa/utils/tracker'],
-    ['packages/rafa/src/config-schema-bugs.ts', '@open-tomato/rafa/config-schema-bugs'],
-    ['packages/rafa/src/core/config/index.ts', '@open-tomato/rafa/core/config'],
-    ['packages/rafa/src/effort/store/index.ts', '@open-tomato/rafa/store'],
-    ['packages/rafa/src/effort/store/sqlite.ts', '@open-tomato/rafa/store/sqlite'],
-    ['packages/rafa/src/modules/testdata/fixture/package.json', '@open-tomato/rafa/modules/testdata/fixture/package.json'],
-  ])('spells %s as %s', (path, expected) => {
-    expect(packageSubpath(path)).toBe(expected);
-  });
-
-  it('parks a test at its path below src/ under the parked folder', () => {
-    expect(parkedPath('src/utils/tracker.test.ts')).toBe('src/tests/core-coupled/utils/tracker.test.ts');
-  });
-});
 
 describe('rewriteMovedPath', () => {
   const finals = new Map([['src/utils/git.ts', 'packages/rafa/src/utils/git.ts']]);
@@ -284,14 +264,6 @@ describe('metaPaths', () => {
   });
 });
 
-describe('readmeRow', () => {
-  it('writes a row of the parked-tests README', () => {
-    const row = readmeRow({ from: 'src/utils/git.test.ts', reaches: ['package.json', 'src/tests/git-identity.ts'], to: 'src/tests/core-coupled/utils/git.test.ts' });
-
-    expect(row).toBe('| `utils/git.test.ts` | `package.json`, `src/tests/git-identity.ts` |');
-  });
-});
-
 describe('the codemod under --dry-run, over a planted tree', () => {
   it('prints each list with its count and changes nothing', async () => {
     // Arrange
@@ -313,6 +285,21 @@ describe('the codemod under --dry-run, over a planted tree', () => {
     expect(result.out).toContain('3. importers rewritten: 15 specifier(s) in 5 file(s) outside the move, parked tests apart');
     expect(result.out).toContain('refused (0)');
     expect(result.out.at(-1)).toBe('dry run, nothing written.');
+  });
+
+  it('reads the same lists under an explicit --package=rafa as with no flag', async () => {
+    // Arrange
+    const root = plant();
+
+    // Act
+    const bare = await run([`--list=${LIST_PATH}`, '--dry-run'], root);
+    const named = await run([`--list=${LIST_PATH}`, '--package=rafa', '--dry-run'], root);
+
+    // Assert
+    expect(named.code).toBe(0);
+    expect(named.err).toEqual([]);
+    expect(named.out).toEqual(bare.out);
+    expect(named.out[0]).toBe('the package: packages/rafa/src/, imported as @open-tomato/rafa/');
   });
 });
 
@@ -668,6 +655,9 @@ describe('the codemod\'s command line', () => {
     ['two lists', ['--list=a.ts', '--list=b.ts']],
     ['an unknown flag', ['--list=a.ts', '--force']],
     ['two roots', ['--list=a.ts', 'a', 'b']],
+    ['a --package with no value', ['--list=a.ts', '--package=']],
+    ['a --package with no =', ['--list=a.ts', '--package']],
+    ['two packages', ['--list=a.ts', '--package=rafa-inventory', '--package=rafa-effort']],
   ])('answers the usage line and exit 2 for %s', async (_name, argv) => {
     const result = await run(argv);
 
@@ -687,10 +677,282 @@ describe('the codemod\'s command line', () => {
     expect(result.err.join('\n')).toContain('exports 0 arrays of FileMove');
   });
 
+  it.each([
+    ['no workspace member', 'rafa-nowhere', '--package=rafa-nowhere names no workspace member: packages/rafa-nowhere/package.json is absent'],
+    ['no rafa-<name> package', 'inventory', '--package=inventory names no rafa-<name> package'],
+  ])('exits 2 naming a --package that is %s, and writes nothing', async (_name, name, message) => {
+    // Arrange
+    const root = plant();
+    const before = snapshot(root);
+
+    // Act
+    const result = await run([`--list=${LIST_PATH}`, `--package=${name}`], root);
+
+    // Assert
+    expect(result.code).toBe(2);
+    expect(result.err).toEqual([message]);
+    expect(result.out).toEqual([]);
+    expect(snapshot(root)).toEqual(before);
+  });
+
   it('exits 2 naming a list that cannot load', async () => {
     const result = await run(['--list=/nowhere/list.ts', '--dry-run']);
 
     expect(result.code).toBe(2);
     expect(result.err.join('\n')).toContain('cannot load the move list /nowhere/list.ts');
+  });
+});
+
+/** The planted feature move's list path, under the planted root. */
+const FEATURE_LIST_PATH = 'scripts/codemod/moves/plant-feature.ts';
+
+/** The planted feature move: two files of two folders into `rafa-inventory`. */
+const FEATURE_MOVES: readonly { readonly from: string; readonly to: string }[] = [
+  { from: 'src/learning/learn.ts', to: 'packages/rafa-inventory/src/learning/learn.ts' },
+  { from: 'src/tiers/tier.ts', to: 'packages/rafa-inventory/src/tiers/tier.ts' },
+];
+
+const LEARN_TEXT = lines(
+  '/** Learns from the tier of src/tiers/tier.ts. */',
+  'import { sections } from \'@open-tomato/rafa/core/config/sections\';',
+  '',
+  'import { tier } from \'../tiers/tier.js\';',
+  '',
+  'export const learn = [sections, tier];',
+);
+
+/** The coupled test, its core import spelled with the `/index` core's subpath drops, so a kept text reads apart from a rewritten one. */
+const COUPLED_TEXT = lines(
+  'import { join } from \'node:path\';',
+  '',
+  'import { sections } from \'@open-tomato/rafa/core/config/index\';',
+  '',
+  'import { registry } from \'../config-registry.js\';',
+  '',
+  'import { tier } from \'./tier.js\';',
+  '',
+  'const CORPUS = join(import.meta.dir, \'testdata\', \'corpus\');',
+  'export const read = [sections, registry, tier, CORPUS];',
+);
+
+/** The tracked files of the planted tree with a feature package, by path. */
+const FEATURE_TREE: Readonly<Record<string, string>> = {
+  '.gitignore': 'node_modules/\n',
+  'tsconfig.json': JSON.stringify({
+    compilerOptions: {
+      baseUrl: '.',
+      paths: {
+        '@open-tomato/rafa-inventory': ['./packages/rafa-inventory/index.ts'],
+        '@open-tomato/rafa/*': ['./packages/rafa/src/*'],
+      },
+    },
+  }),
+  [FEATURE_LIST_PATH]: listText(FEATURE_MOVES),
+  'context/source.md': lines(
+    'Learning is `src/learning/learn.ts`, its tier `src/tiers/tier.ts`, tested by `src/tiers/tier.test.ts`',
+    'over `src/tiers/testdata/`; `src/commands/browse.ts` stays.',
+  ),
+  'packages/rafa/src/core/config/index.ts': 'export { sections } from \'./sections.js\';\n',
+  'packages/rafa/src/core/config/sections.ts': 'export const sections = 1;\n',
+  'packages/rafa-effort/index.ts': lines('export { tier } from \'../../src/tiers/tier.js\';'),
+  'packages/rafa-effort/package.json': '{"name":"@open-tomato/rafa-effort"}\n',
+  'packages/rafa-inventory/commands.ts': lines('import { tier } from \'../../src/tiers/tier.js\';', '', 'export const commands = [tier];'),
+  'packages/rafa-inventory/index.test.ts': lines(
+    'import { learn } from \'../../src/learning/learn.js\';',
+    '',
+    'import { learn as entry } from \'./index.js\';',
+    '',
+    'export const read = learn === entry;',
+  ),
+  'packages/rafa-inventory/index.ts': lines(
+    '/** The facade over src/learning/learn.ts. */',
+    'export { learn } from \'../../src/learning/learn.js\';',
+    'export { tier } from \'../../src/tiers/tier.js\';',
+  ),
+  'packages/rafa-inventory/package.json': '{"name":"@open-tomato/rafa-inventory"}\n',
+  'src/commands/browse.ts': lines('import { learn } from \'@open-tomato/rafa-inventory\';', '', 'export const browse = learn;'),
+  'src/commands/learn.test.ts': lines('import { learn } from \'../learning/learn.js\';', '', 'export const read = learn;'),
+  'src/config-registry.ts': 'export const registry = 1;\n',
+  'src/learning/learn.test.ts': lines(
+    'import { sections } from \'@open-tomato/rafa/core/config/sections\';',
+    '',
+    'import { learn } from \'./learn.js\';',
+    '',
+    'export const read = [sections, learn];',
+  ),
+  'src/learning/learn.ts': LEARN_TEXT,
+  'src/tiers/testdata/corpus/SKILL.md': 'A skill naming src/tiers/tier.ts.\n',
+  'src/tiers/tier.test.ts': COUPLED_TEXT,
+  'src/tiers/tier.ts': 'export const tier = 1;\n',
+};
+
+describe('the codemod under --package=rafa-inventory, over a planted tree', () => {
+  const root = plant({}, FEATURE_TREE);
+  const before = snapshot(root);
+  const dry = run([`--list=${FEATURE_LIST_PATH}`, '--package=rafa-inventory', '--dry-run'], root);
+  const result = dry.then(async (printed) => ({ printed, written: await run([`--list=${FEATURE_LIST_PATH}`, '--package=rafa-inventory'], root) }));
+
+  it('prints the lists under --dry-run and changes nothing', async () => {
+    const { printed } = await result;
+
+    expect(printed.err).toEqual([]);
+    expect(printed.code).toBe(0);
+    expect(printed.out[0]).toBe('the package: packages/rafa-inventory/src/, imported as @open-tomato/rafa-inventory/');
+    expect(printed.out).toContain('1. moved into the package (2)');
+    expect(printed.out).toContain('3. importers rewritten: 8 specifier(s) in 5 file(s) outside the move, parked tests apart');
+    expect(printed.out).toContain('4. moved files\' own specifiers rewritten (0)');
+    expect(printed.out).toContain('refused (0)');
+    expect(printed.out).toContain('  src/tiers/tier.test.ts:9 const CORPUS = join(import.meta.dir, \'testdata\', \'corpus\');');
+    expect(printed.out.at(-1)).toBe('dry run, nothing written.');
+    expect(Object.keys(before)).toContain('src/learning/learn.ts');
+  });
+
+  it('1. moves the listed files, their colocated test and the folder\'s testdata/ under the package\'s src/', async () => {
+    const { written } = await result;
+    const tracked = git(root, ['ls-files']).split('\n');
+
+    expect(written.err).toEqual([]);
+    expect(written.code).toBe(0);
+    expect(written.out).toContain('  src/learning/learn.ts -> packages/rafa-inventory/src/learning/learn.ts');
+    expect(written.out).toContain('  src/learning/learn.test.ts -> packages/rafa-inventory/src/learning/learn.test.ts');
+    expect(written.out).toContain('  src/tiers/testdata/corpus/SKILL.md -> packages/rafa-inventory/src/tiers/testdata/corpus/SKILL.md');
+    for (const path of ['learning/learn.ts', 'learning/learn.test.ts', 'tiers/tier.ts', 'tiers/testdata/corpus/SKILL.md']) {
+      expect(tracked).toContain(`packages/rafa-inventory/src/${path}`);
+      expect(existsSync(join(root, 'src', path))).toBe(false);
+    }
+    expect(read(root, 'packages/rafa-inventory/src/tiers/testdata/corpus/SKILL.md')).toBe(FEATURE_TREE['src/tiers/testdata/corpus/SKILL.md']!);
+  });
+
+  it('2 and 3. parks the coupled test under src/tests/inventory-coupled/, its README row relative to that folder', async () => {
+    const { written } = await result;
+
+    expect(written.out).toContain('  src/tiers/tier.test.ts -> src/tests/inventory-coupled/tiers/tier.test.ts');
+    expect(written.out).toContain('  | `tiers/tier.test.ts` | `src/config-registry.ts` |');
+    expect(existsSync(join(root, 'src/tiers/tier.test.ts'))).toBe(false);
+    expect(read(root, 'src/tests/inventory-coupled/tiers/tier.test.ts')).toBe(lines(
+      'import { join } from \'node:path\';',
+      '',
+      'import { sections } from \'@open-tomato/rafa/core/config/index\';',
+      '',
+      'import { registry } from \'../../../config-registry.js\';',
+      '',
+      'import { tier } from \'@open-tomato/rafa-inventory/tiers/tier\';',
+      '',
+      'const CORPUS = join(import.meta.dir, \'testdata\', \'corpus\');',
+      'export const read = [sections, registry, tier, CORPUS];',
+    ));
+  });
+
+  it('3. rewrites an importing test outside the move and another package\'s facade to the subpath', async () => {
+    await result;
+
+    expect(read(root, 'src/commands/learn.test.ts')).toBe(lines('import { learn } from \'@open-tomato/rafa-inventory/learning/learn\';', '', 'export const read = learn;'));
+    expect(read(root, 'packages/rafa-effort/index.ts')).toBe(lines('export { tier } from \'@open-tomato/rafa-inventory/tiers/tier\';'));
+    expect(read(root, 'src/commands/browse.ts')).toBe(FEATURE_TREE['src/commands/browse.ts']!);
+  });
+
+  it('3. rewrites the package\'s facade, its commands.ts and its index.test.ts to the relative path into src/', async () => {
+    await result;
+
+    expect(read(root, 'packages/rafa-inventory/index.ts')).toBe(lines(
+      '/** The facade over packages/rafa-inventory/src/learning/learn.ts. */',
+      'export { learn } from \'./src/learning/learn.js\';',
+      'export { tier } from \'./src/tiers/tier.js\';',
+    ));
+    expect(read(root, 'packages/rafa-inventory/commands.ts')).toContain('import { tier } from \'./src/tiers/tier.js\';');
+    expect(read(root, 'packages/rafa-inventory/index.test.ts')).toBe(lines(
+      'import { learn } from \'./src/learning/learn.js\';',
+      '',
+      'import { learn as entry } from \'./index.js\';',
+      '',
+      'export const read = learn === entry;',
+    ));
+  });
+
+  it('4. keeps a moved file\'s bare core specifier and its relative one to a second moved file', async () => {
+    await result;
+
+    expect(read(root, 'packages/rafa-inventory/src/learning/learn.ts')).toBe(lines(
+      '/** Learns from the tier of packages/rafa-inventory/src/tiers/tier.ts. */',
+      'import { sections } from \'@open-tomato/rafa/core/config/sections\';',
+      '',
+      'import { tier } from \'../tiers/tier.js\';',
+      '',
+      'export const learn = [sections, tier];',
+    ));
+    expect(read(root, 'packages/rafa-inventory/src/learning/learn.test.ts')).toBe(FEATURE_TREE['src/learning/learn.test.ts']!);
+  });
+
+  it('5. rewrites the moved and parked paths in prose', async () => {
+    await result;
+
+    expect(read(root, 'context/source.md')).toBe(lines(
+      'Learning is `packages/rafa-inventory/src/learning/learn.ts`, its tier `packages/rafa-inventory/src/tiers/tier.ts`, tested by `src/tests/inventory-coupled/tiers/tier.test.ts`',
+      'over `packages/rafa-inventory/src/tiers/testdata/`; `src/commands/browse.ts` stays.',
+    ));
+  });
+});
+
+describe('the codemod\'s refusals under --package=rafa-inventory', () => {
+  it.each([
+    [
+      'a to outside the package\'s source',
+      {},
+      [{ from: 'src/config-registry.ts', to: 'packages/rafa/src/config-registry.ts' }],
+      '  src/config-registry.ts:0 moves to packages/rafa/src/config-registry.ts, outside packages/rafa-inventory/src/',
+    ],
+    [
+      'a listed file whose relative specifier resolves outside the list and the package',
+      { 'src/tiers/rank.ts': 'import { registry } from \'../config-registry.js\';\nexport const rank = registry;\n' },
+      [{ from: 'src/tiers/rank.ts', to: 'packages/rafa-inventory/src/tiers/rank.ts' }],
+      '  src/tiers/rank.ts:1 \'../config-registry.js\' resolves to src/config-registry.ts, outside the move and the package',
+    ],
+  ])('writes nothing and exits 2 for %s', async (_name, extra, more, refusal) => {
+    // Arrange
+    const root = plant(extra, FEATURE_TREE);
+    write(root, { [FEATURE_LIST_PATH]: listText([...FEATURE_MOVES, ...more]) });
+    const before = snapshot(root);
+
+    // Act
+    const result = await run([`--list=${FEATURE_LIST_PATH}`, '--package=rafa-inventory'], root);
+
+    // Assert
+    expect(result.code).toBe(2);
+    expect(result.out).toContain(refusal);
+    expect(result.out.at(-1)).toBe('refused, nothing written.');
+    expect(snapshot(root)).toEqual(before);
+  });
+});
+
+/** A build file and the root manifest naming moved paths, and a script outside the build naming one as the control. */
+const BUILD_FILES: Readonly<Record<string, string>> = {
+  'package.json': `${JSON.stringify({ scripts: { build: 'bun build src/tiers/tier.ts --outfile=dist/tier.js' } }, null, 2)}\n`,
+  'scripts/build/bundle.ts': lines(
+    '/** The entries, built with --root=src; src/learning/learn.ts is one. */',
+    'export const LIBRARY_ENTRIES: readonly string[] = [\'src/learning/learn.ts\', \'src/commands/browse.ts\'];',
+  ),
+  'scripts/report.ts': lines('export const LEARN = \'src/learning/learn.ts\';'),
+};
+
+describe('the codemod under --package=rafa-inventory, over the build\'s files', () => {
+  const root = plant(BUILD_FILES, FEATURE_TREE);
+  const result = run([`--list=${FEATURE_LIST_PATH}`, '--package=rafa-inventory'], root);
+
+  it('5. lists the moved paths of scripts/build/ and the root package.json and leaves their text', async () => {
+    const { code, out } = await result;
+
+    expect(code).toBe(0);
+    expect(out).toContain('5. left to the move task: moved paths in the build\'s files, left as written (3)');
+    expect(out).toContain('  package.json:3 src/tiers/tier.ts -> packages/rafa-inventory/src/tiers/tier.ts');
+    expect(out).toContain('  scripts/build/bundle.ts:1 src/learning/learn.ts -> packages/rafa-inventory/src/learning/learn.ts');
+    expect(out).toContain('  scripts/build/bundle.ts:2 src/learning/learn.ts -> packages/rafa-inventory/src/learning/learn.ts');
+    expect(read(root, 'scripts/build/bundle.ts')).toBe(BUILD_FILES['scripts/build/bundle.ts']!);
+    expect(read(root, 'package.json')).toBe(BUILD_FILES['package.json']!);
+  });
+
+  it('5. rewrites the same path in a script outside the build, the control that the path is read', async () => {
+    await result;
+
+    expect(read(root, 'scripts/report.ts')).toBe(lines('export const LEARN = \'packages/rafa-inventory/src/learning/learn.ts\';'));
   });
 });

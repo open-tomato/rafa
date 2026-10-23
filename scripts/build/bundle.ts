@@ -1,5 +1,5 @@
 /**
- * The published JavaScript build: the two `bun build` runs of the root
+ * The published JavaScript build: the three `bun build` runs of the root
  * `build` script, each with every publishable workspace package left
  * external, and a guard that fails the build when a bundle holds a file
  * of one anyway.
@@ -24,9 +24,10 @@
  *      `<name>/<subpath>` before it resolves the import: the bundle keeps
  *      the bare specifier. A private member (`@open-tomato/rafa-core`)
  *      stays bundled, as it was before this script;
- *   2. runs the two builds of {@link bundlesFor}: `src/rafa.ts` alone to
- *      `<out>/cli.js`, and the six library entries together with
- *      `--splitting --root=src` into `<out>/`. Each runs as
+ *   2. runs the three builds of {@link bundlesFor}: `src/rafa.ts` alone
+ *      to `<out>/cli.js`, the five library entries under `src/` together
+ *      with `--splitting --root=src` into `<out>/`, and the learning
+ *      entry alone to `<out>/learning/index.js`. Each runs as
  *      `process.execPath build …` with its working directory at the root
  *      and `--metafile` pointed into a scratch directory, as
  *      `scripts/survey/import-graph.ts`'s `readMetafile` does. A build
@@ -60,15 +61,23 @@ export const NO_EXTERNALS_FLAG = '--no-externals';
 /** The flags that take a value. */
 const VALUE_FLAGS: readonly string[] = ['--root', '--out'];
 
-/** The six library entries, built together so their shared code sits in one set of chunks. */
+/** The five library entries under `src/`, built together so their shared code sits in one set of chunks. */
 export const LIBRARY_ENTRIES: readonly string[] = [
   'src/index.ts',
   'src/plan/index.ts',
   'src/effort/store/index.ts',
   'src/ports/index.ts',
-  'src/learning/index.ts',
   'src/config/index.ts',
 ];
+
+/**
+ * The entry of the root's `./learning` subpath, in the inventory package
+ * since pass 4a (#808). It lies outside `src/`, so the `--root=src` of
+ * the library build would write it outside `<out>/`; it imports nothing
+ * but `node:crypto` and shares no code with the other entries, so it is
+ * built alone to `<out>/learning/index.js` instead.
+ */
+export const LEARNING_ENTRY = 'packages/rafa-inventory/src/learning/index.ts';
 
 /** One `bun build` run of the script. */
 export interface BundleSpec {
@@ -79,12 +88,13 @@ export interface BundleSpec {
 }
 
 /**
- * The two builds, in the order the `build` script ran them.
+ * The three builds: the two in the order the `build` script ran them,
+ * then the learning entry's.
  *
  * @param out - The output directory as the lines spell it: `dist`, or the
  *   `--out` value.
  * @param outPath - The same directory as `bun build` is handed it.
- * @returns The CLI bundle, then the library build.
+ * @returns The CLI bundle, the library build, then the learning bundle.
  */
 export function bundlesFor(out: string, outPath: string): BundleSpec[] {
   const dir = out.replace(/\/+$/, '');
@@ -96,6 +106,10 @@ export function bundlesFor(out: string, outPath: string): BundleSpec[] {
     {
       label: `${dir}/`,
       args: [...LIBRARY_ENTRIES, '--target=bun', '--splitting', '--root=src', `--outdir=${outPath}`],
+    },
+    {
+      label: posix.join(dir, 'learning', 'index.js'),
+      args: [LEARNING_ENTRY, '--target=bun', `--outfile=${join(outPath, 'learning', 'index.js')}`],
     },
   ];
 }
@@ -279,12 +293,12 @@ function runBuild(
 }
 
 /**
- * The command: builds both bundles in the root, guards each, and writes
+ * The command: builds every bundle in the root, guards each, and writes
  * the lines.
  *
  * @param args - The arguments after the script path.
  * @param write - Where each line goes.
- * @returns The exit code: 0 when both bundles built and hold no file of
+ * @returns The exit code: 0 when every bundle built and holds no file of
  *   a publishable package, 1 otherwise.
  */
 export function main(args: readonly string[], write: (line: string) => void): number {

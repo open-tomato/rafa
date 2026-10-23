@@ -6,7 +6,7 @@
  * run cannot reach.
  *
  * Every row is an {@link InventoryRecord} of kind `agent` as
- * `buildInventory` (`src/inventory/index.ts`) decides it, so
+ * `buildInventory` (`packages/rafa-inventory/src/inventory/index.ts`) decides it, so
  * precedence, `collision`, `shadowed-by:` and `visibleToLoop` are
  * decided there and only there, and this command filters and prints
  * them. A `collision` row is one of two loaded tiers' different

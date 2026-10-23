@@ -9,7 +9,7 @@
  * INSTALLED, where each one comes from, which holder of a name answers,
  * and which of them a session the loop spawns can reach. Every row is
  * an {@link InventoryRecord} of kind `skill` as `buildInventory`
- * (`src/inventory/index.ts`) decides it, so precedence, `collision`,
+ * (`packages/rafa-inventory/src/inventory/index.ts`) decides it, so precedence, `collision`,
  * `shadowed-by:`, `disabled:` and `visibleToLoop` are decided there and
  * only there, and this command filters and prints them.
  *

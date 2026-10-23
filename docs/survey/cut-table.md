@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2167 files, 2139 of them in 12 packages (618 left to place) and 28 in 3 unassigned folders. Of the 4811 edges between two files neither of which is a test, value and type alike, 107 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2168 files, 2140 of them in 12 packages (626 left to place) and 28 in 3 unassigned folders. Of the 4811 edges between two files neither of which is a test, value and type alike, 107 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -13,7 +13,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 1 | `rafa-eslint-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 3 | `@open-tomato/rafa-core` | 295 | 168 | 121 | 6 | 0 | 0 | 0 |
-| 4 | `rafa-inventory` | 112 | 56 | 56 | 0 | 0 | 0 | 0 |
+| 4 | `rafa-inventory` | 105 | 56 | 49 | 0 | 0 | 0 | 0 |
 | 5 | `rafa-board` | 341 | 155 | 179 | 7 | 33 | 0 | 33 |
 | 6 | `rafa-pr` | 215 | 93 | 120 | 2 | 55 | 0 | 55 |
 | 7 | `rafa-run` | 284 | 121 | 163 | 0 | 18 | 0 | 18 |
@@ -21,7 +21,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 9 | `rafa-effort` | 66 | 34 | 32 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 660 | 176 | 458 | 26 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 668 | 176 | 466 | 26 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -32,7 +32,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-eslint-config` | `packages/eslint-config/` (0) | - |
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
 | `@open-tomato/rafa-core` | `packages/rafa/` (295) | - |
-| `rafa-inventory` | `src/inventory/` (26), `src/tiers/` (13), `src/schema/` (11), `src/backfill/` (10), `src/demote/` (10), `src/learning/` (10), `src/check/` (8), `src/task/` (8), `src/agents/` (4), `packages/rafa-inventory/` (0), `src/bundled/` (0) | `src/adapters/learning/held.ts`, `src/adapters/learning/local.ts`, `src/plan/risk/commands.ts`, `src/plan/risk/long-runs.ts`, `src/report/lessons.ts`, `src/start/serving.ts` |
+| `rafa-inventory` | `packages/rafa-inventory/` (104), `src/tiers/` (1), `src/agents/` (0), `src/backfill/` (0), `src/bundled/` (0), `src/check/` (0), `src/demote/` (0), `src/inventory/` (0), `src/learning/` (0), `src/schema/` (0), `src/task/` (0) | - |
 | `rafa-board` | `src/board/` (136), `src/commands/issue/` (44), `src/board/project/` (43), `src/commands/epic/` (35), `src/adapters/tracker/` (19), `src/refs/` (13), `src/commands/board/` (8), `packages/rafa-board/` (0) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts`, `src/bugs/cause-rule.ts`, `src/commands/doctor-refs.ts`, `src/commands/plan/refs-check.ts`, `src/config-schema-board-project.ts`, `src/config-schema-issues.ts`, `src/epic/verify-plan.ts`, `src/next/hop-chain.ts`, `src/next/relation-readings.ts` |
 | `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (65), `src/triage/` (36), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/bugs/fill.ts`, `src/bugs/versions.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/config-schema-readings.ts`, `src/config-schema-triage.ts`, `src/docs/open-lines.ts`, `src/docs/release-issue.ts`, `src/docs/task-reading.ts`, `src/next/owner-gate.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/pr/index.ts` |
 | `rafa-run` | `src/start/` (175), `src/claims/` (19), `src/suite/` (18), `src/commands/claim/` (15), `src/preflight/` (8), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/config-schema-checks.ts`, `src/config-schema-loop-continue.ts`, `src/config-schema-loop-retries.ts`, `src/config-schema-tests.ts`, `src/config-schema-wrap-up.ts`, `src/epic/verify-run.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/plan/validate.ts`, `src/runtime/install.ts`, `src/start/branch-decision.ts` |
@@ -92,7 +92,7 @@ None.
 
 ## Files left to place
 
-No rule holds these 618 files. By folder, with the upward edges that end on its files:
+No rule holds these 626 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
@@ -126,7 +126,7 @@ No rule holds these 618 files. By folder, with the upward edges that end on its 
 | `src/ports/` | 1 | 1 | 0 |
 | `src/project/` | 11 | 6 | 0 |
 | `src/status/` | 19 | 9 | 0 |
-| `src/tests/` | 231 | 23 | 0 |
+| `src/tests/` | 232 | 23 | 0 |
 | `src/tests/core-coupled/` | 4 | 0 | 0 |
 | `src/tests/core-coupled/adapters/logger/` | 3 | 0 | 0 |
 | `src/tests/core-coupled/bugs/` | 3 | 0 | 0 |
@@ -147,6 +147,11 @@ No rule holds these 618 files. By folder, with the upward edges that end on its 
 | `src/tests/core-coupled/schema/` | 1 | 0 | 0 |
 | `src/tests/core-coupled/start/` | 1 | 0 | 0 |
 | `src/tests/core-coupled/utils/` | 3 | 0 | 0 |
+| `src/tests/inventory-coupled/adapters/learning/` | 1 | 0 | 0 |
+| `src/tests/inventory-coupled/agents/` | 2 | 0 | 0 |
+| `src/tests/inventory-coupled/inventory/search/` | 1 | 0 | 0 |
+| `src/tests/inventory-coupled/plan/risk/` | 1 | 0 | 0 |
+| `src/tests/inventory-coupled/tiers/` | 2 | 0 | 0 |
 | `src/tools/ts-symbols/` | 2 | 1 | 0 |
 | `src/tools/ts-symbols/fixtures/proj/src/` | 2 | 2 | 0 |
 | `src/utils/` | 3 | 2 | 0 |

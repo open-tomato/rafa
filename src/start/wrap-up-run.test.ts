@@ -90,8 +90,8 @@ import type { ReleaseFinish } from './release-stage.js';
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
-import type { Instinct } from '../schema/instinct.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -104,13 +104,13 @@ import ts from 'typescript';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { localInstinctsDir } from '../adapters/learning/local.js';
 import { assumptionsHeading } from '../board/review-stamp.js';
-import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
-import { writeInstinct } from '../schema/instinct.js';
 import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';

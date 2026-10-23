@@ -25,7 +25,7 @@
  * is held beside the frontmatter it did fill, so a fix that wrote
  * nothing at all would redden the same case.
  */
-import type { CheckIssue, CheckReport } from '../check/run.js';
+import type { CheckIssue, CheckReport } from '@open-tomato/rafa-inventory/check/run';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

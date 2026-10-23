@@ -12,7 +12,8 @@
  * the suite relies on. A child process a test spawns runs no preload:
  * its script calls the roots itself before it reads either registry. `bun test` run from inside a
  * workspace package reads no `bunfig.toml` of the root, so that
- * package's suite runs with nothing registered.
+ * package's suite runs with nothing registered unless the package names
+ * a preload of its own, as `packages/rafa-inventory/bunfig.toml` does.
  */
 import { registerCoreAdapters } from '../adapter-registry.js';
 import { registerCoreConfigSections } from '../config-registry.js';

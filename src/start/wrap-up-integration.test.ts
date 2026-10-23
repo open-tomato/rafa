@@ -24,8 +24,8 @@
  * with a bare `origin`, with the recorded `gh` fake as the provider.
  */
 import type { ReleaseStageSettings } from './release-stage.js';
-import type { Instinct } from '../schema/instinct.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
+import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,14 +36,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
+import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { localInstinctsDir } from '../adapters/learning/local.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { writeInstinct } from '../schema/instinct.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { retargetedLine, retargetPullRequest } from './pr-retarget.js';

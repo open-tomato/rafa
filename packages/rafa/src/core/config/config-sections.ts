@@ -167,11 +167,11 @@
  * back.
  *
  * The range {@link confidence} accepts, {@link CONFIDENCE_MIN} to
- * {@link CONFIDENCE_MAX}, is declared here and not read from the
- * learning library: core imports nothing above it, and `src/learning/`
- * imports nothing from the rest of `src/`, so each declares the pair the
- * library clamps every lesson's confidence to, and
- * `src/tests/learning-contract.test.ts` holds the two equal.
+ * {@link CONFIDENCE_MAX}, is declared here and not read from the learning
+ * library: core imports nothing above it, and the library under
+ * `packages/rafa-inventory/src/learning/` imports nothing outside its folder,
+ * so each declares the pair the library clamps every lesson's confidence to,
+ * and `src/tests/learning-contract.test.ts` holds the two equal.
  *
  * The reader of `pr.mergeMethod`, over the pull request port's three
  * methods, is not here: it sits with the setting it reads, in

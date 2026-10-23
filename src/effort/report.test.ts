@@ -137,8 +137,8 @@ import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 import { writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 import { writeTriage } from '@open-tomato/rafa/store/triage';
+import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 import { expectExit } from '../tests/cli-capture.js';
 
 import { PROMPT_SHAPES } from './classify.js';

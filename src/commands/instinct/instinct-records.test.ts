@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
+import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 import {
   isRecordFile,
   readRecord,
@@ -32,7 +32,7 @@ import {
   readScopes,
   recordFiles,
   recordId,
-} from '../../schema/scope-records.js';
+} from '@open-tomato/rafa-inventory/schema/scope-records';
 
 import { findRecords, LEARNING_STORE_FILES } from './instinct-records.js';
 

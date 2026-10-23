@@ -2,8 +2,8 @@
  * Where a skill and an instinct live: the three skill tiers, the two
  * instinct scopes, and the paths each resolves to.
  *
- * `src/check/layout.ts` answers what one directory holds and
- * `src/check/run.ts` checks it; neither knows which directory it was
+ * `packages/rafa-inventory/src/check/layout.ts` answers what one directory holds and
+ * `packages/rafa-inventory/src/check/run.ts` checks it; neither knows which directory it was
  * handed or why. This module is the other half: it answers WHICH
  * directories exist to be checked, so `rafa skill list` and every later
  * writer name a tier rather than a path, and one place carries the
@@ -27,14 +27,14 @@
  *
  * The bundle is `dist/cli.js` and its skills sit in `dist/bundled/`
  * beside it, so the tier is `dirname(entry)/bundled/skills`. The
- * `bundled/` parent keeps the tier apart from `src/agents/`, which
- * holds TypeScript, and gives the rafa tier's agents and programs
- * (`bundled/agents`, `bundled/bin`) one home beside its skills. The entry is resolved through
- * {@link realEntry} because the installed rafa is reached through a
- * link — `~/.rafa/bin/rafa` points into `~/.rafa/runtime/<version>/` —
- * and the skills of a runtime sit in that runtime's directory, not in
- * `bin/`. `src/start/runtime.ts` compares entries the same way and for
- * the same reason.
+ * `bundled/` parent keeps the tier apart from
+ * `packages/rafa-inventory/src/agents/`, which holds TypeScript, and gives the
+ * rafa tier's agents and programs (`bundled/agents`, `bundled/bin`) one home
+ * beside its skills. The entry is resolved through {@link realEntry} because
+ * the installed rafa is reached through a link — `~/.rafa/bin/rafa` points into
+ * `~/.rafa/runtime/<version>/` — and the skills of a runtime sit in that
+ * runtime's directory, not in `bin/`. `src/start/runtime.ts` compares entries
+ * the same way and for the same reason.
  *
  * Run from the checkout as `bun src/rafa.ts`, the entry is
  * `src/rafa.ts` and the tier resolves to `src/bundled/skills`, the

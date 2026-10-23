@@ -158,6 +158,7 @@ import { writePositionFile } from '@open-tomato/rafa/project/position';
 import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
 
 import { version } from '../../package.json';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
@@ -179,7 +180,6 @@ import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
 import { BOARDS_HEADING, unresolvedOwnerMessage } from './doctor-boards.js';

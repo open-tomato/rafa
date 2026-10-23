@@ -3,11 +3,11 @@
  * skills directory, in the two halves the spec separates — a report
  * written with nothing moved, and a reviewed report applied.
  *
- * The work is `src/demote/`'s: `select.ts` answers which directory and
- * which files, `classify.ts` what each file is, `draft.ts` the report a
- * run writes, `report.ts` how it is spelled, and `apply.ts` what a
- * reviewed one does. This module is the declaration, the reading of the
- * line, and the lines a run prints.
+ * The work is `packages/rafa-inventory/src/demote/`'s: `select.ts` answers
+ * which directory and which files, `classify.ts` what each file is, `draft.ts`
+ * the report a run writes, `report.ts` how it is spelled, and `apply.ts` what a
+ * reviewed one does. This module is the declaration, the reading of the line,
+ * and the lines a run prints.
  *
  * ## The two halves, and why they are one command
  *

@@ -28,10 +28,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { createLocalLearning, localInstinctsDir } from '../../adapters/learning/local.js';
 import { projectConfigText } from '../../project/scaffold.js';
-import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { blankReasonMessage, createInstinctFlagCommand, refusedFlagMessage } from './flag.js';

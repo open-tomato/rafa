@@ -24,10 +24,10 @@
  * control for the reason, which is absent there.
  */
 import type { PromotedCheck } from './promoted-check.js';
-import type { InstinctRecord } from '../learning/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { Instinct } from '../schema/instinct.js';
 import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,12 +36,12 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { parseInstinct, writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
-import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/index.js';
-import { parseInstinct, writeInstinct } from '../schema/instinct.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

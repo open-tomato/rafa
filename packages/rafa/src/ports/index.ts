@@ -67,7 +67,7 @@
  *     {@link BlessedBundle}, {@link MergeRule}, {@link MergeDecision} and
  *     {@link MergeResult} are declared in `./learning.ts` and re-exported
  *     here under the same names. The learning library declares its own
- *     six in `src/learning/types.ts`, since neither side may import the
+ *     six in `packages/rafa-inventory/src/learning/types.ts`, since neither side may import the
  *     other, and `src/tests/learning-contract.test.ts` holds each pair
  *     mutually assignable.
  *   - {@link Output}: open-tomato's `packages/shared/cli-core`, the

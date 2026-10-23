@@ -10,6 +10,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
+import { SKILL_ISSUE_CODES } from '@open-tomato/rafa-inventory/schema/skill';
 
 import {
   AGENT_ISSUE_CODES,
@@ -17,7 +18,6 @@ import {
   checkAgentFrontmatter,
   parseAgentFrontmatter,
 } from './agent.js';
-import { SKILL_ISSUE_CODES } from './skill.js';
 
 /** The two required fields, filled. */
 const MINIMAL = {

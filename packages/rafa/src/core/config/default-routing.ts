@@ -2,7 +2,7 @@
  * rafa's routing defaults: which agent a task of each shape goes to
  * when no config layer says otherwise.
  *
- * The table moved here from `src/tiers/routing.ts`, which re-exports
+ * The table moved here from `packages/rafa-inventory/src/tiers/routing.ts`, which re-exports
  * each name, so `core-section.ts` reads {@link DEFAULT_ROUTING} without
  * importing above core. What the rows mean, and why the map is one
  * shared `Map` while the list is frozen, is `routing.ts`'s module note.

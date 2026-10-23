@@ -13,7 +13,7 @@
  * Three jobs:
  *
  *  - Hold the class set closed from both ends, the way
- *    `src/check/references.test.ts` holds its issue codes.
+ *    `packages/rafa-inventory/src/check/references.test.ts` holds its issue codes.
  *    {@link EVERY_CLASS} carries one input per class and the class it
  *    must produce, and the closed-set case asserts the classes it
  *    produced are exactly `TRIAGE_CLASSES` — so a class added to the

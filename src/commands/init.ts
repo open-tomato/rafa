@@ -141,7 +141,7 @@
  *
  * ## The agent warning
  *
- * `vendorableAgents` (`src/agents/vendorable.ts`) then reads the plans
+ * `vendorableAgents` (`packages/rafa-inventory/src/agents/vendorable.ts`) then reads the plans
  * under the config's `plan.dir`, and a warning is written for every
  * `agent=` of a still-to-run task that resolves only in
  * `~/.claude/agents` under the resolved `loop.settingSources`, naming
@@ -158,7 +158,7 @@
  *
  * `init` writes nothing under `.claude/`, the project's or the home's.
  * rafa's own agents and skills are its rafa tier, `bundled/` beside the
- * entry, served per session (`src/tiers/serve.ts`), so a new project
+ * entry, served per session (`packages/rafa-inventory/src/tiers/serve.ts`), so a new project
  * routes to the core roster with no copy made. The one command that
  * does copy an agent into `.claude/agents` is `rafa agent vendor`,
  * which only the warning above names and which `init` never runs.
