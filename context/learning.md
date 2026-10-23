@@ -6,7 +6,7 @@ The local adapter holds lessons in `.rafa/instincts/`, logs every merge
 decision, and the wrap-up writes those lessons into the pages that own their
 subjects.
 
-## The library: `src/learning/`
+## The library: `packages/rafa-inventory/src/learning/`
 
 Pure, self-contained, and published as `@open-tomato/rafa/learning`. No
 filesystem, no clock, no randomness. Imported by the port and by the

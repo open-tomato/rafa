@@ -29,7 +29,7 @@ module's note is the long form.
 | `packages/rafa/src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
-| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `src/backfill/` over one directory |
+| `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `packages/rafa-inventory/src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `packages/rafa-inventory/src/backfill/` over one directory |
 | `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; and `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what only `instinct list` and `instinct show` use: the id lookup and the project a command context carries |
 | `packages/rafa-inventory/src/schema/scope-records.ts` | the two instinct scopes read as records: which files in a scope are records, what one file reads as, `readScope` and `readScopes`; read by both commands, the local Learning adapter and the skills report |
@@ -1845,116 +1845,108 @@ New; it replaces no earlier text. What a row or an action added to
   `loop.settingSources` and the warnings are the result's `data`, `text`
   holding the file under `--full` alone.
 - **`skill search "<question>" [--all] [--no-model]` finds the skills that
-  answer a question** (`src/commands/skill/search.ts`, through `runSearch`
-  and `rankSearch` of `src/inventory/search/`). The inventory is built
-  through `projectInventory`, as `skill list` builds it. Each kind
-  searched is one `runSearch`: the ranking by the question's words, one
-  `haiku` session in a scratch copy of the top twelve, the quote check
-  against the file and one `search` effort row, stored in the store
-  `selectEffortStore` opens from the project's config. `--all` searches
-  agent definitions as well, skills first, one session per kind, since a
-  candidate is keyed by its name and a skill and an agent may share one.
-  `--no-model` runs the ranking alone, prints it and stops: no session
-  starts, no scratch copy is made and no effort row is written. The
-  command's `spends` declaration is `unless --no-model`, so the spend
-  guard warns about a session a run carrying that flag would start. Text mode
-  prints, per kind, a heading naming the kind, the question and the
-  project, then the kept matches with each quote and its `path:line` and
-  the dropped line, or "not answerable from these files", or the numbered
-  ranking (under `--no-model`, and after a `warn:` notice of a fallback
-  when the session gave no usable answer), or `(no skill ranks for these
-  words)` when no session starts. The parser's issues and an effort row
-  that was not stored are `warn:` lines. The exit code is 0 whatever is
-  found; 1 for no question or two, a blank one, a value read into
-  `--all` or `--no-model`, and a config `loadConfig` refuses. The
-  switches are read ahead of the question through `readSwitch`, since
-  `--all "<question>"` hands the question to `--all`. In json mode the
-  result's `data` holds the project, `loop.settingSources`, the
-  question, `model`, the warnings and one entry per kind: the runner's
-  outcome, or `status: ranked` with the ranking under `--no-model`.
-- **`skill demote <dir> [--apply]` runs the demotion pass over one
-  skills directory** (`src/commands/skill/demote.ts`, over
-  `src/demote/`). `<dir>` must be a `<base>/.claude/skills`, and
-  `<base>` decides the scope: the home makes it `user`, writing to
-  `~/.rafa/`, and any other base a `project` one, writing under that
-  base's `.rafa/`. Anything else is refused, which is why this command
-  runs INSIDE a project where the two checkers do not — the home is
-  what tells the scopes apart, and it is read off the project the
-  dispatcher resolved, as `skill list` reads its own. `<dir>` resolves
-  against the working directory, the command's one seam.
-  Without `--apply` it selects every `<name>/SKILL.md` and, by
-  `origin`, the `learned/*.md` files (`packages/rafa-inventory/src/demote/select.ts`),
-  classifies each (`packages/rafa-inventory/src/demote/classify.ts`) and writes
-  `<base>/.rafa/demoted/report.md` (`packages/rafa-inventory/src/demote/draft.ts`,
-  `packages/rafa-inventory/src/demote/report.ts`), MOVING NOTHING. A report already there has
-  each override carried onto the row for the same path whose hash is
-  unchanged, and keeps `status: reviewed` only when the row set is
-  identical; a report that does not parse is warned about and carried
-  from not at all.
-  With `--apply` it reads that report back and refuses the whole run
-  when it is missing, does not parse, or is still `draft`. Then, one
-  row at a time (`packages/rafa-inventory/src/demote/apply.ts`): an observation becomes a
-  record under `<base>/.rafa/instincts/`, run through `checkFile` with
-  NO project root — which is how `instinct check` runs — before it is
-  written, with the original moved under `<base>/.rafa/demoted/` at its
-  relative path; a procedure `SKILL.md` is left where it is and a
-  procedure `learned/<name>.md` moves to `<dir>/<name>/SKILL.md`; an
-  unclassified row the review did not decide is left alone. A row whose
-  file changed since the report, whose file is gone with nothing
-  matching at its destination, whose record the conversion refuses and
-  whose record the checker fails are each refused ALONE, so one stale
-  row does not throw away a review of 124. A second `--apply` reads the
-  moved rows as `done` and changes nothing.
-  `skill backfill` rewrites the frontmatter of every skill the demotion
-  KEPT, so once it has run every surviving row of that report carries a
-  stale hash, and a re-`--apply` answers a wall of `file changed since
-  the report was written` that is hash drift and no reading at all
-  about the demotion. To count afterwards what a report turned into,
-  read the report with `parseDemotionReport` and `effectiveVerdict` and
-  match each observation row against the instinct scope's
-  `evidence[].path` through `readFrontmatter`; never re-run `--apply`
-  to measure.
-  The exit code is the number of rows refused, capped at 255, and 1 is
-  kept for the refusals above and for no directory, a second word and
-  an `--apply` that read the directory as its value. In json mode the
-  counts, or the per-row actions, are the result's `data` on a run that
-  refused no row.
-- **`skill backfill <dir> [--propose|--apply] [--project=<root>]` fills
-  in the fields a skills directory lacks** (`src/commands/skill/backfill.ts`,
-  over `src/backfill/`). `<dir>` is read as `skill demote` reads it —
-  a `<base>/.claude/skills`, the home making it `user` and any other
-  base a `project` one — and everything the run writes outside the
-  skills directory goes under that `<base>/.rafa/backfill/`. So this
-  command too runs INSIDE a project, and `<dir>` and `--project`
-  resolve against the working directory, the command's one path seam;
-  the spawner each session runs through is its other.
-  With no flag the run PLANS: `planDerivation` (`packages/rafa-inventory/src/backfill/derive.ts`)
-  answers what `stack`, `paths` and `when_to_use` would be written,
-  `selectProposals` (`packages/rafa-inventory/src/backfill/proposal-batch.ts`) counts the files
-  a session would be asked about, and NOTHING is written.
-  With `--propose` it runs `runProposalPass` (`packages/rafa-inventory/src/backfill/propose.ts`):
-  one `claude -p` session per batch of twenty through the capturing
-  spawner of `packages/rafa/src/core/loop/claude.ts`, the setting sources
+  answer a question** (`src/commands/skill/search.ts`, through `runSearch` and
+  `rankSearch` of `packages/rafa-inventory/src/inventory/search/`). The
+  inventory is built through `projectInventory`, as `skill list` builds it. Each
+  kind searched is one `runSearch`: the ranking by the question's words, one
+  `haiku` session in a scratch copy of the top twelve, the quote check against
+  the file and one `search` effort row, stored in the store `selectEffortStore`
+  opens from the project's config. `--all` searches agent definitions as well,
+  skills first, one session per kind, since a candidate is keyed by its name and
+  a skill and an agent may share one. `--no-model` runs the ranking alone,
+  prints it and stops: no session starts, no scratch copy is made and no effort
+  row is written. The command's `spends` declaration is `unless --no-model`, so
+  the spend guard warns about a session a run carrying that flag would start.
+  Text mode prints, per kind, a heading naming the kind, the question and the
+  project, then the kept matches with each quote and its `path:line` and the
+  dropped line, or "not answerable from these files", or the numbered ranking
+  (under `--no-model`, and after a `warn:` notice of a fallback when the session
+  gave no usable answer), or `(no skill ranks for these words)` when no session
+  starts. The parser's issues and an effort row that was not stored are `warn:`
+  lines. The exit code is 0 whatever is found; 1 for no question or two, a blank
+  one, a value read into `--all` or `--no-model`, and a config `loadConfig`
+  refuses. The switches are read ahead of the question through `readSwitch`,
+  since `--all "<question>"` hands the question to `--all`. In json mode the
+  result's `data` holds the project, `loop.settingSources`, the question,
+  `model`, the warnings and one entry per kind: the runner's outcome, or
+  `status: ranked` with the ranking under `--no-model`.
+- **`skill demote <dir> [--apply]` runs the demotion pass over one skills
+  directory** (`src/commands/skill/demote.ts`, over
+  `packages/rafa-inventory/src/demote/`). `<dir>` must be a
+  `<base>/.claude/skills`, and `<base>` decides the scope: the home makes it
+  `user`, writing to `~/.rafa/`, and any other base a `project` one, writing
+  under that base's `.rafa/`. Anything else is refused, which is why this
+  command runs INSIDE a project where the two checkers do not — the home is what
+  tells the scopes apart, and it is read off the project the dispatcher
+  resolved, as `skill list` reads its own. `<dir>` resolves against the working
+  directory, the command's one seam. Without `--apply` it selects every
+  `<name>/SKILL.md` and, by `origin`, the `learned/*.md` files
+  (`packages/rafa-inventory/src/demote/select.ts`), classifies each
+  (`packages/rafa-inventory/src/demote/classify.ts`) and writes
+  `<base>/.rafa/demoted/report.md`
+  (`packages/rafa-inventory/src/demote/draft.ts`,
+  `packages/rafa-inventory/src/demote/report.ts`), MOVING NOTHING. A report
+  already there has each override carried onto the row for the same path whose
+  hash is unchanged, and keeps `status: reviewed` only when the row set is
+  identical; a report that does not parse is warned about and carried from not
+  at all. With `--apply` it reads that report back and refuses the whole run
+  when it is missing, does not parse, or is still `draft`. Then, one row at a
+  time (`packages/rafa-inventory/src/demote/apply.ts`): an observation becomes a
+  record under `<base>/.rafa/instincts/`, run through `checkFile` with NO
+  project root — which is how `instinct check` runs — before it is written, with
+  the original moved under `<base>/.rafa/demoted/` at its relative path; a
+  procedure `SKILL.md` is left where it is and a procedure `learned/<name>.md`
+  moves to `<dir>/<name>/SKILL.md`; an unclassified row the review did not
+  decide is left alone. A row whose file changed since the report, whose file is
+  gone with nothing matching at its destination, whose record the conversion
+  refuses and whose record the checker fails are each refused ALONE, so one
+  stale row does not throw away a review of 124. A second `--apply` reads the
+  moved rows as `done` and changes nothing. `skill backfill` rewrites the
+  frontmatter of every skill the demotion KEPT, so once it has run every
+  surviving row of that report carries a stale hash, and a re-`--apply` answers
+  a wall of `file changed since the report was written` that is hash drift and
+  no reading at all about the demotion. To count afterwards what a report turned
+  into, read the report with `parseDemotionReport` and `effectiveVerdict` and
+  match each observation row against the instinct scope's `evidence[].path`
+  through `readFrontmatter`; never re-run `--apply` to measure. The exit code is
+  the number of rows refused, capped at 255, and 1 is kept for the refusals
+  above and for no directory, a second word and an `--apply` that read the
+  directory as its value. In json mode the counts, or the per-row actions, are
+  the result's `data` on a run that refused no row.
+- **`skill backfill <dir> [--propose|--apply] [--project=<root>]` fills in the
+  fields a skills directory lacks** (`src/commands/skill/backfill.ts`, over
+  `packages/rafa-inventory/src/backfill/`). `<dir>` is read as `skill demote`
+  reads it — a `<base>/.claude/skills`, the home making it `user` and any other
+  base a `project` one — and everything the run writes outside the skills
+  directory goes under that `<base>/.rafa/backfill/`. So this command too runs
+  INSIDE a project, and `<dir>` and `--project` resolve against the working
+  directory, the command's one path seam; the spawner each session runs through
+  is its other. With no flag the run PLANS: `planDerivation`
+  (`packages/rafa-inventory/src/backfill/derive.ts`) answers what `stack`,
+  `paths` and `when_to_use` would be written, `selectProposals`
+  (`packages/rafa-inventory/src/backfill/proposal-batch.ts`) counts the files a
+  session would be asked about, and NOTHING is written. With `--propose` it runs
+  `runProposalPass` (`packages/rafa-inventory/src/backfill/propose.ts`): one
+  `claude -p` session per batch of twenty through the capturing spawner of
+  `packages/rafa/src/core/loop/claude.ts`, the setting sources
   `loop.settingSources` resolves to, and one
-  `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each
-  `status: draft` and each row of a session that answered nothing
-  readable marked `unanswered`. No skill is touched.
-  With `--apply` it reads those files back — refusing the whole run
-  when one does not parse — copies every file a reviewed row could
-  rewrite under `<base>/.rafa/backfill/backup/` (`packages/rafa-inventory/src/backfill/backup.ts`),
-  writes the rows (`applyProposals`), then plans the derivation with
-  the trigger sentences those rows carried, copies what it will rewrite
-  and derives (`applyDerivation`). A file under the checkout the
-  command runs in is copied nowhere: git holds it. A draft file, a
-  file naming another skills directory, a skill that changed since its
-  proposal and any write that fails a check the file passed before are
-  each refused ALONE, and no body is ever written.
-  The exit code is the number of rows and files refused, capped at 255,
-  and 1 is kept for no directory, a second word, `--propose` and
-  `--apply` together, a switch that read the directory as its value, a
-  bare `--project`, a `<dir>` that is no `.claude/skills` or is not
-  there, and a proposal file that does not parse. In json mode the
-  actions and their counts are the result's `data` on a run that
+  `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each `status: draft`
+  and each row of a session that answered nothing readable marked `unanswered`.
+  No skill is touched. With `--apply` it reads those files back — refusing the
+  whole run when one does not parse — copies every file a reviewed row could
+  rewrite under `<base>/.rafa/backfill/backup/`
+  (`packages/rafa-inventory/src/backfill/backup.ts`), writes the rows
+  (`applyProposals`), then plans the derivation with the trigger sentences those
+  rows carried, copies what it will rewrite and derives (`applyDerivation`). A
+  file under the checkout the command runs in is copied nowhere: git holds it. A
+  draft file, a file naming another skills directory, a skill that changed since
+  its proposal and any write that fails a check the file passed before are each
+  refused ALONE, and no body is ever written. The exit code is the number of
+  rows and files refused, capped at 255, and 1 is kept for no directory, a
+  second word, `--propose` and `--apply` together, a switch that read the
+  directory as its value, a bare `--project`, a `<dir>` that is no
+  `.claude/skills` or is not there, and a proposal file that does not parse. In
+  json mode the actions and their counts are the result's `data` on a run that
   refused nothing.
 - **`instinct list` and `instinct show <id>` read the two instinct
   scopes** (`src/commands/instinct/list.ts`,

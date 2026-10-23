@@ -22,10 +22,10 @@ outside these three tiers and keep the inventory's own separate precedence.
 
 ### The resolver: `resolveTiers`
 
-`resolveTiers(rows, settings)` in `packages/rafa-inventory/src/tiers/resolve.ts` is a pure resolver
-that decides which holder of a skill or agent name a loop session is served.
-It works in tier order (project, rafa, user) and only counts tiers the session
-loads.
+`resolveTiers(rows, settings)` in `packages/rafa-inventory/src/tiers/resolve.ts`
+is a pure resolver that decides which holder of a skill or agent name a loop
+session is served. It works in tier order (project, rafa, user) and only counts
+tiers the session loads.
 
 For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
 
@@ -42,12 +42,12 @@ For each kind (`skill`, `agent`) and bare name, the resolver checks in order:
    with no pin. Nothing serves it. `loop start` preflight and `plan validate`
    refuse before any session starts only for a name the plan uses: an agent
    routed by `agent=`, or a skill named by `skills=`, on a task still to run
-   (`collidingPlanSkills` in `packages/rafa-inventory/src/agents/roster.ts`). A colliding skill the
-   plan never names starts the run; `doctor` still lists it. To see the
-   refusal by hand, name the skill on an open task, and delete
-   `PLAN_TRACKER-<stub>.md` between runs, since a task the refusal blocked is
-   no longer open. The refused start still writes a run record under
-   `.rafa/runs/` with state `stopped` and task `null`; that is not a crash.
+   (`collidingPlanSkills` in `packages/rafa-inventory/src/agents/roster.ts`). A
+   colliding skill the plan never names starts the run; `doctor` still lists it.
+   To see the refusal by hand, name the skill on an open task, and delete
+   `PLAN_TRACKER-<stub>.md` between runs, since a task the refusal blocked is no
+   longer open. The refused start still writes a run record under `.rafa/runs/`
+   with state `stopped` and task `null`; that is not a crash.
 
    A plan whose task edits an agent or a skill rafa bundles gets a note,
    never a refusal, from `plan validate` and `plan create`. A clone whose
@@ -73,13 +73,14 @@ sets aside: a project and a loaded user skill of one name suggest
 name are both `collision` without a pin, but `enabled` and `shadowed` with
 `loop.settingSources` narrowed to exclude `user`.
 
-**A skill pin must name the copy Claude Code loads.** rafa serves only
-winners, but Claude Code loads the project's and a loaded user tier's
-`.claude/skills/<name>` by itself, and a served skill reaches a session
-through `--add-dir`. Claude Code loads a user skill over a project skill,
-and both over the rafa copy it is served. That is `CLAUDE_SKILL_ORDER` in
-`packages/rafa-inventory/src/tiers/resolve.ts`. It is not the tier order: project → rafa → user
-still decides which of byte-identical copies serves, and which tiers load.
+**A skill pin must name the copy Claude Code loads.** rafa serves only winners,
+but Claude Code loads the project's and a loaded user tier's
+`.claude/skills/<name>` by itself, and a served skill reaches a session through
+`--add-dir`. Claude Code loads a user skill over a project skill, and both over
+the rafa copy it is served. That is `CLAUDE_SKILL_ORDER` in
+`packages/rafa-inventory/src/tiers/resolve.ts`. It is not the tier order:
+project → rafa → user still decides which of byte-identical copies serves, and
+which tiers load.
 
 So a skill pin has no effect while a loaded holder Claude Code ranks above
 the pinned one differs from the pinned copy, and the name stays a
@@ -185,7 +186,8 @@ project,local`. The probe ran on 2026-09-24 against Claude Code 2.1.280
 | `--add-dir <dir>` | `<dir>/skills/<n>/` | not listed |
 | `--plugin-dir <dir>` with `.claude-plugin/plugin.json` | skill, agent | `<plugin>:<n>` |
 
-So `SKILL_DELIVERY` is `add-dir` in `packages/rafa-inventory/src/tiers/delivery.ts`, pinned with
+So `SKILL_DELIVERY` is `add-dir` in
+`packages/rafa-inventory/src/tiers/delivery.ts`, pinned with
 `SERVE_CLI_VERSION`. The served directory keeps the `.claude/` layout. A skill
 served under `plugin-dir` would be named `rafa:<name>` in a session, but
 `--add-dir` keeps the bare name. Agents are prefixed in either delivery, and
@@ -193,10 +195,10 @@ under `add-dir` are stored in `agents.json`. A CLI version other than
 `SERVE_CLI_VERSION` means running the probe again before trusting the pin.
 
 **Provenance and what blocks serving.** Each bundled skill and agent carries
-`provenance:` in its frontmatter: either `first-party` or
-`{ origin, license, reviewed? }` where `reviewed` is `<who> YYYY-MM-DD`. An
-unreviewed third-party item is not served from the rafa tier. A rafa-tier
-winner's verdict, from `serveVerdict` in `packages/rafa-inventory/src/tiers/serve.ts`, is one of:
+`provenance:` in its frontmatter: either `first-party` or `{ origin, license,
+reviewed? }` where `reviewed` is `<who> YYYY-MM-DD`. An unreviewed third-party
+item is not served from the rafa tier. A rafa-tier winner's verdict, from
+`serveVerdict` in `packages/rafa-inventory/src/tiers/serve.ts`, is one of:
 
 - **served**: a skill admitted, or an agent with its JSON entry
 - **unreviewed**: third-party `provenance` with no `reviewed`
@@ -227,8 +229,8 @@ An item is visible to a loop session if and only if:
     session
 
 The inventory answers `visibleToLoop` as a boolean; `sourceVisibleToLoop` in
-`packages/rafa-inventory/src/inventory/index.ts` computes it. The loop reads the inventory to decide
-which items a session can invoke.
+`packages/rafa-inventory/src/inventory/index.ts` computes it. The loop reads the
+inventory to decide which items a session can invoke.
 
 ### Disabled readings
 
@@ -240,10 +242,10 @@ outside the config:
   `on`) do not disable. Reads from `.claude/settings.json`,
   `.claude/settings.local.json`, and `~/.claude/settings.json` (in that order
   of precedence). This code only READS; it never writes.
-- **Frontmatter switches**: a frontmatter key that switches the item off
-  reads as `disabled:<key>`. The one read today is
-  `disable-model-invocation: true`, as
-  `disabled:disable-model-invocation` (`packages/rafa-inventory/src/inventory/disabled.ts`).
+- **Frontmatter switches**: a frontmatter key that switches the item off reads
+  as `disabled:<key>`. The one read today is `disable-model-invocation: true`,
+  as `disabled:disable-model-invocation`
+  (`packages/rafa-inventory/src/inventory/disabled.ts`).
 
 An item cannot be shadowed AND disabled; once shadowed, shadowing takes
 precedence in `state`. A colliding item reads `collision` even when a
@@ -251,9 +253,10 @@ switch would disable it, since the loop refuses the name either way.
 
 ### Search and plan needs
 
-`skill search` and `agent search` rank inventory rows in code, then start
-one session over a scratch copy of the top twelve (`src/inventory/search/`).
-The session's reach is narrower in intent than in fact:
+`skill search` and `agent search` rank inventory rows in code, then start one
+session over a scratch copy of the top twelve
+(`packages/rafa-inventory/src/inventory/search/`). The session's reach is
+narrower in intent than in fact:
 
 - `--tools Read,Grep,Glob` limits which tools exist, not which paths they
   reach. `claudeArgs` always prepends `--dangerously-skip-permissions`, so
@@ -282,11 +285,11 @@ fails on an item that is absent or not visible. Two limits of
   `unusable-value`), so a plan can never name a plugin item and needs only
   ever meets bare names.
 
-MCP server lookup (`packages/rafa-inventory/src/inventory/mcp.ts`) models the `claude -p` path: a
-pending `.mcp.json` server nobody approved still starts there, so approval
-and trust are not read; a pending or rejected declaration does not hold its
-name against a farther scope; and `disabledMcpjsonServers` counts only when
-its settings file's source is on, while `disabledMcpServers` in
+MCP server lookup (`packages/rafa-inventory/src/inventory/mcp.ts`) models the
+`claude -p` path: a pending `.mcp.json` server nobody approved still starts
+there, so approval and trust are not read; a pending or rejected declaration
+does not hold its name against a farther scope; and `disabledMcpjsonServers`
+counts only when its settings file's source is on, while `disabledMcpServers` in
 `~/.claude.json` applies under any sources.
 
 This section replaces the former "Search and plan needs" paragraphs, which
@@ -309,13 +312,14 @@ drops from a project-scoped `env`; its module note in
 
 ### Plugins and add-ons
 
-Plugins are recorded at `~/.claude/plugins/installed_plugins.json`; the
-plugin reader scans that file to discover plugins and records each with
-`source: plugin:<name>`. The reader pins the Claude Code version it was
-written against (`PLUGINS_CLI_VERSION`) and the file's own `version` key
-(`PLUGINS_RECORD_VERSION`) in `packages/rafa-inventory/src/inventory/plugins.ts`; a record under
-any other `version` is one warning row, not a guess. The MCP reader pins
-its own (`MCP_CLI_VERSION`, `packages/rafa-inventory/src/inventory/mcp.ts`).
+Plugins are recorded at `~/.claude/plugins/installed_plugins.json`; the plugin
+reader scans that file to discover plugins and records each with `source:
+plugin:<name>`. The reader pins the Claude Code version it was written against
+(`PLUGINS_CLI_VERSION`) and the file's own `version` key
+(`PLUGINS_RECORD_VERSION`) in
+`packages/rafa-inventory/src/inventory/plugins.ts`; a record under any other
+`version` is one warning row, not a guess. The MCP reader pins its own
+(`MCP_CLI_VERSION`, `packages/rafa-inventory/src/inventory/mcp.ts`).
 
 Each inventory row carries these fields:
 
