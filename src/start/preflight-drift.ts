@@ -51,7 +51,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
-import { scanClaimBranches } from '../board/roadmap.js';
+import { scanClaimBranches } from '../board/branch-scan.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */

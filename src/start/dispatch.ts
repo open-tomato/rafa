@@ -97,7 +97,7 @@ import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { InstinctRecord } from '../learning/index.js';
+import type { InstinctRecord } from '../learning/types.js';
 import type { InjectionRequest, PlanInjection } from '../plan/index.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
