@@ -509,10 +509,11 @@ runs from a package earlier in that order into a later one, since moved
 first the earlier package would import a file not yet moved. Run as
 `bun scripts/survey/coupling.ts --max=<percent>` from the root, it prints the
 back edges by package pair and one line, `back <n> of <total> value imports
-between feature packages, <percent>%`, and exits 1 when the percent is above
-`--max`. It reads the import graph and the cut table and writes nothing; an
-edge with an end in core, in the CLI or in a package outside the order is not
-counted.
+between feature packages, <percent>%`, then a second, `kept <k> of <n>
+importers on relative paths, <percent>%`, and exits 1 when either percent is
+above `--max`. It reads the import graph and the cut table and writes nothing;
+an edge with an end in core, in the CLI or in a package outside the order is
+not counted on the first line.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,

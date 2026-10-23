@@ -219,7 +219,8 @@ its change reaches:
 **The coupling reading is a survey reading, not a gate.**
 `bun scripts/survey/coupling.ts --max=20` reads `docs/survey/import-graph.json`
 and `docs/survey/cut-table.json` and prints the back edges between the feature
-packages; with `--max` it exits 1 above that percent. No `checks.*` entry,
+packages and the importers kept on relative paths; with `--max` it exits 1
+when either percent is above it. No `checks.*` entry,
 script or workflow runs it: a session runs it by hand, and
 `scripts/survey/coupling.test.ts` holds its reading. Its order and the
 left-to-place test it reads are set out in `context/source.md`, "The cut table".
