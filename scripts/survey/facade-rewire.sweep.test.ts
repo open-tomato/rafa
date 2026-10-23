@@ -19,7 +19,7 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Why a rewired package's file is still imported by path. */
-type KeptGroup = 'backEdge' | 'declarationGraph' | 'loadCycle';
+type KeptGroup = 'backEdge' | 'declarationGraph' | 'loadCycle' | 'toRewire';
 
 /** One rewired package and the files allowed to import it by path. */
 interface RewiredRow {
@@ -40,6 +40,9 @@ interface RewiredRow {
  * they imported it by name, and its three back-edge files are effort
  * files, which the codemod reads as to rewire now that inventory moves
  * first and which the rewire stage takes onto the facade.
+ * Its one to-rewire file, `src/inventory/browse.ts`, is the CLI's by
+ * `CLI_NAMED` of `cut-names.ts` and imports inventory's `record.ts` and
+ * `show.ts` by path until the rewire stage takes it onto the facade.
  * Board's 24 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`; its two
  * declaration-graph files are effort's two.
@@ -77,6 +80,7 @@ const REWIRED: readonly RewiredRow[] = [
       'src/effort/report-skills.ts': 'backEdge',
       'src/effort/skill-facts.ts': 'backEdge',
       'src/effort/skill-use.ts': 'loadCycle',
+      'src/inventory/browse.ts': 'toRewire',
       'src/start/dispatch.ts': 'loadCycle',
       'src/start/handout.ts': 'loadCycle',
       'src/start/preflight.ts': 'loadCycle',

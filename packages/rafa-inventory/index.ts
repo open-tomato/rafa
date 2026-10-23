@@ -121,8 +121,6 @@ export {
   selectSources,
 } from '../../src/demote/select.js';
 
-export { browse } from '../../src/inventory/browse.js';
-
 export type { OverrideReading } from '../../src/inventory/disabled.js';
 export {
   OVERRIDES_KEY,

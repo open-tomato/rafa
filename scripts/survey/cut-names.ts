@@ -118,3 +118,21 @@ export const INVENTORY_NAMED: readonly string[] = [
   'src/report/lessons.ts',
   'src/start/serving.ts',
 ];
+
+/**
+ * The files named for the CLI, `@open-tomato/rafa`. The first, third and
+ * fourth were the CLI rule's inline names: the roster
+ * (`src/commands/index.ts`), the bin entry (`src/rafa.ts`) and the agent
+ * schema (`src/schema/agent.ts`), as the module note of `cut-table.ts`
+ * says. `src/inventory/browse.ts`, the view behind `rafa skill list -i`
+ * and `rafa agent list -i`, reaches `src/cli/prompt/page.ts`, `select.ts`
+ * and `terminal.ts`, CLI files, so under pass 1's rule that a file goes
+ * with the latest package it reaches it is the CLI's, which comes after
+ * every feature package. The file does not move.
+ */
+export const CLI_NAMED: readonly string[] = [
+  'src/commands/index.ts',
+  'src/inventory/browse.ts',
+  'src/rafa.ts',
+  'src/schema/agent.ts',
+];
