@@ -4,6 +4,9 @@
  * count of each group, in text and in json's `cleanup`, and over a
  * repository with nothing to clean (one commit, one branch) there is
  * no row.
+ *
+ * The repository is built with `now: new Date()`, the real clock, because
+ * the spawned CLI reads `Date.now()` and fixed dates would go stale.
  */
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { ScratchRepo } from '../tests/cli-capture.js';
@@ -19,6 +22,9 @@ import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capt
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 const SPAWN_TIMEOUT = 60_000;
+
+/** The real clock, read once: the spawned `rafa doctor` reads `Date.now()` against `cleanup.staleDays`, so the repository is built around it and not around the fixed `SCRATCH_NOW`. */
+const buildMoment = new Date();
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-doctor-cleanup-')));
 
@@ -37,7 +43,7 @@ describe('rafa doctor over the cleanup scratch repository', () => {
   let target: ScratchRepo;
 
   beforeAll(() => {
-    scratch = createScratchRepository();
+    scratch = createScratchRepository({ now: buildMoment });
     plantProjectConfig(scratch.clone);
     target = around(scratch.clone, scratch.home);
   });
