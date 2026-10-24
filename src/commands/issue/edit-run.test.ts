@@ -29,6 +29,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { branchName } from '@open-tomato/rafa/board/naming';
+import { IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { fileStamp } from '@open-tomato/rafa-effort/effort/file-stamp';
 
@@ -37,7 +38,6 @@ import { renderUpdateBlock } from '../../board/issue-edit-body.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { createGhEditorLogin, ghBoardTrust } from '../../board/trust.js';
-import { IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import {

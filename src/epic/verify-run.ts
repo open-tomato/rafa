@@ -25,7 +25,7 @@
  * 3. `git worktree add --detach <path> <commit>` at
  *    {@link verifyWorktreePath}: `<home>/.rafa/worktrees/epic-<n>`, beside
  *    `rafa pr triage --resolve`'s `pr-<n>` (`WORKTREES_SUBDIR`,
- *    `../pr/worktree.ts`). Detached, so the run makes no branch and holds
+ *    `@open-tomato/rafa/start/worktree-dir`). Detached, so the run makes no branch and holds
  *    none checked out, and at the resolved commit rather than at the
  *    remote-tracking name, so the checkout is the commit step 2 reported.
  * 4. Each check as one captured session, one after another, with the
@@ -121,12 +121,12 @@ import type { RafaBlock } from '@open-tomato/rafa/core/plan/block-reader';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
-import { DEFAULT_BASE_BRANCH, WORKTREES_SUBDIR, shellQuote } from '@open-tomato/rafa-pr';
-
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_BASE_BRANCH, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 import { claudeArgs, SESSION_ID_FLAG, spawnClaudeCaptured } from '@open-tomato/rafa/core/loop';
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+import { WORKTREES_SUBDIR } from '@open-tomato/rafa/start/worktree-dir';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { fenceFor } from './verify-plan.js';
 

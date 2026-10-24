@@ -71,9 +71,8 @@
  */
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
+import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
-
-import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 
 /** The `for-each-ref` format every branch is read with; see the module note. */
 export const BRANCH_FORMAT: string = [

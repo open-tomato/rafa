@@ -79,8 +79,7 @@ import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { createLinePrompter } from '@open-tomato/rafa/core/command';
-
-import { answeredYes } from '../start/branch-decision.js';
+import { answeredYes } from '@open-tomato/rafa/start/branch-decision';
 
 import { runAction } from './actions.js';
 import { nextStepHint } from './hint.js';

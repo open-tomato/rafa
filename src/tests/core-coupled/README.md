@@ -68,7 +68,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `packages/rafa-inventory/src/schema/failure-strings.ts`, `packages/rafa-inventory/src/schema/skill.ts` |
 | `modules/load.test.ts` | `src/config-registry.ts` |
 | `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
-| `plan/doc-task.test.ts` | `src/plan/index.ts`, `src/plan/validate.ts` |
+| `plan/doc-task.test.ts` | `src/plan/index.ts`, `packages/rafa/src/plan/validate.ts` |
 | `ports/index.test.ts` | `src/plan/index.ts` |
 | `project/package-of.test.ts` | `src/tests/package-tree.ts` |
 | `project/position.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |

@@ -1,9 +1,8 @@
-import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
-
+import { suggestedEnvironment } from './places.js';
 import { codeVersionOf, errorLineOf, versionsText } from './versions.js';
 
 /** A git answering each first argument with what `answers` holds, recording every call. */

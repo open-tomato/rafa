@@ -20,9 +20,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
+
 import { createGitRunner } from '../pr/index.js';
 
-import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from './git.js';
 import { claimLostReport, lostBranchFor, readRefusedPush } from './lost.js';
 
 /** The claim branch every case pushes. */

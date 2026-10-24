@@ -1,9 +1,9 @@
 /**
  * A scratch-repo integration suite for the branch offer
- * (`src/start/branch.ts` over `src/start/branch-decision.ts`), run end to
+ * (`src/start/branch.ts` over `packages/rafa/src/start/branch-decision.ts`), run end to
  * end against a REAL git.
  *
- * `src/start/branch-decision.test.ts` pins what each reading answers off
+ * `packages/rafa/src/start/branch-decision.test.ts` pins what each reading answers off
  * a literal, and `src/start/branch.test.ts` drives the runner over a
  * stubbed `GitRunner` that answers from a scripted table — neither
  * reaches a real repository, by design, so together they pin the ORDER

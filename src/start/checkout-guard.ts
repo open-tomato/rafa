@@ -89,7 +89,9 @@ import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { existsSync, realpathSync } from 'node:fs';
 
-import { createGitRunner, shellQuote } from '@open-tomato/rafa-pr';
+import { createGitRunner } from '@open-tomato/rafa-pr';
+
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 /** The reason a halted task is stored with, and its `[BLOCKED]` blocker text. */
 export const CHECKOUT_MOVED = 'checkout moved';

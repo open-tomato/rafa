@@ -19,9 +19,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { CLAIMED_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { findDrift } from '../claims/drift.js';
-import { makeOwnershipCommit, pushNewClaimBranch } from '../claims/git.js';
-import { CLAIMED_LABEL } from '../claims/stale.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { createRoadmapReadings, DEFAULT_REMOTE, scanClaimBranches } from './roadmap.js';

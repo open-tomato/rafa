@@ -9,8 +9,9 @@ import type { CheckAnswered } from '../../epic/verify-run.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
+
 import { splitCriteria } from '../../epic/verify-plan.js';
-import { bugKeyOf } from '../../triage/triage.js';
 
 import { bugLine, closeTriageFile, failedCheckArtifact, failedCheckReport } from './close-triage.js';
 

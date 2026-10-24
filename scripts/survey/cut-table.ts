@@ -14,8 +14,10 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/start/branch-decision.test.ts` goes where
- *      `src/start/branch-decision.ts` goes;
+ *      `src/next/readings.test.ts` goes where `src/next/readings.ts`
+ *      goes. The run rule named `packages/rafa/src/start/branch-decision.ts`
+ *      beside `RUN_NAMED` until the fourth decouple item (rafa-1333) moved
+ *      it into core's package, where the `packages/rafa/` folder places it;
  *   2. otherwise the longest folder that holds it decides, among the
  *      packages' folders and the unassigned folders. A folder closes
  *      with its `/`, so `packages/rafa/` (core) does not hold
@@ -316,7 +318,7 @@ export const CUT_RULES: CutRules = {
     {
       folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
       name: 'rafa-run',
-      named: [...RUN_NAMED, 'src/start/branch-decision.ts'],
+      named: RUN_NAMED,
     },
     {
       folders: ['packages/rafa-release/', 'src/commands/release/', 'src/release/'],

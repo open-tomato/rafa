@@ -49,7 +49,7 @@
  * failure (`expect(received).toBe(expected)`, `boom 42`), which is what
  * `src/suite/run.ts` records as a run-start failure's message.
  */
-import type { ReportBug } from '@open-tomato/rafa/report/parse';
+import type { ReportBug } from '../report/parse.js';
 
 /** The test a bug names; see the module note. */
 export interface TestFailure {

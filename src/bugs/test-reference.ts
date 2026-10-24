@@ -23,7 +23,7 @@
  *     a test file, or a word after the file.
  *
  * A test file is a relative path whose name ends in `.test` or `.spec`
- * and a JavaScript or TypeScript extension, as `src/triage/test-failure.ts`
+ * and a JavaScript or TypeScript extension, as `packages/rafa/src/triage/test-failure.ts`
  * defines one.
  *
  * The `-t` value is read as a POSIX shell reads a double-quoted string:

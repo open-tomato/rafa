@@ -146,14 +146,14 @@ for the module or another wording.
   action and in reproduce.
 - **The versions** are the rafa version, the short commit with `-dirty`
   when a tracked file has changes, and the package as `name@version`
-  (`src/bugs/versions.ts`).
-- **The package** is the nearest manifest above the file the error
-  points at (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
+  (`packages/rafa/src/bugs/versions.ts`).
+- **The package** is the nearest manifest above the file the error points at
+  (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
   directory up to the checkout's root, the first `package.json` holding a
-  `name`. The `workspaces` globs are never read. The file is `--path`,
-  else the first file of the checkout the artifact names
-  (`packages/rafa/src/bugs/stack-path.ts`); with none, the checkout's own package. A
-  relative `--path` is read from the directory rafa runs in, and one
+  `name`. The `workspaces` globs are never read. The file is `--path`, else the
+  first file of the checkout the artifact names
+  (`packages/rafa/src/bugs/stack-path.ts`); with none, the checkout's own
+  package. A relative `--path` is read from the directory rafa runs in, and one
   outside the checkout, or naming no file, is refused.
 - **The checkout** is the one the command runs in. A project's root is
   its main checkout, and a command run from a worktree resolves to it,

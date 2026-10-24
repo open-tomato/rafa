@@ -31,9 +31,9 @@
 import type { TitleValues } from '@open-tomato/rafa/bugs/title';
 
 import { ACTION_SHAPE, MODULE_SHAPE, titleRoundTrips, UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
+import { oneLine } from '@open-tomato/rafa/triage/bug-key';
 
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '../adapters/tracker/github.js';
-import { oneLine } from '../triage/bug-key.js';
 
 /** The two fields the boundary rule reads. */
 export type BoundaryField = 'module' | 'action';

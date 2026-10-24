@@ -37,15 +37,15 @@
  * baseline holds them, since stripping takes out folder prefixes on both
  * sides.
  */
-import type { TestFailure } from './test-failure.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { IssueState } from '@open-tomato/rafa/ports';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
+import type { TestFailure } from '@open-tomato/rafa/triage/test-failure';
 
 import { basename } from 'node:path';
 
-import { hasText, keyText, oneLine } from './bug-key.js';
-import { testFailureOf } from './test-failure.js';
+import { hasText, keyText, oneLine } from '@open-tomato/rafa/triage/bug-key';
+import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
 
 /** The run-start failures and what one run commented on; `TriageOptions.inherited`. */
 export interface InheritedTriage {

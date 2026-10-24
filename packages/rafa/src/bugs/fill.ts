@@ -38,16 +38,15 @@
  * its `cause` is the record's, which the tracker files as a label
  * ({@link draftOf}).
  */
-import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
-import type { GitRunner } from '@open-tomato/rafa/core/git';
-import type { IssueDraft } from '@open-tomato/rafa/ports';
+import type { BugRecord, BugRules } from './record.js';
+import type { GitRunner } from '../core/git/index.js';
+import type { IssueDraft } from '../ports/index.js';
 
-import { bugTitle, hasBugSections, otherSections, renderBugBody } from '@open-tomato/rafa/bugs/record';
-import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
-import { isInside } from '@open-tomato/rafa/project/package-of';
+import { isInside } from '../project/package-of.js';
+import { TRIAGE_MODULE } from '../triage/filed-text.js';
 
-import { TRIAGE_MODULE } from '../triage/triage.js';
-
+import { bugTitle, hasBugSections, otherSections, renderBugBody } from './record.js';
+import { UNKNOWN_VALUE } from './title.js';
 import { errorLineOf } from './versions.js';
 
 /** The most lines of an artifact a bug is filed with. */

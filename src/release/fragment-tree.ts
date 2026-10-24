@@ -7,14 +7,14 @@
  *
  * The settled state is the set of fragments in the tree, never a commit
  * trailer: settle deletes what it folds, so whatever is still under
- * `release.fragments` in the base branch's tree is waiting. A fragment
- * is a blob directly in that directory whose name is `<id>.md`, the id
+ * `release.fragments` in the base branch's tree is waiting. A fragment is
+ * a blob directly in that directory whose name is `<id>.md`, the id
  * matching {@link FRAGMENT_PLAN_ID_PATTERN} — the names
- * `allocateFragmentName` (`./fragment.ts`) hands out. Anything else
- * there (a subdirectory, a file of another extension, a name with a
- * space) is not a fragment and is not listed. A directory the tree does
- * not hold is an empty list, not a problem: a project that never wrote
- * a fragment has nothing waiting.
+ * `allocateFragmentName` (`packages/rafa/src/release/fragment.ts`) hands
+ * out. Anything else there (a subdirectory, a file of another extension, a
+ * name with a space) is not a fragment and is not listed. A directory the
+ * tree does not hold is an empty list, not a problem: a project that never
+ * wrote a fragment has nothing waiting.
  *
  * Each fragment's text is read out of the tree's blob and parsed, and
  * the {@link FragmentReading} is answered as it came, refusals
@@ -57,14 +57,11 @@
  * `origin/main` moving mid-read cannot mix two trees into one answer,
  * and every later argv names that hash rather than caller text.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { FragmentReading } from '@open-tomato/rafa/release/fragment';
 
-import { posix } from 'node:path';
-
-import { FRAGMENT_EXTENSION, FRAGMENT_PLAN_ID_PATTERN, parseFragment } from '@open-tomato/rafa/release/fragment';
-
-import { gitSaid } from '../pr/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+import { directoryPrefix, fragmentIdOf, parseFragment } from '@open-tomato/rafa/release/fragment';
 
 /** One fragment present in the tree, with the commit that added it. */
 export interface TreeFragment {
@@ -129,31 +126,11 @@ function unread(what: string, said: string): FragmentTreeReading {
   return { ok: false, problem: `${what} could not be read: ${said}` };
 }
 
-/**
- * `directory` as a path prefix from the root: `./.changes/` and
- * `.changes` both answer `.changes/`, and the root itself answers ''.
- */
-export function directoryPrefix(directory: string): string {
-  const normal = posix.normalize(directory.replace(/\\/g, '/')).replace(/\/+$/, '');
-  return normal === '.' || normal === ''
-    ? ''
-    : `${normal}/`;
-}
-
 /** The pathspec naming the fragments directory from the root. */
 function pathspecOf(prefix: string): string {
   return prefix === ''
     ? '.'
     : prefix;
-}
-
-/** The id `name` carries as a fragment, or null when it is none. */
-export function fragmentIdOf(name: string): string | null {
-  if (!name.endsWith(FRAGMENT_EXTENSION)) return null;
-  const id = name.slice(0, -FRAGMENT_EXTENSION.length);
-  return FRAGMENT_PLAN_ID_PATTERN.test(id)
-    ? id
-    : null;
 }
 
 /** The fragments `ls-tree -z` listed directly under `prefix`. */

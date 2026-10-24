@@ -11,7 +11,7 @@
  * leading zero. Then this device's store id (`src/claims/device.ts`),
  * since a claim names a store and a device with no id holds none. Then
  * one fetch of the claim branches the `naming.branch` template names
- * (`src/claims/git.ts`), `feat/rafa-*` by default, and every remote
+ * (`packages/rafa/src/claims/git.ts`), `feat/rafa-*` by default, and every remote
  * branch of the issue, the template with the stub `rafa-<n>` or
  * `rafa-<n>-<slug>` (`feat/rafa-<n>-<slug>` by default), read as that
  * fetch left it. Only the configured template is read: under
@@ -27,7 +27,7 @@
  * branch's remote tip (`makeOwnershipCommit`) and pushed with
  * `--force-with-lease` on that tip (`pushOwnershipCommit`). A release
  * over a pending handover ends it, since the latest ownership commit
- * decides (`src/claims/record.ts`). The release is read from the
+ * decides (`packages/rafa/src/claims/record.ts`). The release is read from the
  * RECORD, not from staleness: an owner may release its claim at any
  * age and at either stage.
  *
@@ -86,8 +86,8 @@
  * `branchTemplate`.
  */
 import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
-import type { ClaimBranchReading } from '../../claims/git.js';
-import type { ClaimRecord } from '../../claims/record.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { IssueBoard } from '@open-tomato/rafa-board';
@@ -95,11 +95,6 @@ import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
 
-import { expectOneArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
-import { CommandExit } from '@open-tomato/rafa/core/command';
-import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { holdsClaim } from '../../claims/device.js';
 import {
   claimBranchGlob,
   claimBranchIssue,
@@ -107,9 +102,14 @@ import {
   makeOwnershipCommit,
   pushOwnershipCommit,
   readClaimBranch,
-} from '../../claims/git.js';
+} from '@open-tomato/rafa/claims/git';
+import { expectOneArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
+
+import { holdsClaim } from '../../claims/device.js';
 import { unlabelReleased } from '../../claims/labels.js';
-import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 
 import { CLAIM_RELEASE_DECLARATION } from './declarations.js';

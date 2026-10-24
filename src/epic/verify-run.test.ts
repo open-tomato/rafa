@@ -23,8 +23,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { claudeArgs, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
-
-import { WORKTREES_SUBDIR } from '../pr/worktree.js';
+import { WORKTREES_SUBDIR } from '@open-tomato/rafa/start/worktree-dir';
 
 import { splitCriteria } from './verify-plan.js';
 import {

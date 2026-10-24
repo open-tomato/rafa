@@ -73,7 +73,7 @@ module's note is the long form.
 | `src/commands/issue/edit.ts` | `rafa issue edit <n>`: one issue on the tracker the chain lands on appended to (`--append-file=<file>` or `--append=<text>`, with `--reason`, `--while-in-development` allowed), its body replaced (`--replace-file=<file>`, `--title` allowed beside it), its title changed (`--title` alone) or its priority set (`--priority=<urgent\|high\|medium\|low>`, `--title` allowed beside it, refused beside an append or `--replace-file`), the run being `editIssue` in `./edit-run.ts`. A priority runs the same four gates, weighed as a title change, and answers `replaced`, or `already` when the issue holds it alone. The command prints `renderEditReport`'s lines in text mode, each gate's reading and the added part first under `--dry-run`, the added part of a priority being the swap `priority: needs-triage → high`, and gives the report with its tracker as the data of a json-mode terminal result. Exit code 0 for `appended`, `replaced`, `already` and `stale-copy`, the last naming `rafa plan create --issue=<n> --refresh`, which it never runs; 2 for a gate's refusal, `--dry-run` included; 1 for a line refusal, a tracker read or write rejected, and `conflict`, whose report is the message of the `CommandExit`, as `pr wait` carries a non-zero ending, so both `.rafa/scratch/` paths reach the person in either mode. It starts no session, so it declares no `spends` |
 | `src/commands/issue/edit-priority.ts` | what `--priority` adds to `rafa issue edit`, kept out of `./edit-run.ts`, which sits at the 800-line cap: `readPriorityFlag` (a value outside `ISSUE_PRIORITIES` and the flag beside `--append-file`, `--append` or `--replace-file` refused with exit code 1, before anything is opened), `planPriorityEdit` (the one write, `{ priority }` or `{ title, priority }`, refused with exit code 1 on a tracker whose `editable` reads no priority), `holdsPriorityAlone` (the `already` answer), `swapLine` (the `--dry-run` line) and `priorityMessage`. `./edit-run.ts` calls them from `readEditLine`, `planEdit` and its outcome sentence, and its `writeHeld` reads the priority back, a priority the tracker did not keep answering `conflict`. It imports nothing from `./edit-run.ts` |
 | `src/commands/issue/issue-tracker.ts` | what the nine `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
-| `src/commands/issue/declarations.ts` | the nine `issue` commands as `CommandDeclaration`s, each command less its `run`, which each module's `createIssue<Action>Command` spreads under its own; `ISSUE_SUBJECT`, the subject's routing word and roster line; and the constants a declaration spells that a module reads too: `ISSUE_LIST_FLAGS` (read by `list.ts` and `src/commands/roadmap.ts`), `DEFAULT_ISSUE_TYPE`, `PRIORITY_FLAG`, `STAMP_FLAG`, `READY_YES_FLAG`, `READY_DRY_RUN_FLAG`, `UNBLOCK_ALL_FLAG` and `UNBLOCK_YES_FLAG`. It imports from the core entries alone, types and the one value `HINT_FLAG_SPEC` (`packages/rafa/src/core/command/shared-flags.ts`), which `issue ready` declares itself, and no module under `src/`, which `declarations.test.ts` reads off its source, so the values its help spells from elsewhere are copies that `declarations-integration.test.ts` holds equal to their sources: the state, type and priority lists of `src/adapters/tracker/issue-values.ts`, `TRIAGE_MODULE` (read off `src/triage/triage.ts` as text), and the `spec:ready`, `spec:needs-work` and `spec:blocked` labels. `BOARD_FEATURE` (`src/commands/board/index.ts`) reads it, and `ROSTER_SUBJECTS` (`src/commands/index.ts`) takes `ISSUE_SUBJECT` from it |
+| `src/commands/issue/declarations.ts` | the nine `issue` commands as `CommandDeclaration`s, each command less its `run`, which each module's `createIssue<Action>Command` spreads under its own; `ISSUE_SUBJECT`, the subject's routing word and roster line; and the constants a declaration spells that a module reads too: `ISSUE_LIST_FLAGS` (read by `list.ts` and `src/commands/roadmap.ts`), `DEFAULT_ISSUE_TYPE`, `PRIORITY_FLAG`, `STAMP_FLAG`, `READY_YES_FLAG`, `READY_DRY_RUN_FLAG`, `UNBLOCK_ALL_FLAG` and `UNBLOCK_YES_FLAG`. It imports from the core entries alone, types and the one value `HINT_FLAG_SPEC` (`packages/rafa/src/core/command/shared-flags.ts`), which `issue ready` declares itself, and no module under `src/`, which `declarations.test.ts` reads off its source, so the values its help spells from elsewhere are copies that `declarations-integration.test.ts` holds equal to their sources: the state, type and priority lists of `src/adapters/tracker/issue-values.ts`, `TRIAGE_MODULE` (read off `packages/rafa/src/triage/filed-text.ts` as text), and the `spec:ready`, `spec:needs-work` and `spec:blocked` labels. `BOARD_FEATURE` (`src/commands/board/index.ts`) reads it, and `ROSTER_SUBJECTS` (`src/commands/index.ts`) takes `ISSUE_SUBJECT` from it |
 | `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status`, `list` and `wait` share that reads a context or flags: the `--session-id` flag, the session a line picks, the write to its record, a phase and an ETA as written, and the refusals, the two finding no session a `NoSessionRefusal`. Its library half is `packages/rafa/src/core/loop/session-readings.ts`: the records under a root, a session's checklist and rough ETA, a session as a line and the seams, which any folder may import |
 | `src/commands/loop/wait.ts` | `rafa loop wait [--session-id=<id>] [--until=<reasons>] [--timeout=<minutes>]`: follows one run until a reason `--until` asks for happens, in code and starting no session, so it declares no `spends`. The session is picked as `loop status` picks it; the two refusals finding none exit 2, every other refusal of the pick 1. `--until` is read by `src/loop/wait-reasons.ts`, whose `WAIT_REASONS` table the help, the json result and the exit code all read: `pr` 0, `no-pr` 10, `halt` 11, `error` 12, `blocked` (event `task-blocked`) 13, `exit` (the record's pid not alive, or the record reading `stopped` or `done`) 14, `quiet:<minutes>` 15; left out it is `pr,no-pr,halt,error,exit`. An entry it refuses, a `--timeout` that is no whole number from 1 and a stray word exit 1. Every `WAIT_POLL_MS` (5 s) a poll reads the events file from the last offset (`src/loop/events-file.ts`, from byte 0 so a run that already ended answers), then the record and its pid, reading the events once more before answering `exit`, then the awake clock (`src/loop/awake-clock.ts`) for `quiet`, counted from the last event read, and `--timeout`, counted from the wait's start, exit 16; both count awake minutes, and on macOS, where the clock counts through sleep, a long sleep can raise a false `quiet`, which the help says. A run with no events file is noted once as a warning and the wait goes on. It prints one `rafa·` line: the event's summary, or a line naming `exit`, `quiet` or `timeout`, the last two adding the minutes suspended. In json mode the result (reason, exit code, line, event, session id, state, pid and liveness, awake and suspended minutes) is a named `wait` event, and the terminal result's `data` for `pr` alone, since the dispatcher drops a payload on a non-zero exit; for any other reason the terminal error's message is the line. The branch reader, pid probe, record read, clock, sleep and poll length are seams |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class, or for `conflict-version` converted in code with no session; and `pr wait`, its checks polled until they settle, the deadline passes or it turns out to have none, exiting 0 green, 1 red and on no checks at all, and 3 at the deadline |
@@ -575,20 +575,19 @@ New; it replaces no earlier text. What a row or an action added to
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
-- **`loop start --create-branch` creates the feature branch when on
-  `main`, `master` or a detached HEAD** (`start/run-setup.ts`): when the
-  working directory is checked out on `main` or `master`, or on no branch
-  at all, the flag creates `feat/<stub>` from the latest `origin/<base>`,
-  where `<base>` is `pr.base` when set, else `origin/HEAD`. The branch's
-  name is the `naming.branch` template, `feat/{stub}` by default, with the
-  plan's stub for `{stub}`; it names the worktree's branch under
-  `--as-worktree` too (`start/branch-decision.ts`), and the claim and
-  status readers match the same template. Without the
-  flag a terminal asks the same question, and any other run is refused,
-  naming the flag. The flag is read from the parsed line and handed into
-  `start`, which resolves the plan from `.rafa/plans/` unless `plan.dir`
-  in the config names another directory, then uses that plan's stub to
-  name the new branch.
+- **`loop start --create-branch` creates the feature branch when on `main`,
+  `master` or a detached HEAD** (`start/run-setup.ts`): when the working
+  directory is checked out on `main` or `master`, or on no branch at all, the
+  flag creates `feat/<stub>` from the latest `origin/<base>`, where `<base>` is
+  `pr.base` when set, else `origin/HEAD`. The branch's name is the
+  `naming.branch` template, `feat/{stub}` by default, with the plan's stub for
+  `{stub}`; it names the worktree's branch under `--as-worktree` too
+  (`packages/rafa/src/start/branch-decision.ts`), and the claim and status
+  readers match the same template. Without the flag a terminal asks the same
+  question, and any other run is refused, naming the flag. The flag is read from
+  the parsed line and handed into `start`, which resolves the plan from
+  `.rafa/plans/` unless `plan.dir` in the config names another directory, then
+  uses that plan's stub to name the new branch.
 - **`loop start --roadmap` stamps the away hop on the session record**
   (`start/session.ts`): `rafa next --roadmap` passes the flag to the loop
   it starts, and the run's `.rafa/runs/<session-id>.json` then carries the
@@ -2225,50 +2224,46 @@ New; it replaces no earlier text. What a row or an action added to
   is no epic, or does not hold, is refused with exit 1; a Roadmap that
   cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
   no `spends`.
-- **`rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]`
-  creates one epic whole** (`src/commands/epic/new.ts`): the
-  `epic:<slug>` label, the epic issue, and its line on the current board.
-  The title is the one argument, one line; `--slug` is required;
-  `--horizon` defaults to `later`, so a new epic is not picked unasked.
-  Those are refused with exit 1, but the slug's own refusals exit 2
-  (`EPIC_NEW_REFUSAL_EXIT`), before `gh` is asked anything or before
-  anything is written: a slug that is not a kebab word (`KEBAB_SLUG`,
-  lowercase letters and digits joined by single hyphens), and a slug
-  ALREADY LABELLED, one any issue on the board listing carries as
-  `epic:<slug>`, open or closed, compared without case, the refusal
-  naming the issues. A repository label `epic:<slug>` no issue carries is
-  kept, not created again, so a rerun after a failed issue create goes
-  through; the labels are read with `listBoardLabels`, the first
-  `LABEL_LIST_LIMIT`. It reads the board listing once, for the slug check
-  and for `resolvePlace` with `defaultBoardOnce` (`src/commands/switch.ts`);
-  a listing, label list or default board that cannot be read also exits
-  2 with nothing created. The writes then go in order through
-  `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when needed,
-  then `createIssue` with the body `renderEpicBody` answers
-  (`src/board/epic-template.ts`) and the labels `type:epic`,
-  `epic:<slug>` and `horizon:<horizon>` in one `gh issue create`; then
-  `- [ ] #<n> <title>` appended to the current board with `appendLine`
-  and `editChecklist` (`src/board/epic-checklist.ts`), every other byte
-  of the board kept. A failed label or issue create exits 1, the second
-  naming the label it left; a board line that ends `failed` exits 1 after
-  the epic exists, naming it, its URL and the line to add by hand. No
-  comment is posted: `src/board/epic-trail.ts` holds none for a new epic.
-  Text mode prints the epic with its horizon and label, where its line
-  went, and its URL; json mode's result is `EpicNewResult`. All of that
-  is the `labels` mode, the default. Under `board.relationships: native`
-  (`epicNewMode` reads it off the config, its warnings dropped, `labels`
-  for a config `loadConfig` refuses, so a labels line meets its refusals
-  in the same order as before) an epic is named by its number and title:
+- **`rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]` creates
+  one epic whole** (`src/commands/epic/new.ts`): the `epic:<slug>` label, the
+  epic issue, and its line on the current board. The title is the one argument,
+  one line; `--slug` is required; `--horizon` defaults to `later`, so a new epic
+  is not picked unasked. Those are refused with exit 1, but the slug's own
+  refusals exit 2 (`EPIC_NEW_REFUSAL_EXIT`), before `gh` is asked anything or
+  before anything is written: a slug that is not a kebab word (`KEBAB_SLUG`,
+  lowercase letters and digits joined by single hyphens), and a slug ALREADY
+  LABELLED, one any issue on the board listing carries as `epic:<slug>`, open or
+  closed, compared without case, the refusal naming the issues. A repository
+  label `epic:<slug>` no issue carries is kept, not created again, so a rerun
+  after a failed issue create goes through; the labels are read with
+  `listBoardLabels`, the first `LABEL_LIST_LIMIT`. It reads the board listing
+  once, for the slug check and for `resolvePlace` with `defaultBoardOnce`
+  (`src/board/default-board-once.ts`); a listing, label list or default board
+  that cannot be read also exits 2 with nothing created. The writes then go in
+  order through `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when
+  needed, then `createIssue` with the body `renderEpicBody` answers
+  (`src/board/epic-template.ts`) and the labels `type:epic`, `epic:<slug>` and
+  `horizon:<horizon>` in one `gh issue create`; then `- [ ] #<n> <title>`
+  appended to the current board with `appendLine` and `editChecklist`
+  (`src/board/epic-checklist.ts`), every other byte of the board kept. A failed
+  label or issue create exits 1, the second naming the label it left; a board
+  line that ends `failed` exits 1 after the epic exists, naming it, its URL and
+  the line to add by hand. No comment is posted: `src/board/epic-trail.ts` holds
+  none for a new epic. Text mode prints the epic with its horizon and label,
+  where its line went, and its URL; json mode's result is `EpicNewResult`. All
+  of that is the `labels` mode, the default. Under `board.relationships: native`
+  (`epicNewMode` reads it off the config, its warnings dropped, `labels` for a
+  config `loadConfig` refuses, so a labels line meets its refusals in the same
+  order as before) an epic is named by its number and title:
   `readNativeEpicDraft` reads the title and horizon only, `--slug` is not
-  required or checked and, when given, draws the warning
-  `NATIVE_SLUG_WARNING`; no slug-in-use check, `gh label list` or
-  `gh label create` is sent; the issue is created with `type:epic` and
-  `horizon:<horizon>` only (`nativeEpicIssueLabels`), a failed create
-  naming no label left; the listing read and the board line are the same.
-  Text mode names the mode where it named the label, and json's
-  `NativeEpicNewResult` carries `relationships: 'native'` with the
-  `slug`, `label` and `labelOutcome` keys left out. It declares
-  no `spends` and reads no terminal.
+  required or checked and, when given, draws the warning `NATIVE_SLUG_WARNING`;
+  no slug-in-use check, `gh label list` or `gh label create` is sent; the issue
+  is created with `type:epic` and `horizon:<horizon>` only
+  (`nativeEpicIssueLabels`), a failed create naming no label left; the listing
+  read and the board line are the same. Text mode names the mode where it named
+  the label, and json's `NativeEpicNewResult` carries `relationships: 'native'`
+  with the `slug`, `label` and `labelOutcome` keys left out. It declares no
+  `spends` and reads no terminal.
 - **`rafa epic defer <n> --to=next|later` and `rafa epic promote <n>
   --to=now|next`, each with `[--reason="<why>"]`, move an epic between
   horizons** (`src/commands/epic/defer.ts`, `src/commands/epic/promote.ts`,
@@ -2505,7 +2500,7 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/commands/board/list.ts`), the first action of the `board` subject.
   It reads the board listing once, as `switch` does, and ranks the
   default board over that listing through `defaultBoardOnce`, which it imports from
-  `src/commands/switch.ts`, and `openBoards`, from
+  `src/board/default-board-once.ts`, and `openBoards`, from
   `src/board/epic-board.ts`. The
   boards are the listing's open `type:roadmap` rows, lowest first, plus
   the default board when it is open on the listing without the label (an

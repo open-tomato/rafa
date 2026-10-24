@@ -127,6 +127,8 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit } from '@open-tomato/rafa/claims/git';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
@@ -139,8 +141,6 @@ import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify'
 import { serveSession } from '@open-tomato/rafa-inventory/start/serving';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
-import { makeOwnershipCommit } from '../claims/git.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { createGitRunner } from '../pr/index.js';
 import {

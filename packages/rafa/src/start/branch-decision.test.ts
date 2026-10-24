@@ -29,11 +29,11 @@ import type {
   BranchStepId,
   StepOutcome,
 } from './branch-decision.js';
-import type { GitResult } from '../pr/index.js';
+import type { GitResult } from '../core/git/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parseWorkingTree } from '../pr/index.js';
+import { parseWorkingTree } from '../core/git/index.js';
 
 import {
   answeredYes,

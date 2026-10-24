@@ -281,7 +281,6 @@ import {
 } from '@open-tomato/rafa-pr';
 import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
 import {
-  REMOTE,
   actionInvocation,
   actionOutput,
   commandWords,
@@ -294,6 +293,7 @@ import {
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import {

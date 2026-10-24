@@ -30,17 +30,15 @@
  * A path that is no file is refused with `CommandExit` and exit code 1,
  * which is the refusal `rafa plan validate` ends with for it.
  */
-import type { PlanIssue } from './index.js';
-import type { TaskCounts } from '@open-tomato/rafa/core/plan';
-import type { PlanWarning } from '@open-tomato/rafa/plan/doc-task';
+import type { PlanWarning } from './doc-task.js';
+import type { PlanIssue, TaskCounts } from '../core/plan/index.js';
 
 import { readFileSync } from 'node:fs';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
-import { countTasks, isFile } from '@open-tomato/rafa/core/plan';
-import { docTaskWarnings } from '@open-tomato/rafa/plan/doc-task';
+import { CommandExit } from '../core/command/index.js';
+import { countTasks, isFile, parsePlan } from '../core/plan/index.js';
 
-import { parsePlan } from './index.js';
+import { docTaskWarnings } from './doc-task.js';
 
 /** A plan file read; see the module note. */
 export interface PlanValidation {

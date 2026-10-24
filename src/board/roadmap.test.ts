@@ -86,17 +86,17 @@ import type { SpecIssue } from './issue.js';
 import type { BranchClaim } from './roadmap-claims.js';
 import type { RoadmapLine, RoadmapReadings, RoadmapSkip } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ClaimBranchReading } from '../claims/git.js';
-import type { Ownership } from '../claims/record.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { Ownership } from '@open-tomato/rafa/claims/record';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { CLAIMS_STALE_DISABLED } from '@open-tomato/rafa/core/config/sections';
 
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {

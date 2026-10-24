@@ -137,9 +137,10 @@
 import type { BundledEdit } from './bundled-check.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PlanValidation } from '@open-tomato/rafa/plan/validate';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '@open-tomato/rafa-inventory';
-import type { PlanValidation, StoreRuleProblem } from '@open-tomato/rafa-run';
+import type { StoreRuleProblem } from '@open-tomato/rafa-run';
 
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
@@ -153,7 +154,7 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '@open-tomato/rafa-inventory';
-import { prerequisitesPathForPlan, storeRuleLine, validatePlan } from '@open-tomato/rafa-run';
+import { prerequisitesPathForPlan, storeRuleLine } from '@open-tomato/rafa-run';
 
 import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -161,6 +162,7 @@ import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
+import { validatePlan } from '@open-tomato/rafa/plan/validate';
 
 import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
 import { checkStoreRules } from './store-check.js';

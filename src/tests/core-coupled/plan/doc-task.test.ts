@@ -17,9 +17,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { docTaskWarnings, isProseOnly } from '@open-tomato/rafa/plan/doc-task';
+import { validatePlan } from '@open-tomato/rafa/plan/validate';
 
 import { parsePlan } from '../../../plan/index.js';
-import { validatePlan } from '../../../plan/validate.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-doc-task-'));

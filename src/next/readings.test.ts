@@ -91,10 +91,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
 import { scanClaimBranches } from '../board/roadmap.js';
-import { formatClaimMessage } from '../claims/record.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
@@ -758,7 +758,7 @@ describe('a plan branch that holds claim commits alone', () => {
     expect(claimsOnly([])).toBe(false);
   });
 
-  it('reads a claim subject with no trailers as work, the trailers deciding as `src/claims/record.ts` reads them', () => {
+  it('reads a claim subject with no trailers as work, the trailers deciding as `packages/rafa/src/claims/record.ts` reads them', () => {
     expect(claimsOnly(['claim(rafa-63): claim'])).toBe(false);
   });
 

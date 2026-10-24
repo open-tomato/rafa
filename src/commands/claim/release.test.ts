@@ -23,10 +23,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { createGhIssueBoard } from '../../board/issue-board.js';
-import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../../claims/git.js';
-import { parseClaimMessage } from '../../claims/record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
 import { createGitRunner } from '../../pr/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

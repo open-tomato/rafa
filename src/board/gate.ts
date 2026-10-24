@@ -177,8 +177,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { issueLine, rejectedPath } from '@open-tomato/rafa/core/plan';
-
-import { validatePlan } from '../plan/validate.js';
+import { validatePlan } from '@open-tomato/rafa/plan/validate';
 
 import { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG } from './flags.js';
 import { SPEC_READY_LABEL } from './readiness.js';

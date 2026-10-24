@@ -10,7 +10,7 @@
  * a control that the same reading moves when a push does land.
  */
 import type { ClaimBranchReading, ClaimPush } from './git.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '../core/git/index.js';
 
 import {
   CLAIM_BRANCH_GLOB,

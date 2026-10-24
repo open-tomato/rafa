@@ -50,7 +50,7 @@
 import type { BugTriage } from './triage.js';
 import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 
-import { hasText } from './bug-key.js';
+import { hasText } from '@open-tomato/rafa/triage/bug-key';
 
 /** `text` on one line: each run of white space one space, none at either end. */
 function oneLine(text: string): string {

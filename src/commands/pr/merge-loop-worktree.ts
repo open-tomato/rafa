@@ -91,10 +91,10 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { countChanges, WORKTREE_STATUS } from '../../cleanup/worktrees.js';
 import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
-import { shellQuote } from '../../pr/preflight-items.js';
 
 /** How every refusal here opens, as `src/pr/merge.ts`'s refusals open. */
 const REFUSAL_PREFIX = 'rafa pr merge refuses';

@@ -76,7 +76,7 @@ import type { GitResult, GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
 
-import { REMOTE } from './branch-decision.js';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 /** How many times the upstream line is run before the step gives up. */
 export const UPSTREAM_TRIES = 5;

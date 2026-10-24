@@ -54,7 +54,6 @@ describe('the pull request barrel', () => {
   it('answers the merge readers of ./merge.js themselves', () => {
     expect(barrel.cleanUpSteps).toBe(merge.cleanUpSteps);
     expect(barrel.commandLine).toBe(merge.commandLine);
-    expect(barrel.parseWorkingTree).toBe(merge.parseWorkingTree);
     expect(barrel.parseWorktrees).toBe(merge.parseWorktrees);
     expect(barrel.readMergeRefusal).toBe(merge.readMergeRefusal);
     expect(barrel.remainingFrom).toBe(merge.remainingFrom);

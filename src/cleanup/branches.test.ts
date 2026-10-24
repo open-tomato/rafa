@@ -14,9 +14,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { BRANCH_FORMAT, isKept, parseBranchLine, readBranches, resolveBaseBranch } from './branches.js';

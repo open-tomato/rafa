@@ -16,13 +16,13 @@
  * remote, a fresh held claim beside a stale one, a fetch that lands
  * beside one that fails.
  */
-import type { ClaimBranchReading } from '../claims/git.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
-import { formatClaimMessage } from '../claims/record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 
 import {
   claimBranchOfRef,

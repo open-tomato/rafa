@@ -67,7 +67,6 @@ export type {
   MergeState,
   MergeStep,
   MergeStepId,
-  WorkingTreeStatus,
   WorktreeEntry,
 } from './merge.js';
 export type { PushOutcome } from './none.js';
@@ -92,7 +91,6 @@ export {
   cleanUpSteps,
   commandLine,
   parseTreePaths,
-  parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
   remainingFrom,

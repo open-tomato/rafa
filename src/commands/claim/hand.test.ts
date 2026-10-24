@@ -25,9 +25,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit, readClaimBranch } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+
 import { createGhIssueBoard } from '../../board/issue-board.js';
-import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit, readClaimBranch } from '../../claims/git.js';
-import { parseClaimMessage } from '../../claims/record.js';
 import { createGitRunner } from '../../pr/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

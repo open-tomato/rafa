@@ -15,7 +15,8 @@
  *
  * The three directories worktrees are made in on a person's behalf:
  * Claude Code's `<repo>/.claude/worktrees/<name>`,
- * `<home>/.rafa/worktrees/` (`WORKTREES_SUBDIR`, `src/pr/worktree.ts`),
+ * `<home>/.rafa/worktrees/` (`WORKTREES_SUBDIR`,
+ * `packages/rafa/src/start/worktree-dir.ts`),
  * which holds `rafa pr triage --resolve`'s `pr-<n>` and the epic
  * verification run's detached `epic-<n>` (`src/epic/verify-run.ts`), the
  * second left there only when its run could not remove it, and the
@@ -98,10 +99,9 @@ import { join, sep } from 'node:path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { readSessions, runsDir } from '@open-tomato/rafa/core/loop';
-import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
+import { WORKTREES_SUBDIR, worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
 import { parseWorktrees } from '../pr/merge.js';
-import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 
 /** Where under the repository Claude Code makes its worktrees. */
 export const CLAUDE_WORKTREES_SUBDIR: string = join('.claude', 'worktrees');

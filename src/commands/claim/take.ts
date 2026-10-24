@@ -22,7 +22,7 @@
  *
  * ## Which claim it takes
  *
- * Each branch is weighed with `readClaimState` (`src/claims/stale.ts`)
+ * Each branch is weighed with `readClaimState` (`packages/rafa/src/claims/stale.ts`)
  * over its ownership, its tip's committer date, the issue's labels,
  * `claims.staleAfter` and the clock ({@link takeOf}):
  *
@@ -64,7 +64,7 @@
  * The labels are read, never written: the stage is the same whoever
  * holds the claim. A board that is not `gh` (the `labels` seam is null)
  * or a label read that fails leaves the labels unknown, and unknown
- * labels read as in development (`src/claims/stale.ts`): a stale claim
+ * labels read as in development (`packages/rafa/src/claims/stale.ts`): a stale claim
  * then needs `--stale`, and the refusal and the result both carry the
  * warning saying why.
  *
@@ -72,7 +72,7 @@
  *
  * One empty `take` commit naming this store, made on the branch's
  * remote tip and pushed with `--force-with-lease` on that tip
- * (`src/claims/git.ts`). An owner whose push lands between this
+ * (`packages/rafa/src/claims/git.ts`). An owner whose push lands between this
  * command's fetch and its push moves the tip, so the lease refuses the
  * take and nothing lands: a returning owner is never overwritten. No
  * local ref, index or working tree moves but the remote-tracking ref the
@@ -94,21 +94,21 @@
  * push git refused otherwise.
  */
 import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, FoundBranch } from './release.js';
-import type { ClaimBranchReading } from '../../claims/git.js';
-import type { ClaimState } from '../../claims/stale.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { ClaimState } from '@open-tomato/rafa/claims/stale';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner, createGhSpecIssueReader, idleText } from '@open-tomato/rafa-board';
 
+import { readClaimState } from '@open-tomato/rafa/claims/stale';
 import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { holdsClaim } from '../../claims/device.js';
-import { readClaimState } from '../../claims/stale.js';
-import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 
 import { CLAIM_TAKE_DECLARATION, CLAIM_TAKE_STALE_FLAG } from './declarations.js';

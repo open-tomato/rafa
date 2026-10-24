@@ -15,9 +15,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+
 import { createGitRunner } from '../pr/index.js';
 
-import { makeOwnershipCommit, pushNewClaimBranch } from './git.js';
 import { claimPlanIssue } from './plan-claim.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-claim-template-')));

@@ -28,11 +28,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
-import { parseClaimMessage } from '../claims/record.js';
 import { createClaimAcceptCommand } from '../commands/claim/accept.js';
 import { createClaimHandCommand } from '../commands/claim/hand.js';
 import { createClaimReleaseCommand } from '../commands/claim/release.js';

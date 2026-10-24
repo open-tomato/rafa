@@ -57,13 +57,20 @@
     "./runtime/live-loops": "./src/runtime/live-loops.ts",
     "./utils/*": "./src/utils/*.ts",
     "./board/naming": "./src/board/naming.ts",
+    "./claims/git": "./src/claims/git.ts",
+    "./claims/record": "./src/claims/record.ts",
+    "./claims/stale": "./src/claims/stale.ts",
     "./effort/session-log": "./src/effort/session-log.ts",
     "./effort/session-log-dirs": "./src/effort/session-log-dirs.ts",
     "./release/fragment": "./src/release/fragment.ts",
     "./schema/frontmatter": "./src/schema/frontmatter.ts",
+    "./start/branch-decision": "./src/start/branch-decision.ts",
     "./start/worktree-dir": "./src/start/worktree-dir.ts",
+    "./triage/bug-key": "./src/triage/bug-key.ts",
     "./triage/doc-only": "./src/triage/doc-only.ts",
-    "./triage/local-paths": "./src/triage/local-paths.ts"
+    "./triage/filed-text": "./src/triage/filed-text.ts",
+    "./triage/local-paths": "./src/triage/local-paths.ts",
+    "./triage/test-failure": "./src/triage/test-failure.ts"
   },
   "scripts": {
     "lint": "eslint .",

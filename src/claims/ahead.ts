@@ -70,16 +70,13 @@
  */
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
-import type { GitRunner } from '@open-tomato/rafa-pr';
-
-import { gitSaid } from '@open-tomato/rafa-pr';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { planStub } from '@open-tomato/rafa/board/naming';
+import { CLAIMED_REASONS, claimBranchGlob, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from '@open-tomato/rafa/claims/git';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
-
-import { branchNameFor, REMOTE } from '../start/branch-decision.js';
-
-import { CLAIMED_REASONS, claimBranchGlob, claimBranchIssue, LANDED_FLAGS, porcelainFor, STALE_LEASE } from './git.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+import { branchNameFor, REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 /** The line ahead of the home issue, as the walk read it. */
 export interface AheadCandidate {

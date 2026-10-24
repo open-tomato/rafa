@@ -77,9 +77,8 @@ import { basename } from 'node:path';
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { familyOf, NEW_CONTEXT_LEAF } from '@open-tomato/rafa/errors/codes';
-
-import { strippedText } from './bug-key.js';
-import { testFailureOf, testFilesIn } from './test-failure.js';
+import { strippedText } from '@open-tomato/rafa/triage/bug-key';
+import { testFailureOf, testFilesIn } from '@open-tomato/rafa/triage/test-failure';
 
 /** A run of non-word characters, which words are split on. */
 const NON_WORD = /\W+/;

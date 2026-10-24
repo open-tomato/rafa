@@ -51,10 +51,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { issueLine } from '@open-tomato/rafa/core/plan';
+import { validatePlan } from '@open-tomato/rafa/plan/validate';
 
 import { createCommandRegistry } from '../../cli/registry.js';
 import { parsePlan } from '../../plan/index.js';
-import { validatePlan } from '../../plan/validate.js';
 import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
 import {
   dispatchCaptured,

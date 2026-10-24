@@ -36,7 +36,7 @@
  * ## Which branches count
  *
  * Every ref the branch scan answered (`scanClaimBranches`,
- * `src/board/roadmap.ts`): this checkout's branches and remote-tracking
+ * `src/board/branch-scan.ts`): this checkout's branches and remote-tracking
  * refs, and the remote's heads. A ref counts when `claimBranchOfRef`
  * (`src/board/roadmap-claims.ts`) reads a claim branch in it under the
  * scan's own template (`BranchScan.branchTemplate`): the `naming.branch`
@@ -59,17 +59,17 @@
  * check spends one small incremental read. A listing that rejects answers
  * a report with no finding and the rejection as its one notice.
  */
+import type { BranchScan } from '../board/branch-scan.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from '../board/roadmap-board.js';
-import type { BranchScan } from '../board/roadmap.js';
 
+import { claimBranchIssue } from '@open-tomato/rafa/claims/git';
 import { DEFAULT_BRANCH_TEMPLATE, branchFromTemplate, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { isEpicIssue } from '../board/epic-walk.js';
 import { claimBranchOfRef } from '../board/roadmap-claims.js';
 import { parseRoadmapBody } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup.js';
+import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 
-import { claimBranchIssue } from './git.js';
 import { STAGE_LABELS } from './labels.js';
 
 /** What every line {@link driftLines} writes opens with. */

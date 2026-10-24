@@ -4,21 +4,6 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-pr --entry`.
  */
 
-export {
-  bodyOf,
-  checkoutOf,
-  draftOf,
-  redacted,
-  settled,
-} from '../../src/bugs/fill.js';
-
-export {
-  DIRTY_MARK,
-  NO_COMMIT,
-  codeVersionOf,
-  versionsText,
-} from '../../src/bugs/versions.js';
-
 export type {
   BranchSettings,
   BranchesRead,
@@ -127,7 +112,6 @@ export type {
   OpenedNextSources,
 } from '../../src/next/sources.js';
 export {
-  DEFAULT_BASE_BRANCH,
   ghNextBoard,
   openNextSources,
 } from '../../src/next/sources.js';
@@ -161,7 +145,6 @@ export type {
   ResolvePrProviderOptions,
   WaitOptions,
   WaitResult,
-  WorkingTreeStatus,
   WorktreeEntry,
 } from '../../src/pr/index.js';
 export {
@@ -175,7 +158,6 @@ export {
   ghPreflightItems,
   ghPullRequestsIn,
   gitSaid,
-  parseWorkingTree,
   parseWorktrees,
   pushBranch,
   requireGhProvider,
@@ -188,14 +170,11 @@ export type { OwnerApproval } from '../../src/pr/owner-approval.js';
 export {
   ghMissingMessage,
   ghUnauthenticatedMessage,
-  shellQuote,
 } from '../../src/pr/preflight-items.js';
 
 export { parseFailedLogLine } from '../../src/pr/triage/evidence.js';
 
 export type { MergedPullRequest } from '../../src/pr/types.js';
-
-export { WORKTREES_SUBDIR } from '../../src/pr/worktree.js';
 
 export type {
   BaseRunAnswer,
@@ -205,11 +184,6 @@ export {
   createBaseRunCache,
   runNamedTestAt,
 } from '../../src/triage/base-run.js';
-
-export {
-  artifactOf,
-  hasText,
-} from '../../src/triage/bug-key.js';
 
 export type { InheritedTriage } from '../../src/triage/inherited.js';
 export { inheritedFailureOf } from '../../src/triage/inherited.js';
@@ -249,15 +223,10 @@ export {
 
 export type {
   BugTriage,
-  NamedSecret,
-  SecretEnvironment,
   TriageOptions,
   TriageResult,
 } from '../../src/triage/triage.js';
 export {
-  TRIAGE_MODULE,
   blockerTextOf,
-  namedSecrets,
-  redactSecrets,
   triageReport,
 } from '../../src/triage/triage.js';

@@ -158,11 +158,10 @@
  * start the plan off the latest base — the one thing the offer exists to
  * prevent.
  */
-import type { GitResult, WorkingTreeStatus } from '../pr/index.js';
+import type { GitResult, WorkingTreeStatus } from '../core/git/index.js';
 
-import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
-
-import { gitSaid } from '../pr/index.js';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE } from '../core/config/sections.js';
+import { gitSaid } from '../core/git/index.js';
 
 /** The remote a plan's branch is created from and tracked on. */
 export const REMOTE = 'origin';

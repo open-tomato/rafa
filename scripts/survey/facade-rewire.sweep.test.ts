@@ -51,23 +51,57 @@ interface RewiredRow {
  * the row onto the facade: the three effort files of the skills report,
  * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
  * `src/inventory/browse.ts`.
- * Board's 21 load-cycle files are mostly run and pr files that board's files
- * reach through `src/claims/`, `src/next/` and `src/start/`. The same stage took
+ * Board's 19 load-cycle files are mostly run and pr files that board's files
+ * reach through `src/claims/`, `src/next/` and `src/start/`. On the graph the
+ * fourth decouple item's survey regenerated, the codemod reads 15 of them on
+ * a load cycle and `src/claims/drift.ts`, `src/claims/labels.ts`,
+ * `src/commands/switch.ts` and `src/start/triage.ts` to rewire. The dry run
+ * takes all four now, the facade having the names they import, so they stay
+ * on their paths until the rewire runs. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
- * `preflight-drift.ts` onto the facade.
- * Release's one board importer, `src/board/project/facts.ts`, is a back edge
- * the load-cycle group takes first.
- * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
- * pr's files reach, six of them release files that are back edges the
- * load-cycle group takes first. Its 18 back-edge files are board and release
- * files, every one earlier in the move order.
- * Run's 13 load-cycle files are board, pr and release files run's files
+ * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
+ * `src/epic/verify-run.ts` left the row in the fourth decouple item, which
+ * places them in board by name, and `src/claims/plan-claim.ts`, which took
+ * them by path then, took the facade.
+ * Release's one board importer, `src/board/project/facts.ts`, left the row
+ * in the fourth decouple item: its one release import by path was
+ * `directoryPrefix` and `fragmentIdOf`, which it takes from
+ * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
+ * stays, for `SettleForecast` and `nextVersion`.
+ * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
+ * pr's files reach, three of them release files that are back edges the
+ * load-cycle group takes first. `packages/rafa/src/claims/git.ts`,
+ * `packages/rafa/src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
+ * row in the fourth decouple item: their one pr import by path was the pr
+ * barrel, for core's git names and `WorkingTreeStatus`, which they take from
+ * `@open-tomato/rafa/core/git` now. Its 16 back-edge files are board and
+ * release files, every one earlier in the move order.
+ * `src/commands/issue/create.ts` left them in the same item: its one pr
+ * import by path was `TRIAGE_MODULE`, which it takes from
+ * `@open-tomato/rafa/triage/filed-text` now. So did
+ * `src/commands/issue/create-bug.ts`, whose pr imports by path were
+ * `packages/rafa/src/bugs/fill.ts` and `packages/rafa/src/bugs/versions.ts`,
+ * which the item's move list took into core.
+ * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
- * moves last. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
+ * moves last. Board's `src/board/gate.ts`, `src/board/project/rules.ts`,
+ * `src/board/roadmap-claims.ts` and `src/board/setup.ts` left them, and
+ * `src/board/issue-edit-state.ts` left the back-edge files, in the fourth
+ * decouple item: their run imports by path were
+ * `packages/rafa/src/plan/validate.ts`, `packages/rafa/src/claims/stale.ts`,
+ * `packages/rafa/src/claims/git.ts` and
+ * `packages/rafa/src/start/branch-decision.ts`, which the item's move list
+ * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
- * 15 back-edge files are board and pr files, every one earlier in the
- * move order.
+ * ten back-edge files are board and pr files, every one earlier in the
+ * move order. `src/board/spec-source.ts` and `src/commands/epic/close.ts`
+ * left them in the fourth decouple item: their one run import by path was
+ * `src/claims/ahead.ts` and `src/epic/verify-run.ts`, which it places in
+ * board by name. `src/commands/board/list.ts` and `src/commands/epic/new.ts`
+ * left them in the same item: their one run import by path was
+ * `defaultBoardOnce` of `src/commands/switch.ts`, which it moves into
+ * board's `src/board/default-board-once.ts`.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
@@ -87,11 +121,9 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/bugs/filed-values.ts': 'loadCycle',
-      'src/claims/ahead.ts': 'loadCycle',
       'src/claims/drift.ts': 'loadCycle',
       'src/claims/labels.ts': 'loadCycle',
       'src/commands/switch.ts': 'loadCycle',
-      'src/epic/verify-run.ts': 'loadCycle',
       'src/next/hop-action.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
@@ -112,7 +144,6 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/board/project/facts.ts': 'loadCycle',
       'src/docs/release-issue.ts': 'loadCycle',
     },
     packageName: 'rafa-release',
@@ -120,15 +151,12 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/board/project/add-filed.ts': 'backEdge',
-      'src/claims/git.ts': 'loadCycle',
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
       'src/commands/epic/close-docs.ts': 'backEdge',
       'src/commands/epic/close-triage.ts': 'backEdge',
       'src/commands/epic/close.ts': 'backEdge',
-      'src/commands/issue/create-bug.ts': 'backEdge',
-      'src/commands/issue/create.ts': 'backEdge',
       'src/commands/release/fragment.ts': 'backEdge',
       'src/commands/release/list.ts': 'backEdge',
       'src/commands/release/publish.ts': 'backEdge',
@@ -145,11 +173,9 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
       'src/release/branch-forecast.ts': 'loadCycle',
-      'src/release/fragment-tree.ts': 'loadCycle',
       'src/release/prepare.ts': 'backEdge',
       'src/release/settle-pr.ts': 'loadCycle',
       'src/release/verify.ts': 'backEdge',
-      'src/start/branch-decision.ts': 'loadCycle',
       'src/start/pr-lifecycle.ts': 'loadCycle',
       'src/start/pr-retarget.ts': 'loadCycle',
       'src/start/suite-blocker.ts': 'loadCycle',
@@ -158,18 +184,9 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/board/gate.ts': 'loadCycle',
-      'src/board/issue-edit-state.ts': 'backEdge',
-      'src/board/project/rules.ts': 'loadCycle',
-      'src/board/roadmap-claims.ts': 'loadCycle',
-      'src/board/setup.ts': 'loadCycle',
-      'src/board/spec-source.ts': 'backEdge',
       'src/cleanup/groups.ts': 'loadCycle',
       'src/cleanup/steps.ts': 'loadCycle',
-      'src/commands/board/list.ts': 'backEdge',
       'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/epic/close.ts': 'backEdge',
-      'src/commands/epic/new.ts': 'backEdge',
       'src/commands/issue/ready.ts': 'backEdge',
       'src/commands/pr/merge-cleanup.ts': 'backEdge',
       'src/commands/pr/merge-followups.ts': 'backEdge',

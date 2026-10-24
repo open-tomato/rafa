@@ -1,11 +1,8 @@
-import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
-import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
-import type { IssueDraft } from '@open-tomato/rafa/ports';
+import type { BugRecord, BugRules } from './record.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { IssueDraft } from '../ports/index.js';
 
 import { describe, expect, test } from 'bun:test';
-
-import { EMPTY_BUG_RECORD, renderBugBody } from '@open-tomato/rafa/bugs/record';
-import { DEFAULT_BUG_TITLE, UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 
 import {
   ARTIFACT_MAX_LINES,
@@ -17,6 +14,8 @@ import {
   redacted,
   settled,
 } from './fill.js';
+import { EMPTY_BUG_RECORD, renderBugBody } from './record.js';
+import { DEFAULT_BUG_TITLE, UNKNOWN_VALUE } from './title.js';
 
 /** A runner answering `result` to every call, and recording each call's arguments. */
 function gitAnswering(result: GitResult): { readonly git: GitRunner; readonly calls: (readonly string[])[] } {

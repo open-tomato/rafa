@@ -83,9 +83,9 @@ import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { artifactOf } from '@open-tomato/rafa/triage/bug-key';
 import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
 
-import { artifactOf } from './bug-key.js';
 import { insertLeftoverRepair } from './leftover-repair.js';
 import { CHECKED_KINDS, checkKind, namedTestOf } from './own-check.js';
 

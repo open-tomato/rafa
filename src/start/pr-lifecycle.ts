@@ -126,6 +126,7 @@ import type {
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 
+import { claimBranchIssue } from '@open-tomato/rafa/claims/git';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -134,7 +135,6 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { readDeviceStoreId } from '../claims/device.js';
-import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
 import {
   compareUrl,

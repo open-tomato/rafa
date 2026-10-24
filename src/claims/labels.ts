@@ -49,9 +49,8 @@
  */
 import type { IssueBoard } from '../board/issue-board.js';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 /** What every warning this module answers opens with. */
 const PREFIX = 'claim labels';

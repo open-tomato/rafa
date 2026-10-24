@@ -20,7 +20,9 @@ import type { MergeRefusalReading } from './merge.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { parseWorkingTree, readMergeRefusal } from './merge.js';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
+
+import { readMergeRefusal } from './merge.js';
 import { readUnchecked } from './unchecked.js';
 
 /** A reading that passes every refusal but the checks verdict itself. */

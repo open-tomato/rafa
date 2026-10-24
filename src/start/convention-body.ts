@@ -52,16 +52,15 @@
 import type { BodyAnnouncer, ReleaseBodySeams, ReleaseBodyWrite } from './release-body.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
-import type { SecretEnvironment } from '@open-tomato/rafa-pr';
+import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 
 import { homedir } from 'node:os';
-
-import { namedSecrets, redactSecrets } from '@open-tomato/rafa-pr';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { RELEASE_BODY_SEAMS, writeBodyWith } from './release-body.js';

@@ -113,7 +113,9 @@ import {
 import { bugRulesOf, ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
 import { createJsonOutput } from '../adapters/output/json.js';
@@ -124,13 +126,12 @@ import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
 import { scopeWarning } from '../board/project/refresh-warnings.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { bugKeyOf, createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
+import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 
 import {
   createStartTriage,
   describeStartTriage,
   NOT_RESOLVED_REASON,
-  unresolvedTracker,
 } from './triage.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-start-triage-'));

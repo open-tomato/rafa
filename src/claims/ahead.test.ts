@@ -12,7 +12,7 @@
  */
 import type { AheadCandidate, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,8 +21,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { branchName } from '@open-tomato/rafa/board/naming';
-
-import { createGitRunner } from '../pr/index.js';
+import { makeOwnershipCommit } from '@open-tomato/rafa/claims/git';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import {
   aheadClaimedLine,
@@ -32,7 +32,6 @@ import {
   pushClaimsAtomic,
   resolveAheadTarget,
 } from './ahead.js';
-import { makeOwnershipCommit } from './git.js';
 
 const HOME = 'feat/rafa-7-home';
 const AHEAD = 'feat/rafa-8-ahead';

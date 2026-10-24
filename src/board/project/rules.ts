@@ -112,8 +112,9 @@ import type { RoadmapLine } from '../roadmap.js';
 import type { HorizonOption, StageOption } from './options.js';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
 import { EPIC_TYPE_LABEL } from '../epic-context.js';
 import { HORIZON_LABEL_PREFIX } from '../epic-problems.js';
 import { epicLines } from '../epic-walk.js';

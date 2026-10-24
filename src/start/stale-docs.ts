@@ -97,9 +97,9 @@ import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
+import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type {
   GitRunner,
-  SecretEnvironment,
   StaleDocEntry,
   StaleDocLineResult,
   StaleDocTickResult,
@@ -116,8 +116,6 @@ import {
   addStaleDocLine,
   createGitRunner,
   docUpdateLineText,
-  namedSecrets,
-  redactSecrets,
   staleDocLineText,
   staleDocsVersion,
   tickStaleDocLine,
@@ -138,6 +136,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan , readDocsRole } from '@open-tomato/rafa/core/plan';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { resolveTracker } from '../adapters/tracker/resolve.js';

@@ -50,16 +50,16 @@ import type { MergeRefusalReading } from './merge.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
+
 import { classifyState } from './checks.js';
 import {
   cleanUpSteps,
   commandLine,
   parseTreePaths,
-  parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
   remainingFrom,
-  unquoteGitPath,
   untrackedIncoming,
   untrackedLeftLine,
   worktreesHolding,
@@ -100,61 +100,6 @@ const GREEN: MergeRefusalReading = {
 function row(name: string, state: string): CheckRow {
   return { name, state, link: '', outcome: classifyState(state) };
 }
-
-describe('parseWorkingTree', () => {
-  it('reads a clean tree from the empty answer git gives for one', () => {
-    const tree = parseWorkingTree('');
-    expect(tree.clean).toBe(true);
-    expect(tree.entries).toEqual([]);
-  });
-
-  it('keeps each porcelain line as git wrote it, quoting included', () => {
-    // Both lines are git 2.50.1 output for a staged path with a space
-    // and an untracked file; see the module note.
-    const tree = parseWorkingTree('A  "src/a b.ts"\n?? untracked.txt\n');
-    expect(tree.clean).toBe(false);
-    expect(tree.entries).toEqual(['A  "src/a b.ts"', '?? untracked.txt']);
-  });
-
-  it('counts staged, unstaged and untracked lines alike', () => {
-    const tree = parseWorkingTree('M  a.ts\n M b.ts\n?? c.ts\n');
-    expect(tree.entries).toHaveLength(3);
-  });
-
-  it('drops a trailing carriage return rather than keeping it in the line', () => {
-    expect(parseWorkingTree('?? a.ts\r\n').entries).toEqual(['?? a.ts']);
-  });
-
-  it('splits the lines into tracked lines as git wrote them and untracked paths', () => {
-    const tree = parseWorkingTree('M  a.ts\n M b.ts\n?? c.ts\n?? .claude/\n');
-    expect(tree.tracked).toEqual(['M  a.ts', ' M b.ts']);
-    expect(tree.untracked).toEqual(['c.ts', '.claude/']);
-  });
-
-  it('reads a quoted untracked path with a space as the path itself', () => {
-    // `?? "a b.txt"` is git 2.53.0's porcelain for an untracked `a b.txt`;
-    // see `unquoteGitPath`.
-    const tree = parseWorkingTree('?? "a b.txt"\n');
-    expect(tree.untracked).toEqual(['a b.txt']);
-    expect(tree.entries).toEqual(['?? "a b.txt"']);
-  });
-});
-
-describe('unquoteGitPath', () => {
-  it('leaves a path git printed bare as it is', () => {
-    expect(unquoteGitPath('src/a.ts')).toBe('src/a.ts');
-  });
-
-  it('undoes octal escapes into the UTF-8 bytes git wrote them for', () => {
-    // `"\303\251.txt"` is git 2.53.0's spelling of `é.txt`, in porcelain
-    // and in ls-tree alike.
-    expect(unquoteGitPath('"\\303\\251.txt"')).toBe('é.txt');
-  });
-
-  it('undoes an escaped quote, backslash and tab', () => {
-    expect(unquoteGitPath('"a\\"b\\\\c\\td"')).toBe('a"b\\c\td');
-  });
-});
 
 describe('parseTreePaths', () => {
   it('reads one path per line of ls-tree --name-only, unquoting each', () => {

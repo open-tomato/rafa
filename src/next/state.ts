@@ -166,11 +166,11 @@ import type { NextSources, NextWorld, OpenPull } from './readings.js';
 
 import { planLabel } from '@open-tomato/rafa/core/loop/readings';
 import { plural } from '@open-tomato/rafa/core/plan';
+import { hasDiverged } from '@open-tomato/rafa/start/branch-decision';
 
 import { blockedLineSentence, notReadySentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { hasDiverged } from '../start/branch-decision.js';
 
 import { homeAfterLoop, readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';
 import { readPullsUnusable, readTreeModified } from './preconditions.js';

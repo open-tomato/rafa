@@ -4,26 +4,7 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-run --entry`.
  */
 
-export type {
-  AheadCandidate,
-  AheadRequest,
-} from '../../src/claims/ahead.js';
-export {
-  aheadClaimedLine,
-  aheadEnabled,
-  aheadNotClaimedWarning,
-  nextUndoneLine,
-} from '../../src/claims/ahead.js';
-
 export { readDeviceStoreId } from '../../src/claims/device.js';
-
-export type { ClaimBranchReading } from '../../src/claims/git.js';
-export {
-  claimBranchGlob,
-  claimBranchIssue,
-  fetchClaimBranches,
-  readClaimBranch,
-} from '../../src/claims/git.js';
 
 export { STAGE_LABELS } from '../../src/claims/labels.js';
 
@@ -33,17 +14,6 @@ export type {
   PlanClaimRequest,
 } from '../../src/claims/plan-claim.js';
 export { claimPlanIssue } from '../../src/claims/plan-claim.js';
-
-export type {
-  ClaimOwnership,
-  ClaimState,
-  ClaimStateName,
-} from '../../src/claims/stale.js';
-export {
-  CLAIMED_LABEL,
-  IN_DEVELOPMENT_LABEL,
-  readClaimState,
-} from '../../src/claims/stale.js';
 
 export type {
   BranchRow,
@@ -90,17 +60,7 @@ export {
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
-export {
-  default as command,
-  defaultBoardOnce,
-} from '../../src/commands/switch.js';
-
-export type {
-  CheckAnswered,
-  CheckUnanswered,
-  VerifyRunRan,
-} from '../../src/epic/verify-run.js';
-export { runVerification } from '../../src/epic/verify-run.js';
+export { default as command } from '../../src/commands/switch.js';
 
 export type { EventLine } from '../../src/loop/events-file.js';
 export {
@@ -227,9 +187,6 @@ export {
   storeRuleLine,
 } from '../../src/plan/store-rules.js';
 
-export type { PlanValidation } from '../../src/plan/validate.js';
-export { validatePlan } from '../../src/plan/validate.js';
-
 export { isFirstDispatch } from '../../src/preflight/first-dispatch.js';
 
 export type {
@@ -281,13 +238,6 @@ export {
   outcomeProblem,
   runBuild,
 } from '../../src/runtime/install.js';
-
-export {
-  REMOTE,
-  branchNameFor,
-  hasDiverged,
-  parseBaseStanding,
-} from '../../src/start/branch-decision.js';
 
 export {
   isBudgetExit,
@@ -416,7 +366,6 @@ export { readAlwaysRunFiles } from '../../src/start/task-gate-lines.js';
 export {
   createStartTriage,
   runStartFailures,
-  unresolvedTracker,
 } from '../../src/start/triage.js';
 
 export { readTypeCheckRecipe } from '../../src/start/type-step.js';

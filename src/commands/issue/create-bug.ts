@@ -67,19 +67,18 @@ import type { IssueDraft } from '@open-tomato/rafa/ports';
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
+import { bodyOf, checkoutOf, draftOf, redacted, settled } from '@open-tomato/rafa/bugs/fill';
 import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
 import { bugProblems, EMPTY_BUG_RECORD, hasBugSections, parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { firstProjectPath } from '@open-tomato/rafa/bugs/stack-path';
 import { parseTitle } from '@open-tomato/rafa/bugs/title';
+import { codeVersionOf, versionsText } from '@open-tomato/rafa/bugs/versions';
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isInside, packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
-
-import { bodyOf, checkoutOf, draftOf, redacted, settled } from '../../bugs/fill.js';
-import { codeVersionOf, versionsText } from '../../bugs/versions.js';
-import { namedSecrets, redactSecrets } from '../../triage/triage.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal, readNonBlankFlag } from './issue-tracker.js';
 

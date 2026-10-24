@@ -34,12 +34,11 @@
  * found again in `[redacted: HOST]` and a secret whose value is
  * `redacted` in every marker.
  */
-import type { NamedSecret, SecretEnvironment } from '@open-tomato/rafa-pr';
+import type { NamedSecret, SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 
 import { homedir, hostname } from 'node:os';
 
-import { namedSecrets, redactSecrets } from '@open-tomato/rafa-pr';
-
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { HOME_MARKER, localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 /** What stands for an email address in a scrubbed text. */

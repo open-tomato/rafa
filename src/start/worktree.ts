@@ -180,9 +180,9 @@
  * was left alone, which the `git status --short` readings above are the
  * ground for.
  */
-import type { BranchPlan, BranchRoute } from './branch-decision.js';
 import type { ClaimCatchUpReading } from './claim-catch-up.js';
 import type { Sleep } from './worktree-upstream.js';
+import type { BranchPlan, BranchRoute } from '@open-tomato/rafa/start/branch-decision';
 import type { GitResult, GitRunner, WorktreeEntry } from '@open-tomato/rafa-pr';
 
 import { realpathSync } from 'node:fs';
@@ -192,9 +192,9 @@ import { createGitRunner, gitSaid, parseWorktrees } from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from '@open-tomato/rafa/start/branch-decision';
 import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
-import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';
 import { readClaimCatchUp } from './claim-catch-up.js';
 import { isConfigLockRefusal, setUpstream, upstreamArgv, upstreamRefusal } from './worktree-upstream.js';
 

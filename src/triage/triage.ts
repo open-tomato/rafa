@@ -227,9 +227,10 @@
  * runner, environment and rules this module is handed; its note holds
  * each fill. The title is `bugTitle` over the record and the rules'
  * template (`../bugs/record.ts`), the summary already cut and redacted.
- * The draft's `module` is the record's, or {@link TRIAGE_MODULE},
- * `unassigned`, for `unknown`: the module the GitHub adapter's `get`
- * answers for an issue with no module label. Its `cause` is the
+ * The draft's `module` is the record's, or {@link TRIAGE_MODULE}
+ * (`packages/rafa/src/triage/filed-text.ts`), `unassigned`, for
+ * `unknown`: the module the GitHub adapter's `get` answers for an issue
+ * with no module label. Its `cause` is the
  * record's, which the `github` adapter files as a label and the `local`
  * adapter keeps in its file. The private tracker's issue carries the
  * same record, and a machine fault is skipped before any is built.
@@ -255,9 +256,10 @@
  * is read in the checkout too, so a path a filed body names is stamped
  * against the tree the session saw.
  *
- * {@link namedSecrets} answers the value of every `env` item under
- * `prerequisites`, both tiers, and of each of {@link SECRET_ENV_NAMES}
- * that is set. {@link redactSecrets} replaces each value with
+ * `namedSecrets` answers the value of every `env` item under
+ * `prerequisites`, both tiers, and of each of `SECRET_ENV_NAMES` that is
+ * set, both in core's `packages/rafa/src/triage/filed-text.ts`, beside
+ * {@link redactSecrets}, which replaces each value with
  * `[redacted: <NAME>]`. Every value a session or the plan supplied goes
  * through it before it reaches a title, a body, a comment or a `find`
  * query: the key is searched for as it was filed, built from the redacted
@@ -297,6 +299,7 @@ import type {
 } from '@open-tomato/rafa/store/findings';
 import type { MachineFault } from '@open-tomato/rafa/store/machine-fault';
 import type { TrackerRefWriteAction } from '@open-tomato/rafa/store/tracker-refs';
+import type { NamedSecret, SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -306,13 +309,14 @@ import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from '@open-tomato/rafa/triage/bug-key';
+import { redactSecrets, TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
-import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import {
   COMMENT_OPENING,
@@ -328,23 +332,8 @@ import { triageStaleDocs } from './stale-docs.js';
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
 
-/** The variables named as secrets whatever the config says, each when set. */
-export const SECRET_ENV_NAMES = ['GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'LINEAR_API_KEY'] as const;
-
-/** The module every triage draft names; see the module note. */
-export const TRIAGE_MODULE = 'unassigned';
-
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
-
-/** Names `./bug-key.ts` now holds, still answered from here. */
-export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
-
-/** One named secret: the variable's name and the value it held. */
-export interface NamedSecret {
-  readonly name: string;
-  readonly value: string;
-}
 
 /**
  * Where a bug goes: the tracker the chain landed on, the private one, or
@@ -457,9 +446,10 @@ export interface TriageOptions {
    */
   readonly privateTracker?: Tracker;
   /**
-   * The secrets every filed text is redacted of, as {@link namedSecrets}
-   * answers them. Required rather than defaulted, so no caller files
-   * unredacted text by leaving them out.
+   * The secrets every filed text is redacted of, as `namedSecrets`
+   * (`packages/rafa/src/triage/filed-text.ts`) answers them. Required
+   * rather than defaulted, so no caller files unredacted text by leaving
+   * them out.
    */
   readonly secrets: readonly NamedSecret[];
   /**
@@ -520,9 +510,6 @@ export interface TriageOptions {
   readonly bugRules?: BugRules;
 }
 
-/** The environment a secret's value is read from. */
-export type SecretEnvironment = Readonly<Record<string, string | undefined>>;
-
 /** Where a security bug's issue files live under a repository root. */
 export function privateTriageDir(repoRoot: string): string {
   return join(repoRoot, PRIVATE_TRIAGE_DIR);
@@ -539,57 +526,6 @@ export function createPrivateTriageTracker(
     now: options.now,
     warn: options.warn,
   });
-}
-
-/**
- * The named secrets, in order: each `env` item of `prerequisites.required`
- * then `prerequisites.optional`, then {@link SECRET_ENV_NAMES}, each name
- * once, at its first place. A variable that is unset, empty or blank names
- * nothing, since there is no value to take out.
- */
-export function namedSecrets(
-  config: Pick<RafaConfig, 'prerequisitesRequired' | 'prerequisitesOptional'>,
-  env: SecretEnvironment,
-): readonly NamedSecret[] {
-  const configured = [...config.prerequisitesRequired, ...config.prerequisitesOptional]
-    .filter((item) => item.kind === 'env')
-    .map((item) => item.name);
-  const names = [...new Set([...configured, ...SECRET_ENV_NAMES])];
-  return names.flatMap((name) => {
-    const value = env[name];
-    return typeof value === 'string' && value.trim().length > 0
-      ? [{ name, value }]
-      : [];
-  });
-}
-
-/** A text matched literally inside a regular expression. */
-function literalPattern(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * `text` with every value of `secrets` replaced by `[redacted: <NAME>]`.
- *
- * A value is matched byte for byte, and also with its surrounding
- * whitespace trimmed when it has some, as a variable read from a file
- * often does. Two names holding one value are both redacted under the
- * first. The replacement is one pass that tries longer values first, so a
- * value holding another is replaced whole, and a marker already written is
- * never matched again.
- */
-export function redactSecrets(text: string, secrets: readonly NamedSecret[]): string {
-  const nameByValue = new Map<string, string>();
-  for (const { name, value } of secrets) {
-    for (const form of [value, value.trim()]) {
-      if (form.trim().length > 0 && !nameByValue.has(form)) nameByValue.set(form, name);
-    }
-  }
-  if (nameByValue.size === 0) return text;
-
-  const values = [...nameByValue.keys()].sort((a, b) => b.length - a.length);
-  const pattern = new RegExp(values.map(literalPattern).join('|'), 'g');
-  return text.replace(pattern, (value) => `[redacted: ${nameByValue.get(value)}]`);
 }
 
 /** The text written for a report's blockers, or null when none has a `what`. */

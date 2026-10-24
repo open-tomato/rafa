@@ -73,6 +73,8 @@
  * that could be wrong is the one that creates nothing until git has
  * spoken again.
  */
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { WorkingTreeStatus } from '@open-tomato/rafa/core/git';
 import type {
   BranchOffer,
   BranchPlan,
@@ -80,15 +82,14 @@ import type {
   BranchStep,
   RunStanding,
   StandAsideReason,
-} from './branch-decision.js';
-import type { Prompter } from '@open-tomato/rafa/core/command';
-import type { GitRunner, WorkingTreeStatus } from '@open-tomato/rafa-pr';
+} from '@open-tomato/rafa/start/branch-decision';
+import type { GitRunner } from '@open-tomato/rafa-pr';
 
-import { createGitRunner, gitSaid, parseWorkingTree } from '@open-tomato/rafa-pr';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa-pr';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
 import {
   answeredYes,
   anyBranchStandsAside,
@@ -101,7 +102,7 @@ import {
   remoteTrackingRef,
   standsOn,
   treeRefusal,
-} from './branch-decision.js';
+} from '@open-tomato/rafa/start/branch-decision';
 
 /** The indent a quoted git line carries, as `./branch-decision.ts` indents its own. */
 const INDENT = '   ';

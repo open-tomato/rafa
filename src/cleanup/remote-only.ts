@@ -113,11 +113,11 @@ import type { BranchesUnread, PullRequests } from '@open-tomato/rafa-pr';
 
 import { isKept, readRemoteHead } from '@open-tomato/rafa-pr';
 
+import { claimBranchIssue, readClaimBranch } from '@open-tomato/rafa/claims/git';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { holdsClaim } from '../claims/device.js';
-import { claimBranchIssue, readClaimBranch } from '../claims/git.js';
 
 /** The remote whose branches are read. */
 const REMOTE = 'origin';

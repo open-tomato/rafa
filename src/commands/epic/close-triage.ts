@@ -16,14 +16,15 @@
  * cause: a criterion that does not hold is a product bug, so it goes to
  * the public tracker the chain resolves, resolved once and only when a
  * check failed
- * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
+ * (`resolveTracker`, with `unresolvedTracker` from
+ * `packages/rafa/src/ports/unresolved-tracker.ts`
  * standing in for a chain that landed nowhere, so each bug then fails
  * with its refusal). Its
  * `what` names the epic and the criterion, and its `artifact` is
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
  * recurrence key is that artifact, stripped of its numbers as
- * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
+ * `packages/rafa/src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
  * name, which keeps the epic's number, so a second close failing the same
  * criterion comments on the first issue rather than filing another, unless
  * that issue was closed as completed, when a new one is filed in its place
@@ -83,17 +84,20 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { AddIssueOptions, RefreshAddedItems } from '../../board/project/add-issue.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
-import type { BugTriage, NamedSecret, TriageResult } from '../../triage/triage.js';
+import type { BugTriage, TriageResult } from '../../triage/triage.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { TaskReport } from '@open-tomato/rafa/report/parse';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 
 import { join } from 'node:path';
 
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -101,8 +105,7 @@ import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
-import { unresolvedTracker } from '../../start/triage.js';
-import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';
+import { triageReport } from '../../triage/triage.js';
 
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 

@@ -15,6 +15,8 @@ import type { IssueBoard } from '../board/issue-board.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { createGhIssueBoard } from '../board/issue-board.js';
 
 import {
@@ -24,7 +26,6 @@ import {
   unlabelMerged,
   unlabelReleased,
 } from './labels.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 const ISSUE = 324;
 const OK: GhResult = { ok: true, stdout: '', stderr: '' };

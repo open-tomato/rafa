@@ -116,6 +116,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
@@ -123,7 +124,6 @@ import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
 import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
-import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';

@@ -10,8 +10,9 @@
  * `src/board/roadmap-board.ts`: every issue, open and closed, through
  * `BOARD_LIST_FIELDS` and `parseBoardListing`), and every column is read
  * off that one answer. The default board is ranked over the listing's
- * open `type:roadmap` rows by `defaultBoardOnce` (`../switch.ts`), never
- * a second `gh issue list --label`, and asked at most once.
+ * open `type:roadmap` rows by `defaultBoardOnce`
+ * (`src/board/default-board-once.ts`), never a second
+ * `gh issue list --label`, and asked at most once.
  *
  * ## Which boards
  *
@@ -64,13 +65,13 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readBoardBody } from '../../board/board-body.js';
+import { defaultBoardOnce } from '../../board/default-board-once.js';
 import { openBoards } from '../../board/epic-board.js';
 import { createOwnerResolver } from '../../board/owner-resolve.js';
 import { resolvePlace } from '../../board/place.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
-import { defaultBoardOnce } from '../switch.js';
 
 import { BOARD_LIST_DECLARATION } from './declarations.js';
 

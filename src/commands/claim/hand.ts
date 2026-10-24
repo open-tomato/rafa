@@ -7,7 +7,7 @@
  *
  * Handover is two-sided: this command is the owner's side, and
  * `rafa claim accept <n>` on the receiver is the other. Until the
- * receiver accepts, the owner stays the owner (`src/claims/record.ts`)
+ * receiver accepts, the owner stays the owner (`packages/rafa/src/claims/record.ts`)
  * and may withdraw.
  *
  * ## What is read
@@ -32,7 +32,7 @@
  *
  * The one branch of the issue whose claim this store holds gets one
  * empty commit made on its remote tip and pushed with
- * `--force-with-lease` on that tip (`src/claims/git.ts`). A claim
+ * `--force-with-lease` on that tip (`packages/rafa/src/claims/git.ts`). A claim
  * naming an id the store replaced is this store's too, as
  * `rafa claim release` reads it (`./release.ts`), and the commit pushed
  * over it names the store's own id, never the replaced one:
@@ -74,15 +74,15 @@
  * git refused otherwise.
  */
 import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
-import type { ClaimRecord } from '../../claims/record.js';
+import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { holdsClaim } from '../../claims/device.js';
-import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 
 import { CLAIM_HAND_DECLARATION, CLAIM_HAND_TO_FLAG, CLAIM_HAND_WITHDRAW_FLAG } from './declarations.js';

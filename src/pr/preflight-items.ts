@@ -57,27 +57,13 @@
 import type { PrProviderReading } from './provider.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
+
 /** The host asked about when a reading names none; see the module note. */
 export const DEFAULT_GH_HOST = 'github.com';
 
 /** How the failures say to get the CLI. The spec's install line. */
 export const GH_INSTALL_LINE = 'brew install gh (https://cli.github.com on every other platform)';
-
-/** A word a shell takes as it stands; anything else is quoted. */
-const PLAIN_WORD = /^[A-Za-z0-9._:/-]+$/;
-
-/** The quote a shell word is wrapped in. */
-const QUOTE = '\'';
-
-/** A single quote inside a single-quoted shell word: `'\''`. */
-const QUOTED_QUOTE = '\'\\\'\'';
-
-/** `word` as one shell word: quoted unless it is plain; see the module note. */
-export function shellQuote(word: string): string {
-  return PLAIN_WORD.test(word)
-    ? word
-    : QUOTE + word.split(QUOTE).join(QUOTED_QUOTE) + QUOTE;
-}
 
 /** The `gh auth login` line a failure for `host` tells the operator to run. */
 export function ghAuthLine(host: string): string {

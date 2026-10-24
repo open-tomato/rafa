@@ -1,8 +1,9 @@
 /**
  * Tests for the change fragment format (`packages/rafa/src/release/fragment.ts`):
  * the parser and its four refusals, the optional `package` key, the
- * serialiser, and the name allocation. Everything is driven from string literals; the module
- * opens no file.
+ * serialiser, the name allocation, and the two readers of a tree's
+ * names (`directoryPrefix`, `fragmentIdOf`). Everything is driven from
+ * string literals; the module opens no file.
  *
  * Things here that would pass while wrong:
  *
@@ -28,7 +29,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 
-import { allocateFragmentName, parseFragment, serializeFragment } from './fragment.js';
+import { allocateFragmentName, directoryPrefix, fragmentIdOf, parseFragment, serializeFragment } from './fragment.js';
 
 const VALID = [
   '---',
@@ -253,6 +254,22 @@ describe('allocateFragmentName', () => {
     expect(() => allocateFragmentName('', [])).toThrow('the plan id is empty');
     expect(() => allocateFragmentName('rafa 1', [])).toThrow('the plan id "rafa 1"');
     expect(() => allocateFragmentName('.hidden', [])).toThrow('the plan id ".hidden"');
+  });
+});
+
+describe('directoryPrefix', () => {
+  test('answers one prefix for a directory with and without its trailing slash', () => {
+    expect(directoryPrefix('.changes')).toBe('.changes/');
+    expect(directoryPrefix('./.changes/')).toBe('.changes/');
+    expect(directoryPrefix('.')).toBe('');
+  });
+});
+
+describe('fragmentIdOf', () => {
+  test('reads a fragment name as its id and answers null for a name that is none', () => {
+    expect(fragmentIdOf('rafa-247.md')).toBe('rafa-247');
+    expect(fragmentIdOf('rafa 247.md')).toBeNull();
+    expect(fragmentIdOf('rafa-247.txt')).toBeNull();
   });
 });
 

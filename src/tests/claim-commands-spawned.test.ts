@@ -52,10 +52,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { formatClaimMessage, parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { makeOwnershipCommit, pushNewClaimBranch } from '../claims/git.js';
-import { formatClaimMessage, parseClaimMessage } from '../claims/record.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
