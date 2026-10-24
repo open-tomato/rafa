@@ -123,7 +123,7 @@ afterAll(() => {
 /** Settles the checkout of a run on `project` with `--as-worktree`, recording git. */
 function settle(project: string, stub: string, prBase: string | null, calls: string[][]): ReturnType<typeof settleRunCheckout> {
   return settleRunCheckout(
-    { projectRoot: project, worktreeDir: WORKTREE_DIR, prBase, planStub: stub, args: AS_WORKTREE },
+    { projectRoot: project, worktreeDir: WORKTREE_DIR, worktreeSetup: null, prBase, planStub: stub, args: AS_WORKTREE },
     {
       dirs: () => ({ projectRoot: project, checkout: project }),
       worktree: (request) => addRunWorktree(request, { git: recordingRunner(calls) }),

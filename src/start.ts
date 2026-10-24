@@ -517,6 +517,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const { checkout, branch } = await settleRunCheckout({
     projectRoot: repoRoot,
     worktreeDir: runConfig.config.loopWorktreeDir,
+    worktreeSetup: runConfig.config.loopWorktreeSetup,
     prBase: runConfig.config.prBase,
     planStub,
     args,

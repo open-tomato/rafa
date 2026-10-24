@@ -266,6 +266,7 @@ describe('the two directories start.ts points each call at', () => {
     expect(START).toContain('const { checkout, branch } = await settleRunCheckout({');
     expect(input).toContain('projectRoot: repoRoot,');
     expect(input).toContain('worktreeDir: runConfig.config.loopWorktreeDir,');
+    expect(input).toContain('worktreeSetup: runConfig.config.loopWorktreeSetup,');
     expect(input).toContain('prBase: runConfig.config.prBase,');
     expect(input).toContain('args,');
     expect(input).not.toContain('checkout');
