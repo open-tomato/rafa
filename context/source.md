@@ -439,9 +439,11 @@ on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The four
 entries are board's calls, each into a higher package:
 
-- `addStaleDocLine`, pr's, in `src/docs/release-issue.ts` (reach 6), for
-  `rafa epic close`, which adds a line to the release's stale-docs issue, whose
-  module reads the release version helpers of `src/release/`.
+- `addStaleDocLine`, pr's, in `src/docs/release-issue.ts` (reach 6 at
+  aec5e4a, the figure the registry records; a second method read 95, so the
+  figure is unsettled and was not re-measured), for `rafa epic close`, which
+  adds a line to the release's stale-docs issue, whose module reads the
+  release version helpers of `src/release/`.
 - `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
   `rafa issue ready`, which ends naming the next step and runs its action
   through run's dispatch.
@@ -841,9 +843,10 @@ names come from, and the facade entry is no node.
     `src/commands/epic/new.ts` left them in the fourth decouple item,
     which moved `defaultBoardOnce` into `src/board/default-board-once.ts`,
     and `src/commands/issue/ready.ts` and
-    `src/commands/epic/close-triage.ts` in the fifth decouple item, which calls
-    `endWithNextStep` and `readStaleDocsVersion` through core's service
-    registry), and the eight `src/commands/pr/` files
+    `src/commands/epic/close-triage.ts` in the fifth decouple item, each
+    calling one run function through core's service registry (`ready.ts`
+    calls `endWithNextStep`, `close-triage.ts` calls `readStaleDocsVersion`),
+    and the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
     `wait.ts`). Each sits earlier in the move order than
