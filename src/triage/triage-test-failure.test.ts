@@ -4,6 +4,9 @@
  * A recording tracker over a temporary directory and the real SQLite store
  * under it: the same test failure worded two ways by two plans files one bug
  * and comments on it, and two different failures in one test case file two.
+ *
+ * Renamed from `test-failure-triage.test.ts` in decouple 4 (#808), so the
+ * move tool does not read it as `test-failure.ts`'s.
  */
 import type { TriageResult } from './triage.js';
 import type { IssueDraft, IssueRef, Tracker } from '@open-tomato/rafa/ports';
