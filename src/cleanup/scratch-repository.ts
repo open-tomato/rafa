@@ -15,7 +15,7 @@
  *   merged; {@link ScratchRepository.squashedTip} is the head commit
  *   such a pull request carries.
  * - `stale`: pushed, in sync with its upstream, and last committed 90
- *   days before {@link SCRATCH_NOW}.
+ *   days before the build's clock.
  * - `unpushed`: two commits and no upstream.
  * - `gone`: pushed, then deleted in the remote; `[gone]` once a fetch
  *   has pruned it.
@@ -28,16 +28,38 @@
  *
  * The last two branches are pushed and recent, so they are in no
  * group and only their worktrees show. Every commit but `stale`'s is
- * dated {@link SCRATCH_NOW}, so a reading taken with that clock finds
+ * dated the build's clock, so a reading taken with that clock finds
  * `stale` 90 days idle and nothing else old.
+ *
+ * ## The build's clock
+ *
+ * The repository is built around one moment,
+ * {@link ScratchOptions.now}, {@link SCRATCH_NOW} when left out, and
+ * answers it as {@link ScratchRepository.now}. Every commit date and
+ * every worktree file time is computed from it, so a build around
+ * another moment reads, with that moment as its clock, exactly as the
+ * default build reads with {@link SCRATCH_NOW}.
+ *
+ * Which clock a reader passes depends on who reads:
+ *
+ * - A case that reads in process passes `repo.now` as the reading's
+ *   `now`, which is {@link SCRATCH_NOW} for a build given no `now`;
+ *   such a case builds with no `now` and reads fixed dates.
+ * - A case that spawns the CLI builds with `now: new Date()`, because
+ *   the spawned process reads the real clock and cannot be handed
+ *   another. Built at the fixed moment instead, every branch dated
+ *   {@link SCRATCH_NOW} is past the default `cleanup.staleDays` (30)
+ *   of the real clock from 2026-10-24 12:00 UTC on, so the spawned
+ *   `rafa doctor` counts as stale branches the in-process reading
+ *   does not.
  *
  * ## The worktrees are dated too
  *
  * The idle rule reads a worktree's age off file times, not commits:
  * the worktree directory and the {@link ADMIN_FILES} of its
  * administrative directory (`./worktrees.ts`). Git writes those at the
- * real moment the repository is built, so each of them is set to
- * {@link SCRATCH_NOW} once everything else is done. Left at the real
+ * real moment the repository is built, so each of them is set to the
+ * build's clock once everything else is done. Left at the real
  * time, a reading with the {@link SCRATCH_NOW} clock would find every
  * worktree modified AFTER its own clock once the calendar passed that
  * date; a negative age is below any `cleanup.worktreeIdleDays`, zero
@@ -54,8 +76,11 @@
  *
  * - `wt-held`: pushed and merged into `main` with a merge commit, and
  *   checked out in `.claude/worktrees/wt-held`, whose file times are
+ *   30 days past the build's clock, which for the default build is
  *   {@link SCRATCH_LATER}: a reading with that clock finds it `recent`,
  *   so the worktree cannot be ticked and its branch starts unticked.
+ *   Built around another `now`, the held worktree is dated 30 days
+ *   past it and {@link SCRATCH_LATER} is no longer its date.
  * - `fragment`: pushed, squash-merged into `main` (which also holds
  *   `.changes/{@link FRAGMENT_ID}.md`), then one local commit past the
  *   head adding that same fragment file; its remote branch is deleted,
@@ -102,10 +127,10 @@ import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-run';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-/** The moment every commit is dated, except `stale`'s. */
+/** The moment the default build is built around: every commit is dated it, except `stale`'s. */
 export const SCRATCH_NOW: Date = new Date('2026-09-24T12:00:00Z');
 
-/** How many days before {@link SCRATCH_NOW} the `stale` branch was last committed. */
+/** How many days before the build's clock the `stale` branch was last committed. */
 export const STALE_AGE_DAYS = 90;
 
 /** The lock reason `wt-locked` carries. */
@@ -113,12 +138,16 @@ export const LOCK_REASON = 'scratch lock';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** How many days past {@link SCRATCH_NOW} {@link SCRATCH_LATER} is. */
+/**
+ * How many days past the build's clock the held worktree is dated, and
+ * so how many past {@link SCRATCH_NOW} {@link SCRATCH_LATER} is.
+ */
 const LATER_DAYS = 30;
 
 /**
- * The clock a past-head reading runs with: the worktree `wt-held` is
- * dated to it, so it is no idle at all and reads `recent`.
+ * The clock a past-head reading of the default build runs with: that
+ * build dates the worktree `wt-held` to it, so it is no idle at all
+ * and reads `recent`.
  */
 export const SCRATCH_LATER: Date = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
 
@@ -159,6 +188,12 @@ export interface ScratchOptions {
   readonly pastHead?: boolean;
   /** Add the remote-only set of the module note; false when left out. */
   readonly remoteOnly?: boolean;
+  /**
+   * The moment the repository is built around, which every commit date
+   * and worktree file time is computed from; {@link SCRATCH_NOW} when
+   * left out. See the module note for which clock a reader passes.
+   */
+  readonly now?: Date;
 }
 
 /** What {@link createScratchRepository} built. */
@@ -171,6 +206,12 @@ export interface ScratchRepository {
   readonly clone: string;
   /** An empty home directory, for `~/.rafa/worktrees/`. */
   readonly home: string;
+  /**
+   * The moment it was built around, {@link ScratchOptions.now} or
+   * {@link SCRATCH_NOW}: the clock a reader passes to read it as the
+   * module note describes.
+   */
+  readonly now: Date;
   /** The worktree paths by name. */
   readonly worktrees: Readonly<Record<'clean' | 'dirty' | 'locked', string>>;
   /** The past-head set; null unless {@link ScratchOptions.pastHead} asked for it. */
@@ -185,6 +226,7 @@ export interface ScratchRepository {
 
 /** Builds the repository the module note describes, in a fresh temporary directory. */
 export function createScratchRepository(options: ScratchOptions = {}): ScratchRepository {
+  const now = options.now ?? SCRATCH_NOW;
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-')));
   const bare = join(root, 'remote.git');
   const clone = join(root, 'clone');
@@ -195,7 +237,7 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     GIT_AUTHOR_DATE: at.toISOString(),
     GIT_COMMITTER_DATE: at.toISOString(),
   });
-  const run = (args: readonly string[], cwd: string, at: Date = SCRATCH_NOW): string => {
+  const run = (args: readonly string[], cwd: string, at: Date = now): string => {
     const result = spawnSync('git', [...args], {
       cwd,
       encoding: 'utf8',
@@ -214,11 +256,11 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     return result.stdout;
   };
   const git = (args: readonly string[], cwd: string = clone): string => run(args, cwd);
-  const commit = (message: string, at: Date = SCRATCH_NOW): void => {
+  const commit = (message: string, at: Date = now): void => {
     run(['commit', '--quiet', '--allow-empty', '-m', message], clone, at);
   };
   /** A branch off `main` with `commits` commits, pushed unless `push` is false. */
-  const branch = (name: string, commits: number, push: boolean, at: Date = SCRATCH_NOW): void => {
+  const branch = (name: string, commits: number, push: boolean, at: Date = now): void => {
     git(['switch', '--quiet', '-c', name, 'main']);
     for (let index = 1; index <= commits; index += 1) {
       commit(`${name} ${String(index)}`, at);
@@ -279,7 +321,7 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     commit('first');
     git(['push', '--quiet', '-u', 'origin', 'main']);
 
-    const staleAt = new Date(SCRATCH_NOW.getTime() - STALE_AGE_DAYS * MS_PER_DAY);
+    const staleAt = new Date(now.getTime() - STALE_AGE_DAYS * MS_PER_DAY);
     branch('merged', 1, true);
     branch('squashed', 1, true);
     branch('stale', 1, true, staleAt);
@@ -334,9 +376,9 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     }
     git(['worktree', 'lock', '--reason', LOCK_REASON, worktrees.locked]);
     // Last, so no git call after it moves a time again; see the module note.
-    const datedAt = new Map<string, Date>(Object.values(worktrees).map((path) => [path, SCRATCH_NOW]));
+    const datedAt = new Map<string, Date>(Object.values(worktrees).map((path) => [path, now]));
     if (pastHead !== null) {
-      datedAt.set(heldWorktree, SCRATCH_LATER);
+      datedAt.set(heldWorktree, new Date(now.getTime() + LATER_DAYS * MS_PER_DAY));
     }
     for (const [path, at] of datedAt) {
       const adminDir = git(GIT_DIR, path).trim();
@@ -350,6 +392,7 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
       bare,
       clone,
       home,
+      now,
       worktrees,
       pastHead: pastHead === null
         ? null
