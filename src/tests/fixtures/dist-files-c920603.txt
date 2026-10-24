@@ -137,6 +137,7 @@ index-<hash>.js
 index-<hash>.js
 index-<hash>.js
 index-<hash>.js
+index-<hash>.js
 index.js
 learning/index.js
 plan-prompt.md
