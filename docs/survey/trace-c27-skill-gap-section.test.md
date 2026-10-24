@@ -26,7 +26,7 @@ Outbound: no imports of project files, so 0 edges to any cluster (0 value, 0 typ
 
 By path and not by import, the cluster touches the two copies of the skill, the section's other readers being `extras/claude-code/rafa-hookify/install.ts` (copies the file by name) and `extras/claude-code/rafa-hookify/files/rafa-tooling-hook.ts` (whose message text names `module:cli-gap` and `rafa issue list --module=cli-gap`, which the section tells an agent to run). Neither is in the graph.
 
-Test reach, from `docs/survey/test-index.json`: the test has index 0 (no source file reached, no folder counted, `spawns` false). It is one of 44 of the 908 indexed tests at 0. Index 0 is the cheapest a test can be, and also means that `bun test --changed=<base>` never selects it by import graph: a change to either skill file selects nothing, and the test runs only in a full pass or when the test file itself changes. `src/config-schema-tests.ts` (`tests.alwaysRun`, default `src/**/*.sweep.test.ts`, line 135) is the setting that rescues a test of this shape, and this one does not carry the `.sweep.test.ts` suffix, so the pattern does not match it; `src/tests/sweep-suffix.sweep.test.ts` does not flag it either, because its detectors look for `git ls-files` calls and walks of the repository root, not a `readFileSync` of two fixed paths.
+Test reach, from `docs/survey/test-index.json`: the test has index 0 (no source file reached, no folder counted, `spawns` false). It is one of 44 of the 908 indexed tests at 0. Index 0 is the cheapest a test can be, and also means that `bun test --changed=<base>` never selects it by import graph: a change to either skill file selects nothing, and the test runs only in a full pass or when the test file itself changes. `packages/rafa/src/config-schema-tests.ts` (`tests.alwaysRun`, default `src/**/*.sweep.test.ts`, line 135) is the setting that rescues a test of this shape, and this one does not carry the `.sweep.test.ts` suffix, so the pattern does not match it; `src/tests/sweep-suffix.sweep.test.ts` does not flag it either, because its detectors look for `git ls-files` calls and walks of the repository root, not a `readFileSync` of two fixed paths.
 
 ## Entry points
 
@@ -38,7 +38,7 @@ No member is imported from outside the cluster. No `RafaCommand` is registered f
 | --- | --- | --- | --- |
 | Commands | **missing** | none | the cluster is a test; no `RafaCommand` |
 | Steps with guards | **missing** | none; the test is a gate on a document, run by `bun test` | no step, no guard class; what it guards is a property of two files, not a refusal in a run |
-| Config section | **missing** | none; reads no config key | none needed; `tests.alwaysRun` (`src/config-schema-tests.ts`) is the key that would make it a sweep, and it belongs to the tests section |
+| Config section | **missing** | none; reads no config key | none needed; `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`) is the key that would make it a sweep, and it belongs to the tests section |
 | Flows | **missing** | none | no multi-step path; one read, one compare |
 
 ### Commands
@@ -51,7 +51,7 @@ None. The check is a gate in the sense of `context/verification.md`: a test in t
 
 ### Config section
 
-None, and no config read. The file is selected or skipped by `tests.alwaysRun` and `tests.integration`, both declared in `src/config-schema-tests.ts`, which owns them.
+None, and no config read. The file is selected or skipped by `tests.alwaysRun` and `tests.integration`, both declared in `packages/rafa/src/config-schema-tests.ts`, which owns them.
 
 ### Flows
 

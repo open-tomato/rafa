@@ -52,7 +52,7 @@ Non-test imports leaving the cluster (170 edges, 70 distinct files; 128 value ed
 | Target cluster | Edges | Distinct files | Files a cut would have to give `c05-sessions` access to |
 | --- | --- | --- | --- |
 | `c01-github` | 52 | 24 | `src/adapters/tracker/github.ts`, `src/board/{blocked-line,blocked,boards,epic-board,epic-cancel-notice,epic-walk,epics,issue,place,roadmap-board,roadmap-epic-rows,roadmap-rows,roadmap,setup}.ts`, `src/cli/prompt/confirm.ts`, `src/commands/doctor-blocked.ts`, `src/commands/issue/ready.ts`, `src/next/{hop-chain,hop-record,relation-readings}.ts`, `src/pr/git.ts`, `src/project/position.ts`, `src/status/blocked-count.ts` |
-| `c03-config` | 38 | 7 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `src/config-schema-release.ts`, `src/config-sections.ts`, `src/effort/collect.ts`, `src/effort/sync/contact.ts` |
+| `c03-config` | 38 | 7 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `packages/rafa/src/config-schema-release.ts`, `src/config-sections.ts`, `src/effort/collect.ts`, `src/effort/sync/contact.ts` |
 | `c06-command` | 24 | 9 | `src/cli/{command,dispatch,registry,route}.ts`, `src/cli/prompt/{multi-select,terminal}.ts`, `src/adapters/output/events.ts`, `src/next/{epic-end,settle-step}.ts` |
 | `c07-index` | 20 | 9 | `src/board/roadmap-claims.ts`, `src/claims/record.ts`, `src/pr/{checks,index,merge,preflight-items,worktree}.ts`, `src/start/branch-decision.ts`, `src/status/claims.ts` |
 | `c02-active` | 19 | 8 | `src/adapters/output/active.ts`, `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/runtime.ts`, `src/suite/run.ts`, `src/utils/{declaration,plan-stamp,tracker}.ts` |
@@ -187,7 +187,7 @@ The cluster declares none of the config it reads; `src/config-schema.ts` (`c03-c
 | `status.notice` | a flag | `src/config-schema.ts` (`statusNotice`) | `status/hook.ts` |
 | `loop.worktreeDir` | `.rafa/worktrees` | `src/config-schema.ts` (`loopWorktreeDir`) | `commands/cleanup.ts`, `doctor-cleanup.ts`, `status/sections.ts`, `status/seen.ts`; `start/worktree-dir.ts` (`worktreeDirAt`) and `commands/pr/merge-loop-worktree.ts` through it |
 | `plan.dir` | `.rafa/plans` | `src/config-schema.ts` (`planDir`, `cli: true`) | `commands/plan/plan-files.ts`, `commands/pr/merge-loop-worktree.ts`, `next/sources.ts`, `runtime/install.ts`, `status/sections.ts` |
-| the pull request base (`prBase`) | the project's | `src/config-schema.ts` and `src/config-schema-release.ts` | `commands/cleanup.ts`, `doctor-cleanup.ts`, `next/sources.ts`, `status/sections.ts`, `status/seen.ts` |
+| the pull request base (`prBase`) | the project's | `src/config-schema.ts` and `packages/rafa/src/config-schema-release.ts` | `commands/cleanup.ts`, `doctor-cleanup.ts`, `next/sources.ts`, `status/sections.ts`, `status/seen.ts` |
 | `roadmap.issue` | none | `src/config-schema.ts` (`roadmapIssue`) | `next/sources.ts`, `status/sections.ts` |
 | `claims.staleAfter` | the claims' own | `src/config-schema.ts` (`claimsStaleAfter`) | `status/sections.ts` |
 | `dangerous.selfUpdateDuringLoop` | false | `src/config-schema.ts` | `commands/self-update.ts` |

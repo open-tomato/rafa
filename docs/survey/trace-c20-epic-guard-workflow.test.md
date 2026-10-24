@@ -18,7 +18,7 @@ The cluster spans one folder, `src/tests`, which holds 188 files over many clust
 
 - Outbound: none, by import. The test names `src/board/templates/epic-guard.yml` as a path, not as an import, so the graph draws nothing. The code that owns the template is `src/board/epic-guard.ts` (`EPIC_GUARD_PATH`, a reader of `templates/epic-guard.yml` beside the module, `src/board/templates/` in a checkout and `dist/templates/` in a build), in `c01-github`; the test does not import it.
 - Inbound: none. Nothing imports a test.
-- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders, no process spawned. It is the cheapest kind of test in the index; a change to any source file leaves it unselected by `bun test --changed=<base>`, since it has no import to be selected through, and the default `tests.alwaysRun` glob (`src/**/*.sweep.test.ts`, `src/config-schema-tests.ts`) does not name it, because the file is `.test.ts` and not `.sweep.test.ts`. It runs in the full suite and in a scoped run that names it, or when the template or the workflow is the changed path and someone selects it.
+- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders, no process spawned. It is the cheapest kind of test in the index; a change to any source file leaves it unselected by `bun test --changed=<base>`, since it has no import to be selected through, and the default `tests.alwaysRun` glob (`src/**/*.sweep.test.ts`, `packages/rafa/src/config-schema-tests.ts`) does not name it, because the file is `.test.ts` and not `.sweep.test.ts`. It runs in the full suite and in a scoped run that names it, or when the template or the workflow is the changed path and someone selects it.
 
 ## Entry points
 
@@ -30,7 +30,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | --- | --- | --- | --- |
 | Commands | **missing** | none; the file is a test | a test is not a command; the command it guards, `rafa init --board --epic-guard`, is registered from `init` (`src/commands/init.ts`, another cluster) |
 | Steps with guards | **missing** | none | the one assertion is a check, not a step a loop run contributes; it is the guard on a copy, not a guard class |
-| Config section | **missing** | none | no key of `src/config-schema*.ts` is read or declared here; `board.relationships` (which makes `--epic-guard` refuse in `native` mode, per `src/commands/init-board-native.test.ts`) belongs to the board section, not this file |
+| Config section | **missing** | none | no key of `config-schema*.ts` is read or declared here; `board.relationships` (which makes `--epic-guard` refuse in `native` mode, per `src/commands/init-board-native.test.ts`) belongs to the board section, not this file |
 | Flows | **missing** | none | no multi-step path is driven; the test is two reads and one equality |
 
 ### Commands
