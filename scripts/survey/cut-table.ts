@@ -324,7 +324,10 @@ export const CUT_RULES: CutRules = {
       named: RELEASE_NAMED,
     },
     {
-      folders: ['packages/rafa-effort/', 'src/effort/'],
+      // #1327: pass 4b emptied `src/effort/` but for
+      // `src/effort/store/index.ts`, the CLI's by name, so the folder
+      // leaves the list.
+      folders: ['packages/rafa-effort/'],
       name: 'rafa-effort',
       named: EFFORT_NAMED,
     },

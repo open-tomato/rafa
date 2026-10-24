@@ -276,12 +276,12 @@ describe('loadKeptReader', () => {
     if (init.exitCode !== 0) {
       throw new Error(`git init exited ${init.exitCode}: ${init.stderr.toString()}`);
     }
-    plant('src/effort/a.ts', 'export const a = 1;\n');
-    plant('src/effort/b.ts', 'import { a } from \'./a\';\nexport const b = a;\n');
-    plant('src/cli/x.ts', 'import { a } from \'../effort/a\';\nexport const x = a;\n');
-    plant('src/cli/x.test.ts', 'import { a } from \'../effort/a\';\nexport const t = a;\n');
+    plant('packages/rafa-effort/src/effort/a.ts', 'export const a = 1;\n');
+    plant('packages/rafa-effort/src/effort/b.ts', 'import { a } from \'./a\';\nexport const b = a;\n');
+    plant('src/cli/x.ts', 'import { a } from \'../../packages/rafa-effort/src/effort/a\';\nexport const x = a;\n');
+    plant('src/cli/x.test.ts', 'import { a } from \'../../packages/rafa-effort/src/effort/a\';\nexport const t = a;\n');
     plant('src/plan.ts', 'import { a } from \'@open-tomato/rafa-effort\';\nexport const p = a;\n');
-    plant('scripts/y.ts', 'import { a } from \'../src/effort/a\';\nexport const y = a;\n');
+    plant('scripts/y.ts', 'import { a } from \'../packages/rafa-effort/src/effort/a\';\nexport const y = a;\n');
   });
 
   afterEach(() => {

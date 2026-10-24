@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2168 files, 2140 of them in 12 packages (636 left to place) and 28 in 3 unassigned folders. Of the 4811 edges between two files neither of which is a test, value and type alike, 104 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2168 files, 2140 of them in 12 packages (648 left to place) and 28 in 3 unassigned folders. Of the 4811 edges between two files neither of which is a test, value and type alike, 104 point upward, 0 of them cleared by #118, and 77 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -18,10 +18,10 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 6 | `rafa-pr` | 212 | 91 | 119 | 2 | 52 | 0 | 52 |
 | 7 | `rafa-run` | 274 | 116 | 158 | 0 | 18 | 0 | 18 |
 | 8 | `rafa-release` | 123 | 54 | 69 | 0 | 1 | 0 | 1 |
-| 9 | `rafa-effort` | 64 | 33 | 31 | 0 | 0 | 0 | 0 |
+| 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 678 | 176 | 476 | 26 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 691 | 177 | 488 | 26 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -37,10 +37,10 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (65), `src/triage/` (36), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/bugs/fill.ts`, `src/bugs/versions.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/docs/open-lines.ts`, `src/docs/release-issue.ts`, `src/docs/task-reading.ts`, `src/next/owner-gate.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/pr/index.ts` |
 | `rafa-run` | `src/start/` (175), `src/claims/` (19), `src/suite/` (18), `src/commands/claim/` (15), `src/preflight/` (8), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/epic/verify-run.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/plan/validate.ts`, `src/runtime/install.ts`, `src/start/branch-decision.ts` |
 | `rafa-release` | `src/release/` (73), `src/commands/release/` (42), `packages/rafa-release/` (0) | `src/cleanup/past-head.ts`, `src/commands/doctor-ladder.ts`, `src/next/epic-end.ts`, `src/project/lock.ts` |
-| `rafa-effort` | `src/effort/` (64), `packages/rafa-effort/` (0) | - |
+| `rafa-effort` | `packages/rafa-effort/` (51) | - |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
-| `@open-tomato/rafa` | `src/cli/` (35) | `src/commands/index.ts`, `src/inventory/browse.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
+| `@open-tomato/rafa` | `src/cli/` (35) | `src/commands/index.ts`, `src/effort/store/index.ts`, `src/inventory/browse.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
 
 ## Upward edges by pair of packages
 
@@ -92,7 +92,7 @@ None.
 
 ## Files left to place
 
-No rule holds these 636 files. By folder, with the upward edges that end on its files:
+No rule holds these 648 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
@@ -147,6 +147,8 @@ No rule holds these 636 files. By folder, with the upward edges that end on its 
 | `src/tests/core-coupled/schema/` | 1 | 0 | 0 |
 | `src/tests/core-coupled/start/` | 1 | 0 | 0 |
 | `src/tests/core-coupled/utils/` | 3 | 0 | 0 |
+| `src/tests/effort-coupled/effort/` | 7 | 0 | 0 |
+| `src/tests/effort-coupled/effort/sync/` | 5 | 0 | 0 |
 | `src/tests/inventory-coupled/adapters/learning/` | 1 | 0 | 0 |
 | `src/tests/inventory-coupled/agents/` | 2 | 0 | 0 |
 | `src/tests/inventory-coupled/inventory/search/` | 1 | 0 | 0 |

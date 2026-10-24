@@ -219,11 +219,20 @@ describe('placeFile', () => {
     expect(placeFile('packages/eslint-config-extra/base.ts').package).toBe(CLI_PACKAGE);
   });
 
-  it('places every file under packages/rafa/ in core, and the rest of src/effort/ in rafa-effort', () => {
+  it('places every file under packages/rafa/ in core, effort\'s files in rafa-effort by folder, and src/effort/store/index.ts in the CLI by name', () => {
     expect(placeFile('packages/rafa/src/effort/store/sqlite.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa/src/effort/store/testdata/merge-scenarios.ts').package).toBe(CORE_PACKAGE);
-    expect(placeFile('src/effort/report.ts').package).toBe('rafa-effort');
-    expect(placeFile('src/effort/sync/select.ts').package).toBe('rafa-effort');
+    expect(placeFile('packages/rafa-effort/src/effort/report.ts')).toEqual({
+      by: 'folder',
+      folder: 'packages/rafa-effort/',
+      package: 'rafa-effort',
+    });
+    expect(placeFile('packages/rafa-effort/src/effort/sync/select.ts')).toEqual({
+      by: 'folder',
+      folder: 'packages/rafa-effort/',
+      package: 'rafa-effort',
+    });
+    expect(placeFile('src/effort/store/index.ts')).toEqual({ by: 'named', folder: undefined, package: CLI_PACKAGE });
     expect(placeFile('src/board/project/rules.ts')).toEqual({
       by: 'folder',
       folder: 'src/board/project/',
