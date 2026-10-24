@@ -48,12 +48,14 @@
  * ## Untrusted text
  *
  * `where` and `what` are a session's text. {@link staleDocLine} puts each
- * on one line, every run of white space (U+2028 and U+2029 included) one
- * space and every other control character dropped, so no entry can open
- * a second item or a heading. A `!` between `<` and `--` is written
- * `\!`, as `escapeBlockerText` (`utils/tracker.ts`) writes it, so no
- * entry opens an HTML comment that would hide the rest of the body on
- * the tracker, or writes a marker of its own. Redacting local paths is
+ * on one line through `staleDocLineText` and `oneLine`, which core holds
+ * (`packages/rafa/src/triage/stale-doc-line.ts`): every run of white
+ * space (U+2028 and U+2029 included) one space and every other control
+ * character dropped, so no entry can open a second item or a heading. A
+ * `!` between `<` and `--` is written `\!`, as `escapeBlockerText`
+ * (`utils/tracker.ts`) writes it, so no entry opens an HTML comment that
+ * would hide the rest of the body on the tracker, or writes a marker of
+ * its own. Redacting local paths is
  * the caller's, who knows the repository root: the line is written as it
  * is handed.
  *
@@ -87,10 +89,12 @@
  */
 import type { SettleForecast } from '../release/forecast.js';
 import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { unescapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
+import { oneLine, staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { nextVersion } from '../release/version.js';
 
@@ -122,54 +126,9 @@ export const DOC_UPDATE_TITLE = 'chore(doc-update)';
 /** What each task of such a plan opens with, before its escaped line. */
 export const DOC_UPDATE_TASK_PREFIX = 'Repair the stale doc line at ';
 
-/** A run of white space, the line and paragraph separators included. */
-const WHITE_SPACE = /\s+/g;
-
-/** True for a control character that is not white space, or DEL. */
-function isDroppedControl(char: string): boolean {
-  const code = char.charCodeAt(0);
-  return code <= 0x08 || (code >= 0x0E && code <= 0x1F) || code === 0x7F;
-}
-
-/** A `!` that would open an HTML comment after a `<`. */
-const COMMENT_OPEN = /(?<=<)!(?=--)/g;
-
 /** The title of the stale-docs issue of `version`. */
 export function staleDocsTitle(version: string): string {
   return `Release ${version}: update stale docs`;
-}
-
-/** One stale documentation line: where it is, and what no longer matches. */
-export interface StaleDocEntry {
-  /** The file, with the line when known, or null when none was named. */
-  readonly where: string | null;
-  /** What no longer matches. */
-  readonly what: string;
-}
-
-/** `text` on one line, each white space run one space, no comment opened. */
-function oneLine(text: string): string {
-  return Array.from(text)
-    .filter((char) => !isDroppedControl(char))
-    .join('')
-    .replace(WHITE_SPACE, ' ')
-    .trim()
-    .replace(COMMENT_OPEN, '\\!');
-}
-
-/**
- * The text of the checklist item for `entry`, after its box:
- * `<where>: <what>`, or `<what>` when the entry named no place or a
- * blank one; see the module note for what is escaped.
- */
-export function staleDocLineText(entry: StaleDocEntry): string {
-  const what = oneLine(entry.what);
-  const where = entry.where === null
-    ? ''
-    : oneLine(entry.where);
-  return where === ''
-    ? what
-    : `${where}: ${what}`;
 }
 
 /** The unticked checklist item for `entry`, as the issue's body holds it. */
