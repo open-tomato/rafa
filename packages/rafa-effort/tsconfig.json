@@ -1,8 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.packages.json",
-  // Composite, so `tsc --build` builds core first and reads its declarations
-  // from packages/rafa/.tsbuild through the reference below.
+  // Composite, so `tsc --build` builds core and inventory first and reads
+  // their declarations from each package's .tsbuild through the references
+  // below.
   "compilerOptions": {
     "composite": true,
     "noEmit": false,
