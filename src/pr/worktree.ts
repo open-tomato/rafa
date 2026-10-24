@@ -111,12 +111,10 @@ import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
+import { WORKTREES_SUBDIR } from '@open-tomato/rafa/start/worktree-dir';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { parseWorktrees } from './merge.js';
-import { shellQuote } from './preflight-items.js';
-
-/** Where under a home directory the resolve worktrees are made. */
-export const WORKTREES_SUBDIR: string = join('.rafa', 'worktrees');
 
 /** What a resolve worktree directory is named before its PR number. */
 const WORKTREE_PREFIX = 'pr-';

@@ -106,6 +106,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
 
@@ -113,7 +114,7 @@ import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { DEFAULT_BASE_BRANCH, ghNextBoard, openNextSources } from './sources.js';
+import { ghNextBoard, openNextSources } from './sources.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-sources-')));

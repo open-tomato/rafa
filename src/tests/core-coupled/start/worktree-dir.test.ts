@@ -2,13 +2,14 @@
  * Tests for `worktree-dir.ts`: `loop.worktreeDir` resolved against the
  * project root. Each project root is a made-up absolute path that is not
  * the process's working directory, so a resolution against the working
- * directory would answer a different path and fail the case.
+ * directory would answer a different path and fail the case. And
+ * `WORKTREES_SUBDIR`, the home's worktree directory.
  */
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
+import { WORKTREES_SUBDIR, worktreeDirAt } from '@open-tomato/rafa/start/worktree-dir';
 
 import { CONFIG_DEFAULTS } from '../../../config-registry.js';
 
@@ -29,5 +30,11 @@ describe('worktreeDirAt', () => {
     const elsewhere = join('/', 'var', 'trees');
 
     expect(worktreeDirAt(ROOT, elsewhere)).toBe(elsewhere);
+  });
+});
+
+describe('WORKTREES_SUBDIR', () => {
+  it('names .rafa/worktrees, read under a home rather than resolved from the project root', () => {
+    expect(WORKTREES_SUBDIR).toBe(join('.rafa', 'worktrees'));
   });
 });

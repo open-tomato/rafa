@@ -127,7 +127,6 @@ export type {
   OpenedNextSources,
 } from '../../src/next/sources.js';
 export {
-  DEFAULT_BASE_BRANCH,
   ghNextBoard,
   openNextSources,
 } from '../../src/next/sources.js';
@@ -186,14 +185,11 @@ export type { OwnerApproval } from '../../src/pr/owner-approval.js';
 export {
   ghMissingMessage,
   ghUnauthenticatedMessage,
-  shellQuote,
 } from '../../src/pr/preflight-items.js';
 
 export { parseFailedLogLine } from '../../src/pr/triage/evidence.js';
 
 export type { MergedPullRequest } from '../../src/pr/types.js';
-
-export { WORKTREES_SUBDIR } from '../../src/pr/worktree.js';
 
 export type {
   BaseRunAnswer,

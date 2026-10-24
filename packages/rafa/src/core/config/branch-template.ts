@@ -18,8 +18,16 @@
  * `naming.branch` reader (`branchTemplate`) holds it; given one that
  * does not, {@link stubOfBranch} answers null for every branch rather
  * than guess which marker the stub sits at.
+ *
+ * {@link DEFAULT_BASE_BRANCH} sits here too: the branch a plan branch is
+ * cut from and merged back into when `pr.base` names none, read by
+ * `rafa next`, `rafa status`, `rafa cleanup`, the stretch commands and
+ * the epic's verification run.
  */
 import { BRANCH_STUB, isBranchTemplate } from './config-readers.js';
+
+/** The base every row that names one is read against where `pr.base` names none. */
+export const DEFAULT_BASE_BRANCH = 'main';
 
 /** The prefix every plan stub opens with. */
 const STUB_PREFIX = 'rafa-';

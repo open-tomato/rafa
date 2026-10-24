@@ -15,8 +15,19 @@
  *
  * Nothing here reads the disk or creates the directory: git creates it
  * when a worktree is added under it.
+ *
+ * {@link WORKTREES_SUBDIR} is a different directory: the one under the
+ * HOME that `rafa pr triage --resolve` and `rafa epic close` add their
+ * worktrees under, whatever `loop.worktreeDir` says.
  */
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+
+/**
+ * The directory under the home that `rafa pr triage --resolve` and
+ * `rafa epic close` add their worktrees under; distinct from the
+ * project-root `loop.worktreeDir` {@link worktreeDirAt} resolves.
+ */
+export const WORKTREES_SUBDIR: string = join('.rafa', 'worktrees');
 
 /** `worktreeDir`, as `loop.worktreeDir` resolved it, read from `projectRoot`. */
 export function worktreeDirAt(projectRoot: string, worktreeDir: string): string {

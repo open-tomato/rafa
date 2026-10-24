@@ -131,7 +131,7 @@
  * module too), because it is compared with the paths `git ls-tree`
  * prints, which quotes differently. A worktree's
  * path is likewise git's, and it reaches a pasteable command line
- * through {@link shellQuote} — `./preflight-items.ts` owns the one
+ * through {@link shellQuote} — core's `utils/shell.ts` owns the one
  * shell quoter here, and a second one could disagree with it.
  */
 import type { CheckRow, ChecksVerdict } from './checks.js';
@@ -139,9 +139,9 @@ import type { Mergeability } from './types.js';
 import type { WorkingTreeStatus } from '@open-tomato/rafa/core/git';
 
 import { unquoteGitPath } from '@open-tomato/rafa/core/git';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { formatRows } from './checks.js';
-import { shellQuote } from './preflight-items.js';
 
 /** How every refusal in this module opens. */
 const REFUSAL_PREFIX = 'rafa pr merge refuses';

@@ -206,7 +206,6 @@ import {
   resolvePlace,
 } from '@open-tomato/rafa-board';
 import {
-  DEFAULT_BASE_BRANCH,
   createGhPullRequests,
   createGitRunner,
   ghNextBoard,
@@ -223,7 +222,7 @@ import {
   readPlans,
 } from '@open-tomato/rafa-run';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_BASE_BRANCH, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';

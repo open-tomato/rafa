@@ -33,7 +33,6 @@ import {
   GH_INSTALL_LINE,
   ghOnPathItem,
   ghPreflightItems,
-  shellQuote,
 } from './preflight-items.js';
 
 /** Every scratch directory made here, removed when the file is done. */
@@ -182,12 +181,6 @@ describe('the gh preflight probes', () => {
 });
 
 describe('quoting a host that reaches the shell', () => {
-  it('leaves a plain host as it stands and quotes one that is not', () => {
-    expect(shellQuote('github.com')).toBe('github.com');
-    expect(shellQuote('git hub.com')).toBe('\'git hub.com\'');
-    expect(shellQuote('o\'hara.com')).toBe('\'o\'\\\'\'hara.com\'');
-  });
-
   it('runs the auth probe as one command when the host carries a quote', async () => {
     const host = 'o\'hara; touch pwned.txt; x.com';
     const dir = scratchDir();

@@ -51,6 +51,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { WORKTREES_SUBDIR } from '@open-tomato/rafa/start/worktree-dir';
 
 import {
   addResolveWorktree,
@@ -65,7 +66,6 @@ import {
   resolveWorktreePath,
   worktreeAt,
   worktreeCommandLine,
-  WORKTREES_SUBDIR,
 } from './worktree.js';
 
 /** A temporary directory of this file own. */

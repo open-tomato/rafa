@@ -166,8 +166,7 @@ import { rmSync } from 'node:fs';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
-
-import { shellQuote } from '../pr/preflight-items.js';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { heldReason as checkedOutReason } from './groups.js';
 

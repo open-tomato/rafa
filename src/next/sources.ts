@@ -264,6 +264,7 @@ import { readEpicEndRelease } from '@open-tomato/rafa-release';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
@@ -291,9 +292,6 @@ import { settleReaderFor } from './settle-step.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */
 const PREFIX = 'rafa next';
-
-/** The base every row that names one is read against where `pr.base` names none. */
-export const DEFAULT_BASE_BRANCH = 'main';
 
 /** How the composition reaches git, `gh`, the provider, `origin` and the pids; each left out is the system's own. */
 export interface NextSourceSeams {
