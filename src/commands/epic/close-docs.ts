@@ -36,8 +36,8 @@
  * failed are each a `warn` line, and the close is refused all the same,
  * since the criterion does not hold.
  */
-import type { StaleDocLineResult, StaleDocsTracker } from '../../docs/release-issue.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
+import type { StaleDocLineResult, StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 

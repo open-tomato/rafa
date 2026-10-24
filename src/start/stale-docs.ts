@@ -93,18 +93,14 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { StaleDocLineResult, StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
-import type {
-  GitRunner,
-  StaleDocLineResult,
-  StaleDocTickResult,
-  StaleDocsTracker,
-} from '@open-tomato/rafa-pr';
+import type { GitRunner, StaleDocTickResult } from '@open-tomato/rafa-pr';
 import type { FoldFragment, SettleForecast } from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';

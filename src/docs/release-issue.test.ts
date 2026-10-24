@@ -9,8 +9,8 @@
  * Each case that answers no write sits beside the one that does, varied
  * in the one input, so a module that never wrote, or always did, reddens.
  */
-import type { StaleDocsTracker } from './release-issue.js';
 import type { SettleForecast } from '../release/forecast.js';
+import type { StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueDraft, IssueEdit, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, rmSync } from 'node:fs';

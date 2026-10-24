@@ -45,6 +45,11 @@
  * member, answers `kept` and makes no call; the caller keeps the line for
  * the print after the last task.
  *
+ * The shapes {@link addStaleDocLine} is written over, `StaleDocsTracker`,
+ * `StaleDocLineResult` and `AddStaleDocLineOptions`, are core's
+ * (`packages/rafa/src/core/services/shapes.ts`), since board calls the
+ * function through core's service registry; this module re-exports none.
+ *
  * ## Untrusted text
  *
  * `where` and `what` are a session's text. {@link staleDocLine} puts each
@@ -88,6 +93,11 @@
  * the run, as triage's failures do not.
  */
 import type { SettleForecast } from '../release/forecast.js';
+import type {
+  AddStaleDocLineOptions,
+  StaleDocLineResult,
+  StaleDocsTracker,
+} from '@open-tomato/rafa/core/services';
 import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
 
@@ -191,38 +201,12 @@ function issueDraft(title: string, item: string): IssueDraft {
   };
 }
 
-/** What {@link addStaleDocLine} did with one line. */
-export type StaleDocLineResult =
-  /** No issue of the title was open: one was created holding the line. */
-  | { readonly action: 'created'; readonly title: string; readonly ref: IssueRef }
-  /** The issue was found and the line appended to its body. */
-  | { readonly action: 'appended'; readonly title: string; readonly ref: IssueRef }
-  /** The issue already holds the line; nothing was written. */
-  | { readonly action: 'held'; readonly title: string; readonly ref: IssueRef }
-  /** No tracker can hold the issue; the caller keeps the line. */
-  | { readonly action: 'kept'; readonly title: string; readonly reason: string }
-  /** A tracker call rejected; nothing more was tried. */
-  | { readonly action: 'failed'; readonly title: string; readonly problem: string };
-
-/** The tracker members adding a line calls. */
-export type StaleDocsTracker = Pick<Tracker, 'create'> & Partial<Pick<Tracker, 'openIssues' | 'edit'>>;
-
 /** A tracker that can both list and edit, and so can hold the issue. */
 type HoldingTracker = StaleDocsTracker & Required<Pick<Tracker, 'openIssues' | 'edit'>>;
 
 /** True when `tracker` can list its open issues and edit one; see the module note. */
 function canHoldIssue(tracker: StaleDocsTracker | null): tracker is HoldingTracker {
   return tracker !== null && tracker.openIssues !== undefined && tracker.edit !== undefined;
-}
-
-/** What {@link addStaleDocLine} adds, and where. */
-export interface AddStaleDocLineOptions {
-  /** The tracker the run resolved, or null when it resolved none. */
-  readonly tracker: StaleDocsTracker | null;
-  /** The version the issue is titled for, from {@link staleDocsVersion}. */
-  readonly version: string;
-  /** The line to add. */
-  readonly entry: StaleDocEntry;
 }
 
 /** A tracker call's value, or the one-line problem it rejected with. */

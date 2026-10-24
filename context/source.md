@@ -141,10 +141,13 @@ version and the confirm prompt; `output/` the active output; `adapters/` the
 adapter registry; `git/` the git runner and the commit helpers; `plan/` the
 block reader, the plan parser and the plan-file readers; `loop/` the loop's
 session helpers, its session readings and the Claude spawner; `runtime/` the
-reading of which build is running. A file keeps its base name when it moves. A
-moved file keeps no re-export at its old path. The root's build entries are
-the exception: `src/effort/store/index.ts` and `src/ports/index.ts` stand at
-core's folder paths and re-export a package subpath until #808 publishes core.
+reading of which build is running. A ninth folder, `services/`, moved nothing
+in: it was written there (#1336) and holds the service registry, the functions
+of run and pr that board calls, registered by the root. A file keeps its base
+name when it moves. A moved file keeps no re-export at its old path. The root's
+build entries are the exception: `src/effort/store/index.ts` and
+`src/ports/index.ts` stand at core's folder paths and re-export a package
+subpath until #808 publishes core.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it moved to
@@ -237,13 +240,13 @@ already publishes, so the store barrel is `@open-tomato/rafa/store`, and the
 ports barrel is `@open-tomato/rafa/ports`. The `core/` prefix is not optional:
 `@open-tomato/rafa/plan` and `@open-tomato/rafa/config` are the root's own
 `./plan` and `./config` exports, and core's subpaths must not collide with
-them. So the thirteen barrels of `CORE_BARRELS` read
+them. So the fourteen barrels of `CORE_BARRELS` read
 `@open-tomato/rafa/core/adapters`, `core/command`, `core/config`,
 `core/config/load`, `core/config/sections`, `core/git`, `core/loop`,
 `core/loop/hops`, `core/loop/readings`, `core/output`, `core/plan`,
-`core/plan/block-reader` and `core/runtime`; the named files read
-`report/parse`, `report/record`, `schema/tiers` and `schema/project-id`; the
-augmentation target reads `core/config/config-schema`. A store file is
+`core/plan/block-reader`, `core/runtime` and `core/services`; the named files
+read `report/parse`, `report/record`, `schema/tiers` and `schema/project-id`;
+the augmentation target reads `core/config/config-schema`. A store file is
 `store/<file>` and a ports file `ports/<file>`. A file moved outside `core/`
 takes the same spelling: `packages/rafa/src/bugs/record.ts` is `bugs/record`,
 which the package's `exports` names with `./bugs/*`, so a file outside the
@@ -260,7 +263,7 @@ manifests spell it in four places: core's own `package.json` and the three
 for core's files.
 
 **A subject's barrel is the only file under `packages/rafa/src/core/` that a
-file outside it may import.** There are thirteen, all listed in `CORE_BARRELS`
+file outside it may import.** There are fourteen, all listed in `CORE_BARRELS`
 of `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
 five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
 `loop/hops.ts` and `plan/block-reader.ts`. A barrel re-exports the names of the
@@ -277,7 +280,7 @@ barrel. No non-test file under `packages/rafa/src/` imports
 core's own, so no barrel rule holds the effort store, the ports or a moved file
 outside `core/`. They reach core's barrels by relative path, as
 `effort/store/move.ts` and `utils/tracker.ts` do. A scan of the non-test files
-at this commit found every such import names one of the thirteen barrels and no
+at this commit found every such import names one of the fourteen barrels and no
 deeper file. A grep at this commit found no barrel imported from inside core,
 but no sweep measures that half.
 

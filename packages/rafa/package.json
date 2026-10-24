@@ -24,6 +24,7 @@
     "./core/plan": "./src/core/plan/index.ts",
     "./core/plan/block-reader": "./src/core/plan/block-reader.ts",
     "./core/runtime": "./src/core/runtime/index.ts",
+    "./core/services": "./src/core/services/index.ts",
     "./report/parse": "./src/report/parse.ts",
     "./report/record": "./src/report/record.ts",
     "./schema/tiers": "./src/schema/tiers.ts",

@@ -68,7 +68,7 @@ export const CORE_FOLDERS: readonly string[] = [CORE_SOURCE];
 export const CORE_NAMED_FILES: readonly string[] = [];
 
 /** The subject folders under {@link CORE_FOLDER}, sorted. */
-export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime'] as const;
+export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime', 'services'] as const;
 
 /** One subject folder under {@link CORE_FOLDER}. */
 export type CoreSubject = (typeof CORE_SUBJECTS)[number];
@@ -95,6 +95,9 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  *
  * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
  * file under `src/` and so reaches nothing that imports it back.
+ *
+ * `services` has one, `index.ts`, over `registry.ts` and `shapes.ts`,
+ * which import types alone and so load no file that imports it back.
  *
  * `loop` has three. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
@@ -128,6 +131,7 @@ export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   output: ['packages/rafa/src/core/output/index.ts'],
   plan: ['packages/rafa/src/core/plan/block-reader.ts', 'packages/rafa/src/core/plan/index.ts'],
   runtime: ['packages/rafa/src/core/runtime/index.ts'],
+  services: ['packages/rafa/src/core/services/index.ts'],
 };
 
 /**
