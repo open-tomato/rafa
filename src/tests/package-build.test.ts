@@ -482,13 +482,13 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import * as portsSource from '@open-tomato/rafa/ports';
 import * as storeSource from '@open-tomato/rafa/store';
-import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
 
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import * as configSource from '../config/index.js';
