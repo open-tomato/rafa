@@ -51,7 +51,7 @@
  *   {@link SCRATCH_NOW} is past the default `cleanup.staleDays` (30)
  *   of the real clock from 2026-10-24 12:00 UTC on, so the spawned
  *   `rafa doctor` counts as stale branches the in-process reading
- *   does not, beside the expiry of 2026-09-28 recorded below.
+ *   does not.
  *
  * ## The worktrees are dated too
  *
