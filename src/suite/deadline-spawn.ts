@@ -3,7 +3,7 @@
  * spawns the argv as {@link spawnSuite} does, stdin and stdout ignored and
  * stderr piped, but as the leader of its own process group
  * (`detached: true`), and kills that whole group with SIGKILL once
- * `timeoutMs` has passed, as `killGroup` in `src/preflight/run.ts` does:
+ * `timeoutMs` has passed, as `killGroup` in `src/preflight/shell.ts` does:
  * the signal goes to `-pid`, and any refusal but `ESRCH` (no process left
  * in the group) falls back to `proc.kill`. A process that exits first has
  * its timer cleared, so nothing is left armed.

@@ -36,7 +36,8 @@
  * ## How a probe runs
  *
  * {@link runShellProbe} runs `/bin/sh -c <probe>` in the directory and
- * the environment handed in. Each rule below was measured on bun 1.3.14.
+ * the environment handed in, through the spawn, the group kill and the
+ * stream reader of `shell.ts`. Each rule below was measured on bun 1.3.14.
  *
  *   - **stdin is closed.** It is `ignore`, which is `/dev/null`: `cat`
  *     exits 0 at once and `read` answers 1. A probe waiting for input
@@ -96,19 +97,19 @@
  * writer reads them; this file re-exports them under the same names.
  */
 import type { PreflightItems } from './prerequisites-md.js';
+import type { ShellProcess } from './shell.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
+import { collect, killGroup, SHELL, spawnShell } from './shell.js';
+
 export type { CheckOutcome, PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;
-
-/** The shell a probe runs through, by absolute path; see the module note. */
-const SHELL = '/bin/sh';
 
 /** The environment a check reads and a probe runs in. */
 export type PreflightEnv = Readonly<Record<string, string | undefined>>;
@@ -183,73 +184,15 @@ type Verdict = Pick<PreflightCheck, 'outcome' | 'failure'>;
 /** The verdict of every check that passed. */
 const PASS: Verdict = Object.freeze({ outcome: 'pass', failure: null });
 
-/** Spawns the shell running `probe`; see the module note. */
-function spawnShell(probe: string, options: ProbeOptions) {
-  return Bun.spawn([SHELL, '-c', probe], {
-    cwd: options.cwd,
-    env: { ...options.env },
-    stdin: 'ignore',
-    stdout: 'ignore',
-    stderr: 'pipe',
-    detached: true,
-  });
-}
-
-/** A probe's shell, as {@link spawnShell} answers it. */
-type ShellProcess = ReturnType<typeof spawnShell>;
-
-/** True for the error `kill` throws when no process is left to signal. */
-function isNoSuchProcess(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ESRCH';
-}
-
-/**
- * Sends SIGKILL to the process group `proc` leads. A group with no
- * process left is no error; any other refusal falls back to the shell.
- */
-function killGroup(proc: ShellProcess): void {
-  try {
-    process.kill(-proc.pid, 'SIGKILL');
-  } catch (error) {
-    if (!isNoSuchProcess(error)) proc.kill('SIGKILL');
-  }
-}
-
-/** A stream being read to its end, and the call that stops reading it early. */
-interface Collected {
-  readonly text: Promise<string>;
-  readonly stop: () => void;
-}
-
-/** Reads `stream` to its end, or until `stop`, keeping what was read. */
-function collect(stream: ReadableStream<Uint8Array>): Collected {
-  const reader = stream.getReader();
-  const read = async (): Promise<string> => {
-    const chunks: Uint8Array[] = [];
-    let next = await reader.read();
-    while (!next.done) {
-      chunks.push(next.value);
-      next = await reader.read();
-    }
-    return Buffer.concat(chunks).toString('utf8');
-  };
-  // A cancel that rejects leaves a stream errored, and the read above
-  // rejects with that error, so the rejection is not lost by ignoring it here.
-  const stop = () => {
-    reader.cancel().catch(() => undefined);
-  };
-  return { text: read(), stop };
-}
-
 /**
  * Runs `probe` through `/bin/sh` in `options.cwd` with stdin closed,
  * killing its process group at the timeout; see the module note. A probe
  * that fails, times out or cannot start answers so, and never rejects.
  */
 export async function runShellProbe(probe: string, options: ProbeOptions): Promise<ProbeRun> {
-  let proc: ShellProcess;
+  let proc: ShellProcess<'ignore', 'pipe'>;
   try {
-    proc = spawnShell(probe, options);
+    proc = spawnShell(probe, { cwd: options.cwd, env: options.env, stdout: 'ignore', stderr: 'pipe' });
   } catch (error) {
     const stderr = `could not run ${SHELL} in ${options.cwd}: ${messageOf(error)}`;
     return Object.freeze({ exitCode: null, stderr, timedOut: false });
