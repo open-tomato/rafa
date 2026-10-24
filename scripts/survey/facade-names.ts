@@ -6,10 +6,13 @@
  *
  * The universe is the root program: the `fileNames` and options of the
  * root `tsconfig.json` (so `paths` resolves `@open-tomato/rafa/*` into
- * core), built once with `ts.createProgram`. A file is set aside when
- * `classifyFile` reads it as `test` or `test-support`, or when `placeFile`
- * puts it in the package being read. Every other file is an outside
- * importer, a file of an unassigned folder and a file under `scripts/`
+ * core), built once with `ts.createProgram`, and the files of
+ * `packages/` the program reaches from it: a feature package's own files
+ * are outside importers of the other packages (effort's of inventory's
+ * `bareSkillName`) though the root tsconfig excludes `packages/`. A file is
+ * set aside when `classifyFile` reads it as `test` or `test-support`, or
+ * when `placeFile` puts it in the package being read. Every other file is an
+ * outside importer, a file of an unassigned folder and a file under `scripts/`
  * included.
  *
  * For each outside file the reader walks the `import` and `export … from`
@@ -641,7 +644,11 @@ export function readFacadeNames(root: string, pkg: string, options: FacadeOption
     rules,
   };
   const collected: Collected = { dynamicImports: [], problems: [], uses: [] };
-  for (const fileName of fileNames) {
+  const packageFiles = program
+    .getSourceFiles()
+    .map((file) => file.fileName)
+    .filter((fileName) => repoPath(realRoot, fileName).startsWith('packages/'));
+  for (const fileName of new Set([...fileNames, ...packageFiles])) {
     const path = repoPath(realRoot, fileName);
     const file = program.getSourceFile(fileName);
     if (file === undefined || classifyFile(path) !== 'source' || inPackage(context, path)) {
