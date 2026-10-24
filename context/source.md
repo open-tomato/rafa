@@ -692,14 +692,19 @@ names come from, and the facade entry is no node.
     decouple item cut that edge, and it took the facade once the graph was
     regenerated without the cycle, so the guard's inventory row is empty;
     `packages/rafa-inventory/src/start/serving.ts` is an inventory file by name,
-    so it is no importer. Board has nineteen: `src/bugs/filed-values.ts`,
+    so it is no importer. Board holds nineteen: `src/bugs/filed-values.ts`,
     `src/claims/drift.ts`, `src/claims/labels.ts`, `src/commands/switch.ts`,
     `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/owner-gate.ts`,
     `src/next/readings.ts`, `src/next/relations-mode.ts`, `src/next/sources.ts`,
     `src/next/state.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
     `src/pr/owner-approval.ts`, `src/start/stale-docs.ts`,
     `src/start/triage.ts`, `src/triage/bug-filing.ts`,
-    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/triage/refs-section.ts` and `src/triage/triage.ts`. On the graph the
+    fourth decouple item's survey regenerated, the dry run reads fifteen of
+    them on a load cycle and the other four, `drift.ts`, `labels.ts`,
+    `switch.ts` and `start/triage.ts`, to rewire, but refuses all four, since
+    the facade exports no `BranchScan`, `scanClaimBranches` or
+    `ROADMAP_LABEL`, so they keep their paths.
     `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
