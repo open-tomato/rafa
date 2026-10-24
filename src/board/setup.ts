@@ -49,7 +49,7 @@
  * `GITHUB_LABELS` type prefix, and is exported from here as
  * {@link ROADMAP_LABEL} for the readers that find boards by it.
  * `rafa:claimed` and `rafa:in-development` are the stages of a claim
- * (`.rafa/plans/rafa-324-claim-issue-so-two`), `src/claims/stale.ts`'s
+ * (`.rafa/plans/rafa-324-claim-issue-so-two`), `packages/rafa/src/claims/stale.ts`'s
  * {@link CLAIMED_LABEL} and {@link IN_DEVELOPMENT_LABEL}: they show the
  * stage an issue's claim is at, never who holds it, which lives in git.
  *
@@ -103,10 +103,10 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { SPEC_NEEDS_WORK_LABEL } from './gate.js';

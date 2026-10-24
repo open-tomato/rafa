@@ -13,10 +13,11 @@ import type { BoardIssue, BoardIssueState } from '../board/roadmap-board.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
 
 import { checkDrift, checklistIssues, driftLines, findDrift } from './drift.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 /** One row as the listing reads it. */
 function row(number: number, labels: readonly string[], body = '', state: BoardIssueState = 'OPEN'): BoardIssue {

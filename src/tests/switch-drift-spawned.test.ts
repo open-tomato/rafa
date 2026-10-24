@@ -27,7 +27,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

@@ -24,7 +24,7 @@
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
  * recurrence key is that artifact, stripped of its numbers as
- * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
+ * `packages/rafa/src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
  * name, which keeps the epic's number, so a second close failing the same
  * criterion comments on the first issue rather than filing another, unless
  * that issue was closed as completed, when a new one is filed in its place

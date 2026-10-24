@@ -17,14 +17,6 @@ export {
 
 export { readDeviceStoreId } from '../../src/claims/device.js';
 
-export type { ClaimBranchReading } from '../../src/claims/git.js';
-export {
-  claimBranchGlob,
-  claimBranchIssue,
-  fetchClaimBranches,
-  readClaimBranch,
-} from '../../src/claims/git.js';
-
 export { STAGE_LABELS } from '../../src/claims/labels.js';
 
 export type {
@@ -33,17 +25,6 @@ export type {
   PlanClaimRequest,
 } from '../../src/claims/plan-claim.js';
 export { claimPlanIssue } from '../../src/claims/plan-claim.js';
-
-export type {
-  ClaimOwnership,
-  ClaimState,
-  ClaimStateName,
-} from '../../src/claims/stale.js';
-export {
-  CLAIMED_LABEL,
-  IN_DEVELOPMENT_LABEL,
-  readClaimState,
-} from '../../src/claims/stale.js';
 
 export type {
   BranchRow,
@@ -227,9 +208,6 @@ export {
   storeRuleLine,
 } from '../../src/plan/store-rules.js';
 
-export type { PlanValidation } from '../../src/plan/validate.js';
-export { validatePlan } from '../../src/plan/validate.js';
-
 export { isFirstDispatch } from '../../src/preflight/first-dispatch.js';
 
 export type {
@@ -281,13 +259,6 @@ export {
   outcomeProblem,
   runBuild,
 } from '../../src/runtime/install.js';
-
-export {
-  REMOTE,
-  branchNameFor,
-  hasDiverged,
-  parseBaseStanding,
-} from '../../src/start/branch-decision.js';
 
 export {
   isBudgetExit,

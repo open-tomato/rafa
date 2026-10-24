@@ -24,14 +24,14 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { branchName } from '@open-tomato/rafa/board/naming';
+import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from './git.js';
 import { claimPlanIssue, resolveClaimTarget } from './plan-claim.js';
-import { parseClaimMessage } from './record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 const ISSUE = 7;
 const STUB = 'rafa-7-claim-race';

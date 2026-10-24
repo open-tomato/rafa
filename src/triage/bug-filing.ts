@@ -80,17 +80,16 @@ import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
 import { EMPTY_BUG_RECORD } from '@open-tomato/rafa/bugs/record';
 import { firstProjectPath } from '@open-tomato/rafa/bugs/stack-path';
 import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
+import { codeVersionOf, versionsText } from '@open-tomato/rafa/bugs/versions';
 import { ERRORS_DEFAULTS } from '@open-tomato/rafa/config-schema-errors';
 import { bugRulesOf, ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
+import { artifactOf, hasText } from '@open-tomato/rafa/triage/bug-key';
+import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
 
 import { causeOf } from '../bugs/cause-rule.js';
 import { boundaryValueOf, summaryOf } from '../bugs/filed-values.js';
-import { codeVersionOf, versionsText } from '../bugs/versions.js';
-
-import { artifactOf, hasText } from './bug-key.js';
-import { testFailureOf } from './test-failure.js';
 
 export type { ReportedWords };
 

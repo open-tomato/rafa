@@ -74,15 +74,15 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, readLocalClaimBranch } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { readDeviceStoreId } from '../claims/device.js';
-import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
-import { parseClaimMessage } from '../claims/record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { createGitRunner } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

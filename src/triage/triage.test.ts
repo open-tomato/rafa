@@ -92,6 +92,7 @@ import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 import { writeFindings } from '@open-tomato/rafa/store/findings';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { bugKeyOf, legacyBugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
@@ -101,9 +102,7 @@ import { DEFAULT_BUG_RULES } from './bug-filing.js';
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';
 import {
   blockerTextOf,
-  bugKeyOf,
   createPrivateTriageTracker,
-  legacyBugKeyOf,
   PRIVATE_TRIAGE_DIR,
   privateTriageDir,
   triageReport,

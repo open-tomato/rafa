@@ -18,8 +18,8 @@
  * claim gives.
  */
 import type { SpecIssue } from './issue.js';
-import type { ClaimRecord } from '../claims/record.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,8 +28,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { formatClaimMessage } from '../claims/record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+
 import { createGitRunner } from '../pr/index.js';
 
 import {

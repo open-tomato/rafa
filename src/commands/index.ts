@@ -122,7 +122,7 @@
  * and `src/board/issue-board.ts`, and closes the epic through the last,
  * nor the four `claim` actions, `release`, `hand`, `accept` and `take`,
  * which read an issue's claim branches and push one ownership commit on
- * them through `src/claims/git.ts` and share `claim/release.ts`'s
+ * them through `packages/rafa/src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
  * through `src/config-set.ts`, nor `config show`, which prints the
  * config `loadConfig` resolves, nor `ci status`, which reads a branch's

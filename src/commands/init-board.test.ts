@@ -48,11 +48,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { parseConfigText } from '@open-tomato/rafa/core/config';
 
 import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
 import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

@@ -17,11 +17,11 @@
  *
  * Only a claim branch the REMOTE holds, as the branch scan's
  * `git ls-remote --heads` half saw it, since the claim lives in git on
- * the remote (`src/claims/git.ts`). A branch held only by this checkout
+ * the remote (`packages/rafa/src/claims/git.ts`). A branch held only by this checkout
  * has no claim anybody else can read, so it answers `none` and stays
  * taken as a branch always was; so does every branch when the remote
  * half of the scan failed, and every branch when the scan asked a
- * remote other than `origin`, the one remote `src/claims/git.ts` reads
+ * remote other than `origin`, the one remote `packages/rafa/src/claims/git.ts` reads
  * claims from. No reading is ever `released` or stale by default:
  * data this module could not read keeps a line taken.
  *
@@ -43,22 +43,21 @@
  * |---|---|
  * | not held by the remote, `absent`, or no ownership commit | `none` |
  * | `unreadable` | `unreadable`, with the reason |
- * | an ownership | `readClaimState` over it (`src/claims/stale.ts`) |
+ * | an ownership | `readClaimState` over it (`packages/rafa/src/claims/stale.ts`) |
  *
  * So a released claim answers `released`, a held one `held` until it
  * has stood `claims.staleAfter` idle, and then `stale-claimed` or
  * `stale-in-development` by the issue's stage labels.
  */
-import type { ClaimBranchReading } from '../claims/git.js';
-import type { ClaimState } from '../claims/stale.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { ClaimState } from '@open-tomato/rafa/claims/stale';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
+import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '@open-tomato/rafa/claims/git';
+import { readClaimState } from '@open-tomato/rafa/claims/stale';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
-
-import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '../claims/git.js';
-import { readClaimState } from '../claims/stale.js';
-import { REMOTE } from '../start/branch-decision.js';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 /** What the claim on one branch says, as the taken reading weighs it. */
 export type BranchClaim =

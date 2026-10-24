@@ -59,7 +59,7 @@
  *
  * {@link NextWorld.standing} runs `git fetch <remote> <base>` and then
  * `git rev-list --left-right --count <base>...<remote>/<base>`, the pair
- * `src/start/branch-decision.ts` measured and parses. A standing read
+ * `packages/rafa/src/start/branch-decision.ts` measured and parses. A standing read
  * off an unfetched clone answers "up to date" for a base a colleague
  * pushed to an hour ago, and the row that reads it is the one that
  * exists to stop a plan being cut from that base.
@@ -102,23 +102,23 @@ import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../plan/list.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { BaseStanding } from '../start/branch-decision.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Position } from '@open-tomato/rafa/project/position';
+import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
 
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
+import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 
 import { scanClaimBranches } from '../board/roadmap.js';
-import { parseClaimMessage } from '../claims/record.js';
 import { listPlans } from '../plan/list.js';
 import { gitSaid } from '../pr/index.js';
-import { parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */
 const DETACHED = 'HEAD';
@@ -534,7 +534,7 @@ export function hasBranch(refs: readonly string[], stub: string, template: strin
  * own branch and its remote-tracking one, as full refs that resolve
  * here; or null with a
  * problem noted when git could not say. A ref git answers nothing for
- * is absent, the way `src/claims/git.ts` reads one.
+ * is absent, the way `packages/rafa/src/claims/git.ts` reads one.
  */
 export function readBranchTips(sources: NextSources, remote: string, stub: string, note: Note): readonly string[] | null {
   const branch = planBranchOf(sources, stub);
@@ -577,7 +577,7 @@ export function readBranchMessages(sources: NextSources, ref: string, note: Note
 
 /**
  * True when `messages` are claim commits and nothing else: at least one,
- * and each a well-formed ownership record (`src/claims/record.ts`), its
+ * and each a well-formed ownership record (`packages/rafa/src/claims/record.ts`), its
  * subject `claim(rafa-<n>): <action>` and its trailers both read. A
  * branch with no commit past its fork reads false, as every branch did
  * before `plan create` claimed one.

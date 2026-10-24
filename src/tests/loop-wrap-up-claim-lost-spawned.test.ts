@@ -55,10 +55,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { pushNewClaimBranch } from '../claims/git.js';
-import { formatClaimMessage } from '../claims/record.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';

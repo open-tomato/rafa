@@ -236,7 +236,7 @@ import {
   readGateFlags,
 } from '@open-tomato/rafa-board';
 import { DEFAULT_ROUTING, renderSkillIndex, resolveSessionTiers } from '@open-tomato/rafa-inventory';
-import { branchNameFor, claimPlanIssue } from '@open-tomato/rafa-run';
+import { claimPlanIssue } from '@open-tomato/rafa-run';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -245,6 +245,7 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPath } from '@open-tomato/rafa/core/plan';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
+import { branchNameFor } from '@open-tomato/rafa/start/branch-decision';
 
 import { planFilePath } from './adapters/planner/claude.js';
 import { notePlanBundledEdits } from './commands/plan/bundled-check.js';

@@ -309,6 +309,7 @@ import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { machineFaultSentence, readMachineFault } from '@open-tomato/rafa/store/machine-fault';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { redactSecrets, TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
@@ -316,7 +317,6 @@ import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 import { createLocalTracker } from '../adapters/tracker/local.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
-import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import {
   COMMENT_OPENING,
@@ -334,9 +334,6 @@ export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
 
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
-
-/** Names `./bug-key.ts` now holds, still answered from here. */
-export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
 
 /**
  * Where a bug goes: the tracker the chain landed on, the private one, or

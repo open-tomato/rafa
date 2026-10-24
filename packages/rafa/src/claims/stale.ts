@@ -51,9 +51,9 @@
  * claim can have, and the type refuses the third.
  */
 import type { Ownership, PendingHandover } from './record.js';
-import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 
-import { claimDurationHours, CLAIMS_STALE_DISABLED } from '@open-tomato/rafa/core/config/sections';
+import { claimDurationHours, CLAIMS_STALE_DISABLED } from '../core/config/sections.js';
 
 /** The label a claim's issue carries from `plan create` to `loop start`. */
 export const CLAIMED_LABEL = 'rafa:claimed';

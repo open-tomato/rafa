@@ -146,7 +146,7 @@ for the module or another wording.
   action and in reproduce.
 - **The versions** are the rafa version, the short commit with `-dirty`
   when a tracked file has changes, and the package as `name@version`
-  (`src/bugs/versions.ts`).
+  (`packages/rafa/src/bugs/versions.ts`).
 - **The package** is the nearest manifest above the file the error
   points at (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
   directory up to the checkout's root, the first `package.json` holding a

@@ -75,17 +75,17 @@
  * drives the absent, fast-forward and refused rows over planted clones.
  */
 import type { DeviceStoreIds } from './device.js';
-import type { ClaimBranchReading } from './git.js';
-import type { PendingHandover } from './record.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { PendingHandover } from '@open-tomato/rafa/claims/record';
 
+import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '@open-tomato/rafa/claims/git';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
+import { localRef, REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { gitSaid } from '../pr/index.js';
-import { localRef, REMOTE } from '../start/branch-decision.js';
 
 import { holdsClaim } from './device.js';
-import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from './git.js';
 
 /** What every branch that keeps a lost claim's commits is called: this, and the plan's stub. */
 export const LOST_PREFIX = 'lost/';

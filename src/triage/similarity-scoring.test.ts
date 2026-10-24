@@ -30,7 +30,8 @@ import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
-import { bugKeyOf } from './bug-key.js';
+import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
+
 import { ISSUE_OPENING, issueText } from './issue-text.js';
 import { firstLeakIn } from './scoring-fixture.js';
 import { nearestOpenBugs } from './similarity.js';

@@ -213,10 +213,8 @@ import type {
 import { homedir } from 'node:os';
 
 import {
-  artifactOf,
   blockerTextOf,
   checkedKindOf,
-  hasText,
   inheritedFailureOf,
   scoreText,
   triageReport,
@@ -229,6 +227,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
+import { artifactOf, hasText } from '@open-tomato/rafa/triage/bug-key';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 

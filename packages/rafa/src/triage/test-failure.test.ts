@@ -1,6 +1,6 @@
 /**
  * Tests for reading the test a reported bug names
- * (`src/triage/test-failure.ts`).
+ * (`packages/rafa/src/triage/test-failure.ts`).
  *
  * {@link BUN_CAPTURE} is bun 1.4.2's console output for two failing cases
  * in one file, as it printed them, with the temporary directory written

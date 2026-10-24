@@ -53,16 +53,16 @@
  * switching the main checkout, so a line naming both asks for two
  * contradictory things and is refused before anything is read.
  */
-import type { RunStanding } from './branch-decision.js';
 import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { RunStanding } from '@open-tomato/rafa/start/branch-decision';
 
 import { isLoopRetryCount } from '@open-tomato/rafa/config-schema-loop-retries';
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { branchNameFor, detachedHeadRefusal, REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
-import { branchNameFor, detachedHeadRefusal, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';
 import { readContinueArgs } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS } from './pr-lifecycle.js';

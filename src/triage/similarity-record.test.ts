@@ -14,8 +14,8 @@ import type { OpenIssue } from '@open-tomato/rafa/ports';
 import { describe, expect, it } from 'bun:test';
 
 import { EMPTY_BUG_RECORD } from '@open-tomato/rafa/bugs/record';
+import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 
-import { bugKeyOf } from './bug-key.js';
 import { ISSUE_OPENING, issueText, possibleDuplicatesSection } from './issue-text.js';
 import { nearestOpenBugs, rankedCandidates, sectionValueOf } from './similarity.js';
 

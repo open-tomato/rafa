@@ -46,12 +46,13 @@ export const BOARD_NAMED: readonly string[] = [
  * pull-request package. The section files `config-schema-readings.ts`
  * and `config-schema-triage.ts` left the list in the third decouple item
  * (rafa-1325), which moves them into core's package, where the
- * `packages/rafa/` folder of `CUT_RULES` places them.
+ * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
+ * item (rafa-1333) moved `packages/rafa/src/bugs/fill.ts` and
+ * `packages/rafa/src/bugs/versions.ts` into core's package too, and the
+ * same folder places them.
  */
 export const PR_NAMED: readonly string[] = [
   'src/bugs/filed-values.ts',
-  'src/bugs/fill.ts',
-  'src/bugs/versions.ts',
   'src/cleanup/branches.ts',
   'src/cleanup/groups.ts',
   'src/cleanup/steps.ts',
@@ -73,7 +74,9 @@ export const PR_NAMED: readonly string[] = [
  * `config-schema-loop-retries.ts`, `config-schema-tests.ts` and
  * `config-schema-wrap-up.ts`, left the list in the third decouple item
  * (rafa-1325), which moves them into core's package, where the
- * `packages/rafa/` folder of `CUT_RULES` places them.
+ * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
+ * item (rafa-1333) moved `packages/rafa/src/plan/validate.ts` into core's
+ * package too, and the same folder places it.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',
@@ -94,7 +97,6 @@ export const RUN_NAMED: readonly string[] = [
   'src/plan/index.ts',
   'src/plan/list.ts',
   'src/plan/store-rules.ts',
-  'src/plan/validate.ts',
   'src/runtime/install.ts',
 ];
 

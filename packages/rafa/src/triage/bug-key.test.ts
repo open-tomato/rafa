@@ -1,5 +1,5 @@
 /**
- * Tests for the key a bug is looked up by (`src/triage/bug-key.ts`).
+ * Tests for the key a bug is looked up by (`packages/rafa/src/triage/bug-key.ts`).
  *
  * {@link BUN_CAPTURE} is the shape of bun 1.4.2's console output for two
  * failing cases in one test case's file, as `./test-failure.test.ts`

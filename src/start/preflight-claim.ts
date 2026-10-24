@@ -177,8 +177,8 @@
  * warning beside a run that goes on.
  */
 import type { DeviceStoreId } from '../claims/device.js';
-import type { ClaimBranchReading } from '../claims/git.js';
-import type { Ownership } from '../claims/record.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { Ownership } from '@open-tomato/rafa/claims/record';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { IssueBoard, RefreshConfig } from '@open-tomato/rafa-board';
@@ -187,13 +187,6 @@ import type { GitRunner } from '@open-tomato/rafa-pr';
 import { createGhRunner, createRefreshingGhIssueBoard } from '@open-tomato/rafa-board';
 import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
-import { claimDurationHours, CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
-import { createGitRunner } from '@open-tomato/rafa/core/git';
-import { activeOutput } from '@open-tomato/rafa/core/output';
-import { planStubFromPath } from '@open-tomato/rafa/core/plan';
-
-import { holdsClaim, readDeviceStoreId } from '../claims/device.js';
 import {
   claimBranchIssue,
   fetchClaimBranches,
@@ -202,11 +195,17 @@ import {
   pushOwnershipCommit,
   readClaimBranch,
   readLocalClaimBranch,
-} from '../claims/git.js';
-import { labelInDevelopment } from '../claims/labels.js';
-import { parseClaimMessage } from '../claims/record.js';
+} from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { claimDurationHours, CLAIMS_STALE_DISABLED, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { planStubFromPath } from '@open-tomato/rafa/core/plan';
+import { branchNameFor, REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
-import { branchNameFor, REMOTE } from './branch-decision.js';
+import { holdsClaim, readDeviceStoreId } from '../claims/device.js';
+import { labelInDevelopment } from '../claims/labels.js';
 
 /** The seams the claim check reads and writes through. */
 export interface StartPreflightClaim {

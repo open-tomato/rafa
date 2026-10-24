@@ -103,15 +103,11 @@ import {
   resolveIssueTracker,
   trustRefusalClause,
 } from '@open-tomato/rafa-board';
-import {
-  DIRTY_MARK,
-  NO_COMMIT,
-  checkoutOf,
-  codeVersionOf,
-} from '@open-tomato/rafa-pr';
 import { suiteEnv } from '@open-tomato/rafa-run';
 
+import { checkoutOf } from '@open-tomato/rafa/bugs/fill';
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { DIRTY_MARK, NO_COMMIT, codeVersionOf } from '@open-tomato/rafa/bugs/versions';
 import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

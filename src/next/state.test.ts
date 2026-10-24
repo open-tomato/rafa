@@ -122,9 +122,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
-import { formatClaimMessage } from '../claims/record.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { isPrecondition, NEXT_PRECONDITIONS, NEXT_STATES, readNextState } from './state.js';

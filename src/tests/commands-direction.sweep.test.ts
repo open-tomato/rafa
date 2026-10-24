@@ -90,7 +90,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
   { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
   { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },
-  { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'src/plan/validate.ts' },
+  { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'packages/rafa/src/plan/validate.ts' },
   { commandFile: 'src/commands/loop/status.ts', libraryHalf: 'src/loop/blocked-tasks.ts' },
   { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'src/board/blocked-issues.ts' },
   { commandFile: 'src/commands/doctor-cleanup.ts', libraryHalf: 'src/cleanup/settings.ts' },

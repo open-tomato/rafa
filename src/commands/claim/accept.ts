@@ -8,7 +8,7 @@
  * owner (`./hand.ts`) is one side, and this command on the receiver is
  * the other. The accept commit is the latest ownership commit once it
  * lands, so its store, this device's, is the owner from then on
- * (`src/claims/record.ts`).
+ * (`packages/rafa/src/claims/record.ts`).
  *
  * ## What is read
  *
@@ -58,7 +58,7 @@
  *
  * One empty `accept` commit naming this store, made on the branch's
  * remote tip and pushed with `--force-with-lease` on that tip
- * (`src/claims/git.ts`). An owner that withdraws, or hands the claim
+ * (`packages/rafa/src/claims/git.ts`). An owner that withdraws, or hands the claim
  * elsewhere, between this command's fetch and its push moves the tip,
  * so the lease refuses the accept and nothing lands.
  *
@@ -84,17 +84,17 @@
  * otherwise.
  */
 import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
-import type { ClaimBranchReading } from '../../claims/git.js';
-import type { ClaimRecord } from '../../claims/record.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { holdsClaim } from '../../claims/device.js';
-import { parseClaimMessage } from '../../claims/record.js';
-import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 
 import { CLAIM_ACCEPT_DECLARATION } from './declarations.js';

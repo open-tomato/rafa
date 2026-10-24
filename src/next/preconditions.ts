@@ -15,7 +15,7 @@
  *    committing them, stashing them and moving them elsewhere is the
  *    person's and rafa does not make it. An untracked file is not one of
  *    these: nothing rafa runs loses one (`trackedChanges` in
- *    `src/start/branch-decision.ts`).
+ *    `packages/rafa/src/start/branch-decision.ts`).
  *  - {@link readPullsUnusable}, `pulls-unusable`: the pull request
  *    provider could not be ASKED — no network, no authentication, a
  *    `gh` that did not run. The port answers null for a pull request

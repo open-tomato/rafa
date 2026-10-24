@@ -120,7 +120,7 @@
  */
 import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { DeviceStoreId, DeviceStoreIds } from './device.js';
-import type { ClaimBranchReading } from './git.js';
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
 import type { ClaimsAhead, ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { IssueBoard } from '@open-tomato/rafa-board';
 import type { GitRunner } from '@open-tomato/rafa-pr';
@@ -130,12 +130,6 @@ import path from 'node:path';
 import { weighBranchClaim } from '@open-tomato/rafa-board';
 import { gitSaid } from '@open-tomato/rafa-pr';
 
-import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
-
-import { branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
-
-import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
-import { holdsClaim } from './device.js';
 import {
   claimBranchGlob,
   claimBranchIssue,
@@ -144,10 +138,15 @@ import {
   pushNewClaimBranch,
   pushOwnershipCommit,
   readClaimBranch,
-} from './git.js';
+} from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
+import { branchNameFor, localRef, REMOTE } from '@open-tomato/rafa/start/branch-decision';
+
+import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
+import { holdsClaim } from './device.js';
 import { labelClaimed } from './labels.js';
-import { parseClaimMessage } from './record.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 /** Why a run made no claim. */
 export type UnclaimedCause =

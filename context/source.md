@@ -494,8 +494,9 @@ hold the root files that reach each feature package, each sorted by UTF-16
 code unit. A file a list names is placed in that package whatever its folder,
 and keeps its path: no named file moves in the cut itself; the packages' moves
 move them. `CUT_RULES` reads them and adds a package's own file beside its
-list where one belongs (`src/pr/index.ts` to `PR_NAMED`,
-`src/start/branch-decision.ts` to `RUN_NAMED`). `INVENTORY_NAMED` is empty
+list where one belongs: `src/pr/index.ts` to `PR_NAMED`. The run rule added
+`packages/rafa/src/start/branch-decision.ts` beside `RUN_NAMED` until the
+fourth decouple item (rafa-1333) moved it into core. `INVENTORY_NAMED` is empty
 since pass 4a moved its six files into `packages/rafa-inventory/src/`, where
 the package's folder rule places them. The CLI's named files are five,
 `CLI_NAMED`: the roster, the bin entry and the agent schema, which were the
@@ -710,12 +711,12 @@ names come from, and the facade entry is no node.
     `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
     though it is a board file that imports release, because the load-cycle group
     comes first; its edge to release is a back edge the decouple step before
-    pass 4 cuts. Pr has sixteen: `src/claims/git.ts`, `src/claims/lost.ts`,
+    pass 4 cuts. Pr has sixteen: `packages/rafa/src/claims/git.ts`, `src/claims/lost.ts`,
     `src/cleanup/past-head.ts`, `src/cleanup/worktrees.ts`,
     `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,
     `src/next/hint.ts`, `src/next/hop-rows.ts`, `src/next/readings.ts`,
     `src/release/branch-forecast.ts`, `src/release/fragment-tree.ts`,
-    `src/release/settle-pr.ts`, `src/start/branch-decision.ts`,
+    `src/release/settle-pr.ts`, `packages/rafa/src/start/branch-decision.ts`,
     `src/start/pr-lifecycle.ts`, `src/start/pr-retarget.ts` and
     `src/start/suite-blocker.ts`. Six of them, `src/cleanup/past-head.ts`,
     `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,

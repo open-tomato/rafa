@@ -116,11 +116,10 @@
  * while leaving `refs/remotes/origin/main` where it was.
  */
 import type { BranchCommit, ClaimRecord, Ownership } from './record.js';
-import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GitRunner } from '../core/git/index.js';
 
-import { branchGlob, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
-import { gitSaid } from '@open-tomato/rafa/core/git';
-
+import { branchGlob, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '../core/config/sections.js';
+import { gitSaid } from '../core/git/index.js';
 import { localRef, REMOTE, remoteTrackingRef } from '../start/branch-decision.js';
 
 import { formatClaimMessage, parseClaimMessage, readOwnership } from './record.js';

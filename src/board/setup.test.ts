@@ -70,10 +70,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { parseConfigText } from '@open-tomato/rafa/core/config';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
-import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';

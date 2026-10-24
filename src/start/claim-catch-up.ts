@@ -71,9 +71,8 @@ import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
 
-import { CLAIM_SUBJECT } from '../claims/record.js';
-
-import { localRef, REMOTE, remoteTrackingRef } from './branch-decision.js';
+import { CLAIM_SUBJECT } from '@open-tomato/rafa/claims/record';
+import { localRef, REMOTE, remoteTrackingRef } from '@open-tomato/rafa/start/branch-decision';
 
 /** The fields every reading names: which branch, read against which base. */
 interface ReadingOf {

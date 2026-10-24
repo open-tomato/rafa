@@ -35,14 +35,14 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { readHostId } from '@open-tomato/rafa/store/store-identity';
 import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
 
 import { readDeviceStoreId } from '../../claims/device.js';
-import { makeOwnershipCommit, pushNewClaimBranch } from '../../claims/git.js';
-import { parseClaimMessage } from '../../claims/record.js';
 import { createGitRunner } from '../../pr/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { createMergeCommand } from '../effort/merge.js';

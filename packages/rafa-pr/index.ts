@@ -4,21 +4,6 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-pr --entry`.
  */
 
-export {
-  bodyOf,
-  checkoutOf,
-  draftOf,
-  redacted,
-  settled,
-} from '../../src/bugs/fill.js';
-
-export {
-  DIRTY_MARK,
-  NO_COMMIT,
-  codeVersionOf,
-  versionsText,
-} from '../../src/bugs/versions.js';
-
 export type {
   BranchSettings,
   BranchesRead,
@@ -199,11 +184,6 @@ export {
   createBaseRunCache,
   runNamedTestAt,
 } from '../../src/triage/base-run.js';
-
-export {
-  artifactOf,
-  hasText,
-} from '../../src/triage/bug-key.js';
 
 export type { InheritedTriage } from '../../src/triage/inherited.js';
 export { inheritedFailureOf } from '../../src/triage/inherited.js';

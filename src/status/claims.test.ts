@@ -13,9 +13,9 @@
 import type { ClaimBranches, ClaimLabels } from './claims.js';
 import type { StatusConfig, StatusSeams } from './sections.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { ClaimRecord } from '../claims/record.js';
 import type { NextBoard } from '../next/readings.js';
 import type { GitRunner } from '../pr/index.js';
+import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,7 +23,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
+import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
+
 import { createGitRunner } from '../pr/index.js';
 
 import { readClaimBranches, readClaims } from './claims.js';

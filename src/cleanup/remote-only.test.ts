@@ -21,9 +21,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { formatClaimMessage } from '../claims/record.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
