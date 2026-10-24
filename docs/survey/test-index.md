@@ -8,26 +8,26 @@ Coverage: 2168 of 2168 tracked files read (src/ and packages/*/src/).
 
 | Rank | Test | Index | Folders | Spawns via | Support-only folders |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `src/cli/help.test.ts` | 126 | 63 | `src/cli/help.test.ts`, `src/tests/cli-capture.ts` | - |
-| 2 | `src/commands/index.test.ts` | 126 | 63 | `src/tests/cli-capture.ts` | - |
-| 3 | `src/commands/module/list.test.ts` | 126 | 63 | `src/tests/cli-capture.ts` | - |
-| 4 | `src/commands/doctor-refs-roadmap.test.ts` | 124 | 62 | `src/commands/doctor-refs-roadmap.test.ts` | - |
-| 5 | `src/commands/doctor-refs.test.ts` | 124 | 62 | `src/commands/doctor-refs.test.ts` | - |
-| 6 | `src/commands/index.roster.sweep.test.ts` | 124 | 62 | `src/commands/index.roster.sweep.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output` |
-| 7 | `src/commands/issue/ready.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | `src/adapters/output` |
-| 8 | `src/commands/plan/refs-check.test.ts` | 124 | 62 | `src/commands/plan/refs-check.test.ts` | - |
-| 9 | `src/refs/reading.test.ts` | 124 | 62 | `src/refs/reading.test.ts` | - |
-| 10 | `src/refs/verify.test.ts` | 124 | 62 | `src/refs/verify.test.ts` | - |
-| 11 | `src/release/templates-shape.test.ts` | 124 | 62 | `src/release/templates-shape.test.ts` | - |
-| 12 | `src/tests/config-parity.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | `src/adapters/output` |
-| 13 | `src/tests/refs-reading-integration.test.ts` | 124 | 62 | `src/tests/refs-reading-integration.test.ts` | - |
-| 14 | `src/commands/doctor.test.ts` | 82 | 41 | `src/tests/cli-capture.ts` | - |
-| 15 | `src/commands/doctor-ladder.command.test.ts` | 78 | 39 | `src/commands/doctor-ladder.command.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
-| 16 | `src/commands/doctor-release.test.ts` | 78 | 39 | `src/commands/doctor-release.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
-| 17 | `src/commands/doctor-stretch.test.ts` | 78 | 39 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
-| 18 | `src/commands/tiers-scratch.test.ts` | 78 | 39 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
-| 19 | `src/tests/epic-labels-cross-command-integration.test.ts` | 78 | 39 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
-| 20 | `src/tests/package-build.test.ts` | 78 | 39 | `src/tests/cli-capture.ts`, `src/tests/package-build.test.ts` | `src/errors` |
+| 1 | `src/cli/help.test.ts` | 124 | 62 | `src/cli/help.test.ts`, `src/tests/cli-capture.ts` | - |
+| 2 | `src/commands/index.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | - |
+| 3 | `src/commands/module/list.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | - |
+| 4 | `src/commands/doctor-refs-roadmap.test.ts` | 122 | 61 | `src/commands/doctor-refs-roadmap.test.ts` | - |
+| 5 | `src/commands/doctor-refs.test.ts` | 122 | 61 | `src/commands/doctor-refs.test.ts` | - |
+| 6 | `src/commands/index.roster.sweep.test.ts` | 122 | 61 | `src/commands/index.roster.sweep.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output` |
+| 7 | `src/commands/issue/ready.test.ts` | 122 | 61 | `src/tests/cli-capture.ts` | `src/adapters/output` |
+| 8 | `src/commands/plan/refs-check.test.ts` | 122 | 61 | `src/commands/plan/refs-check.test.ts` | - |
+| 9 | `src/refs/reading.test.ts` | 122 | 61 | `src/refs/reading.test.ts` | - |
+| 10 | `src/refs/verify.test.ts` | 122 | 61 | `src/refs/verify.test.ts` | - |
+| 11 | `src/release/templates-shape.test.ts` | 122 | 61 | `src/release/templates-shape.test.ts` | - |
+| 12 | `src/tests/config-parity.test.ts` | 122 | 61 | `src/tests/cli-capture.ts` | `src/adapters/output` |
+| 13 | `src/tests/refs-reading-integration.test.ts` | 122 | 61 | `src/tests/refs-reading-integration.test.ts` | - |
+| 14 | `src/commands/doctor.test.ts` | 80 | 40 | `src/tests/cli-capture.ts` | - |
+| 15 | `src/commands/doctor-ladder.command.test.ts` | 76 | 38 | `src/commands/doctor-ladder.command.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
+| 16 | `src/commands/doctor-release.test.ts` | 76 | 38 | `src/commands/doctor-release.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
+| 17 | `src/commands/doctor-stretch.test.ts` | 76 | 38 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
+| 18 | `src/commands/tiers-scratch.test.ts` | 76 | 38 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
+| 19 | `src/tests/epic-labels-cross-command-integration.test.ts` | 76 | 38 | `src/tests/cli-capture.ts` | `src/adapters/output`, `src/errors` |
+| 20 | `src/tests/package-build.test.ts` | 76 | 38 | `src/tests/cli-capture.ts`, `src/tests/package-build.test.ts` | `src/errors` |
 
 ## The 20 source files reached by the most test files from other folders
 

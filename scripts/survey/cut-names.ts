@@ -140,9 +140,14 @@ export const INVENTORY_NAMED: readonly string[] = [];
  * and `terminal.ts`, CLI files, so under pass 1's rule that a file goes
  * with the latest package it reaches it is the CLI's, which comes after
  * every feature package. The file does not move.
+ * `src/effort/store/index.ts` is the published `./store` entry, a build
+ * entry of the CLI as `src/rafa.ts` is (`LIBRARY_ENTRIES` of
+ * `scripts/build/bundle.ts`), holding one line of core; it does not move
+ * in pass 4b, so the build is untouched.
  */
 export const CLI_NAMED: readonly string[] = [
   'src/commands/index.ts',
+  'src/effort/store/index.ts',
   'src/inventory/browse.ts',
   'src/rafa.ts',
   'src/schema/agent.ts',

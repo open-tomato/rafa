@@ -5,14 +5,14 @@
  * anywhere.
  *
  * The full recompute every case is held to is production code, not a
- * second spelling of it: `parseCommitLog` (`src/effort/commits.ts`) over
+ * second spelling of it: `parseCommitLog` (`packages/rafa-effort/src/effort/commits.ts`) over
  * a planted `git log` capture of the commits, which fills each gap
  * through `assignElapsedMinutes`. The capture lists the commits by sha,
  * so the stable sort there breaks a tie by sha as the recompute does.
  * Each store holds real `CommitStats` rows from such a parse, stored as
  * `JSON.stringify` of the row as `store/sqlite.ts` stores it.
  */
-import type { CommitStats } from '../../../../effort/commits.js';
+import type { CommitStats } from '@open-tomato/rafa-effort/effort/commits';
 
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
@@ -20,8 +20,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { recomputeCommitGaps, withoutGap } from '@open-tomato/rafa/store/merge-commit-gaps';
 import { unionStores } from '@open-tomato/rafa/store/merge-union';
 import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
-
-import { COMMIT_RECORD_MARKER, parseCommitLog } from '../../../../effort/commits.js';
+import { COMMIT_RECORD_MARKER, parseCommitLog } from '@open-tomato/rafa-effort/effort/commits';
 
 /** One commit as planted: its sha and author date. */
 interface PlantedCommit {

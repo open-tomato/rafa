@@ -60,9 +60,9 @@ import { ConfigError } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';

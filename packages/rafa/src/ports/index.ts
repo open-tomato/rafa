@@ -791,8 +791,8 @@ export type SyncPullResult =
  * How a project's effort store travels between devices: the strategy
  * `effort.sync` selects. `local` and `file` are core's strategies and
  * `git`, `service` and `p2p` modules'; the adapter registry holds core's
- * as `sync/local` (`src/effort/sync/select.ts`) and `sync/file`
- * (`src/effort/sync/file.ts`). Push and pull are directions,
+ * as `sync/local` (`packages/rafa-effort/src/effort/sync/select.ts`) and `sync/file`
+ * (`packages/rafa-effort/src/effort/sync/file.ts`). Push and pull are directions,
  * not strategies: in every strategy a device pushes the rows it wrote
  * and pulls the rows others wrote.
  */

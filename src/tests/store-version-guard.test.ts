@@ -83,8 +83,7 @@ import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '@open-tomato/rafa/store/sqlite';
-
-import { sessionLogDir } from '../effort/collect.js';
+import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';

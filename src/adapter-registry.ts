@@ -2,11 +2,13 @@
  * The composition root of the adapter registry: core's adapters, listed
  * here and handed to core when {@link registerCoreAdapters} is called.
  *
- * Core declares the registry (`packages/rafa/src/core/adapters/registry.ts`) and
- * imports no adapter: the adapters sit under `src/adapters/`,
- * `packages/rafa/src/effort/store/` and `src/effort/sync/`, above core, and a core
- * file importing them would be an upward edge. This module, outside
- * `packages/rafa/src/core/`, is the one place they are listed, {@link CORE_ADAPTERS}.
+ * Core declares the registry (`packages/rafa/src/core/adapters/registry.ts`)
+ * and imports no adapter: the adapters sit under `src/adapters/`,
+ * `packages/rafa/src/effort/store/`, `packages/rafa-inventory/src/adapters/`
+ * and `packages/rafa-effort/src/effort/sync/`, above core, and a core file
+ * importing them would be an upward edge. This module, outside
+ * `packages/rafa/src/core/`, is the one place they are listed,
+ * {@link CORE_ADAPTERS}.
  *
  * Importing it registers nothing. {@link registerCoreAdapters} calls
  * `registerAdapters` with that list, so `CORE_ADAPTER_REGISTRY` answers

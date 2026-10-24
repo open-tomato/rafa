@@ -19,7 +19,8 @@
  * no terminal to be asked on.
  *
  * Before the first turn it pulls the other devices' effort rows once,
- * through `pullBeforeRead` (`../effort/sync/contact.ts`), `--dry-run`
+ * through `pullBeforeRead`
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), `--dry-run`
  * included; a hub that cannot be reached is one `warn` line, and the
  * chain reads the local store as it would have.
  *

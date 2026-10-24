@@ -1,11 +1,11 @@
 /**
  * Where a command pushes then pulls through its hub contact
- * (`src/effort/sync/contact.ts`), spawned as the real `rafa` binary
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), spawned as the real `rafa` binary
  * (`src/tests/cli-capture.ts`) in scratch projects under this file's
  * temporary directory:
  *
  *   - `rafa effort collect`, once its rows are stored and its summary
- *     written (`src/effort/collect.ts`);
+ *     written (`packages/rafa-effort/src/effort/collect.ts`);
  *   - `rafa loop start`, at the end of each task, through the one contact
  *     it makes for its run (`src/start.ts`);
  *
@@ -43,7 +43,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { hubUnreachableLine } from '../effort/sync/contact.js';
+import { hubUnreachableLine } from '@open-tomato/rafa-effort/effort/sync/contact';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 

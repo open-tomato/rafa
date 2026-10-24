@@ -28,8 +28,8 @@ import type { CapturedSpawnOptions } from '@open-tomato/rafa/core/loop';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
-import { classifyPromptContent } from '../effort/classify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { withStamp } from './stamp.js';

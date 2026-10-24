@@ -366,7 +366,7 @@ export function skillUseVersionRows(installed: string | null, pinned: string = S
     'Claude Code',
     `${installed} is installed, and the skill-use collector reads logs of ${pinned}, `
       + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-    'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
+    'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
   )];
 }
 

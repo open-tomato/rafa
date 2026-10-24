@@ -347,7 +347,7 @@ async function runCommand(device: Device, words: readonly string[]): Promise<Com
   return { exitCode, output: `${stdout}${stderr}`, ms: performance.now() - started };
 }
 
-/** What every line a contact writes opens with (`src/effort/sync/contact.ts`'s `OPENING`). */
+/** What every line a contact writes opens with (`packages/rafa-effort/src/effort/sync/contact.ts`'s `OPENING`). */
 const SYNC_OPENING = 'effort sync:';
 
 /** The text output's warning prefix, naming `hubUrl`, up to the reason a contact gives in parentheses. */
@@ -355,7 +355,7 @@ function unreachablePrefix(hubUrl: string): string {
   return `warn: ${SYNC_OPENING} the hub at ${hubUrl} is unreachable (`;
 }
 
-/** What every unreachable line ends with, past the reason (`src/effort/sync/contact.ts`'s `hubUnreachableLine`). */
+/** What every unreachable line ends with, past the reason (`packages/rafa-effort/src/effort/sync/contact.ts`'s `hubUnreachableLine`). */
 const UNREACHABLE_SUFFIX = '); this command used the local store, and its rows sync on the next contact';
 
 /** How many of `output`'s lines are the hub-unreachable line naming `hubUrl`, whatever its reason. */

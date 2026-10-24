@@ -52,16 +52,16 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `core/runtime/identity.test.ts` | `package.json`, the root manifest |
 | `effort/store/changes.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/fixture-extract.test.ts` | `src/fixtures/scrub.ts` |
-| `effort/store/forward-compat.test.ts` | `src/effort/skill-facts.ts` |
+| `effort/store/forward-compat.test.ts` | `packages/rafa-effort/src/effort/skill-facts.ts` |
 | `effort/store/index.test.ts` | `src/adapter-registry.ts` |
 | `effort/store/location.test.ts` | `src/tests/cli-capture.ts` |
-| `effort/store/merge-commit-gaps.test.ts` | `src/effort/commits.ts` |
+| `effort/store/merge-commit-gaps.test.ts` | `packages/rafa-effort/src/effort/commits.ts` |
 | `effort/store/merge-rules.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
 | `effort/store/migrations.test.ts` | `src/tests/git-identity.ts` |
 | `effort/store/move.test.ts` | `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
-| `effort/store/origins.test.ts` | `src/effort/skill-facts.ts` |
+| `effort/store/origins.test.ts` | `packages/rafa-effort/src/effort/skill-facts.ts` |
 | `effort/store/preflight.test.ts` | `src/preflight/run.ts` |
-| `effort/store/search-row.test.ts` | `src/effort/collect.ts`, `src/effort/report.ts` |
+| `effort/store/search-row.test.ts` | `packages/rafa-effort/src/effort/collect.ts`, `packages/rafa-effort/src/effort/report.ts` |
 | `effort/store/settings.test.ts` | `src/config-registry.ts` |
 | `effort/store/stale-docs.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/store-sources.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
@@ -80,4 +80,4 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `start/worktree-dir.test.ts` | `src/config-registry.ts` |
 | `utils/git.test.ts` | `src/tests/git-identity.ts` |
 | `utils/progress.test.ts` | `scripts/control-byte-gate/control-byte-gate.ts`, `src/plan.ts` |
-| `utils/tracker.test.ts` | `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts`, `src/tests/output-sinks.ts` |
+| `utils/tracker.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts`, `src/tests/output-sinks.ts` |

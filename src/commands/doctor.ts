@@ -181,7 +181,7 @@
  *
  * Every such run then reads the `effort sync` row
  * (`./doctor-effort-sync.ts`, over the reading of
- * `../effort/sync/doctor-reading.ts`, whose note says which registry each
+ * `packages/rafa-effort/src/effort/sync/doctor-reading.ts`, whose note says which registry each
  * kind is selected through): `ok` naming the strategy `effort.sync` names,
  * `local` when it names none, and `fail` when no adapter serves it,
  * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`

@@ -7,7 +7,7 @@
  *
  * The rendered prompt opens with {@link SEARCH_PROMPT_PREFIX}, and that
  * literal is the `search` entry's `prefix` in `PROMPT_SHAPES`
- * (`src/effort/classify.ts`). `rafa effort collect` reads a session's
+ * (`packages/rafa-effort/src/effort/classify.ts`). `rafa effort collect` reads a session's
  * kind off the first characters of its prompt, so a search session is
  * counted as `search` only while the two agree. They are two literals
  * rather than one import, as every other shape's are: the classifier's
@@ -36,7 +36,7 @@ import type { InventoryKind } from '../record.js';
 
 /**
  * The rendered prompt's first line, and the `search` classifier key in
- * `PROMPT_SHAPES` (`src/effort/classify.ts`); see the module note.
+ * `PROMPT_SHAPES` (`packages/rafa-effort/src/effort/classify.ts`); see the module note.
  */
 export const SEARCH_PROMPT_PREFIX = '# Inventory search instructions';
 

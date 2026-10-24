@@ -35,7 +35,7 @@
  *
  * `--plan=<stub>` names it outright. With no flag the branch checked
  * out at the project root answers, by the rule effort attribution
- * already uses (`src/effort/attribution.ts`): the part of
+ * already uses (`packages/rafa-effort/src/effort/attribution.ts`): the part of
  * `<type>/<stub>` after the slash, resolved against the plan roster in
  * `plan.dir` exactly or by queue id.
  *

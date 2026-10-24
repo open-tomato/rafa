@@ -2,7 +2,8 @@
  * The `effort sync` row of `rafa doctor`: the lines it prints for whether
  * the strategy the project's `effort.sync` names has an adapter to carry
  * the store, and the text `doctor` exits 1 with when none does. This is
- * the command half of `../effort/sync/doctor-reading.ts`, which holds the
+ * the command half of
+ * `packages/rafa-effort/src/effort/sync/doctor-reading.ts`, which holds the
  * reading itself (`readDoctorEffortSync`), its types
  * (`DoctorEffortSyncReading`, `DoctorEffortSyncSeams`,
  * `DoctorEffortSyncInput`) and the row's name (`EFFORT_SYNC_ROW`), for

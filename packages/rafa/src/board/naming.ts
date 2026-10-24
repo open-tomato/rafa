@@ -26,7 +26,7 @@
  * The spellings are ONE convention with several surfaces, and they are
  * written here together because a caller that spells one of them by hand
  * is a caller that can disagree with the others. The disagreement is not
- * cosmetic: `src/effort/attribution.ts` matches a branch back to its
+ * cosmetic: `packages/rafa-effort/src/effort/attribution.ts` matches a branch back to its
  * plan by name, and `plan create --next` calls a roadmap line TAKEN when
  * a branch the `naming.branch` template names over `rafa-<n>-*` exists
  * (`feat/rafa-<n>-*` by default), so a branch spelled a second way is

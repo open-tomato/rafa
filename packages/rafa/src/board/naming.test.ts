@@ -26,7 +26,7 @@
  *
  * The cross-surface cases are the point of the module and not an extra:
  * `plan create --issue` writes the snapshot, `plan create --next` calls
- * a line taken by matching a branch, and `src/effort/attribution.ts`
+ * a line taken by matching a branch, and `packages/rafa-effort/src/effort/attribution.ts`
  * matches a branch back to its plan, so the stub, the spec basename and
  * the branch tail must be one string. A case asserts they are, rather
  * than asserting each against a literal that could drift one at a time.

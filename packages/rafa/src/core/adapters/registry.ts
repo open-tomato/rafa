@@ -93,9 +93,9 @@
  * the planner under `src/adapters/planner/`, `planner/claude`, which
  * `rafa plan` resolves through {@link CORE_ADAPTER_REGISTRY}. Those are all
  * the core adapters the phase 1 table names. The `sync` port adds `sync/local`,
- * the default strategy of `effort.sync`, from `src/effort/sync/select.ts`,
+ * the default strategy of `effort.sync`, from `packages/rafa-effort/src/effort/sync/select.ts`,
  * whose `selectSync` resolves `effort.sync` through a registry, and
- * `sync/file`, the store carried as a file, from `src/effort/sync/file.ts`.
+ * `sync/file`, the store carried as a file, from `packages/rafa-effort/src/effort/sync/file.ts`.
  * `git`, `service` and `p2p` are modules' strategies, registered by a loaded
  * module.
  *
@@ -125,7 +125,7 @@
  * registers throws when any is left out. `store` is the same to
  * `sync/file`: a default of
  * `sqlite` would carry an NDJSON project's store without its sessions
- * (`src/effort/sync/file.ts` says why), so its `create` throws when it is
+ * (`packages/rafa-effort/src/effort/sync/file.ts` says why), so its `create` throws when it is
  * left out or names no backend. The `local` learning adapter's floor
  * defaults to the registered `learning.bless.minConfidence`, and its
  * `create` throws, naming `src/config-registry.ts`, when no section

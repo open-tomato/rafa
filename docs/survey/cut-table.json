@@ -2209,6 +2209,66 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/effort-coupled/effort/classify.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/collect.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/dashboard-status.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/report-skills.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/report-trend-read.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/report.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/skill-facts.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/sync/contact.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/sync/doctor-reading.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/sync/file-round-trip.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/sync/file.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/effort-coupled/effort/sync/select.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/effort-import-spawn.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3829,7 +3889,7 @@
           "from": "src/commands/epic/close.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
-          "to": "src/effort/epic-cost.ts",
+          "to": "packages/rafa-effort/src/effort/epic-cost.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -3885,7 +3945,7 @@
           "from": "src/commands/issue/edit-run.ts",
           "fromPackage": "rafa-board",
           "kind": "value",
-          "to": "src/effort/file-stamp.ts",
+          "to": "packages/rafa-effort/src/effort/file-stamp.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -4972,7 +5032,7 @@
           "from": "src/start/preflight-sync.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/effort/sync/doctor-reading.ts",
+          "to": "packages/rafa-effort/src/effort/sync/doctor-reading.ts",
           "toPackage": "rafa-effort"
         },
         {
@@ -5413,7 +5473,7 @@
           "from": "src/commands/release/status.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
-          "to": "src/effort/attribution.ts",
+          "to": "packages/rafa-effort/src/effort/attribution.ts",
           "toPackage": "rafa-effort"
         }
       ],
@@ -5572,83 +5632,68 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 33,
-        "test": 31,
+        "source": 32,
+        "test": 19,
         "testSupport": 0
       },
       "files": [
-        "src/effort/attribution.test.ts",
-        "src/effort/attribution.ts",
-        "src/effort/classify.test.ts",
-        "src/effort/classify.ts",
-        "src/effort/collect-args.ts",
-        "src/effort/collect-skills.test.ts",
-        "src/effort/collect-skills.ts",
-        "src/effort/collect.test.ts",
-        "src/effort/collect.ts",
-        "src/effort/commits.test.ts",
-        "src/effort/commits.ts",
-        "src/effort/dashboard-format.test.ts",
-        "src/effort/dashboard-format.ts",
-        "src/effort/dashboard-status.test.ts",
-        "src/effort/dashboard-status.ts",
-        "src/effort/dashboard.test.ts",
-        "src/effort/dashboard.ts",
-        "src/effort/epic-cost.test.ts",
-        "src/effort/epic-cost.ts",
-        "src/effort/file-stamp.test.ts",
-        "src/effort/file-stamp.ts",
-        "src/effort/recurrence.test.ts",
-        "src/effort/recurrence.ts",
-        "src/effort/report-args.test.ts",
-        "src/effort/report-args.ts",
-        "src/effort/report-budgets.test.ts",
-        "src/effort/report-budgets.ts",
-        "src/effort/report-doc-bugs.test.ts",
-        "src/effort/report-doc-bugs.ts",
-        "src/effort/report-format.test.ts",
-        "src/effort/report-format.ts",
-        "src/effort/report-kinds.test.ts",
-        "src/effort/report-kinds.ts",
-        "src/effort/report-skills-format.test.ts",
-        "src/effort/report-skills-format.ts",
-        "src/effort/report-skills-read.ts",
-        "src/effort/report-skills.test.ts",
-        "src/effort/report-skills.ts",
-        "src/effort/report-trend-format.test.ts",
-        "src/effort/report-trend-format.ts",
-        "src/effort/report-trend-read.test.ts",
-        "src/effort/report-trend-read.ts",
-        "src/effort/report-trend.test.ts",
-        "src/effort/report-trend.ts",
-        "src/effort/report.test.ts",
-        "src/effort/report.ts",
-        "src/effort/skill-facts.test.ts",
-        "src/effort/skill-facts.ts",
-        "src/effort/skill-signals.test.ts",
-        "src/effort/skill-signals.ts",
-        "src/effort/skill-use.test.ts",
-        "src/effort/skill-use.ts",
-        "src/effort/store/index.ts",
-        "src/effort/sync/contact.test.ts",
-        "src/effort/sync/contact.ts",
-        "src/effort/sync/doctor-reading.test.ts",
-        "src/effort/sync/doctor-reading.ts",
-        "src/effort/sync/file-round-trip.test.ts",
-        "src/effort/sync/file.test.ts",
-        "src/effort/sync/file.ts",
-        "src/effort/sync/select.test.ts",
-        "src/effort/sync/select.ts",
-        "src/effort/trend-stats.test.ts",
-        "src/effort/trend-stats.ts"
+        "packages/rafa-effort/src/effort/attribution.test.ts",
+        "packages/rafa-effort/src/effort/attribution.ts",
+        "packages/rafa-effort/src/effort/classify.ts",
+        "packages/rafa-effort/src/effort/collect-args.ts",
+        "packages/rafa-effort/src/effort/collect-skills.test.ts",
+        "packages/rafa-effort/src/effort/collect-skills.ts",
+        "packages/rafa-effort/src/effort/collect.ts",
+        "packages/rafa-effort/src/effort/commits.test.ts",
+        "packages/rafa-effort/src/effort/commits.ts",
+        "packages/rafa-effort/src/effort/dashboard-format.test.ts",
+        "packages/rafa-effort/src/effort/dashboard-format.ts",
+        "packages/rafa-effort/src/effort/dashboard-status.ts",
+        "packages/rafa-effort/src/effort/dashboard.test.ts",
+        "packages/rafa-effort/src/effort/dashboard.ts",
+        "packages/rafa-effort/src/effort/epic-cost.test.ts",
+        "packages/rafa-effort/src/effort/epic-cost.ts",
+        "packages/rafa-effort/src/effort/file-stamp.test.ts",
+        "packages/rafa-effort/src/effort/file-stamp.ts",
+        "packages/rafa-effort/src/effort/recurrence.test.ts",
+        "packages/rafa-effort/src/effort/recurrence.ts",
+        "packages/rafa-effort/src/effort/report-args.test.ts",
+        "packages/rafa-effort/src/effort/report-args.ts",
+        "packages/rafa-effort/src/effort/report-budgets.test.ts",
+        "packages/rafa-effort/src/effort/report-budgets.ts",
+        "packages/rafa-effort/src/effort/report-doc-bugs.test.ts",
+        "packages/rafa-effort/src/effort/report-doc-bugs.ts",
+        "packages/rafa-effort/src/effort/report-format.test.ts",
+        "packages/rafa-effort/src/effort/report-format.ts",
+        "packages/rafa-effort/src/effort/report-kinds.test.ts",
+        "packages/rafa-effort/src/effort/report-kinds.ts",
+        "packages/rafa-effort/src/effort/report-skills-format.test.ts",
+        "packages/rafa-effort/src/effort/report-skills-format.ts",
+        "packages/rafa-effort/src/effort/report-skills-read.ts",
+        "packages/rafa-effort/src/effort/report-skills.ts",
+        "packages/rafa-effort/src/effort/report-trend-format.test.ts",
+        "packages/rafa-effort/src/effort/report-trend-format.ts",
+        "packages/rafa-effort/src/effort/report-trend-read.ts",
+        "packages/rafa-effort/src/effort/report-trend.test.ts",
+        "packages/rafa-effort/src/effort/report-trend.ts",
+        "packages/rafa-effort/src/effort/report.ts",
+        "packages/rafa-effort/src/effort/skill-facts.ts",
+        "packages/rafa-effort/src/effort/skill-signals.test.ts",
+        "packages/rafa-effort/src/effort/skill-signals.ts",
+        "packages/rafa-effort/src/effort/skill-use.test.ts",
+        "packages/rafa-effort/src/effort/skill-use.ts",
+        "packages/rafa-effort/src/effort/sync/contact.ts",
+        "packages/rafa-effort/src/effort/sync/doctor-reading.ts",
+        "packages/rafa-effort/src/effort/sync/file.ts",
+        "packages/rafa-effort/src/effort/sync/select.ts",
+        "packages/rafa-effort/src/effort/trend-stats.test.ts",
+        "packages/rafa-effort/src/effort/trend-stats.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-effort/": 0,
-        "src/effort/": 64
+        "packages/rafa-effort/": 51
       },
       "folders": [
-        "packages/rafa-effort/",
-        "src/effort/"
+        "packages/rafa-effort/"
       ],
       "name": "rafa-effort",
       "named": [],
@@ -5745,8 +5790,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 176,
-        "test": 476,
+        "source": 177,
+        "test": 488,
         "testSupport": 26
       },
       "files": [
@@ -6035,6 +6080,7 @@
         "src/config/shape.ts",
         "src/config/templates.test.ts",
         "src/config/templates.ts",
+        "src/effort/store/index.ts",
         "src/errors/bug-fields.test.ts",
         "src/errors/bug-fields.ts",
         "src/errors/handler.test.ts",
@@ -6233,6 +6279,18 @@
         "src/tests/doctor-deep-spawned.test.ts",
         "src/tests/doctor-preflight-parity.test.ts",
         "src/tests/effort-collect-worktrees-integration.test.ts",
+        "src/tests/effort-coupled/effort/classify.test.ts",
+        "src/tests/effort-coupled/effort/collect.test.ts",
+        "src/tests/effort-coupled/effort/dashboard-status.test.ts",
+        "src/tests/effort-coupled/effort/report-skills.test.ts",
+        "src/tests/effort-coupled/effort/report-trend-read.test.ts",
+        "src/tests/effort-coupled/effort/report.test.ts",
+        "src/tests/effort-coupled/effort/skill-facts.test.ts",
+        "src/tests/effort-coupled/effort/sync/contact.test.ts",
+        "src/tests/effort-coupled/effort/sync/doctor-reading.test.ts",
+        "src/tests/effort-coupled/effort/sync/file-round-trip.test.ts",
+        "src/tests/effort-coupled/effort/sync/file.test.ts",
+        "src/tests/effort-coupled/effort/sync/select.test.ts",
         "src/tests/effort-import-spawn.test.ts",
         "src/tests/effort-merge-move-spawn.test.ts",
         "src/tests/effort-pipeline.test.ts",
@@ -6438,6 +6496,7 @@
       "name": "@open-tomato/rafa",
       "named": [
         "src/commands/index.ts",
+        "src/effort/store/index.ts",
         "src/inventory/browse.ts",
         "src/rafa.ts",
         "src/schema/agent.ts"
@@ -6450,7 +6509,7 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2168,
-    "leftToPlace": 636,
+    "leftToPlace": 648,
     "nonTestEdges": 4811,
     "unassignedFiles": 28,
     "unrankedEdges": 77,

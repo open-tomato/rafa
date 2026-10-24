@@ -34,7 +34,8 @@ import { join } from 'node:path';
 
 import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 
-import { PROMPT_SHAPES } from '../effort/classify.js';
+import { PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
+
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
 import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 

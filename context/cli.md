@@ -140,8 +140,8 @@ module's note is the long form.
 | `src/commands/doctor-release.ts` | the release row of `rafa doctor`, read only where `resolveReleaseEnabled` says the release is on: the version `origin/<pr.base>` declares as last fetched, the waiting fragments and their forecast (`readWaiting`, `src/commands/release/status-fragments.ts`), the latest release tag (`readTags`) and the version of the changelog's top heading (`changelogVersions`), all through `rafa release status`'s readers, the last two in its library half `src/release/status-readings.ts`; one `Release:` line, a warning in both modes naming `rafa release settle` while any fragment waits, `info` in text mode otherwise, and a `?` with an indented reason for a part it could not read; the ladder row of `./doctor-ladder.ts` goes right under it, read with the rest and kept as the reading's `ladder` |
 | `src/commands/doctor-ladder.ts` | the release ladder row of `rafa doctor`, under the release row: the readings `src/release/ladder.ts` takes (each ladder workflow's stat, the publish workflow's text, `.github/dependabot.yml`'s stat, the version file parsed as a JSON manifest), the level `ladderLevel` reads with the key that does not fit, and the missing preconditions `ladderPreconditions` answers; one `Release ladder: level <n>, <name>` line, `info` when nothing is missing and `warn` naming each missing item with the file or command that supplies it (`rafa release workflows --write` for a workflow) otherwise, in both modes, ending from level 2 up on the `RAFA_RELEASE_PUBLISH` reminder; never the exit code |
 | `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`packages/rafa/src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
-| `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`, over the reading of `src/effort/sync/doctor-reading.ts`: `renderDoctorEffortSync` gives `Effort sync: ok, <strategy>`, ` (module)` added for a strategy a module serves, or `Effort sync: fail, <strategy>` with each line of the problem indented under it, and `effortSyncRefusal` the text `doctor` exits 1 with for a failing row, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
-| `src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind the composition root registers and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
+| `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`, over the reading of `packages/rafa-effort/src/effort/sync/doctor-reading.ts`: `renderDoctorEffortSync` gives `Effort sync: ok, <strategy>`, ` (module)` added for a strategy a module serves, or `Effort sync: fail, <strategy>` with each line of the problem indented under it, and `effortSyncRefusal` the text `doctor` exits 1 with for a failing row, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
+| `packages/rafa-effort/src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`packages/rafa-effort/src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind the composition root registers and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
 | `src/commands/doctor-description.ts` | the help description of `rafa doctor`, moved out of `src/commands/doctor.ts` to keep that module under the 800-line cap; text alone |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
 | `src/commands/doctor-board.ts` | the GitHub board readings of `rafa doctor`: the one `gh` runner opened for a `gh` provider and none for another (`boardRunner`), the board rows over `src/board/status.ts`, the blocked issues and the epic labels in `labels` mode or the relationships row in their place in `native` mode (`board.relationships`, handed in by `rafa doctor`), the other mode's marks when a config layer sets `board.relationships` (`modeSet`), and the boards, read over it in that order (`readDoctorBoard`, all four null with no runner, `relations` left out in `labels` mode, `marks` left out with the key unset), the board listing made once in that mode, or in the native fields whenever the key is set, and handed to the epic labels (or the relationships), the marks and the boards, their lines joined in that order (`renderDoctorBoard`), and the json result's `relations` key, left out in `labels` mode, and `marks` key, left out with the key unset (`relationsResultOf`) |
@@ -912,12 +912,13 @@ New; it replaces no earlier text. What a row or an action added to
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
   budgeted sessions added, or under `--skills` the `SkillsReport`
-  (`src/effort/report-skills.ts`), or under `--trend` the `TrendReport`
-  (`src/effort/report-trend.ts`), and
+  (`packages/rafa-effort/src/effort/report-skills.ts`), or under `--trend` the
+  `TrendReport` (`packages/rafa-effort/src/effort/report-trend.ts`), and
   writes no table line. `effort dashboard` gives the `Dashboard`
-  (`src/effort/dashboard.ts`), one key per widget: `status`, `trend`,
-  `loops`, `skills` and `totals`, beside `generatedAt`. `plan create` and `effort collect`
-  write each line as a `log` event of its level and give no result.
+  (`packages/rafa-effort/src/effort/dashboard.ts`), one key per widget:
+  `status`, `trend`, `loops`, `skills` and `totals`, beside `generatedAt`. `plan
+  create` and `effort collect` write each line as a `log` event of its level and
+  give no result.
 - **The plan readers start no session, and read the configured
   directory.** `plan list` and `plan show` read the directory
   `resolvePlansDir` (`packages/rafa/src/commands/plan/plan-files.ts`) answers:
@@ -2386,12 +2387,12 @@ New; it replaces no earlier text. What a row or an action added to
   one report holding one `security: false` bug and no blocker, its
   artifact the epic and the criterion on one line (`failedCheckArtifact`)
   and its key's file half `epic-<n>-close` (`closeTriageFile`, a name
-  only: nothing is written there), so a second failing close comments on the first issue, or files
-  one in its place when the first was closed as completed; the
-  public tracker is resolved once, and only when a check failed. A failed
+  only: nothing is written there), so a second failing close comments on the
+  first issue, or files one in its place when the first was closed as completed;
+  the public tracker is resolved once, and only when a check failed. A failed
   check whose criterion's text satisfies `namesOnlyDocs`
-  (`packages/rafa/src/triage/doc-only.ts`) files no bug: `close-docs.ts` stores one
-  `unsettled` stale-docs row with no plan stub and adds one line to the
+  (`packages/rafa/src/triage/doc-only.ts`) files no bug: `close-docs.ts` stores
+  one `unsettled` stale-docs row with no plan stub and adds one line to the
   release's stale-docs issue on that tracker through `addStaleDocLine`,
   the version read once (`EpicCloseSeams.staleDocsVersion`). A failed
   check, and a check whose session answered nothing, which files
@@ -2399,8 +2400,8 @@ New; it replaces no earlier text. What a row or an action added to
   closes the epic as `completed` with `renderCloseComment`
   (`src/board/epic-trail.ts`), a refusal from `gh` being exit 1, and
   `renderEpicCost` prints the members' cost beside the body's estimate
-  with the membership line (`src/effort/epic-cost.ts`); a store that
-  cannot be read is a `warn` line after the close. Every line goes
+  with the membership line (`packages/rafa-effort/src/effort/epic-cost.ts`); a
+  store that cannot be read is a `warn` line after the close. Every line goes
   through the output in both modes; json mode's result on a close is
   `EpicCloseResult`. Git, `gh`, the spawner, the store and the tracker
   chain are `EpicCloseSeams`.

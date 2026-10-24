@@ -32,10 +32,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
 import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
-
-import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
 
 import { renderDeepRow } from './doctor-deep-row.js';
 import {
@@ -297,7 +296,7 @@ describe('the SKILL_USE_CLI_VERSION pin', () => {
       name: 'Claude Code',
       detail: '2.1.999 is installed, and the skill-use collector reads logs of 2.1.280, '
         + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-      fix: 'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) '
+      fix: 'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) '
         + 'before moving SKILL_USE_CLI_VERSION',
     }]);
   });

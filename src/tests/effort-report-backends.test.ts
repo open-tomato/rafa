@@ -24,9 +24,9 @@
  * a function call and wrong for the command's own argv-free entry would
  * still pass every case above it.
  */
-import type { CollectOptions } from '../effort/collect.js';
-import type { CommitLogOptions, CommitLogParseResult } from '../effort/commits.js';
-import type { EffortReport } from '../effort/report.js';
+import type { CollectOptions } from '@open-tomato/rafa-effort/effort/collect';
+import type { CommitLogOptions, CommitLogParseResult } from '@open-tomato/rafa-effort/effort/commits';
+import type { EffortReport } from '@open-tomato/rafa-effort/effort/report';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,8 +35,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { collectEffort } from '../effort/collect.js';
-import { buildReport } from '../effort/report.js';
+import { collectEffort } from '@open-tomato/rafa-effort/effort/collect';
+import { buildReport } from '@open-tomato/rafa-effort/effort/report';
 
 import { expectExit } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
