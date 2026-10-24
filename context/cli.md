@@ -912,12 +912,13 @@ New; it replaces no earlier text. What a row or an action added to
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
   budgeted sessions added, or under `--skills` the `SkillsReport`
-  (`packages/rafa-effort/src/effort/report-skills.ts`), or under `--trend` the `TrendReport`
-  (`packages/rafa-effort/src/effort/report-trend.ts`), and
+  (`packages/rafa-effort/src/effort/report-skills.ts`), or under `--trend` the
+  `TrendReport` (`packages/rafa-effort/src/effort/report-trend.ts`), and
   writes no table line. `effort dashboard` gives the `Dashboard`
-  (`packages/rafa-effort/src/effort/dashboard.ts`), one key per widget: `status`, `trend`,
-  `loops`, `skills` and `totals`, beside `generatedAt`. `plan create` and `effort collect`
-  write each line as a `log` event of its level and give no result.
+  (`packages/rafa-effort/src/effort/dashboard.ts`), one key per widget:
+  `status`, `trend`, `loops`, `skills` and `totals`, beside `generatedAt`. `plan
+  create` and `effort collect` write each line as a `log` event of its level and
+  give no result.
 - **The plan readers start no session, and read the configured
   directory.** `plan list` and `plan show` read the directory
   `resolvePlansDir` (`packages/rafa/src/commands/plan/plan-files.ts`) answers:
@@ -2386,12 +2387,12 @@ New; it replaces no earlier text. What a row or an action added to
   one report holding one `security: false` bug and no blocker, its
   artifact the epic and the criterion on one line (`failedCheckArtifact`)
   and its key's file half `epic-<n>-close` (`closeTriageFile`, a name
-  only: nothing is written there), so a second failing close comments on the first issue, or files
-  one in its place when the first was closed as completed; the
-  public tracker is resolved once, and only when a check failed. A failed
+  only: nothing is written there), so a second failing close comments on the
+  first issue, or files one in its place when the first was closed as completed;
+  the public tracker is resolved once, and only when a check failed. A failed
   check whose criterion's text satisfies `namesOnlyDocs`
-  (`packages/rafa/src/triage/doc-only.ts`) files no bug: `close-docs.ts` stores one
-  `unsettled` stale-docs row with no plan stub and adds one line to the
+  (`packages/rafa/src/triage/doc-only.ts`) files no bug: `close-docs.ts` stores
+  one `unsettled` stale-docs row with no plan stub and adds one line to the
   release's stale-docs issue on that tracker through `addStaleDocLine`,
   the version read once (`EpicCloseSeams.staleDocsVersion`). A failed
   check, and a check whose session answered nothing, which files
@@ -2399,8 +2400,8 @@ New; it replaces no earlier text. What a row or an action added to
   closes the epic as `completed` with `renderCloseComment`
   (`src/board/epic-trail.ts`), a refusal from `gh` being exit 1, and
   `renderEpicCost` prints the members' cost beside the body's estimate
-  with the membership line (`packages/rafa-effort/src/effort/epic-cost.ts`); a store that
-  cannot be read is a `warn` line after the close. Every line goes
+  with the membership line (`packages/rafa-effort/src/effort/epic-cost.ts`); a
+  store that cannot be read is a `warn` line after the close. Every line goes
   through the output in both modes; json mode's result on a close is
   `EpicCloseResult`. Git, `gh`, the spawner, the store and the tracker
   chain are `EpicCloseSeams`.

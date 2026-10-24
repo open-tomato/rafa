@@ -288,27 +288,28 @@ refused all the same, since the criterion does not hold.
 `rafa effort report` prints two readings of the triage.
 
 The first is one line, `filed bugs naming only documentation: N of M`, from
-`packages/rafa-effort/src/effort/report-doc-bugs.ts`. M counts the `out_of_scope_bugs` rows of
-scope `rafa`, the bugs a tracker could be handed, and N counts those whose
-`what` and `artifact` read as ONE text name only documentation, by
-`namesOnlyDocs`. The two fields are joined by a line break because the
-reading is split across the pair both ways: a `what` naming a page beside an
-`artifact` naming a source file is a bug about code, and a `what` naming a
-page beside an artifact quoting the page's sentence is a bug about the page.
-A `machine` row is in neither figure. This count is the control for a session
-filing a stale page as a bug instead of a `stale_docs` entry. It reads zero
-while the sessions keep the two fields apart; a figure that rises says they
+`packages/rafa-effort/src/effort/report-doc-bugs.ts`. M counts the
+`out_of_scope_bugs` rows of scope `rafa`, the bugs a tracker could be handed,
+and N counts those whose `what` and `artifact` read as ONE text name only
+documentation, by `namesOnlyDocs`. The two fields are joined by a line break
+because the reading is split across the pair both ways: a `what` naming a page
+beside an `artifact` naming a source file is a bug about code, and a `what`
+naming a page beside an artifact quoting the page's sentence is a bug about the
+page. A `machine` row is in neither figure. This count is the control for a
+session filing a stale page as a bug instead of a `stale_docs` entry. It reads
+zero while the sessions keep the two fields apart; a figure that rises says they
 have stopped.
 
 The second is the section `out-of-scope entries by routed kind`
-(`packages/rafa-effort/src/effort/report-kinds.ts`, rendered by `packages/rafa-effort/src/effort/report-format.ts`): one
-row per plan, under its stub with the rows of no plan last, giving its
-entries, those routed `filed`, the share of them filed, and the count under
-each kind in the order of `BUG_KINDS`. It counts the kind the loop routed each
-entry under, so a sweep whose entries are its own fallout reads a low share
-and one that files everything reads a high one. A store with no `bug_routes`
-row prints no section; a store that cannot be read prints the heading with
-the problem in place of the rows.
+(`packages/rafa-effort/src/effort/report-kinds.ts`, rendered by
+`packages/rafa-effort/src/effort/report-format.ts`): one row per plan, under its
+stub with the rows of no plan last, giving its entries, those routed `filed`,
+the share of them filed, and the count under each kind in the order of
+`BUG_KINDS`. It counts the kind the loop routed each entry under, so a sweep
+whose entries are its own fallout reads a low share and one that files
+everything reads a high one. A store with no `bug_routes` row prints no section;
+a store that cannot be read prints the heading with the problem in place of the
+rows.
 
 ### The key and the two-step match
 
