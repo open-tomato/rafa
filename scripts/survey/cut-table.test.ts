@@ -125,7 +125,7 @@ const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], le
   ['rafa-run', RUN_NAMED, 20, ['src/start/branch-decision.ts']],
   ['rafa-release', RELEASE_NAMED, 4, []],
   ['rafa-effort', EFFORT_NAMED, 0, []],
-  ['@open-tomato/rafa', CLI_NAMED, 4, []],
+  ['@open-tomato/rafa', CLI_NAMED, 5, []],
 ];
 
 /**
@@ -145,8 +145,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 63 files across the seven lists, the 74 after pass 4a less the eleven section files the third decouple item moves into core', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(63);
+  it('names 64 files across the seven lists, the 63 the third decouple item left and the store entry named to the CLI in pass 4b', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(64);
   });
 });
 
