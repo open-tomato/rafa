@@ -86,12 +86,12 @@ import {
   createGitRunner,
   ghPullRequestsIn,
   gitSaid,
-  parseWorkingTree,
   pushBranch,
 } from '@open-tomato/rafa-pr';
 
 import { pullRequestTitle } from '@open-tomato/rafa/board/naming';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 import { parseFragment } from '@open-tomato/rafa/release/fragment';
 
 /** The steps an attempt can be blocked at, in the order they run. */

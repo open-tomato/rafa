@@ -28,12 +28,12 @@ import type { PrContext } from './pr-context.js';
 import type { ChecksReading, GitRunner, PullRequestDetail, WorktreeEntry } from '../../pr/index.js';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 
 import {
   createGitRunner,
   gitSaid,
   parseTreePaths,
-  parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
   untrackedLeftLine,

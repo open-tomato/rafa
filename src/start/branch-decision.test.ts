@@ -29,11 +29,11 @@ import type {
   BranchStepId,
   StepOutcome,
 } from './branch-decision.js';
-import type { GitResult } from '../pr/index.js';
+import type { GitResult } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parseWorkingTree } from '../pr/index.js';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 
 import {
   answeredYes,

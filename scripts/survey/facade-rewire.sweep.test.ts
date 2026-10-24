@@ -57,10 +57,14 @@ interface RewiredRow {
  * `preflight-drift.ts` onto the facade.
  * Release's one board importer, `src/board/project/facts.ts`, is a back edge
  * the load-cycle group takes first.
- * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
- * pr's files reach, six of them release files that are back edges the
- * load-cycle group takes first. Its 18 back-edge files are board and release
- * files, every one earlier in the move order.
+ * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
+ * pr's files reach, three of them release files that are back edges the
+ * load-cycle group takes first. `src/claims/git.ts`,
+ * `src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
+ * row in the fourth decouple item: their one pr import by path was the pr
+ * barrel, for core's git names and `WorkingTreeStatus`, which they take from
+ * `@open-tomato/rafa/core/git` now. Its 18 back-edge files are board and
+ * release files, every one earlier in the move order.
  * Run's 13 load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
@@ -120,7 +124,6 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/board/project/add-filed.ts': 'backEdge',
-      'src/claims/git.ts': 'loadCycle',
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
@@ -145,11 +148,9 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
       'src/release/branch-forecast.ts': 'loadCycle',
-      'src/release/fragment-tree.ts': 'loadCycle',
       'src/release/prepare.ts': 'backEdge',
       'src/release/settle-pr.ts': 'loadCycle',
       'src/release/verify.ts': 'backEdge',
-      'src/start/branch-decision.ts': 'loadCycle',
       'src/start/pr-lifecycle.ts': 'loadCycle',
       'src/start/pr-retarget.ts': 'loadCycle',
       'src/start/suite-blocker.ts': 'loadCycle',

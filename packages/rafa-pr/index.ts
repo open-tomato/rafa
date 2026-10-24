@@ -161,7 +161,6 @@ export type {
   ResolvePrProviderOptions,
   WaitOptions,
   WaitResult,
-  WorkingTreeStatus,
   WorktreeEntry,
 } from '../../src/pr/index.js';
 export {
@@ -175,7 +174,6 @@ export {
   ghPreflightItems,
   ghPullRequestsIn,
   gitSaid,
-  parseWorkingTree,
   parseWorktrees,
   pushBranch,
   requireGhProvider,

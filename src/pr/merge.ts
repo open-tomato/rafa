@@ -123,17 +123,22 @@
  * A {@link WorkingTreeStatus} entry, and a tracked one, is the porcelain
  * line as git wrote it, quoting included: `git status --porcelain` answered
  * `A  "src/a b.ts"` for a staged path with a space in the same reading
- * above. The refusal prints those lines rather than a re-rendering, so
- * what the operator sees is what `git status` would say. An untracked
- * entry is also kept as a PATH with git's quoting undone
- * ({@link unquoteGitPath}), because it is compared with the paths
- * `git ls-tree` prints, which quotes differently. A worktree's
+ * above. The type and its reader, `parseWorkingTree`, sit in core's git
+ * module (`packages/rafa/src/core/git/git.ts`). The refusal prints those
+ * lines rather than a re-rendering, so what the operator sees is what
+ * `git status` would say. An untracked entry is also kept as a PATH with
+ * git's quoting undone ({@link unquoteGitPath}, which sits in core's git
+ * module too), because it is compared with the paths `git ls-tree`
+ * prints, which quotes differently. A worktree's
  * path is likewise git's, and it reaches a pasteable command line
  * through {@link shellQuote} — `./preflight-items.ts` owns the one
  * shell quoter here, and a second one could disagree with it.
  */
 import type { CheckRow, ChecksVerdict } from './checks.js';
 import type { Mergeability } from './types.js';
+import type { WorkingTreeStatus } from '@open-tomato/rafa/core/git';
+
+import { unquoteGitPath } from '@open-tomato/rafa/core/git';
 
 import { formatRows } from './checks.js';
 import { shellQuote } from './preflight-items.js';
@@ -153,93 +158,8 @@ const BRANCH_REF_PREFIX = 'refs/heads/';
 /** The indent a refusal's listed lines carry, as `formatRows` uses. */
 const INDENT = '   ';
 
-/** The working tree of the checkout the merge would run in. */
-export interface WorkingTreeStatus {
-  /** True when git reported nothing at all. */
-  readonly clean: boolean;
-  /** Every porcelain line, as git wrote it; see the module note. */
-  readonly entries: readonly string[];
-  /** The porcelain lines naming a tracked path, as git wrote them. */
-  readonly tracked: readonly string[];
-  /**
-   * The untracked paths, unquoted ({@link unquoteGitPath}). A directory
-   * git folded into one line keeps its trailing `/`.
-   */
-  readonly untracked: readonly string[];
-}
-
 /** How `git status --porcelain` opens an untracked line. */
 const UNTRACKED_PREFIX = '?? ';
-
-/**
- * Parses `git status --porcelain` into a status.
- *
- * Every non-blank line lands in {@link WorkingTreeStatus.entries}, and
- * each one in exactly one of the two halves: a `?? ` line is untracked
- * and its path is unquoted, every other line is tracked and kept as git
- * wrote it. Which half refuses a merge is {@link readMergeRefusal}'s;
- * see the module note.
- */
-export function parseWorkingTree(stdout: string): WorkingTreeStatus {
-  const entries = stdout.split('\n')
-    .map((line) => line.replace(/\r$/, ''))
-    .filter((line) => line.trim() !== '');
-  const tracked = entries.filter((line) => !line.startsWith(UNTRACKED_PREFIX));
-  const untracked = entries.filter((line) => line.startsWith(UNTRACKED_PREFIX))
-    .map((line) => unquoteGitPath(line.slice(UNTRACKED_PREFIX.length)));
-  return {
-    clean: entries.length === 0,
-    entries: Object.freeze(entries),
-    tracked: Object.freeze(tracked),
-    untracked: Object.freeze(untracked),
-  };
-}
-
-/** The one-letter escapes git's path quoting writes, and the byte each stands for. */
-const C_ESCAPES: Readonly<Record<string, number>> = {
-  'a': 0x07, 'b': 0x08, 'f': 0x0c, 'n': 0x0a, 'r': 0x0d, 't': 0x09, 'v': 0x0b,
-  '\\': 0x5c, '"': 0x22,
-};
-
-/** An octal escape: three digits after the backslash, one byte. */
-const OCTAL_ESCAPE = /^[0-7]{3}$/;
-
-/**
- * A path as git printed it, with git's quoting undone. git wraps a path
- * in double quotes when it holds a character it will not print bare —
- * `git status --porcelain` for a space, `git ls-tree` for a non-ASCII
- * byte, which it writes as octal escapes under `core.quotePath` — and
- * leaves every other path as it is. Measured on git 2.53.0: an
- * untracked `a b.txt` read `?? "a b.txt"` in porcelain and `a b.txt` in
- * `ls-tree -r --name-only`, and `é.txt` read `"\303\251.txt"` in both.
- */
-export function unquoteGitPath(raw: string): string {
-  if (raw.length < 2 || !raw.startsWith('"') || !raw.endsWith('"')) return raw;
-  const body = raw.slice(1, -1);
-  const bytes: number[] = [];
-  const encoder = new TextEncoder();
-  for (let at = 0; at < body.length; at += 1) {
-    const char = body.charAt(at);
-    if (char !== '\\') {
-      bytes.push(...encoder.encode(char));
-      continue;
-    }
-    const octal = body.slice(at + 1, at + 4);
-    if (OCTAL_ESCAPE.test(octal)) {
-      bytes.push(Number.parseInt(octal, 8));
-      at += 3;
-      continue;
-    }
-    const escaped = C_ESCAPES[body.charAt(at + 1)];
-    if (escaped === undefined) {
-      bytes.push(...encoder.encode(char));
-      continue;
-    }
-    bytes.push(escaped);
-    at += 1;
-  }
-  return new TextDecoder().decode(new Uint8Array(bytes));
-}
 
 /**
  * Parses `git ls-tree -r --name-only <tree>` into the paths the tree

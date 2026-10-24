@@ -110,13 +110,14 @@ import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Position } from '@open-tomato/rafa/project/position';
 
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
 
 import { scanClaimBranches } from '../board/roadmap.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { listPlans } from '../plan/list.js';
-import { gitSaid, parseWorkingTree } from '../pr/index.js';
+import { gitSaid } from '../pr/index.js';
 import { parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */

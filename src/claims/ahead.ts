@@ -70,12 +70,11 @@
  */
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
-import type { GitRunner } from '@open-tomato/rafa-pr';
-
-import { gitSaid } from '@open-tomato/rafa-pr';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { planStub } from '@open-tomato/rafa/board/naming';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { branchNameFor, REMOTE } from '../start/branch-decision.js';
 

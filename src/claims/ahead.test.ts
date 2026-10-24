@@ -12,7 +12,7 @@
  */
 import type { AheadCandidate, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,8 +21,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { branchName } from '@open-tomato/rafa/board/naming';
-
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 import {
   aheadClaimedLine,
